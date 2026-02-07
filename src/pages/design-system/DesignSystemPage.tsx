@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
+import { Sun, Moon } from "lucide-react";
 import { ColorsSection } from "./sections/ColorsSection";
 import { TypographySection } from "./sections/TypographySection";
 import { SpacingSection } from "./sections/SpacingSection";
@@ -43,6 +45,28 @@ const navItems = [
   ]},
 ];
 
+const ThemeToggle = () => {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors bg-muted hover:bg-muted/80 text-foreground"
+      aria-label={`Cambiar a tema ${isDark ? "claro" : "oscuro"}`}
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <span>{isDark ? "Light" : "Dark"}</span>
+    </button>
+  );
+};
+
 const DesignSystemPage = () => {
   const [activeId, setActiveId] = useState("colors");
 
@@ -79,9 +103,12 @@ const DesignSystemPage = () => {
         {/* Sidebar */}
         <nav className="hidden lg:block w-60 shrink-0 border-r border-border">
           <div className="sticky top-0 h-screen overflow-y-auto py-8 px-4 space-y-6">
-            <div>
-              <h1 className="text-lg font-bold">Design System</h1>
-              <p className="text-xs text-muted-foreground">v1.0.0</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-bold">Design System</h1>
+                <p className="text-xs text-muted-foreground">v1.0.0</p>
+              </div>
+              <ThemeToggle />
             </div>
             {navItems.map((group) => (
               <div key={group.label}>
@@ -112,12 +139,17 @@ const DesignSystemPage = () => {
         {/* Main content */}
         <main className="flex-1 min-w-0 max-w-5xl mx-auto px-6 py-12 space-y-20">
           <header className="space-y-2">
-            <h1 className="text-5xl font-bold tracking-tight lg:hidden">Design System</h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-5xl font-bold tracking-tight lg:hidden">Design System</h1>
+              <div className="lg:hidden">
+                <ThemeToggle />
+              </div>
+            </div>
             <p className="text-muted-foreground text-lg">
               Referencia completa de tokens de diseño y componentes UI.
             </p>
             <p className="text-sm text-muted-foreground">
-              React + Tailwind CSS · Tema oscuro · Tokens semánticos HSL
+              React + Tailwind CSS · Light / Dark mode · Tokens semánticos HSL
             </p>
           </header>
 

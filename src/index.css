@@ -3,11 +3,62 @@
 @tailwind utilities;
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
   :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 271 91% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 145 63% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 40 96% 40%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 211 100% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 10% 4%;
+    --sidebar-primary: 211 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-ring: 211 100% 50%;
+
+    --instagram-pink: 340 82% 59%;
+    --instagram-purple: 271 91% 50%;
+    --instagram-orange: 25 95% 53%;
+  }
+
+  .dark {
     --background: 240 8% 10%;
     --foreground: 240 5% 96%;
 
@@ -41,8 +92,6 @@ All colors MUST be HSL.
     --border: 240 6% 18%;
     --input: 240 6% 18%;
     --ring: 211 100% 50%;
-
-    --radius: 0.5rem;
 
     --sidebar-background: 240 8% 10%;
     --sidebar-foreground: 240 5% 96%;
