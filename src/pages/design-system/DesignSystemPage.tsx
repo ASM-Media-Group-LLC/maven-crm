@@ -13,6 +13,9 @@ import { CardsSection } from "./sections/CardsSection";
 import { ModalsSection } from "./sections/ModalsSection";
 import { FeedbackSection } from "./sections/FeedbackSection";
 import { DataDisplaySection } from "./sections/DataDisplaySection";
+import { IconsSection } from "./sections/IconsSection";
+import { AvatarsSection } from "./sections/AvatarsSection";
+import { DocumentationSection } from "./sections/DocumentationSection";
 
 const navItems = [
   { label: "FOUNDATIONS", items: [
@@ -23,6 +26,8 @@ const navItems = [
     { id: "shadows", label: "1.5 Sombras" },
     { id: "z-index", label: "1.6 Z-Index" },
     { id: "global-states", label: "1.7 Estados" },
+    { id: "icons", label: "1.8 Iconografía" },
+    { id: "avatars", label: "1.9 Avatares" },
   ]},
   { label: "COMPONENTS", items: [
     { id: "buttons", label: "2.1 Botones" },
@@ -32,6 +37,9 @@ const navItems = [
     { id: "modals", label: "2.5 Modales" },
     { id: "feedback", label: "2.6 Feedback" },
     { id: "data-display", label: "2.7 Data Display" },
+  ]},
+  { label: "GUIDELINES", items: [
+    { id: "documentation", label: "3.1 Docs & a11y" },
   ]},
 ];
 
@@ -121,6 +129,8 @@ const DesignSystemPage = () => {
           <ShadowsSection />
           <ZIndexSection />
           <GlobalStatesSection />
+          <IconsSection />
+          <AvatarsSection />
 
           {/* Components */}
           <ButtonsSection />
@@ -130,6 +140,9 @@ const DesignSystemPage = () => {
           <ModalsSection />
           <FeedbackSection />
           <DataDisplaySection />
+
+          {/* Guidelines */}
+          <DocumentationSection />
         </main>
       </div>
     </div>
