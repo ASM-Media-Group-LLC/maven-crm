@@ -1,106 +1,108 @@
 
 
-# Agregar secciones de Iconografia, Avatares, Logos, Documentacion y Accesibilidad
+# Soporte Light/Dark Mode en el Design System
 
 ## Resumen
 
-Se agregan 3 nuevas secciones al Design System existente:
-- **1.8 Iconografia** (en Foundations): Documentar el sistema de iconos Lucide, tamanos permitidos, colores, y reglas de uso
-- **1.9 Avatares y Logos** (en Foundations): Documentar el componente Avatar existente con sus variantes de tamano, fallbacks, y reglas para logos/imagenes de marca
-- **3. Documentacion y Accesibilidad** (nueva categoria): Guia de buenas practicas ARIA, contraste, navegacion por teclado, y reglas de documentacion para nuevos componentes
-
-No se crean colores nuevos, no se modifican componentes existentes, no se inventan variantes visuales.
+Agregar un tema claro (light mode) al sistema de tokens CSS y un toggle de tema en la pagina del Design System para poder previsualizar todos los componentes y tokens en ambos modos. El resto de la aplicacion mantendra el tema oscuro como default.
 
 ---
 
 ## Cambios detallados
 
-### 1. Nueva seccion: IconsSection.tsx (1.8 Iconografia)
+### 1. Actualizar tokens CSS (`src/index.css`)
 
-Ubicacion: `src/pages/design-system/sections/IconsSection.tsx`
+Actualmente todos los tokens estan definidos en `:root` con valores oscuros. Se reorganizara:
 
-Contenido:
-- **Libreria oficial**: Documentar que el proyecto usa exclusivamente `lucide-react`. Prohibido usar otras librerias de iconos
-- **Tamanos estandar**: Mostrar los 4 tamanos permitidos con ejemplos visuales:
-  - `h-4 w-4` (16px) -- Dentro de botones, menu items, badges
-  - `h-5 w-5` (20px) -- Iconos standalone en toolbars
-  - `h-6 w-6` (24px) -- Tamano por defecto de Lucide, headers de seccion
-  - `h-8 w-8` (32px) -- Empty states, iconos hero
-- **Colores permitidos**: `currentColor` (hereda del padre), `text-muted-foreground`, `text-primary`, `text-destructive`
-- **Galeria de iconos frecuentes**: Grid con los iconos ya usados en el proyecto (User, Settings, LogOut, Loader2, Trash2, ExternalLink, Info, AlertCircle, CheckCircle, AlertTriangle, ChevronDown, Keyboard) mostrando nombre y tamano
-- **Reglas**: No usar iconos sin proposito semantico, siempre incluir `aria-hidden="true"` si el icono es decorativo, acompanar con texto o tooltip si es el unico elemento interactivo
+- **`:root`** (light mode por defecto): Definir valores claros para todos los tokens existentes
+  - background: blanco/gris muy claro
+  - foreground: gris oscuro/negro
+  - card: blanco
+  - muted: gris claro
+  - border: gris medio
+  - Los colores de marca (primary, accent, destructive, success, warning, instagram) se mantienen identicos en ambos modos
+  - Los foregrounds de colores de marca se ajustan para contraste en fondo claro
 
-### 2. Nueva seccion: AvatarsSection.tsx (1.9 Avatares y Logos)
+- **`.dark`**: Mover los valores actuales (oscuros) a este selector
+  - Todos los valores actuales de `:root` se mueven intactos aqui
+  - Esto funciona con `darkMode: ["class"]` de Tailwind
 
-Ubicacion: `src/pages/design-system/sections/AvatarsSection.tsx`
+No se crean colores nuevos. Solo se definen valores alternativos (claros) para los tokens semanticos existentes.
 
-Contenido:
-- **Componente Avatar**: Mostrar el componente `Avatar` de Radix/shadcn ya existente en el proyecto
-- **Tamanos**: Documentar 4 tamanos con ejemplos visuales:
-  - `h-8 w-8` -- Listas compactas, comentarios
-  - `h-10 w-10` -- Tamano default, menus de usuario
-  - `h-12 w-12` -- Cards de perfil, headers
-  - `h-16 w-16` -- Paginas de perfil, hero
-- **Fallback**: Mostrar como funciona `AvatarFallback` con iniciales cuando la imagen no carga
-- **Grupos de avatares**: Ejemplo con avatares solapados (patron comun con `-space-x-2`)
-- **Logos e imagenes de marca**: Documentar reglas para logos: mantener aspect ratio, usar `object-contain`, tamanos recomendados, y que deben ir siempre en `public/` o cargados desde CDN
-- **Reglas**: Siempre usar el componente Avatar (no `img` directas), siempre incluir fallback, usar `rounded-full` siempre (ya incluido en el componente)
+### 2. Configurar ThemeProvider (`src/App.tsx`)
 
-### 3. Nueva seccion: DocumentationSection.tsx (3.1 Documentacion y Accesibilidad)
+Envolver la aplicacion con `ThemeProvider` de `next-themes` (ya instalado):
+- `attribute="class"` (coincide con Tailwind `darkMode: ["class"]`)
+- `defaultTheme="dark"` (mantener el tema oscuro como default para la app)
+- `enableSystem={false}` (no usar preferencia del sistema, controlar manualmente)
 
-Ubicacion: `src/pages/design-system/sections/DocumentationSection.tsx`
+### 3. Agregar toggle de tema al Design System (`src/pages/design-system/DesignSystemPage.tsx`)
 
-Contenido organizado en subsecciones:
+Agregar un boton de toggle en el header de la sidebar y en el header principal del contenido:
+- Icono `Sun` / `Moon` de lucide-react
+- Usa `useTheme()` de `next-themes` para cambiar entre "light" y "dark"
+- Label que indica el modo actual ("Light" / "Dark")
 
-**Accesibilidad (a11y)**
-- Contraste minimo: documentar que los tokens actuales cumplen WCAG AA (4.5:1 para texto normal, 3:1 para texto grande)
-- Navegacion por teclado: todos los componentes interactivos deben ser accesibles con Tab/Enter/Escape (ya cubierto por Radix)
-- Focus visible: siempre usar `focus-visible:ring-2` (ya documentado en Estados Globales, aqui se refuerza)
-- ARIA labels: reglas para cuando usar `aria-label`, `aria-describedby`, `sr-only`
-- Orden de lectura: el DOM debe reflejar el orden visual (no reordenar con CSS sin considerar lectores de pantalla)
+### 4. Actualizar ColorsSection (`src/pages/design-system/sections/ColorsSection.tsx`)
 
-**Reglas de documentacion para nuevos componentes**
-- Todo componente nuevo debe documentarse en esta pagina antes de usarse en produccion
-- Estructura requerida: nombre, variantes, props, estados, reglas de uso, ejemplo visual
-- Naming: PascalCase para componentes, kebab-case para archivos, camelCase para props
-- Tokens: nunca hardcodear colores, usar siempre variables CSS del sistema
-- Testing: todo componente debe ser navegable por teclado
+El problema actual: los swatches de color usan valores HSL hardcodeados en `style={{ backgroundColor }}`. En su lugar:
 
-**Checklist de accesibilidad**
-- Lista verificable de items que todo componente debe cumplir: focusable, label, contraste, responsive, keyboard nav
+- Cambiar los swatches para usar clases de Tailwind que referencian los tokens (ej: `bg-primary`, `bg-background`), de forma que cambien automaticamente con el tema
+- Mantener la tabla de valores HSL pero ahora mostrar los valores de ambos modos en la documentacion
+- La seccion de opacidades no cambia (los porcentajes son los mismos)
+
+### 5. Actualizar descripcion en la pagina
+
+- Cambiar el texto "Tema oscuro" por "Light / Dark mode" en el header de la pagina
+- Actualizar la nota en ColorsSection de "unico tema oscuro" a "soporte light y dark mode"
+- Actualizar la nota en ShadowsSection que dice "En tema oscuro las sombras tienen menor impacto visual"
 
 ---
 
-## Cambios en archivos existentes
+## Valores del tema Light
 
-### DesignSystemPage.tsx
+Los tokens light se definen invirtiendo la luminosidad de los neutrales mientras se mantienen los colores de marca:
 
-- Agregar imports de las 3 nuevas secciones
-- Agregar a `navItems` la nueva categoria "FOUNDATIONS" items para 1.8 y 1.9
-- Agregar nueva categoria "GUIDELINES" con item 3.1
-- Agregar los componentes al area de contenido principal
-- Los IDs de seccion nuevos se registran en el IntersectionObserver automaticamente (ya usa `navItems.flatMap`)
-
-### Archivos nuevos
-
-```
-src/pages/design-system/sections/
-  IconsSection.tsx          -- 1.8 Iconografia
-  AvatarsSection.tsx        -- 1.9 Avatares y Logos
-  DocumentationSection.tsx  -- 3.1 Documentacion y Accesibilidad
-```
+| Token | Dark (actual) | Light (nuevo) |
+|---|---|---|
+| background | 240 8% 10% | 0 0% 100% |
+| foreground | 240 5% 96% | 240 10% 4% |
+| card | 240 6% 13% | 0 0% 100% |
+| card-foreground | 240 5% 96% | 240 10% 4% |
+| popover | 240 6% 13% | 0 0% 100% |
+| popover-foreground | 240 5% 96% | 240 10% 4% |
+| muted | 240 6% 15% | 240 5% 96% |
+| muted-foreground | 240 5% 65% | 240 4% 46% |
+| secondary | 240 6% 15% | 240 5% 96% |
+| secondary-foreground | 240 5% 96% | 240 6% 10% |
+| border | 240 6% 18% | 240 6% 90% |
+| input | 240 6% 18% | 240 6% 90% |
+| primary | 211 100% 50% | 211 100% 50% (igual) |
+| accent | 271 91% 50% | 271 91% 50% (igual) |
+| destructive | 0 84% 60% | 0 84% 60% (igual) |
+| success | 145 63% 32% | 145 63% 32% (igual) |
+| warning | 40 96% 40% | 40 96% 40% (igual) |
+| ring | 211 100% 50% | 211 100% 50% (igual) |
+| sidebar-background | 240 8% 10% | 0 0% 98% |
+| sidebar-border | 240 6% 12% | 240 6% 90% |
 
 ---
 
-## Detalles tecnicos
+## Archivos a modificar
 
-**Dependencias**: Ninguna nueva. Se usan los componentes `Avatar`, `AvatarImage`, `AvatarFallback` ya existentes en `src/components/ui/avatar.tsx`, iconos de `lucide-react` ya instalado, y clases de Tailwind.
+| Archivo | Cambio |
+|---|---|
+| `src/index.css` | Reorganizar tokens: light en `:root`, dark en `.dark` |
+| `src/App.tsx` | Envolver con `ThemeProvider` de `next-themes` |
+| `src/pages/design-system/DesignSystemPage.tsx` | Agregar toggle light/dark con icono Sun/Moon |
+| `src/pages/design-system/sections/ColorsSection.tsx` | Usar clases Tailwind en vez de HSL hardcodeado para swatches; documentar ambos modos |
+| `src/pages/design-system/sections/ShadowsSection.tsx` | Actualizar texto descriptivo sobre sombras en temas |
 
-**Iconos para la galeria**: Se importaran directamente de `lucide-react` (tree-shakable). Solo se muestran los que ya se usan en el proyecto mas algunos adicionales comunes (Home, Search, Plus, X, Check, Eye, EyeOff, Mail, Lock, Calendar).
+## Archivos sin cambios
 
-**Avatares**: Se usa el componente Avatar de Radix ya configurado. Las imagenes de ejemplo usaran URLs de placeholder (`/placeholder.svg` que ya existe en el proyecto) y fallbacks con iniciales.
+Ningun componente en `src/components/ui/` se modifica. Todos ya usan tokens semanticos (`bg-background`, `text-foreground`, etc.) que se adaptan automaticamente al cambiar la clase `.dark` en el HTML.
 
-**Sin cambios a componentes UI**: Los archivos en `src/components/ui/` no se tocan.
+## Sin dependencias nuevas
 
-**Sin nuevos colores ni tokens**: Se usan exclusivamente los tokens ya definidos.
+`next-themes` ya esta instalado en el proyecto.
 
