@@ -1,60 +1,146 @@
 
 
-# Integrar Design System en una nueva pagina
+# Mejorar y Completar el Design System
 
 ## Resumen
 
-Se creara una pagina dedicada `/design-system` que muestra visualmente todos los tokens y componentes definidos en el archivo JSON exportado. Ademas, se actualizaran los CSS variables y la configuracion de Tailwind para que coincidan con el nuevo design system (tema oscuro con azul primario y morado como accent).
+Reestructurar la pagina `/design-system` existente para convertirla en una referencia completa, navegable y documentada de todos los tokens de diseno y componentes UI del proyecto. No se crean colores nuevos, no se modifican componentes existentes, no se cambian layouts ni flujos.
 
-## Que se va a hacer
+## Que cambia
 
-### 1. Actualizar los CSS tokens globales (`src/index.css`)
+### Navegacion interna
 
-Reemplazar las variables CSS actuales (tema claro por defecto) con los valores del design system importado:
+La pagina actual es un scroll largo sin forma de navegar. Se agregara una barra lateral fija (solo dentro de esta pagina) con enlaces ancla a cada seccion y subseccion, permitiendo saltar rapidamente entre Foundations y Components.
 
-- **Tema principal (`:root`)**: Fondo oscuro (`240 8% 10%`), primary azul (`211 100% 50%`), accent morado (`271 91% 50%`), etc.
-- **Agregar nuevos tokens**: `--success`, `--success-foreground`, `--instagram-pink`, `--instagram-purple`, `--instagram-orange`
-- **Sidebar tokens**: Actualizar con los valores del JSON
-- Se eliminara el bloque `.dark` ya que el design system define un unico tema oscuro como base
+### Seccion 1: FOUNDATIONS (Estilos base)
 
-### 2. Actualizar Tailwind config (`tailwind.config.ts`)
+Se reorganizan y expanden las secciones actuales de la pagina:
 
-- Agregar colores `success` y `success-foreground` al extend de colores
-- Agregar colores de Instagram (`instagram-pink`, `instagram-purple`, `instagram-orange`)
+**1.1 Colores** (ya existe parcialmente, se completa)
+- Reorganizar en grupos semanticos: Brand (primary, accent), Neutrales (background, foreground, card, muted, border), Estados (success, warning, destructive, info), Instagram
+- Agregar documentacion de opacidades estandar usadas en el sistema (ejemplo: `/80` para hover, `/50` para disabled, `/15` para soft backgrounds)
+- Documentar reglas de uso para cada color
+- Nota sobre modo light/dark: actualmente el sistema usa un unico tema oscuro como base
 
-### 3. Extender variantes del Badge (`src/components/ui/badge.tsx`)
+**1.2 Tipografia** (ya existe parcialmente, se completa)
+- Agregar jerarquia semantica: mapear los tamanos a roles (H1=5xl, H2=3xl, H3=2xl, H4=xl, body=base, caption=sm, label=sm+medium)
+- Documentar line-height y letter-spacing por nivel
+- Indicar familia tipografica del sistema
+- Documentar casos de uso recomendados por nivel
 
-Agregar las variantes adicionales definidas en el JSON:
-- `success`, `warning`, `info`
-- `success-soft`, `warning-soft`, `destructive-soft`, `primary-soft`, `secondary-soft`
+**1.3 Espaciado** (ya existe, se mejora)
+- Agregar nombres semanticos (xs=1/4px, sm=2/8px, md=4/16px, lg=6-8/24-32px, xl=12-16/48-64px)
+- Documentar cuando usar cada rango
+- Nota sobre prohibicion de valores fuera de escala
 
-### 4. Crear la pagina Design System (`src/pages/DesignSystem.tsx`)
+**1.4 Bordes y Radius** (ya existe, se mejora)
+- Agregar casos de uso documentados (sm para inputs, lg para cards, full para avatars/badges)
+- Regla de no mezclar radios sin justificacion
 
-Una pagina visual con scroll que muestre todas las secciones del design system:
+**1.5 Sombras** (ya existe, se mejora)
+- Agregar sombras de estado: hover y focus (documentar que se usan ring para focus)
+- Documentar uso permitido vs no permitido
 
-- **Header**: Nombre, version y fecha de exportacion
-- **Seccion Colores**: Grid con swatches de todos los colores (background, foreground, primary, secondary, accent, destructive, success, muted, border, sidebar, instagram) mostrando nombre, valor HSL y descripcion
-- **Seccion Tipografia**: Escala tipografica (xs a 5xl) con ejemplos visuales del texto en cada tamano, y los pesos disponibles (thin a black)
-- **Seccion Espaciado**: Barras visuales horizontales representando cada valor de spacing (0 a 16)
-- **Seccion Border Radius**: Cuadros mostrando cada nivel de redondeo (none, sm, md, lg, xl, 2xl, full)
-- **Seccion Sombras**: Tarjetas con los 3 niveles de sombra (minimal, card, elevated)
-- **Seccion Componentes - Badges**: Todos los badges en todas sus variantes
-- **Seccion Componentes - Buttons**: Todos los botones en todas sus variantes y tamanos
+**1.6 Z-Index** (nueva seccion)
+- Documentar la escala actual del proyecto extraida de los componentes:
+  - Base content: `auto/0`
+  - Dropdown/Select/Popover: `z-50`
+  - Dialog overlay: `z-50`
+  - Toast viewport: `z-[100]`
+- Regla: prohibido usar valores arbitrarios fuera de esta escala
 
-### 5. Agregar ruta en `src/App.tsx`
+**1.7 Estados Globales** (nueva seccion)
+- Hover: documentar patron `hover:bg-{color}/90` para botones, `hover:bg-accent` para menus
+- Focus: documentar patron `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
+- Disabled: documentar patron `disabled:pointer-events-none disabled:opacity-50`
+- Loading: documentar uso del componente Skeleton existente con `animate-pulse`
+- Active: documentar `data-[state=selected]` y patrones active
 
-Registrar la nueva ruta `/design-system` que apunte a la pagina creada.
+### Seccion 2: COMPONENTS
+
+Se agregan showcases de los componentes UI ya existentes en el proyecto. No se crean componentes nuevos, solo se documentan los que ya estan en `src/components/ui/`.
+
+**2.1 Botones** (ya existe parcialmente, se completa)
+- Mostrar todas las variantes con su caso de uso documentado (Primary=accion principal, Secondary/Ghost=acciones secundarias, Destructive=eliminar, Outline=neutro, Link=navegacion)
+- Agregar estado disabled y un ejemplo de loading con icono Loader2
+- Reglas claras: un solo boton primary por seccion, siempre usar variante semantica
+
+**2.2 Inputs** (nueva seccion)
+- Input de texto: estado default, focus, disabled, con placeholder
+- Select: trigger + opciones, estado focus, disabled
+- Textarea: default, focus, disabled
+- Checkbox y Switch como variantes de input booleano
+- Documentar estados de error (borde destructive) y reglas
+
+**2.3 Dropdowns** (nueva seccion)
+- DropdownMenu como componente unico de dropdown
+- Ejemplo funcional con items, separador, shortcut
+- Documentar: comportamiento (click para abrir, click fuera para cerrar), z-index, fondo opaco
+
+**2.4 Cards** (nueva seccion)
+- Card estandar con Header, Content, Footer
+- Documentar estructura base y cuando usarla
+- No existe GlassCard actualmente, se documenta solo la Card existente
+
+**2.5 Modales** (nueva seccion)
+- Dialog con estructura Header/Content/Footer
+- Documentar z-index (z-50), backdrop (bg-black/80), animaciones
+- Ejemplo visual con boton para abrir
+
+**2.6 Feedback** (nueva seccion)
+- Alert: variantes default y destructive
+- Toast: ejemplo de invocacion con useToast
+- Skeleton: patron de loading/empty state
+- Documentar cuando usar cada tipo
+
+**2.7 Data Display** (nueva seccion)
+- Table: ejemplo con header, rows, footer
+- Badges: todas las variantes ya existentes organizadas por categoria (solid, soft, outline)
+- Tooltip: ejemplo funcional
+- Progress: barra de progreso
+
+## Estructura de archivos
+
+Para mantener el codigo organizado sin crear un archivo monolitico de 1500+ lineas, se crearan componentes de seccion exclusivos de la pagina del design system:
+
+```text
+src/pages/design-system/
+  DesignSystemPage.tsx        -- Layout principal con sidebar de navegacion
+  sections/
+    ColorsSection.tsx         -- 1.1 Colores
+    TypographySection.tsx     -- 1.2 Tipografia  
+    SpacingSection.tsx        -- 1.3 Espaciado
+    BordersSection.tsx        -- 1.4 Bordes y Radius
+    ShadowsSection.tsx        -- 1.5 Sombras
+    ZIndexSection.tsx         -- 1.6 Z-Index
+    GlobalStatesSection.tsx   -- 1.7 Estados Globales
+    ButtonsSection.tsx        -- 2.1 Botones
+    InputsSection.tsx         -- 2.2 Inputs
+    DropdownsSection.tsx      -- 2.3 Dropdowns
+    CardsSection.tsx          -- 2.4 Cards
+    ModalsSection.tsx         -- 2.5 Modales
+    FeedbackSection.tsx       -- 2.6 Feedback
+    DataDisplaySection.tsx    -- 2.7 Data Display
+```
+
+**Archivos a modificar:**
+- `src/pages/DesignSystem.tsx` -- Se redirige al nuevo componente
+- `src/App.tsx` -- Sin cambios, la ruta `/design-system` ya existe
+
+**Archivos a crear:**
+- Todos los listados arriba en `src/pages/design-system/`
+
+**Sin dependencias nuevas.** Todo se construye con los componentes UI existentes (Card, Badge, Button, Input, Select, Textarea, Dialog, Alert, Table, DropdownMenu, Tooltip, Checkbox, Switch, Progress, Skeleton, Label) y clases de Tailwind.
+
+**Sin cambios a componentes UI.** Los archivos en `src/components/ui/` no se tocan. Solo se documentan y muestran.
+
+**Sin nuevos colores ni tokens.** Se usan exclusivamente los tokens ya definidos en `index.css` y `tailwind.config.ts`.
 
 ## Detalles tecnicos
 
-**Archivos a modificar:**
-- `src/index.css` - Variables CSS del design system
-- `tailwind.config.ts` - Colores extendidos (success, instagram)
-- `src/components/ui/badge.tsx` - Nuevas variantes (success, warning, info, soft variants)
-- `src/App.tsx` - Ruta nueva
+**Navegacion interna:** Se implementara con IDs en cada seccion y scroll suave (`scroll-behavior: smooth`). La sidebar usara `position: sticky` con `top` para mantenerse visible durante el scroll.
 
-**Archivos a crear:**
-- `src/pages/DesignSystem.tsx` - Pagina completa del design system
+**Componentes interactivos:** Los ejemplos de Modal y Dropdown seran funcionales (se pueden abrir/cerrar) usando los componentes Radix existentes con estado local via `useState`.
 
-**Sin dependencias nuevas** - Todo se construye con los componentes UI existentes (Card, Badge, Button) y clases de Tailwind.
+**Documentacion inline:** Cada seccion incluira un bloque de texto con reglas de uso, tokens permitidos y restricciones, usando las clases `text-muted-foreground text-sm` para mantener consistencia visual.
 
