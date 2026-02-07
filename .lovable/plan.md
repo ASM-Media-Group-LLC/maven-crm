@@ -1,108 +1,105 @@
 
 
-# Soporte Light/Dark Mode en el Design System
+# Reorganizar el Design System en 5 categorias
 
 ## Resumen
 
-Agregar un tema claro (light mode) al sistema de tokens CSS y un toggle de tema en la pagina del Design System para poder previsualizar todos los componentes y tokens en ambos modos. El resto de la aplicacion mantendra el tema oscuro como default.
+Redistribuir las 17 secciones existentes del Design System en 5 categorias claras, y agregar una nueva seccion de Layout & Patterns. No se elimina ni duplica contenido -- solo se reorganiza la navegacion y numeracion.
 
 ---
 
-## Cambios detallados
+## Nueva estructura
 
-### 1. Actualizar tokens CSS (`src/index.css`)
+```text
+1. DESIGN FOUNDATIONS (styles & tokens)
+   1.1 Colores
+   1.2 Tipografia
+   1.3 Espaciado
+   1.4 Bordes
+   1.5 Sombras
+   1.6 Z-Index
+   1.7 Estados globales
 
-Actualmente todos los tokens estan definidos en `:root` con valores oscuros. Se reorganizara:
+2. COMPONENT LIBRARY (reusable UI elements)
+   2.1 Botones
+   2.2 Inputs
+   2.3 Dropdowns
+   2.4 Cards
+   2.5 Modales
+   2.6 Feedback
+   2.7 Data Display
 
-- **`:root`** (light mode por defecto): Definir valores claros para todos los tokens existentes
-  - background: blanco/gris muy claro
-  - foreground: gris oscuro/negro
-  - card: blanco
-  - muted: gris claro
-  - border: gris medio
-  - Los colores de marca (primary, accent, destructive, success, warning, instagram) se mantienen identicos en ambos modos
-  - Los foregrounds de colores de marca se ajustan para contraste en fondo claro
+3. LAYOUT & PATTERNS (page templates and structure)   <-- NUEVA
+   3.1 Page Layouts
+   3.2 Patrones de composicion
 
-- **`.dark`**: Mover los valores actuales (oscuros) a este selector
-  - Todos los valores actuales de `:root` se mueven intactos aqui
-  - Esto funciona con `darkMode: ["class"]` de Tailwind
+4. ICONS & BRAND ASSETS
+   4.1 Iconografia    (antes 1.8)
+   4.2 Avatares       (antes 1.9)
 
-No se crean colores nuevos. Solo se definen valores alternativos (claros) para los tokens semanticos existentes.
-
-### 2. Configurar ThemeProvider (`src/App.tsx`)
-
-Envolver la aplicacion con `ThemeProvider` de `next-themes` (ya instalado):
-- `attribute="class"` (coincide con Tailwind `darkMode: ["class"]`)
-- `defaultTheme="dark"` (mantener el tema oscuro como default para la app)
-- `enableSystem={false}` (no usar preferencia del sistema, controlar manualmente)
-
-### 3. Agregar toggle de tema al Design System (`src/pages/design-system/DesignSystemPage.tsx`)
-
-Agregar un boton de toggle en el header de la sidebar y en el header principal del contenido:
-- Icono `Sun` / `Moon` de lucide-react
-- Usa `useTheme()` de `next-themes` para cambiar entre "light" y "dark"
-- Label que indica el modo actual ("Light" / "Dark")
-
-### 4. Actualizar ColorsSection (`src/pages/design-system/sections/ColorsSection.tsx`)
-
-El problema actual: los swatches de color usan valores HSL hardcodeados en `style={{ backgroundColor }}`. En su lugar:
-
-- Cambiar los swatches para usar clases de Tailwind que referencian los tokens (ej: `bg-primary`, `bg-background`), de forma que cambien automaticamente con el tema
-- Mantener la tabla de valores HSL pero ahora mostrar los valores de ambos modos en la documentacion
-- La seccion de opacidades no cambia (los porcentajes son los mismos)
-
-### 5. Actualizar descripcion en la pagina
-
-- Cambiar el texto "Tema oscuro" por "Light / Dark mode" en el header de la pagina
-- Actualizar la nota en ColorsSection de "unico tema oscuro" a "soporte light y dark mode"
-- Actualizar la nota en ShadowsSection que dice "En tema oscuro las sombras tienen menor impacto visual"
+5. DOCUMENTATION & ACCESSIBILITY
+   5.1 Docs & a11y    (antes 3.1)
+```
 
 ---
 
-## Valores del tema Light
+## Que cambia y que no
 
-Los tokens light se definen invirtiendo la luminosidad de los neutrales mientras se mantienen los colores de marca:
+### Sin cambios de contenido
 
-| Token | Dark (actual) | Light (nuevo) |
-|---|---|---|
-| background | 240 8% 10% | 0 0% 100% |
-| foreground | 240 5% 96% | 240 10% 4% |
-| card | 240 6% 13% | 0 0% 100% |
-| card-foreground | 240 5% 96% | 240 10% 4% |
-| popover | 240 6% 13% | 0 0% 100% |
-| popover-foreground | 240 5% 96% | 240 10% 4% |
-| muted | 240 6% 15% | 240 5% 96% |
-| muted-foreground | 240 5% 65% | 240 4% 46% |
-| secondary | 240 6% 15% | 240 5% 96% |
-| secondary-foreground | 240 5% 96% | 240 6% 10% |
-| border | 240 6% 18% | 240 6% 90% |
-| input | 240 6% 18% | 240 6% 90% |
-| primary | 211 100% 50% | 211 100% 50% (igual) |
-| accent | 271 91% 50% | 271 91% 50% (igual) |
-| destructive | 0 84% 60% | 0 84% 60% (igual) |
-| success | 145 63% 32% | 145 63% 32% (igual) |
-| warning | 40 96% 40% | 40 96% 40% (igual) |
-| ring | 211 100% 50% | 211 100% 50% (igual) |
-| sidebar-background | 240 8% 10% | 0 0% 98% |
-| sidebar-border | 240 6% 12% | 240 6% 90% |
+Las 17 secciones existentes se mantienen identicas en su contenido interno. Solo se renumeran los titulos (ej: "1.8 Iconografia" pasa a "4.1 Iconografia") y se reubican en la sidebar.
+
+### Archivos que se modifican
+
+**`src/pages/design-system/DesignSystemPage.tsx`**
+- Actualizar `navItems` con las 5 categorias nuevas
+- Agregar import de la nueva seccion `LayoutPatternsSection`
+- Reordenar los componentes en el area de contenido para que sigan la nueva estructura
+- Agregar un nuevo `id="layouts"` y `id="composition"` para las secciones nuevas
+
+**`src/pages/design-system/sections/IconsSection.tsx`**
+- Cambiar titulo de "1.8 Iconografia" a "4.1 Iconografia"
+
+**`src/pages/design-system/sections/AvatarsSection.tsx`**
+- Cambiar titulo de "1.9 Avatares y Logos" a "4.2 Avatares y Logos"
+
+**`src/pages/design-system/sections/DocumentationSection.tsx`**
+- Cambiar titulo de "3.1 Documentacion y Accesibilidad" a "5.1 Documentacion y Accesibilidad"
+
+### Archivo nuevo
+
+**`src/pages/design-system/sections/LayoutPatternsSection.tsx`**
+
+Seccion nueva que documenta los patrones de layout usados en el proyecto:
+
+**3.1 Page Layouts** -- Patrones de pagina completa
+- Sidebar + Content (el patron usado en esta misma pagina del Design System): sidebar fija con `sticky top-0` y area de contenido scrollable
+- Centrado (`max-w-5xl mx-auto`): layout por defecto para paginas de contenido
+- Fullscreen sin sidebar: paginas de login, landing, error
+
+**3.2 Patrones de composicion** -- Patrones de estructura interna
+- Stack vertical (`space-y-{n}`): el patron mas comun, bloques apilados con espaciado consistente
+- Grid responsive (`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3`): para galerías, cards, dashboards
+- Flex con alineacion (`flex items-center justify-between`): headers, toolbars, filas de accion
+- Container con max-width: reglas de anchos maximos para legibilidad
+
+Cada patron incluira:
+- Ejemplo visual simplificado (usando divs con fondo `bg-muted` para representar areas)
+- La clase Tailwind exacta a usar
+- Cuando usar y cuando no
+
+Reglas:
+- Siempre usar Tailwind utilities, nunca CSS custom para layout
+- Respetar los breakpoints del sistema: `sm` (640px), `md` (768px), `lg` (1024px), `xl` (1280px)
+- No usar `position: absolute/fixed` excepto para overlays, tooltips y elementos flotantes documentados
 
 ---
 
-## Archivos a modificar
+## Detalle tecnico
 
-| Archivo | Cambio |
-|---|---|
-| `src/index.css` | Reorganizar tokens: light en `:root`, dark en `.dark` |
-| `src/App.tsx` | Envolver con `ThemeProvider` de `next-themes` |
-| `src/pages/design-system/DesignSystemPage.tsx` | Agregar toggle light/dark con icono Sun/Moon |
-| `src/pages/design-system/sections/ColorsSection.tsx` | Usar clases Tailwind en vez de HSL hardcodeado para swatches; documentar ambos modos |
-| `src/pages/design-system/sections/ShadowsSection.tsx` | Actualizar texto descriptivo sobre sombras en temas |
+La sidebar del Design System (`navItems`) pasara de 3 grupos a 5 grupos. El IntersectionObserver existente ya recorre automaticamente todos los IDs de `navItems.flatMap()`, por lo que el scroll-spy funcionara sin cambios adicionales.
 
-## Archivos sin cambios
+Los nuevos IDs de seccion seran `layouts` y `composition`, usados tanto en la sidebar como en los `<section id="...">` del contenido.
 
-Ningun componente en `src/components/ui/` se modifica. Todos ya usan tokens semanticos (`bg-background`, `text-foreground`, etc.) que se adaptan automaticamente al cambiar la clase `.dark` en el HTML.
-
-## Sin dependencias nuevas
-
-`next-themes` ya esta instalado en el proyecto.
+No se crean dependencias nuevas. Los ejemplos de layout usan divs con clases Tailwind existentes para representar visualmente los patrones.
 
