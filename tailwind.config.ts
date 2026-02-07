@@ -57,6 +57,17 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        "instagram-pink": "hsl(var(--instagram-pink))",
+        "instagram-purple": "hsl(var(--instagram-purple))",
+        "instagram-orange": "hsl(var(--instagram-orange))",
       },
       borderRadius: {
         lg: "var(--radius)",
