@@ -1,146 +1,106 @@
 
 
-# Mejorar y Completar el Design System
+# Agregar secciones de Iconografia, Avatares, Logos, Documentacion y Accesibilidad
 
 ## Resumen
 
-Reestructurar la pagina `/design-system` existente para convertirla en una referencia completa, navegable y documentada de todos los tokens de diseno y componentes UI del proyecto. No se crean colores nuevos, no se modifican componentes existentes, no se cambian layouts ni flujos.
+Se agregan 3 nuevas secciones al Design System existente:
+- **1.8 Iconografia** (en Foundations): Documentar el sistema de iconos Lucide, tamanos permitidos, colores, y reglas de uso
+- **1.9 Avatares y Logos** (en Foundations): Documentar el componente Avatar existente con sus variantes de tamano, fallbacks, y reglas para logos/imagenes de marca
+- **3. Documentacion y Accesibilidad** (nueva categoria): Guia de buenas practicas ARIA, contraste, navegacion por teclado, y reglas de documentacion para nuevos componentes
 
-## Que cambia
+No se crean colores nuevos, no se modifican componentes existentes, no se inventan variantes visuales.
 
-### Navegacion interna
+---
 
-La pagina actual es un scroll largo sin forma de navegar. Se agregara una barra lateral fija (solo dentro de esta pagina) con enlaces ancla a cada seccion y subseccion, permitiendo saltar rapidamente entre Foundations y Components.
+## Cambios detallados
 
-### Seccion 1: FOUNDATIONS (Estilos base)
+### 1. Nueva seccion: IconsSection.tsx (1.8 Iconografia)
 
-Se reorganizan y expanden las secciones actuales de la pagina:
+Ubicacion: `src/pages/design-system/sections/IconsSection.tsx`
 
-**1.1 Colores** (ya existe parcialmente, se completa)
-- Reorganizar en grupos semanticos: Brand (primary, accent), Neutrales (background, foreground, card, muted, border), Estados (success, warning, destructive, info), Instagram
-- Agregar documentacion de opacidades estandar usadas en el sistema (ejemplo: `/80` para hover, `/50` para disabled, `/15` para soft backgrounds)
-- Documentar reglas de uso para cada color
-- Nota sobre modo light/dark: actualmente el sistema usa un unico tema oscuro como base
+Contenido:
+- **Libreria oficial**: Documentar que el proyecto usa exclusivamente `lucide-react`. Prohibido usar otras librerias de iconos
+- **Tamanos estandar**: Mostrar los 4 tamanos permitidos con ejemplos visuales:
+  - `h-4 w-4` (16px) -- Dentro de botones, menu items, badges
+  - `h-5 w-5` (20px) -- Iconos standalone en toolbars
+  - `h-6 w-6` (24px) -- Tamano por defecto de Lucide, headers de seccion
+  - `h-8 w-8` (32px) -- Empty states, iconos hero
+- **Colores permitidos**: `currentColor` (hereda del padre), `text-muted-foreground`, `text-primary`, `text-destructive`
+- **Galeria de iconos frecuentes**: Grid con los iconos ya usados en el proyecto (User, Settings, LogOut, Loader2, Trash2, ExternalLink, Info, AlertCircle, CheckCircle, AlertTriangle, ChevronDown, Keyboard) mostrando nombre y tamano
+- **Reglas**: No usar iconos sin proposito semantico, siempre incluir `aria-hidden="true"` si el icono es decorativo, acompanar con texto o tooltip si es el unico elemento interactivo
 
-**1.2 Tipografia** (ya existe parcialmente, se completa)
-- Agregar jerarquia semantica: mapear los tamanos a roles (H1=5xl, H2=3xl, H3=2xl, H4=xl, body=base, caption=sm, label=sm+medium)
-- Documentar line-height y letter-spacing por nivel
-- Indicar familia tipografica del sistema
-- Documentar casos de uso recomendados por nivel
+### 2. Nueva seccion: AvatarsSection.tsx (1.9 Avatares y Logos)
 
-**1.3 Espaciado** (ya existe, se mejora)
-- Agregar nombres semanticos (xs=1/4px, sm=2/8px, md=4/16px, lg=6-8/24-32px, xl=12-16/48-64px)
-- Documentar cuando usar cada rango
-- Nota sobre prohibicion de valores fuera de escala
+Ubicacion: `src/pages/design-system/sections/AvatarsSection.tsx`
 
-**1.4 Bordes y Radius** (ya existe, se mejora)
-- Agregar casos de uso documentados (sm para inputs, lg para cards, full para avatars/badges)
-- Regla de no mezclar radios sin justificacion
+Contenido:
+- **Componente Avatar**: Mostrar el componente `Avatar` de Radix/shadcn ya existente en el proyecto
+- **Tamanos**: Documentar 4 tamanos con ejemplos visuales:
+  - `h-8 w-8` -- Listas compactas, comentarios
+  - `h-10 w-10` -- Tamano default, menus de usuario
+  - `h-12 w-12` -- Cards de perfil, headers
+  - `h-16 w-16` -- Paginas de perfil, hero
+- **Fallback**: Mostrar como funciona `AvatarFallback` con iniciales cuando la imagen no carga
+- **Grupos de avatares**: Ejemplo con avatares solapados (patron comun con `-space-x-2`)
+- **Logos e imagenes de marca**: Documentar reglas para logos: mantener aspect ratio, usar `object-contain`, tamanos recomendados, y que deben ir siempre en `public/` o cargados desde CDN
+- **Reglas**: Siempre usar el componente Avatar (no `img` directas), siempre incluir fallback, usar `rounded-full` siempre (ya incluido en el componente)
 
-**1.5 Sombras** (ya existe, se mejora)
-- Agregar sombras de estado: hover y focus (documentar que se usan ring para focus)
-- Documentar uso permitido vs no permitido
+### 3. Nueva seccion: DocumentationSection.tsx (3.1 Documentacion y Accesibilidad)
 
-**1.6 Z-Index** (nueva seccion)
-- Documentar la escala actual del proyecto extraida de los componentes:
-  - Base content: `auto/0`
-  - Dropdown/Select/Popover: `z-50`
-  - Dialog overlay: `z-50`
-  - Toast viewport: `z-[100]`
-- Regla: prohibido usar valores arbitrarios fuera de esta escala
+Ubicacion: `src/pages/design-system/sections/DocumentationSection.tsx`
 
-**1.7 Estados Globales** (nueva seccion)
-- Hover: documentar patron `hover:bg-{color}/90` para botones, `hover:bg-accent` para menus
-- Focus: documentar patron `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`
-- Disabled: documentar patron `disabled:pointer-events-none disabled:opacity-50`
-- Loading: documentar uso del componente Skeleton existente con `animate-pulse`
-- Active: documentar `data-[state=selected]` y patrones active
+Contenido organizado en subsecciones:
 
-### Seccion 2: COMPONENTS
+**Accesibilidad (a11y)**
+- Contraste minimo: documentar que los tokens actuales cumplen WCAG AA (4.5:1 para texto normal, 3:1 para texto grande)
+- Navegacion por teclado: todos los componentes interactivos deben ser accesibles con Tab/Enter/Escape (ya cubierto por Radix)
+- Focus visible: siempre usar `focus-visible:ring-2` (ya documentado en Estados Globales, aqui se refuerza)
+- ARIA labels: reglas para cuando usar `aria-label`, `aria-describedby`, `sr-only`
+- Orden de lectura: el DOM debe reflejar el orden visual (no reordenar con CSS sin considerar lectores de pantalla)
 
-Se agregan showcases de los componentes UI ya existentes en el proyecto. No se crean componentes nuevos, solo se documentan los que ya estan en `src/components/ui/`.
+**Reglas de documentacion para nuevos componentes**
+- Todo componente nuevo debe documentarse en esta pagina antes de usarse en produccion
+- Estructura requerida: nombre, variantes, props, estados, reglas de uso, ejemplo visual
+- Naming: PascalCase para componentes, kebab-case para archivos, camelCase para props
+- Tokens: nunca hardcodear colores, usar siempre variables CSS del sistema
+- Testing: todo componente debe ser navegable por teclado
 
-**2.1 Botones** (ya existe parcialmente, se completa)
-- Mostrar todas las variantes con su caso de uso documentado (Primary=accion principal, Secondary/Ghost=acciones secundarias, Destructive=eliminar, Outline=neutro, Link=navegacion)
-- Agregar estado disabled y un ejemplo de loading con icono Loader2
-- Reglas claras: un solo boton primary por seccion, siempre usar variante semantica
+**Checklist de accesibilidad**
+- Lista verificable de items que todo componente debe cumplir: focusable, label, contraste, responsive, keyboard nav
 
-**2.2 Inputs** (nueva seccion)
-- Input de texto: estado default, focus, disabled, con placeholder
-- Select: trigger + opciones, estado focus, disabled
-- Textarea: default, focus, disabled
-- Checkbox y Switch como variantes de input booleano
-- Documentar estados de error (borde destructive) y reglas
+---
 
-**2.3 Dropdowns** (nueva seccion)
-- DropdownMenu como componente unico de dropdown
-- Ejemplo funcional con items, separador, shortcut
-- Documentar: comportamiento (click para abrir, click fuera para cerrar), z-index, fondo opaco
+## Cambios en archivos existentes
 
-**2.4 Cards** (nueva seccion)
-- Card estandar con Header, Content, Footer
-- Documentar estructura base y cuando usarla
-- No existe GlassCard actualmente, se documenta solo la Card existente
+### DesignSystemPage.tsx
 
-**2.5 Modales** (nueva seccion)
-- Dialog con estructura Header/Content/Footer
-- Documentar z-index (z-50), backdrop (bg-black/80), animaciones
-- Ejemplo visual con boton para abrir
+- Agregar imports de las 3 nuevas secciones
+- Agregar a `navItems` la nueva categoria "FOUNDATIONS" items para 1.8 y 1.9
+- Agregar nueva categoria "GUIDELINES" con item 3.1
+- Agregar los componentes al area de contenido principal
+- Los IDs de seccion nuevos se registran en el IntersectionObserver automaticamente (ya usa `navItems.flatMap`)
 
-**2.6 Feedback** (nueva seccion)
-- Alert: variantes default y destructive
-- Toast: ejemplo de invocacion con useToast
-- Skeleton: patron de loading/empty state
-- Documentar cuando usar cada tipo
+### Archivos nuevos
 
-**2.7 Data Display** (nueva seccion)
-- Table: ejemplo con header, rows, footer
-- Badges: todas las variantes ya existentes organizadas por categoria (solid, soft, outline)
-- Tooltip: ejemplo funcional
-- Progress: barra de progreso
-
-## Estructura de archivos
-
-Para mantener el codigo organizado sin crear un archivo monolitico de 1500+ lineas, se crearan componentes de seccion exclusivos de la pagina del design system:
-
-```text
-src/pages/design-system/
-  DesignSystemPage.tsx        -- Layout principal con sidebar de navegacion
-  sections/
-    ColorsSection.tsx         -- 1.1 Colores
-    TypographySection.tsx     -- 1.2 Tipografia  
-    SpacingSection.tsx        -- 1.3 Espaciado
-    BordersSection.tsx        -- 1.4 Bordes y Radius
-    ShadowsSection.tsx        -- 1.5 Sombras
-    ZIndexSection.tsx         -- 1.6 Z-Index
-    GlobalStatesSection.tsx   -- 1.7 Estados Globales
-    ButtonsSection.tsx        -- 2.1 Botones
-    InputsSection.tsx         -- 2.2 Inputs
-    DropdownsSection.tsx      -- 2.3 Dropdowns
-    CardsSection.tsx          -- 2.4 Cards
-    ModalsSection.tsx         -- 2.5 Modales
-    FeedbackSection.tsx       -- 2.6 Feedback
-    DataDisplaySection.tsx    -- 2.7 Data Display
+```
+src/pages/design-system/sections/
+  IconsSection.tsx          -- 1.8 Iconografia
+  AvatarsSection.tsx        -- 1.9 Avatares y Logos
+  DocumentationSection.tsx  -- 3.1 Documentacion y Accesibilidad
 ```
 
-**Archivos a modificar:**
-- `src/pages/DesignSystem.tsx` -- Se redirige al nuevo componente
-- `src/App.tsx` -- Sin cambios, la ruta `/design-system` ya existe
-
-**Archivos a crear:**
-- Todos los listados arriba en `src/pages/design-system/`
-
-**Sin dependencias nuevas.** Todo se construye con los componentes UI existentes (Card, Badge, Button, Input, Select, Textarea, Dialog, Alert, Table, DropdownMenu, Tooltip, Checkbox, Switch, Progress, Skeleton, Label) y clases de Tailwind.
-
-**Sin cambios a componentes UI.** Los archivos en `src/components/ui/` no se tocan. Solo se documentan y muestran.
-
-**Sin nuevos colores ni tokens.** Se usan exclusivamente los tokens ya definidos en `index.css` y `tailwind.config.ts`.
+---
 
 ## Detalles tecnicos
 
-**Navegacion interna:** Se implementara con IDs en cada seccion y scroll suave (`scroll-behavior: smooth`). La sidebar usara `position: sticky` con `top` para mantenerse visible durante el scroll.
+**Dependencias**: Ninguna nueva. Se usan los componentes `Avatar`, `AvatarImage`, `AvatarFallback` ya existentes en `src/components/ui/avatar.tsx`, iconos de `lucide-react` ya instalado, y clases de Tailwind.
 
-**Componentes interactivos:** Los ejemplos de Modal y Dropdown seran funcionales (se pueden abrir/cerrar) usando los componentes Radix existentes con estado local via `useState`.
+**Iconos para la galeria**: Se importaran directamente de `lucide-react` (tree-shakable). Solo se muestran los que ya se usan en el proyecto mas algunos adicionales comunes (Home, Search, Plus, X, Check, Eye, EyeOff, Mail, Lock, Calendar).
 
-**Documentacion inline:** Cada seccion incluira un bloque de texto con reglas de uso, tokens permitidos y restricciones, usando las clases `text-muted-foreground text-sm` para mantener consistencia visual.
+**Avatares**: Se usa el componente Avatar de Radix ya configurado. Las imagenes de ejemplo usaran URLs de placeholder (`/placeholder.svg` que ya existe en el proyecto) y fallbacks con iniciales.
+
+**Sin cambios a componentes UI**: Los archivos en `src/components/ui/` no se tocan.
+
+**Sin nuevos colores ni tokens**: Se usan exclusivamente los tokens ya definidos.
 
