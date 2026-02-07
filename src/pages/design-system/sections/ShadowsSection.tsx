@@ -11,7 +11,7 @@ export const ShadowsSection = () => (
     <div>
       <h2 className="text-3xl font-semibold mb-2">1.5 Sombras</h2>
       <p className="text-sm text-muted-foreground max-w-2xl">
-        En tema oscuro las sombras tienen menor impacto visual. Se usan con moderación.
+        Las sombras se usan con moderación. En dark mode tienen menor impacto visual; en light mode son más evidentes.
         Para estados de focus se usa <code className="font-mono text-primary">ring</code> en lugar de sombras.
       </p>
     </div>
