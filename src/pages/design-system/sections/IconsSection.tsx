@@ -65,7 +65,7 @@ const iconGallery = [
 export const IconsSection = () => (
   <section id="icons" className="space-y-8">
     <div>
-      <h2 className="text-3xl font-bold tracking-tight">1.8 Iconografía</h2>
+      <h2 className="text-3xl font-bold tracking-tight">4.1 Iconografía</h2>
       <p className="text-muted-foreground mt-1">
         Sistema de iconos basado exclusivamente en <code className="text-sm bg-muted px-1.5 py-0.5 rounded">lucide-react</code>. Prohibido usar otras librerías de iconos.
       </p>

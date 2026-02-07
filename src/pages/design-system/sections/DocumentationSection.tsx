@@ -21,7 +21,7 @@ const namingRules = [
 export const DocumentationSection = () => (
   <section id="documentation" className="space-y-8">
     <div>
-      <h2 className="text-3xl font-bold tracking-tight">3.1 Documentación y Accesibilidad</h2>
+      <h2 className="text-3xl font-bold tracking-tight">5.1 Documentación y Accesibilidad</h2>
       <p className="text-muted-foreground mt-1">
         Guía de buenas prácticas de accesibilidad y reglas para documentar nuevos componentes.
       </p>

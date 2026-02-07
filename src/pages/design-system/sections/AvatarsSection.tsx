@@ -19,7 +19,7 @@ const avatarGroupData = [
 export const AvatarsSection = () => (
   <section id="avatars" className="space-y-8">
     <div>
-      <h2 className="text-3xl font-bold tracking-tight">1.9 Avatares y Logos</h2>
+      <h2 className="text-3xl font-bold tracking-tight">4.2 Avatares y Logos</h2>
       <p className="text-muted-foreground mt-1">
         Componente <code className="text-sm bg-muted px-1.5 py-0.5 rounded">Avatar</code> de Radix/shadcn con fallback de iniciales y reglas para logos.
       </p>

@@ -15,12 +15,13 @@ import { CardsSection } from "./sections/CardsSection";
 import { ModalsSection } from "./sections/ModalsSection";
 import { FeedbackSection } from "./sections/FeedbackSection";
 import { DataDisplaySection } from "./sections/DataDisplaySection";
+import { LayoutPatternsSection } from "./sections/LayoutPatternsSection";
 import { IconsSection } from "./sections/IconsSection";
 import { AvatarsSection } from "./sections/AvatarsSection";
 import { DocumentationSection } from "./sections/DocumentationSection";
 
 const navItems = [
-  { label: "FOUNDATIONS", items: [
+  { label: "DESIGN FOUNDATIONS", items: [
     { id: "colors", label: "1.1 Colores" },
     { id: "typography", label: "1.2 Tipografía" },
     { id: "spacing", label: "1.3 Espaciado" },
@@ -28,10 +29,8 @@ const navItems = [
     { id: "shadows", label: "1.5 Sombras" },
     { id: "z-index", label: "1.6 Z-Index" },
     { id: "global-states", label: "1.7 Estados" },
-    { id: "icons", label: "1.8 Iconografía" },
-    { id: "avatars", label: "1.9 Avatares" },
   ]},
-  { label: "COMPONENTS", items: [
+  { label: "COMPONENT LIBRARY", items: [
     { id: "buttons", label: "2.1 Botones" },
     { id: "inputs", label: "2.2 Inputs" },
     { id: "dropdowns", label: "2.3 Dropdowns" },
@@ -40,8 +39,16 @@ const navItems = [
     { id: "feedback", label: "2.6 Feedback" },
     { id: "data-display", label: "2.7 Data Display" },
   ]},
-  { label: "GUIDELINES", items: [
-    { id: "documentation", label: "3.1 Docs & a11y" },
+  { label: "LAYOUT & PATTERNS", items: [
+    { id: "layouts", label: "3.1 Page Layouts" },
+    { id: "composition", label: "3.2 Composición" },
+  ]},
+  { label: "ICONS & BRAND", items: [
+    { id: "icons", label: "4.1 Iconografía" },
+    { id: "avatars", label: "4.2 Avatares" },
+  ]},
+  { label: "DOCS & A11Y", items: [
+    { id: "documentation", label: "5.1 Docs & a11y" },
   ]},
 ];
 
@@ -153,7 +160,7 @@ const DesignSystemPage = () => {
             </p>
           </header>
 
-          {/* Foundations */}
+          {/* 1. Design Foundations */}
           <ColorsSection />
           <TypographySection />
           <SpacingSection />
@@ -161,10 +168,8 @@ const DesignSystemPage = () => {
           <ShadowsSection />
           <ZIndexSection />
           <GlobalStatesSection />
-          <IconsSection />
-          <AvatarsSection />
 
-          {/* Components */}
+          {/* 2. Component Library */}
           <ButtonsSection />
           <InputsSection />
           <DropdownsSection />
@@ -173,7 +178,14 @@ const DesignSystemPage = () => {
           <FeedbackSection />
           <DataDisplaySection />
 
-          {/* Guidelines */}
+          {/* 3. Layout & Patterns */}
+          <LayoutPatternsSection />
+
+          {/* 4. Icons & Brand */}
+          <IconsSection />
+          <AvatarsSection />
+
+          {/* 5. Docs & A11y */}
           <DocumentationSection />
         </main>
       </div>
