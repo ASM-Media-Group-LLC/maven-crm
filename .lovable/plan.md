@@ -1,105 +1,66 @@
 
 
-# Reorganizar el Design System en 5 categorias
+# Crear logo de Maven CRM y boton de acceso al Design System
 
 ## Resumen
 
-Redistribuir las 17 secciones existentes del Design System en 5 categorias claras, y agregar una nueva seccion de Layout & Patterns. No se elimina ni duplica contenido -- solo se reorganiza la navegacion y numeracion.
+Se recreara el logo "Maven CRM" como un componente de texto estilizado (no imagen) basado en la referencia visual proporcionada, y se rediseñara la pagina Index para incluir el logo centrado junto con un boton de navegacion al Design System.
 
 ---
 
-## Nueva estructura
+## Analisis de la referencia visual
 
-```text
-1. DESIGN FOUNDATIONS (styles & tokens)
-   1.1 Colores
-   1.2 Tipografia
-   1.3 Espaciado
-   1.4 Bordes
-   1.5 Sombras
-   1.6 Z-Index
-   1.7 Estados globales
-
-2. COMPONENT LIBRARY (reusable UI elements)
-   2.1 Botones
-   2.2 Inputs
-   2.3 Dropdowns
-   2.4 Cards
-   2.5 Modales
-   2.6 Feedback
-   2.7 Data Display
-
-3. LAYOUT & PATTERNS (page templates and structure)   <-- NUEVA
-   3.1 Page Layouts
-   3.2 Patrones de composicion
-
-4. ICONS & BRAND ASSETS
-   4.1 Iconografia    (antes 1.8)
-   4.2 Avatares       (antes 1.9)
-
-5. DOCUMENTATION & ACCESSIBILITY
-   5.1 Docs & a11y    (antes 3.1)
-```
+La imagen muestra:
+- **"Maven"** en color azul (coincide con el token `primary` del sistema: `211 100% 50%`)
+- **"CRM"** en color gris claro/blanco (coincide con `foreground` o `muted-foreground`)
+- Fondo oscuro (el background del tema dark)
+- Tipografia sans-serif, peso medium/semibold
+- Estilo limpio y minimalista
 
 ---
 
-## Que cambia y que no
+## Cambios detallados
 
-### Sin cambios de contenido
+### 1. Crear componente Logo (`src/components/Logo.tsx`)
 
-Las 17 secciones existentes se mantienen identicas en su contenido interno. Solo se renumeran los titulos (ej: "1.8 Iconografia" pasa a "4.1 Iconografia") y se reubican en la sidebar.
+Un componente reutilizable que renderiza el logotipo "Maven CRM" usando texto estilizado:
 
-### Archivos que se modifican
+- **"Maven"** con `text-primary` (azul del sistema) y `font-bold`
+- **"CRM"** con `text-muted-foreground` (gris claro en dark, gris oscuro en light) y `font-normal` o `font-light`
+- Prop `size` opcional para controlar el tamano (`sm`, `md`, `lg`) para reutilizar en diferentes contextos (sidebar, header, etc.)
+- El componente usa exclusivamente tokens del Design System, sin colores hardcodeados
+- Funciona correctamente en ambos temas (light y dark)
 
-**`src/pages/design-system/DesignSystemPage.tsx`**
-- Actualizar `navItems` con las 5 categorias nuevas
-- Agregar import de la nueva seccion `LayoutPatternsSection`
-- Reordenar los componentes en el area de contenido para que sigan la nueva estructura
-- Agregar un nuevo `id="layouts"` y `id="composition"` para las secciones nuevas
+### 2. Actualizar pagina Index (`src/pages/Index.tsx`)
 
-**`src/pages/design-system/sections/IconsSection.tsx`**
-- Cambiar titulo de "1.8 Iconografia" a "4.1 Iconografia"
+Redisenar la pagina principal para mostrar:
 
-**`src/pages/design-system/sections/AvatarsSection.tsx`**
-- Cambiar titulo de "1.9 Avatares y Logos" a "4.2 Avatares y Logos"
-
-**`src/pages/design-system/sections/DocumentationSection.tsx`**
-- Cambiar titulo de "3.1 Documentacion y Accesibilidad" a "5.1 Documentacion y Accesibilidad"
-
-### Archivo nuevo
-
-**`src/pages/design-system/sections/LayoutPatternsSection.tsx`**
-
-Seccion nueva que documenta los patrones de layout usados en el proyecto:
-
-**3.1 Page Layouts** -- Patrones de pagina completa
-- Sidebar + Content (el patron usado en esta misma pagina del Design System): sidebar fija con `sticky top-0` y area de contenido scrollable
-- Centrado (`max-w-5xl mx-auto`): layout por defecto para paginas de contenido
-- Fullscreen sin sidebar: paginas de login, landing, error
-
-**3.2 Patrones de composicion** -- Patrones de estructura interna
-- Stack vertical (`space-y-{n}`): el patron mas comun, bloques apilados con espaciado consistente
-- Grid responsive (`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3`): para galerías, cards, dashboards
-- Flex con alineacion (`flex items-center justify-between`): headers, toolbars, filas de accion
-- Container con max-width: reglas de anchos maximos para legibilidad
-
-Cada patron incluira:
-- Ejemplo visual simplificado (usando divs con fondo `bg-muted` para representar areas)
-- La clase Tailwind exacta a usar
-- Cuando usar y cuando no
-
-Reglas:
-- Siempre usar Tailwind utilities, nunca CSS custom para layout
-- Respetar los breakpoints del sistema: `sm` (640px), `md` (768px), `lg` (1024px), `xl` (1280px)
-- No usar `position: absolute/fixed` excepto para overlays, tooltips y elementos flotantes documentados
+- El componente `Logo` centrado en pantalla con tamano grande
+- Un boton debajo del logo con texto "Design System" que navega a `/design-system`
+- El boton usara el componente `Button` existente con variante `outline` o `ghost`
+- Se usara `Link` de `react-router-dom` para la navegacion
+- El layout mantiene el patron actual: `flex min-h-screen items-center justify-center`
+- Se agrupara todo en un contenedor vertical con `flex-col` y `gap` apropiado
 
 ---
+
+## Archivos
+
+| Archivo | Accion | Detalle |
+|---|---|---|
+| `src/components/Logo.tsx` | Crear | Componente de logo reutilizable con variantes de tamano |
+| `src/pages/Index.tsx` | Modificar | Reemplazar el `<h1>MAVEN</h1>` actual con el Logo + boton al Design System |
+
+## Sin cambios en
+
+- Ningun archivo de `src/components/ui/`
+- `src/index.css` (no se crean tokens nuevos)
+- `src/App.tsx` (las rutas ya existen)
 
 ## Detalle tecnico
 
-La sidebar del Design System (`navItems`) pasara de 3 grupos a 5 grupos. El IntersectionObserver existente ya recorre automaticamente todos los IDs de `navItems.flatMap()`, por lo que el scroll-spy funcionara sin cambios adicionales.
-
-Los nuevos IDs de seccion seran `layouts` y `composition`, usados tanto en la sidebar como en los `<section id="...">` del contenido.
-
-No se crean dependencias nuevas. Los ejemplos de layout usan divs con clases Tailwind existentes para representar visualmente los patrones.
+- El logo es 100% texto/CSS, no se genera ni almacena ninguna imagen
+- Se usa `Link` de `react-router-dom` envuelto en el componente `Button` con `asChild` para navegacion declarativa
+- El componente Logo acepta un prop `size` con valores predefinidos que mapean a clases de Tailwind (`text-2xl`, `text-4xl`, `text-7xl`)
+- El componente es compatible con light y dark mode gracias al uso de tokens semanticos
 
