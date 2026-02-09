@@ -1,72 +1,43 @@
 
 
-# Redisenar KPI Cards y agregar tabs de agencia en /creadores
+# Ajustar tabla de Creadores segun mockup
 
 ## Resumen
-Redisenar las KPI cards de la pagina de creadores para que coincidan con el mockup: layout horizontal con icono a la derecha en fondo coloreado, subtitulos descriptivos debajo del numero, y una card separada "Total de Creadoras" mas pequena debajo. Ademas, agregar tabs de agencia (Todas, Atomic Agency, Kash Agency, etc.) entre las cards y los filtros existentes.
+Actualizar `CreadoresTable.tsx` para que coincida con el diseno del mockup: badges de categoria con colores, banderas emoji en ubicacion, icono de edificio en agencia, iconos de redes sociales con color, y columna de acciones con botones individuales (refresh, editar, ver) en lugar del dropdown.
 
-## Cambios
+## Cambios en `src/pages/creadores/CreadoresTable.tsx`
 
-### 1. Redisenar `CreadoresKPICards.tsx`
-Actualizar el componente para que coincida con el mockup:
+### 1. Categoria con badge coloreado
+Reemplazar el badge generico `variant="secondary"` por badges con colores segun la categoria, reutilizando el mismo mapeo que usa `CreadoresGrid`:
+- A+: `success-soft`
+- A: `primary-soft`
+- B+: `warning-soft`
+- B: `secondary-soft`
+- C: `destructive-soft`
 
-- **5 cards principales** en una fila (`grid-cols-5`): Activas, Onboarding, Pausadas, Retiros, Terminadas
-- Cada card muestra:
-  - Titulo arriba a la izquierda (ej: "Activas")
-  - Icono arriba a la derecha en un cuadrado con fondo coloreado (ej: `bg-success/20` con icono `text-success`)
-  - Numero grande debajo del titulo con color correspondiente
-  - Subtitulo descriptivo en `text-muted-foreground` (ej: "52% del total", "En proceso", "Temporales", "Proximas salidas", "Inactivas")
-- **Card "Total de Creadoras"** separada debajo, mas pequena, con icono de Users a la izquierda
+### 2. Estado con label traducido
+Agregar mapeo de labels para mostrar "Onboarding", "Activa", "Pausada", etc. en lugar del valor crudo de la base de datos. Usar el mismo `statusLabel` que `CreadoresGrid`.
 
-Subtitulos por card:
-| Card | Subtitulo |
-|------|-----------|
-| Activas | Calculo dinamico: `{Math.round(active/total*100)}% del total` |
-| Onboarding | "En proceso" |
-| Pausadas | "Temporales" |
-| Retiros | "Proximas salidas" |
-| Terminadas | "Inactivas" |
+### 3. Ubicacion con bandera emoji
+Agregar la funcion `getFlagEmoji` (misma que usa `CreadoresGrid`) para mostrar la bandera del pais junto a la ciudad. Formato: `[bandera] Ciudad`.
 
-### 2. Agregar tabs de agencia en `CreadoresContent.tsx`
-Debajo de las KPI cards y antes de los filtros, agregar una barra de tabs con las agencias disponibles:
-- Tab "Todas" (seleccionada por defecto, limpia filtro de agencia)
-- Tabs dinamicas basadas en las agencias que vienen del hook `useCreadores` (ej: "Atomic Agency", "Kash Agency", etc.)
-- Al hacer clic en una tab, se actualiza `filters.agency`
-- Estilo: botones con borde, el activo con fondo `secondary`
+### 4. Agencia con icono de edificio
+Agregar el icono `Building2` antes del nombre de la agencia. Si hay `kash_type`, concatenar con " . Mas..." truncado.
 
-### 3. Integrar KPI cards en `CreadoresContent.tsx`
-- Importar `CreadoresKPICards`
-- Agregar `statusCounts` del hook (ya existe pero no se usa)
-- Renderizar las cards entre el header y los filtros
+### 5. Redes sociales con iconos de color
+Mostrar iconos de Instagram, TikTok y Twitter con estilos visibles (no solo gris). Agregar soporte para `tiktok_handle` y `twitter_handle` ademas del `instagram_handle` existente.
 
-## Archivo modificados
-- `src/pages/creadores/CreadoresKPICards.tsx` (rediseno completo)
-- `src/pages/creadores/CreadoresContent.tsx` (agregar cards + tabs de agencia)
+### 6. Columna Acciones con botones individuales
+Reemplazar el dropdown menu con 3 botones de icono visibles:
+- `RefreshCw` (actualizar/sync)
+- `Pencil` (editar)
+- `Eye` (ver perfil)
 
-## Detalle tecnico
+Cambiar el header de la columna vacia a "Acciones".
 
-**Estructura de cada KPI card:**
-```text
-+----------------------------------+
-| Activas            [icon bg]     |
-|                                  |
-| 134                              |
-| 52% del total                    |
-+----------------------------------+
-```
+### 7. Avatar mas grande
+Aumentar el avatar de `h-8 w-8` a `h-10 w-10` para coincidir mejor con el mockup.
 
-**Card Total separada:**
-```text
-+------------------------+
-| [icon] Total de Creadoras |
-|        259                |
-+------------------------+
-```
-
-**Tabs de agencia:**
-```text
-[ Todas ] [ Atomic Agency ] [ Kash Agency ] [ Unlok Platform ] [ Otra ] [ Elite Models ]
-```
-
-Implementadas como botones con `variant="outline"` o `variant="secondary"` segun si estan activas, conectadas al filtro `agency` existente. Las agencias se obtienen dinamicamente del hook `useCreadores` que ya expone `agencies`.
+## Archivo modificado
+- `src/pages/creadores/CreadoresTable.tsx`
 
