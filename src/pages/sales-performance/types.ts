@@ -8,5 +8,5 @@ export interface EarningsRow {
   artistic_name: string | null;
 }
 
-export type SortField = "date" | "total_earnings_gross" | "artistic_name";
+export type SortField = "date" | "total_earnings_gross" | "artistic_name" | "pending_creator" | "document_id";
 export type SortDirection = "asc" | "desc";

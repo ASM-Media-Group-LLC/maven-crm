@@ -43,7 +43,11 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTable
               Artistic Name <SortIcon field="artistic_name" current={sortField} direction={sortDirection} />
             </button>
           </TableHead>
-          <TableHead className="text-xs">Creator OF</TableHead>
+          <TableHead className="text-xs">
+            <button className="flex items-center gap-1" onClick={() => onSort("pending_creator")}>
+              Creator OF <SortIcon field="pending_creator" current={sortField} direction={sortDirection} />
+            </button>
+          </TableHead>
           <TableHead className="text-xs text-right">
             <button className="flex items-center justify-end gap-1 w-full" onClick={() => onSort("date")}>
               Fecha <SortIcon field="date" current={sortField} direction={sortDirection} />
@@ -54,7 +58,11 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTable
               Total Earnings Gross <SortIcon field="total_earnings_gross" current={sortField} direction={sortDirection} />
             </button>
           </TableHead>
-          <TableHead className="text-xs">Document ID</TableHead>
+          <TableHead className="text-xs">
+            <button className="flex items-center gap-1" onClick={() => onSort("document_id")}>
+              Document ID <SortIcon field="document_id" current={sortField} direction={sortDirection} />
+            </button>
+          </TableHead>
 
         </TableRow>
       </TableHeader>
