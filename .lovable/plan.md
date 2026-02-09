@@ -1,28 +1,56 @@
 
-# Agregar columna "Hora" (HH:MM) junto a Fecha
+# Agregar filtro "Managers" y boton "Limpiar" a Creadores
 
 ## Resumen
-Agregar una columna "Hora" que muestre la hora del reporte en formato HH:MM (24 horas), posicionada justo despues de la columna "Fecha". La hora se extrae del campo `date` existente que ya contiene timestamp completo.
+Agregar el filtro faltante "Managers" (usando `manager_type` de `creator_business`) y un boton "Limpiar" con icono X para resetear todos los filtros a su estado inicial, tal como se muestra en la imagen de referencia.
 
 ## Cambios
 
-### 1. `src/pages/sales-performance/types.ts`
-- Agregar campo `report_time: string | null` a la interfaz `EarningsRow`
-- Agregar formato `"time"` al tipo union de `ColumnDef.format`
-- Insertar nueva columna en `ALL_COLUMNS` justo despues de "Fecha":
-  ```
-  { key: "report_time", label: "Hora", defaultVisible: true, align: "right", format: "time" }
-  ```
+### 1. `src/pages/creadores/useCreadores.ts`
+- Agregar campo `manager` a la interfaz `CreadorFilters`
+- Ampliar el select de Supabase para incluir `manager_type` de `creator_business`: `creator_business(assigned_agency, manager_type)`
+- Actualizar el tipo `CreatorWithBusiness` para incluir `manager_type`
+- Agregar filtro por `manager_type` en `applyFilters`
+- Agregar funcion `uniqueManagers` que extrae valores unicos de `creator_business.manager_type`
+- Retornar `managers` desde el hook
 
-### 2. `src/pages/sales-performance/useEarningsData.ts`
-- En el `.map()` final donde se construye cada `EarningsRow`, computar `report_time` extrayendo HH:MM del campo `date`:
-  ```typescript
-  report_time: e.date ? new Date(e.date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false }) : null
-  ```
+### 2. `src/pages/creadores/CreadoresFilters.tsx`
+- Agregar prop `managers: string[]` y prop `onClear: () => void`
+- Agregar el selector "Managers" despues de "Ciudades" usando el componente `FilterSelect` existente
+- Agregar boton "Limpiar" con icono `X` al final de la fila de filtros (antes del switch de vista), que llama `onClear`
+- Actualizar los placeholders a "Estados", "Categorias", "Paises", "Ciudades", "Managers" para coincidir con la imagen
 
-### 3. `src/pages/sales-performance/EarningsTable.tsx`
-- Agregar case `"time"` en la funcion `formatCell` que simplemente retorna el string tal cual (ya viene formateado desde el hook)
+### 3. `src/pages/creadores/CreadoresContent.tsx`
+- Agregar `manager: ""` al objeto `emptyFilters`
+- Pasar `managers` y `onClear` como props a `CreadoresFilters`
+- La funcion `onClear` simplemente hace `setFilters(emptyFilters)`
 
-## Resultado
-La tabla mostrara: ... | Fecha | Hora | Total Earnings | ...
-Donde "Fecha" muestra "ene 15, 2025" y "Hora" muestra "14:30". La columna es sortable y visible por defecto, y se puede ocultar/mostrar desde Custom Metrics.
+## Detalle Tecnico
+
+**CreadorFilters actualizado:**
+```typescript
+export interface CreadorFilters {
+  search: string;
+  agency: string;
+  status: string;
+  category: string;
+  country: string;
+  city: string;
+  manager: string;  // nuevo
+}
+```
+
+**Select ampliado:**
+```typescript
+supabase.from("creators").select("*, creator_business(assigned_agency, manager_type)")
+```
+
+**Boton Limpiar:**
+```tsx
+<Button variant="ghost" size="sm" onClick={onClear}>
+  <X className="h-4 w-4 mr-1" />
+  Limpiar
+</Button>
+```
+
+Los valores actuales de `manager_type` en la base de datos son: Basic, Full Management, Hybrid.
