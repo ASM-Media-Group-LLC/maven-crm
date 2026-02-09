@@ -40,9 +40,10 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTable
         <TableRow className="hover:bg-transparent">
           <TableHead className="text-xs">
             <button className="flex items-center gap-1" onClick={() => onSort("artistic_name")}>
-              Creadora <SortIcon field="artistic_name" current={sortField} direction={sortDirection} />
+              Artistic Name <SortIcon field="artistic_name" current={sortField} direction={sortDirection} />
             </button>
           </TableHead>
+          <TableHead className="text-xs">Creator OF</TableHead>
           <TableHead className="text-xs text-right">
             <button className="flex items-center justify-end gap-1 w-full" onClick={() => onSort("date")}>
               Fecha <SortIcon field="date" current={sortField} direction={sortDirection} />
@@ -54,18 +55,17 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTable
             </button>
           </TableHead>
           <TableHead className="text-xs">Document ID</TableHead>
+
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.id}>
-            <TableCell>
-              <div className="space-y-0.5">
-                {row.artistic_name && (
-                  <div className="text-sm font-medium text-foreground">{row.artistic_name}</div>
-                )}
-                <div className="text-xs text-muted-foreground">{row.pending_creator ?? "—"}</div>
-              </div>
+            <TableCell className="text-sm font-medium text-foreground">
+              {row.artistic_name ?? "—"}
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {row.pending_creator ?? "—"}
             </TableCell>
             <TableCell className="text-right text-sm text-foreground">{formatDate(row.date)}</TableCell>
             <TableCell className="text-right text-sm font-medium text-foreground">
@@ -78,7 +78,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTable
         ))}
         {rows.length === 0 && (
           <TableRow>
-            <TableCell colSpan={4} className="text-center text-muted-foreground text-sm py-8">
+            <TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-8">
               Sin resultados
             </TableCell>
           </TableRow>
