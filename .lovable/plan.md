@@ -1,68 +1,67 @@
 
-# Ajustar opciones de dropdowns y etiquetas en el formulario Nuevo Creador
+
+# Ajustar seccion Documentacion segun imagen de referencia
 
 ## Resumen
-Actualizar las constantes del formulario en `NuevoCreadorForm.tsx` para ajustar las opciones de Agencia, Estado, Pais, Idiomas y Categorias segun lo solicitado.
+Reemplazar la seccion de Documentacion actual (simplificada) por una version completa que replica 1:1 la imagen de referencia, incluyendo nuevos campos y logica condicional para PickLink.
 
 ## Cambios en `src/pages/creadores/NuevoCreadorForm.tsx`
 
-### 1. Agencia Asignada (linea 18-26 aprox)
-Cambiar el campo de Input a Select con opciones fijas:
-- Kash Agency, Atomic Agency, Unlok Platform, Elite Models, ORA Agency, Exchange, Otra
+### 1. Agregar campos nuevos al FormData y defaults
+Nuevos campos:
+- `piclink_url: string` (Direccion de PickLink)
+- `piclink_monthly_payment: number` (Pago Mensual PickLink)
+- `piclink_env_confirmed: boolean` (PickLink ENV Confirmado)
 
-### 2. Estados en espanol
-Cambiar de valores crudos a etiquetas en espanol en el dropdown:
-- onboarding -> "En Onboarding"
-- active -> "Activa"
-- paused -> "Pausada"
-- leaving -> "En Retiro"
-- terminated -> "Terminada"
+### 2. Actualizar testData con valores para los nuevos campos
 
-(El value interno sigue siendo el codigo en ingles, solo cambia la etiqueta visible)
+### 3. Reescribir la Seccion 6 - Documentacion
+Estructura segun la imagen:
 
-### 3. Paises - lista completa
-Reemplazar la lista corta de 11 paises por una lista completa de paises hispanohablantes y del mundo (~50+ paises mas relevantes, ordenados alfabeticamente).
-
-### 4. Idiomas
-Cambiar "Russkiy" por "Русский" en la constante LANGUAGES.
-
-### 5. Categorias de modelo
-Cambiar las etiquetas del select de categorias:
-- "A+" -> "A+ (Premium)"
-- "A" -> "A (Alta)"
-- "B+" -> "B+ (Media Alta)"
-- "B" -> "B (Media)"
-- "C" -> "C (Basica)"
-
-(El value almacenado sigue siendo "A+", "A", etc.)
-
-## Detalle tecnico
-
-```typescript
-const AGENCIES = ["Kash Agency", "Atomic Agency", "Unlok Platform", "Elite Models", "ORA Agency", "Exchange", "Otra"];
-
-const STATUSES = [
-  { value: "onboarding", label: "En Onboarding" },
-  { value: "active", label: "Activa" },
-  { value: "paused", label: "Pausada" },
-  { value: "leaving", label: "En Retiro" },
-  { value: "terminated", label: "Terminada" },
-];
-
-const CATEGORIES = [
-  { value: "A+", label: "A+ (Premium)" },
-  { value: "A", label: "A (Alta)" },
-  { value: "B+", label: "B+ (Media Alta)" },
-  { value: "B", label: "B (Media)" },
-  { value: "C", label: "C (Basica)" },
-];
-
-const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
+```
+Documentacion
+├── Contrato Firmado & Documentos
+│   ├── [Subir Archivos] (boton outline, alineado a la derecha)
+│   └── "Formatos: PDF, Word (.doc, .docx) e Imagenes. Maximo 10MB por archivo, 10 archivos."
+│
+├── Card con borde redondeado:
+│   ├── "Tiene PickLink Confirmado?" (titulo bold)
+│   ├── "Marcar si el creador tiene PickLink activo" (subtitulo muted)
+│   └── Checkbox alineado a la derecha
+│
+├── (Condicional: si has_piclink es true)
+│   ├── Barra lateral izquierda azul/accent
+│   ├── Grid 2 cols:
+│   │   ├── "Direccion de PickLink" (Input, placeholder https://piclink.com/username)
+│   │   └── "Pago Mensual PickLink" (Input number, placeholder 50.00)
+│   └── "Fotos de PickLink (Comprobante)" (texto label)
+│
+├── Fotos y Videos Extras
+│   ├── [Subir Archivos] (boton outline, alineado a la derecha)
+│   └── "Formatos: Imagenes (JPG, PNG, GIF) y Videos (MP4, MOV). Maximo 20MB por archivo."
+│
+└── Card con borde redondeado:
+    ├── "PickLink ENV Confirmado" (titulo bold)
+    ├── "Tag 'ENV' configurado en Bios" (subtitulo muted)
+    └── Checkbox alineado a la derecha (sin check)
 ```
 
-Ademas se cambia el campo "Agencia Asignada" de `<Input>` a `<Select>` con las opciones de AGENCIES, y se actualizan los renders de STATUSES y CATEGORIES para usar `s.value` / `s.label`.
+### 4. Actualizar handleSubmit
+Agregar los nuevos campos al objeto `business`:
+- `piclink_url: form.piclink_url || null`
+- `piclink_monthly_payment: form.piclink_monthly_payment || null`
+- `piclink_env_confirmed: form.piclink_env_confirmed`
 
-La lista de paises se amplia a incluir todos los paises de America Latina, Europa, Norteamerica y otros relevantes.
+### Detalle tecnico
+
+**Campos condicionales:** Cuando `has_piclink` es true, se muestran los campos de Direccion de PickLink y Pago Mensual con un borde izquierdo de acento (clase `border-l-2 border-primary pl-4`).
+
+**Checkboxes en cards:** Los dos checkboxes (PickLink Confirmado y ENV Confirmado) se renderizan dentro de cards con layout flex justify-between, texto a la izquierda y checkbox a la derecha.
+
+**Botones Subir Archivos:** Se mantienen como botones outline deshabilitados con el icono Upload, alineados a la derecha con flex justify-between respecto al titulo.
+
+**Mapeo a DB:** Los campos `piclink_url`, `piclink_monthly_payment` y `piclink_env_confirmed` ya existen en la tabla `creator_business` (como `piclink_url` no existe directamente, se usara el campo `piclink_url` del table `creators`). Revisando: `creator_business` tiene `piclink_env_confirmed` y `piclink_monthly_payment`. El campo `piclink_url` existe en la tabla `creators`.
 
 ## Archivos modificados
 - `src/pages/creadores/NuevoCreadorForm.tsx`
+
