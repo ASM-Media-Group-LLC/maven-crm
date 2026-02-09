@@ -1,63 +1,26 @@
 
 
-# Modal "Ver Creador" al hacer clic en el icono Eye
+# Mostrar bandera en la ubicacion del modal Ver Creador
 
-## Resumen
-Crear un modal de solo lectura que muestra la informacion del creador con un header con avatar, nombre artistico, nombre real, estado con badge de categoria, y un boton "Perfil Completo". Debajo, tabs para Info, Redes, Notas y Monetizacion (inicialmente solo Info activo). Boton "Cerrar" en el footer.
+## Problema
+El campo `country_code` esta vacio (null) en todos los registros de la base de datos. El codigo actual intenta generar la bandera a partir de `country_code`, pero como no existe, nunca se muestra.
 
-## Archivos a crear
+## Solucion
+Crear un mapeo de nombres de paises (en espanol) a codigos ISO de 2 letras dentro de `ViewCreadorModal.tsx`, y usarlo como fallback cuando `country_code` es null.
 
-### 1. `src/pages/creadores/ViewCreadorModal.tsx`
-Componente Dialog de solo lectura con:
+## Cambios en `src/pages/creadores/ViewCreadorModal.tsx`
 
-**Header del modal:**
-- Avatar grande (h-16 w-16) con iniciales o foto
-- Nombre artistico en texto grande (ej. "Jessy Asu")
-- Nombre real debajo en texto muted (ej. "Jessica Paola Maldonado Vargas")
-- Badge de categoria (A+, A, B+, etc.) con colores existentes
-- Badge de estado (Onboarding, Activa, etc.) con colores existentes
-- Boton "Perfil Completo" con icono ExternalLink (alineado a la derecha, solo visual por ahora)
+1. Agregar un diccionario `countryToCode` con los paises mas comunes en espanol:
+   - Argentina -> AR, Chile -> CL, Colombia -> CO, Mexico -> MX, Venezuela -> VE, etc.
 
-**Tabs (usando componente Tabs existente):**
-- **Info** (activo por defecto): Grid de 2 columnas con:
-  - Ubicacion (flag emoji + ciudad)
-  - Agencia (assigned_agency del creator_business)
-  - Email
-  - Telefono
-  - Tipo de Manager (manager_type del creator_business)
-  - Fecha de Registro (registration_date formateado)
-  - Idiomas (badges con los idiomas del array languages)
-- **Redes**: Links a Instagram, TikTok, Twitter/X, YouTube, OnlyFans, WhatsApp
-- **Notas (0)**: Placeholder "Sin notas" (funcionalidad futura)
-- **Monetizacion**: Placeholder "Sin datos" (funcionalidad futura)
+2. Modificar el calculo de `flag` para usar el nombre del pais como fallback:
+   ```
+   const code = c.country_code || countryToCode[c.country] || null
+   const flag = getFlagEmoji(code)
+   ```
 
-**Footer:**
-- Boton "Cerrar" alineado a la derecha
+Esto hara que la bandera se muestre junto a la ubicacion sin necesidad de modificar datos en la base de datos.
 
-**Props:** `open`, `onOpenChange`, `creator: CreatorWithBusiness`
-
-## Archivos a modificar
-
-### 2. `src/pages/creadores/CreadoresTable.tsx`
-- Agregar estado `viewingCreator` (`CreatorWithBusiness | null`)
-- Al hacer clic en el boton Eye, setear `viewingCreator`
-- Importar y renderizar `ViewCreadorModal`
-- Al cerrar modal, limpiar `viewingCreator`
-
-## Detalle tecnico
-
-**Datos mostrados en tab Info y su origen:**
-
-| Campo UI | Origen |
-|----------|--------|
-| Ubicacion | country_code (flag) + city |
-| Agencia | creator_business.assigned_agency |
-| Email | email |
-| Telefono | phone |
-| Tipo de Manager | creator_business.manager_type |
-| Fecha de Registro | registration_date (formateado con date-fns: "dd MMM yyyy", locale es) |
-| Idiomas | languages (array, mostrar como badges) |
-
-**Datos en tab Redes:**
-Cada red social con icono y link clickeable. Mostrar "---" si no tiene handle.
+## Archivo modificado
+- `src/pages/creadores/ViewCreadorModal.tsx`
 
