@@ -110,24 +110,7 @@ const CreadorProfileContent = () => {
               <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
             )}
 
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {c.status && (
-                <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
-                  {statusLabel[c.status] ?? c.status}
-                </Badge>
-              )}
-              {age != null && (
-                <Badge variant="secondary-soft">{age} años</Badge>
-              )}
-              {birthdayDays != null && (
-                <Badge variant="secondary-soft" className="gap-1">
-                  <Cake className="h-3 w-3" />
-                  {birthdayDays === 0 ? "¡Hoy!" : `${birthdayDays} días para su cumpleaños`}
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="flex flex-wrap items-center gap-2 mt-3">
               {c.whatsapp_number && (
                 <a href={`https://wa.me/${c.whatsapp_number}`} target="_blank" rel="noopener noreferrer">
                   <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
@@ -142,7 +125,24 @@ const CreadorProfileContent = () => {
                   </Badge>
                 </a>
               )}
+              {age != null && (
+                <Badge variant="secondary-soft">{age} años</Badge>
+              )}
             </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {c.status && (
+              <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
+                {statusLabel[c.status] ?? c.status}
+              </Badge>
+            )}
+            {birthdayDays != null && (
+              <Badge variant="secondary-soft" className="gap-1">
+                <Cake className="h-3 w-3" />
+                {birthdayDays === 0 ? "¡Hoy!" : `${birthdayDays} días para su cumpleaños`}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
