@@ -66,18 +66,26 @@ const InfoField = ({ icon: Icon, label, value }: { icon: React.ElementType; labe
   </div>
 );
 
-const SocialLink = ({ label, handle, url }: { label: string; handle: string | null; url: string }) => (
-  <div className="flex items-center justify-between py-2">
-    <span className="text-sm text-muted-foreground">{label}</span>
-    {handle ? (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-        {handle} <ExternalLink className="h-3 w-3" />
-      </a>
-    ) : (
-      <span className="text-sm text-muted-foreground">—</span>
-    )}
+const PlatformIcon = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground shrink-0">
+    {children}
   </div>
 );
+
+const SocialLink = ({ icon, handle, url }: { icon: React.ReactNode; handle: string | null; url: string }) => {
+  if (!handle) return null;
+  return (
+    <div className="flex items-center justify-between py-3">
+      <div className="flex items-center gap-3">
+        <PlatformIcon>{icon}</PlatformIcon>
+        <span className="text-sm font-medium">@{handle}</span>
+      </div>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+        <ExternalLink className="h-4 w-4" />
+      </a>
+    </div>
+  );
+};
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const c = creator;
@@ -153,13 +161,13 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
               )}
             </TabsContent>
 
-            <TabsContent value="redes" className="pr-3 space-y-1 divide-y">
-              <SocialLink label="Instagram" handle={c.instagram_handle} url={`https://instagram.com/${c.instagram_handle}`} />
-              <SocialLink label="TikTok" handle={c.tiktok_handle} url={`https://tiktok.com/@${c.tiktok_handle}`} />
-              <SocialLink label="Twitter / X" handle={c.twitter_handle} url={`https://x.com/${c.twitter_handle}`} />
-              <SocialLink label="YouTube" handle={c.youtube_handle} url={`https://youtube.com/@${c.youtube_handle}`} />
-              <SocialLink label="OnlyFans" handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
-              <SocialLink label="WhatsApp" handle={c.whatsapp_number} url={`https://wa.me/${c.whatsapp_number}`} />
+            <TabsContent value="redes" className="pr-3 divide-y">
+              <SocialLink icon={<Instagram className="h-4 w-4" />} handle={c.instagram_handle} url={`https://instagram.com/${c.instagram_handle}`} />
+              <SocialLink icon={<span className="text-xs font-bold">TT</span>} handle={c.tiktok_handle} url={`https://tiktok.com/@${c.tiktok_handle}`} />
+              <SocialLink icon={<span className="text-xs font-bold">X</span>} handle={c.twitter_handle} url={`https://x.com/${c.twitter_handle}`} />
+              <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} url={`https://youtube.com/@${c.youtube_handle}`} />
+              <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
+              <SocialLink icon={<Phone className="h-4 w-4" />} handle={c.whatsapp_number} url={`https://wa.me/${c.whatsapp_number}`} />
             </TabsContent>
 
             <TabsContent value="notas" className="pr-3">
