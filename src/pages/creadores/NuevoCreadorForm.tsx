@@ -94,7 +94,7 @@ const defaultForm: FormData = {
   status: "onboarding",
   name: "",
   artistic_name: "",
-  age: 18,
+  age: 0,
   birth_date: "",
   country: "",
   city: "",
@@ -196,7 +196,7 @@ const NuevoCreadorForm = () => {
     const e: Record<string, string> = {};
     if (!form.assigned_agency) e.assigned_agency = "La agencia es obligatoria";
     if (!form.name.trim()) e.name = "El nombre es obligatorio";
-    if (form.age < 18) e.age = "La edad mínima es 18 años";
+    if (!form.age || form.age < 18) e.age = "La edad mínima es 18 años";
     if (!form.birth_date) e.birth_date = "La fecha de nacimiento es obligatoria";
     if (!form.country) e.country = "El país es obligatorio";
     if (!form.city.trim()) e.city = "La ciudad es obligatoria";
@@ -322,7 +322,7 @@ const NuevoCreadorForm = () => {
               <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder="Nombre artístico" />
             </Field>
             <Field label="Edad *" error={errors.age} fieldKey="age">
-              <Input type="number" value={form.age} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive focus-visible:ring-destructive" : ""} />
+              <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
             <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
               <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className={errors.birth_date ? "border-destructive focus-visible:ring-destructive" : ""} />
