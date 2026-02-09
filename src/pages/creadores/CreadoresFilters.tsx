@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid } from "lucide-react";
+import { Search, List, LayoutGrid, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -14,10 +14,12 @@ import type { CreadorFilters } from "./useCreadores";
 interface Props {
   filters: CreadorFilters;
   onChange: (patch: Partial<CreadorFilters>) => void;
+  onClear: () => void;
   agencies: string[];
   categories: string[];
   countries: string[];
   cities: string[];
+  managers: string[];
   view: "table" | "grid";
   onViewChange: (v: "table" | "grid") => void;
 }
@@ -25,10 +27,12 @@ interface Props {
 const CreadoresFilters = ({
   filters,
   onChange,
+  onClear,
   agencies,
   categories,
   countries,
   cities,
+  managers,
   view,
   onViewChange,
 }: Props) => (
@@ -61,29 +65,40 @@ const CreadoresFilters = ({
       </div>
 
       <FilterSelect
-        placeholder="Estado"
+        placeholder="Estados"
         value={filters.status}
         options={["active", "onboarding", "paused", "leaving", "terminated"]}
         onChange={(v) => onChange({ status: v })}
       />
       <FilterSelect
-        placeholder="Categoría"
+        placeholder="Categorías"
         value={filters.category}
         options={categories}
         onChange={(v) => onChange({ category: v })}
       />
       <FilterSelect
-        placeholder="País"
+        placeholder="Países"
         value={filters.country}
         options={countries}
         onChange={(v) => onChange({ country: v })}
       />
       <FilterSelect
-        placeholder="Ciudad"
+        placeholder="Ciudades"
         value={filters.city}
         options={cities}
         onChange={(v) => onChange({ city: v })}
       />
+      <FilterSelect
+        placeholder="Managers"
+        value={filters.manager}
+        options={managers}
+        onChange={(v) => onChange({ manager: v })}
+      />
+
+      <Button variant="ghost" size="sm" onClick={onClear}>
+        <X className="h-4 w-4 mr-1" />
+        Limpiar
+      </Button>
 
       <div className="ml-auto flex gap-1">
         <Button

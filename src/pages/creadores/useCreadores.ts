@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type CreatorWithBusiness = Tables<"creators"> & {
-  creator_business: { assigned_agency: string | null } | null;
+  creator_business: { assigned_agency: string | null; manager_type: string | null } | null;
 };
 
 const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated"] as const;
@@ -21,7 +21,7 @@ export interface StatusCounts {
 async function fetchCreators(): Promise<CreatorWithBusiness[]> {
   const { data, error } = await supabase
     .from("creators")
-    .select("*, creator_business(assigned_agency)");
+    .select("*, creator_business(assigned_agency, manager_type)");
   if (error) throw error;
   return (data ?? []) as CreatorWithBusiness[];
 }
@@ -53,6 +53,15 @@ function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
   return Array.from(set).sort();
 }
 
+function uniqueManagers(creators: CreatorWithBusiness[]): string[] {
+  const set = new Set<string>();
+  for (const c of creators) {
+    const mt = c.creator_business?.manager_type;
+    if (mt) set.add(mt);
+  }
+  return Array.from(set).sort();
+}
+
 export interface CreadorFilters {
   search: string;
   agency: string;
@@ -60,6 +69,7 @@ export interface CreadorFilters {
   category: string;
   country: string;
   city: string;
+  manager: string;
 }
 
 function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters): CreatorWithBusiness[] {
@@ -79,6 +89,9 @@ function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters):
   }
   if (filters.city) {
     result = result.filter((c) => c.city === filters.city);
+  }
+  if (filters.manager) {
+    result = result.filter((c) => c.creator_business?.manager_type === filters.manager);
   }
   if (filters.search) {
     const q = filters.search.toLowerCase();
@@ -110,6 +123,7 @@ export function useCreadores(filters: CreadorFilters) {
     categories: uniqueValues(allCreators, "category"),
     countries: uniqueValues(allCreators, "country"),
     cities: uniqueValues(allCreators, "city"),
+    managers: uniqueManagers(allCreators),
   };
 }
 
