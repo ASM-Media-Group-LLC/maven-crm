@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, Instagram, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -11,20 +11,39 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { CreatorWithBusiness } from "./useCreadores";
 
-const statusVariant: Record<string, string> = {
-  active: "bg-success/20 text-success border-success/30",
-  onboarding: "bg-primary/20 text-primary border-primary/30",
-  leaving: "bg-destructive/20 text-destructive border-destructive/30",
-  terminated: "bg-muted text-muted-foreground border-border",
-  paused: "bg-warning/20 text-warning border-warning/30",
+const statusLabel: Record<string, string> = {
+  active: "Activa",
+  onboarding: "Onboarding",
+  leaving: "Retiro",
+  terminated: "Terminada",
+  paused: "Pausada",
+};
+
+const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
+  active: "success-soft",
+  onboarding: "primary-soft",
+  leaving: "warning-soft",
+  terminated: "destructive-soft",
+  paused: "secondary-soft",
+};
+
+const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "A+": "success-soft",
+  A: "primary-soft",
+  "B+": "warning-soft",
+  B: "secondary-soft",
+  C: "destructive-soft",
+};
+
+const getFlagEmoji = (countryCode: string | null) => {
+  if (!countryCode) return "";
+  return countryCode
+    .toUpperCase()
+    .split("")
+    .map((c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+    .join("");
 };
 
 type SortKey = "name" | "category" | "status" | "country" | "agency";
@@ -90,7 +109,7 @@ const CreadoresTable = ({ creators }: Props) => {
           <TableHead><SortHeader label="Ubicación" col="country" /></TableHead>
           <TableHead><SortHeader label="Agencia" col="agency" /></TableHead>
           <TableHead>Redes</TableHead>
-          <TableHead className="w-10" />
+          <TableHead>Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -102,11 +121,16 @@ const CreadoresTable = ({ creators }: Props) => {
             .join("")
             .toUpperCase();
 
+          const flag = getFlagEmoji(c.country_code);
+          const agency = c.creator_business?.assigned_agency;
+          const kashType = c.creator_business?.kash_type;
+          const agencyLabel = [agency, kashType].filter(Boolean).join(" · ");
+
           return (
             <TableRow key={c.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-10 w-10">
                     {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
                     <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                   </Avatar>
@@ -120,26 +144,29 @@ const CreadoresTable = ({ creators }: Props) => {
               </TableCell>
               <TableCell>
                 {c.category && (
-                  <Badge variant="secondary" className="font-normal">
+                  <Badge variant={categoryVariant[c.category] ?? "secondary-soft"} className="font-normal">
                     {c.category}
                   </Badge>
                 )}
               </TableCell>
               <TableCell>
                 {c.status && (
-                  <Badge
-                    variant="outline"
-                    className={`capitalize ${statusVariant[c.status] ?? ""}`}
-                  >
-                    {c.status}
+                  <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
+                    {statusLabel[c.status] ?? c.status}
                   </Badge>
                 )}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {[c.city, c.country].filter(Boolean).join(", ")}
+                {flag && <span className="mr-1">{flag}</span>}
+                {c.city || c.country || "—"}
               </TableCell>
               <TableCell className="text-sm">
-                {c.creator_business?.assigned_agency ?? "—"}
+                {agencyLabel ? (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate max-w-[140px]">{agencyLabel}</span>
+                  </span>
+                ) : "—"}
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
@@ -148,25 +175,45 @@ const CreadoresTable = ({ creators }: Props) => {
                       href={`https://instagram.com/${c.instagram_handle}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground"
+                      className="text-destructive hover:text-destructive/80"
                     >
                       <Instagram className="h-4 w-4" />
+                    </a>
+                  )}
+                  {c.tiktok_handle && (
+                    <a
+                      href={`https://tiktok.com/@${c.tiktok_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                    >
+                      TT
+                    </a>
+                  )}
+                  {c.twitter_handle && (
+                    <a
+                      href={`https://twitter.com/${c.twitter_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                    >
+                      𝕏
                     </a>
                   )}
                 </div>
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Ver perfil</DropdownMenuItem>
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           );
