@@ -1,25 +1,38 @@
 
 
-# Cambiar vista por defecto de Creadores a listado
+# Agregar hover y click en tarjetas del Grid de Creadores
 
 ## Cambio
 
-En `src/pages/creadores/CreadoresContent.tsx`, cambiar el valor inicial del estado `view` de `"grid"` a `"table"` para que al entrar a `/creadores` se muestre la vista de listado por defecto.
+Cada tarjeta (Card) en la vista de grid tendra un efecto hover visual y al hacer clic abrira el modal de informacion (ViewCreadorModal) del creador.
 
 ## Detalle tecnico
 
-En la linea 26 de `CreadoresContent.tsx`, cambiar:
+### Archivo: `src/pages/creadores/CreadoresGrid.tsx`
 
-```
-const [view, setView] = useState<"table" | "grid">("grid");
-```
+1. **Convertir a componente con estado** - Cambiar de arrow function sin estado a componente con `useState` para manejar el creador seleccionado.
 
-por:
+2. **Agregar hover a cada Card** - Aplicar clases de transicion al Card:
+   ```
+   className="overflow-hidden cursor-pointer transition-shadow duration-200 hover:shadow-md hover:border-primary/30"
+   ```
 
-```
-const [view, setView] = useState<"table" | "grid">("table");
-```
+3. **Agregar onClick** - Al hacer clic en la Card, guardar el creador en estado local:
+   ```
+   onClick={() => setViewingCreator(c)}
+   ```
 
-## Archivo modificado
-- `src/pages/creadores/CreadoresContent.tsx`
+4. **Evitar que los links de redes sociales disparen el click de la card** - Agregar `e.stopPropagation()` en los links de Instagram, TikTok y Twitter.
+
+5. **Renderizar ViewCreadorModal** - Importar y montar el modal al final del componente, controlado por el estado `viewingCreator`.
+
+### Cambios concretos
+
+- Importar `useState` de React
+- Importar `ViewCreadorModal` desde `./ViewCreadorModal`
+- Agregar estado `viewingCreator` de tipo `CreatorWithBusiness | null`
+- Agregar clases hover y cursor-pointer a `<Card>`
+- Agregar `onClick` a `<Card>`
+- Agregar `e.stopPropagation()` a cada `<a>` de redes sociales
+- Renderizar `<ViewCreadorModal>` condicionalmente al final
 
