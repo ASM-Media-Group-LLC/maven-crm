@@ -165,6 +165,27 @@ export function useUpdateCreador() {
   });
 }
 
+export type CreatorFull = Tables<"creators"> & {
+  creator_business: Tables<"creator_business"> | null;
+};
+
+export function useCreadorById(id: string) {
+  return useQuery({
+    queryKey: ["creator", id],
+    queryFn: async (): Promise<CreatorFull | null> => {
+      if (!id) return null;
+      const { data, error } = await supabase
+        .from("creators")
+        .select("*, creator_business(*)")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as CreatorFull | null;
+    },
+    enabled: !!id,
+  });
+}
+
 export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
