@@ -1,9 +1,11 @@
-import { Filter, Search, CalendarIcon } from "lucide-react";
+import { Filter, Search, CalendarIcon, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
   PopoverContent,
@@ -18,11 +20,11 @@ import {
 } from "@/components/ui/select";
 
 interface EarningsFiltersProps {
-  documentFilter: string;
-  onDocumentFilterChange: (value: string) => void;
+  documentFilter: string[];
+  onDocumentFilterChange: (value: string[]) => void;
   documentIds: string[];
-  creatorFilter: string;
-  onCreatorFilterChange: (value: string) => void;
+  creatorFilter: string[];
+  onCreatorFilterChange: (value: string[]) => void;
   creatorNames: string[];
   totalCount: number;
   searchQuery: string;
@@ -36,6 +38,15 @@ interface EarningsFiltersProps {
   pageSize: number | "all";
   onPageSizeChange: (value: number | "all") => void;
 }
+
+const toggleItem = (arr: string[], item: string) =>
+  arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
+
+const getDisplayLabel = (selected: string[], allLabel: string) => {
+  if (selected.length === 0) return allLabel;
+  if (selected.length === 1) return selected[0].length > 20 ? selected[0].slice(0, 20) + "…" : selected[0];
+  return `${selected.length} seleccionadas`;
+};
 
 const EarningsFilters = ({
   documentFilter,
@@ -57,7 +68,7 @@ const EarningsFilters = ({
   onPageSizeChange,
 }: EarningsFiltersProps) => (
   <div className="space-y-3">
-    {/* Row 1: Search + dropdowns */}
+    {/* Row 1: Search + multi-select dropdowns */}
     <div className="flex items-center gap-3 flex-wrap">
       <Filter className="h-4 w-4 text-muted-foreground" />
 
@@ -71,38 +82,74 @@ const EarningsFilters = ({
         />
       </div>
 
+      {/* Creator multi-select */}
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">Creadora:</span>
-        <Select value={creatorFilter} onValueChange={onCreatorFilterChange}>
-          <SelectTrigger className="w-48 h-8 text-xs">
-            <SelectValue placeholder="Todas" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {creatorNames.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="w-48 h-8 text-xs justify-between font-normal">
+              {getDisplayLabel(creatorFilter, "Todas")}
+              <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="start">
+            {creatorFilter.length > 0 && (
+              <div className="p-2 border-b">
+                <Button variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={() => onCreatorFilterChange([])}>
+                  Limpiar
+                </Button>
+              </div>
+            )}
+            <ScrollArea className="h-60">
+              <div className="p-2 space-y-1">
+                {creatorNames.map((name) => (
+                  <label key={name} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs">
+                    <Checkbox
+                      checked={creatorFilter.includes(name)}
+                      onCheckedChange={() => onCreatorFilterChange(toggleItem(creatorFilter, name))}
+                    />
+                    {name}
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
       </div>
 
+      {/* Document ID multi-select */}
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground">Document ID:</span>
-        <Select value={documentFilter} onValueChange={onDocumentFilterChange}>
-          <SelectTrigger className="w-64 h-8 text-xs">
-            <SelectValue placeholder="Todos" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {documentIds.map((id) => (
-              <SelectItem key={id} value={id}>
-                {id.slice(0, 8)}…
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="w-64 h-8 text-xs justify-between font-normal">
+              {getDisplayLabel(documentFilter.map((id) => id.slice(0, 8) + "…"), "Todos")}
+              <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-0" align="start">
+            {documentFilter.length > 0 && (
+              <div className="p-2 border-b">
+                <Button variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={() => onDocumentFilterChange([])}>
+                  Limpiar
+                </Button>
+              </div>
+            )}
+            <ScrollArea className="h-60">
+              <div className="p-2 space-y-1">
+                {documentIds.map((id) => (
+                  <label key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs">
+                    <Checkbox
+                      checked={documentFilter.includes(id)}
+                      onCheckedChange={() => onDocumentFilterChange(toggleItem(documentFilter, id))}
+                    />
+                    {id.slice(0, 8)}…
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
 
