@@ -20,7 +20,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { SidebarSeparator } from "@/components/ui/sidebar";
 
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -37,7 +37,7 @@ const secondaryMenu = [
 const DashboardSidebar = () => {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-3">
         <Logo size="sm" />
       </SidebarHeader>
 
@@ -65,7 +65,7 @@ const DashboardSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Separator className="mx-4 w-auto" />
+        <SidebarSeparator />
 
         <SidebarGroup>
           <SidebarGroupContent>
