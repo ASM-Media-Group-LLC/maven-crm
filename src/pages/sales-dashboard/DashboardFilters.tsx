@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,16 @@ const DashboardFilters = ({
   activePeriod,
   onPeriodChange,
 }: DashboardFiltersProps) => {
+  const navigate = useNavigate();
+
+  const handleViewChange = (tab: ViewTab) => {
+    if (tab === "Rendimiento por Creadora") {
+      navigate("/salesperformancecreator");
+      return;
+    }
+    onViewChange(tab);
+  };
+
   return (
     <div className="space-y-4">
       {/* View tabs */}
@@ -29,7 +40,7 @@ const DashboardFilters = ({
         {viewTabs.map((tab) => (
           <button
             key={tab}
-            onClick={() => onViewChange(tab)}
+            onClick={() => handleViewChange(tab)}
             className={cn(
               "px-4 py-2 rounded-md text-sm font-medium transition-colors",
               activeView === tab
