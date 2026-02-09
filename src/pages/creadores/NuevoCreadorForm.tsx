@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Users, Pencil, Save, Upload,
+  ArrowLeft, Users, Pencil, Save, Upload, X,
   User, Phone, Share2, Image, Settings, FileText, DollarSign, Camera, StickyNote,
 } from "lucide-react";
+import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -161,6 +162,14 @@ const NuevoCreadorForm = () => {
   const { toast } = useToast();
   const [form, setForm] = useState<FormData>(defaultForm);
   const mutation = useAddCreadorWithBusiness();
+  const tempId = useMemo(() => crypto.randomUUID(), []);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "contracts" });
+
+  const openUpload = (category: UploadCategory) => setUploadModal({ open: true, category });
+  const handleFilesUploaded = (files: UploadedFile[]) => setUploadedFiles((prev) => [...prev, ...files]);
+  const removeUploadedFile = (url: string) => setUploadedFiles((prev) => prev.filter((f) => f.url !== url));
+  const filesByCategory = (cat: UploadCategory) => uploadedFiles.filter((f) => f.category === cat);
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -180,6 +189,13 @@ const NuevoCreadorForm = () => {
     }
 
     try {
+      const documents = uploadedFiles.map((f) => ({
+        file_name: f.name,
+        file_url: f.url,
+        file_type: f.type,
+        description: f.category,
+      }));
+
       await mutation.mutateAsync({
         creator: {
           name: form.name,
@@ -217,6 +233,7 @@ const NuevoCreadorForm = () => {
           platform_username: form.platform_username || null,
           start_date: form.start_date || null,
         },
+        documents,
       });
       toast({ title: "Creador guardado exitosamente" });
       navigate("/creadores");
@@ -377,11 +394,12 @@ const NuevoCreadorForm = () => {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Contrato Firmado & Documentos</p>
-                <Button variant="outline" size="sm" disabled>
+                <Button variant="outline" size="sm" onClick={() => openUpload("contracts")}>
                   <Upload className="mr-2 h-4 w-4" /> Subir Archivos
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx) e Imágenes. Máximo 10MB por archivo, 10 archivos.</p>
+              <UploadedFilesList files={filesByCategory("contracts")} onRemove={removeUploadedFile} />
             </div>
 
             {/* PickLink Confirmado Card */}
@@ -404,11 +422,16 @@ const NuevoCreadorForm = () => {
                     <Input type="number" value={form.piclink_monthly_payment} onChange={(e) => set("piclink_monthly_payment", Number(e.target.value))} placeholder="50.00" min={0} />
                   </Field>
                 </div>
-                <p className="text-sm font-medium">Fotos de PickLink (Comprobante)</p>
-                <Button variant="outline" size="sm" disabled>
-                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-                </Button>
-                <p className="text-xs text-muted-foreground">Requiere configuración de storage</p>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium">Fotos de PickLink (Comprobante)</p>
+                    <Button variant="outline" size="sm" onClick={() => openUpload("piclink")}>
+                      <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF, WebP). Máximo 10MB por archivo.</p>
+                  <UploadedFilesList files={filesByCategory("piclink")} onRemove={removeUploadedFile} />
+                </div>
               </div>
             )}
 
@@ -416,11 +439,12 @@ const NuevoCreadorForm = () => {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-medium">Fotos y Videos Extras</p>
-                <Button variant="outline" size="sm" disabled>
+                <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
                   <Upload className="mr-2 h-4 w-4" /> Subir Archivos
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
+              <UploadedFilesList files={filesByCategory("extras")} onRemove={removeUploadedFile} />
             </div>
 
             {/* PickLink ENV Confirmado Card */}
@@ -432,6 +456,14 @@ const NuevoCreadorForm = () => {
               <Checkbox checked={form.piclink_env_confirmed} onCheckedChange={(v) => set("piclink_env_confirmed", !!v)} />
             </div>
           </div>
+
+          <FileUploadModal
+            open={uploadModal.open}
+            onClose={() => setUploadModal((p) => ({ ...p, open: false }))}
+            category={uploadModal.category}
+            tempId={tempId}
+            onFilesUploaded={handleFilesUploaded}
+          />
         </Section>
 
         {/* Seccion 7 - Condiciones Comerciales */}
@@ -532,6 +564,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1.5">
       <Label className="text-sm font-medium">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function UploadedFilesList({ files, onRemove }: { files: UploadedFile[]; onRemove: (url: string) => void }) {
+  if (!files.length) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      {files.map((f) => (
+        <div key={f.url} className="flex items-center gap-2 text-sm rounded-md border px-3 py-1.5">
+          {f.type.startsWith("image/") ? (
+            <img src={f.url} alt={f.name} className="h-8 w-8 rounded object-cover shrink-0" />
+          ) : (
+            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+          <span className="truncate flex-1">{f.name}</span>
+          <button onClick={() => onRemove(f.url)} className="text-muted-foreground hover:text-destructive">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

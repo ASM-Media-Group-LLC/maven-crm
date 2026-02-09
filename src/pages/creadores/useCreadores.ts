@@ -143,16 +143,40 @@ interface AddCreadorWithBusinessInput {
   business: Omit<TablesInsert<"creator_business">, "creator_id">;
 }
 
+interface DocumentInput {
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  description?: string;
+}
+
+interface AddCreadorFullInput extends AddCreadorWithBusinessInput {
+  documents?: DocumentInput[];
+}
+
 export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ creator, business }: AddCreadorWithBusinessInput) => {
+    mutationFn: async ({ creator, business, documents }: AddCreadorFullInput) => {
       const { data, error } = await supabase.from("creators").insert(creator).select("id").single();
       if (error) throw error;
+      const creatorId = data.id;
       const { error: bizError } = await supabase
         .from("creator_business")
-        .insert({ ...business, creator_id: data.id });
+        .insert({ ...business, creator_id: creatorId });
       if (bizError) throw bizError;
+
+      if (documents && documents.length > 0) {
+        const docs = documents.map((d) => ({
+          creator_id: creatorId,
+          file_name: d.file_name,
+          file_url: d.file_url,
+          file_type: d.file_type,
+          description: d.description || null,
+        }));
+        const { error: docError } = await supabase.from("creator_documents").insert(docs);
+        if (docError) throw docError;
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
   });
