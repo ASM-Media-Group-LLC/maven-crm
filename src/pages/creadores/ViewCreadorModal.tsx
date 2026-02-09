@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Instagram, Globe } from "lucide-react";
@@ -88,6 +89,7 @@ const SocialLink = ({ icon, handle, url }: { icon: React.ReactNode; handle: stri
 };
 
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
+  const navigate = useNavigate();
   const c = creator;
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
@@ -120,7 +122,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 )}
               </div>
             </div>
-            <Button variant="outline" size="sm" className="shrink-0 gap-1.5">
+            <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => { onOpenChange(false); navigate(`/creadores/${c.id}`); }}>
               <ExternalLink className="h-3.5 w-3.5" />
               Perfil Completo
             </Button>

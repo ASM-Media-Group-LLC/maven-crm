@@ -11,6 +11,7 @@ import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import NuevoCreador from "./pages/NuevoCreador";
+import CreadorProfile from "./pages/CreadorProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/creadores" element={<Creadores />} />
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
+            <Route path="/creadores/:id" element={<CreadorProfile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

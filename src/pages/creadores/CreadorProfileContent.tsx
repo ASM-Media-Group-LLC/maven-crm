@@ -1,0 +1,227 @@
+import { useParams, useNavigate } from "react-router-dom";
+import { format, differenceInCalendarDays, setYear } from "date-fns";
+import { es } from "date-fns/locale";
+import { ArrowLeft, CalendarDays, Instagram, Phone, Edit, MapPin, Building2, UserCog, Cake, Globe } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCreadorById } from "./useCreadores";
+
+const statusLabel: Record<string, string> = {
+  active: "Activa",
+  onboarding: "Onboarding",
+  leaving: "Retiro",
+  terminated: "Terminada",
+  paused: "Pausada",
+};
+
+const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
+  active: "success-soft",
+  onboarding: "primary-soft",
+  leaving: "warning-soft",
+  terminated: "destructive-soft",
+  paused: "secondary-soft",
+};
+
+const countryToCode: Record<string, string> = {
+  Argentina: "AR", Bolivia: "BO", Brasil: "BR", Chile: "CL", Colombia: "CO",
+  "Costa Rica": "CR", Cuba: "CU", Ecuador: "EC", "El Salvador": "SV",
+  España: "ES", "Estados Unidos": "US", Guatemala: "GT", Honduras: "HN",
+  México: "MX", Nicaragua: "NI", Panamá: "PA", Paraguay: "PY", Perú: "PE",
+  "Puerto Rico": "PR", "República Dominicana": "DO", Uruguay: "UY", Venezuela: "VE",
+};
+
+const getFlagEmoji = (code: string | null) => {
+  if (!code) return "";
+  return code.toUpperCase().split("").map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
+};
+
+function getDaysUntilBirthday(birthDate: string): number | null {
+  const bd = new Date(birthDate);
+  if (isNaN(bd.getTime())) return null;
+  const today = new Date();
+  let next = setYear(bd, today.getFullYear());
+  if (next < today) next = setYear(bd, today.getFullYear() + 1);
+  return differenceInCalendarDays(next, today);
+}
+
+function computeAge(birthDate: string): number | null {
+  const bd = new Date(birthDate);
+  if (isNaN(bd.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - bd.getFullYear();
+  const m = today.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="py-3">
+    <p className="text-xs text-muted-foreground mb-1">{label}</p>
+    <p className="text-sm font-medium">{value || "—"}</p>
+  </div>
+);
+
+const CreadorProfileContent = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { data: creator, isLoading } = useCreadorById(id ?? "");
+
+  if (isLoading) {
+    return (
+      <main className="flex-1 p-6 space-y-4">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </main>
+    );
+  }
+
+  if (!creator) {
+    return (
+      <main className="flex-1 p-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/creadores")} className="gap-1.5 mb-4">
+          <ArrowLeft className="h-4 w-4" /> Volver
+        </Button>
+        <p className="text-muted-foreground">Creadora no encontrada.</p>
+      </main>
+    );
+  }
+
+  const c = creator;
+  const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
+  const age = c.birth_date ? computeAge(c.birth_date) : c.age;
+  const birthdayDays = c.birth_date ? getDaysUntilBirthday(c.birth_date) : null;
+  const biz = c.creator_business;
+
+  return (
+    <main className="flex-1 overflow-y-auto">
+      {/* Back button */}
+      <div className="px-6 pt-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/creadores")} className="gap-1.5 text-muted-foreground">
+          <ArrowLeft className="h-4 w-4" /> Volver
+        </Button>
+      </div>
+
+      {/* Hero Header */}
+      <div className="mx-6 mt-3 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-6">
+        <div className="flex items-start gap-6">
+          <Avatar className="h-24 w-24 shrink-0">
+            {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
+            <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
+          </Avatar>
+
+          <div className="flex-1 min-w-0 space-y-2">
+            <h1 className="text-2xl font-bold tracking-wide uppercase">{c.name}</h1>
+            {c.artistic_name && (
+              <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {c.status && (
+                <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
+                  {statusLabel[c.status] ?? c.status}
+                </Badge>
+              )}
+              {age != null && (
+                <Badge variant="secondary-soft">{age} años</Badge>
+              )}
+              {birthdayDays != null && (
+                <Badge variant="secondary-soft" className="gap-1">
+                  <Cake className="h-3 w-3" />
+                  {birthdayDays === 0 ? "¡Hoy!" : `${birthdayDays} días para su cumpleaños`}
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-3">
+              {c.whatsapp_number && (
+                <a href={`https://wa.me/${c.whatsapp_number}`} target="_blank" rel="noopener noreferrer">
+                  <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
+                    <Phone className="h-3 w-3" /> WhatsApp
+                  </Badge>
+                </a>
+              )}
+              {c.instagram_handle && (
+                <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer">
+                  <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
+                    <Instagram className="h-3 w-3" /> @{c.instagram_handle}
+                  </Badge>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-6 mt-4 pb-6">
+        <Tabs defaultValue="info">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
+            <TabsTrigger value="redes">Redes</TabsTrigger>
+            <TabsTrigger value="monetizacion">Monetización</TabsTrigger>
+            <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            <TabsTrigger value="notas">Notas</TabsTrigger>
+            <TabsTrigger value="tickets">Tickets</TabsTrigger>
+            <TabsTrigger value="historial">Historial</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="info">
+            <div className="flex items-center justify-between mt-4 mb-2">
+              <h2 className="text-lg font-semibold">Información General</h2>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Edit className="h-3.5 w-3.5" /> Editar
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 rounded-lg border border-border bg-card p-5">
+              <InfoField label="Agencia Asignada" value={
+                biz?.assigned_agency ? (
+                  <span className="text-primary cursor-pointer hover:underline">{biz.assigned_agency}</span>
+                ) : null
+              } />
+              <InfoField label="Categoría" value={c.category} />
+              <InfoField label="Estado" value={
+                c.status ? (
+                  <Badge variant={statusVariant[c.status] ?? "secondary-soft"} className="font-normal">
+                    {statusLabel[c.status] ?? c.status}
+                  </Badge>
+                ) : null
+              } />
+              <InfoField label="Fecha de Registro" value={
+                c.registration_date ? format(new Date(c.registration_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
+              } />
+              <InfoField label="Manager" value={biz?.manager_type} />
+              <InfoField label="País" value={
+                c.country ? (
+                  <span>{flag && <span className="mr-1">{flag}</span>}{c.country}</span>
+                ) : null
+              } />
+              <InfoField label="Ciudad" value={c.city} />
+              <InfoField label="Fecha de Nacimiento" value={
+                c.birth_date ? format(new Date(c.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
+              } />
+              <InfoField label="Porcentaje con Agencia" value={
+                biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null
+              } />
+              <InfoField label="Notas Internas" value={c.internal_notes} />
+            </div>
+          </TabsContent>
+
+          {["lineamientos", "redes", "monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
+            <TabsContent key={tab} value={tab}>
+              <p className="text-sm text-muted-foreground text-center py-12">Sin datos disponibles</p>
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
+    </main>
+  );
+};
+
+export default CreadorProfileContent;
