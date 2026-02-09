@@ -1,39 +1,45 @@
 
 
-# Corregir scroll horizontal en /creadores
+# Redisenar cards del grid para layout vertical
 
-## Problema
+## Cambio
 
-El contenedor `flex-1` que envuelve el contenido no tiene restriccion de ancho minimo. En flexbox, los hijos no se encogen por debajo de su contenido a menos que se aplique `min-w-0` o `overflow-hidden`. Esto causa que el grid empuje el contenido mas alla del sidebar, generando scroll horizontal.
+Reorganizar el layout de cada card de horizontal (avatar a la izquierda, info a la derecha) a vertical, siguiendo el diseno de referencia.
 
-## Solucion
+## Layout objetivo (basado en screenshot)
 
-Aplicar `min-w-0` y `overflow-hidden` en los contenedores necesarios para que el contenido respete el espacio disponible junto al sidebar.
-
-## Cambios
-
-### 1. `src/pages/Creadores.tsx` (linea 11)
-
-Agregar `min-w-0` al div contenedor del contenido:
-
-```
-// Antes
-<div className="flex flex-1 flex-col">
-
-// Despues
-<div className="flex flex-1 flex-col min-w-0">
+```text
++---------------------------+
+|  [Avatar]  Nombre Artistico|
+|           Nombre Real...   |
+|           [B] [Onboarding] |
+|                             |
+|  Flag Colombia, Bogota      |
+|  Building Atomic Agency     |
+| ─────────────────────────── |
+|  [IG] [TT] [X]             |
++---------------------------+
 ```
 
-### 2. `src/pages/creadores/CreadoresContent.tsx` (linea 34)
+## Detalle tecnico
 
-Agregar `min-w-0` al main para reforzar la restriccion:
+### Archivo: `src/pages/creadores/CreadoresGrid.tsx`
 
-```
-// Antes
-<main className="flex-1 overflow-auto p-6 space-y-6">
+1. **Cambiar layout del CardContent** de `flex gap-4` (horizontal) a una estructura con dos secciones:
+   - **Header**: `flex gap-3` con avatar a la izquierda y nombre + badges a la derecha
+   - **Body**: ubicacion y agencia como lineas independientes debajo del header
+   - **Separador visual**: un `border-t` antes de los iconos sociales
+   - **Footer**: iconos de redes sociales con tamano mas grande (h-4 w-4)
 
-// Despues
-<main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
-```
+2. **Cambios especificos en clases**:
+   - CardContent: cambiar de `flex gap-4 p-4` a `p-4 space-y-3`
+   - Header section: `flex items-start gap-3` con avatar y bloque de texto
+   - Nombre: texto `text-sm font-semibold text-primary`
+   - Nombre real: `text-xs text-muted-foreground truncate`
+   - Badges row: incluir categoria, status y icono RefreshCw en la misma fila
+   - Location y agency: cada uno en su propia linea con `text-sm`
+   - Separador: `<div className="border-t" />`
+   - Social icons: tamano `h-4 w-4`, espaciado `gap-3`
 
-Estos dos cambios aseguran que la cadena de flexbox respete el ancho del sidebar y el grid se ajuste al espacio disponible sin generar scroll horizontal.
+3. **Sin cambios funcionales**: toda la logica de estado, click, modal y stopPropagation se mantiene igual.
+
