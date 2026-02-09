@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import * as XLSX from "xlsx";
 import Logo from "@/components/Logo";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import EarningsFilters from "./sales-performance/EarningsFilters";
@@ -47,6 +48,16 @@ const SalesPerformanceCreator = () => {
       if (sortField === "total_earnings_gross") {
         return ((a.total_earnings_gross ?? 0) - (b.total_earnings_gross ?? 0)) * dir;
       }
+      if (sortField === "pending_creator") {
+        const pa = (a.pending_creator || "").toLowerCase();
+        const pb = (b.pending_creator || "").toLowerCase();
+        return pa.localeCompare(pb) * dir;
+      }
+      if (sortField === "document_id") {
+        const da = (a.document_id || "").toLowerCase();
+        const db = (b.document_id || "").toLowerCase();
+        return da.localeCompare(db) * dir;
+      }
       // artistic_name
       const na = (a.artistic_name || a.pending_creator || "").toLowerCase();
       const nb = (b.artistic_name || b.pending_creator || "").toLowerCase();
@@ -76,6 +87,20 @@ const SalesPerformanceCreator = () => {
   const handleDocumentFilter = (v: string) => { setDocumentFilter(v); setCurrentPage(1); };
   const handleCreatorFilter = (v: string) => { setCreatorFilter(v); setCurrentPage(1); };
 
+  const handleDownloadExcel = useCallback(() => {
+    const exportData = filtered.map((r) => ({
+      "Artistic Name": r.artistic_name ?? "",
+      "Creator OF": r.pending_creator ?? "",
+      Fecha: r.date,
+      "Total Earnings Gross": r.total_earnings_gross ?? 0,
+      "Document ID": r.document_id ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Earnings");
+    XLSX.writeFile(wb, "earnings_export.xlsx");
+  }, [filtered]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
@@ -103,12 +128,18 @@ const SalesPerformanceCreator = () => {
           totalCount={filtered.length}
         />
 
-        {/* Total Earnings Indicator */}
+        {/* Total Earnings Indicator + Download */}
         <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Total Earnings Gross (filtrado)</span>
-          <span className="text-xl font-bold text-foreground">
-            ${totalEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">Total Earnings Gross (filtrado)</span>
+            <span className="text-xl font-bold text-foreground">
+              ${totalEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
+            <Download className="h-4 w-4" />
+            Descargar Excel
+          </Button>
         </div>
 
         {isLoading ? (
