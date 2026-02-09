@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, differenceInCalendarDays, setYear } from "date-fns";
 import { es } from "date-fns/locale";
@@ -5,9 +6,12 @@ import { ArrowLeft, CalendarDays, Instagram, Phone, Edit, MapPin, Building2, Use
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreadorById } from "./useCreadores";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -67,7 +71,36 @@ const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) 
 const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
+
+  const [agencyPercentage, setAgencyPercentage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [initialPercentage, setInitialPercentage] = useState("");
+
+  useEffect(() => {
+    if (creator?.creator_business?.agency_percentage != null) {
+      const val = String(creator.creator_business.agency_percentage);
+      setAgencyPercentage(val);
+      setInitialPercentage(val);
+    } else {
+      setAgencyPercentage("");
+      setInitialPercentage("");
+    }
+  }, [creator?.creator_business?.agency_percentage]);
+
+  const handlePercentageBlur = async () => {
+    if (agencyPercentage === initialPercentage) return;
+    if (!creator?.creator_business?.id) return;
+    setSaving(true);
+    const numVal = agencyPercentage === "" ? null : Number(agencyPercentage);
+    await supabase
+      .from("creator_business")
+      .update({ agency_percentage: numVal })
+      .eq("id", creator.creator_business.id);
+    await queryClient.invalidateQueries({ queryKey: ["creator", id] });
+    setSaving(false);
+  };
 
   if (isLoading) {
     return (
@@ -206,9 +239,22 @@ const CreadorProfileContent = () => {
               <InfoField label="Fecha de Nacimiento" value={
                 c.birth_date ? format(new Date(c.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
               } />
-              <InfoField label="Porcentaje con Agencia" value={
-                biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null
-              } />
+              <div className="py-3">
+                <p className="text-xs text-muted-foreground mb-1">Porcentaje con Agencia</p>
+                <div className="relative w-24">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={agencyPercentage}
+                    onChange={(e) => setAgencyPercentage(e.target.value)}
+                    onBlur={handlePercentageBlur}
+                    className={`h-auto py-0 px-0 text-sm font-medium bg-transparent border-transparent shadow-none cursor-default focus:cursor-text focus:border-input focus:ring-ring focus:bg-background pr-6 ${saving ? "opacity-50" : ""}`}
+                    placeholder="—"
+                  />
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                </div>
+              </div>
               <InfoField label="Notas Internas" value={c.internal_notes} />
             </div>
           </TabsContent>
