@@ -1,0 +1,125 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+
+export type CreatorWithBusiness = Tables<"creators"> & {
+  creator_business: { assigned_agency: string | null } | null;
+};
+
+const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated"] as const;
+export type CreatorStatus = (typeof STATUS_LIST)[number];
+
+export interface StatusCounts {
+  active: number;
+  onboarding: number;
+  paused: number;
+  leaving: number;
+  terminated: number;
+  total: number;
+}
+
+async function fetchCreators(): Promise<CreatorWithBusiness[]> {
+  const { data, error } = await supabase
+    .from("creators")
+    .select("*, creator_business(assigned_agency)");
+  if (error) throw error;
+  return (data ?? []) as CreatorWithBusiness[];
+}
+
+function computeStatusCounts(creators: CreatorWithBusiness[]): StatusCounts {
+  const counts: StatusCounts = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0, total: creators.length };
+  for (const c of creators) {
+    const s = c.status as CreatorStatus;
+    if (s in counts) counts[s]++;
+  }
+  return counts;
+}
+
+function uniqueValues(creators: CreatorWithBusiness[], key: keyof Tables<"creators">): string[] {
+  const set = new Set<string>();
+  for (const c of creators) {
+    const val = c[key];
+    if (val && typeof val === "string") set.add(val);
+  }
+  return Array.from(set).sort();
+}
+
+function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
+  const set = new Set<string>();
+  for (const c of creators) {
+    const agency = c.creator_business?.assigned_agency;
+    if (agency) set.add(agency);
+  }
+  return Array.from(set).sort();
+}
+
+export interface CreadorFilters {
+  search: string;
+  agency: string;
+  status: string;
+  category: string;
+  country: string;
+  city: string;
+}
+
+function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters): CreatorWithBusiness[] {
+  let result = creators;
+
+  if (filters.agency) {
+    result = result.filter((c) => c.creator_business?.assigned_agency === filters.agency);
+  }
+  if (filters.status) {
+    result = result.filter((c) => c.status === filters.status);
+  }
+  if (filters.category) {
+    result = result.filter((c) => c.category === filters.category);
+  }
+  if (filters.country) {
+    result = result.filter((c) => c.country === filters.country);
+  }
+  if (filters.city) {
+    result = result.filter((c) => c.city === filters.city);
+  }
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    result = result.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.artistic_name && c.artistic_name.toLowerCase().includes(q))
+    );
+  }
+
+  return result;
+}
+
+export function useCreadores(filters: CreadorFilters) {
+  const query = useQuery({
+    queryKey: ["creators"],
+    queryFn: fetchCreators,
+  });
+
+  const allCreators = query.data ?? [];
+  const filtered = applyFilters(allCreators, filters);
+
+  return {
+    creators: filtered,
+    allCreators,
+    isLoading: query.isLoading,
+    statusCounts: computeStatusCounts(filtered),
+    agencies: uniqueAgencies(allCreators),
+    categories: uniqueValues(allCreators, "category"),
+    countries: uniqueValues(allCreators, "country"),
+    cities: uniqueValues(allCreators, "city"),
+  };
+}
+
+export function useAddCreador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: TablesInsert<"creators">) => {
+      const { error } = await supabase.from("creators").insert(data);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
+  });
+}
