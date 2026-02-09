@@ -1,20 +1,24 @@
 
 
-# Bloquear campo "Porcentaje con Agencia" en modo lectura
+# Bloquear campo "Porcentaje con Agencia" tambien en modo edicion
 
 ## Cambio
 
-En `src/pages/creadores/InfoTabContent.tsx`, el campo "Porcentaje con Agencia" en modo lectura (no editing) debe mostrarse como texto estatico igual que los demas campos, sin permitir edicion.
+El campo "Porcentaje con Agencia" debe ser de solo lectura **siempre**, tanto en modo lectura como en modo edicion. No debe permitir modificacion en ningun caso.
 
 ## Detalle tecnico
 
-1. **Eliminar** el estado local `agencyPct`, `initialAgencyPct` y la funcion `handleAutoSavePercentage` (ya no se necesitan porque no hay auto-save en modo lectura).
+En `src/pages/creadores/InfoTabContent.tsx`, lineas 286-304:
 
-2. **Modo lectura** (lineas ~296-309): reemplazar el input editable por un `InfoField` estatico que muestre el valor con el sufijo `%`, igual que cualquier otro campo de solo lectura:
-   - Si hay valor: mostrar `"50%"` (por ejemplo)
-   - Si no hay valor: mostrar `"—"`
-
-3. **Modo edicion** (lineas ~285-295): se mantiene el input numerico como esta, ya que en modo edicion si debe ser editable. Este campo se guarda junto con los demas al hacer clic en "Guardar".
+1. **Eliminar** la rama condicional `isEditing ? ... : ...` para este campo.
+2. **Reemplazar** todo el bloque por un unico `InfoField` estatico que se muestre igual en ambos modos:
+   ```
+   <InfoField 
+     label="Porcentaje con Agencia" 
+     value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} 
+   />
+   ```
+3. **Eliminar** `agency_percentage` del estado `editData` y de la funcion `handleSave`, ya que este campo nunca se edita desde el formulario.
 
 ## Archivo modificado
 - `src/pages/creadores/InfoTabContent.tsx`
