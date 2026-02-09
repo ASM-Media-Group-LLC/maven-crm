@@ -69,6 +69,9 @@ interface FormData {
   youtube_handle: string;
   linkedin_handle: string;
   onlyfans_url: string;
+  piclink_url: string;
+  piclink_monthly_payment: number;
+  piclink_env_confirmed: boolean;
   profile_photo_url: string;
   bio: string;
   category: string;
@@ -101,6 +104,9 @@ const defaultForm: FormData = {
   youtube_handle: "",
   linkedin_handle: "",
   onlyfans_url: "",
+  piclink_url: "",
+  piclink_monthly_payment: 0,
+  piclink_env_confirmed: false,
   profile_photo_url: "",
   bio: "",
   category: "",
@@ -133,6 +139,9 @@ const testData: FormData = {
   youtube_handle: "https://youtube.com/@marigar",
   linkedin_handle: "",
   onlyfans_url: "https://onlyfans.com/marigar",
+  piclink_url: "https://piclink.com/marigar",
+  piclink_monthly_payment: 75,
+  piclink_env_confirmed: true,
   profile_photo_url: "https://i.pravatar.cc/300?u=marigar",
   bio: "Creadora de contenido especializada en lifestyle y fitness. 3 años de experiencia en plataformas digitales.",
   category: "A",
@@ -190,6 +199,7 @@ const NuevoCreadorForm = () => {
           youtube_handle: form.youtube_handle || null,
           linkedin_handle: form.linkedin_handle || null,
           onlyfans_url: form.onlyfans_url || null,
+          piclink_url: form.piclink_url || null,
           profile_photo_url: form.profile_photo_url || null,
           bio: form.bio || null,
           internal_notes: form.internal_notes || null,
@@ -200,6 +210,8 @@ const NuevoCreadorForm = () => {
           payment_method: form.payment_method || null,
           blue_package: form.blue_package,
           has_piclink: form.has_piclink,
+          piclink_monthly_payment: form.piclink_monthly_payment || null,
+          piclink_env_confirmed: form.piclink_env_confirmed,
           main_platform: form.main_platform || null,
           secondary_platform: form.secondary_platform || null,
           platform_username: form.platform_username || null,
@@ -361,17 +373,64 @@ const NuevoCreadorForm = () => {
         {/* Seccion 6 - Documentación */}
         <Section icon={<FileText className="h-5 w-5" />} title="Documentación">
           <div className="space-y-4">
+            {/* Contrato Firmado */}
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Contrato Firmado & Documentos</p>
-              <Button variant="outline" disabled>
-                <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-              </Button>
-              <p className="text-xs text-muted-foreground mt-1">Requiere configuración de storage</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-medium">Contrato Firmado & Documentos</p>
+                <Button variant="outline" size="sm" disabled>
+                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx) e Imágenes. Máximo 10MB por archivo, 10 archivos.</p>
             </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+
+            {/* PickLink Confirmado Card */}
+            <div className="rounded-lg border p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Tiene PickLink Confirmado?</p>
+                <p className="text-xs text-muted-foreground">Marcar si el creador tiene PickLink activo</p>
+              </div>
               <Checkbox checked={form.has_piclink} onCheckedChange={(v) => set("has_piclink", !!v)} />
-              Tiene PickLink Confirmado?
-            </label>
+            </div>
+
+            {/* Campos condicionales PickLink */}
+            {form.has_piclink && (
+              <div className="border-l-2 border-primary pl-4 space-y-4 ml-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Dirección de PickLink">
+                    <Input value={form.piclink_url} onChange={(e) => set("piclink_url", e.target.value)} placeholder="https://piclink.com/username" />
+                  </Field>
+                  <Field label="Pago Mensual PickLink">
+                    <Input type="number" value={form.piclink_monthly_payment} onChange={(e) => set("piclink_monthly_payment", Number(e.target.value))} placeholder="50.00" min={0} />
+                  </Field>
+                </div>
+                <p className="text-sm font-medium">Fotos de PickLink (Comprobante)</p>
+                <Button variant="outline" size="sm" disabled>
+                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                </Button>
+                <p className="text-xs text-muted-foreground">Requiere configuración de storage</p>
+              </div>
+            )}
+
+            {/* Fotos y Videos Extras */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-medium">Fotos y Videos Extras</p>
+                <Button variant="outline" size="sm" disabled>
+                  <Upload className="mr-2 h-4 w-4" /> Subir Archivos
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
+            </div>
+
+            {/* PickLink ENV Confirmado Card */}
+            <div className="rounded-lg border p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">PickLink ENV Confirmado</p>
+                <p className="text-xs text-muted-foreground">Tag "ENV" configurado en Bios</p>
+              </div>
+              <Checkbox checked={form.piclink_env_confirmed} onCheckedChange={(v) => set("piclink_env_confirmed", !!v)} />
+            </div>
           </div>
         </Section>
 
