@@ -423,11 +423,8 @@ const NuevoCreadorForm = () => {
                   </Field>
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="mb-1">
                     <p className="text-sm font-medium">Fotos de PickLink (Comprobante)</p>
-                    <Button variant="outline" size="sm" onClick={() => openUpload("piclink")}>
-                      <Upload className="mr-2 h-4 w-4" /> Subir Archivos
-                    </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">Formatos: Imágenes (JPG, PNG, GIF, WebP). Máximo 10MB por archivo.</p>
                   <UploadedFilesList files={filesByCategory("piclink")} onRemove={removeUploadedFile} />
