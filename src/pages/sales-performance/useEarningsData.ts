@@ -33,6 +33,7 @@ const fetchEarnings = async (): Promise<EarningsRow[]> => {
   return (earnings ?? []).map((e) => ({
     ...e,
     artistic_name: e.creator_id ? creatorsMap[e.creator_id] ?? null : null,
+    report_time: e.date ? new Date(e.date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false }) : null,
   }));
 };
 

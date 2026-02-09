@@ -46,6 +46,8 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
       return (val as number).toFixed(2) + "%";
     case "date":
       return formatDate(val as string);
+    case "time":
+      return String(val);
     case "document":
       return (val as string).slice(0, 8) + "…";
     default:
