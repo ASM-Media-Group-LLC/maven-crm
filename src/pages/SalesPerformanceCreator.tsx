@@ -14,8 +14,8 @@ import CustomMetrics from "./sales-performance/CustomMetrics";
 import { ALL_COLUMNS, type SortField, type SortDirection } from "./sales-performance/types";
 
 const SalesPerformanceCreator = () => {
-  const [documentFilter, setDocumentFilter] = useState("all");
-  const [creatorFilter, setCreatorFilter] = useState("all");
+  const [documentFilter, setDocumentFilter] = useState<string[]>([]);
+  const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -50,12 +50,12 @@ const SalesPerformanceCreator = () => {
       );
     }
 
-    if (documentFilter !== "all") {
-      result = result.filter((r) => r.document_id === documentFilter);
+    if (documentFilter.length > 0) {
+      result = result.filter((r) => documentFilter.includes(r.document_id ?? ""));
     }
-    if (creatorFilter !== "all") {
+    if (creatorFilter.length > 0) {
       result = result.filter(
-        (r) => r.artistic_name === creatorFilter || r.pending_creator === creatorFilter
+        (r) => creatorFilter.includes(r.artistic_name ?? "") || creatorFilter.includes(r.pending_creator ?? "")
       );
     }
 
@@ -96,8 +96,8 @@ const SalesPerformanceCreator = () => {
     setCurrentPage(1);
   };
 
-  const handleDocumentFilter = (v: string) => { setDocumentFilter(v); setCurrentPage(1); };
-  const handleCreatorFilter = (v: string) => { setCreatorFilter(v); setCurrentPage(1); };
+  const handleDocumentFilter = (v: string[]) => { setDocumentFilter(v); setCurrentPage(1); };
+  const handleCreatorFilter = (v: string[]) => { setCreatorFilter(v); setCurrentPage(1); };
   const handleSearchChange = (v: string) => { setSearchQuery(v); setCurrentPage(1); };
   const handlePageSizeChange = (v: number | "all") => { setPageSize(v); setCurrentPage(1); };
 
