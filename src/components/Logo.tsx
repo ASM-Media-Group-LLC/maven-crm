@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const sizeClasses = {
+  xs: "text-base gap-1",
   sm: "text-2xl gap-2",
   md: "text-4xl gap-2",
   lg: "text-7xl md:text-9xl gap-3",

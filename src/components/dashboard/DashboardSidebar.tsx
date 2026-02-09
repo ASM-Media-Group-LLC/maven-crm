@@ -1,9 +1,5 @@
 import {
   LayoutDashboard,
-  MessageSquare,
-  Users,
-  Calendar,
-  BarChart3,
   Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -19,15 +15,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { SidebarSeparator } from "@/components/ui/sidebar";
 
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Chats", url: "/dashboard/chats", icon: MessageSquare },
-  { title: "Contacts", url: "/dashboard/contacts", icon: Users },
-  { title: "Events", url: "/dashboard/events", icon: Calendar },
-  { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
 ];
 
 const secondaryMenu = [
@@ -35,10 +28,13 @@ const secondaryMenu = [
 ];
 
 const DashboardSidebar = () => {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-3">
-        <Logo size="sm" />
+        <Logo size={collapsed ? "xs" : "sm"} />
       </SidebarHeader>
 
       <SidebarContent>
