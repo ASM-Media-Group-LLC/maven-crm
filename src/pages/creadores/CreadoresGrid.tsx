@@ -28,6 +28,14 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
+const countryToCode: Record<string, string> = {
+  Argentina: "AR", Bolivia: "BO", Brasil: "BR", Chile: "CL", Colombia: "CO",
+  "Costa Rica": "CR", Cuba: "CU", Ecuador: "EC", "El Salvador": "SV",
+  España: "ES", "Estados Unidos": "US", Guatemala: "GT", Honduras: "HN",
+  México: "MX", Nicaragua: "NI", Panamá: "PA", Paraguay: "PY", Perú: "PE",
+  "Puerto Rico": "PR", "República Dominicana": "DO", Uruguay: "UY", Venezuela: "VE",
+};
+
 const getFlagEmoji = (countryCode: string | null) => {
   if (!countryCode) return "";
   return countryCode
@@ -51,7 +59,7 @@ const CreadoresGrid = ({ creators }: Props) => (
         .join("")
         .toUpperCase();
 
-      const flag = getFlagEmoji(c.country_code);
+      const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
       const location = [c.country, c.city].filter(Boolean).join(", ");
       const agency = c.creator_business?.assigned_agency;
       const kashType = c.creator_business?.kash_type;

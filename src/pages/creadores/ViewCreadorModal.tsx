@@ -33,6 +33,14 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
+const countryToCode: Record<string, string> = {
+  Argentina: "AR", Bolivia: "BO", Brasil: "BR", Chile: "CL", Colombia: "CO",
+  "Costa Rica": "CR", Cuba: "CU", Ecuador: "EC", "El Salvador": "SV",
+  España: "ES", "Estados Unidos": "US", Guatemala: "GT", Honduras: "HN",
+  México: "MX", Nicaragua: "NI", Panamá: "PA", Paraguay: "PY", Perú: "PE",
+  "Puerto Rico": "PR", "República Dominicana": "DO", Uruguay: "UY", Venezuela: "VE",
+};
+
 const getFlagEmoji = (countryCode: string | null) => {
   if (!countryCode) return "";
   return countryCode
@@ -74,7 +82,7 @@ const SocialLink = ({ label, handle, url }: { label: string; handle: string | nu
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const c = creator;
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  const flag = getFlagEmoji(c.country_code);
+  const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
 
   return (
