@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -40,6 +41,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     instagram_handle: "",
     tiktok_handle: "",
     twitter_handle: "",
+    youtube_handle: "",
+    onlyfans_url: "",
+    whatsapp_number: "",
+    bio: "",
   });
   const [nameError, setNameError] = useState(false);
   const updateMutation = useUpdateCreador();
@@ -57,6 +62,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
         instagram_handle: creator.instagram_handle ?? "",
         tiktok_handle: creator.tiktok_handle ?? "",
         twitter_handle: creator.twitter_handle ?? "",
+        youtube_handle: creator.youtube_handle ?? "",
+        onlyfans_url: creator.onlyfans_url ?? "",
+        whatsapp_number: creator.whatsapp_number ?? "",
+        bio: creator.bio ?? "",
       });
       setNameError(false);
     }
@@ -86,6 +95,10 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           instagram_handle: form.instagram_handle.trim() || null,
           tiktok_handle: form.tiktok_handle.trim() || null,
           twitter_handle: form.twitter_handle.trim() || null,
+          youtube_handle: form.youtube_handle.trim() || null,
+          onlyfans_url: form.onlyfans_url.trim() || null,
+          whatsapp_number: form.whatsapp_number.trim() || null,
+          bio: form.bio.trim() || null,
         },
       },
       {
@@ -153,20 +166,37 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
 
         <div className="space-y-3">
           <h4 className="text-sm font-medium">Redes Sociales</h4>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Instagram</Label>
               <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Twitter/X</Label>
+              <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
             </div>
             <div className="space-y-1.5">
               <Label>TikTok</Label>
               <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
             </div>
             <div className="space-y-1.5">
-              <Label>Twitter</Label>
-              <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
+              <Label>YouTube</Label>
+              <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>OnlyFans URL</Label>
+              <Input value={form.onlyfans_url} onChange={(e) => handleChange("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>WhatsApp</Label>
+              <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
             </div>
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Biografía</Label>
+          <Textarea value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} placeholder="Breve descripción del creador..." rows={3} />
         </div>
 
         <DialogFooter>
