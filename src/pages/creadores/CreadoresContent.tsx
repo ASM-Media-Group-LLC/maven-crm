@@ -21,7 +21,7 @@ const emptyFilters: CreadorFilters = {
 
 const CreadoresContent = () => {
   const [filters, setFilters] = useState<CreadorFilters>(emptyFilters);
-  const [view, setView] = useState<"table" | "grid">("grid");
+  const [view, setView] = useState<"table" | "grid">("table");
   const navigate = useNavigate();
 
   const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers } =
