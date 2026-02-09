@@ -93,8 +93,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [agencyPct, setAgencyPct] = useState(biz?.agency_percentage != null ? String(biz.agency_percentage) : "");
-  const [initialAgencyPct] = useState(agencyPct);
   const [editData, setEditData] = useState<EditData>({
     assigned_agency: "",
     category: "",
@@ -165,15 +163,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
     setEditData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleAutoSavePercentage = async () => {
-    if (agencyPct === initialAgencyPct || isEditing) return;
-    if (!biz?.id) return;
-    await supabase
-      .from("creator_business")
-      .update({ agency_percentage: agencyPct === "" ? null : Number(agencyPct) })
-      .eq("id", biz.id);
-    await queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
-  };
 
   return (
     <>
@@ -311,22 +300,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
             </div>
           </EditField>
         ) : (
-          <div className="py-3">
-            <p className="text-xs text-muted-foreground mb-1">Porcentaje con Agencia</p>
-            <div className="relative w-24">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                className="h-9 text-sm pr-6 bg-transparent border-transparent cursor-default focus:border-input focus:bg-background"
-                value={agencyPct}
-                onChange={(e) => setAgencyPct(e.target.value)}
-                onBlur={handleAutoSavePercentage}
-                placeholder="—"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-            </div>
-          </div>
+          <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
         )}
 
         {/* Notas Internas */}
