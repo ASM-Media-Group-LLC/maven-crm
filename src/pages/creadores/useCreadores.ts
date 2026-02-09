@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 
 export type CreatorWithBusiness = Tables<"creators"> & {
-  creator_business: { assigned_agency: string | null; manager_type: string | null } | null;
+  creator_business: { assigned_agency: string | null; manager_type: string | null; kash_type: string | null } | null;
 };
 
 const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated"] as const;
@@ -21,7 +21,7 @@ export interface StatusCounts {
 async function fetchCreators(): Promise<CreatorWithBusiness[]> {
   const { data, error } = await supabase
     .from("creators")
-    .select("*, creator_business(assigned_agency, manager_type)");
+    .select("*, creator_business(assigned_agency, manager_type, kash_type)");
   if (error) throw error;
   return (data ?? []) as CreatorWithBusiness[];
 }
