@@ -1,20 +1,48 @@
 
-# Campo "Porcentaje con Agencia" editable con apariencia bloqueada
 
-## Cambio
-Reemplazar el campo estático "Porcentaje con Agencia" por un input numérico que visualmente luzca deshabilitado (fondo muted, sin borde visible, texto igual al resto de campos), pero que permita al usuario hacer clic, editar el valor y guardarlo en la base de datos.
+# Modo edicion en tab "Informacion General"
 
-## Detalle técnico en `src/pages/creadores/CreadorProfileContent.tsx`
+## Resumen
+Al hacer clic en "Editar", los campos de la seccion se convierten en inputs/selects editables, y los botones cambian a "Cancelar" y "Guardar". Al cancelar se revierten los valores; al guardar se persisten en Supabase.
 
-1. Agregar estado local para el valor del porcentaje (`agencyPercentage`) y un flag de "guardando" (`saving`).
-2. Reemplazar el `InfoField` de "Porcentaje con Agencia" por un input con estas características:
-   - Tipo `number`, sufijo visual `%`
-   - Clases: `bg-muted/50 border-transparent cursor-default` para que parezca bloqueado
-   - Al hacer focus: se activa el borde normal de input para indicar que es editable
-   - Al perder focus (onBlur): si el valor cambió, hacer update a `creator_business.agency_percentage` via Supabase e invalidar la query
-3. Importar `supabase` client y `useQueryClient` para el update y la invalidación del cache.
+## Cambios en `src/pages/creadores/CreadorProfileContent.tsx`
 
-### Apariencia
-- En reposo: idéntico a los demás campos (texto estático sobre fondo sutil)
-- En focus: borde y ring normales de input, indicando que se puede editar
-- Mientras guarda: opacity reducida brevemente
+### 1. Estado de edicion
+- Agregar `isEditing` (boolean) y `editData` (objeto con los valores editables).
+- Al hacer clic en "Editar": `setIsEditing(true)` y copiar valores actuales a `editData`.
+- Al hacer clic en "Cancelar": `setIsEditing(false)` y descartar `editData`.
+- Al hacer clic en "Guardar": actualizar `creators` y `creator_business` en Supabase, invalidar query, `setIsEditing(false)`.
+
+### 2. Campos editables (segun la imagen de referencia)
+| Campo | Tipo de input | Tabla |
+|-------|--------------|-------|
+| Agencia Asignada | Select (opciones desde datos existentes o texto libre) | creator_business.assigned_agency |
+| Categoria | Select | creators.category |
+| Manager | Select | creator_business.manager_type |
+| Pais | Select (lista de paises del mapa countryToCode) | creators.country |
+| Ciudad | Input texto | creators.city |
+| Fecha de Nacimiento | Input date | creators.birth_date |
+| Porcentaje con Agencia | Input number (ya existe) | creator_business.agency_percentage |
+| Notas Internas | Textarea | creators.internal_notes |
+
+Los campos **Estado** y **Fecha de Registro** se mantienen como solo lectura incluso en modo edicion.
+
+### 3. Botones
+- En modo lectura: boton "Editar" con icono Edit (como esta ahora).
+- En modo edicion: boton "Cancelar" (variant ghost) y boton "Guardar" (variant default con icono Save).
+- Posicion: misma ubicacion actual, a la derecha del titulo "Informacion General".
+
+### 4. Logica de guardado
+- Separar los campos en dos updates: uno para `creators` (category, country, city, birth_date, internal_notes) y otro para `creator_business` (assigned_agency, manager_type, agency_percentage).
+- Ejecutar ambos updates, luego invalidar la query `["creator", id]`.
+- Mostrar estado de carga en el boton "Guardar" mientras se guarda.
+
+### 5. Apariencia de los campos editables
+- Usar `Select` de shadcn para los dropdowns (Agencia, Categoria, Manager, Pais).
+- Usar `Input` para Ciudad y Fecha de Nacimiento.
+- Usar `Textarea` para Notas Internas.
+- El campo "Porcentaje con Agencia" ya es editable, se integra con el flujo general.
+
+## Archivo modificado
+- `src/pages/creadores/CreadorProfileContent.tsx`
+
