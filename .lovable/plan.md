@@ -1,35 +1,45 @@
 
-# Dashboard Sidebar Width & Design System Alignment
 
-## Problem
-The sidebar is 16rem (256px) wide -- too wide for the "MavenCRM" logo. Components need tighter alignment with the design system tokens.
+# Ajustar Logo y Limpiar Menú del Sidebar
 
-## Changes
+## Resumen
+Dos cambios: (1) agregar una variante extra-pequeña del logo para cuando el sidebar está colapsado, y (2) eliminar los items Chats, Contacts, Events y Analytics del menú.
 
-### 1. `src/components/ui/sidebar.tsx` - Reduce sidebar width
-- Change `SIDEBAR_WIDTH` from `"16rem"` to `"12rem"` (~192px) to match the logo width plus comfortable padding
-- This single constant controls both expanded and transition widths globally
+## Cambios
 
-### 2. `src/components/dashboard/DashboardSidebar.tsx` - Refine sidebar styling
-- Reduce header padding from `p-4` to `p-3` (12px per design system md spacing)
-- Use `SidebarSeparator` instead of raw `Separator` with manual margin (follows sidebar component conventions)
-- Logo already uses design tokens correctly (text-primary, text-muted-foreground) -- no changes needed
+### 1. `src/components/Logo.tsx` - Agregar variante `xs`
+- Agregar tamaño `xs` con clase `text-base gap-1` para que el logo quepa cuando el sidebar se colapsa a modo icono
+- Sin otros cambios al componente
 
-### 3. `src/components/dashboard/DashboardTopbar.tsx` - Align with design tokens
-- Already uses design tokens correctly (border-border, bg-background, text-muted-foreground)
-- No changes needed -- all values map to CSS variables
+### 2. `src/components/dashboard/DashboardSidebar.tsx`
+- **Eliminar menu items**: Quitar Chats, Contacts, Events y Analytics del array `mainMenu`, dejando solo Dashboard
+- **Logo responsivo al colapso**: Usar el hook `useSidebar` para detectar el estado colapsado y renderizar `Logo size="xs"` cuando está colapsado vs `size="sm"` cuando está expandido
+- Limpiar imports no utilizados (`MessageSquare`, `Users`, `Calendar`, `BarChart3`)
 
-### 4. `src/components/dashboard/DashboardMetricCard.tsx` - Verify token compliance
-- Already fully compliant: bg-muted, text-muted-foreground, text-success, text-destructive
-- No changes needed
+## Detalle Técnico
 
-### 5. `src/components/dashboard/DashboardContent.tsx` - Verify token compliance
-- Already fully compliant: border-border, text-muted-foreground, bg-card tokens via Card component
-- No changes needed
+**Logo.tsx - nueva variante:**
+```typescript
+const sizeClasses = {
+  xs: "text-base gap-1",
+  sm: "text-2xl gap-2",
+  md: "text-4xl gap-2",
+  lg: "text-7xl md:text-9xl gap-3",
+};
+```
 
-## Summary
-Only two files actually need changes:
-1. **sidebar.tsx**: `SIDEBAR_WIDTH` from `"16rem"` to `"12rem"`
-2. **DashboardSidebar.tsx**: header padding `p-4` to `p-3`, use `SidebarSeparator` instead of raw `Separator`
+**DashboardSidebar.tsx - menú simplificado:**
+```typescript
+const mainMenu = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+];
+```
 
-All other dashboard components already use design system tokens correctly -- no hardcoded values found.
+**DashboardSidebar.tsx - logo adaptativo:**
+```typescript
+const { state } = useSidebar();
+const collapsed = state === "collapsed";
+// En el header:
+<Logo size={collapsed ? "xs" : "sm"} />
+```
+
