@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
+import CreadoresKPICards from "./CreadoresKPICards";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
 
 const emptyFilters: CreadorFilters = {
@@ -23,7 +24,7 @@ const CreadoresContent = () => {
   const [view, setView] = useState<"table" | "grid">("grid");
   const navigate = useNavigate();
 
-  const { creators, allCreators, isLoading, categories, countries, cities, managers } =
+  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers } =
     useCreadores(filters);
 
   const updateFilters = (patch: Partial<CreadorFilters>) =>
@@ -52,6 +53,28 @@ const CreadoresContent = () => {
         </div>
       ) : (
         <>
+          <CreadoresKPICards counts={statusCounts} />
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={filters.agency === "" ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => updateFilters({ agency: "" })}
+            >
+              Todas
+            </Button>
+            {agencies.map((agency) => (
+              <Button
+                key={agency}
+                variant={filters.agency === agency ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => updateFilters({ agency })}
+              >
+                {agency}
+              </Button>
+            ))}
+          </div>
+
           <CreadoresFilters
             filters={filters}
             onChange={updateFilters}

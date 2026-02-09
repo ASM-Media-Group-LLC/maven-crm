@@ -2,46 +2,51 @@ import { TrendingUp, UserPlus, Pause, UserMinus, UserX, Users } from "lucide-rea
 import { Card, CardContent } from "@/components/ui/card";
 import type { StatusCounts } from "./useCreadores";
 
-interface KPICardProps {
-  label: string;
-  count: number;
-  icon: React.ElementType;
-  colorClass: string;
-}
-
-const KPICard = ({ label, count, icon: Icon, colorClass }: KPICardProps) => (
-  <Card>
-    <CardContent className="flex items-center justify-between p-4">
-      <div>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={`text-2xl font-bold ${colorClass}`}>{count}</p>
-      </div>
-      <Icon className={`h-8 w-8 ${colorClass} opacity-40`} />
-    </CardContent>
-  </Card>
-);
-
 interface Props {
   counts: StatusCounts;
 }
 
-const cards: Omit<KPICardProps, "count">[] = [
-  { label: "Activas", icon: TrendingUp, colorClass: "text-success" },
-  { label: "Onboarding", icon: UserPlus, colorClass: "text-primary" },
-  { label: "Pausadas", icon: Pause, colorClass: "text-warning" },
-  { label: "Retiros", icon: UserMinus, colorClass: "text-destructive" },
-  { label: "Terminadas", icon: UserX, colorClass: "text-muted-foreground" },
-  { label: "Total", icon: Users, colorClass: "text-secondary-foreground" },
-];
+const CreadoresKPICards = ({ counts }: Props) => {
+  const activePercent = counts.total > 0 ? Math.round((counts.active / counts.total) * 100) : 0;
 
-const statusKeys: (keyof StatusCounts)[] = ["active", "onboarding", "paused", "leaving", "terminated", "total"];
+  const cards = [
+    { label: "Activas", count: counts.active, subtitle: `${activePercent}% del total`, icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20" },
+    { label: "Onboarding", count: counts.onboarding, subtitle: "En proceso", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20" },
+    { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20" },
+    { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20" },
+    { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted" },
+  ];
 
-const CreadoresKPICards = ({ counts }: Props) => (
-  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-    {cards.map((card, i) => (
-      <KPICard key={card.label} {...card} count={counts[statusKeys[i]]} />
-    ))}
-  </div>
-);
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        {cards.map((card) => (
+          <Card key={card.label}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
+                  <card.icon className={`h-4 w-4 ${card.colorClass}`} />
+                </div>
+              </div>
+              <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{card.count}</p>
+              <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="w-fit">
+        <CardContent className="flex items-center gap-3 px-4 py-3">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground">Total de Creadoras</p>
+            <p className="text-lg font-bold">{counts.total}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 export default CreadoresKPICards;
