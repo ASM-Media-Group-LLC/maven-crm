@@ -1,68 +1,41 @@
 
 
-# Modal "Editar Creador" al hacer clic en el boton de editar (Pencil)
+# Agregar campos adicionales al modal "Editar Creador"
 
 ## Resumen
-Crear un modal Dialog que se abre al hacer clic en el boton de editar (Pencil) en la tabla de creadores. El modal muestra un formulario con los campos del creador precargados y permite guardar los cambios.
+Agregar los campos faltantes al modal de edicion segun el mockup: YouTube, OnlyFans URL, WhatsApp y Biografia. Tambien reorganizar la seccion de Redes Sociales en grid de 2 columnas.
 
-## Archivos a crear
+## Cambios en `src/pages/creadores/EditCreadorModal.tsx`
 
-### 1. `src/pages/creadores/EditCreadorModal.tsx`
-Nuevo componente con un Dialog que contiene:
-- **Titulo**: "Editar Creador"
-- **Campos en grid de 2 columnas**:
-  - Nombre * (input, requerido)
-  - Nombre Artistico (input)
-  - Email (input)
-  - Telefono (input)
-  - Pais (input)
-  - Ciudad (input)
-  - Categoria (select con opciones: A+, A, B+, B, C)
-- **Seccion "Redes Sociales"**:
-  - Instagram (input)
-  - TikTok (input)
-  - Twitter (input)
-- **Footer**: Boton "Cancelar" (outline) y "Guardar Cambios" (primary)
-- Props: `open`, `onOpenChange`, `creator: CreatorWithBusiness`
-- Estado local con los valores del creador para edicion
-- Al guardar: actualiza el registro en Supabase (`supabase.from("creators").update(...)`) e invalida el query cache
+### Campos nuevos en el formulario
+Agregar al estado del formulario:
+- `youtube_handle` (input, placeholder: "@canal")
+- `onlyfans_url` (input, placeholder: "https://onlyfans.com/...")
+- `whatsapp_number` (input, placeholder: "+1 234 567 8900")
+- `bio` (textarea, placeholder: "Breve descripcion del creador...")
 
-### 2. Hook de update en `src/pages/creadores/useCreadores.ts`
-Agregar un nuevo hook `useUpdateCreador` con `useMutation`:
-- Ejecuta `supabase.from("creators").update(data).eq("id", id)`
-- En `onSuccess`, invalida `["creators"]`
+### Reorganizar seccion Redes Sociales
+Cambiar el grid de 3 columnas a 2 columnas con los siguientes campos:
+1. Instagram | Twitter/X
+2. TikTok | YouTube
+3. OnlyFans URL | WhatsApp
 
-## Archivos a modificar
+### Agregar seccion Biografia
+Debajo de Redes Sociales, agregar un campo de textarea de ancho completo con label "Biografia".
 
-### 3. `src/pages/creadores/CreadoresTable.tsx`
-- Agregar estado `editingCreator` (`CreatorWithBusiness | null`)
-- Al hacer clic en el boton Pencil, setear `editingCreator` al creador de esa fila
-- Renderizar `EditCreadorModal` con `open={!!editingCreator}` y pasar el creador seleccionado
-- Al cerrar el modal, limpiar `editingCreator`
-
-## Detalle tecnico
-
-**Campos del formulario y su mapeo a la tabla `creators`:**
-
+### Mapeo a la tabla `creators`
 | Campo UI | Campo DB |
 |----------|----------|
-| Nombre | name |
-| Nombre Artistico | artistic_name |
-| Email | email |
-| Telefono | phone |
-| Pais | country |
-| Ciudad | city |
-| Categoria | category |
-| Instagram | instagram_handle |
-| TikTok | tiktok_handle |
-| Twitter | twitter_handle |
+| YouTube | youtube_handle |
+| OnlyFans URL | onlyfans_url |
+| WhatsApp | whatsapp_number |
+| Biografia | bio |
 
-**Validacion**: Solo "Nombre" es requerido (marcado con *). Si esta vacio, mostrar borde rojo y no permitir guardar.
+Todos estos campos ya existen en la tabla `creators` de Supabase.
 
-**Flujo**:
-1. Usuario hace clic en icono Pencil en una fila
-2. Modal se abre con datos precargados del creador
-3. Usuario edita campos
-4. Click "Guardar Cambios" -> update en Supabase -> toast de exito -> cierra modal -> refresca lista
-5. Click "Cancelar" -> cierra modal sin guardar
+### Cambiar label "Twitter" a "Twitter/X"
+Actualizar el label del campo existente de Twitter a "Twitter/X" para coincidir con el mockup.
+
+## Archivo modificado
+- `src/pages/creadores/EditCreadorModal.tsx`
 
