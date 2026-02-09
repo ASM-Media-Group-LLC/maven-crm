@@ -1,66 +1,107 @@
 
 
-# Crear logo de Maven CRM y boton de acceso al Design System
+# Dashboard Layout - Structural Blueprint
 
-## Resumen
+## Overview
+Create the `/dashboard` route as the base container for MavenCRM. This page defines **only layout and visual containers** using placeholders -- no logic, no real data, no features. It follows the existing design system tokens, sidebar component, and patterns already in the project.
 
-Se recreara el logo "Maven CRM" como un componente de texto estilizado (no imagen) basado en la referencia visual proporcionada, y se rediseñara la pagina Index para incluir el logo centrado junto con un boton de navegacion al Design System.
+## Architecture
 
----
+Three fixed layers:
 
-## Analisis de la referencia visual
+```text
++------------+--------------------------------------------+
+|            |              TOPBAR (fixed)                |
+|  SIDEBAR   +--------------------------------------------+
+|  (fixed)   |                                            |
+|  100vh     |           MAIN CONTENT (scroll)            |
+|            |                                            |
+|            |  +--------------------------------------+  |
+|            |  | Dashboard Header                     |  |
+|            |  +--------------------------------------+  |
+|            |  | Metric | Metric | Metric | Metric    |  |
+|            |  +--------------------------------------+  |
+|            |  | Chart Placeholder  | Activity Card   |  |
+|            |  +--------------------------------------+  |
+|            |                                            |
++------------+--------------------------------------------+
+```
 
-La imagen muestra:
-- **"Maven"** en color azul (coincide con el token `primary` del sistema: `211 100% 50%`)
-- **"CRM"** en color gris claro/blanco (coincide con `foreground` o `muted-foreground`)
-- Fondo oscuro (el background del tema dark)
-- Tipografia sans-serif, peso medium/semibold
-- Estilo limpio y minimalista
+## Files to Create
 
----
+### 1. `src/components/dashboard/DashboardSidebar.tsx`
+Sidebar using the existing `Sidebar` component from `src/components/ui/sidebar.tsx`.
 
-## Cambios detallados
+- **Header**: `Logo` component (size="sm")
+- **Main menu** (6 items with Lucide icons):
+  - Dashboard (`LayoutDashboard`)
+  - Chats (`MessageSquare`)
+  - Contacts (`Users`)
+  - Events (`Calendar`)
+  - Analytics (`BarChart3`)
+- **Separator**
+- **Secondary menu**:
+  - Settings (`Settings`)
+- Uses `NavLink` for active state highlighting
+- Tooltip on collapsed state via `SidebarMenuButton tooltip` prop
+- Collapsible: `icon` mode (expanded = icon+label, collapsed = icon only)
 
-### 1. Crear componente Logo (`src/components/Logo.tsx`)
+### 2. `src/components/dashboard/DashboardTopbar.tsx`
+Fixed horizontal bar above the main content.
 
-Un componente reutilizable que renderiza el logotipo "Maven CRM" usando texto estilizado:
+- **Left**: `SidebarTrigger` button
+- **Center**: `Input` placeholder for search (disabled, placeholder text only)
+- **Right**: Bell icon (notification placeholder) + `Avatar` placeholder (initials "U")
+- Height: fixed `h-14`, border-bottom, background with backdrop blur
 
-- **"Maven"** con `text-primary` (azul del sistema) y `font-bold`
-- **"CRM"** con `text-muted-foreground` (gris claro en dark, gris oscuro en light) y `font-normal` o `font-light`
-- Prop `size` opcional para controlar el tamano (`sm`, `md`, `lg`) para reutilizar en diferentes contextos (sidebar, header, etc.)
-- El componente usa exclusivamente tokens del Design System, sin colores hardcodeados
-- Funciona correctamente en ambos temas (light y dark)
+### 3. `src/components/dashboard/DashboardMetricCard.tsx`
+Reusable metric card placeholder component.
 
-### 2. Actualizar pagina Index (`src/pages/Index.tsx`)
+- Props: `label`, `value`, `icon`, `trend` (up/down/neutral)
+- Uses `Card` from the design system
+- Displays: icon, label (muted text), large value, trend indicator arrow with color (success/destructive)
+- All values are placeholder strings passed as props
 
-Redisenar la pagina principal para mostrar:
+### 4. `src/components/dashboard/DashboardContent.tsx`
+The scrollable main area containing:
 
-- El componente `Logo` centrado en pantalla con tamano grande
-- Un boton debajo del logo con texto "Design System" que navega a `/design-system`
-- El boton usara el componente `Button` existente con variante `outline` o `ghost`
-- Se usara `Link` de `react-router-dom` para la navegacion
-- El layout mantiene el patron actual: `flex min-h-screen items-center justify-center`
-- Se agrupara todo en un contenedor vertical con `flex-col` y `gap` apropiado
+- **Section 3.1 - Header**: h2 title "Dashboard" + muted subtitle placeholder
+- **Section 3.2 - Metrics row**: 4 `DashboardMetricCard` with placeholder values ("--", "0", etc.) laid out in a responsive grid (grid-cols-1 sm:grid-cols-2 lg:grid-cols-4)
+- **Section 3.3 - Data area**: Two cards in a grid (lg:grid-cols-3):
+  - Large card (col-span-2): "Chart placeholder" with empty state (dashed border, muted icon+text)
+  - Smaller card (col-span-1): "Recent activity" with empty state
 
----
+### 5. `src/pages/Dashboard.tsx`
+Page component that composes the layout:
 
-## Archivos
+- Wraps everything in `SidebarProvider`
+- Renders `DashboardSidebar` + a flex container for `DashboardTopbar` + `DashboardContent`
+- Main content is `flex-1 overflow-auto`
 
-| Archivo | Accion | Detalle |
-|---|---|---|
-| `src/components/Logo.tsx` | Crear | Componente de logo reutilizable con variantes de tamano |
-| `src/pages/Index.tsx` | Modificar | Reemplazar el `<h1>MAVEN</h1>` actual con el Logo + boton al Design System |
+## Files to Modify
 
-## Sin cambios en
+### `src/App.tsx`
+- Import `Dashboard` page
+- Add route: `<Route path="/dashboard" element={<Dashboard />} />`
 
-- Ningun archivo de `src/components/ui/`
-- `src/index.css` (no se crean tokens nuevos)
-- `src/App.tsx` (las rutas ya existen)
+### `src/pages/Index.tsx`
+- Add a "Dashboard" button linking to `/dashboard`
 
-## Detalle tecnico
+## Visual States (CSS only, no logic)
+- **Active nav item**: `bg-sidebar-accent text-sidebar-accent-foreground font-medium` via NavLink activeClassName
+- **Hover**: existing sidebar hover tokens (`hover:bg-sidebar-accent`)
+- **Empty states**: dashed border containers with muted icon + "No data" placeholder text
 
-- El logo es 100% texto/CSS, no se genera ni almacena ninguna imagen
-- Se usa `Link` de `react-router-dom` envuelto en el componente `Button` con `asChild` para navegacion declarativa
-- El componente Logo acepta un prop `size` con valores predefinidos que mapean a clases de Tailwind (`text-2xl`, `text-4xl`, `text-7xl`)
-- El componente es compatible con light y dark mode gracias al uso de tokens semanticos
+## Design Token Compliance
+- All colors from CSS variables (bg-background, bg-card, text-foreground, text-muted-foreground, border-border, etc.)
+- Spacing via Tailwind scale (p-6, gap-6, etc.)
+- Border radius via design system tokens (rounded-lg)
+- Light/dark mode fully supported via existing class-based theming
+- No hardcoded color values
+
+## Technical Notes
+- No state management beyond sidebar open/collapsed (handled by SidebarProvider)
+- No API calls, no data fetching, no conditional rendering
+- Desktop-first responsive grid
+- Sidebar uses `collapsible="icon"` for expand/collapse without layout shift
 
