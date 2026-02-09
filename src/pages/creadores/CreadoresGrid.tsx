@@ -77,93 +77,87 @@ const CreadoresGrid = ({ creators }: Props) => {
               className="overflow-hidden cursor-pointer transition-shadow duration-200 hover:shadow-md hover:border-primary/30"
               onClick={() => setViewingCreator(c)}
             >
-              <CardContent className="flex gap-4 p-4">
-                {/* Avatar */}
-                <Avatar className="h-16 w-16 shrink-0">
-                  {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
-                  <AvatarFallback className="text-sm">{initials}</AvatarFallback>
-                </Avatar>
-
-                {/* Info */}
-                <div className="flex flex-1 flex-col gap-1 min-w-0">
-                  {/* Name row */}
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate font-semibold text-primary">
+              <CardContent className="p-4 space-y-3">
+                {/* Header: Avatar + Name + Badges */}
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-12 w-12 shrink-0">
+                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
+                    <AvatarFallback className="text-sm">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-sm font-semibold text-primary">
                       {c.artistic_name || c.name}
                     </p>
-                    <RefreshCw className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  </div>
-
-                  {c.artistic_name && (
-                    <p className="truncate text-xs text-muted-foreground">{c.name}</p>
-                  )}
-
-                  {/* Badges */}
-                  <div className="flex flex-wrap gap-1.5 mt-0.5">
-                    {c.category && (
-                      <Badge variant={categoryVariant[c.category] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
-                        {c.category}
-                      </Badge>
+                    {c.artistic_name && (
+                      <p className="truncate text-xs text-muted-foreground">{c.name}</p>
                     )}
-                    {c.status && (
-                      <Badge variant={statusVariant[c.status] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
-                        {statusLabel[c.status] ?? c.status}
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {c.category && (
+                        <Badge variant={categoryVariant[c.category] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
+                          {c.category}
+                        </Badge>
+                      )}
+                      {c.status && (
+                        <Badge variant={statusVariant[c.status] ?? "secondary-soft"} className="text-[10px] px-1.5 py-0">
+                          {statusLabel[c.status] ?? c.status}
+                        </Badge>
+                      )}
+                      <RefreshCw className="h-3 w-3 shrink-0 text-muted-foreground ml-auto" />
+                    </div>
                   </div>
+                </div>
 
-                  {/* Location */}
+                {/* Body: Location + Agency */}
+                <div className="space-y-1">
                   {location && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-sm text-muted-foreground">
                       {flag && <span className="mr-1">{flag}</span>}
                       {location}
                     </p>
                   )}
-
-                  {/* Agency */}
                   {agencyLabel && (
-                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Building2 className="h-3 w-3 shrink-0" />
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Building2 className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{agencyLabel}</span>
                     </p>
                   )}
+                </div>
 
-                  {/* Social */}
-                  <div className="flex gap-2 mt-1">
-                    {c.instagram_handle && (
-                      <a
-                        href={`https://instagram.com/${c.instagram_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Instagram className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                    {c.tiktok_handle && (
-                      <a
-                        href={`https://tiktok.com/@${c.tiktok_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground text-[10px] font-bold"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        TT
-                      </a>
-                    )}
-                    {c.twitter_handle && (
-                      <a
-                        href={`https://twitter.com/${c.twitter_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground text-[10px] font-bold"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        𝕏
-                      </a>
-                    )}
-                  </div>
+                {/* Footer: Social icons */}
+                <div className="border-t pt-3 flex gap-3">
+                  {c.instagram_handle && (
+                    <a
+                      href={`https://instagram.com/${c.instagram_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Instagram className="h-4 w-4" />
+                    </a>
+                  )}
+                  {c.tiktok_handle && (
+                    <a
+                      href={`https://tiktok.com/@${c.tiktok_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      TT
+                    </a>
+                  )}
+                  {c.twitter_handle && (
+                    <a
+                      href={`https://twitter.com/${c.twitter_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      𝕏
+                    </a>
+                  )}
                 </div>
               </CardContent>
             </Card>
