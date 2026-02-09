@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
+import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/salesdashboard" element={<SalesDashboard />} />
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
