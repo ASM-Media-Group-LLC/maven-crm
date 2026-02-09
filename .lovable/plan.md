@@ -1,68 +1,35 @@
 
+# Dashboard Sidebar Width & Design System Alignment
 
-# Multi-Select Filters for Creadora and Document ID
-
-## Overview
-Convert the Creadora and Document ID filters from single-select dropdowns to multi-select using Popover + Checkbox lists. This allows selecting multiple creators and/or multiple document IDs simultaneously.
+## Problem
+The sidebar is 16rem (256px) wide -- too wide for the "MavenCRM" logo. Components need tighter alignment with the design system tokens.
 
 ## Changes
 
-### 1. `src/pages/SalesPerformanceCreator.tsx`
-- Change `creatorFilter` state from `string` to `string[]` (initialized to `[]`, where empty means "all")
-- Change `documentFilter` state from `string` to `string[]` (initialized to `[]`)
-- Update filtering logic in the `filtered` memo:
-  - Creator: if array is non-empty, check if `artistic_name` or `pending_creator` is included in the array
-  - Document: if array is non-empty, check if `document_id` is included in the array
-- Update handler functions to work with arrays
+### 1. `src/components/ui/sidebar.tsx` - Reduce sidebar width
+- Change `SIDEBAR_WIDTH` from `"16rem"` to `"12rem"` (~192px) to match the logo width plus comfortable padding
+- This single constant controls both expanded and transition widths globally
 
-### 2. `src/pages/sales-performance/EarningsFilters.tsx`
-- Update props interface:
-  - `creatorFilter: string[]` and `onCreatorFilterChange: (value: string[]) => void`
-  - `documentFilter: string[]` and `onDocumentFilterChange: (value: string[]) => void`
-- Replace both `Select` components with `Popover` + scrollable checkbox lists:
-  - Trigger button shows count of selected items (e.g., "2 selected") or "Todas"/"Todos" when empty
-  - Content: a scrollable list of `Checkbox` items for each option
-  - Each checkbox toggles its value in/out of the array
-  - A "Limpiar" (clear) button at the top to reset to empty (all)
-- Import `Checkbox` from `@/components/ui/checkbox` and `ScrollArea` from `@/components/ui/scroll-area`
+### 2. `src/components/dashboard/DashboardSidebar.tsx` - Refine sidebar styling
+- Reduce header padding from `p-4` to `p-3` (12px per design system md spacing)
+- Use `SidebarSeparator` instead of raw `Separator` with manual margin (follows sidebar component conventions)
+- Logo already uses design tokens correctly (text-primary, text-muted-foreground) -- no changes needed
 
-### No new files or dependencies needed
-Uses existing `Popover`, `Checkbox`, `ScrollArea`, and `Button` components already in the project.
+### 3. `src/components/dashboard/DashboardTopbar.tsx` - Align with design tokens
+- Already uses design tokens correctly (border-border, bg-background, text-muted-foreground)
+- No changes needed -- all values map to CSS variables
 
-## Technical Details
+### 4. `src/components/dashboard/DashboardMetricCard.tsx` - Verify token compliance
+- Already fully compliant: bg-muted, text-muted-foreground, text-success, text-destructive
+- No changes needed
 
-**Updated props interface (EarningsFilters):**
-```typescript
-interface EarningsFiltersProps {
-  documentFilter: string[];
-  onDocumentFilterChange: (value: string[]) => void;
-  creatorFilter: string[];
-  onCreatorFilterChange: (value: string[]) => void;
-  // ... rest unchanged
-}
-```
+### 5. `src/components/dashboard/DashboardContent.tsx` - Verify token compliance
+- Already fully compliant: border-border, text-muted-foreground, bg-card tokens via Card component
+- No changes needed
 
-**Multi-select toggle logic:**
-```typescript
-const toggleItem = (arr: string[], item: string) =>
-  arr.includes(item) ? arr.filter(v => v !== item) : [...arr, item];
-```
+## Summary
+Only two files actually need changes:
+1. **sidebar.tsx**: `SIDEBAR_WIDTH` from `"16rem"` to `"12rem"`
+2. **DashboardSidebar.tsx**: header padding `p-4` to `p-3`, use `SidebarSeparator` instead of raw `Separator`
 
-**Filter logic update (SalesPerformanceCreator):**
-```typescript
-if (creatorFilter.length > 0) {
-  result = result.filter(r =>
-    creatorFilter.includes(r.artistic_name ?? "") ||
-    creatorFilter.includes(r.pending_creator ?? "")
-  );
-}
-if (documentFilter.length > 0) {
-  result = result.filter(r => documentFilter.includes(r.document_id ?? ""));
-}
-```
-
-**Trigger display:**
-- Empty array: "Todas" / "Todos"
-- 1 selected: show the name
-- 2+ selected: "N seleccionadas"
-
+All other dashboard components already use design system tokens correctly -- no hardcoded values found.
