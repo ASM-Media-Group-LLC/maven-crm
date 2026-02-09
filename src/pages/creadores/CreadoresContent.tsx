@@ -31,7 +31,7 @@ const CreadoresContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
-    <main className="flex-1 overflow-auto p-6 space-y-6">
+    <main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Creadores</h1>

@@ -8,7 +8,7 @@ const Creadores = () => {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <DashboardSidebar />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
           <CreadoresContent />
         </div>
