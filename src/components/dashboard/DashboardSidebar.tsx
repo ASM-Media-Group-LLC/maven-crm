@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Users,
   Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -21,6 +22,7 @@ import {
 
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Creadores", url: "/creadores", icon: Users },
 ];
 
 const secondaryMenu = [
