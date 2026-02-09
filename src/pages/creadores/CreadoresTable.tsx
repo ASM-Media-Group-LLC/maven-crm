@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CreatorWithBusiness } from "./useCreadores";
+import EditCreadorModal from "./EditCreadorModal";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -55,6 +56,7 @@ interface Props {
 const CreadoresTable = ({ creators }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
+  const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -100,6 +102,7 @@ const CreadoresTable = ({ creators }: Props) => {
   );
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
@@ -207,7 +210,7 @@ const CreadoresTable = ({ creators }: Props) => {
                   <Button variant="ghost" size="icon" className="h-8 w-8">
                     <RefreshCw className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -227,6 +230,15 @@ const CreadoresTable = ({ creators }: Props) => {
         )}
       </TableBody>
     </Table>
+
+    {editingCreator && (
+      <EditCreadorModal
+        open={!!editingCreator}
+        onOpenChange={(open) => { if (!open) setEditingCreator(null); }}
+        creator={editingCreator}
+      />
+    )}
+  </>
   );
 };
 
