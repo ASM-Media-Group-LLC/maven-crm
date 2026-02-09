@@ -1,25 +1,40 @@
 
 
-# Bloquear campo "Porcentaje con Agencia" tambien en modo edicion
+# Tab de Lineamientos Operativos
 
-## Cambio
+## Resumen
 
-El campo "Porcentaje con Agencia" debe ser de solo lectura **siempre**, tanto en modo lectura como en modo edicion. No debe permitir modificacion en ningun caso.
+Implementar el contenido del tab "Lineamientos" en el perfil de creador, replicando el diseno de la imagen de referencia. Se conecta con la tabla `creator_guidelines` de Supabase para CRUD completo.
+
+## Estructura visual
+
+El tab muestra:
+
+1. **Header**: Icono de documento + titulo "Lineamientos Operativos" + contador "X registrados" a la izquierda, y botones "Ver" / "+ Agregar" a la derecha.
+2. **Estado vacio**: Cuando no hay lineamientos, un area gris con icono centrado, texto "Sin lineamientos", subtitulo "Documenta como manejar esta cuenta", y boton "+ Agregar".
+3. **Con datos**: Lista de lineamientos mostrando titulo, tipo, contenido (truncado), y fecha de creacion. Acciones de editar/eliminar por fila.
 
 ## Detalle tecnico
 
-En `src/pages/creadores/InfoTabContent.tsx`, lineas 286-304:
+### 1. Nuevo componente: `src/pages/creadores/LineamientosTabContent.tsx`
 
-1. **Eliminar** la rama condicional `isEditing ? ... : ...` para este campo.
-2. **Reemplazar** todo el bloque por un unico `InfoField` estatico que se muestre igual en ambos modos:
-   ```
-   <InfoField 
-     label="Porcentaje con Agencia" 
-     value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} 
-   />
-   ```
-3. **Eliminar** `agency_percentage` del estado `editData` y de la funcion `handleSave`, ya que este campo nunca se edita desde el formulario.
+- Recibe `creatorId: string` como prop
+- Usa `useQuery` para fetch de `creator_guidelines` filtrado por `creator_id`
+- Estado vacio con icono `ClipboardList`, textos y boton centrado
+- Header con contador y botones "Ver" (ojo) / "Agregar" (plus)
+- Modal de agregar/editar con campos: titulo (Input), tipo (Select con opciones como "Operativo", "Contenido", "Ventas", "Comunicacion"), contenido (Textarea)
+- Confirmacion de eliminar con AlertDialog
+- Mutaciones con `useMutation` + invalidacion de query
 
-## Archivo modificado
-- `src/pages/creadores/InfoTabContent.tsx`
+### 2. Modificar: `src/pages/creadores/CreadorProfileContent.tsx`
+
+- Importar `LineamientosTabContent`
+- Reemplazar el placeholder del tab "lineamientos" por `<LineamientosTabContent creatorId={id!} />`
+
+### 3. Flujo de datos
+
+- **Leer**: `SELECT * FROM creator_guidelines WHERE creator_id = ? ORDER BY created_at DESC`
+- **Crear**: `INSERT` con titulo, contenido, guideline_type, creator_id, created_by (placeholder UUID)
+- **Editar**: `UPDATE` por id
+- **Eliminar**: `DELETE` por id
 
