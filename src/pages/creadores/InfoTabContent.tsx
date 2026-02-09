@@ -63,7 +63,6 @@ interface EditData {
   country: string;
   city: string;
   birth_date: string;
-  agency_percentage: string;
   internal_notes: string;
 }
 
@@ -100,7 +99,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
     country: "",
     city: "",
     birth_date: "",
-    agency_percentage: "",
     internal_notes: "",
   });
 
@@ -114,7 +112,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
       country: c.country ?? "",
       city: c.city ?? "",
       birth_date: c.birth_date ?? "",
-      agency_percentage: biz?.agency_percentage != null ? String(biz.agency_percentage) : "",
       internal_notes: c.internal_notes ?? "",
     });
     setIsEditing(true);
@@ -147,7 +144,6 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           .update({
             assigned_agency: editData.assigned_agency || null,
             manager_type: editData.manager_type || null,
-            agency_percentage: editData.agency_percentage === "" ? null : Number(editData.agency_percentage),
           })
           .eq("id", biz.id);
       }
@@ -283,25 +279,8 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
           } />
         )}
 
-        {/* Porcentaje con Agencia */}
-        {isEditing ? (
-          <EditField label="Porcentaje con Agencia">
-            <div className="relative w-24">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                className="h-9 text-sm pr-6"
-                value={editData.agency_percentage}
-                onChange={(e) => updateField("agency_percentage", e.target.value)}
-                placeholder="—"
-              />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-            </div>
-          </EditField>
-        ) : (
-          <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
-        )}
+        {/* Porcentaje con Agencia (read-only always) */}
+        <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
 
         {/* Notas Internas */}
         {isEditing ? (
