@@ -1,32 +1,21 @@
 
-# Ajuste de layout en header del perfil de creador
+
+# Bloquear campo "Porcentaje con Agencia" en modo lectura
 
 ## Cambio
 
-Reorganizar el header del perfil en `CreadorProfileContent.tsx` (lineas 100-145) para que coincida con la imagen de referencia:
+En `src/pages/creadores/InfoTabContent.tsx`, el campo "Porcentaje con Agencia" en modo lectura (no editing) debe mostrarse como texto estatico igual que los demas campos, sin permitir edicion.
 
-**Layout actual:** Avatar + (Nombre, artistic name, status/edad/cumpleanos badges, social badges) todo apilado a la derecha del avatar.
+## Detalle tecnico
 
-**Layout deseado:**
-- **Izquierda:** Avatar + Nombre + artistic name + social badges (WhatsApp, Instagram) + edad badge
-- **Derecha (esquina superior derecha):** Status badge + birthday badge apilados verticalmente
+1. **Eliminar** el estado local `agencyPct`, `initialAgencyPct` y la funcion `handleAutoSavePercentage` (ya no se necesitan porque no hay auto-save en modo lectura).
 
-## Detalle tecnico en `src/pages/creadores/CreadorProfileContent.tsx`
+2. **Modo lectura** (lineas ~296-309): reemplazar el input editable por un `InfoField` estatico que muestre el valor con el sufijo `%`, igual que cualquier otro campo de solo lectura:
+   - Si hay valor: mostrar `"50%"` (por ejemplo)
+   - Si no hay valor: mostrar `"—"`
 
-Lineas 100-145: reestructurar el contenedor flex interior:
+3. **Modo edicion** (lineas ~285-295): se mantiene el input numerico como esta, ya que en modo edicion si debe ser editable. Este campo se guarda junto con los demas al hacer clic en "Guardar".
 
-1. El div `flex-1` mantiene nombre, artistic name, y los badges de social + edad
-2. Mover los badges de **status** y **cumpleanos** a un nuevo div alineado a la derecha (`items-end`) del contenedor principal flex
-3. El badge de **edad** se queda junto a los social badges (WhatsApp, Instagram) en la fila inferior izquierda
-4. Combinar la fila de social badges con el badge de edad en un solo `flex` row
+## Archivo modificado
+- `src/pages/creadores/InfoTabContent.tsx`
 
-### Estructura resultante:
-```
-[Avatar] [Nombre                    ] [Status badge      ]
-         ["Artistic name"           ] [Birthday badge    ]
-         [WhatsApp] [Instagram] [29 anos]
-```
-
-- El contenedor principal (`flex items-start gap-6`) se mantiene
-- Se agrega un div con `flex flex-col items-end gap-2 shrink-0` para status + birthday a la derecha
-- Se mueven los social badges y edad a una sola fila debajo del artistic name
