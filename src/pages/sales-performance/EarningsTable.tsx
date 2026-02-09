@@ -7,13 +7,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { EarningsRow, SortField, SortDirection } from "./types";
+import { ALL_COLUMNS, type EarningsRow, type SortField, type SortDirection, type ColumnDef } from "./types";
 
 interface EarningsTableProps {
   rows: EarningsRow[];
   sortField: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
+  visibleColumns: Set<SortField>;
 }
 
 const formatDate = (d: string) => {
@@ -33,67 +34,76 @@ const SortIcon = ({ field, current, direction }: { field: SortField; current: So
   return direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 };
 
-const EarningsTable = ({ rows, sortField, sortDirection, onSort }: EarningsTableProps) => (
-  <div className="rounded-lg border border-border bg-card overflow-x-auto">
-    <Table>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="text-xs">
-            <button className="flex items-center gap-1" onClick={() => onSort("artistic_name")}>
-              Artistic Name <SortIcon field="artistic_name" current={sortField} direction={sortDirection} />
-            </button>
-          </TableHead>
-          <TableHead className="text-xs">
-            <button className="flex items-center gap-1" onClick={() => onSort("pending_creator")}>
-              Creator OF <SortIcon field="pending_creator" current={sortField} direction={sortDirection} />
-            </button>
-          </TableHead>
-          <TableHead className="text-xs text-right">
-            <button className="flex items-center justify-end gap-1 w-full" onClick={() => onSort("date")}>
-              Fecha <SortIcon field="date" current={sortField} direction={sortDirection} />
-            </button>
-          </TableHead>
-          <TableHead className="text-xs text-right">
-            <button className="flex items-center justify-end gap-1 w-full" onClick={() => onSort("total_earnings_gross")}>
-              Total Earnings Gross <SortIcon field="total_earnings_gross" current={sortField} direction={sortDirection} />
-            </button>
-          </TableHead>
-          <TableHead className="text-xs">
-            <button className="flex items-center gap-1" onClick={() => onSort("document_id")}>
-              Document ID <SortIcon field="document_id" current={sortField} direction={sortDirection} />
-            </button>
-          </TableHead>
+const formatCell = (row: EarningsRow, col: ColumnDef): string => {
+  const val = row[col.key];
+  if (val == null) return "—";
+  switch (col.format) {
+    case "currency":
+      return "$" + (val as number).toLocaleString("en-US", { minimumFractionDigits: 2 });
+    case "number":
+      return (val as number).toLocaleString("en-US");
+    case "percent":
+      return (val as number).toFixed(2) + "%";
+    case "date":
+      return formatDate(val as string);
+    case "document":
+      return (val as string).slice(0, 8) + "…";
+    default:
+      return String(val);
+  }
+};
 
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.id}>
-            <TableCell className="text-sm font-medium text-foreground">
-              {row.artistic_name ?? "—"}
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
-              {row.pending_creator ?? "—"}
-            </TableCell>
-            <TableCell className="text-right text-sm text-foreground">{formatDate(row.date)}</TableCell>
-            <TableCell className="text-right text-sm font-medium text-foreground">
-              ${(row.total_earnings_gross ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </TableCell>
-            <TableCell className="text-xs text-muted-foreground font-mono">
-              {row.document_id ? `${row.document_id.slice(0, 8)}…` : "—"}
-            </TableCell>
+const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns }: EarningsTableProps) => {
+  const columns = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
+
+  return (
+    <div className="rounded-lg border border-border bg-card overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {columns.map((col) => (
+              <TableHead key={col.key} className={`text-xs ${col.align === "right" ? "text-right" : ""}`}>
+                <button
+                  className={`flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : ""}`}
+                  onClick={() => onSort(col.key)}
+                >
+                  {col.label}
+                  <SortIcon field={col.key} current={sortField} direction={sortDirection} />
+                </button>
+              </TableHead>
+            ))}
           </TableRow>
-        ))}
-        {rows.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-8">
-              Sin resultados
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
-  </div>
-);
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              {columns.map((col) => (
+                <TableCell
+                  key={col.key}
+                  className={`text-sm ${col.align === "right" ? "text-right" : ""} ${
+                    col.format === "document" ? "font-mono text-xs text-muted-foreground" :
+                    col.format === "text" && col.key === "artistic_name" ? "font-medium text-foreground" :
+                    col.format === "text" ? "text-muted-foreground" :
+                    col.format === "currency" ? "font-medium text-foreground" :
+                    "text-foreground"
+                  }`}
+                >
+                  {formatCell(row, col)}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+          {rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center text-muted-foreground text-sm py-8">
+                Sin resultados
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
 
 export default EarningsTable;

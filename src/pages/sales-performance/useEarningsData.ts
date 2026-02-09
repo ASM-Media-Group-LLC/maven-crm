@@ -5,7 +5,7 @@ import type { EarningsRow } from "./types";
 const fetchEarnings = async (): Promise<EarningsRow[]> => {
   const { data: earnings, error } = await supabase
     .from("of_gross_earnings")
-    .select("id, date, total_earnings_gross, document_id, pending_creator, creator_id")
+    .select("id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, fans_renew_on, renew_on_percentage, change_expired_fan_count, avg_spend_per_spender_gross, avg_spend_per_transaction_gross, avg_earnings_per_fan_gross, document_id, pending_creator, creator_id")
     .order("date", { ascending: false })
     .limit(1000);
 
