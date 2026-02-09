@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUpdateCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
 import type { CreatorWithBusiness } from "./useCreadores";
@@ -120,84 +121,86 @@ const EditCreadorModal = ({ open, onOpenChange, creator }: Props) => {
           <DialogTitle>Editar Creador</DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 py-4">
-          <div className="space-y-1.5">
-            <Label>Nombre *</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              className={nameError ? "border-destructive" : ""}
-            />
+        <ScrollArea className="max-h-[60vh] pr-4">
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Nombre *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                className={nameError ? "border-destructive" : ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nombre Artístico</Label>
+              <Input value={form.artistic_name} onChange={(e) => handleChange("artistic_name", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Teléfono</Label>
+              <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>País</Label>
+              <Input value={form.country} onChange={(e) => handleChange("country", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Ciudad</Label>
+              <Input value={form.city} onChange={(e) => handleChange("city", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Categoría</Label>
+              <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Nombre Artístico</Label>
-            <Input value={form.artistic_name} onChange={(e) => handleChange("artistic_name", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Teléfono</Label>
-            <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>País</Label>
-            <Input value={form.country} onChange={(e) => handleChange("country", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Ciudad</Label>
-            <Input value={form.city} onChange={(e) => handleChange("city", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Categoría</Label>
-            <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium">Redes Sociales</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Instagram</Label>
-              <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Twitter/X</Label>
-              <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>TikTok</Label>
-              <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>YouTube</Label>
-              <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>OnlyFans URL</Label>
-              <Input value={form.onlyfans_url} onChange={(e) => handleChange("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
-            </div>
-            <div className="space-y-1.5">
-              <Label>WhatsApp</Label>
-              <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Redes Sociales</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Instagram</Label>
+                <Input value={form.instagram_handle} onChange={(e) => handleChange("instagram_handle", e.target.value)} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Twitter/X</Label>
+                <Input value={form.twitter_handle} onChange={(e) => handleChange("twitter_handle", e.target.value)} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>TikTok</Label>
+                <Input value={form.tiktok_handle} onChange={(e) => handleChange("tiktok_handle", e.target.value)} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>YouTube</Label>
+                <Input value={form.youtube_handle} onChange={(e) => handleChange("youtube_handle", e.target.value)} placeholder="@canal" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>OnlyFans URL</Label>
+                <Input value={form.onlyfans_url} onChange={(e) => handleChange("onlyfans_url", e.target.value)} placeholder="https://onlyfans.com/..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>WhatsApp</Label>
+                <Input value={form.whatsapp_number} onChange={(e) => handleChange("whatsapp_number", e.target.value)} placeholder="+1 234 567 8900" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-1.5">
-          <Label>Biografía</Label>
-          <Textarea value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} placeholder="Breve descripción del creador..." rows={3} />
-        </div>
+          <div className="space-y-1.5 mt-4">
+            <Label>Biografía</Label>
+            <Textarea value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} placeholder="Breve descripción del creador..." rows={3} />
+          </div>
+        </ScrollArea>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
