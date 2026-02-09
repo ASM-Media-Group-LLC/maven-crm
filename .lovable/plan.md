@@ -1,40 +1,15 @@
 
 
-# Agregar campos adicionales al modal "Editar Creador"
+# Agregar scroll vertical al modal de Editar Creador
 
 ## Resumen
-Agregar los campos faltantes al modal de edicion segun el mockup: YouTube, OnlyFans URL, WhatsApp y Biografia. Tambien reorganizar la seccion de Redes Sociales en grid de 2 columnas.
+Envolver el contenido del modal (entre el header y el footer) en un `ScrollArea` con altura maxima para que el formulario sea scrolleable cuando hay muchos campos.
 
-## Cambios en `src/pages/creadores/EditCreadorModal.tsx`
+## Cambio en `src/pages/creadores/EditCreadorModal.tsx`
 
-### Campos nuevos en el formulario
-Agregar al estado del formulario:
-- `youtube_handle` (input, placeholder: "@canal")
-- `onlyfans_url` (input, placeholder: "https://onlyfans.com/...")
-- `whatsapp_number` (input, placeholder: "+1 234 567 8900")
-- `bio` (textarea, placeholder: "Breve descripcion del creador...")
-
-### Reorganizar seccion Redes Sociales
-Cambiar el grid de 3 columnas a 2 columnas con los siguientes campos:
-1. Instagram | Twitter/X
-2. TikTok | YouTube
-3. OnlyFans URL | WhatsApp
-
-### Agregar seccion Biografia
-Debajo de Redes Sociales, agregar un campo de textarea de ancho completo con label "Biografia".
-
-### Mapeo a la tabla `creators`
-| Campo UI | Campo DB |
-|----------|----------|
-| YouTube | youtube_handle |
-| OnlyFans URL | onlyfans_url |
-| WhatsApp | whatsapp_number |
-| Biografia | bio |
-
-Todos estos campos ya existen en la tabla `creators` de Supabase.
-
-### Cambiar label "Twitter" a "Twitter/X"
-Actualizar el label del campo existente de Twitter a "Twitter/X" para coincidir con el mockup.
+1. Importar `ScrollArea` desde `@/components/ui/scroll-area`
+2. Envolver las secciones del formulario (los 3 bloques: campos principales, redes sociales, y biografia) dentro de un `<ScrollArea className="max-h-[60vh] pr-4">` entre el `DialogHeader` y el `DialogFooter`
+3. Esto permite scroll vertical cuando el contenido excede el 60% de la altura del viewport, manteniendo el titulo y los botones siempre visibles
 
 ## Archivo modificado
 - `src/pages/creadores/EditCreadorModal.tsx`
