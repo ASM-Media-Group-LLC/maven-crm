@@ -123,7 +123,7 @@ const CreadoresFilters = ({
 function FilterSelect({
   placeholder,
   value,
-  options,
+  options = [],
   onChange,
 }: {
   placeholder: string;
