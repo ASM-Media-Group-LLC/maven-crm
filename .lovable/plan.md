@@ -1,40 +1,71 @@
 
 
-# Tab de Lineamientos Operativos
+# Rediseno del Tab Lineamientos - Vista por Categorias con Accordion
 
 ## Resumen
 
-Implementar el contenido del tab "Lineamientos" en el perfil de creador, replicando el diseno de la imagen de referencia. Se conecta con la tabla `creator_guidelines` de Supabase para CRUD completo.
+Reemplazar la vista plana actual de lineamientos por una vista organizada por **categorias** con items expandibles estilo accordion, replicando el diseno de las imagenes de referencia. Se mantiene la funcionalidad CRUD existente conectada a la tabla `creator_guidelines`.
 
 ## Estructura visual
 
-El tab muestra:
+### Header (sin cambios)
+- Icono ClipboardList + "Lineamientos Operativos" + badge contador
+- Botones "Ver" (Eye) y "Agregar" (Plus) a la derecha
 
-1. **Header**: Icono de documento + titulo "Lineamientos Operativos" + contador "X registrados" a la izquierda, y botones "Ver" / "+ Agregar" a la derecha.
-2. **Estado vacio**: Cuando no hay lineamientos, un area gris con icono centrado, texto "Sin lineamientos", subtitulo "Documenta como manejar esta cuenta", y boton "+ Agregar".
-3. **Con datos**: Lista de lineamientos mostrando titulo, tipo, contenido (truncado), y fecha de creacion. Acciones de editar/eliminar por fila.
+### Cuerpo: Categorias con items expandibles
+Cada categoria tiene:
+- **Encabezado de categoria**: texto bold a la izquierda + boton "+ Nueva categoria" a la derecha
+- **Items**: filas con icono circular a la izquierda, titulo + descripcion, y botones chevron (expandir) + plus (agregar contenido) a la derecha
+- Al expandir un item, se muestra su contenido guardado en la DB con opciones de editar/eliminar
+
+### Categorias predefinidas (basadas en las imagenes)
+
+1. **Operacion Core**: Precios, Limites, Gustos y Preferencias, Estilo de Contenido, Reglas de Sexting, Estrategia PPV, Contenido Custom
+2. **Gestion de Chats**: Instrucciones para Chats, Tipo de Usuarios, Fans VIP / Whales, Tiempos de Respuesta, Estrategia de Renewals, Mass Messages, Idiomas
+3. **Horarios**: Horarios y Disponibilidad, Contacto de Emergencia
+4. **Negocio y Crecimiento**: Metas y Objetivos, Promociones Permitidas, Cross-Promo Redes, Adquisicion de Fans, Tecnicas de Upselling, Retencion de Fans
+5. **Plataformas y Cuentas**: Reglas de Plataforma, Cuentas Backup, Redes Sociales
+6. **Administrativo**: Onboarding, Estado de Verificacion, Contratos y Legales, Info de Pagos, Feedback de Reunion, Historial de Problemas, Alertas Importantes
+
+Cada item predefinido tiene un **icono Lucide** asignado y una **descripcion corta** fija.
 
 ## Detalle tecnico
 
-### 1. Nuevo componente: `src/pages/creadores/LineamientosTabContent.tsx`
+### Mapeo datos DB a nueva UI
+- `guideline_type` = nombre de la categoria (ej: "Operacion Core")
+- `title` = nombre del item (ej: "Precios")
+- `content` = contenido expandible del item
 
-- Recibe `creatorId: string` como prop
-- Usa `useQuery` para fetch de `creator_guidelines` filtrado por `creator_id`
-- Estado vacio con icono `ClipboardList`, textos y boton centrado
-- Header con contador y botones "Ver" (ojo) / "Agregar" (plus)
-- Modal de agregar/editar con campos: titulo (Input), tipo (Select con opciones como "Operativo", "Contenido", "Ventas", "Comunicacion"), contenido (Textarea)
-- Confirmacion de eliminar con AlertDialog
-- Mutaciones con `useMutation` + invalidacion de query
+### Constante de configuracion
+Se define un array `CATEGORY_TEMPLATES` con la estructura predefinida de categorias e items, cada uno con:
+- `category`: nombre de la categoria
+- `items[]`: array con `title`, `description` (texto fijo descriptivo), e `icon` (componente Lucide)
 
-### 2. Modificar: `src/pages/creadores/CreadorProfileContent.tsx`
+### Logica de renderizado
+1. Iterar sobre `CATEGORY_TEMPLATES`
+2. Para cada categoria, mostrar el header con su nombre
+3. Para cada item del template, buscar en `guidelines[]` si existe un registro con ese `guideline_type` + `title`
+4. Mostrar el item con su icono y descripcion del template
+5. Si tiene contenido en DB: el chevron expande para mostrar el contenido con botones editar/eliminar
+6. El boton "+" abre el modal de agregar/editar con `guideline_type` y `title` pre-llenados, solo pide `content`
+7. El boton "Agregar" del header abre el modal completo (con selector de categoria y titulo libre)
+8. El boton "+ Nueva categoria" abre un dialogo simple para crear una categoria custom (se agrega al estado local o se guarda como un `guideline_type` nuevo)
 
-- Importar `LineamientosTabContent`
-- Reemplazar el placeholder del tab "lineamientos" por `<LineamientosTabContent creatorId={id!} />`
+### Componentes usados
+- `Collapsible` (Radix) para expandir/colapsar cada item (mas flexible que Accordion para este caso)
+- `ChevronDown` rotado con transicion para indicar estado abierto/cerrado
+- `Dialog` existente para modales de agregar/editar
+- `AlertDialog` existente para confirmar eliminacion
+- Iconos de `lucide-react` para cada item predefinido
 
-### 3. Flujo de datos
+### Archivo modificado
+- `src/pages/creadores/LineamientosTabContent.tsx` - reescritura completa manteniendo la misma logica de queries/mutations
 
-- **Leer**: `SELECT * FROM creator_guidelines WHERE creator_id = ? ORDER BY created_at DESC`
-- **Crear**: `INSERT` con titulo, contenido, guideline_type, creator_id, created_by (placeholder UUID)
-- **Editar**: `UPDATE` por id
-- **Eliminar**: `DELETE` por id
+### Cambios clave respecto a la version actual
+- Se elimina la lista plana de cards
+- Se organizan los lineamientos dentro de categorias predefinidas
+- Los items predefinidos siempre se muestran (con o sin contenido)
+- El "+" en cada item pre-llena categoria y titulo en el modal, pidiendo solo el contenido
+- Se mantienen los mismos modales de Dialog y AlertDialog
+- Se mantiene la misma conexion a Supabase sin cambios de schema
 
