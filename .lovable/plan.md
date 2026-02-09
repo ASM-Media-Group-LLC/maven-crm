@@ -1,21 +1,72 @@
 
 
-# Corregir validacion del campo Edad
+# Redisenar KPI Cards y agregar tabs de agencia en /creadores
 
-## Problema
-El campo Edad tiene valor por defecto `18`, por lo que nunca muestra error de validacion al enviar el formulario vacio. El usuario espera que si no se ingresa una edad valida, se muestre el helper text de error.
+## Resumen
+Redisenar las KPI cards de la pagina de creadores para que coincidan con el mockup: layout horizontal con icono a la derecha en fondo coloreado, subtitulos descriptivos debajo del numero, y una card separada "Total de Creadoras" mas pequena debajo. Ademas, agregar tabs de agencia (Todas, Atomic Agency, Kash Agency, etc.) entre las cards y los filtros existentes.
 
-## Cambios en `src/pages/creadores/NuevoCreadorForm.tsx`
+## Cambios
 
-### 1. Cambiar valor por defecto de `age` de `18` a `0`
-Esto permite que el campo empiece vacio visualmente y que la validacion lo detecte.
+### 1. Redisenar `CreadoresKPICards.tsx`
+Actualizar el componente para que coincida con el mockup:
 
-### 2. Actualizar la validacion de edad
-Cambiar la regla de `form.age < 18` a `!form.age || form.age < 18` para cubrir tanto el caso vacio (0) como edades menores a 18. Mensaje: "La edad minima es 18 anos".
+- **5 cards principales** en una fila (`grid-cols-5`): Activas, Onboarding, Pausadas, Retiros, Terminadas
+- Cada card muestra:
+  - Titulo arriba a la izquierda (ej: "Activas")
+  - Icono arriba a la derecha en un cuadrado con fondo coloreado (ej: `bg-success/20` con icono `text-success`)
+  - Numero grande debajo del titulo con color correspondiente
+  - Subtitulo descriptivo en `text-muted-foreground` (ej: "52% del total", "En proceso", "Temporales", "Proximas salidas", "Inactivas")
+- **Card "Total de Creadoras"** separada debajo, mas pequena, con icono de Users a la izquierda
 
-### 3. Ajustar el Input de edad
-Mostrar el campo vacio cuando el valor es `0` usando `value={form.age || ""}` para que no se vea un "0" en el input.
+Subtitulos por card:
+| Card | Subtitulo |
+|------|-----------|
+| Activas | Calculo dinamico: `{Math.round(active/total*100)}% del total` |
+| Onboarding | "En proceso" |
+| Pausadas | "Temporales" |
+| Retiros | "Proximas salidas" |
+| Terminadas | "Inactivas" |
 
-## Archivo modificado
-- `src/pages/creadores/NuevoCreadorForm.tsx` (3 lineas)
+### 2. Agregar tabs de agencia en `CreadoresContent.tsx`
+Debajo de las KPI cards y antes de los filtros, agregar una barra de tabs con las agencias disponibles:
+- Tab "Todas" (seleccionada por defecto, limpia filtro de agencia)
+- Tabs dinamicas basadas en las agencias que vienen del hook `useCreadores` (ej: "Atomic Agency", "Kash Agency", etc.)
+- Al hacer clic en una tab, se actualiza `filters.agency`
+- Estilo: botones con borde, el activo con fondo `secondary`
+
+### 3. Integrar KPI cards en `CreadoresContent.tsx`
+- Importar `CreadoresKPICards`
+- Agregar `statusCounts` del hook (ya existe pero no se usa)
+- Renderizar las cards entre el header y los filtros
+
+## Archivo modificados
+- `src/pages/creadores/CreadoresKPICards.tsx` (rediseno completo)
+- `src/pages/creadores/CreadoresContent.tsx` (agregar cards + tabs de agencia)
+
+## Detalle tecnico
+
+**Estructura de cada KPI card:**
+```text
++----------------------------------+
+| Activas            [icon bg]     |
+|                                  |
+| 134                              |
+| 52% del total                    |
++----------------------------------+
+```
+
+**Card Total separada:**
+```text
++------------------------+
+| [icon] Total de Creadoras |
+|        259                |
++------------------------+
+```
+
+**Tabs de agencia:**
+```text
+[ Todas ] [ Atomic Agency ] [ Kash Agency ] [ Unlok Platform ] [ Otra ] [ Elite Models ]
+```
+
+Implementadas como botones con `variant="outline"` o `variant="secondary"` segun si estan activas, conectadas al filtro `agency` existente. Las agencias se obtienen dinamicamente del hook `useCreadores` que ya expone `agencies`.
 
