@@ -1,26 +1,39 @@
 
 
-# Ajustar grid de Creadores a 4 cards por fila
+# Corregir scroll horizontal en /creadores
 
-## Cambio
+## Problema
 
-Modificar las clases de grid en `CreadoresGrid.tsx` para que siempre se muestren 4 tarjetas por fila en pantallas grandes.
+El contenedor `flex-1` que envuelve el contenido no tiene restriccion de ancho minimo. En flexbox, los hijos no se encogen por debajo de su contenido a menos que se aplique `min-w-0` o `overflow-hidden`. Esto causa que el grid empuje el contenido mas alla del sidebar, generando scroll horizontal.
 
-## Detalle tecnico
+## Solucion
 
-### Archivo: `src/pages/creadores/CreadoresGrid.tsx`
+Aplicar `min-w-0` y `overflow-hidden` en los contenedores necesarios para que el contenido respete el espacio disponible junto al sidebar.
 
-Cambiar la clase del contenedor grid de:
+## Cambios
 
-```
-grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
-```
+### 1. `src/pages/Creadores.tsx` (linea 11)
 
-a:
+Agregar `min-w-0` al div contenedor del contenido:
 
 ```
-grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4
+// Antes
+<div className="flex flex-1 flex-col">
+
+// Despues
+<div className="flex flex-1 flex-col min-w-0">
 ```
 
-Esto hace que a partir de `lg` (1024px) ya se muestren 4 columnas, en lugar de esperar a `xl` (1280px).
+### 2. `src/pages/creadores/CreadoresContent.tsx` (linea 34)
 
+Agregar `min-w-0` al main para reforzar la restriccion:
+
+```
+// Antes
+<main className="flex-1 overflow-auto p-6 space-y-6">
+
+// Despues
+<main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
+```
+
+Estos dos cambios aseguran que la cadena de flexbox respete el ancho del sidebar y el grid se ajuste al espacio disponible sin generar scroll horizontal.
