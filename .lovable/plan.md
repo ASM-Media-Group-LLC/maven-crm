@@ -1,48 +1,24 @@
 
 
-# Modo edicion en tab "Informacion General"
+# Porcentaje con Agencia: mantener estilo "bloqueado" en modo lectura
 
-## Resumen
-Al hacer clic en "Editar", los campos de la seccion se convierten en inputs/selects editables, y los botones cambian a "Cancelar" y "Guardar". Al cancelar se revierten los valores; al guardar se persisten en Supabase.
+## Cambio
 
-## Cambios en `src/pages/creadores/CreadorProfileContent.tsx`
+En `src/pages/creadores/InfoTabContent.tsx`, reemplazar el texto estatico del campo "Porcentaje con Agencia" en modo lectura (lineas 302-305) por un input numerico con apariencia bloqueada, igual al que se habia implementado antes:
 
-### 1. Estado de edicion
-- Agregar `isEditing` (boolean) y `editData` (objeto con los valores editables).
-- Al hacer clic en "Editar": `setIsEditing(true)` y copiar valores actuales a `editData`.
-- Al hacer clic en "Cancelar": `setIsEditing(false)` y descartar `editData`.
-- Al hacer clic en "Guardar": actualizar `creators` y `creator_business` en Supabase, invalidar query, `setIsEditing(false)`.
+- Input tipo `number` con clases `bg-transparent border-transparent cursor-default` que visualmente parece texto estatico
+- Al hacer focus: muestra borde normal de input (`focus:border-input focus:bg-background`)
+- Al perder focus (onBlur): si el valor cambio, guarda directamente en `creator_business.agency_percentage` via Supabase e invalida la query
+- Sufijo visual `%` posicionado a la derecha
 
-### 2. Campos editables (segun la imagen de referencia)
-| Campo | Tipo de input | Tabla |
-|-------|--------------|-------|
-| Agencia Asignada | Select (opciones desde datos existentes o texto libre) | creator_business.assigned_agency |
-| Categoria | Select | creators.category |
-| Manager | Select | creator_business.manager_type |
-| Pais | Select (lista de paises del mapa countryToCode) | creators.country |
-| Ciudad | Input texto | creators.city |
-| Fecha de Nacimiento | Input date | creators.birth_date |
-| Porcentaje con Agencia | Input number (ya existe) | creator_business.agency_percentage |
-| Notas Internas | Textarea | creators.internal_notes |
+Esto permite editar el porcentaje de forma inline sin necesidad de entrar al modo edicion completo, manteniendo la apariencia consistente con los demas campos en modo lectura.
 
-Los campos **Estado** y **Fecha de Registro** se mantienen como solo lectura incluso en modo edicion.
+## Detalle tecnico
 
-### 3. Botones
-- En modo lectura: boton "Editar" con icono Edit (como esta ahora).
-- En modo edicion: boton "Cancelar" (variant ghost) y boton "Guardar" (variant default con icono Save).
-- Posicion: misma ubicacion actual, a la derecha del titulo "Informacion General".
+Lineas 285-306 se reemplazan para que tanto en modo edicion como en modo lectura el campo sea un input, pero con estilos diferentes:
 
-### 4. Logica de guardado
-- Separar los campos en dos updates: uno para `creators` (category, country, city, birth_date, internal_notes) y otro para `creator_business` (assigned_agency, manager_type, agency_percentage).
-- Ejecutar ambos updates, luego invalidar la query `["creator", id]`.
-- Mostrar estado de carga en el boton "Guardar" mientras se guarda.
+- **Modo lectura**: input con `bg-transparent border-transparent` + auto-save en `onBlur`
+- **Modo edicion**: input normal (como esta ahora) que se guarda con el boton Guardar general
 
-### 5. Apariencia de los campos editables
-- Usar `Select` de shadcn para los dropdowns (Agencia, Categoria, Manager, Pais).
-- Usar `Input` para Ciudad y Fecha de Nacimiento.
-- Usar `Textarea` para Notas Internas.
-- El campo "Porcentaje con Agencia" ya es editable, se integra con el flujo general.
-
-## Archivo modificado
-- `src/pages/creadores/CreadorProfileContent.tsx`
+Se agrega estado local `agencyPct` y `initialAgencyPct` para controlar el auto-save en modo lectura.
 
