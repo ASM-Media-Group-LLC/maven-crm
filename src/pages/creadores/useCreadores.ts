@@ -154,6 +154,17 @@ interface AddCreadorFullInput extends AddCreadorWithBusinessInput {
   documents?: DocumentInput[];
 }
 
+export function useUpdateCreador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<TablesInsert<"creators">> }) => {
+      const { error } = await supabase.from("creators").update(data).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
+  });
+}
+
 export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
