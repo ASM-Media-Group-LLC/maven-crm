@@ -7,9 +7,14 @@ const Index = () => {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-8">
         <Logo size="lg" />
-        <Button variant="outline" asChild>
-          <Link to="/design-system">Design System</Link>
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" asChild>
+            <Link to="/design-system">Design System</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/salesdashboard">Sales Dashboard</Link>
+          </Button>
+        </div>
       </div>
     </div>
   );
