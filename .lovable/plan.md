@@ -1,67 +1,95 @@
 
-
-# Ajustar seccion Documentacion segun imagen de referencia
+# Funcionalidad de Subir Archivos con Modal
 
 ## Resumen
-Reemplazar la seccion de Documentacion actual (simplificada) por una version completa que replica 1:1 la imagen de referencia, incluyendo nuevos campos y logica condicional para PickLink.
+Crear un modal reutilizable para subir archivos (fotos y documentos) en la seccion de Documentacion. Se configurara un bucket de Supabase Storage y se conectaran los 3 botones "Subir Archivos" al modal. Los archivos subidos se almacenan en Supabase Storage y se registran en la tabla `creator_documents` existente.
 
-## Cambios en `src/pages/creadores/NuevoCreadorForm.tsx`
+## Cambios
 
-### 1. Agregar campos nuevos al FormData y defaults
-Nuevos campos:
-- `piclink_url: string` (Direccion de PickLink)
-- `piclink_monthly_payment: number` (Pago Mensual PickLink)
-- `piclink_env_confirmed: boolean` (PickLink ENV Confirmado)
+### 1. Crear bucket de Supabase Storage (migracion SQL)
+- Crear bucket `creator-files` (publico) para almacenar contratos, fotos de PickLink y fotos/videos extras
+- Agregar politicas RLS para permitir lectura publica y subida autenticada (o anonima si no hay auth configurado)
 
-### 2. Actualizar testData con valores para los nuevos campos
+### 2. Nuevo componente `src/components/FileUploadModal.tsx`
+Modal reutilizable con las siguientes funcionalidades:
+- Se abre al hacer clic en cualquiera de los botones "Subir Archivos"
+- Titulo dinamico segun el contexto (ej: "Contrato Firmado & Documentos", "Fotos de PickLink", "Fotos y Videos Extras")
+- Zona de drag & drop con icono de upload y texto instructivo
+- Boton "Seleccionar archivos" que abre el file picker nativo
+- Filtro de tipos de archivo segun el contexto:
+  - Contratos: PDF, DOC, DOCX, imagenes
+  - Fotos PickLink: imagenes (JPG, PNG, GIF)
+  - Fotos/Videos Extras: imagenes + videos (MP4, MOV)
+- Vista previa de archivos seleccionados con nombre, tamano y boton para eliminar
+- Barra de progreso durante la subida
+- Boton "Subir" para confirmar
+- Validacion de tamano maximo por archivo
 
-### 3. Reescribir la Seccion 6 - Documentacion
-Estructura segun la imagen:
+### 3. Logica de subida en el modal
+- Subir cada archivo a Supabase Storage en la ruta `creator-files/{creatorId o 'temp'}/{categoria}/{filename}`
+- Como el creador aun no existe al momento del formulario, se usara un ID temporal (UUID generado al montar el formulario)
+- Al guardar el creador exitosamente, los archivos quedan vinculados via `creator_documents`
 
+### 4. Actualizar `src/pages/creadores/NuevoCreadorForm.tsx`
+- Importar y usar el nuevo `FileUploadModal`
+- Agregar estado para archivos subidos por categoria (contratos, picklink, extras)
+- Reemplazar los 3 botones "Subir Archivos" deshabilitados por botones funcionales que abren el modal
+- Mostrar lista de archivos ya subidos debajo de cada boton con miniatura (si es imagen) y nombre
+- Al hacer submit del formulario, insertar registros en `creator_documents` con el `creator_id` real
+
+### 5. Actualizar `src/pages/creadores/useCreadores.ts`
+- Agregar funcion para insertar registros en `creator_documents` despues de crear el creador
+
+## Detalle Tecnico
+
+**Estructura del modal:**
+```text
++------------------------------------------+
+|  [X]  Subir Archivos - {Titulo}          |
++------------------------------------------+
+|                                          |
+|     +------------------------------+     |
+|     |    [Icono Upload]            |     |
+|     |  Arrastra archivos aqui o    |     |
+|     |  [Seleccionar archivos]      |     |
+|     |  Formatos: ...               |     |
+|     +------------------------------+     |
+|                                          |
+|  Archivos seleccionados:                 |
+|  +------------------------------------+  |
+|  | archivo1.pdf  2.3MB         [X]    |  |
+|  | foto.jpg      1.1MB         [X]    |  |
+|  +------------------------------------+  |
+|                                          |
+|            [Cancelar]  [Subir]           |
++------------------------------------------+
 ```
-Documentacion
-├── Contrato Firmado & Documentos
-│   ├── [Subir Archivos] (boton outline, alineado a la derecha)
-│   └── "Formatos: PDF, Word (.doc, .docx) e Imagenes. Maximo 10MB por archivo, 10 archivos."
-│
-├── Card con borde redondeado:
-│   ├── "Tiene PickLink Confirmado?" (titulo bold)
-│   ├── "Marcar si el creador tiene PickLink activo" (subtitulo muted)
-│   └── Checkbox alineado a la derecha
-│
-├── (Condicional: si has_piclink es true)
-│   ├── Barra lateral izquierda azul/accent
-│   ├── Grid 2 cols:
-│   │   ├── "Direccion de PickLink" (Input, placeholder https://piclink.com/username)
-│   │   └── "Pago Mensual PickLink" (Input number, placeholder 50.00)
-│   └── "Fotos de PickLink (Comprobante)" (texto label)
-│
-├── Fotos y Videos Extras
-│   ├── [Subir Archivos] (boton outline, alineado a la derecha)
-│   └── "Formatos: Imagenes (JPG, PNG, GIF) y Videos (MP4, MOV). Maximo 20MB por archivo."
-│
-└── Card con borde redondeado:
-    ├── "PickLink ENV Confirmado" (titulo bold)
-    ├── "Tag 'ENV' configurado en Bios" (subtitulo muted)
-    └── Checkbox alineado a la derecha (sin check)
+
+**Estado de archivos en el formulario:**
+```typescript
+interface UploadedFile {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  category: "contracts" | "piclink" | "extras";
+}
 ```
 
-### 4. Actualizar handleSubmit
-Agregar los nuevos campos al objeto `business`:
-- `piclink_url: form.piclink_url || null`
-- `piclink_monthly_payment: form.piclink_monthly_payment || null`
-- `piclink_env_confirmed: form.piclink_env_confirmed`
+**Ruta en Storage:** `creator-files/{tempId}/{category}/{filename}`
 
-### Detalle tecnico
+**Migracion SQL:**
+```sql
+INSERT INTO storage.buckets (id, name, public) VALUES ('creator-files', 'creator-files', true);
+CREATE POLICY "Allow public read" ON storage.objects FOR SELECT USING (bucket_id = 'creator-files');
+CREATE POLICY "Allow uploads" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'creator-files');
+CREATE POLICY "Allow deletes" ON storage.objects FOR DELETE USING (bucket_id = 'creator-files');
+```
 
-**Campos condicionales:** Cuando `has_piclink` es true, se muestran los campos de Direccion de PickLink y Pago Mensual con un borde izquierdo de acento (clase `border-l-2 border-primary pl-4`).
-
-**Checkboxes en cards:** Los dos checkboxes (PickLink Confirmado y ENV Confirmado) se renderizan dentro de cards con layout flex justify-between, texto a la izquierda y checkbox a la derecha.
-
-**Botones Subir Archivos:** Se mantienen como botones outline deshabilitados con el icono Upload, alineados a la derecha con flex justify-between respecto al titulo.
-
-**Mapeo a DB:** Los campos `piclink_url`, `piclink_monthly_payment` y `piclink_env_confirmed` ya existen en la tabla `creator_business` (como `piclink_url` no existe directamente, se usara el campo `piclink_url` del table `creators`). Revisando: `creator_business` tiene `piclink_env_confirmed` y `piclink_monthly_payment`. El campo `piclink_url` existe en la tabla `creators`.
+## Archivos nuevos
+- `src/components/FileUploadModal.tsx`
 
 ## Archivos modificados
-- `src/pages/creadores/NuevoCreadorForm.tsx`
-
+- `src/pages/creadores/NuevoCreadorForm.tsx` (conectar botones al modal, estado de archivos, insertar en creator_documents al submit)
+- `src/pages/creadores/useCreadores.ts` (funcion para insertar en creator_documents)
+- Migracion SQL para crear el bucket de storage
