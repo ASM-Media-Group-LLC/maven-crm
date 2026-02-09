@@ -1,25 +1,32 @@
 
 
-# Mostrar bandera en la ubicacion del modal Ver Creador
-
-## Problema
-El campo `country_code` esta vacio (null) en todos los registros de la base de datos. El codigo actual intenta generar la bandera a partir de `country_code`, pero como no existe, nunca se muestra.
-
-## Solucion
-Crear un mapeo de nombres de paises (en espanol) a codigos ISO de 2 letras dentro de `ViewCreadorModal.tsx`, y usarlo como fallback cuando `country_code` es null.
+# Ajustar visual de la seccion Redes en el modal Ver Creador
 
 ## Cambios en `src/pages/creadores/ViewCreadorModal.tsx`
 
-1. Agregar un diccionario `countryToCode` con los paises mas comunes en espanol:
-   - Argentina -> AR, Chile -> CL, Colombia -> CO, Mexico -> MX, Venezuela -> VE, etc.
+### Redisenar el componente `SocialLink`
+Actualmente muestra el nombre de la plataforma (texto) a la izquierda y el handle a la derecha. Segun la referencia, debe mostrar:
 
-2. Modificar el calculo de `flag` para usar el nombre del pais como fallback:
-   ```
-   const code = c.country_code || countryToCode[c.country] || null
-   const flag = getFlagEmoji(code)
-   ```
+- **Icono de la plataforma** a la izquierda (Instagram, TikTok, etc. usando iconos de Lucide donde esten disponibles, o texto estilizado para los que no tengan icono)
+- **Handle con prefijo @** junto al icono (ej. "@daniela_cardona_7")
+- **Icono ExternalLink** a la derecha, como boton/link
+- **Separador** (linea divisoria) entre cada fila
+- Solo mostrar las redes que tengan handle (ocultar las vacias en lugar de mostrar "---")
 
-Esto hara que la bandera se muestre junto a la ubicacion sin necesidad de modificar datos en la base de datos.
+### Cambios especificos
+
+1. Modificar `SocialLink` para recibir un `icon` (componente React) en lugar de `label` texto
+2. Mostrar: `[Icono plataforma] @handle .................. [ExternalLink icon]`
+3. Filtrar redes sin handle para no mostrar filas vacias
+4. Usar `divide-y` en el contenedor para las lineas divisorias entre filas
+
+### Iconos por plataforma
+- Instagram: icono `Instagram` de Lucide
+- TikTok: texto "TT" estilizado (no hay icono en Lucide)
+- Twitter/X: texto "X" estilizado
+- YouTube: texto "YT" estilizado
+- OnlyFans: texto "OF" estilizado
+- WhatsApp: icono `Phone` de Lucide o texto "WA"
 
 ## Archivo modificado
 - `src/pages/creadores/ViewCreadorModal.tsx`
