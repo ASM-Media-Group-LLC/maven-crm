@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Users, Pencil, Save, Upload, X,
@@ -174,20 +175,46 @@ const NuevoCreadorForm = () => {
   const removeUploadedFile = (url: string) => setUploadedFiles((prev) => prev.filter((f) => f.url !== url));
   const filesByCategory = (cat: UploadCategory) => uploadedFiles.filter((f) => f.category === cat);
 
-  const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const toggleLanguage = (lang: string) =>
+  const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (errors[key]) setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
+  };
+
+  const toggleLanguage = (lang: string) => {
     setForm((prev) => ({
       ...prev,
       languages: prev.languages.includes(lang)
         ? prev.languages.filter((l) => l !== lang)
         : [...prev.languages, lang],
     }));
+    if (errors.languages) setErrors((prev) => { const next = { ...prev }; delete next.languages; return next; });
+  };
+
+  const validate = useCallback((): Record<string, string> => {
+    const e: Record<string, string> = {};
+    if (!form.assigned_agency) e.assigned_agency = "La agencia es obligatoria";
+    if (!form.name.trim()) e.name = "El nombre es obligatorio";
+    if (form.age < 18) e.age = "La edad mínima es 18 años";
+    if (!form.birth_date) e.birth_date = "La fecha de nacimiento es obligatoria";
+    if (!form.country) e.country = "El país es obligatorio";
+    if (!form.city.trim()) e.city = "La ciudad es obligatoria";
+    if (form.languages.length === 0) e.languages = "Selecciona al menos un idioma";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "El email no es válido";
+    if (!form.payment_method) e.payment_method = "El método de pago es obligatorio";
+    if (!form.main_platform) e.main_platform = "La plataforma principal es obligatoria";
+    return e;
+  }, [form]);
 
   const handleSubmit = async () => {
-    if (!form.name.trim()) {
-      toast({ title: "Error", description: "El nombre es obligatorio", variant: "destructive" });
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      const firstKey = Object.keys(validationErrors)[0];
+      const el = document.querySelector(`[data-field="${firstKey}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast({ title: "Revisa los campos marcados", variant: "destructive" });
       return;
     }
 
@@ -272,9 +299,9 @@ const NuevoCreadorForm = () => {
         {/* Seccion 1 - Información Básica */}
         <Section icon={<User className="h-5 w-5" />} title="Información Básica">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Agencia Asignada *">
+            <Field label="Agencia Asignada *" error={errors.assigned_agency} fieldKey="assigned_agency">
               <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
+                <SelectTrigger className={errors.assigned_agency ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
                 <SelectContent>
                   {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                 </SelectContent>
@@ -288,32 +315,32 @@ const NuevoCreadorForm = () => {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Nombre Completo *">
-              <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Nombre completo" />
+            <Field label="Nombre Completo *" error={errors.name} fieldKey="name">
+              <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Nombre completo" className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
             <Field label="Nombre Artístico">
               <Input value={form.artistic_name} onChange={(e) => set("artistic_name", e.target.value)} placeholder="Nombre artístico" />
             </Field>
-            <Field label="Edad *">
-              <Input type="number" value={form.age} onChange={(e) => set("age", Number(e.target.value))} min={18} />
+            <Field label="Edad *" error={errors.age} fieldKey="age">
+              <Input type="number" value={form.age} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
-            <Field label="Fecha de Nacimiento *">
-              <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} />
+            <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
+              <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className={errors.birth_date ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
-            <Field label="País *">
+            <Field label="País *" error={errors.country} fieldKey="country">
               <Select value={form.country} onValueChange={(v) => set("country", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
+                <SelectTrigger className={errors.country ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
                 <SelectContent>
                   {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Ciudad *">
-              <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Ciudad" />
+            <Field label="Ciudad *" error={errors.city} fieldKey="city">
+              <Input value={form.city} onChange={(e) => set("city", e.target.value)} placeholder="Ciudad" className={errors.city ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
           </div>
-          <div className="space-y-2 pt-2">
-            <Label className="text-sm font-medium">Idiomas *</Label>
+          <div className="space-y-2 pt-2" data-field="languages">
+            <Label className={cn("text-sm font-medium", errors.languages && "text-destructive")}>Idiomas *</Label>
             <div className="flex flex-wrap gap-4">
               {LANGUAGES.map((lang) => (
                 <label key={lang} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -325,14 +352,15 @@ const NuevoCreadorForm = () => {
                 </label>
               ))}
             </div>
+            {errors.languages && <p className="text-xs text-destructive">{errors.languages}</p>}
           </div>
         </Section>
 
         {/* Seccion 2 - Contacto */}
         <Section icon={<Phone className="h-5 w-5" />} title="Información de Contacto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" />
+            <Field label="Email" error={errors.email} fieldKey="email">
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" className={errors.email ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
             <Field label="Teléfono">
               <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+573001234567" />
@@ -473,9 +501,9 @@ const NuevoCreadorForm = () => {
             <Field label="Porcentaje Agencia (%)">
               <Input type="number" value={form.agency_percentage} onChange={(e) => set("agency_percentage", Number(e.target.value))} min={0} max={100} />
             </Field>
-            <Field label="Método de Pago">
+            <Field label="Método de Pago *" error={errors.payment_method} fieldKey="payment_method">
               <Select value={form.payment_method} onValueChange={(v) => set("payment_method", v)}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
+                <SelectTrigger className={errors.payment_method ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
@@ -508,9 +536,9 @@ const NuevoCreadorForm = () => {
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Plataforma Principal">
+              <Field label="Plataforma Principal *" error={errors.main_platform} fieldKey="main_platform">
                 <Select value={form.main_platform} onValueChange={(v) => set("main_platform", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar plataforma" /></SelectTrigger>
+                  <SelectTrigger className={errors.main_platform ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar plataforma" /></SelectTrigger>
                   <SelectContent>
                     {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
@@ -568,11 +596,12 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, fieldKey, children }: { label: string; error?: string; fieldKey?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-medium">{label}</Label>
+    <div className="space-y-1.5" data-field={fieldKey}>
+      <Label className={cn("text-sm font-medium", error && "text-destructive")}>{label}</Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
