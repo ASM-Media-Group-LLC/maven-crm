@@ -10,6 +10,7 @@ import SalesDashboard from "./pages/SalesDashboard";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
+import NuevoCreador from "./pages/NuevoCreador";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/creadores" element={<Creadores />} />
+            <Route path="/creadores/nuevo" element={<NuevoCreador />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
