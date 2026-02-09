@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
+import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
 import Logo from "@/components/Logo";
@@ -12,14 +13,16 @@ import EarningsSummaryCards from "./sales-performance/EarningsSummaryCards";
 import CustomMetrics from "./sales-performance/CustomMetrics";
 import { ALL_COLUMNS, type SortField, type SortDirection } from "./sales-performance/types";
 
-const PAGE_SIZE = 25;
-
 const SalesPerformanceCreator = () => {
   const [documentFilter, setDocumentFilter] = useState("all");
   const [creatorFilter, setCreatorFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "all">(50);
   const [visibleColumns, setVisibleColumns] = useState<Set<SortField>>(
     () => new Set(ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key))
   );
@@ -37,6 +40,16 @@ const SalesPerformanceCreator = () => {
 
   const filtered = useMemo(() => {
     let result = rows;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (r) =>
+          (r.artistic_name ?? "").toLowerCase().includes(q) ||
+          (r.pending_creator ?? "").toLowerCase().includes(q)
+      );
+    }
+
     if (documentFilter !== "all") {
       result = result.filter((r) => r.document_id === documentFilter);
     }
@@ -45,6 +58,16 @@ const SalesPerformanceCreator = () => {
         (r) => r.artistic_name === creatorFilter || r.pending_creator === creatorFilter
       );
     }
+
+    if (dateFrom) {
+      const from = startOfDay(dateFrom);
+      result = result.filter((r) => new Date(r.date) >= from);
+    }
+    if (dateTo) {
+      const to = endOfDay(dateTo);
+      result = result.filter((r) => new Date(r.date) <= to);
+    }
+
     return result.sort((a, b) => {
       const dir = sortDirection === "asc" ? 1 : -1;
       const va = a[sortField];
@@ -55,10 +78,13 @@ const SalesPerformanceCreator = () => {
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
       return String(va).localeCompare(String(vb)) * dir;
     });
-  }, [rows, documentFilter, creatorFilter, sortField, sortDirection]);
+  }, [rows, searchQuery, documentFilter, creatorFilter, dateFrom, dateTo, sortField, sortDirection]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginatedRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const effectivePageSize = pageSize === "all" ? filtered.length : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
+  const paginatedRows = pageSize === "all"
+    ? filtered
+    : filtered.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize);
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -72,6 +98,22 @@ const SalesPerformanceCreator = () => {
 
   const handleDocumentFilter = (v: string) => { setDocumentFilter(v); setCurrentPage(1); };
   const handleCreatorFilter = (v: string) => { setCreatorFilter(v); setCurrentPage(1); };
+  const handleSearchChange = (v: string) => { setSearchQuery(v); setCurrentPage(1); };
+  const handlePageSizeChange = (v: number | "all") => { setPageSize(v); setCurrentPage(1); };
+
+  const handleToday = () => {
+    const d = new Date();
+    setDateFrom(d);
+    setDateTo(d);
+    setCurrentPage(1);
+  };
+
+  const handleYesterday = () => {
+    const d = subDays(new Date(), 1);
+    setDateFrom(d);
+    setDateTo(d);
+    setCurrentPage(1);
+  };
 
   const handleToggleColumn = (key: SortField) => {
     setVisibleColumns((prev) => {
@@ -126,6 +168,16 @@ const SalesPerformanceCreator = () => {
           onCreatorFilterChange={handleCreatorFilter}
           creatorNames={creatorNames}
           totalCount={filtered.length}
+          searchQuery={searchQuery}
+          onSearchChange={handleSearchChange}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={(d) => { setDateFrom(d); setCurrentPage(1); }}
+          onDateToChange={(d) => { setDateTo(d); setCurrentPage(1); }}
+          onToday={handleToday}
+          onYesterday={handleYesterday}
+          pageSize={pageSize}
+          onPageSizeChange={handlePageSizeChange}
         />
 
         <EarningsSummaryCards rows={filtered} />
@@ -141,11 +193,13 @@ const SalesPerformanceCreator = () => {
               onSort={handleSort}
               visibleColumns={visibleColumns}
             />
-            <EarningsPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+            {pageSize !== "all" && (
+              <EarningsPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            )}
           </>
         )}
       </main>
