@@ -1,17 +1,13 @@
-import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { format, differenceInCalendarDays, setYear } from "date-fns";
-import { es } from "date-fns/locale";
-import { ArrowLeft, CalendarDays, Instagram, Phone, Edit, MapPin, Building2, UserCog, Cake, Globe } from "lucide-react";
+import { differenceInCalendarDays, setYear } from "date-fns";
+import { ArrowLeft, Instagram, Phone, Cake } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreadorById } from "./useCreadores";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import InfoTabContent from "./InfoTabContent";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -61,46 +57,10 @@ function computeAge(birthDate: string): number | null {
   return age;
 }
 
-const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="py-3">
-    <p className="text-xs text-muted-foreground mb-1">{label}</p>
-    <p className="text-sm font-medium">{value || "—"}</p>
-  </div>
-);
-
 const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
-
-  const [agencyPercentage, setAgencyPercentage] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [initialPercentage, setInitialPercentage] = useState("");
-
-  useEffect(() => {
-    if (creator?.creator_business?.agency_percentage != null) {
-      const val = String(creator.creator_business.agency_percentage);
-      setAgencyPercentage(val);
-      setInitialPercentage(val);
-    } else {
-      setAgencyPercentage("");
-      setInitialPercentage("");
-    }
-  }, [creator?.creator_business?.agency_percentage]);
-
-  const handlePercentageBlur = async () => {
-    if (agencyPercentage === initialPercentage) return;
-    if (!creator?.creator_business?.id) return;
-    setSaving(true);
-    const numVal = agencyPercentage === "" ? null : Number(agencyPercentage);
-    await supabase
-      .from("creator_business")
-      .update({ agency_percentage: numVal })
-      .eq("id", creator.creator_business.id);
-    await queryClient.invalidateQueries({ queryKey: ["creator", id] });
-    setSaving(false);
-  };
 
   if (isLoading) {
     return (
@@ -128,18 +88,15 @@ const CreadorProfileContent = () => {
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const age = c.birth_date ? computeAge(c.birth_date) : c.age;
   const birthdayDays = c.birth_date ? getDaysUntilBirthday(c.birth_date) : null;
-  const biz = c.creator_business;
 
   return (
     <main className="flex-1 overflow-y-auto">
-      {/* Back button */}
       <div className="px-6 pt-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/creadores")} className="gap-1.5 text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Volver
         </Button>
       </div>
 
-      {/* Hero Header */}
       <div className="mx-6 mt-3 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-6">
         <div className="flex items-start gap-6">
           <Avatar className="h-24 w-24 shrink-0">
@@ -190,7 +147,6 @@ const CreadorProfileContent = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="info">
           <TabsList className="w-full justify-start overflow-x-auto">
@@ -205,58 +161,7 @@ const CreadorProfileContent = () => {
           </TabsList>
 
           <TabsContent value="info">
-            <div className="flex items-center justify-between mt-4 mb-2">
-              <h2 className="text-lg font-semibold">Información General</h2>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Edit className="h-3.5 w-3.5" /> Editar
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 rounded-lg border border-border bg-card p-5">
-              <InfoField label="Agencia Asignada" value={
-                biz?.assigned_agency ? (
-                  <span className="text-primary cursor-pointer hover:underline">{biz.assigned_agency}</span>
-                ) : null
-              } />
-              <InfoField label="Categoría" value={c.category} />
-              <InfoField label="Estado" value={
-                c.status ? (
-                  <Badge variant={statusVariant[c.status] ?? "secondary-soft"} className="font-normal">
-                    {statusLabel[c.status] ?? c.status}
-                  </Badge>
-                ) : null
-              } />
-              <InfoField label="Fecha de Registro" value={
-                c.registration_date ? format(new Date(c.registration_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
-              } />
-              <InfoField label="Manager" value={biz?.manager_type} />
-              <InfoField label="País" value={
-                c.country ? (
-                  <span>{flag && <span className="mr-1">{flag}</span>}{c.country}</span>
-                ) : null
-              } />
-              <InfoField label="Ciudad" value={c.city} />
-              <InfoField label="Fecha de Nacimiento" value={
-                c.birth_date ? format(new Date(c.birth_date), "dd 'de' MMMM 'de' yyyy", { locale: es }) : null
-              } />
-              <div className="py-3">
-                <p className="text-xs text-muted-foreground mb-1">Porcentaje con Agencia</p>
-                <div className="relative w-24">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={agencyPercentage}
-                    onChange={(e) => setAgencyPercentage(e.target.value)}
-                    onBlur={handlePercentageBlur}
-                    className={`h-auto py-0 px-0 text-sm font-medium bg-transparent border-transparent shadow-none cursor-default focus:cursor-text focus:border-input focus:ring-ring focus:bg-background pr-6 ${saving ? "opacity-50" : ""}`}
-                    placeholder="—"
-                  />
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-                </div>
-              </div>
-              <InfoField label="Notas Internas" value={c.internal_notes} />
-            </div>
+            <InfoTabContent creator={c} creatorId={id!} />
           </TabsContent>
 
           {["lineamientos", "redes", "monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
