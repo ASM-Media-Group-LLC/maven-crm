@@ -32,8 +32,8 @@ const CATEGORIES = [
   { value: "B", label: "B (Media)" },
   { value: "C", label: "C (Básica)" },
 ];
-const PLATFORMS = ["OnlyFans", "Fansly", "Otra"];
-const PAYMENT_METHODS = ["Transferencia", "PayPal", "Crypto", "Otro"];
+const PLATFORMS = ["Onlyfans", "Unlok", "Fansly", "Patreon", "Otra"];
+const PAYMENT_METHODS = ["PayPal", "Crypto", "Zelle", "Pagomundo", "Directa24", "Paxom", "Cuenta Bancaria Colombia", "Cuenta Bancaria Estados Unidos", "Otro"];
 const COUNTRIES = [
   "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Arabia Saudita", "Argelia", "Argentina",
   "Armenia", "Australia", "Austria", "Azerbaiyán", "Bahamas", "Bangladés", "Bélgica", "Belice",
@@ -81,6 +81,7 @@ interface FormData {
   agency_percentage: number;
   payment_method: string;
   blue_package: boolean;
+  blue_package_amount: number;
   main_platform: string;
   secondary_platform: string;
   platform_username: string;
@@ -116,6 +117,7 @@ const defaultForm: FormData = {
   agency_percentage: 15,
   payment_method: "",
   blue_package: false,
+  blue_package_amount: 0,
   main_platform: "",
   secondary_platform: "",
   platform_username: "",
@@ -151,7 +153,8 @@ const testData: FormData = {
   agency_percentage: 20,
   payment_method: "Transferencia",
   blue_package: true,
-  main_platform: "OnlyFans",
+  blue_package_amount: 500,
+  main_platform: "Onlyfans",
   secondary_platform: "Fansly",
   platform_username: "@marigar",
   internal_notes: "Referida por closer Juan. Alta motivación, excelente contenido fotográfico.",
@@ -225,6 +228,7 @@ const NuevoCreadorForm = () => {
           agency_percentage: form.agency_percentage || null,
           payment_method: form.payment_method || null,
           blue_package: form.blue_package,
+          li_payment_amount: form.blue_package ? form.blue_package_amount : null,
           has_piclink: form.has_piclink,
           piclink_monthly_payment: form.piclink_monthly_payment || null,
           piclink_env_confirmed: form.piclink_env_confirmed,
@@ -478,22 +482,30 @@ const NuevoCreadorForm = () => {
               </Select>
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer pt-2">
+          <div className="rounded-lg border p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Blue Package</p>
+              <p className="text-xs text-muted-foreground">¿Tiene paquete Blue?</p>
+            </div>
             <Checkbox checked={form.blue_package} onCheckedChange={(v) => set("blue_package", !!v)} />
-            Tiene paquete Blue?
-          </label>
+          </div>
+          {form.blue_package && (
+            <div className="border-l-2 border-primary pl-4 ml-2">
+              <Field label="Monto de Pago">
+                <Input type="number" value={form.blue_package_amount} onChange={(e) => set("blue_package_amount", Number(e.target.value))} placeholder="1000.00" min={0} />
+              </Field>
+            </div>
+          )}
         </Section>
 
         {/* Seccion 8 - Captura y Monetización */}
         <Section icon={<Camera className="h-5 w-5" />} title="Captura y Monetización">
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Capturas de Monetización</p>
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Fotos y Videos Extras</p>
-              <Button variant="outline" disabled>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-medium">Capturas de Monetización</p>
+              <Button variant="outline" size="sm" onClick={() => openUpload("extras")}>
                 <Upload className="mr-2 h-4 w-4" /> Subir Archivos
               </Button>
-              <p className="text-xs text-muted-foreground mt-1">Requiere configuración de storage</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Plataforma Principal">
