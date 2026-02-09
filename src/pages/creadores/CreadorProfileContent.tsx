@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreadorById } from "./useCreadores";
 import InfoTabContent from "./InfoTabContent";
+import LineamientosTabContent from "./LineamientosTabContent";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -164,7 +165,11 @@ const CreadorProfileContent = () => {
             <InfoTabContent creator={c} creatorId={id!} />
           </TabsContent>
 
-          {["lineamientos", "redes", "monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
+          <TabsContent value="lineamientos">
+            <LineamientosTabContent creatorId={id!} />
+          </TabsContent>
+
+          {["redes", "monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <p className="text-sm text-muted-foreground text-center py-12">Sin datos disponibles</p>
             </TabsContent>
