@@ -16,6 +16,7 @@ const emptyFilters: CreadorFilters = {
   category: "",
   country: "",
   city: "",
+  manager: "",
 };
 
 const CreadoresContent = () => {
@@ -23,7 +24,7 @@ const CreadoresContent = () => {
   const [view, setView] = useState<"table" | "grid">("table");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const { creators, isLoading, statusCounts, agencies, categories, countries, cities } =
+  const { creators, isLoading, statusCounts, agencies, categories, countries, cities, managers } =
     useCreadores(filters);
 
   const updateFilters = (patch: Partial<CreadorFilters>) =>
@@ -56,10 +57,12 @@ const CreadoresContent = () => {
           <CreadoresFilters
             filters={filters}
             onChange={updateFilters}
+            onClear={() => setFilters(emptyFilters)}
             agencies={agencies}
             categories={categories}
             countries={countries}
             cities={cities}
+            managers={managers}
             view={view}
             onViewChange={setView}
           />
