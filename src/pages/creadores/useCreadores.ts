@@ -137,3 +137,23 @@ export function useAddCreador() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
   });
 }
+
+interface AddCreadorWithBusinessInput {
+  creator: TablesInsert<"creators">;
+  business: Omit<TablesInsert<"creator_business">, "creator_id">;
+}
+
+export function useAddCreadorWithBusiness() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ creator, business }: AddCreadorWithBusinessInput) => {
+      const { data, error } = await supabase.from("creators").insert(creator).select("id").single();
+      if (error) throw error;
+      const { error: bizError } = await supabase
+        .from("creator_business")
+        .insert({ ...business, creator_id: data.id });
+      if (bizError) throw bizError;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
+  });
+}

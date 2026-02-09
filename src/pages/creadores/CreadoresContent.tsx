@@ -1,11 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
-import AddCreadorModal from "./AddCreadorModal";
 import { useCreadores, type CreadorFilters } from "./useCreadores";
 
 const emptyFilters: CreadorFilters = {
@@ -21,7 +21,7 @@ const emptyFilters: CreadorFilters = {
 const CreadoresContent = () => {
   const [filters, setFilters] = useState<CreadorFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("grid");
-  const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const { creators, allCreators, isLoading, categories, countries, cities, managers } =
     useCreadores(filters);
@@ -38,7 +38,7 @@ const CreadoresContent = () => {
             Total: {isLoading ? "…" : allCreators.length} creadores
           </p>
         </div>
-        <Button variant="outline" onClick={() => setModalOpen(true)}>
+        <Button variant="outline" onClick={() => navigate("/creadores/nuevo")}>
           <Plus className="mr-2 h-4 w-4" />
           Agregar Creador
         </Button>
@@ -71,7 +71,6 @@ const CreadoresContent = () => {
         </>
       )}
 
-      <AddCreadorModal open={modalOpen} onOpenChange={setModalOpen} />
     </main>
   );
 };
