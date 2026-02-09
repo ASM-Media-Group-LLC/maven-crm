@@ -23,9 +23,11 @@ interface EarningsFiltersProps {
   documentFilter: string[];
   onDocumentFilterChange: (value: string[]) => void;
   documentIds: string[];
+  relatedDocumentIds: Set<string>;
   creatorFilter: string[];
   onCreatorFilterChange: (value: string[]) => void;
   creatorNames: string[];
+  relatedCreatorNames: Set<string>;
   totalCount: number;
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -48,13 +50,18 @@ const getDisplayLabel = (selected: string[], allLabel: string) => {
   return `${selected.length} seleccionadas`;
 };
 
+const hasActiveFilters = (dateFrom: Date | undefined, dateTo: Date | undefined, otherFilter: string[]) =>
+  dateFrom !== undefined || dateTo !== undefined || otherFilter.length > 0;
+
 const EarningsFilters = ({
   documentFilter,
   onDocumentFilterChange,
   documentIds,
+  relatedDocumentIds,
   creatorFilter,
   onCreatorFilterChange,
   creatorNames,
+  relatedCreatorNames,
   totalCount,
   searchQuery,
   onSearchChange,
@@ -66,7 +73,11 @@ const EarningsFilters = ({
   onYesterday,
   pageSize,
   onPageSizeChange,
-}: EarningsFiltersProps) => (
+}: EarningsFiltersProps) => {
+  const showCreatorHints = hasActiveFilters(dateFrom, dateTo, documentFilter);
+  const showDocumentHints = hasActiveFilters(dateFrom, dateTo, creatorFilter);
+
+  return (
   <div className="space-y-3">
     {/* Row 1: Search + multi-select dropdowns */}
     <div className="flex items-center gap-3 flex-wrap">
@@ -102,15 +113,23 @@ const EarningsFilters = ({
             )}
             <ScrollArea className="h-60">
               <div className="p-2 space-y-1">
-                {creatorNames.map((name) => (
-                  <label key={name} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs">
-                    <Checkbox
-                      checked={creatorFilter.includes(name)}
-                      onCheckedChange={() => onCreatorFilterChange(toggleItem(creatorFilter, name))}
-                    />
-                    {name}
-                  </label>
-                ))}
+                {creatorNames.map((name) => {
+                  const isRelated = showCreatorHints && relatedCreatorNames.has(name);
+                  const isUnrelated = showCreatorHints && !relatedCreatorNames.has(name);
+                  return (
+                    <label key={name} className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs",
+                      isRelated && !creatorFilter.includes(name) && "bg-primary/10 font-medium",
+                      isUnrelated && "opacity-40"
+                    )}>
+                      <Checkbox
+                        checked={creatorFilter.includes(name)}
+                        onCheckedChange={() => onCreatorFilterChange(toggleItem(creatorFilter, name))}
+                      />
+                      {name}
+                    </label>
+                  );
+                })}
               </div>
             </ScrollArea>
           </PopoverContent>
@@ -137,15 +156,23 @@ const EarningsFilters = ({
             )}
             <ScrollArea className="h-60">
               <div className="p-2 space-y-1">
-                {documentIds.map((id) => (
-                  <label key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs">
-                    <Checkbox
-                      checked={documentFilter.includes(id)}
-                      onCheckedChange={() => onDocumentFilterChange(toggleItem(documentFilter, id))}
-                    />
-                    {id.slice(0, 8)}…
-                  </label>
-                ))}
+                {documentIds.map((id) => {
+                  const isRelated = showDocumentHints && relatedDocumentIds.has(id);
+                  const isUnrelated = showDocumentHints && !relatedDocumentIds.has(id);
+                  return (
+                    <label key={id} className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-xs",
+                      isRelated && !documentFilter.includes(id) && "bg-primary/10 font-medium",
+                      isUnrelated && "opacity-40"
+                    )}>
+                      <Checkbox
+                        checked={documentFilter.includes(id)}
+                        onCheckedChange={() => onDocumentFilterChange(toggleItem(documentFilter, id))}
+                      />
+                      {id.slice(0, 8)}…
+                    </label>
+                  );
+                })}
               </div>
             </ScrollArea>
           </PopoverContent>
@@ -235,6 +262,7 @@ const EarningsFilters = ({
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default EarningsFilters;

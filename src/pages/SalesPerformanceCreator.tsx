@@ -38,6 +38,37 @@ const SalesPerformanceCreator = () => {
     return names.sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
+  // Cross-filter: compute which options are related based on OTHER active filters
+  const relatedCreatorNames = useMemo(() => {
+    let subset = rows;
+    if (documentFilter.length > 0)
+      subset = subset.filter((r) => documentFilter.includes(r.document_id ?? ""));
+    if (dateFrom) {
+      const from = startOfDay(dateFrom);
+      subset = subset.filter((r) => new Date(r.date) >= from);
+    }
+    if (dateTo) {
+      const to = endOfDay(dateTo);
+      subset = subset.filter((r) => new Date(r.date) <= to);
+    }
+    return new Set(subset.map((r) => r.artistic_name || r.pending_creator).filter(Boolean) as string[]);
+  }, [rows, documentFilter, dateFrom, dateTo]);
+
+  const relatedDocumentIds = useMemo(() => {
+    let subset = rows;
+    if (creatorFilter.length > 0)
+      subset = subset.filter((r) => creatorFilter.includes(r.artistic_name ?? "") || creatorFilter.includes(r.pending_creator ?? ""));
+    if (dateFrom) {
+      const from = startOfDay(dateFrom);
+      subset = subset.filter((r) => new Date(r.date) >= from);
+    }
+    if (dateTo) {
+      const to = endOfDay(dateTo);
+      subset = subset.filter((r) => new Date(r.date) <= to);
+    }
+    return new Set(subset.map((r) => r.document_id).filter(Boolean) as string[]);
+  }, [rows, creatorFilter, dateFrom, dateTo]);
+
   const filtered = useMemo(() => {
     let result = rows;
 
@@ -164,9 +195,11 @@ const SalesPerformanceCreator = () => {
           documentFilter={documentFilter}
           onDocumentFilterChange={handleDocumentFilter}
           documentIds={documentIds}
+          relatedDocumentIds={relatedDocumentIds}
           creatorFilter={creatorFilter}
           onCreatorFilterChange={handleCreatorFilter}
           creatorNames={creatorNames}
+          relatedCreatorNames={relatedCreatorNames}
           totalCount={filtered.length}
           searchQuery={searchQuery}
           onSearchChange={handleSearchChange}
