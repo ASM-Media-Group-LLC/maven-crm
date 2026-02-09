@@ -15,14 +15,40 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
 
-const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Russkiy"];
-const STATUSES = ["onboarding", "active", "paused", "leaving", "terminated"];
-const CATEGORIES = ["A+", "A", "B+", "B", "C"];
+const AGENCIES = ["Kash Agency", "Atomic Agency", "Unlok Platform", "Elite Models", "ORA Agency", "Exchange", "Otra"];
+const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
+const STATUSES = [
+  { value: "onboarding", label: "En Onboarding" },
+  { value: "active", label: "Activa" },
+  { value: "paused", label: "Pausada" },
+  { value: "leaving", label: "En Retiro" },
+  { value: "terminated", label: "Terminada" },
+];
+const CATEGORIES = [
+  { value: "A+", label: "A+ (Premium)" },
+  { value: "A", label: "A (Alta)" },
+  { value: "B+", label: "B+ (Media Alta)" },
+  { value: "B", label: "B (Media)" },
+  { value: "C", label: "C (Básica)" },
+];
 const PLATFORMS = ["OnlyFans", "Fansly", "Otra"];
 const PAYMENT_METHODS = ["Transferencia", "PayPal", "Crypto", "Otro"];
 const COUNTRIES = [
-  "Colombia", "México", "Argentina", "España", "Estados Unidos", "Venezuela",
-  "Chile", "Perú", "Ecuador", "Brasil", "Otro",
+  "Afganistán", "Albania", "Alemania", "Andorra", "Angola", "Arabia Saudita", "Argelia", "Argentina",
+  "Armenia", "Australia", "Austria", "Azerbaiyán", "Bahamas", "Bangladés", "Bélgica", "Belice",
+  "Benín", "Bielorrusia", "Bolivia", "Bosnia y Herzegovina", "Brasil", "Bulgaria", "Cabo Verde",
+  "Camboya", "Camerún", "Canadá", "Chile", "China", "Chipre", "Colombia", "Corea del Sur",
+  "Costa Rica", "Croacia", "Cuba", "Dinamarca", "Ecuador", "Egipto", "El Salvador", "Emiratos Árabes Unidos",
+  "Eslovaquia", "Eslovenia", "España", "Estados Unidos", "Estonia", "Etiopía", "Filipinas", "Finlandia",
+  "Francia", "Georgia", "Ghana", "Grecia", "Guatemala", "Guinea Ecuatorial", "Haití", "Honduras",
+  "Hungría", "India", "Indonesia", "Irak", "Irán", "Irlanda", "Islandia", "Israel", "Italia",
+  "Jamaica", "Japón", "Jordania", "Kazajistán", "Kenia", "Letonia", "Líbano", "Lituania",
+  "Luxemburgo", "Malasia", "Marruecos", "México", "Moldavia", "Mónaco", "Montenegro", "Mozambique",
+  "Nicaragua", "Nigeria", "Noruega", "Nueva Zelanda", "Países Bajos", "Pakistán", "Panamá",
+  "Paraguay", "Perú", "Polonia", "Portugal", "Puerto Rico", "Reino Unido", "República Checa",
+  "República Dominicana", "Rumania", "Rusia", "Serbia", "Singapur", "Sudáfrica", "Suecia",
+  "Suiza", "Tailandia", "Taiwán", "Trinidad y Tobago", "Túnez", "Turquía", "Ucrania", "Uruguay",
+  "Venezuela", "Vietnam", "Otro",
 ];
 
 interface FormData {
@@ -214,13 +240,18 @@ const NuevoCreadorForm = () => {
         <Section icon={<User className="h-5 w-5" />} title="Información Básica">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Agencia Asignada *">
-              <Input value={form.assigned_agency} onChange={(e) => set("assigned_agency", e.target.value)} placeholder="Nombre de la agencia" />
+              <Select value={form.assigned_agency} onValueChange={(v) => set("assigned_agency", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar agencia" /></SelectTrigger>
+                <SelectContent>
+                  {AGENCIES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Estado">
               <Select value={form.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
@@ -317,7 +348,7 @@ const NuevoCreadorForm = () => {
               <Select value={form.category} onValueChange={(v) => set("category", v)}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
