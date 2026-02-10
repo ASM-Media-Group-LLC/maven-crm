@@ -43,6 +43,11 @@ export const CATEGORIES: Category[] = [
   {
     category: "Operación Core",
     items: [
+      { title: "Precios", description: "Lista de precios por tipo de contenido o servicio", icon: DollarSign },
+      { title: "Límites", description: "Contenido o acciones NO permitidas", icon: AlertCircle },
+      { title: "Gustos y Preferencias", description: "Lo que le gusta y prefiere la creadora", icon: Crown },
+      { title: "Estilo de Contenido", description: "Tipos de contenido y estilo visual", icon: Palette },
+      { title: "Reglas de Sexting", description: "Lineamientos para conversaciones íntimas", icon: MessageSquare },
       { title: "Estrategia PPV", description: "Define la estrategia de pay-per-view", icon: DollarSign },
       { title: "Contenido Custom", description: "Lineamientos para contenido personalizado", icon: Palette },
     ],
