@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye } from "lucide-react";
+import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -12,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CreatorWithBusiness } from "./useCreadores";
+import { useUpdateCreador } from "./useCreadores";
 import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 
@@ -59,6 +67,7 @@ const CreadoresTable = ({ creators }: Props) => {
   const [sortAsc, setSortAsc] = useState(true);
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
+  const updateCreador = useUpdateCreador();
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -155,11 +164,37 @@ const CreadoresTable = ({ creators }: Props) => {
                 )}
               </TableCell>
               <TableCell>
-                {c.status && (
-                  <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
-                    {statusLabel[c.status] ?? c.status}
-                  </Badge>
-                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1 focus:outline-none">
+                      <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
+                        {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
+                      </Badge>
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {Object.entries(statusLabel).map(([value, label]) => (
+                      <DropdownMenuItem
+                        key={value}
+                        disabled={c.status === value}
+                        onClick={() => {
+                          updateCreador.mutate(
+                            { id: c.id, data: { status: value } },
+                            {
+                              onSuccess: () => toast.success(`Estado actualizado a ${label}`),
+                              onError: () => toast.error("Error al actualizar estado"),
+                            }
+                          );
+                        }}
+                      >
+                        <Badge variant={statusVariant[value] ?? "secondary-soft"}>
+                          {label}
+                        </Badge>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {flag && <span className="mr-1">{flag}</span>}
