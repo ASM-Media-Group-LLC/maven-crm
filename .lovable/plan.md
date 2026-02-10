@@ -1,46 +1,47 @@
 
-# Ajustar cada item de lineamiento como card individual segun la imagen de referencia
+
+# Formulario inline al hacer clic en "+" en cada card de lineamiento
 
 ## Resumen
 
-Cambiar la visualizacion de los items de lineamientos: en lugar de estar agrupados dentro de un unico contenedor `Card` con bordes internos (`border-b`), cada item sera una card independiente con bordes redondeados y separacion entre ellas. El contenido expandido sin datos mostrara un boton centrado "+ Agregar a [Nombre]" dentro de un area con borde punteado.
+Reemplazar el comportamiento actual del boton "+" en cada GuidelineItemRow (que abre un modal) por un formulario inline que se despliega dentro de la misma card, similar a la imagen de referencia. El formulario mostrara un campo "Contenido" con textarea y botones "Cancelar" / "Guardar" al pie.
 
 ## Cambios
 
 ### 1. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
 
-- Cambiar el contenedor raiz de `border-b border-border last:border-b-0` a `rounded-lg border border-border bg-card` para que cada item sea una card independiente.
-- En el contenido expandido sin datos (lineas 68-73), reemplazar el texto "Sin contenido" + link "Agregar" por un boton centrado con borde punteado:
+- Agregar nuevas props: `inlineAdding: boolean`, `inlineContent: string`, `onInlineContentChange: (value: string) => void`, `onInlineSubmit: () => void`, `onInlineCancel: () => void`, `isSaving: boolean`
+- Cuando `inlineAdding` es `true`, la card se expande automaticamente mostrando:
+  - Label "Contenido" con un `Textarea` debajo
+  - Botones "Cancelar" (ghost) y "Guardar" (primary, disabled si el contenido esta vacio o si `isSaving`)
+- El boton "+" ahora llama a `onAdd` que activara el modo inline en lugar de abrir modal
 
-```tsx
-// Antes (expanded, sin guideline)
-<div className="flex items-center gap-2">
-  <p className="text-sm text-muted-foreground">Sin contenido</p>
-  <Button variant="link">Agregar</Button>
-</div>
+### 2. `src/pages/creadores/LineamientosTabContent.tsx`
 
-// Despues
-<div
-  className="rounded-lg border-2 border-dashed border-border py-3 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
-  onClick={onAdd}
->
-  <Plus className="h-4 w-4 mr-2 text-muted-foreground" />
-  <span className="text-sm text-muted-foreground">Agregar a {item.title}</span>
-</div>
+- Agregar estado `inlineAddingKey: string | null` para rastrear cual item tiene el formulario inline abierto
+- Agregar estado `inlineAddContent: string` para el contenido del textarea
+- Modificar `openAddForItem` para que en lugar de abrir el modal, active el formulario inline en esa card (`setInlineAddingKey(key)`)
+- Agregar handler `handleInlineAddSubmit` que inserta el lineamiento via `upsertMutation` y limpia el estado inline
+- Pasar las nuevas props a cada `GuidelineItemRow`: `inlineAdding`, `inlineContent`, `onInlineContentChange`, `onInlineSubmit`, `onInlineCancel`, `isSaving`
+
+### Visual del formulario inline (dentro de la card)
+
+```text
++-----------------------------------------------+
+| [icon] Titulo del item                    [+] [v] |
+|-----------------------------------------------|
+|  Contenido                                      |
+|  +-------------------------------------------+  |
+|  | Describe el lineamiento...                 |  |
+|  |                                            |  |
+|  |                                            |  |
+|  +-------------------------------------------+  |
+|                                                  |
+|                     Cancelar    [Guardar]         |
++-----------------------------------------------+
 ```
 
-### 2. `src/pages/creadores/LineamientosTabContent.tsx` (linea 271)
-
-- Cambiar el contenedor que agrupa los items de cada categoria de `rounded-lg border border-border bg-card overflow-hidden` a `space-y-3` para que cada card individual tenga su propia separacion sin un wrapper compartido.
-
-```tsx
-// Antes
-<div className="rounded-lg border border-border bg-card overflow-hidden">
-  {cat.items.map(...)}
-</div>
-
-// Despues
-<div className="space-y-3">
-  {cat.items.map(...)}
-</div>
-```
+- El formulario se muestra en la zona expandida de la card (pl-16 para alinear con el contenido)
+- Textarea con placeholder "Describe el lineamiento..."
+- Botones alineados a la derecha
+- "Guardar" deshabilitado si el contenido esta vacio
