@@ -1,38 +1,65 @@
 
-# Agregar botones "Ver" y "Agregar" en el header de Lineamientos
+
+# Redisenar Lineamientos con categorias jerarquicas y items colapsables
 
 ## Resumen
 
-Modificar el header del tab de Lineamientos para mostrar dos botones a la derecha, segun la imagen de referencia:
-- **Ver** (icono Eye, variante default/dark) - abre un modal o vista con todos los lineamientos
-- **Agregar** (icono ClipboardList/Plus, variante outline) - mantiene la funcionalidad actual de agregar
+Reemplazar la vista plana actual de lineamientos por un layout jerarquico organizado en categorias con items predefinidos, cada uno colapsable con chevron y boton "+" para agregar contenido. Replica el diseno mostrado en las imagenes de referencia de Maven CRM.
 
-## Cambios en la imagen vs estado actual
+## Estructura de categorias e items (extraida de las imagenes)
 
-Actualmente solo existe el boton "Agregar". La imagen muestra:
-- Icono de ClipboardList a la izquierda con el titulo y subtitulo "0 registrados" debajo
-- Dos botones a la derecha: "Ver" (fondo oscuro, icono Eye) y "Agregar" (outline, icono de documento)
+| Categoria | Items |
+|---|---|
+| Operacion Core | Estrategia PPV, Contenido Custom |
+| Gestion de Chats | Instrucciones para Chats, Tipo de Usuarios, Fans VIP / Whales, Tiempos de Respuesta, Estrategia de Renewals, Mass Messages, Idiomas |
+| Horarios | Horarios y Disponibilidad, Contacto de Emergencia, Zonas Horarias |
+| Negocio y Crecimiento | Metas y Objetivos, Promociones Permitidas, Cross-Promo Redes, Adquisicion de Fans, Tecnicas de Upselling, Retencion de Fans |
+| Plataformas y Cuentas | Reglas de Plataforma, Cuentas Backup, Redes Sociales |
+| Administrativo | Onboarding, Estado de Verificacion, Contratos y Legales, Info de Pagos, Feedback de Reunion, Historial de Problemas, Alertas Importantes |
+
+Cada item tiene un icono unico (de Lucide), titulo y descripcion corta.
 
 ## Detalle tecnico
 
-### Archivo: `src/pages/creadores/LineamientosTabContent.tsx`
+### Archivo: `src/pages/creadores/LineamientosTabContent.tsx` (reescritura completa)
 
-**Imports**: Agregar `Eye` de `lucide-react` (ya existe en el archivo pero confirmar uso).
+**Layout principal:**
+- Eliminar el header con botones Ver/Agregar actuales
+- Renderizar cada categoria como seccion con:
+  - Titulo de categoria en texto semibold a la izquierda
+  - Boton "+ Nueva categoria" a la derecha (solo en el header de cada seccion)
+- Debajo de cada header de categoria, listar los items predefinidos
 
-**Cambios en el header** (lineas 187-198):
+**Cada item:**
+- Fila con: icono (circular con fondo muted), titulo en negrita, descripcion en texto muted
+- A la derecha: boton chevron (expand/collapse) y boton "+"
+- Al expandir con chevron: muestra el contenido existente del lineamiento (si hay datos en DB) o un estado vacio
+- Al hacer click en "+": abre el modal actual de agregar/editar, pre-llenando el `guideline_type` con la categoria y el `title` con el nombre del item
 
-1. Reorganizar el lado izquierdo para mostrar titulo y conteo en formato vertical (titulo arriba, "X registrados" abajo), con el icono de ClipboardList al lado
-2. Agregar contenedor con dos botones a la derecha:
-   - Boton "Ver" con icono `Eye`, variante `default`, tamano `sm` - al hacer click abre el primer lineamiento en el modal de vista, o si no hay lineamientos, esta deshabilitado
-   - Boton "Agregar" con icono `Plus`, variante `outline`, tamano `sm` - mantiene el `onClick={openAdd}` actual
+**Mapeo con la base de datos:**
+- El campo `guideline_type` se usara para almacenar la categoria
+- El campo `title` almacena el nombre del item especifico
+- El campo `content` almacena el contenido detallado
+- Los items predefinidos son una configuracion estatica en el frontend
+- Si un item tiene datos en DB, se muestra su contenido al expandir
+- Si no tiene datos, al expandir muestra "Sin contenido" con invitacion a agregar
 
-**Estructura resultante:**
+**Datos estaticos (constante CATEGORIES):**
+- Array de objetos con `{ category, items: [{ title, description, icon }] }`
+- Cada item referencia un icono de Lucide (DollarSign, Palette, MessageSquare, Users, Crown, Clock, RefreshCw, Mail, Languages, Calendar, Phone, Globe, Target, Tag, Share2, UserPlus, TrendingUp, Shield, CheckCircle, Database, Link2, FileText, CreditCard, ClipboardList, AlertTriangle, AlertCircle)
 
-```
-[icon] Lineamientos Operativos          [Ver] [Agregar]
-       0 registrados
-```
+**Estado de expansion:**
+- useState con un Set de keys (ej: "Gestion de Chats::Tipo de Usuarios") para controlar que items estan expandidos
 
-El boton "Ver" mostrara el listado existente haciendo scroll hacia abajo o si no hay guidelines estara deshabilitado. Dado que los lineamientos ya se muestran en la misma pagina, el boton "Ver" no necesita funcionalidad adicional compleja, pero puede servir para expandir/colapsar la lista de lineamientos.
+**Boton "+ Nueva categoria":**
+- Abre un dialog simple pidiendo nombre de la nueva categoria
+- No requiere cambios en DB, se agrega al estado local (o se podria persistir en una tabla aparte, pero para esta iteracion se mantiene en frontend)
 
 ### Sin cambios en otros archivos
+
+La tabla `creator_guidelines` existente es suficiente. Los campos `guideline_type` (categoria) y `title` (item) ya soportan esta estructura.
+
+### Modales existentes
+
+Se mantienen los modales de Add/Edit, View y Delete actuales, con la diferencia de que al hacer click en "+" de un item especifico, el formulario se pre-llena con la categoria y titulo correspondientes (solo editable el campo contenido en ese caso).
+
