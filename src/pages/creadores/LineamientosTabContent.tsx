@@ -55,7 +55,9 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
-  const [customCategory, setCustomCategory] = useState<string | null>(null);
+  const [inlineFormCategory, setInlineFormCategory] = useState<string | null>(null);
+  const [inlineTitle, setInlineTitle] = useState("");
+  const [inlineDescription, setInlineDescription] = useState("");
   const [showList, setShowList] = useState(true);
 
   // --- Queries & Mutations ---
@@ -134,30 +136,41 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     setModalOpen(true);
   };
 
-  const openCustomForCategory = (category: string) => {
-    setEditingId(null);
-    setForm({ title: "", guideline_type: category, content: "" });
-    setCustomCategory(category);
-    setModalOpen(true);
-  };
-
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
-    setCustomCategory(null);
     setForm(emptyForm);
   };
 
   const handleSubmit = () => {
-    if (customCategory && !form.title.trim()) {
-      toast.error("Escribe el título del lineamiento");
-      return;
-    }
     if (!form.content.trim()) {
       toast.error("Escribe el contenido del lineamiento");
       return;
     }
     upsertMutation.mutate({ ...form, id: editingId ?? undefined });
+  };
+
+  const handleCreateInlineCategory = () => {
+    if (!inlineTitle.trim()) {
+      toast.error("Escribe el nombre de la categoría");
+      return;
+    }
+    upsertMutation.mutate(
+      {
+        title: inlineTitle.trim(),
+        guideline_type: inlineFormCategory!,
+        content: inlineDescription.trim() || inlineTitle.trim(),
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey });
+          toast.success("Lineamiento creado");
+          setInlineFormCategory(null);
+          setInlineTitle("");
+          setInlineDescription("");
+        },
+      }
+    );
   };
 
   const toggleExpanded = (key: string) => {
@@ -223,12 +236,38 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                   variant="ghost"
                   size="sm"
                   className="text-xs text-muted-foreground h-auto py-1 px-2"
-                  onClick={() => openCustomForCategory(cat.category)}
+                  onClick={() => {
+                    setInlineFormCategory((prev) => prev === cat.category ? null : cat.category);
+                    setInlineTitle("");
+                    setInlineDescription("");
+                  }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Nueva categoría
                 </Button>
               </div>
+              {inlineFormCategory === cat.category && (
+                <div className="rounded-lg border-2 border-dashed border-border p-4 mb-3 space-y-3">
+                  <Input
+                    value={inlineTitle}
+                    onChange={(e) => setInlineTitle(e.target.value)}
+                    placeholder="Nombre de la categoría (ej: Reglas de Video)"
+                  />
+                  <Input
+                    value={inlineDescription}
+                    onChange={(e) => setInlineDescription(e.target.value)}
+                    placeholder="Descripción breve (opcional)"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setInlineFormCategory(null)}>
+                      Cancelar
+                    </Button>
+                    <Button size="sm" onClick={handleCreateInlineCategory} disabled={upsertMutation.isPending}>
+                      {upsertMutation.isPending ? "Creando…" : "Crear categoría"}
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="rounded-lg border border-border bg-card overflow-hidden">
                 {cat.items.map((item) => {
                   const key = `${cat.category}|${item.title}`;
@@ -321,16 +360,6 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {customCategory && (
-              <div className="space-y-1.5">
-                <Label>Título</Label>
-                <Input
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Nombre del lineamiento..."
-                />
-              </div>
-            )}
             <div className="space-y-1.5">
               <Label>Contenido</Label>
               <Textarea
