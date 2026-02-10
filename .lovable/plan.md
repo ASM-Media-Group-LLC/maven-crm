@@ -1,63 +1,52 @@
 
+# Normalizacion de handles de redes sociales
 
-# Formulario diferenciado por tipo de card en lineamientos
+## Problema
 
-## Resumen
+Los handles guardados en la base de datos pueden tener formatos inconsistentes: `@usuario`, `@@usuario`, `usuario`, o incluso URLs completas como `https://instagram.com/@usuario`. Esto genera URLs rotas al concatenar.
 
-Actualmente todas las cards usan el mismo formulario inline con campos de Precio, Moneda y Nota. El cambio consiste en que solo **Precios** mantenga esos campos, mientras que las demas cards de "Operacion Core" (Limites, Gustos y Preferencias, Estilo de Contenido, Reglas de Sexting, Estrategia PPV, Contenido Custom) y el resto de categorias usen un formulario simplificado con solo **Titulo / Concepto** y **Descripcion / Detalle**.
+## Solucion
 
-## Cambios
+Crear una funcion utilitaria `cleanHandle` en `src/lib/utils.ts` que elimine todos los `@` del inicio de un handle, y una funcion `buildSocialUrl` que construya la URL correcta por plataforma. Luego reemplazar todas las concatenaciones manuales en los 5 archivos afectados.
 
-### 1. `src/pages/creadores/lineamientos/categoriesConfig.ts`
+## Funcion utilitaria
 
-Agregar un campo `formType` a la interfaz `CategoryItem` para distinguir el tipo de formulario:
+Se agregara en `src/lib/utils.ts`:
 
-- `formType: "pricing"` -- solo para "Precios" (muestra Titulo, Precio, Moneda, Nota)
-- `formType: "detail"` -- para el resto (muestra Titulo/Concepto y Descripcion/Detalle)
-
-Valor por defecto: `"detail"` (la mayoria de items).
-
-### 2. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
-
-Agregar una prop `formType` (default `"detail"`). Segun el valor:
-
-- **`"pricing"`**: Muestra el formulario actual (Titulo/Concepto, Precio, Moneda, Nota)
-- **`"detail"`**: Muestra un formulario con:
-  - **Titulo / Concepto** (Input, igual que ahora)
-  - **Descripcion / Detalle** (Textarea, reutilizando el campo `inlineContent` o `inlineNote`)
-  - Botones: Cancelar, Guardar y agregar otro, Guardar
-
-### 3. `src/pages/creadores/LineamientosTabContent.tsx`
-
-Pasar `formType={item.formType ?? "detail"}` a cada `GuidelineItemRow`. El campo "Descripcion/Detalle" usara el estado `inlineAddContent` ya existente para persistir como `content` en la DB.
-
-## Resultado visual
-
-**Cards con formType "detail"** (Limites, Gustos, Estilo, Sexting, PPV, Custom, y todas las demas):
 ```text
-+------------------------------------------+
-| Titulo / Concepto                        |
-| [Input]                                  |
-|                                          |
-| Descripcion / Detalle                    |
-| [Textarea multilinea]                    |
-|                                          |
-|     Cancelar  Guardar y agregar  Guardar |
-+------------------------------------------+
+cleanHandle(handle): 
+  - Si es null/undefined, retorna ""
+  - Elimina todos los "@" del inicio
+  - Si el valor es una URL completa (empieza con http), extrae solo el username
+
+buildSocialUrl(platform, handle):
+  - Limpia el handle con cleanHandle
+  - Construye la URL segun la plataforma:
+    - instagram: https://instagram.com/{handle}
+    - tiktok: https://tiktok.com/@{handle}
+    - twitter/x: https://x.com/{handle}
+    - youtube: https://youtube.com/@{handle}
+    - linkedin: https://linkedin.com/in/{handle}
+
+displayHandle(handle):
+  - Retorna el handle limpio con un solo "@" al inicio para mostrar en UI
 ```
 
-**Card con formType "pricing"** (solo Precios):
-```text
-+------------------------------------------+
-| Titulo / Concepto                        |
-| [Input]                                  |
-|                                          |
-| Precio              Moneda               |
-| [Input]             [Input]              |
-|                                          |
-| Nota (opcional)                          |
-| [Textarea]                               |
-|                                          |
-|     Cancelar  Guardar y agregar  Guardar |
-+------------------------------------------+
-```
+## Archivos a modificar
+
+1. **`src/lib/utils.ts`** -- Agregar `cleanHandle`, `buildSocialUrl`, `displayHandle`
+
+2. **`src/pages/creadores/CreadoresTable.tsx`** -- Reemplazar todas las URLs hardcodeadas con `buildSocialUrl("instagram", c.instagram_handle)`, etc.
+
+3. **`src/pages/creadores/CreadoresGrid.tsx`** -- Mismo cambio que en la tabla
+
+4. **`src/pages/creadores/ViewCreadorModal.tsx`** -- Usar `buildSocialUrl` en los `SocialLink` y `cleanHandle` para el display
+
+5. **`src/pages/creadores/CreadorProfileContent.tsx`** -- Usar `buildSocialUrl` en los badges de Instagram y `displayHandle` para el texto visible
+
+## Que NO cambia
+
+- Ningun diseno visual
+- Ningun icono
+- Ninguna logica de visibilidad o layout
+- Solo se corrige la construccion de URLs y el texto mostrado
