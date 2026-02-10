@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit, Save, X, Phone } from "lucide-react";
+import { Edit, Save, X, Phone, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
-import { displayHandle } from "@/lib/utils";
+import { displayHandle, buildSocialUrl } from "@/lib/utils";
 import type { CreatorFull } from "./useCreadores";
 
 interface RedesTabContentProps {
@@ -31,6 +31,7 @@ interface PlatformConfig {
   icon: React.ReactNode;
   placeholder: string;
   displayValue: (creator: CreatorFull) => string;
+  buildUrl: (creator: CreatorFull) => string;
 }
 
 const platforms: PlatformConfig[] = [
@@ -40,6 +41,7 @@ const platforms: PlatformConfig[] = [
     icon: <InstagramIcon className="h-5 w-5" />,
     placeholder: "@usuario",
     displayValue: (c) => displayHandle(c.instagram_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("instagram", c.instagram_handle),
   },
   {
     key: "tiktok_handle",
@@ -47,6 +49,7 @@ const platforms: PlatformConfig[] = [
     icon: <TikTokIcon className="h-5 w-5" />,
     placeholder: "@usuario",
     displayValue: (c) => displayHandle(c.tiktok_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("tiktok", c.tiktok_handle),
   },
   {
     key: "twitter_handle",
@@ -54,6 +57,7 @@ const platforms: PlatformConfig[] = [
     icon: <XIcon className="h-5 w-5" />,
     placeholder: "@usuario",
     displayValue: (c) => displayHandle(c.twitter_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("twitter", c.twitter_handle),
   },
   {
     key: "youtube_handle",
@@ -61,6 +65,7 @@ const platforms: PlatformConfig[] = [
     icon: <span className="text-xs font-bold">YT</span>,
     placeholder: "@canal",
     displayValue: (c) => displayHandle(c.youtube_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("youtube", c.youtube_handle),
   },
   {
     key: "onlyfans_url",
@@ -68,6 +73,7 @@ const platforms: PlatformConfig[] = [
     icon: <span className="text-xs font-bold">OF</span>,
     placeholder: "https://onlyfans.com/...",
     displayValue: (c) => c.onlyfans_url || "—",
+    buildUrl: (c) => c.onlyfans_url || "",
   },
   {
     key: "whatsapp_number",
@@ -75,6 +81,7 @@ const platforms: PlatformConfig[] = [
     icon: <Phone className="h-5 w-5" />,
     placeholder: "+1234567890",
     displayValue: (c) => c.whatsapp_number || "—",
+    buildUrl: (c) => c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}` : "",
   },
 ];
 
@@ -162,29 +169,50 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         )}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-5 space-y-1">
-        {platforms.map((platform) => (
-          <div key={platform.key} className="flex items-center gap-4 py-3">
-            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              {platform.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">{platform.label}</p>
-              {isEditing ? (
-                <Input
-                  className="h-8 text-sm mt-1"
-                  value={editData[platform.key]}
-                  onChange={(e) => updateField(platform.key, e.target.value)}
-                  placeholder={platform.placeholder}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground truncate">
-                  {platform.displayValue(creator)}
+      <div className="space-y-2">
+        {platforms.map((platform) => {
+          const url = platform.buildUrl(creator);
+          const hasLink = !!url && !isEditing;
+
+          return (
+            <div
+              key={platform.key}
+              className="group rounded-lg border border-border bg-card p-4 flex items-center gap-4 transition-colors duration-200 hover:bg-primary hover:border-primary"
+            >
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary-foreground/20">
+                {platform.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium group-hover:text-primary-foreground">
+                  {platform.label}
                 </p>
+                {isEditing ? (
+                  <Input
+                    className="h-8 text-sm mt-1"
+                    value={editData[platform.key]}
+                    onChange={(e) => updateField(platform.key, e.target.value)}
+                    placeholder={platform.placeholder}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground truncate group-hover:text-primary-foreground/70">
+                    {platform.displayValue(creator)}
+                  </p>
+                )}
+              </div>
+              {hasLink && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-muted-foreground group-hover:text-primary-foreground transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
