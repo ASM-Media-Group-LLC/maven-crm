@@ -262,7 +262,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                     <Button variant="ghost" size="sm" onClick={() => setInlineFormCategory(null)}>
                       Cancelar
                     </Button>
-                    <Button size="sm" onClick={handleCreateInlineCategory} disabled={upsertMutation.isPending}>
+                    <Button size="sm" onClick={handleCreateInlineCategory} disabled={upsertMutation.isPending || !inlineTitle.trim()}>
                       {upsertMutation.isPending ? "Creando…" : "Crear categoría"}
                     </Button>
                   </div>
