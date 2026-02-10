@@ -184,8 +184,11 @@ export type Database = {
           created_at: string | null
           created_by: string
           creator_id: string
+          currency: string | null
           guideline_type: string
           id: string
+          note: string | null
+          price: number | null
           title: string
           updated_at: string | null
         }
@@ -194,8 +197,11 @@ export type Database = {
           created_at?: string | null
           created_by: string
           creator_id: string
+          currency?: string | null
           guideline_type: string
           id?: string
+          note?: string | null
+          price?: number | null
           title: string
           updated_at?: string | null
         }
@@ -204,8 +210,11 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           creator_id?: string
+          currency?: string | null
           guideline_type?: string
           id?: string
+          note?: string | null
+          price?: number | null
           title?: string
           updated_at?: string | null
         }
