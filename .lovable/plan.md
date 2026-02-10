@@ -1,47 +1,74 @@
 
 
-# Formulario inline al hacer clic en "+" en cada card de lineamiento
+# Ampliar formulario inline de lineamientos con campos adicionales
 
 ## Resumen
 
-Reemplazar el comportamiento actual del boton "+" en cada GuidelineItemRow (que abre un modal) por un formulario inline que se despliega dentro de la misma card, similar a la imagen de referencia. El formulario mostrara un campo "Contenido" con textarea y botones "Cancelar" / "Guardar" al pie.
+Actualizar el formulario inline que aparece al hacer clic en "+" para incluir los campos: Titulo/Concepto, Precio, Moneda, Nota (opcional), y tres botones de accion (Cancelar, Guardar y agregar otro, Guardar con icono).
 
-## Cambios
+## Cambios en Base de Datos
 
-### 1. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
+### Migracion: agregar columnas a `creator_guidelines`
 
-- Agregar nuevas props: `inlineAdding: boolean`, `inlineContent: string`, `onInlineContentChange: (value: string) => void`, `onInlineSubmit: () => void`, `onInlineCancel: () => void`, `isSaving: boolean`
-- Cuando `inlineAdding` es `true`, la card se expande automaticamente mostrando:
-  - Label "Contenido" con un `Textarea` debajo
-  - Botones "Cancelar" (ghost) y "Guardar" (primary, disabled si el contenido esta vacio o si `isSaving`)
-- El boton "+" ahora llama a `onAdd` que activara el modo inline en lugar de abrir modal
+Nuevas columnas opcionales (nullable):
+- `price` (numeric) -- Precio
+- `currency` (text, default 'USD') -- Moneda
+- `note` (text) -- Nota opcional
 
-### 2. `src/pages/creadores/LineamientosTabContent.tsx`
+Estas columnas son nullable para no romper los lineamientos existentes que solo usan `content`.
 
-- Agregar estado `inlineAddingKey: string | null` para rastrear cual item tiene el formulario inline abierto
-- Agregar estado `inlineAddContent: string` para el contenido del textarea
-- Modificar `openAddForItem` para que en lugar de abrir el modal, active el formulario inline en esa card (`setInlineAddingKey(key)`)
-- Agregar handler `handleInlineAddSubmit` que inserta el lineamiento via `upsertMutation` y limpia el estado inline
-- Pasar las nuevas props a cada `GuidelineItemRow`: `inlineAdding`, `inlineContent`, `onInlineContentChange`, `onInlineSubmit`, `onInlineCancel`, `isSaving`
+## Cambios en Codigo
 
-### Visual del formulario inline (dentro de la card)
+### 1. `src/integrations/supabase/types.ts`
+Se regenerara automaticamente tras la migracion.
+
+### 2. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
+
+Reemplazar el formulario inline actual (solo Contenido/textarea) por el nuevo layout:
 
 ```text
-+-----------------------------------------------+
-| [icon] Titulo del item                    [+] [v] |
-|-----------------------------------------------|
-|  Contenido                                      |
-|  +-------------------------------------------+  |
-|  | Describe el lineamiento...                 |  |
-|  |                                            |  |
-|  |                                            |  |
-|  +-------------------------------------------+  |
-|                                                  |
-|                     Cancelar    [Guardar]         |
-+-----------------------------------------------+
++--------------------------------------------------+
+| Titulo / Concepto                                 |
+| [Ej: Foto personalizada, Videollamada 15min...]   |
+|                                                   |
+| Precio                    Moneda                  |
+| [Ej: 50]                 [USD]                    |
+|                                                   |
+| Nota (opcional)                                   |
+| [Ej: Incluye nombre del fan, entrega en 24h...]   |
+|                                                   |
+|           Cancelar  Guardar y agregar otro  Guardar|
++--------------------------------------------------+
 ```
 
-- El formulario se muestra en la zona expandida de la card (pl-16 para alinear con el contenido)
-- Textarea con placeholder "Describe el lineamiento..."
-- Botones alineados a la derecha
-- "Guardar" deshabilitado si el contenido esta vacio
+- Agregar nuevas props: `inlineTitle`, `inlinePrice`, `inlineCurrency`, `inlineNote`, y sus handlers `onChange`
+- Agregar prop `onSubmitAndAddAnother` para el boton "Guardar y agregar otro"
+- Campo "Titulo / Concepto": Input con placeholder "Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
+- "Precio" y "Moneda": dos inputs en una fila (grid de 2 columnas), placeholders "Ej: 50" y "USD"
+- "Nota (opcional)": Textarea con placeholder "Ej: Incluye nombre del fan, entrega en 24h..."
+- Tres botones al pie alineados a la derecha:
+  - "Cancelar" (variant ghost)
+  - "Guardar y agregar otro" (variant outline, disabled si titulo vacio)
+  - "Guardar" (variant default con icono Save, disabled si titulo vacio)
+
+### 3. `src/pages/creadores/LineamientosTabContent.tsx`
+
+- Agregar estados para los nuevos campos: `inlineAddTitle`, `inlineAddPrice`, `inlineAddCurrency` (default "USD"), `inlineAddNote`
+- Actualizar `FormData` para incluir `price`, `currency`, `note`
+- Actualizar `handleInlineAddSubmit` para enviar los nuevos campos a Supabase
+- Agregar `handleInlineAddSubmitAndAnother` que guarda y luego resetea el formulario manteniendo la misma card abierta
+- Pasar todas las nuevas props a `GuidelineItemRow`
+- El campo `content` se seguira usando, y se llenara con el valor del titulo/concepto (o se puede dejar como campo separado)
+
+### 4. Mutacion `upsertMutation`
+
+Actualizar el payload del insert para incluir `price`, `currency`, `note` como campos opcionales en la insercion a `creator_guidelines`.
+
+## Secuencia de implementacion
+
+1. Crear migracion SQL para las nuevas columnas
+2. Actualizar tipos de Supabase
+3. Modificar `GuidelineItemRow.tsx` con el nuevo formulario
+4. Modificar `LineamientosTabContent.tsx` con estados y handlers
+5. Probar flujo completo
+
