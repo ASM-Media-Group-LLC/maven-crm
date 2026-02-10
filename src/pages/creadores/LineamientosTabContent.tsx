@@ -209,8 +209,14 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       )}
 
       {guidelines.length === 0 && (
-        <div className="py-8 text-center text-sm text-muted-foreground">
-          Sin lineamientos creados. Haz clic en <span className="font-medium">Agregar</span> para comenzar.
+        <div className="flex flex-col items-center justify-center rounded-lg bg-muted/50 py-16 px-6">
+          <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
+          <h4 className="text-base font-semibold mb-1">Sin lineamientos</h4>
+          <p className="text-sm text-muted-foreground mb-5">Documenta como manejar esta cuenta</p>
+          <Button variant="outline" size="sm" onClick={() => setSelectorOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Agregar
+          </Button>
         </div>
       )}
 
