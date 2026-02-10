@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ClipboardList, Plus, Pencil, Trash2, Eye } from "lucide-react";
+import { ClipboardList, Plus, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { CATEGORIES } from "./lineamientos/categoriesConfig";
+import GuidelineItemRow from "./lineamientos/GuidelineItemRow";
 
 type Guideline = Tables<"creator_guidelines">;
 
@@ -47,7 +48,8 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const queryClient = useQueryClient();
   const queryKey = ["creator_guidelines", creatorId];
 
-  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -67,6 +69,15 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       return data as Guideline[];
     },
   });
+
+  // Lookup: "category|title" -> guideline
+  const guidelineLookup = useMemo(() => {
+    const map = new Map<string, Guideline>();
+    for (const g of guidelines) {
+      map.set(`${g.guideline_type}|${g.title}`, g);
+    }
+    return map;
+  }, [guidelines]);
 
   const upsertMutation = useMutation({
     mutationFn: async (payload: FormData & { id?: string }) => {
@@ -110,7 +121,6 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
 
   // --- Handlers ---
   const openAddForItem = (category: string, title: string) => {
-    setSelectorOpen(false);
     setEditingId(null);
     setForm({ title, guideline_type: category, content: "" });
     setModalOpen(true);
@@ -134,6 +144,15 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       return;
     }
     upsertMutation.mutate({ ...form, id: editingId ?? undefined });
+  };
+
+  const toggleExpanded = (key: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   // --- Render ---
@@ -166,105 +185,102 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             <Eye className="h-4 w-4 mr-1" />
             Ver
           </Button>
-          <Button size="sm" onClick={() => setSelectorOpen(true)}>
+          <Button
+            variant={showCategories ? "outline" : "default"}
+            size="sm"
+            onClick={() => setShowCategories((v) => !v)}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         </div>
       </div>
 
-      {/* Existing guidelines list */}
-      {showList && guidelines.length > 0 && (
-        <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-          {guidelines.map((g) => (
-            <div key={g.id} className="flex items-start gap-3 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    {g.guideline_type}
-                  </span>
-                  <span className="text-xs text-muted-foreground">·</span>
-                  <span className="text-sm font-medium">{g.title}</span>
-                </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-2">
-                  {g.content}
-                </p>
-              </div>
-              <div className="flex items-center gap-1 shrink-0 pt-0.5">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(g)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive"
-                  onClick={() => setDeleteId(g.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+      {/* Inline categories */}
+      {showCategories && (
+        <div className="space-y-5">
+          {CATEGORIES.map((cat) => (
+            <div key={cat.category}>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                {cat.category}
+              </h4>
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                {cat.items.map((item) => {
+                  const key = `${cat.category}|${item.title}`;
+                  const guideline = guidelineLookup.get(key);
+                  return (
+                    <GuidelineItemRow
+                      key={key}
+                      item={item}
+                      guideline={guideline}
+                      expanded={expandedItems.has(key)}
+                      onToggle={() => toggleExpanded(key)}
+                      onAdd={() => openAddForItem(cat.category, item.title)}
+                      onEdit={openEdit}
+                      onDelete={(id) => setDeleteId(id)}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {guidelines.length === 0 && (
+      {/* Existing guidelines list */}
+      {showList && guidelines.length > 0 && !showCategories && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+          {guidelines.map((g) => {
+            // Find matching item for icon
+            const catConfig = CATEGORIES.find((c) => c.category === g.guideline_type);
+            const itemConfig = catConfig?.items.find((i) => i.title === g.title);
+            if (itemConfig) {
+              const key = `list|${g.id}`;
+              return (
+                <GuidelineItemRow
+                  key={g.id}
+                  item={itemConfig}
+                  guideline={g}
+                  expanded={expandedItems.has(key)}
+                  onToggle={() => toggleExpanded(key)}
+                  onAdd={() => openAddForItem(g.guideline_type, g.title)}
+                  onEdit={openEdit}
+                  onDelete={(id) => setDeleteId(id)}
+                />
+              );
+            }
+            // Fallback for guidelines without matching config
+            return (
+              <div key={g.id} className="flex items-start gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {g.guideline_type}
+                    </span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-sm font-medium">{g.title}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-2">
+                    {g.content}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {guidelines.length === 0 && !showCategories && (
         <div className="flex flex-col items-center justify-center rounded-lg bg-muted/50 py-16 px-6">
           <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
           <h4 className="text-base font-semibold mb-1">Sin lineamientos</h4>
           <p className="text-sm text-muted-foreground mb-5">Documenta como manejar esta cuenta</p>
-          <Button variant="outline" size="sm" onClick={() => setSelectorOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowCategories(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         </div>
       )}
-
-      {/* Category Selector Modal */}
-      <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Agregar Lineamiento</DialogTitle>
-            <DialogDescription>Selecciona una categoría e item para agregar contenido.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 mt-2">
-            {CATEGORIES.map((cat) => (
-              <div key={cat.category}>
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  {cat.category}
-                </h4>
-                <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-                  {cat.items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <div
-                        key={item.title}
-                        className="flex items-center gap-3 px-3 py-2.5"
-                      >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium leading-tight">{item.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{item.description}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() => openAddForItem(cat.category, item.title)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Add / Edit Content Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && closeModal()}>
