@@ -77,7 +77,8 @@ const CreadoresGrid = ({ creators }: Props) => {
               className="overflow-hidden cursor-pointer transition-shadow duration-200 hover:shadow-md hover:border-primary/30"
               onClick={() => setViewingCreator(c)}
             >
-              <CardContent className="p-4 space-y-3">
+              <CardContent className="p-4 space-y-3 relative">
+                <RefreshCw className="absolute top-4 right-4 h-3 w-3 text-muted-foreground" />
                 {/* Header: Avatar + Name + Badges */}
                 <div className="flex items-start gap-3">
                   <Avatar className="h-12 w-12 shrink-0">
@@ -102,7 +103,7 @@ const CreadoresGrid = ({ creators }: Props) => {
                           {statusLabel[c.status] ?? c.status}
                         </Badge>
                       )}
-                      <RefreshCw className="h-3 w-3 shrink-0 text-muted-foreground ml-auto" />
+                      
                     </div>
                   </div>
                 </div>
