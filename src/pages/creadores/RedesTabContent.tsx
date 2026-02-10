@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit, Save, X, Phone, ExternalLink, Linkedin, MessageCircle } from "lucide-react";
+import { Edit, Save, X, Phone, ExternalLink, Linkedin, MessageCircle, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ interface EditData {
   onlyfans_url: string;
   whatsapp_number: string;
   linkedin_handle: string;
+  piclink_url: string;
   chat_url: string;
 }
 
@@ -104,6 +105,15 @@ const platforms: PlatformConfig[] = [
     buildUrl: (c) => c.onlyfans_url || "",
   },
   {
+    key: "piclink_url",
+    label: "PicLink",
+    editLabel: "PicLink URL",
+    icon: <Link className="h-5 w-5" />,
+    placeholder: "https://piclink.com/...",
+    displayValue: (c) => c.piclink_url || "—",
+    buildUrl: (c) => c.piclink_url || "",
+  },
+  {
     key: "chat_url",
     label: "Chat URL",
     editLabel: "Chat URL",
@@ -126,6 +136,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
     onlyfans_url: "",
     whatsapp_number: "",
     linkedin_handle: "",
+    piclink_url: "",
     chat_url: "",
   });
 
@@ -138,6 +149,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       onlyfans_url: creator.onlyfans_url ?? "",
       whatsapp_number: creator.whatsapp_number ?? "",
       linkedin_handle: creator.linkedin_handle ?? "",
+      piclink_url: creator.piclink_url ?? "",
       chat_url: creator.chat_url ?? "",
     });
     setIsEditing(true);
@@ -161,6 +173,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           onlyfans_url: editData.onlyfans_url || null,
           whatsapp_number: editData.whatsapp_number || null,
           linkedin_handle: editData.linkedin_handle || null,
+          piclink_url: editData.piclink_url || null,
           chat_url: editData.chat_url || null,
         })
         .eq("id", creatorId);
