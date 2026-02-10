@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, RefreshCw, Globe } from "lucide-react";
+import { Building2, Globe } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -89,7 +89,7 @@ const CreadoresGrid = ({ creators }: Props) => {
               onClick={() => setViewingCreator(c)}
             >
               <CardContent className="p-4 space-y-3 relative">
-                <RefreshCw className="absolute top-4 right-4 h-3 w-3 text-muted-foreground" />
+                
                 {/* Header: Avatar + Name + Badges */}
                 <div className="flex items-start gap-3">
                   <Avatar className="h-12 w-12 shrink-0">
