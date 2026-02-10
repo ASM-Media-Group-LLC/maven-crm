@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
+import AiSales from "./pages/AiSales";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import NuevoCreador from "./pages/NuevoCreador";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/salesdashboard" element={<SalesDashboard />} />
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
+            <Route path="/aisales" element={<AiSales />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/creadores" element={<Creadores />} />
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
