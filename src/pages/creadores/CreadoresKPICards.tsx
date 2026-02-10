@@ -10,18 +10,18 @@ const CreadoresKPICards = ({ counts }: Props) => {
   const activePercent = counts.total > 0 ? Math.round((counts.active / counts.total) * 100) : 0;
 
   const cards = [
-    { label: "Activas", count: counts.active, subtitle: `${activePercent}% del total`, icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20" },
-    { label: "Onboarding", count: counts.onboarding, subtitle: "En proceso", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20" },
-    { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20" },
-    { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20" },
-    { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted" },
+    { label: "Activas", count: counts.active, subtitle: `${activePercent}% del total`, icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:shadow-[0_0_20px_hsl(var(--success)/0.3)]" },
+    { label: "Onboarding", count: counts.onboarding, subtitle: "En proceso", icon: UserPlus, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)]" },
+    { label: "Pausadas", count: counts.paused, subtitle: "Temporales", icon: Pause, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:shadow-[0_0_20px_hsl(var(--warning)/0.3)]" },
+    { label: "Retiros", count: counts.leaving, subtitle: "Próximas salidas", icon: UserMinus, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: "hover:shadow-[0_0_20px_hsl(var(--destructive)/0.3)]" },
+    { label: "Terminadas", count: counts.terminated, subtitle: "Inactivas", icon: UserX, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:shadow-[0_0_20px_hsl(var(--muted-foreground)/0.15)]" },
   ];
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
         {cards.map((card) => (
-          <Card key={card.label}>
+          <Card key={card.label} className={`transition-shadow duration-200 ${card.hoverClass}`}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <p className="text-sm text-muted-foreground">{card.label}</p>

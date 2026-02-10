@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, setYear } from "date-fns";
-import { ArrowLeft, Instagram, Phone, Cake } from "lucide-react";
+import { ArrowLeft, Phone, Cake } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,7 +124,7 @@ const CreadorProfileContent = () => {
               {c.instagram_handle && (
                 <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">
                   <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
-                    <Instagram className="h-3 w-3" /> {displayHandle(c.instagram_handle)}
+                    <InstagramIcon className="h-3 w-3" /> {displayHandle(c.instagram_handle)}
                   </Badge>
                 </a>
               )}

@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import { ArrowUpDown, Building2, RefreshCw, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,7 +225,7 @@ const CreadoresTable = ({ creators }: Props) => {
                           rel="noopener noreferrer"
                           className="text-destructive hover:text-destructive/80"
                         >
-                          <Instagram className="h-4 w-4" />
+                          <InstagramIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>Instagram</TooltipContent>
@@ -235,9 +238,9 @@ const CreadoresTable = ({ creators }: Props) => {
                           href={buildSocialUrl("tiktok", c.tiktok_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                          className="text-foreground hover:text-muted-foreground"
                         >
-                          TT
+                          <TikTokIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>TikTok</TooltipContent>
@@ -250,9 +253,9 @@ const CreadoresTable = ({ creators }: Props) => {
                           href={buildSocialUrl("twitter", c.twitter_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                          className="text-foreground hover:text-muted-foreground"
                         >
-                          𝕏
+                          <XIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>X</TooltipContent>

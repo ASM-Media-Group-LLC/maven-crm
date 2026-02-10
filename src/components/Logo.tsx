@@ -21,7 +21,7 @@ const Logo = ({ size = "lg", className }: LogoProps) => {
         className
       )}
     >
-      <span className="text-primary">Maven</span>
+      <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Maven</span>
       <span className="text-muted-foreground font-light">CRM</span>
     </h1>
   );
