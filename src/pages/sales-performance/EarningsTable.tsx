@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { ArrowUpDown, ArrowUp, ArrowDown, Link2 } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Link2, Unlink } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,6 +13,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ALL_COLUMNS, type EarningsRow, type SortField, type SortDirection, type ColumnDef } from "./types";
 import LinkCreatorModal from "./LinkCreatorModal";
 
@@ -60,11 +73,29 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
 };
 
 const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns }: EarningsTableProps) => {
+  const queryClient = useQueryClient();
   const columns = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
   const [linkModal, setLinkModal] = useState<{ open: boolean; pendingCreator: string; rowId: string }>({
     open: false,
     pendingCreator: "",
     rowId: "",
+  });
+  const [unlinkTarget, setUnlinkTarget] = useState<{ pendingCreator: string } | null>(null);
+
+  const unlinkMutation = useMutation({
+    mutationFn: async (pendingCreator: string) => {
+      const { error } = await supabase
+        .from("of_gross_earnings")
+        .update({ creator_id: null })
+        .eq("pending_creator", pendingCreator);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+      toast.success("Vínculo eliminado");
+      setUnlinkTarget(null);
+    },
+    onError: () => toast.error("Error al desvincular"),
   });
 
   return (
@@ -89,6 +120,7 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
           <TableBody>
             {rows.map((row) => {
               const isUnlinked = !row.creator_id && !!row.pending_creator;
+              const isManuallyLinked = !!row.creator_id && !!row.pending_creator;
               return (
                 <TableRow key={row.id}>
                   {columns.map((col) => (
@@ -125,6 +157,23 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                             <TooltipContent>Vincular a creador</TooltipContent>
                           </Tooltip>
                         </div>
+                      ) : col.key === "pending_creator" && isManuallyLinked ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{formatCell(row, col)}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setUnlinkTarget({ pendingCreator: row.pending_creator! })}
+                              >
+                                <Unlink className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Desvincular creador</TooltipContent>
+                          </Tooltip>
+                        </div>
                       ) : (
                         formatCell(row, col)
                       )}
@@ -150,6 +199,26 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
         pendingCreator={linkModal.pendingCreator}
         earningsRowId={linkModal.rowId}
       />
+
+      <AlertDialog open={!!unlinkTarget} onOpenChange={(o) => !o && setUnlinkTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Desvincular creador?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el vínculo de <span className="font-medium">"{unlinkTarget?.pendingCreator}"</span> con el creador asignado. Podrás volver a vincularlo después.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => unlinkTarget && unlinkMutation.mutate(unlinkTarget.pendingCreator)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Desvincular
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 };
