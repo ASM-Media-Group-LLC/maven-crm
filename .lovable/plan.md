@@ -1,20 +1,20 @@
 
 
-# Agregar toasts de exito y error en subida de documentos
+# Unificar toasts en NotasTabContent con el patron del sistema
 
 ## Situacion actual
 
-- `handleFilesUploaded` en `DocumentosTabContent.tsx` ya muestra un toast de **error** cuando falla el insert en la base de datos (linea 53)
-- `FileUploadModal` muestra un toast generico de "archivo(s) subido(s) exitosamente" al completar el upload al storage
-- Falta un toast de **exito** explicito en `DocumentosTabContent` cuando los registros se insertan correctamente en la tabla
+- `NotasTabContent.tsx` usa `toast` de **sonner** (`toast.success()`, `toast.error()`)
+- `DocumentosTabContent.tsx` usa `toast` de **@/hooks/use-toast** (`toast({ title, description, variant })`)
+- El sistema de diseno (FeedbackSection) documenta el patron de `useToast` con variantes `destructive` y default
 
 ## Cambio
 
-### Modificar `src/pages/creadores/DocumentosTabContent.tsx`
+### Modificar `src/pages/creadores/NotasTabContent.tsx`
 
-En la funcion `handleFilesUploaded`:
-- Agregar un contador de exitos y errores durante el loop de inserts
-- Al finalizar el loop, mostrar toast de **exito** si hubo archivos registrados correctamente (titulo: "Documento(s) registrado(s)", descripcion con cantidad)
-- Mantener el toast de **error** existente por cada fallo individual
-- Usar las variantes del sistema: `variant: "destructive"` para error, variante default para exito (consistente con `FeedbackSection` del design system)
+- Cambiar el import de `toast` de `"sonner"` a `"@/hooks/use-toast"`
+- Reemplazar `toast.success("Nota guardada")` por `toast({ title: "Nota guardada", description: "La nota se ha registrado correctamente." })`
+- Reemplazar `toast.error("Error al guardar nota: " + e.message)` por `toast({ title: "Error al guardar nota", description: e.message, variant: "destructive" })`
+
+Esto mantiene consistencia con DocumentosTabContent y el patron documentado en el design system.
 
