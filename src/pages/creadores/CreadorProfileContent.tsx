@@ -100,7 +100,7 @@ const CreadorProfileContent = () => {
         </Button>
       </div>
 
-      <div className="mx-6 mt-3 h-32 rounded-xl bg-primary -mb-16" />
+      <div className="mx-6 mt-3 h-32 rounded-xl bg-primary/80 -mb-16" />
 
       <div className="mx-6 relative z-10 rounded-xl bg-gradient-to-br from-card to-muted/50 border border-border p-6">
         <div className="flex items-start gap-6">
