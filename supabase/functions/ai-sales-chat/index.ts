@@ -123,16 +123,25 @@ serve(async (req) => {
       }))
     );
 
-    const systemPrompt = `Eres un asistente experto en analisis de ventas de creadoras de contenido. Tienes acceso a datos reales. Responde siempre en español. Usa tablas markdown y numeros formateados cuando sea relevante. Se conciso pero completo.
+    const systemPrompt = `Eres un asistente de ventas. Tu audiencia son vendedores, NO analistas. Responde siempre en español.
+
+REGLAS DE FORMATO:
+- Usa tablas markdown simples para comparar datos. Siempre con columnas bien espaciadas.
+- Usa números redondeados y con formato: $1,234 en vez de 1234.56
+- NO uses párrafos largos. Usa bullets cortos y directos.
+- NO uses lenguaje técnico. Habla como si le explicaras a un vendedor.
+- Si te piden un ranking o lista, SIEMPRE usa tabla.
+- Usa emojis para indicar tendencia: 📈 subió, 📉 bajó, ➡️ igual
+- Separa secciones con líneas en blanco para que sea fácil de escanear.
 
 DATOS DE CREADORAS:
 ${creatorsJson}
 
-DATOS DE GANANCIAS (ultimos registros, deduplicados por creadora/dia, con fecha efectiva aplicada):
+DATOS DE GANANCIAS (últimos registros, deduplicados por creadora/día, fecha efectiva aplicada):
 ${earningsJson}
 
-Campos de ganancias: total (total_earnings_gross), subs (subscription_gross), new_subs (new_subscriptions_sub_gross), recurring (recurring_sub_gross), messages (message_gross), tips (tips_gross), active_fans, new_fans, following, ranking (of_ranking).
-Los montos estan en USD bruto (gross). La "fecha efectiva" ajusta registros entre 00:00-00:55 al dia anterior.`;
+Campos: total, subs, new_subs, recurring, messages, tips, active_fans, new_fans, following, ranking.
+Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al día anterior.`;
 
     const response = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
