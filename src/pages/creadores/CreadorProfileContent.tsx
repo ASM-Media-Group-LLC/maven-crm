@@ -11,6 +11,7 @@ import { buildSocialUrl, displayHandle } from "@/lib/utils";
 import { useCreadorById } from "./useCreadores";
 import InfoTabContent from "./InfoTabContent";
 import LineamientosTabContent from "./LineamientosTabContent";
+import RedesTabContent from "./RedesTabContent";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -173,7 +174,11 @@ const CreadorProfileContent = () => {
             <LineamientosTabContent creatorId={id!} />
           </TabsContent>
 
-          {["redes", "monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
+          <TabsContent value="redes">
+            <RedesTabContent creator={c} creatorId={id!} />
+          </TabsContent>
+
+          {["monetizacion", "documentos", "notas", "tickets", "historial"].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <p className="text-sm text-muted-foreground text-center py-12">Sin datos disponibles</p>
             </TabsContent>
