@@ -1,51 +1,66 @@
 
 
-# Ajustes en campos del tab Redes (modo edicion)
+# Implementar tab de Monetizacion segun imagen de referencia
 
-## Cambios solicitados
+## Lo que muestra la imagen
 
-1. **Agregar campo "Seguidores Instagram"**: Campo numerico que guarda en la columna `instagram_followers` (integer) de la tabla `creators`.
-2. **Quitar campo "Chat URL"**: Eliminar la entrada de `chat_url` del array `platforms` y del estado `EditData`.
-3. **Renombrar label de WhatsApp**: Cambiar de "WhatsApp" a "WhatsApp (Numero o Link API)" en el `editLabel`.
+La pestana "Monetizacion" muestra una seccion titulada **"Monetizacion Mensual"** con:
+- Icono de dolar ($) junto al titulo
+- Subtitulo: "Historico de monetizacion por mes"
+- Tabla con los registros mensuales o un empty state: "No hay datos de monetizacion registrados"
 
-## Archivo: `src/pages/creadores/RedesTabContent.tsx`
+## Datos disponibles
 
-### 1. Agregar `instagram_followers` a `EditData`
-- Agregar `instagram_followers: string` a la interface `EditData` (se maneja como string en el input y se convierte a number al guardar).
+La tabla `creator_monetization` ya existe en la base de datos con las columnas:
+- `id`, `creator_id`, `month_year` (text, formato "YYYY-MM-01"), `amount` (numeric), `notes` (text), `created_at`, `updated_at`
 
-### 2. Agregar entrada en el array `platforms`
-- Nueva entrada justo despues de Instagram:
-  - key: `instagram_followers`
-  - label: "Seguidores Instagram"
-  - editLabel: "Seguidores Instagram"
-  - icon: icono de InstagramIcon
-  - placeholder: "Ej: 150000"
-  - Solo aparece en modo edicion (no tiene card en modo lectura, o se muestra como dato informativo)
+Ya hay datos reales en la tabla.
 
-### 3. Eliminar `chat_url`
-- Remover la entrada de `chat_url` del array `platforms`
-- Remover `chat_url` de la interface `EditData`
-- Remover `chat_url` del estado inicial, de `startEditing` y de `handleSave`
-- Remover import de `MessageCircle` de lucide-react
+## Cambios tecnicos
 
-### 4. Renombrar label de WhatsApp
-- Cambiar `editLabel` de `"WhatsApp"` a `"WhatsApp (Numero o Link API)"`
+### 1. Crear archivo `src/pages/creadores/MonetizacionTabContent.tsx`
 
-### 5. Actualizar `startEditing`
-- Inicializar `instagram_followers` desde `creator.instagram_followers` (convertir number a string)
+Nuevo componente que:
+- Recibe `creatorId` como prop
+- Consulta `creator_monetization` filtrado por `creator_id`, ordenado por `month_year` descendente
+- Muestra un Card con:
+  - Header: icono `DollarSign` (lucide) + titulo "Monetizacion Mensual" + subtitulo "Historico de monetizacion por mes"
+  - Body: Tabla con columnas **Mes**, **Monto**, **Notas**
+    - `month_year` formateado como nombre de mes y ano (ej: "Febrero 2025")
+    - `amount` formateado como moneda
+    - `notes` como texto
+  - Empty state: "No hay datos de monetizacion registrados" cuando no hay registros
+- Usa los componentes existentes del sistema: `Card`, `Table`, `Skeleton` para loading
 
-### 6. Actualizar `handleSave`
-- Incluir `instagram_followers: editData.instagram_followers ? parseInt(editData.instagram_followers, 10) : null` en el update a Supabase
+### 2. Modificar `src/pages/creadores/CreadorProfileContent.tsx`
 
-### Orden final de campos
+- Importar `MonetizacionTabContent`
+- Extraer "monetizacion" del array de tabs placeholder (linea 181)
+- Agregar un `TabsContent` dedicado para `value="monetizacion"` que renderice `<MonetizacionTabContent creatorId={id!} />`
+- El array de placeholders queda: `["documentos", "notas", "tickets", "historial"]`
 
-1. Instagram
-2. **Seguidores Instagram** (nuevo)
-3. WhatsApp (Numero o Link API) (renombrado)
-4. Twitter/X
-5. YouTube
-6. TikTok
-7. LinkedIn
-8. OnlyFans
-9. PicLink
+### Estructura visual del componente
+
+```text
++----------------------------------------------------------+
+|  $  Monetizacion Mensual                                 |
+|     Historico de monetizacion por mes                     |
+|                                                           |
+|  Mes              |  Monto       |  Notas                |
+|  Febrero 2025     |  $9,000.00   |  KK                   |
+|  Junio 2025       |  $9,000.00   |  KJEF                 |
+|  Marzo 2025       |  $4,444.00   |  AFAF                 |
++----------------------------------------------------------+
+```
+
+O si no hay datos:
+
+```text
++----------------------------------------------------------+
+|  $  Monetizacion Mensual                                 |
+|     Historico de monetizacion por mes                     |
+|                                                           |
+|        No hay datos de monetizacion registrados           |
++----------------------------------------------------------+
+```
 
