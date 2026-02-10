@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Instagram, Building2, RefreshCw, Globe } from "lucide-react";
+import { Building2, RefreshCw, Globe } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +148,7 @@ const CreadoresGrid = ({ creators }: Props) => {
                           className="text-muted-foreground hover:text-foreground"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Instagram className="h-4 w-4" />
+                          <InstagramIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>Instagram</TooltipContent>
@@ -158,10 +161,10 @@ const CreadoresGrid = ({ creators }: Props) => {
                           href={buildSocialUrl("tiktok", c.tiktok_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                          className="text-muted-foreground hover:text-foreground"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          TT
+                          <TikTokIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>TikTok</TooltipContent>
@@ -174,10 +177,10 @@ const CreadoresGrid = ({ creators }: Props) => {
                           href={buildSocialUrl("twitter", c.twitter_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                          className="text-muted-foreground hover:text-foreground"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          𝕏
+                          <XIcon className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>X</TooltipContent>

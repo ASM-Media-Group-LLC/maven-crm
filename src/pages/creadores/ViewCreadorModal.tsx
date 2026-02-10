@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Instagram, Globe } from "lucide-react";
+import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -166,9 +169,9 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
             </TabsContent>
 
             <TabsContent value="redes" className="pr-3 divide-y">
-              <SocialLink icon={<Instagram className="h-4 w-4" />} handle={c.instagram_handle} rawHandle={c.instagram_handle} url={buildSocialUrl("instagram", c.instagram_handle)} />
-              <SocialLink icon={<span className="text-xs font-bold">TT</span>} handle={c.tiktok_handle} rawHandle={c.tiktok_handle} url={buildSocialUrl("tiktok", c.tiktok_handle)} />
-              <SocialLink icon={<span className="text-xs font-bold">X</span>} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
+              <SocialLink icon={<InstagramIcon className="h-4 w-4" />} handle={c.instagram_handle} rawHandle={c.instagram_handle} url={buildSocialUrl("instagram", c.instagram_handle)} />
+              <SocialLink icon={<TikTokIcon className="h-4 w-4" />} handle={c.tiktok_handle} rawHandle={c.tiktok_handle} url={buildSocialUrl("tiktok", c.tiktok_handle)} />
+              <SocialLink icon={<XIcon className="h-4 w-4" />} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} rawHandle={c.youtube_handle} url={buildSocialUrl("youtube", c.youtube_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
               <SocialLink icon={<Phone className="h-4 w-4" />} handle={c.whatsapp_number} url={`https://wa.me/${c.whatsapp_number}`} />
