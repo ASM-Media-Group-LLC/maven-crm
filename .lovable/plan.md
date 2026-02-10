@@ -1,74 +1,99 @@
 
 
-# Ampliar formulario inline de lineamientos con campos adicionales
+# Pagina /aisales - Chat AI con datos de creadoras y ganancias
 
 ## Resumen
 
-Actualizar el formulario inline que aparece al hacer clic en "+" para incluir los campos: Titulo/Concepto, Precio, Moneda, Nota (opcional), y tres botones de accion (Cancelar, Guardar y agregar otro, Guardar con icono).
+Crear una nueva pagina `/aisales` con una interfaz de chat estilo ChatGPT donde el usuario puede hacer preguntas sobre las creadoras y sus ganancias. La AI tendra acceso a los datos de las tablas `of_gross_earnings` y `creators` para responder con informacion real.
 
-## Cambios en Base de Datos
+## Arquitectura
 
-### Migracion: agregar columnas a `creator_guidelines`
-
-Nuevas columnas opcionales (nullable):
-- `price` (numeric) -- Precio
-- `currency` (text, default 'USD') -- Moneda
-- `note` (text) -- Nota opcional
-
-Estas columnas son nullable para no romper los lineamientos existentes que solo usan `content`.
-
-## Cambios en Codigo
-
-### 1. `src/integrations/supabase/types.ts`
-Se regenerara automaticamente tras la migracion.
-
-### 2. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
-
-Reemplazar el formulario inline actual (solo Contenido/textarea) por el nuevo layout:
+La solucion consiste en:
+1. Una **edge function** (`ai-sales-chat`) que recibe las preguntas del usuario, consulta las tablas de Supabase para obtener contexto, y llama a Lovable AI para generar la respuesta con streaming.
+2. Una **pagina React** (`/aisales`) con interfaz de chat que consume la edge function via SSE streaming.
 
 ```text
-+--------------------------------------------------+
-| Titulo / Concepto                                 |
-| [Ej: Foto personalizada, Videollamada 15min...]   |
-|                                                   |
-| Precio                    Moneda                  |
-| [Ej: 50]                 [USD]                    |
-|                                                   |
-| Nota (opcional)                                   |
-| [Ej: Incluye nombre del fan, entrega en 24h...]   |
-|                                                   |
-|           Cancelar  Guardar y agregar otro  Guardar|
-+--------------------------------------------------+
+Usuario escribe pregunta
+        |
+        v
+  Frontend (SSE fetch)
+        |
+        v
+  Edge Function "ai-sales-chat"
+        |
+        +---> Consulta Supabase: creators + of_gross_earnings
+        |
+        +---> Construye system prompt con datos reales
+        |
+        +---> Llama a Lovable AI Gateway (streaming)
+        |
+        v
+  Respuesta streameada token por token al frontend
 ```
 
-- Agregar nuevas props: `inlineTitle`, `inlinePrice`, `inlineCurrency`, `inlineNote`, y sus handlers `onChange`
-- Agregar prop `onSubmitAndAddAnother` para el boton "Guardar y agregar otro"
-- Campo "Titulo / Concepto": Input con placeholder "Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
-- "Precio" y "Moneda": dos inputs en una fila (grid de 2 columnas), placeholders "Ej: 50" y "USD"
-- "Nota (opcional)": Textarea con placeholder "Ej: Incluye nombre del fan, entrega en 24h..."
-- Tres botones al pie alineados a la derecha:
-  - "Cancelar" (variant ghost)
-  - "Guardar y agregar otro" (variant outline, disabled si titulo vacio)
-  - "Guardar" (variant default con icono Save, disabled si titulo vacio)
+## Cambios
 
-### 3. `src/pages/creadores/LineamientosTabContent.tsx`
+### 1. Edge Function: `supabase/functions/ai-sales-chat/index.ts`
 
-- Agregar estados para los nuevos campos: `inlineAddTitle`, `inlineAddPrice`, `inlineAddCurrency` (default "USD"), `inlineAddNote`
-- Actualizar `FormData` para incluir `price`, `currency`, `note`
-- Actualizar `handleInlineAddSubmit` para enviar los nuevos campos a Supabase
-- Agregar `handleInlineAddSubmitAndAnother` que guarda y luego resetea el formulario manteniendo la misma card abierta
-- Pasar todas las nuevas props a `GuidelineItemRow`
-- El campo `content` se seguira usando, y se llenara con el valor del titulo/concepto (o se puede dejar como campo separado)
+- Recibe `{ messages }` del frontend
+- Consulta `creators` (id, name, artistic_name, status, category, country, city) y `of_gross_earnings` (todas las columnas relevantes) desde Supabase usando la service role key
+- Aplica la logica de "fecha efectiva" y deduplicacion (misma logica que `useEarningsData`)
+- Construye un system prompt que incluye un resumen de los datos disponibles en formato JSON/tabular para que la AI pueda responder preguntas especificas
+- Llama a `https://ai.gateway.lovable.dev/v1/chat/completions` con `LOVABLE_API_KEY`, modelo `google/gemini-3-flash-preview`, streaming habilitado
+- Retorna el stream SSE directamente al cliente
+- Maneja errores 429 (rate limit) y 402 (payment required)
 
-### 4. Mutacion `upsertMutation`
+### 2. `supabase/config.toml`
 
-Actualizar el payload del insert para incluir `price`, `currency`, `note` como campos opcionales en la insercion a `creator_guidelines`.
+- Agregar configuracion para la nueva edge function `ai-sales-chat` con `verify_jwt = false` (para simplificar, ya que no hay auth implementado)
 
-## Secuencia de implementacion
+### 3. Nueva pagina: `src/pages/AiSales.tsx`
 
-1. Crear migracion SQL para las nuevas columnas
-2. Actualizar tipos de Supabase
-3. Modificar `GuidelineItemRow.tsx` con el nuevo formulario
-4. Modificar `LineamientosTabContent.tsx` con estados y handlers
-5. Probar flujo completo
+- Layout con `DashboardSidebar` y `DashboardTopbar` (mismo patron que las demas paginas)
+- Area de chat principal con:
+  - Lista de mensajes (usuario y asistente) con scroll automatico
+  - Renderizado de markdown para respuestas del asistente (usando react-markdown, que se instalara)
+  - Input de texto en la parte inferior con boton de enviar
+  - Indicador de "escribiendo..." mientras la AI responde
+- Estado: array de mensajes `{ role, content }`, `isLoading`
+- Funcion `streamChat` que hace fetch a la edge function y procesa SSE token por token
+- Mensajes del usuario alineados a la derecha, mensajes del asistente a la izquierda
+- Mensaje inicial de bienvenida del asistente sugiriendo tipos de preguntas
+
+### 4. `src/App.tsx`
+
+- Agregar ruta `/aisales` con el componente `AiSales`
+
+### 5. `src/components/dashboard/DashboardSidebar.tsx`
+
+- Agregar "AI Sales" como sub-item dentro del grupo "Creator Sales" con icono `Bot` o `MessageSquare`
+
+## Detalles tecnicos
+
+### System Prompt de la Edge Function
+
+El system prompt incluira:
+- Instrucciones: "Eres un asistente de analisis de ventas. Tienes acceso a datos reales de creadoras y sus ganancias. Responde en espanol. Usa formato con numeros cuando sea relevante."
+- Datos de creadoras en formato JSON resumido (nombre, status, categoria, etc.)
+- Datos de ganancias con fecha efectiva, totales, suscripciones, mensajes, tips, fans activos, etc.
+- Para evitar exceder el contexto, se enviaran los datos agregados y las ultimas entradas relevantes
+
+### Dependencia nueva
+
+- `react-markdown` para renderizar las respuestas con formato
+
+### Estructura de archivos nuevos
+
+```text
+supabase/functions/ai-sales-chat/index.ts
+src/pages/AiSales.tsx
+```
+
+### Archivos modificados
+
+```text
+supabase/config.toml        -- agregar funcion
+src/App.tsx                  -- agregar ruta
+src/components/dashboard/DashboardSidebar.tsx  -- agregar link en sidebar
+```
 
