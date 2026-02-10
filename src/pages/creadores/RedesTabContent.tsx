@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Edit, Save, X, Phone, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -175,15 +176,15 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           const hasLink = !!url && !isEditing;
 
           return (
-            <div
+            <Card
               key={platform.key}
-              className="group rounded-lg border border-border bg-card p-4 flex items-center gap-4 transition-colors duration-200 hover:bg-primary hover:border-primary"
+              className="group p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40"
             >
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary-foreground/20">
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
                 {platform.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium group-hover:text-primary-foreground">
+                <p className="text-sm font-medium">
                   {platform.label}
                 </p>
                 {isEditing ? (
@@ -194,7 +195,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                     placeholder={platform.placeholder}
                   />
                 ) : (
-                  <p className="text-sm text-muted-foreground truncate group-hover:text-primary-foreground/70">
+                  <p className="text-sm text-muted-foreground truncate">
                     {platform.displayValue(creator)}
                   </p>
                 )}
@@ -204,13 +205,13 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="shrink-0 text-muted-foreground group-hover:text-primary-foreground transition-colors"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
               )}
-            </div>
+            </Card>
           );
         })}
       </div>
