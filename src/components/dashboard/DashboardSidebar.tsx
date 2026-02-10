@@ -3,9 +3,16 @@ import {
   Users,
   Settings,
   TrendingUp,
+  ChevronRight,
 } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +23,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
   SidebarSeparator,
   useSidebar,
@@ -24,16 +34,25 @@ import {
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Creadores", url: "/creadores", icon: Users },
-  { title: "Sales Dashboard", url: "/salesdashboard", icon: TrendingUp },
 ];
 
 const secondaryMenu = [
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
+const creatorSalesSubItems = [
+  { title: "Dashboard", url: "/salesdashboard" },
+  { title: "Sales Report", url: "/salesperformancecreator" },
+];
+
 const DashboardSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { pathname } = useLocation();
+
+  const isCreatorSalesActive = creatorSalesSubItems.some(
+    (item) => pathname === item.url
+  );
 
   return (
     <Sidebar collapsible="icon">
@@ -61,6 +80,35 @@ const DashboardSidebar = () => {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              <Collapsible
+                defaultOpen={isCreatorSalesActive}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Creator Sales">
+                      <TrendingUp className="h-4 w-4 shrink-0" />
+                      <span>Creator Sales</span>
+                      <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {creatorSalesSubItems.map((item) => (
+                        <SidebarMenuSubItem key={item.url}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === item.url}
+                          >
+                            <NavLink to={item.url}>{item.title}</NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
