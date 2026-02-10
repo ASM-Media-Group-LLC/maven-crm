@@ -14,6 +14,8 @@ import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
+import Eventos from "./pages/Eventos";
+import NuevoEvento from "./pages/NuevoEvento";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
             <Route path="/creadores" element={<Creadores />} />
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
             <Route path="/creadores/:id" element={<CreadorProfile />} />
+            <Route path="/eventos" element={<Eventos />} />
+            <Route path="/eventos/nuevo" element={<NuevoEvento />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -553,6 +553,105 @@ export type Database = {
         }
         Relationships: []
       }
+      event_guests: {
+        Row: {
+          created_at: string
+          creator_id: string | null
+          event_id: string
+          guest_name: string | null
+          guest_type: string
+          id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id?: string | null
+          event_id: string
+          guest_name?: string | null
+          guest_type?: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string | null
+          event_id?: string
+          guest_name?: string | null
+          guest_type?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_guests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_guests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string | null
+          end_date: string | null
+          end_time: string | null
+          event_type: string
+          id: string
+          location: string | null
+          max_capacity: number | null
+          name: string
+          notes: string | null
+          start_time: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type: string
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          name: string
+          notes?: string | null
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          name?: string
+          notes?: string | null
+          start_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       missing_creatos_id_of_gross_earnings: {
         Row: {
           created_at: string

@@ -5,6 +5,7 @@ import {
   TrendingUp,
   ChevronRight,
   Bot,
+  CalendarDays,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -35,6 +36,7 @@ import {
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Creadores", url: "/creadores", icon: Users },
+  { title: "Eventos", url: "/eventos", icon: CalendarDays },
 ];
 
 const secondaryMenu = [
