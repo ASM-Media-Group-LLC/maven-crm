@@ -4,6 +4,7 @@ import {
   Settings,
   TrendingUp,
   ChevronRight,
+  Bot,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -43,6 +44,7 @@ const secondaryMenu = [
 const creatorSalesSubItems = [
   { title: "Dashboard", url: "/salesdashboard" },
   { title: "Sales Report", url: "/salesperformancecreator" },
+  { title: "AI Sales", url: "/aisales", icon: Bot },
 ];
 
 const DashboardSidebar = () => {
