@@ -22,6 +22,9 @@ import {
   Lock,
   Calendar,
 } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIconCustom from "@/components/icons/XIcon";
 
 const sizes = [
   { className: "h-4 w-4", label: "16px", usage: "Botones, menu items, badges" },
@@ -124,6 +127,32 @@ export const IconsSection = () => (
       </div>
     </div>
 
+    {/* Iconos de marca / Redes Sociales */}
+    <div className="space-y-4">
+      <h3 className="text-xl font-semibold">Iconos de marca / Redes Sociales</h3>
+      <p className="text-sm text-muted-foreground">
+        Para redes sociales, usar siempre estos componentes custom en lugar de Lucide.
+        Importar desde <code className="bg-muted px-1.5 py-0.5 rounded text-xs">@/components/icons/[Name]Icon</code>.
+      </p>
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4 max-w-md">
+        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+          <InstagramIcon className="h-6 w-6" />
+          <span className="text-xs text-muted-foreground">InstagramIcon</span>
+          <span className="text-[10px] text-muted-foreground">Con gradiente</span>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+          <TikTokIcon className="h-6 w-6" />
+          <span className="text-xs text-muted-foreground">TikTokIcon</span>
+          <span className="text-[10px] text-muted-foreground">currentColor</span>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4 flex flex-col items-center gap-3">
+          <XIconCustom className="h-6 w-6" />
+          <span className="text-xs text-muted-foreground">XIcon</span>
+          <span className="text-[10px] text-muted-foreground">currentColor</span>
+        </div>
+      </div>
+    </div>
+
     {/* Reglas */}
     <div className="space-y-3">
       <h3 className="text-xl font-semibold">Reglas de uso</h3>
@@ -139,6 +168,10 @@ export const IconsSection = () => (
         <div className="flex items-start gap-2">
           <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
           <span>Si el icono es el único elemento interactivo, acompañar con <code className="bg-muted px-1 py-0.5 rounded text-xs">aria-label</code> o tooltip</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Check className="h-4 w-4 text-[hsl(var(--success))] mt-0.5 shrink-0" aria-hidden="true" />
+          <span>Para redes sociales, usar <strong>siempre</strong> los iconos custom (<code className="bg-muted px-1 py-0.5 rounded text-xs">InstagramIcon</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">TikTokIcon</code>, <code className="bg-muted px-1 py-0.5 rounded text-xs">XIcon</code>) en lugar de Lucide</span>
         </div>
         <div className="flex items-start gap-2">
           <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden="true" />
