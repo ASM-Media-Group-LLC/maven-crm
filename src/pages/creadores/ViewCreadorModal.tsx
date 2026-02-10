@@ -99,7 +99,7 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 pr-8">
             <Avatar className="h-16 w-16">
               {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
