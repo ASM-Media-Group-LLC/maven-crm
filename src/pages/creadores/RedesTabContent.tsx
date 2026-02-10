@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Edit, Save, X, Phone, ExternalLink } from "lucide-react";
+import { Edit, Save, X, Phone, ExternalLink, Linkedin, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,11 +25,14 @@ interface EditData {
   youtube_handle: string;
   onlyfans_url: string;
   whatsapp_number: string;
+  linkedin_handle: string;
+  chat_url: string;
 }
 
 interface PlatformConfig {
   key: keyof EditData;
   label: string;
+  editLabel: string;
   icon: React.ReactNode;
   placeholder: string;
   displayValue: (creator: CreatorFull) => string;
@@ -39,50 +43,74 @@ const platforms: PlatformConfig[] = [
   {
     key: "instagram_handle",
     label: "Instagram",
+    editLabel: "Instagram URL",
     icon: <InstagramIcon className="h-5 w-5" />,
-    placeholder: "@usuario",
+    placeholder: "https://instagram.com/username",
     displayValue: (c) => displayHandle(c.instagram_handle) || "—",
     buildUrl: (c) => buildSocialUrl("instagram", c.instagram_handle),
   },
   {
-    key: "tiktok_handle",
-    label: "TikTok",
-    icon: <TikTokIcon className="h-5 w-5" />,
-    placeholder: "@usuario",
-    displayValue: (c) => displayHandle(c.tiktok_handle) || "—",
-    buildUrl: (c) => buildSocialUrl("tiktok", c.tiktok_handle),
+    key: "whatsapp_number",
+    label: "WhatsApp",
+    editLabel: "WhatsApp",
+    icon: <Phone className="h-5 w-5" />,
+    placeholder: "+1234567890 o https://wa.me/...",
+    displayValue: (c) => c.whatsapp_number || "—",
+    buildUrl: (c) => c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}` : "",
   },
   {
     key: "twitter_handle",
     label: "X (Twitter)",
+    editLabel: "Twitter/X URL",
     icon: <XIcon className="h-5 w-5" />,
-    placeholder: "@usuario",
+    placeholder: "https://x.com/username",
     displayValue: (c) => displayHandle(c.twitter_handle) || "—",
     buildUrl: (c) => buildSocialUrl("twitter", c.twitter_handle),
   },
   {
     key: "youtube_handle",
     label: "YouTube",
+    editLabel: "YouTube URL",
     icon: <span className="text-xs font-bold">YT</span>,
-    placeholder: "@canal",
+    placeholder: "https://youtube.com/@channel",
     displayValue: (c) => displayHandle(c.youtube_handle) || "—",
     buildUrl: (c) => buildSocialUrl("youtube", c.youtube_handle),
   },
   {
+    key: "tiktok_handle",
+    label: "TikTok",
+    editLabel: "TikTok URL",
+    icon: <TikTokIcon className="h-5 w-5" />,
+    placeholder: "https://tiktok.com/@username",
+    displayValue: (c) => displayHandle(c.tiktok_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("tiktok", c.tiktok_handle),
+  },
+  {
+    key: "linkedin_handle",
+    label: "LinkedIn",
+    editLabel: "LinkedIn URL",
+    icon: <Linkedin className="h-5 w-5" />,
+    placeholder: "https://linkedin.com/in/...",
+    displayValue: (c) => displayHandle(c.linkedin_handle) || "—",
+    buildUrl: (c) => buildSocialUrl("linkedin", c.linkedin_handle),
+  },
+  {
     key: "onlyfans_url",
     label: "OnlyFans",
+    editLabel: "OnlyFans URL",
     icon: <span className="text-xs font-bold">OF</span>,
     placeholder: "https://onlyfans.com/...",
     displayValue: (c) => c.onlyfans_url || "—",
     buildUrl: (c) => c.onlyfans_url || "",
   },
   {
-    key: "whatsapp_number",
-    label: "WhatsApp",
-    icon: <Phone className="h-5 w-5" />,
-    placeholder: "+1234567890",
-    displayValue: (c) => c.whatsapp_number || "—",
-    buildUrl: (c) => c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/[^0-9]/g, "")}` : "",
+    key: "chat_url",
+    label: "Chat URL",
+    editLabel: "Chat URL",
+    icon: <MessageCircle className="h-5 w-5" />,
+    placeholder: "https://...",
+    displayValue: (c) => c.chat_url || "—",
+    buildUrl: (c) => c.chat_url || "",
   },
 ];
 
@@ -97,6 +125,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
     youtube_handle: "",
     onlyfans_url: "",
     whatsapp_number: "",
+    linkedin_handle: "",
+    chat_url: "",
   });
 
   const startEditing = () => {
@@ -107,6 +137,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       youtube_handle: creator.youtube_handle ?? "",
       onlyfans_url: creator.onlyfans_url ?? "",
       whatsapp_number: creator.whatsapp_number ?? "",
+      linkedin_handle: creator.linkedin_handle ?? "",
+      chat_url: creator.chat_url ?? "",
     });
     setIsEditing(true);
   };
@@ -128,6 +160,8 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           youtube_handle: editData.youtube_handle || null,
           onlyfans_url: editData.onlyfans_url || null,
           whatsapp_number: editData.whatsapp_number || null,
+          linkedin_handle: editData.linkedin_handle || null,
+          chat_url: editData.chat_url || null,
         })
         .eq("id", creatorId);
 
@@ -170,51 +204,56 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         )}
       </div>
 
-      <div className="space-y-2">
-        {platforms.map((platform) => {
-          const url = platform.buildUrl(creator);
-          const hasLink = !!url && !isEditing;
+      {isEditing ? (
+        <div className="space-y-4">
+          {platforms.map((platform) => (
+            <div key={platform.key} className="space-y-1.5">
+              <Label htmlFor={platform.key}>{platform.editLabel}</Label>
+              <Input
+                id={platform.key}
+                value={editData[platform.key]}
+                onChange={(e) => updateField(platform.key, e.target.value)}
+                placeholder={platform.placeholder}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {platforms.map((platform) => {
+            const url = platform.buildUrl(creator);
+            const hasLink = !!url;
 
-          return (
-            <Card
-              key={platform.key}
-              className="group p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40"
-            >
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                {platform.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">
-                  {platform.label}
-                </p>
-                {isEditing ? (
-                  <Input
-                    className="h-8 text-sm mt-1"
-                    value={editData[platform.key]}
-                    onChange={(e) => updateField(platform.key, e.target.value)}
-                    placeholder={platform.placeholder}
-                  />
-                ) : (
+            return (
+              <Card
+                key={platform.key}
+                className="group p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40"
+              >
+                <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  {platform.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{platform.label}</p>
                   <p className="text-sm text-muted-foreground truncate">
                     {platform.displayValue(creator)}
                   </p>
+                </div>
+                {hasLink && (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
                 )}
-              </div>
-              {hasLink && (
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              )}
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 };
