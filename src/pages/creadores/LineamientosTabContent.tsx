@@ -174,6 +174,9 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             resetInlineForm();
           }
         },
+        onError: () => {
+          toast.error("Error al guardar lineamiento");
+        },
       }
     );
   };
@@ -344,7 +347,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                       onInlineNoteChange={setInlineAddNote}
                       onInlineSubmit={() => handleInlineAddSubmit(false)}
                       onInlineSubmitAndAnother={() => handleInlineAddSubmit(true)}
-                      onInlineCancel={() => { setInlineAddingKey(null); resetInlineForm(); }}
+                      onInlineCancel={() => { setInlineAddingKey(null); resetInlineForm(); toast("Edición cancelada"); }}
                       isSaving={upsertMutation.isPending}
                     />
                   );
