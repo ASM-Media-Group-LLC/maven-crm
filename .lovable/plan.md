@@ -1,69 +1,72 @@
 
-# Dropdown para cambiar estado del creador en la tabla
 
-## Cambio
+# Agregar submenu "Creator Sales" al sidebar
 
-Reemplazar el Badge estatico de estado en `CreadoresTable.tsx` por un `DropdownMenu` que permita cambiar el estado del creador directamente desde la tabla, similar a la referencia donde se ve un badge con un chevron desplegable.
+## Resumen
 
-## Detalle tecnico
+Reemplazar el item actual "Sales Dashboard" por un item colapsable "Creator Sales" con dos sub-items: "Dashboard" (`/salesdashboard`) y "Sales Report" (`/salesperformancecreator`), usando exclusivamente los componentes existentes del sidebar de shadcn.
 
-### Archivo: `src/pages/creadores/CreadoresTable.tsx`
+## Componentes reutilizados
 
-1. **Importar** `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuTrigger` desde `@/components/ui/dropdown-menu` y `ChevronDown` desde `lucide-react`.
+Se usaran componentes ya exportados en `src/components/ui/sidebar.tsx`:
+- `SidebarMenuSub` (contenedor de sub-items con borde izquierdo e indentacion)
+- `SidebarMenuSubItem` (wrapper de cada sub-item)
+- `SidebarMenuSubButton` (boton del sub-item con estados hover/active)
 
-2. **Importar** `useUpdateCreador` desde `./useCreadores` para persistir el cambio de estado en Supabase.
+Y de la libreria existente:
+- `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent` de `@radix-ui/react-collapsible`
+- `ChevronRight` de `lucide-react`
+- `NavLink` de `@/components/NavLink`
+- `useLocation` de `react-router-dom`
 
-3. **Reemplazar la celda de estado** (lineas 157-163) que actualmente muestra un Badge estatico:
+## Cambios
 
-Antes:
+### Archivo: `src/components/dashboard/DashboardSidebar.tsx`
+
+1. **Remover** "Sales Dashboard" del array `mainMenu` (vuelve a ser solo Dashboard y Creadores).
+
+2. **Agregar imports**: `Collapsible`, `CollapsibleTrigger`, `CollapsibleContent`, `ChevronRight`, `useLocation`, `SidebarMenuSub`, `SidebarMenuSubItem`, `SidebarMenuSubButton`.
+
+3. **Agregar logica** para detectar si la ruta actual esta dentro del submenu (`/salesdashboard` o `/salesperformancecreator`) y mantener el submenu abierto automaticamente.
+
+4. **Agregar el item colapsable** despues del map de `mainMenu`, dentro del mismo `SidebarMenu`:
+
 ```tsx
-<TableCell>
-  {c.status && (
-    <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
-      {statusLabel[c.status] ?? c.status}
-    </Badge>
-  )}
-</TableCell>
+<Collapsible defaultOpen={isCreatorSalesActive} className="group/collapsible">
+  <SidebarMenuItem>
+    <CollapsibleTrigger asChild>
+      <SidebarMenuButton tooltip="Creator Sales">
+        <TrendingUp className="h-4 w-4 shrink-0" />
+        <span>Creator Sales</span>
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+      </SidebarMenuButton>
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <SidebarMenuSub>
+        <SidebarMenuSubItem>
+          <SidebarMenuSubButton asChild isActive={pathname === "/salesdashboard"}>
+            <NavLink to="/salesdashboard">Dashboard</NavLink>
+          </SidebarMenuSubButton>
+        </SidebarMenuSubItem>
+        <SidebarMenuSubItem>
+          <SidebarMenuSubButton asChild isActive={pathname === "/salesperformancecreator"}>
+            <NavLink to="/salesperformancecreator">Sales Report</NavLink>
+          </SidebarMenuSubButton>
+        </SidebarMenuSubItem>
+      </SidebarMenuSub>
+    </CollapsibleContent>
+  </SidebarMenuItem>
+</Collapsible>
 ```
 
-Despues:
-```tsx
-<TableCell>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button className="flex items-center gap-1 focus:outline-none">
-        <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
-          {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
-        </Badge>
-        <ChevronDown className="h-3 w-3 text-muted-foreground" />
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="start">
-      {Object.entries(statusLabel).map(([value, label]) => (
-        <DropdownMenuItem
-          key={value}
-          onClick={() => updateCreator({ id: c.id, data: { status: value } })}
-          disabled={c.status === value}
-        >
-          <Badge variant={statusVariant[value] ?? "secondary-soft"} className="mr-2">
-            {label}
-          </Badge>
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
-```
+## Comportamiento
 
-4. **Agregar el hook** dentro del componente:
-```tsx
-const updateCreador = useUpdateCreador();
-```
+- Click en "Creator Sales" expande/colapsa el submenu.
+- El chevron rota 90 grados al abrir.
+- Si el usuario navega a `/salesdashboard` o `/salesperformancecreator`, el submenu se abre automaticamente via `defaultOpen`.
+- Los sub-items tienen indentacion visual (borde izquierdo del `SidebarMenuSub`), hover y estado activo.
+- En modo colapsado (icon), el submenu se oculta automaticamente (comportamiento nativo de `SidebarMenuSub`).
 
-Y usar `updateCreador.mutate(...)` en el onClick de cada item.
+## Sin cambios en otros archivos
 
-5. **Feedback visual**: Mostrar un toast de confirmacion al cambiar el estado usando `sonner`.
-
-### Sin cambios en otros archivos
-- `useUpdateCreador` ya existe en `useCreadores.ts` y actualiza el campo e invalida la query.
-- No se requieren cambios en el schema ni migraciones.
+No se crean componentes nuevos, no se modifican estilos, no se agregan rutas. Solo se reestructura el sidebar.
