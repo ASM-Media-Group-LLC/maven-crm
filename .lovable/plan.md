@@ -1,14 +1,29 @@
 
-# Eliminar accion de RefreshCw de tabla y cards de creadores
 
-## Cambios
+# Confirmar formulario "detail" en items de Gestión de Chats
 
-### 1. `src/pages/creadores/CreadoresTable.tsx`
-- Eliminar `RefreshCw` del import de lucide-react (linea 2)
-- Eliminar el boton con `RefreshCw` (lineas 319-321)
+## Estado actual
 
-### 2. `src/pages/creadores/CreadoresGrid.tsx`
-- Eliminar `RefreshCw` del import de lucide-react (linea 2)
-- Eliminar el icono `<RefreshCw>` posicionado en la esquina superior derecha de cada card (linea 92)
+Los items de "Gestion de Chats" ya funcionan con el formulario de **Titulo / Concepto** + **Descripcion / Detalle** porque el `formType` por defecto es `"detail"`. Lo confirme visualmente en el navegador.
 
-Nota: el uso de `RefreshCw` en `categoriesConfig.ts` (lineamientos) no se tocara, ya que es un contexto diferente (icono de "Estrategia de Renewals").
+Sin embargo, para mayor claridad y consistencia explicita, se agregara `formType: "detail"` a cada item de la categoria "Gestion de Chats" en la configuracion.
+
+## Cambio
+
+**Archivo:** `src/pages/creadores/lineamientos/categoriesConfig.ts`
+
+Agregar `formType: "detail"` explicitamente a los 7 items de "Gestion de Chats":
+
+- Instrucciones para Chats
+- Tipo de Usuarios
+- Fans VIP / Whales
+- Tiempos de Respuesta
+- Estrategia de Renewals
+- Mass Messages
+- Idiomas
+
+Esto no cambia el comportamiento (ya es el default), pero documenta la intencion explicitamente en el codigo para que quede claro que todos usan el formulario de Titulo + Descripcion.
+
+## Nota
+
+Si lo que se busca es un cambio visual o funcional diferente al formulario actual de Titulo/Concepto + Descripcion/Detalle, por favor indicar que campos o comportamiento se espera. El formulario inline actual ya muestra exactamente esos dos campos, con los botones de "Guardar" y "Guardar y agregar otro".
