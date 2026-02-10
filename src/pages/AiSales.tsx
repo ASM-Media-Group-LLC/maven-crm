@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { getAiConfig } from "@/lib/ai-config";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -23,11 +24,13 @@ async function streamChat({
   onDelta,
   onDone,
   onError,
+  config,
 }: {
   messages: Msg[];
   onDelta: (t: string) => void;
   onDone: () => void;
   onError: (msg: string) => void;
+  config?: { customInstructions?: string; tone?: string; model?: string };
 }) {
   const resp = await fetch(CHAT_URL, {
     method: "POST",
@@ -35,7 +38,7 @@ async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, config }),
   });
 
   if (!resp.ok) {
@@ -116,6 +119,7 @@ const AiSales = () => {
     };
 
     try {
+      const aiConfig = getAiConfig();
       await streamChat({
         messages: allMsgs,
         onDelta: upsert,
@@ -123,6 +127,11 @@ const AiSales = () => {
         onError: (msg) => {
           toast.error(msg);
           setIsLoading(false);
+        },
+        config: {
+          customInstructions: aiConfig.customInstructions,
+          tone: aiConfig.tone,
+          model: aiConfig.model,
         },
       });
     } catch {

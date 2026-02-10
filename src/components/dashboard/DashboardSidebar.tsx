@@ -45,6 +45,7 @@ const creatorSalesSubItems = [
   { title: "Dashboard", url: "/salesdashboard" },
   { title: "Sales Report", url: "/salesperformancecreator" },
   { title: "AI Sales", url: "/aisales", icon: Bot },
+  { title: "AI Config", url: "/ai-sales-config" },
 ];
 
 const DashboardSidebar = () => {
