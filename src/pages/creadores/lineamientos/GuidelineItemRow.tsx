@@ -1,5 +1,6 @@
-import { ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,16 @@ interface Props {
   inlineAdding?: boolean;
   inlineContent?: string;
   onInlineContentChange?: (value: string) => void;
+  inlineTitle?: string;
+  onInlineTitleChange?: (value: string) => void;
+  inlinePrice?: string;
+  onInlinePriceChange?: (value: string) => void;
+  inlineCurrency?: string;
+  onInlineCurrencyChange?: (value: string) => void;
+  inlineNote?: string;
+  onInlineNoteChange?: (value: string) => void;
   onInlineSubmit?: () => void;
+  onInlineSubmitAndAnother?: () => void;
   onInlineCancel?: () => void;
   isSaving?: boolean;
 }
@@ -35,7 +45,16 @@ const GuidelineItemRow = ({
   inlineAdding = false,
   inlineContent = "",
   onInlineContentChange,
+  inlineTitle = "",
+  onInlineTitleChange,
+  inlinePrice = "",
+  onInlinePriceChange,
+  inlineCurrency = "USD",
+  onInlineCurrencyChange,
+  inlineNote = "",
+  onInlineNoteChange,
   onInlineSubmit,
+  onInlineSubmitAndAnother,
   onInlineCancel,
   isSaving = false,
 }: Props) => {
@@ -80,19 +99,50 @@ const GuidelineItemRow = ({
           {inlineAdding ? (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Contenido</Label>
+                <Label>Título / Concepto</Label>
+                <Input
+                  value={inlineTitle}
+                  onChange={(e) => onInlineTitleChange?.(e.target.value)}
+                  placeholder="Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Precio</Label>
+                  <Input
+                    type="number"
+                    value={inlinePrice}
+                    onChange={(e) => onInlinePriceChange?.(e.target.value)}
+                    placeholder="Ej: 50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Moneda</Label>
+                  <Input
+                    value={inlineCurrency}
+                    onChange={(e) => onInlineCurrencyChange?.(e.target.value)}
+                    placeholder="USD"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nota (opcional)</Label>
                 <Textarea
-                  value={inlineContent}
-                  onChange={(e) => onInlineContentChange?.(e.target.value)}
-                  placeholder="Describe el lineamiento…"
-                  rows={4}
+                  value={inlineNote}
+                  onChange={(e) => onInlineNoteChange?.(e.target.value)}
+                  placeholder="Ej: Incluye nombre del fan, entrega en 24h..."
+                  rows={3}
                 />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={onInlineCancel}>
                   Cancelar
                 </Button>
-                <Button size="sm" onClick={onInlineSubmit} disabled={!inlineContent.trim() || isSaving}>
+                <Button variant="outline" size="sm" onClick={onInlineSubmitAndAnother} disabled={!inlineTitle.trim() || isSaving}>
+                  Guardar y agregar otro
+                </Button>
+                <Button size="sm" onClick={onInlineSubmit} disabled={!inlineTitle.trim() || isSaving}>
+                  <Save className="h-4 w-4 mr-1" />
                   {isSaving ? "Guardando…" : "Guardar"}
                 </Button>
               </div>

@@ -61,6 +61,10 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const [showList, setShowList] = useState(true);
   const [inlineAddingKey, setInlineAddingKey] = useState<string | null>(null);
   const [inlineAddContent, setInlineAddContent] = useState("");
+  const [inlineAddTitle, setInlineAddTitle] = useState("");
+  const [inlineAddPrice, setInlineAddPrice] = useState("");
+  const [inlineAddCurrency, setInlineAddCurrency] = useState("USD");
+  const [inlineAddNote, setInlineAddNote] = useState("");
 
   // --- Queries & Mutations ---
   const { data: guidelines = [], isLoading } = useQuery({
@@ -100,6 +104,9 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
           content: payload.content,
           creator_id: creatorId,
           created_by: PLACEHOLDER_USER_ID,
+          price: (payload as any).price ?? null,
+          currency: (payload as any).currency ?? "USD",
+          note: (payload as any).note ?? null,
         });
         if (error) throw error;
       }
@@ -132,17 +139,40 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     setInlineAddContent("");
   };
 
-  const handleInlineAddSubmit = () => {
-    if (!inlineAddingKey || !inlineAddContent.trim()) return;
+  const resetInlineForm = () => {
+    setInlineAddTitle("");
+    setInlineAddPrice("");
+    setInlineAddCurrency("USD");
+    setInlineAddNote("");
+    setInlineAddContent("");
+  };
+
+  const handleInlineAddSubmit = (keepOpen = false) => {
+    if (!inlineAddingKey || !inlineAddTitle.trim()) return;
     const [category, title] = inlineAddingKey.split("|");
+    const content = inlineAddTitle.trim();
+    const price = inlineAddPrice ? parseFloat(inlineAddPrice) : null;
+    const currency = inlineAddCurrency.trim() || "USD";
+    const note = inlineAddNote.trim() || null;
     upsertMutation.mutate(
-      { title, guideline_type: category, content: inlineAddContent.trim() },
+      {
+        title: content,
+        guideline_type: category,
+        content,
+        price,
+        currency,
+        note,
+      } as any,
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey });
           toast.success("Lineamiento creado");
-          setInlineAddingKey(null);
-          setInlineAddContent("");
+          if (keepOpen) {
+            resetInlineForm();
+          } else {
+            setInlineAddingKey(null);
+            resetInlineForm();
+          }
         },
       }
     );
@@ -303,8 +333,17 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                       inlineAdding={inlineAddingKey === key && !guideline}
                       inlineContent={inlineAddContent}
                       onInlineContentChange={setInlineAddContent}
-                      onInlineSubmit={handleInlineAddSubmit}
-                      onInlineCancel={() => { setInlineAddingKey(null); setInlineAddContent(""); }}
+                      inlineTitle={inlineAddTitle}
+                      onInlineTitleChange={setInlineAddTitle}
+                      inlinePrice={inlineAddPrice}
+                      onInlinePriceChange={setInlineAddPrice}
+                      inlineCurrency={inlineAddCurrency}
+                      onInlineCurrencyChange={setInlineAddCurrency}
+                      inlineNote={inlineAddNote}
+                      onInlineNoteChange={setInlineAddNote}
+                      onInlineSubmit={() => handleInlineAddSubmit(false)}
+                      onInlineSubmitAndAnother={() => handleInlineAddSubmit(true)}
+                      onInlineCancel={() => { setInlineAddingKey(null); resetInlineForm(); }}
                       isSaving={upsertMutation.isPending}
                     />
                   );
