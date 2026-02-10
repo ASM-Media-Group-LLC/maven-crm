@@ -133,7 +133,7 @@ const CreadoresTable = ({ creators }: Props) => {
 
           return (
             <TableRow key={c.id}>
-              <TableCell>
+              <TableCell className="cursor-pointer" onClick={() => setViewingCreator(c)}>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
