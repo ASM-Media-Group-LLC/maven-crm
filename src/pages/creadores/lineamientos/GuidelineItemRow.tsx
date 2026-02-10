@@ -1,5 +1,7 @@
 import { ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { CategoryItem } from "./categoriesConfig";
 import type { Tables } from "@/integrations/supabase/types";
@@ -14,6 +16,12 @@ interface Props {
   onAdd: () => void;
   onEdit: (g: Guideline) => void;
   onDelete: (id: string) => void;
+  inlineAdding?: boolean;
+  inlineContent?: string;
+  onInlineContentChange?: (value: string) => void;
+  onInlineSubmit?: () => void;
+  onInlineCancel?: () => void;
+  isSaving?: boolean;
 }
 
 const GuidelineItemRow = ({
@@ -24,8 +32,15 @@ const GuidelineItemRow = ({
   onAdd,
   onEdit,
   onDelete,
+  inlineAdding = false,
+  inlineContent = "",
+  onInlineContentChange,
+  onInlineSubmit,
+  onInlineCancel,
+  isSaving = false,
 }: Props) => {
   const Icon = item.icon;
+  const isExpanded = expanded || inlineAdding;
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -54,15 +69,35 @@ const GuidelineItemRow = ({
             </Button>
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggle}>
-            <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", expanded && "rotate-180")} />
+            <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")} />
           </Button>
         </div>
       </div>
 
       {/* Expanded content */}
-      {expanded && (
+      {isExpanded && (
         <div className="px-4 pb-4 pl-16">
-          {guideline ? (
+          {inlineAdding ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Contenido</Label>
+                <Textarea
+                  value={inlineContent}
+                  onChange={(e) => onInlineContentChange?.(e.target.value)}
+                  placeholder="Describe el lineamiento…"
+                  rows={4}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={onInlineCancel}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={onInlineSubmit} disabled={!inlineContent.trim() || isSaving}>
+                  {isSaving ? "Guardando…" : "Guardar"}
+                </Button>
+              </div>
+            </div>
+          ) : guideline ? (
             <p className="text-sm whitespace-pre-wrap text-foreground">{guideline.content}</p>
           ) : (
             <div

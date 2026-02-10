@@ -59,6 +59,8 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const [inlineTitle, setInlineTitle] = useState("");
   const [inlineDescription, setInlineDescription] = useState("");
   const [showList, setShowList] = useState(true);
+  const [inlineAddingKey, setInlineAddingKey] = useState<string | null>(null);
+  const [inlineAddContent, setInlineAddContent] = useState("");
 
   // --- Queries & Mutations ---
   const { data: guidelines = [], isLoading } = useQuery({
@@ -125,9 +127,25 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
 
   // --- Handlers ---
   const openAddForItem = (category: string, title: string) => {
-    setEditingId(null);
-    setForm({ title, guideline_type: category, content: "" });
-    setModalOpen(true);
+    const key = `${category}|${title}`;
+    setInlineAddingKey(key);
+    setInlineAddContent("");
+  };
+
+  const handleInlineAddSubmit = () => {
+    if (!inlineAddingKey || !inlineAddContent.trim()) return;
+    const [category, title] = inlineAddingKey.split("|");
+    upsertMutation.mutate(
+      { title, guideline_type: category, content: inlineAddContent.trim() },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey });
+          toast.success("Lineamiento creado");
+          setInlineAddingKey(null);
+          setInlineAddContent("");
+        },
+      }
+    );
   };
 
   const openEdit = (g: Guideline) => {
@@ -282,6 +300,12 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                       onAdd={() => openAddForItem(cat.category, item.title)}
                       onEdit={openEdit}
                       onDelete={(id) => setDeleteId(id)}
+                      inlineAdding={inlineAddingKey === key && !guideline}
+                      inlineContent={inlineAddContent}
+                      onInlineContentChange={setInlineAddContent}
+                      onInlineSubmit={handleInlineAddSubmit}
+                      onInlineCancel={() => { setInlineAddingKey(null); setInlineAddContent(""); }}
+                      isSaving={upsertMutation.isPending}
                     />
                   );
                 })}
