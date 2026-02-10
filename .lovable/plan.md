@@ -1,57 +1,38 @@
 
+# Redisenar estado vacio de Lineamientos segun imagen de referencia
 
-# Corregir vista de Lineamientos: categorias solo al hacer clic en "Agregar"
+## Resumen
 
-## Problema actual
-Las categorias (Operacion Core, Gestion de Chats, etc.) se muestran directamente en la vista principal del tab. Segun la imagen de referencia, la vista principal solo debe mostrar:
-- Header con icono, titulo "Lineamientos Operativos", conteo "X registrados", y botones "Ver" / "Agregar"
-- Lista de lineamientos ya creados (si existen)
+Reemplazar el texto plano "Sin lineamientos creados..." por un estado vacio visual centrado con icono grande, titulo "Sin lineamientos", subtitulo "Documenta como manejar esta cuenta", y boton "+ Agregar" centrado. Todo dentro de un contenedor con fondo sutil y bordes redondeados.
 
-Las categorias con sus items solo deben aparecer cuando se hace clic en el boton "Agregar".
+## Detalle tecnico
 
-## Cambios propuestos
+### Archivo: `src/pages/creadores/LineamientosTabContent.tsx` (lineas 211-215)
 
-### Archivo: `src/pages/creadores/LineamientosTabContent.tsx`
+Reemplazar el bloque del estado vacio actual:
 
-1. **Vista principal**: Mostrar el header (icono ClipboardList + titulo + conteo + botones Ver/Agregar) seguido de la lista de lineamientos existentes guardados en DB (cards simples con categoria, titulo y contenido).
-
-2. **Boton "Agregar"**: Al hacer clic, abre un Dialog/modal que muestra las categorias con sus items (el layout jerarquico actual con Operacion Core, Gestion de Chats, etc.). Dentro de este modal, cada item tiene un boton "+" para agregar contenido. Al seleccionar un item, se abre el formulario de contenido.
-
-3. **Boton "Ver"**: Habilitado si hay lineamientos existentes; al hacer clic muestra/expande la lista de lineamientos guardados.
-
-4. **Boton "+ Nueva categoria"**: Aparece dentro del modal de Agregar, al final de la lista de categorias.
-
-### Estructura resultante
-
-**Vista por defecto (sin lineamientos):**
-```
-[icon] Lineamientos Operativos          [Ver] [Agregar]
-       0 registrados
-
-       (vacio - sin lineamientos creados)
+```tsx
+{guidelines.length === 0 && (
+  <div className="py-8 text-center text-sm text-muted-foreground">
+    Sin lineamientos creados. Haz clic en <span className="font-medium">Agregar</span> para comenzar.
+  </div>
+)}
 ```
 
-**Al hacer clic en "Agregar" se abre modal con:**
+Por un contenedor con fondo `bg-muted/50`, bordes redondeados, padding generoso, y contenido centrado verticalmente:
+
+- Icono `ClipboardList` grande (h-12 w-12) centrado, con color muted
+- Titulo "Sin lineamientos" en texto semibold y tamano base
+- Subtitulo "Documenta como manejar esta cuenta" en texto muted mas pequeno
+- Boton "+ Agregar" con variante outline, que al hacer clic abre el modal selector de categorias (`setSelectorOpen(true)`)
+
+Estructura:
 ```
-Agregar Lineamiento                        [X]
-
-Operacion Core              + Nueva categoria
-  [icon] Estrategia PPV          [+]
-  [icon] Contenido Custom        [+]
-
-Gestion de Chats
-  [icon] Instrucciones para Chats [+]
-  ...
+[contenedor bg-muted/50 rounded-lg py-16]
+  [icono ClipboardList grande centrado]
+  "Sin lineamientos"
+  "Documenta como manejar esta cuenta"
+  [+ Agregar] (boton outline)
 ```
 
-**Al hacer clic en [+] de un item:** Se cierra el selector de categorias y se abre el formulario de contenido (modal actual con Textarea).
-
-### Detalle tecnico
-
-- Agregar un nuevo estado `selectorOpen` para controlar el modal de seleccion de categorias
-- El boton "Agregar" del header abre este modal selector
-- Dentro del modal selector se renderizan las categorias con `GuidelineItemRow` (sin expand, solo boton "+")
-- Al hacer clic en "+" de un item, se cierra el selector y se abre el formulario de contenido pre-llenado
-- La vista principal muestra los lineamientos existentes (de la DB) como una lista simple con opciones de editar/eliminar
-- No se eliminan los componentes `categoriesConfig.ts` ni `GuidelineItemRow.tsx`, se reutilizan dentro del modal
-
+### Sin cambios en otros archivos
