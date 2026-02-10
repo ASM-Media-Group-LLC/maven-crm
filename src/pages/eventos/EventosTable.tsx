@@ -1,0 +1,145 @@
+import { useState } from "react";
+import { format, formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  ArrowUpDown, Camera, Mic, Users, Video, CalendarDays,
+  MoreHorizontal, Eye, Pencil, Share2, Trash2,
+} from "lucide-react";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { useDeleteEvento, statusLabel, statusVariant, type EventRow } from "./useEventos";
+
+const typeIcons: Record<string, React.ElementType> = {
+  Shooting: Camera, Podcast: Mic, Casting: Users, Reunion: Video, Otro: CalendarDays,
+};
+
+type SortKey = "name" | "event_type" | "date" | "location" | "status" | "guest_count";
+
+interface Props {
+  events: EventRow[];
+}
+
+const EventosTable = ({ events }: Props) => {
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortAsc, setSortAsc] = useState(true);
+  const deleteEvento = useDeleteEvento();
+  const { toast } = useToast();
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+
+  const sorted = [...events].sort((a, b) => {
+    let va: string | number = "";
+    let vb: string | number = "";
+    switch (sortKey) {
+      case "name": va = a.name; vb = b.name; break;
+      case "event_type": va = a.event_type; vb = b.event_type; break;
+      case "date": va = a.date; vb = b.date; break;
+      case "location": va = a.location ?? ""; vb = b.location ?? ""; break;
+      case "status": va = a.status; vb = b.status; break;
+      case "guest_count": return sortAsc ? a.guest_count - b.guest_count : b.guest_count - a.guest_count;
+    }
+    return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+  });
+
+  const SortHeader = ({ label, col }: { label: string; col: SortKey }) => (
+    <Button variant="ghost" size="sm" className="-ml-3 h-8" onClick={() => handleSort(col)}>
+      {label}
+      <ArrowUpDown className="ml-1 h-3 w-3" />
+    </Button>
+  );
+
+  const handleDelete = (e: EventRow) => {
+    deleteEvento.mutate(e.id, {
+      onSuccess: () => toast({ title: `"${e.name}" eliminado` }),
+      onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+    });
+  };
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead><SortHeader label="Evento" col="name" /></TableHead>
+          <TableHead><SortHeader label="Tipo" col="event_type" /></TableHead>
+          <TableHead><SortHeader label="Fecha" col="date" /></TableHead>
+          <TableHead><SortHeader label="Ubicación" col="location" /></TableHead>
+          <TableHead><SortHeader label="Estado" col="status" /></TableHead>
+          <TableHead>Notas</TableHead>
+          <TableHead><SortHeader label="Invitados" col="guest_count" /></TableHead>
+          <TableHead>Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((e) => {
+          const Icon = typeIcons[e.event_type] ?? CalendarDays;
+          return (
+            <TableRow key={e.id}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="font-medium text-sm">{e.name}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-sm">{e.event_type}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {formatDistanceToNow(new Date(e.date), { addSuffix: true, locale: es })}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">{e.location || "—"}</TableCell>
+              <TableCell>
+                <Badge variant={statusVariant[e.status] ?? "secondary-soft"}>
+                  {statusLabel[e.status] ?? e.status}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                {e.notes || "—"}
+              </TableCell>
+              <TableCell>
+                <span className="flex items-center gap-1 text-sm">
+                  <Users className="h-3.5 w-3.5" />
+                  {e.guest_count}
+                </span>
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem><Eye className="mr-2 h-4 w-4" />Ver detalles</DropdownMenuItem>
+                    <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
+                    <DropdownMenuItem><Share2 className="mr-2 h-4 w-4" />Compartir</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(e)}>
+                      <Trash2 className="mr-2 h-4 w-4" />Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+        {sorted.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+              No se encontraron eventos.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+};
+
+export default EventosTable;
