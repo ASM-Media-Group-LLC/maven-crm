@@ -1,6 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { format, subDays } from "date-fns";
 import type { EarningsRow } from "./types";
+
+const computeEffectiveDate = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  if (hours === 0 && minutes <= 55) {
+    return format(subDays(d, 1), "yyyy-MM-dd");
+  }
+  return format(d, "yyyy-MM-dd");
+};
+
+const deduplicateByCreatorDay = (rows: EarningsRow[]): EarningsRow[] => {
+  const grouped = new Map<string, EarningsRow>();
+  for (const row of rows) {
+    const creatorKey = row.creator_id || row.pending_creator || row.id;
+    const key = `${creatorKey}__${row.effective_date}`;
+    const existing = grouped.get(key);
+    if (!existing || new Date(row.date) > new Date(existing.date)) {
+      grouped.set(key, row);
+    }
+  }
+  return Array.from(grouped.values());
+};
 
 const fetchEarnings = async (): Promise<EarningsRow[]> => {
   const { data: earnings, error } = await supabase
@@ -30,11 +54,14 @@ const fetchEarnings = async (): Promise<EarningsRow[]> => {
     }
   }
 
-  return (earnings ?? []).map((e) => ({
+  const mapped = (earnings ?? []).map((e) => ({
     ...e,
     artistic_name: e.creator_id ? creatorsMap[e.creator_id] ?? null : null,
     report_time: e.date ? new Date(e.date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hour12: false }) : null,
+    effective_date: computeEffectiveDate(e.date),
   }));
+
+  return deduplicateByCreatorDay(mapped);
 };
 
 export const useEarningsData = () => {

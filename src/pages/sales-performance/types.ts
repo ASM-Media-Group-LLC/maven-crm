@@ -23,6 +23,7 @@ export interface EarningsRow {
   creator_id: string | null;
   artistic_name: string | null;
   report_time: string | null;
+  effective_date: string;
 }
 
 export type SortField = keyof EarningsRow;
@@ -39,7 +40,7 @@ export interface ColumnDef {
 export const ALL_COLUMNS: ColumnDef[] = [
   { key: "artistic_name", label: "Artistic Name", defaultVisible: true, format: "text" },
   { key: "pending_creator", label: "Creator OF", defaultVisible: true, format: "text" },
-  { key: "date", label: "Fecha", defaultVisible: true, align: "right", format: "date" },
+  { key: "effective_date", label: "Fecha", defaultVisible: true, align: "right", format: "date" },
   { key: "report_time", label: "Hora", defaultVisible: true, align: "right", format: "time" },
   { key: "total_earnings_gross", label: "Total Earnings", defaultVisible: true, align: "right", format: "currency" },
   { key: "subscription_gross", label: "Subscriptions", defaultVisible: true, align: "right", format: "currency" },
