@@ -58,7 +58,10 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    const { messages, config } = await req.json();
+    const userModel = config?.model || "google/gemini-3-flash-preview";
+    const userTone = config?.tone || "default";
+    const userInstructions = config?.customInstructions || "";
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -123,6 +126,15 @@ serve(async (req) => {
       }))
     );
 
+    const toneInstructions: Record<string, string> = {
+      formal: "Responde de manera profesional y estructurada. Usa un lenguaje corporativo.",
+      casual: "Responde de manera amigable y conversacional, como un compañero de trabajo.",
+      directo: "Responde con la menor cantidad de palabras posible. Ve al grano.",
+      detallado: "Da explicaciones amplias con contexto y ejemplos cuando sea relevante.",
+    };
+
+    const toneExtra = toneInstructions[userTone] || "";
+
     const systemPrompt = `Eres un asistente de ventas. Tu audiencia son vendedores, NO analistas. Responde siempre en español.
 
 REGLAS DE FORMATO:
@@ -133,6 +145,8 @@ REGLAS DE FORMATO:
 - Si te piden un ranking o lista, SIEMPRE usa tabla.
 - Usa emojis para indicar tendencia: 📈 subió, 📉 bajó, ➡️ igual
 - Separa secciones con líneas en blanco para que sea fácil de escanear.
+${toneExtra ? `\nTONO: ${toneExtra}` : ""}
+${userInstructions ? `\nINSTRUCCIONES ADICIONALES DEL USUARIO:\n${userInstructions}` : ""}
 
 DATOS DE CREADORAS:
 ${creatorsJson}
@@ -152,7 +166,7 @@ Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al d
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: userModel,
           messages: [{ role: "system", content: systemPrompt }, ...messages],
           stream: true,
         }),

@@ -9,6 +9,7 @@ import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
 import AiSales from "./pages/AiSales";
+import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import NuevoCreador from "./pages/NuevoCreador";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/salesdashboard" element={<SalesDashboard />} />
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
             <Route path="/aisales" element={<AiSales />} />
+            <Route path="/ai-sales-config" element={<AiSalesConfig />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/creadores" element={<Creadores />} />
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
