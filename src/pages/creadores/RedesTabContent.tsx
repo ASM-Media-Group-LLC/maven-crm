@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit, Save, X, Phone, ExternalLink, Linkedin, MessageCircle, Link } from "lucide-react";
+import { Edit, Save, X, Phone, ExternalLink, Linkedin, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ interface RedesTabContentProps {
 
 interface EditData {
   instagram_handle: string;
+  instagram_followers: string;
   tiktok_handle: string;
   twitter_handle: string;
   youtube_handle: string;
@@ -27,7 +28,6 @@ interface EditData {
   whatsapp_number: string;
   linkedin_handle: string;
   piclink_url: string;
-  chat_url: string;
 }
 
 interface PlatformConfig {
@@ -38,6 +38,8 @@ interface PlatformConfig {
   placeholder: string;
   displayValue: (creator: CreatorFull) => string;
   buildUrl: (creator: CreatorFull) => string;
+  editOnly?: boolean;
+  inputType?: string;
 }
 
 const platforms: PlatformConfig[] = [
@@ -51,9 +53,20 @@ const platforms: PlatformConfig[] = [
     buildUrl: (c) => buildSocialUrl("instagram", c.instagram_handle),
   },
   {
+    key: "instagram_followers",
+    label: "Seguidores Instagram",
+    editLabel: "Seguidores Instagram",
+    icon: <InstagramIcon className="h-5 w-5" />,
+    placeholder: "Ej: 150000",
+    displayValue: (c) => c.instagram_followers ? c.instagram_followers.toLocaleString() : "—",
+    buildUrl: () => "",
+    editOnly: true,
+    inputType: "number",
+  },
+  {
     key: "whatsapp_number",
     label: "WhatsApp",
-    editLabel: "WhatsApp",
+    editLabel: "WhatsApp (Número o Link API)",
     icon: <Phone className="h-5 w-5" />,
     placeholder: "+1234567890 o https://wa.me/...",
     displayValue: (c) => c.whatsapp_number || "—",
@@ -113,15 +126,6 @@ const platforms: PlatformConfig[] = [
     displayValue: (c) => c.piclink_url || "—",
     buildUrl: (c) => c.piclink_url || "",
   },
-  {
-    key: "chat_url",
-    label: "Chat URL",
-    editLabel: "Chat URL",
-    icon: <MessageCircle className="h-5 w-5" />,
-    placeholder: "https://...",
-    displayValue: (c) => c.chat_url || "—",
-    buildUrl: (c) => c.chat_url || "",
-  },
 ];
 
 const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
@@ -130,6 +134,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<EditData>({
     instagram_handle: "",
+    instagram_followers: "",
     tiktok_handle: "",
     twitter_handle: "",
     youtube_handle: "",
@@ -137,12 +142,12 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
     whatsapp_number: "",
     linkedin_handle: "",
     piclink_url: "",
-    chat_url: "",
   });
 
   const startEditing = () => {
     setEditData({
       instagram_handle: creator.instagram_handle ?? "",
+      instagram_followers: creator.instagram_followers != null ? String(creator.instagram_followers) : "",
       tiktok_handle: creator.tiktok_handle ?? "",
       twitter_handle: creator.twitter_handle ?? "",
       youtube_handle: creator.youtube_handle ?? "",
@@ -150,7 +155,6 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
       whatsapp_number: creator.whatsapp_number ?? "",
       linkedin_handle: creator.linkedin_handle ?? "",
       piclink_url: creator.piclink_url ?? "",
-      chat_url: creator.chat_url ?? "",
     });
     setIsEditing(true);
   };
@@ -167,6 +171,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         .from("creators")
         .update({
           instagram_handle: editData.instagram_handle || null,
+          instagram_followers: editData.instagram_followers ? parseInt(editData.instagram_followers, 10) : null,
           tiktok_handle: editData.tiktok_handle || null,
           twitter_handle: editData.twitter_handle || null,
           youtube_handle: editData.youtube_handle || null,
@@ -174,7 +179,6 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
           whatsapp_number: editData.whatsapp_number || null,
           linkedin_handle: editData.linkedin_handle || null,
           piclink_url: editData.piclink_url || null,
-          chat_url: editData.chat_url || null,
         })
         .eq("id", creatorId);
 
@@ -224,6 +228,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
               <Label htmlFor={platform.key}>{platform.editLabel}</Label>
               <Input
                 id={platform.key}
+                type={platform.inputType || "text"}
                 value={editData[platform.key]}
                 onChange={(e) => updateField(platform.key, e.target.value)}
                 placeholder={platform.placeholder}
@@ -233,7 +238,7 @@ const RedesTabContent = ({ creator, creatorId }: RedesTabContentProps) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {platforms.map((platform) => {
+          {platforms.filter((p) => !p.editOnly).map((platform) => {
             const url = platform.buildUrl(creator);
             const hasLink = !!url;
 
