@@ -185,16 +185,21 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     <div className="space-y-4 mt-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ClipboardList className="h-5 w-5 text-muted-foreground" />
-          <h3 className="font-semibold text-base">Lineamientos Operativos</h3>
-          <Badge variant="secondary" className="ml-1 text-xs">
-            {guidelines.length} registrados
-          </Badge>
+          <div>
+            <h3 className="font-semibold text-base leading-tight">Lineamientos Operativos</h3>
+            <p className="text-xs text-muted-foreground">{guidelines.length} registrados</p>
+          </div>
         </div>
-        <Button size="sm" onClick={openAdd} className="gap-1.5">
-          <Plus className="h-4 w-4" /> Agregar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" disabled={guidelines.length === 0} onClick={() => guidelines.length > 0 && openView(guidelines[0])} className="gap-1.5">
+            <Eye className="h-4 w-4" /> Ver
+          </Button>
+          <Button size="sm" variant="outline" onClick={openAdd} className="gap-1.5">
+            <Plus className="h-4 w-4" /> Agregar
+          </Button>
+        </div>
       </div>
 
       {/* Empty state */}
