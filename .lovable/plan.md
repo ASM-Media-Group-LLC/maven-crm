@@ -1,61 +1,41 @@
 
 
-# Redisenar tab Redes con Cards individuales, hover y enlace externo
+# Ajustar tab Redes al sistema de diseno
 
-## Objetivo
+## Problemas detectados
 
-Transformar el tab de Redes Sociales de una lista en una sola tarjeta a **cards individuales por red social**, con efecto hover tipo gradiente primary (como se ve en la imagen de referencia: fondo violeta/primary al hacer hover) y un icono de enlace externo (`ExternalLink` de Lucide) que al hacer clic abra el perfil en la red correspondiente.
+1. **Divs manuales en lugar de Card**: El sistema de diseno indica "Usar siempre el componente Card, no crear divs con estilos manuales". Actualmente se usan `<div className="rounded-lg border border-border bg-card p-4 ...">` en lugar del componente `Card`.
+2. **Hover incorrecto**: Se usa `hover:bg-primary hover:border-primary` (color solido). El sistema de diseno define el patron de hover como: `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40` con `transition-all duration-200`.
+3. **Transicion incorrecta**: Se usa `transition-colors` en lugar de `transition-all`.
 
 ## Cambios
 
 **Archivo unico:** `src/pages/creadores/RedesTabContent.tsx`
 
-### Estructura visual (modo lectura)
+### 1. Reemplazar divs manuales por componente Card
 
-Reemplazar el contenedor unico `<div className="rounded-lg border...">` por un grid/stack de cards individuales. Cada card:
+Cada card de plataforma pasara a usar el componente `Card` de shadcn importado desde `@/components/ui/card`. Se aplicara el hover con gradiente primary del sistema de diseno en lugar del color solido actual.
 
-- Borde redondeado con `border border-border bg-card`
-- Fila horizontal: icono circular (bg-muted) + nombre de plataforma y handle + icono `ExternalLink` alineado a la derecha
-- **Hover**: transicion suave con fondo `bg-primary` y texto blanco (`hover:bg-primary hover:text-primary-foreground transition-colors duration-200`), replicando el efecto violeta de la imagen
-- El icono `ExternalLink` funciona como enlace: abre `buildSocialUrl(platform, handle)` en nueva pestana. Para OnlyFans usa la URL directa, para WhatsApp usa `https://wa.me/{number}`
-- Si la red no tiene datos, la card se muestra con handle "---" y sin enlace activo
+### 2. Aplicar hover del sistema de diseno
 
-### Estructura visual (modo edicion)
-
-- Mismas cards pero con Input en lugar del handle
-- Sin icono de enlace externo durante edicion
-- Botones Guardar/Cancelar en el header (sin cambios)
-
-### Configuracion de plataformas actualizada
-
-Agregar un campo `buildUrl` a cada `PlatformConfig` para construir la URL de enlace:
-
-| Plataforma | buildUrl |
-|---|---|
-| Instagram | `buildSocialUrl("instagram", handle)` |
-| TikTok | `buildSocialUrl("tiktok", handle)` |
-| X (Twitter) | `buildSocialUrl("twitter", handle)` |
-| YouTube | `buildSocialUrl("youtube", handle)` |
-| OnlyFans | URL directa del campo `onlyfans_url` |
-| WhatsApp | `https://wa.me/{number}` |
-
-### Imports nuevos
-
-- Agregar `ExternalLink` de `lucide-react`
-- Agregar `buildSocialUrl` de `@/lib/utils` (ya importa `displayHandle`)
-
-### Toasts
-
-Sin cambios, se mantienen los existentes (exito, error, cancelacion).
-
-## Detalle tecnico de la card
-
-```text
-+------------------------------------------------------------------+
-| [icon circle]  Platform Name              [ExternalLink icon]    |
-|                @handle                                            |
-+------------------------------------------------------------------+
+Reemplazar:
+```
+hover:bg-primary hover:border-primary transition-colors duration-200
 ```
 
-En hover toda la card cambia a fondo primary con texto blanco, incluyendo el icono.
+Por el patron documentado en CardsSection:
+```
+cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40
+```
 
+### 3. Eliminar clases de hover en textos e iconos hijos
+
+Ya no es necesario cambiar texto a `primary-foreground` en hover (el fondo ahora es un gradiente sutil, no un color solido). Se eliminan todas las clases `group-hover:text-primary-foreground` y `group-hover:bg-primary-foreground/20`.
+
+### 4. Agregar import de Card
+
+Agregar `import { Card } from "@/components/ui/card"` y eliminar las clases manuales de borde/fondo/sombra que el componente Card ya provee.
+
+## Resultado visual
+
+Las cards tendran un efecto hover sutil con escala 1.03 y gradiente primary semitransparente, consistente con las KPI/Metric Cards del design system, en lugar del cambio de color solido actual.
