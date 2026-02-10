@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { CategoryItem } from "./categoriesConfig";
+import type { CategoryItem, FormType } from "./categoriesConfig";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Guideline = Tables<"creator_guidelines">;
@@ -17,6 +17,7 @@ interface Props {
   onAdd: () => void;
   onEdit: (g: Guideline) => void;
   onDelete: (id: string) => void;
+  formType?: FormType;
   inlineAdding?: boolean;
   inlineContent?: string;
   onInlineContentChange?: (value: string) => void;
@@ -42,6 +43,7 @@ const GuidelineItemRow = ({
   onAdd,
   onEdit,
   onDelete,
+  formType = "detail",
   inlineAdding = false,
   inlineContent = "",
   onInlineContentChange,
@@ -106,34 +108,48 @@ const GuidelineItemRow = ({
                   placeholder="Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {formType === "pricing" ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Precio</Label>
+                      <Input
+                        type="number"
+                        value={inlinePrice}
+                        onChange={(e) => onInlinePriceChange?.(e.target.value)}
+                        placeholder="Ej: 50"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Moneda</Label>
+                      <Input
+                        value={inlineCurrency}
+                        onChange={(e) => onInlineCurrencyChange?.(e.target.value)}
+                        placeholder="USD"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Nota (opcional)</Label>
+                    <Textarea
+                      value={inlineNote}
+                      onChange={(e) => onInlineNoteChange?.(e.target.value)}
+                      placeholder="Ej: Incluye nombre del fan, entrega en 24h..."
+                      rows={3}
+                    />
+                  </div>
+                </>
+              ) : (
                 <div className="space-y-1.5">
-                  <Label>Precio</Label>
-                  <Input
-                    type="number"
-                    value={inlinePrice}
-                    onChange={(e) => onInlinePriceChange?.(e.target.value)}
-                    placeholder="Ej: 50"
+                  <Label>Descripción / Detalle</Label>
+                  <Textarea
+                    value={inlineContent}
+                    onChange={(e) => onInlineContentChange?.(e.target.value)}
+                    placeholder="Describe el detalle de este lineamiento..."
+                    rows={4}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Moneda</Label>
-                  <Input
-                    value={inlineCurrency}
-                    onChange={(e) => onInlineCurrencyChange?.(e.target.value)}
-                    placeholder="USD"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Nota (opcional)</Label>
-                <Textarea
-                  value={inlineNote}
-                  onChange={(e) => onInlineNoteChange?.(e.target.value)}
-                  placeholder="Ej: Incluye nombre del fan, entrega en 24h..."
-                  rows={3}
-                />
-              </div>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" size="sm" onClick={onInlineCancel}>
                   Cancelar
