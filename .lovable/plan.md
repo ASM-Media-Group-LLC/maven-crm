@@ -1,65 +1,57 @@
 
 
-# Redisenar Lineamientos con categorias jerarquicas y items colapsables
+# Corregir vista de Lineamientos: categorias solo al hacer clic en "Agregar"
 
-## Resumen
+## Problema actual
+Las categorias (Operacion Core, Gestion de Chats, etc.) se muestran directamente en la vista principal del tab. Segun la imagen de referencia, la vista principal solo debe mostrar:
+- Header con icono, titulo "Lineamientos Operativos", conteo "X registrados", y botones "Ver" / "Agregar"
+- Lista de lineamientos ya creados (si existen)
 
-Reemplazar la vista plana actual de lineamientos por un layout jerarquico organizado en categorias con items predefinidos, cada uno colapsable con chevron y boton "+" para agregar contenido. Replica el diseno mostrado en las imagenes de referencia de Maven CRM.
+Las categorias con sus items solo deben aparecer cuando se hace clic en el boton "Agregar".
 
-## Estructura de categorias e items (extraida de las imagenes)
+## Cambios propuestos
 
-| Categoria | Items |
-|---|---|
-| Operacion Core | Estrategia PPV, Contenido Custom |
-| Gestion de Chats | Instrucciones para Chats, Tipo de Usuarios, Fans VIP / Whales, Tiempos de Respuesta, Estrategia de Renewals, Mass Messages, Idiomas |
-| Horarios | Horarios y Disponibilidad, Contacto de Emergencia, Zonas Horarias |
-| Negocio y Crecimiento | Metas y Objetivos, Promociones Permitidas, Cross-Promo Redes, Adquisicion de Fans, Tecnicas de Upselling, Retencion de Fans |
-| Plataformas y Cuentas | Reglas de Plataforma, Cuentas Backup, Redes Sociales |
-| Administrativo | Onboarding, Estado de Verificacion, Contratos y Legales, Info de Pagos, Feedback de Reunion, Historial de Problemas, Alertas Importantes |
+### Archivo: `src/pages/creadores/LineamientosTabContent.tsx`
 
-Cada item tiene un icono unico (de Lucide), titulo y descripcion corta.
+1. **Vista principal**: Mostrar el header (icono ClipboardList + titulo + conteo + botones Ver/Agregar) seguido de la lista de lineamientos existentes guardados en DB (cards simples con categoria, titulo y contenido).
 
-## Detalle tecnico
+2. **Boton "Agregar"**: Al hacer clic, abre un Dialog/modal que muestra las categorias con sus items (el layout jerarquico actual con Operacion Core, Gestion de Chats, etc.). Dentro de este modal, cada item tiene un boton "+" para agregar contenido. Al seleccionar un item, se abre el formulario de contenido.
 
-### Archivo: `src/pages/creadores/LineamientosTabContent.tsx` (reescritura completa)
+3. **Boton "Ver"**: Habilitado si hay lineamientos existentes; al hacer clic muestra/expande la lista de lineamientos guardados.
 
-**Layout principal:**
-- Eliminar el header con botones Ver/Agregar actuales
-- Renderizar cada categoria como seccion con:
-  - Titulo de categoria en texto semibold a la izquierda
-  - Boton "+ Nueva categoria" a la derecha (solo en el header de cada seccion)
-- Debajo de cada header de categoria, listar los items predefinidos
+4. **Boton "+ Nueva categoria"**: Aparece dentro del modal de Agregar, al final de la lista de categorias.
 
-**Cada item:**
-- Fila con: icono (circular con fondo muted), titulo en negrita, descripcion en texto muted
-- A la derecha: boton chevron (expand/collapse) y boton "+"
-- Al expandir con chevron: muestra el contenido existente del lineamiento (si hay datos en DB) o un estado vacio
-- Al hacer click en "+": abre el modal actual de agregar/editar, pre-llenando el `guideline_type` con la categoria y el `title` con el nombre del item
+### Estructura resultante
 
-**Mapeo con la base de datos:**
-- El campo `guideline_type` se usara para almacenar la categoria
-- El campo `title` almacena el nombre del item especifico
-- El campo `content` almacena el contenido detallado
-- Los items predefinidos son una configuracion estatica en el frontend
-- Si un item tiene datos en DB, se muestra su contenido al expandir
-- Si no tiene datos, al expandir muestra "Sin contenido" con invitacion a agregar
+**Vista por defecto (sin lineamientos):**
+```
+[icon] Lineamientos Operativos          [Ver] [Agregar]
+       0 registrados
 
-**Datos estaticos (constante CATEGORIES):**
-- Array de objetos con `{ category, items: [{ title, description, icon }] }`
-- Cada item referencia un icono de Lucide (DollarSign, Palette, MessageSquare, Users, Crown, Clock, RefreshCw, Mail, Languages, Calendar, Phone, Globe, Target, Tag, Share2, UserPlus, TrendingUp, Shield, CheckCircle, Database, Link2, FileText, CreditCard, ClipboardList, AlertTriangle, AlertCircle)
+       (vacio - sin lineamientos creados)
+```
 
-**Estado de expansion:**
-- useState con un Set de keys (ej: "Gestion de Chats::Tipo de Usuarios") para controlar que items estan expandidos
+**Al hacer clic en "Agregar" se abre modal con:**
+```
+Agregar Lineamiento                        [X]
 
-**Boton "+ Nueva categoria":**
-- Abre un dialog simple pidiendo nombre de la nueva categoria
-- No requiere cambios en DB, se agrega al estado local (o se podria persistir en una tabla aparte, pero para esta iteracion se mantiene en frontend)
+Operacion Core              + Nueva categoria
+  [icon] Estrategia PPV          [+]
+  [icon] Contenido Custom        [+]
 
-### Sin cambios en otros archivos
+Gestion de Chats
+  [icon] Instrucciones para Chats [+]
+  ...
+```
 
-La tabla `creator_guidelines` existente es suficiente. Los campos `guideline_type` (categoria) y `title` (item) ya soportan esta estructura.
+**Al hacer clic en [+] de un item:** Se cierra el selector de categorias y se abre el formulario de contenido (modal actual con Textarea).
 
-### Modales existentes
+### Detalle tecnico
 
-Se mantienen los modales de Add/Edit, View y Delete actuales, con la diferencia de que al hacer click en "+" de un item especifico, el formulario se pre-llena con la categoria y titulo correspondientes (solo editable el campo contenido en ese caso).
+- Agregar un nuevo estado `selectorOpen` para controlar el modal de seleccion de categorias
+- El boton "Agregar" del header abre este modal selector
+- Dentro del modal selector se renderizan las categorias con `GuidelineItemRow` (sin expand, solo boton "+")
+- Al hacer clic en "+" de un item, se cierra el selector y se abre el formulario de contenido pre-llenado
+- La vista principal muestra los lineamientos existentes (de la DB) como una lista simple con opciones de editar/eliminar
+- No se eliminan los componentes `categoriesConfig.ts` ni `GuidelineItemRow.tsx`, se reutilizan dentro del modal
 
