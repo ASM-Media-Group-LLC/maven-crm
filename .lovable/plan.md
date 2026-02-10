@@ -1,55 +1,48 @@
 
 
-# Implementar tab de Monetizacion segun imagen de referencia
+# Implementar tab de Documentos segun imagen de referencia
 
 ## Lo que muestra la imagen
 
-La pestana "Monetizacion" muestra una seccion titulada **"Monetizacion Mensual"** con:
-- Icono de dolar ($) junto al titulo
-- Subtitulo: "Historico de monetizacion por mes"
-- Tabla con los registros mensuales o un empty state: "No hay datos de monetizacion registrados"
+La pestana "Documentos" muestra:
+- Titulo **"Documentos"** (h2/bold) alineado a la izquierda
+- Boton **"Subir Archivo"** (primario, con icono de upload) alineado a la derecha en el header
+- Empty state centrado: **"No hay documentos"**
+- Todo dentro de un Card con header y contenido
 
-## Datos disponibles
+## Recursos existentes
 
-La tabla `creator_monetization` ya existe en la base de datos con las columnas:
-- `id`, `creator_id`, `month_year` (text, formato "YYYY-MM-01"), `amount` (numeric), `notes` (text), `created_at`, `updated_at`
-
-Ya hay datos reales en la tabla.
+- Tabla `creator_documents` con columnas: `id`, `creator_id`, `file_name`, `file_type`, `file_url`, `description`, `uploaded_by`, `uploaded_at`
+- Componente `FileUploadModal` ya existente con logica de upload a Supabase Storage (bucket `creator-files`)
 
 ## Cambios tecnicos
 
-### 1. Crear archivo `src/pages/creadores/MonetizacionTabContent.tsx`
+### 1. Crear `src/pages/creadores/DocumentosTabContent.tsx`
 
 Nuevo componente que:
 - Recibe `creatorId` como prop
-- Consulta `creator_monetization` filtrado por `creator_id`, ordenado por `month_year` descendente
-- Muestra un Card con:
-  - Header: icono `DollarSign` (lucide) + titulo "Monetizacion Mensual" + subtitulo "Historico de monetizacion por mes"
-  - Body: Tabla con columnas **Mes**, **Monto**, **Notas**
-    - `month_year` formateado como nombre de mes y ano (ej: "Febrero 2025")
-    - `amount` formateado como moneda
-    - `notes` como texto
-  - Empty state: "No hay datos de monetizacion registrados" cuando no hay registros
-- Usa los componentes existentes del sistema: `Card`, `Table`, `Skeleton` para loading
+- Consulta `creator_documents` filtrado por `creator_id`, ordenado por `uploaded_at` descendente
+- **Header**: Titulo "Documentos" a la izquierda + Boton "Subir Archivo" (primario, icono `Upload`) a la derecha
+- **Lista de documentos**: Si hay registros, muestra cada documento con nombre, tipo, fecha de subida y enlace de descarga/vista
+- **Empty state**: "No hay documentos" centrado cuando no hay registros
+- Al hacer clic en "Subir Archivo", abre el `FileUploadModal` existente con category `contracts`
+- Al completar el upload, inserta el registro en `creator_documents` y refresca la query
 
 ### 2. Modificar `src/pages/creadores/CreadorProfileContent.tsx`
 
-- Importar `MonetizacionTabContent`
-- Extraer "monetizacion" del array de tabs placeholder (linea 181)
-- Agregar un `TabsContent` dedicado para `value="monetizacion"` que renderice `<MonetizacionTabContent creatorId={id!} />`
-- El array de placeholders queda: `["documentos", "notas", "tickets", "historial"]`
+- Importar `DocumentosTabContent`
+- Extraer "documentos" del array de tabs placeholder
+- Agregar `TabsContent` dedicado para `value="documentos"` con `<DocumentosTabContent creatorId={id!} />`
+- El array de placeholders queda: `["notas", "tickets", "historial"]`
 
-### Estructura visual del componente
+### Estructura visual
 
 ```text
 +----------------------------------------------------------+
-|  $  Monetizacion Mensual                                 |
-|     Historico de monetizacion por mes                     |
+|  Documentos                        [Subir Archivo]        |
 |                                                           |
-|  Mes              |  Monto       |  Notas                |
-|  Febrero 2025     |  $9,000.00   |  KK                   |
-|  Junio 2025       |  $9,000.00   |  KJEF                 |
-|  Marzo 2025       |  $4,444.00   |  AFAF                 |
+|  file_name.pdf   |  PDF   |  10 Feb 2025   [Descargar]   |
+|  foto.jpg        |  IMG   |  08 Feb 2025   [Descargar]   |
 +----------------------------------------------------------+
 ```
 
@@ -57,10 +50,17 @@ O si no hay datos:
 
 ```text
 +----------------------------------------------------------+
-|  $  Monetizacion Mensual                                 |
-|     Historico de monetizacion por mes                     |
+|  Documentos                        [Subir Archivo]        |
 |                                                           |
-|        No hay datos de monetizacion registrados           |
+|              No hay documentos                            |
 +----------------------------------------------------------+
 ```
+
+### Detalles de implementacion
+
+- Reutilizar `FileUploadModal` para el flujo de subida
+- Al recibir archivos del modal, insertar en `creator_documents` con `creator_id`, `file_name`, `file_type`, `file_url`
+- Usar `useQuery` para fetch y `useMutation` / invalidacion de cache para refresh post-upload
+- Componentes del sistema: `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Button`, `Table`, `Skeleton`
+- Seguir el patron visual de MonetizacionTabContent para consistencia
 
