@@ -104,7 +104,7 @@ function FilterSelect({
   onChange: (v: string) => void;
 }) {
   return (
-    <Select value={value || "__all__"} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
+    <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
       <SelectTrigger className="w-[140px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
