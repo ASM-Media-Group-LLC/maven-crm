@@ -1,29 +1,51 @@
 
 
-# Confirmar formulario "detail" en items de Gestión de Chats
+# Agregar selector de idiomas al desplegable de "Idiomas"
 
-## Estado actual
+## Problema
 
-Los items de "Gestion de Chats" ya funcionan con el formulario de **Titulo / Concepto** + **Descripcion / Detalle** porque el `formType` por defecto es `"detail"`. Lo confirme visualmente en el navegador.
+El item "Idiomas" en la seccion de Gestion de Chats actualmente muestra el formulario generico de Titulo/Concepto + Descripcion/Detalle. Segun la referencia visual, debe incluir una fila de chips de idiomas predefinidos (Espanol, English, Portugues, Francais, Deutsch, Italiano) con un boton "+ Otro" antes de los campos de formulario.
 
-Sin embargo, para mayor claridad y consistencia explicita, se agregara `formType: "detail"` a cada item de la categoria "Gestion de Chats" en la configuracion.
+## Solucion
 
-## Cambio
+Crear un nuevo tipo de formulario `"language"` que renderice los chips de idioma como selector antes de los campos estandar.
 
-**Archivo:** `src/pages/creadores/lineamientos/categoriesConfig.ts`
+## Cambios
 
-Agregar `formType: "detail"` explicitamente a los 7 items de "Gestion de Chats":
+### 1. `src/pages/creadores/lineamientos/categoriesConfig.ts`
 
-- Instrucciones para Chats
-- Tipo de Usuarios
-- Fans VIP / Whales
-- Tiempos de Respuesta
-- Estrategia de Renewals
-- Mass Messages
-- Idiomas
+- Agregar `"language"` como valor posible de `FormType`: `type FormType = "pricing" | "detail" | "language"`
+- Cambiar el `formType` del item "Idiomas" de `"detail"` a `"language"`
 
-Esto no cambia el comportamiento (ya es el default), pero documenta la intencion explicitamente en el codigo para que quede claro que todos usan el formulario de Titulo + Descripcion.
+### 2. `src/pages/creadores/lineamientos/GuidelineItemRow.tsx`
 
-## Nota
+- Agregar estado local para el idioma seleccionado y un input para "Otro"
+- Agregar las props necesarias o manejar el estado internamente
+- Cuando `formType === "language"`, renderizar:
+  1. Una fila de chips/botones con los idiomas predefinidos: Espanol, English, Portugues, Francais, Deutsch, Italiano
+  2. Un boton "+ Otro" que al hacer click muestre un input para escribir un idioma personalizado
+  3. El chip seleccionado tendra estilo activo (variant `secondary`)
+  4. Debajo, los campos normales de Titulo/Concepto y Descripcion/Detalle
+- Al seleccionar un idioma, se pre-llenara automaticamente el campo "Titulo / Concepto" con el nombre del idioma seleccionado (el usuario puede modificarlo)
+- Los placeholders se actualizaran para reflejar el contexto de idiomas:
+  - Titulo: "Ej: Saludo inicial, Despedida, Usuario agresivo..."
+  - Descripcion: "Ej: Saludo calido, usar emojis, tono amigable..."
 
-Si lo que se busca es un cambio visual o funcional diferente al formulario actual de Titulo/Concepto + Descripcion/Detalle, por favor indicar que campos o comportamiento se espera. El formulario inline actual ya muestra exactamente esos dos campos, con los botones de "Guardar" y "Guardar y agregar otro".
+### 3. Flujo de uso
+
+1. El usuario expande "Idiomas" y hace click en "+"
+2. Aparecen los chips de idioma en la parte superior
+3. El usuario selecciona un idioma (ej: "Espanol")
+4. El campo Titulo/Concepto se pre-llena con "Espanol" (editable)
+5. El usuario completa la descripcion
+6. Guarda normalmente con los botones existentes
+
+## Detalles tecnicos
+
+| Archivo | Cambio |
+|---|---|
+| `categoriesConfig.ts` | Agregar `"language"` a `FormType`, cambiar formType de Idiomas |
+| `GuidelineItemRow.tsx` | Agregar bloque condicional para `formType === "language"` con chips de idioma antes de los campos de formulario |
+
+Los chips usaran el patron de tab navigation existente (inline-flex con bg-muted/50) y los botones tendran variant `secondary` para activo y `ghost` para inactivo, consistente con el design system.
+
