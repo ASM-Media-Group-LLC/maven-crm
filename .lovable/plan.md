@@ -1,51 +1,51 @@
 
 
-# Agregar campo faltante: PicLink URL
+# Ajustes en campos del tab Redes (modo edicion)
 
-## Hallazgo
+## Cambios solicitados
 
-Revisando la base de datos y las imagenes de referencia, el campo **`piclink_url`** existe en la tabla `creators` pero no esta incluido en el tab de Redes. Este es el campo que falta.
+1. **Agregar campo "Seguidores Instagram"**: Campo numerico que guarda en la columna `instagram_followers` (integer) de la tabla `creators`.
+2. **Quitar campo "Chat URL"**: Eliminar la entrada de `chat_url` del array `platforms` y del estado `EditData`.
+3. **Renombrar label de WhatsApp**: Cambiar de "WhatsApp" a "WhatsApp (Numero o Link API)" en el `editLabel`.
 
-## Campos actuales vs campos en BD
+## Archivo: `src/pages/creadores/RedesTabContent.tsx`
 
-| Campo | En componente | En BD |
-|---|---|---|
-| Instagram | Si | Si |
-| WhatsApp | Si | Si |
-| Twitter/X | Si | Si |
-| YouTube | Si | Si |
-| TikTok | Si | Si |
-| LinkedIn | Si | Si |
-| OnlyFans | Si | Si |
-| Chat URL | Si | Si |
-| **PicLink** | **No** | **Si (`piclink_url`)** |
+### 1. Agregar `instagram_followers` a `EditData`
+- Agregar `instagram_followers: string` a la interface `EditData` (se maneja como string en el input y se convierte a number al guardar).
 
-## Cambios
+### 2. Agregar entrada en el array `platforms`
+- Nueva entrada justo despues de Instagram:
+  - key: `instagram_followers`
+  - label: "Seguidores Instagram"
+  - editLabel: "Seguidores Instagram"
+  - icon: icono de InstagramIcon
+  - placeholder: "Ej: 150000"
+  - Solo aparece en modo edicion (no tiene card en modo lectura, o se muestra como dato informativo)
 
-### Archivo: `src/pages/creadores/RedesTabContent.tsx`
+### 3. Eliminar `chat_url`
+- Remover la entrada de `chat_url` del array `platforms`
+- Remover `chat_url` de la interface `EditData`
+- Remover `chat_url` del estado inicial, de `startEditing` y de `handleSave`
+- Remover import de `MessageCircle` de lucide-react
 
-1. **Agregar `piclink_url` a `EditData`**: nuevo campo string en la interface
-2. **Agregar plataforma PicLink al array `platforms`**:
-   - key: `piclink_url`
-   - label: "PicLink"
-   - editLabel: "PicLink URL"
-   - icon: icono `Link` de lucide-react
-   - placeholder: "https://piclink.com/..."
-   - displayValue: URL directa o "---"
-   - buildUrl: URL directa
-3. **Actualizar `startEditing`**: inicializar `piclink_url` desde `creator.piclink_url`
-4. **Actualizar `handleSave`**: incluir `piclink_url` en el update a Supabase
-5. **Importar `Link` de lucide-react** para el icono de PicLink
+### 4. Renombrar label de WhatsApp
+- Cambiar `editLabel` de `"WhatsApp"` a `"WhatsApp (Numero o Link API)"`
+
+### 5. Actualizar `startEditing`
+- Inicializar `instagram_followers` desde `creator.instagram_followers` (convertir number a string)
+
+### 6. Actualizar `handleSave`
+- Incluir `instagram_followers: editData.instagram_followers ? parseInt(editData.instagram_followers, 10) : null` en el update a Supabase
 
 ### Orden final de campos
 
 1. Instagram
-2. WhatsApp
-3. Twitter/X
-4. YouTube
-5. TikTok
-6. LinkedIn
-7. OnlyFans
-8. PicLink
-9. Chat URL
+2. **Seguidores Instagram** (nuevo)
+3. WhatsApp (Numero o Link API) (renombrado)
+4. Twitter/X
+5. YouTube
+6. TikTok
+7. LinkedIn
+8. OnlyFans
+9. PicLink
 
