@@ -1,56 +1,54 @@
 
-# Mostrar categorias inline al hacer clic en "Agregar" (sin modal)
+# Ajustar botones "Ver" y "Agregar" al estilo de tabs contenidas
 
 ## Resumen
 
-Cambiar el comportamiento del boton "Agregar": en lugar de abrir un modal con las categorias, mostrarlas directamente en la vista principal debajo del header. El boton "Agregar" actuara como toggle para mostrar/ocultar la lista de categorias con sus items expandibles. Se reutiliza el componente `GuidelineItemRow` existente que ya soporta expand/collapse y acciones CRUD.
+Cambiar los botones "Ver" y "Agregar" de botones separados a un grupo contenido tipo "tabs" con fondo sutil, siguiendo el patron de filtros de agencia ya existente en el proyecto. El boton activo usa variante `secondary` y el inactivo `ghost`, todo dentro de un contenedor `inline-flex` con borde redondeado y fondo `bg-muted/50`.
 
 ## Detalle tecnico
 
-### Archivo: `src/pages/creadores/LineamientosTabContent.tsx`
+### Archivo: `src/pages/creadores/LineamientosTabContent.tsx` (lineas 178-196)
 
-1. **Reemplazar `selectorOpen` por `showCategories`**: Un estado booleano que controla si las categorias se muestran inline en la vista. El boton "Agregar" del header togglea este estado.
+Reemplazar el `div` contenedor de los botones:
 
-2. **Agregar estado `expandedItems`**: Un `Set<string>` para rastrear que items estan expandidos (para los chevrons de `GuidelineItemRow`).
-
-3. **Eliminar el Dialog del Category Selector Modal** (lineas 223-267): Ya no se necesita el modal.
-
-4. **Renderizar categorias inline**: Cuando `showCategories` es true, debajo del header mostrar:
-   - Por cada categoria: un encabezado con el nombre (ej. "Operacion Core") y un boton "+ Nueva categoria" a la derecha (solo en la primera categoria, segun la imagen)
-   - Debajo, una card con borde que contiene los items usando `GuidelineItemRow`, pasando el guideline correspondiente (si existe) para mostrar contenido expandible, y los handlers de add/edit/delete
-
-5. **Logica de match guideline**: Crear un `Map` o lookup de guidelines existentes por `title` + `guideline_type` para pasarle a cada `GuidelineItemRow` el guideline correspondiente (si ya fue creado).
-
-6. **Boton "Agregar" del header**: Cambia de `onClick={() => setSelectorOpen(true)}` a `onClick={() => setShowCategories(v => !v)}`. Se muestra con variante `outline` cuando las categorias estan visibles.
-
-7. **Estado vacio**: Cuando `guidelines.length === 0` y `showCategories` es false, se sigue mostrando el empty state actual. El boton "Agregar" del empty state tambien togglea `showCategories`.
-
-8. **Handler `openAddForItem`**: Ya no cierra `selectorOpen`. Solo setea el form y abre el modal de contenido.
-
-### Estructura visual resultante (segun imagen de referencia)
-
-```
-[icon] Lineamientos Operativos          [Ver] [Agregar]
-       0 registrados
-
-Operacion Core                    + Nueva categoria
-+---------------------------------------------+
-| [icon] Precios                    [v] [+]    |
-|   Lista de precios por tipo...               |
-| [icon] Limites                    [v] [+]    |
-|   Contenido o acciones que NO...             |
-| [icon] Gustos y Preferencias      [v] [+]    |
-|   Lo que le gusta y prefiere...              |
-| [icon] Estilo de Contenido        [v] [+]    |
-|   Tipos de contenido y estilo...             |
-+---------------------------------------------+
-
-Gestion de Chats
-+---------------------------------------------+
-| [icon] Instrucciones para Chats   [v] [+]    |
-| ...                                          |
-+---------------------------------------------+
+**Antes:**
+```tsx
+<div className="flex items-center gap-2">
+  <Button variant="outline" size="sm" ...>
+    <Eye /> Ver
+  </Button>
+  <Button variant={showCategories ? "outline" : "default"} size="sm" ...>
+    <Plus /> Agregar
+  </Button>
+</div>
 ```
 
-### Sin cambios en otros archivos
-- `categoriesConfig.ts` y `GuidelineItemRow.tsx` se reutilizan tal cual
+**Despues:**
+```tsx
+<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+  <Button
+    variant={showList && !showCategories ? "secondary" : "ghost"}
+    size="sm"
+    disabled={guidelines.length === 0}
+    onClick={() => { setShowList(v => !v); setShowCategories(false); }}
+  >
+    <Eye className="h-4 w-4 mr-1" />
+    Ver
+  </Button>
+  <Button
+    variant={showCategories ? "secondary" : "ghost"}
+    size="sm"
+    onClick={() => { setShowCategories(v => !v); setShowList(false); }}
+  >
+    <ClipboardList className="h-4 w-4 mr-1" />
+    Agregar
+  </Button>
+</div>
+```
+
+Cambios clave:
+- Contenedor con `inline-flex rounded-lg border border-border bg-muted/50 p-1` para el efecto de grupo
+- Gap reducido a `gap-1` entre botones
+- Variantes cambian a `secondary` (activo) y `ghost` (inactivo), siguiendo el patron de filtros de agencia
+- Icono de "Agregar" cambia de `Plus` a `ClipboardList` (icono de documento/edicion como en la imagen de referencia)
+- Al activar un boton, se desactiva el otro para comportamiento exclusivo
