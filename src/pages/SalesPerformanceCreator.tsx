@@ -45,11 +45,11 @@ const SalesPerformanceCreator = () => {
       subset = subset.filter((r) => documentFilter.includes(r.document_id ?? ""));
     if (dateFrom) {
       const from = startOfDay(dateFrom);
-      subset = subset.filter((r) => new Date(r.date) >= from);
+      subset = subset.filter((r) => new Date(r.effective_date) >= from);
     }
     if (dateTo) {
       const to = endOfDay(dateTo);
-      subset = subset.filter((r) => new Date(r.date) <= to);
+      subset = subset.filter((r) => new Date(r.effective_date) <= to);
     }
     return new Set(subset.map((r) => r.artistic_name || r.pending_creator).filter(Boolean) as string[]);
   }, [rows, documentFilter, dateFrom, dateTo]);
@@ -60,11 +60,11 @@ const SalesPerformanceCreator = () => {
       subset = subset.filter((r) => creatorFilter.includes(r.artistic_name ?? "") || creatorFilter.includes(r.pending_creator ?? ""));
     if (dateFrom) {
       const from = startOfDay(dateFrom);
-      subset = subset.filter((r) => new Date(r.date) >= from);
+      subset = subset.filter((r) => new Date(r.effective_date) >= from);
     }
     if (dateTo) {
       const to = endOfDay(dateTo);
-      subset = subset.filter((r) => new Date(r.date) <= to);
+      subset = subset.filter((r) => new Date(r.effective_date) <= to);
     }
     return new Set(subset.map((r) => r.document_id).filter(Boolean) as string[]);
   }, [rows, creatorFilter, dateFrom, dateTo]);
@@ -92,11 +92,11 @@ const SalesPerformanceCreator = () => {
 
     if (dateFrom) {
       const from = startOfDay(dateFrom);
-      result = result.filter((r) => new Date(r.date) >= from);
+      result = result.filter((r) => new Date(r.effective_date) >= from);
     }
     if (dateTo) {
       const to = endOfDay(dateTo);
-      result = result.filter((r) => new Date(r.date) <= to);
+      result = result.filter((r) => new Date(r.effective_date) <= to);
     }
 
     return result.sort((a, b) => {
