@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,34 +17,50 @@ import {
   ExternalLink,
   EyeOff,
   Flag,
-  TrendingDown,
   ArrowUpDown,
 } from "lucide-react";
+import type { EarningsRow } from "../sales-performance/types";
 
-interface Creator {
+interface Props {
+  rows: EarningsRow[];
+}
+
+interface CreatorAgg {
   name: string;
   initials: string;
   grossEarnings: number;
   netEarnings: number;
-  variation: number;
-  trend: string;
   participation: number;
 }
 
-const creatorsData: Creator[] = [
-  { name: "Alemiarojas", initials: "AL", grossEarnings: 1050.52, netEarnings: 840.42, variation: -88.6, trend: "Cayendo", participation: 8.7 },
-  { name: "franundurraga", initials: "FR", grossEarnings: 942.87, netEarnings: 754.30, variation: -86.7, trend: "Cayendo", participation: 7.8 },
-  { name: "Sin Vincular", initials: "SI", grossEarnings: 912.72, netEarnings: 730.18, variation: -88.9, trend: "Cayendo", participation: 7.6 },
-  { name: "Martina Smith", initials: "MS", grossEarnings: 825.54, netEarnings: 660.43, variation: -85.1, trend: "Cayendo", participation: 6.8 },
-  { name: "GiselleMontes18", initials: "GM", grossEarnings: 619.13, netEarnings: 495.30, variation: -86.0, trend: "Cayendo", participation: 5.1 },
-  { name: "Heidygarcia1111", initials: "HG", grossEarnings: 562.60, netEarnings: 450.08, variation: -68.3, trend: "Cayendo", participation: 4.7 },
-  { name: "Dayoranmx", initials: "DA", grossEarnings: 409.67, netEarnings: 327.74, variation: -85.1, trend: "Cayendo", participation: 3.4 },
-];
+const fmt = (v: number) =>
+  `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const CreatorsTable = () => {
+const CreatorsTable = ({ rows }: Props) => {
   const [search, setSearch] = useState("");
 
-  const filtered = creatorsData.filter((c) =>
+  const creators = useMemo(() => {
+    const grouped = new Map<string, number>();
+    let total = 0;
+
+    for (const r of rows) {
+      const name = r.artistic_name || r.pending_creator || "Sin Vincular";
+      grouped.set(name, (grouped.get(name) ?? 0) + (r.total_earnings_gross ?? 0));
+      total += r.total_earnings_gross ?? 0;
+    }
+
+    return Array.from(grouped.entries())
+      .map(([name, grossEarnings]): CreatorAgg => ({
+        name,
+        initials: name.slice(0, 2).toUpperCase(),
+        grossEarnings,
+        netEarnings: grossEarnings * 0.8,
+        participation: total > 0 ? (grossEarnings / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.grossEarnings - a.grossEarnings);
+  }, [rows]);
+
+  const filtered = creators.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -101,12 +117,6 @@ const CreatorsTable = () => {
               </TableHead>
               <TableHead className="text-xs text-right">
                 <span className="flex items-center justify-end gap-1">
-                  Variación <ArrowUpDown className="h-3 w-3" />
-                </span>
-              </TableHead>
-              <TableHead className="text-xs">Tendencia</TableHead>
-              <TableHead className="text-xs text-right">
-                <span className="flex items-center justify-end gap-1">
                   Participación <ArrowUpDown className="h-3 w-3" />
                 </span>
               </TableHead>
@@ -114,63 +124,62 @@ const CreatorsTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((creator) => (
-              <TableRow key={creator.name}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs bg-muted text-muted-foreground">
-                        {creator.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-medium text-foreground">
-                      {creator.name}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right text-sm text-foreground">
-                  ${creator.grossEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </TableCell>
-                <TableCell className="text-right text-sm font-medium text-success">
-                  ${creator.netEarnings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                </TableCell>
-                <TableCell className="text-right text-sm text-destructive">
-                  {creator.variation}%
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5 text-destructive">
-                    <TrendingDown className="h-3.5 w-3.5" />
-                    <span className="text-xs">{creator.trend}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${creator.participation * 10}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground w-10 text-right">
-                      {creator.participation}%
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <Flag className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                  Sin datos para el período seleccionado
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filtered.map((creator) => (
+                <TableRow key={creator.name}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs bg-muted text-muted-foreground">
+                          {creator.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium text-foreground">
+                        {creator.name}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-foreground">
+                    {fmt(creator.grossEarnings)}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium text-success">
+                    {fmt(creator.netEarnings)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${Math.min(creator.participation * 10, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground w-10 text-right">
+                        {creator.participation.toFixed(1)}%
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Flag className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

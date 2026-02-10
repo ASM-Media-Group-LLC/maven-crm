@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,13 +13,22 @@ interface DashboardFiltersProps {
   onViewChange: (view: ViewTab) => void;
   activePeriod: TimePeriod;
   onPeriodChange: (period: TimePeriod) => void;
+  dateFrom?: Date;
+  dateTo?: Date;
 }
+
+const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+const formatDateEs = (d: Date) =>
+  `${d.getDate().toString().padStart(2, "0")} ${MONTHS_ES[d.getMonth()]}`;
 
 const DashboardFilters = ({
   activeView,
   onViewChange,
   activePeriod,
   onPeriodChange,
+  dateFrom,
+  dateTo,
 }: DashboardFiltersProps) => {
   const navigate = useNavigate();
 
@@ -32,6 +39,11 @@ const DashboardFilters = ({
     }
     onViewChange(tab);
   };
+
+  const dateLabel =
+    dateFrom && dateTo
+      ? `${formatDateEs(dateFrom)} – ${formatDateEs(dateTo)} ${dateTo.getFullYear()}`
+      : "Seleccione un período";
 
   return (
     <div className="space-y-4">
@@ -75,7 +87,7 @@ const DashboardFilters = ({
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
-            <span>09 feb – 09 feb 2026</span>
+            <span>{dateLabel}</span>
           </div>
           <select className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-foreground outline-none">
             <option>Net Earnings</option>

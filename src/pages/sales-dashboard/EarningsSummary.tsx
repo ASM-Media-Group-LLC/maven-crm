@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   CheckCircle,
   Users,
@@ -7,17 +8,41 @@ import {
   UserPlus,
   Radio,
 } from "lucide-react";
+import type { EarningsRow } from "../sales-performance/types";
 
-const metricCards = [
-  { label: "Suscripciones", value: "$2,984.18", icon: Users, color: "text-success" },
-  { label: "Posts", value: "$0.00", icon: FileText, color: "text-primary" },
-  { label: "Mensajes", value: "$8,608.24", icon: MessageCircle, color: "text-instagram-pink" },
-  { label: "Propinas", value: "$474.00", icon: Sparkles, color: "text-warning" },
-  { label: "Referidos", value: "$0.00", icon: UserPlus, color: "text-destructive" },
-  { label: "Streams", value: "$0.00", icon: Radio, color: "text-accent" },
-];
+interface Props {
+  rows: EarningsRow[];
+}
 
-const EarningsSummary = () => {
+const fmt = (v: number) =>
+  `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const EarningsSummary = ({ rows }: Props) => {
+  const totals = useMemo(() => {
+    let totalEarnings = 0;
+    let subscriptions = 0;
+    let messages = 0;
+    let tips = 0;
+
+    for (const r of rows) {
+      totalEarnings += r.total_earnings_gross ?? 0;
+      subscriptions += r.subscription_gross ?? 0;
+      messages += r.message_gross ?? 0;
+      tips += r.tips_gross ?? 0;
+    }
+
+    return { totalEarnings, subscriptions, messages, tips };
+  }, [rows]);
+
+  const metricCards = [
+    { label: "Suscripciones", value: fmt(totals.subscriptions), icon: Users, color: "text-success" },
+    { label: "Posts", value: "$0.00", icon: FileText, color: "text-primary" },
+    { label: "Mensajes", value: fmt(totals.messages), icon: MessageCircle, color: "text-instagram-pink" },
+    { label: "Propinas", value: fmt(totals.tips), icon: Sparkles, color: "text-warning" },
+    { label: "Referidos", value: "$0.00", icon: UserPlus, color: "text-destructive" },
+    { label: "Streams", value: "$0.00", icon: Radio, color: "text-accent" },
+  ];
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -31,7 +56,7 @@ const EarningsSummary = () => {
           <CheckCircle className="h-12 w-12 text-primary" />
           <div>
             <p className="text-sm text-primary font-medium">Ganancias totales</p>
-            <p className="text-3xl font-bold text-foreground">$12,066.42</p>
+            <p className="text-3xl font-bold text-foreground">{fmt(totals.totalEarnings)}</p>
           </div>
         </div>
 
