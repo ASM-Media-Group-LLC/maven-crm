@@ -28,10 +28,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export type FormType = "pricing" | "detail";
+
 export interface CategoryItem {
   title: string;
   description: string;
   icon: LucideIcon;
+  formType?: FormType;
 }
 
 export interface Category {
@@ -43,7 +46,7 @@ export const CATEGORIES: Category[] = [
   {
     category: "Operación Core",
     items: [
-      { title: "Precios", description: "Lista de precios por tipo de contenido o servicio", icon: DollarSign },
+      { title: "Precios", description: "Lista de precios por tipo de contenido o servicio", icon: DollarSign, formType: "pricing" },
       { title: "Límites", description: "Contenido o acciones NO permitidas", icon: AlertCircle },
       { title: "Gustos y Preferencias", description: "Lo que le gusta y prefiere la creadora", icon: Crown },
       { title: "Estilo de Contenido", description: "Tipos de contenido y estilo visual", icon: Palette },

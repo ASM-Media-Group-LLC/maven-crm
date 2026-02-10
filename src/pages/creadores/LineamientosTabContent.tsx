@@ -324,6 +324,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                     <GuidelineItemRow
                       key={key}
                       item={item}
+                      formType={item.formType ?? "detail"}
                       guideline={guideline}
                       expanded={expandedItems.has(key)}
                       onToggle={() => toggleExpanded(key)}
