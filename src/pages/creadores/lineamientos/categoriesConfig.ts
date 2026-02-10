@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type FormType = "pricing" | "detail";
+export type FormType = "pricing" | "detail" | "language";
 
 export interface CategoryItem {
   title: string;
@@ -64,7 +64,7 @@ export const CATEGORIES: Category[] = [
       { title: "Tiempos de Respuesta", description: "SLA y tiempos esperados", icon: Clock, formType: "detail" },
       { title: "Estrategia de Renewals", description: "Renovaciones y retención", icon: RefreshCw, formType: "detail" },
       { title: "Mass Messages", description: "Estrategia de mensajes masivos", icon: Mail, formType: "detail" },
-      { title: "Idiomas", description: "Idiomas soportados y preferencias", icon: Languages, formType: "detail" },
+      { title: "Idiomas", description: "Idiomas soportados y preferencias", icon: Languages, formType: "language" },
     ],
   },
   {
