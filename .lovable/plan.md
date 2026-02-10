@@ -1,72 +1,63 @@
 
-
-# Agregar boton "+ Nueva categoria" en cada seccion de lineamientos
+# Despliegue inline de "+ Nueva categoria" con formulario
 
 ## Resumen
 
-Agregar un boton "+ Nueva categoria" alineado a la derecha en el encabezado de cada seccion (Operacion Core, Gestion de Chats, Horarios, etc.) cuando se muestra la vista de categorias. El boton permitira crear un lineamiento con categoria y titulo personalizados.
+Reemplazar el comportamiento actual del boton "+ Nueva categoria" (que abre un modal) por un formulario inline que se despliega directamente debajo del encabezado de la seccion, tal como se ve en la imagen de referencia. El formulario tendra borde punteado, dos campos (nombre y descripcion) y botones "Cancelar" / "Crear categoria".
 
-## Cambios
+## Detalle tecnico
 
 ### Archivo: `src/pages/creadores/LineamientosTabContent.tsx`
 
-1. **Modificar el encabezado de cada categoria** (linea 203-206): Cambiar el `h4` a un `div` con `flex justify-between items-center` que contenga el titulo a la izquierda y un boton "+ Nueva categoria" a la derecha.
+1. **Reemplazar estado `customCategory`** (string | null) por `inlineFormCategory` (string | null) para controlar en que seccion se muestra el formulario inline.
 
-```tsx
-// Antes
-<h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-  {cat.category}
-</h4>
-
-// Despues
-<div className="flex items-center justify-between mb-2">
-  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-    {cat.category}
-  </h4>
-  <Button
-    variant="ghost"
-    size="sm"
-    className="text-xs text-muted-foreground h-auto py-1 px-2"
-    onClick={() => openCustomForCategory(cat.category)}
-  >
-    <Plus className="h-3.5 w-3.5 mr-1" />
-    Nueva categoría
-  </Button>
-</div>
+2. **Agregar estado para el formulario inline**:
+```
+inlineTitle: string
+inlineDescription: string
 ```
 
-2. **Agregar estado y modal para categoria personalizada**: Nuevo estado `customCategory` para saber desde que seccion se abrio. Al hacer clic en "+ Nueva categoria", se abre el modal existente pero con campos de titulo y contenido editables (titulo libre en lugar de uno predefinido).
-
-3. **Agregar nuevo handler `openCustomForCategory`**:
-
+3. **Modificar el onClick de "+ Nueva categoria"**: En lugar de llamar `openCustomForCategory` (que abre modal), ahora hara toggle del formulario inline en esa seccion:
 ```tsx
-const openCustomForCategory = (category: string) => {
-  setEditingId(null);
-  setForm({ title: "", guideline_type: category, content: "" });
-  setCustomCategory(category);
-  setModalOpen(true);
-};
+onClick={() => {
+  setInlineFormCategory(prev => prev === cat.category ? null : cat.category);
+  setInlineTitle("");
+  setInlineDescription("");
+}}
 ```
 
-4. **Modificar el modal** para mostrar un campo de titulo editable cuando se abre desde "+ Nueva categoria" (cuando `customCategory` tiene valor):
+4. **Agregar formulario inline** justo despues del encabezado de cada seccion, visible solo cuando `inlineFormCategory === cat.category`:
 
 ```tsx
-// Agregar campo de titulo en el modal cuando customCategory esta activo
-{customCategory && (
-  <div className="space-y-1.5">
-    <Label>Título</Label>
+{inlineFormCategory === cat.category && (
+  <div className="rounded-lg border-2 border-dashed border-border p-4 mb-3 space-y-3">
     <Input
-      value={form.title}
-      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-      placeholder="Nombre del lineamiento..."
+      value={inlineTitle}
+      onChange={(e) => setInlineTitle(e.target.value)}
+      placeholder="Nombre de la categoría (ej: Reglas de Video)"
     />
+    <Input
+      value={inlineDescription}
+      onChange={(e) => setInlineDescription(e.target.value)}
+      placeholder="Descripción breve (opcional)"
+    />
+    <div className="flex justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={() => setInlineFormCategory(null)}>
+        Cancelar
+      </Button>
+      <Button size="sm" onClick={handleCreateInlineCategory}>
+        Crear categoría
+      </Button>
+    </div>
   </div>
 )}
 ```
 
-5. **Actualizar `handleSubmit`** para validar que el titulo no este vacio cuando es categoria personalizada.
+5. **Handler `handleCreateInlineCategory`**: Valida que el titulo no este vacio, luego inserta el lineamiento en Supabase usando `upsertMutation` con el titulo y la descripcion como contenido, y cierra el formulario inline.
 
-6. **Actualizar `closeModal`** para limpiar `customCategory`.
+6. **Limpiar estado `customCategory` y logica de modal asociada** ya que se reemplaza por el formulario inline. Mantener el modal solo para agregar/editar contenido de items predefinidos.
 
-7. **Agregar import** de `Plus` de lucide-react (ya importado) y `Input` de componentes UI.
-
+### Estilo visual (segun imagen de referencia)
+- Contenedor con `border-2 border-dashed border-border rounded-lg p-4`
+- Inputs con placeholders descriptivos
+- Botones alineados a la derecha: "Cancelar" (ghost) y "Crear categoria" (default/primary)
