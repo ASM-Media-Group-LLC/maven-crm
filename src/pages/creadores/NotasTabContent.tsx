@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   creatorId: string;
@@ -47,9 +47,9 @@ const NotasTabContent = ({ creatorId }: Props) => {
       if (error) throw error;
       setNoteText("");
       queryClient.invalidateQueries({ queryKey: ["creator_notes", creatorId] });
-      toast.success("Nota guardada");
+      toast({ title: "Nota guardada", description: "La nota se ha registrado correctamente." });
     } catch (e: any) {
-      toast.error("Error al guardar nota: " + e.message);
+      toast({ title: "Error al guardar nota", description: e.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
