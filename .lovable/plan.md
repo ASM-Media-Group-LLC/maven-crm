@@ -1,89 +1,60 @@
 
+# Deduplicar registros: un registro por creador por dia
 
-# Agregar iconos de plataformas externas y tooltips a las vistas de creadores
+## Problema actual
 
-## Resumen
+La tabla muestra multiples registros por creador por dia (snapshots cada hora). Por ejemplo, Franundurraga tiene registros a las 00:31, 01:00, 02:00, 08:00 del 10 feb 2026.
 
-Agregar tooltips a todos los iconos de redes sociales existentes y mostrar un icono generico (Globe) para plataformas externas como OnlyFans, Piclink, etc. Sin eliminar ni modificar los iconos actuales de Instagram, TikTok y X.
+## Reglas de negocio
 
-## Datos disponibles en el modelo `creators`
-
-Campos de links existentes que se usaran:
-
-| Campo | Tipo | Icono actual | Tratamiento |
-|---|---|---|---|
-| `instagram_handle` | handle | Instagram | Mantener sin cambios + tooltip |
-| `tiktok_handle` | handle | "TT" texto | Mantener sin cambios + tooltip |
-| `twitter_handle` | handle | "X" texto | Mantener sin cambios + tooltip |
-| `onlyfans_url` | URL completa | Ninguno | Globe generico + tooltip |
-| `piclink_url` | URL completa | Ninguno | Globe generico + tooltip |
-| `linkedin_handle` | handle | Ninguno | Globe generico + tooltip |
-| `youtube_handle` | handle | Ninguno | Globe generico + tooltip |
-| `chat_url` | URL completa | Ninguno | Globe generico + tooltip |
+1. Registros con hora entre 00:00 y 00:55 pertenecen al dia anterior (ej: 10 feb 00:31 = earnings del 9 feb)
+2. Solo un registro por creador por dia efectivo: el mas reciente
+3. Para el dia actual (aun no terminado), mostrar el registro mas nuevo disponible
 
 ## Detalle tecnico
 
-### Archivos modificados
+### Archivo: `src/pages/sales-performance/useEarningsData.ts`
 
-**1. `src/pages/creadores/CreadoresTable.tsx`**
+Agregar una funcion de deduplicacion despues de mapear los earnings. La logica:
 
-- Importar `Globe` de `lucide-react`
-- Importar `Tooltip`, `TooltipTrigger`, `TooltipContent`, `TooltipProvider` de `@/components/ui/tooltip`
-- Envolver cada icono social existente (Instagram, TikTok, X) con `Tooltip` mostrando el nombre de la red
-- Agregar logica para recopilar links externos del creador (`onlyfans_url`, `piclink_url`, `linkedin_handle`, `youtube_handle`, `chat_url`)
-- Si existe al menos un link externo: mostrar un unico icono `Globe` con tooltip "Ver plataforma"
-  - Si hay exactamente un link: click abre directamente en nueva pestana
-  - Si hay multiples links: usar `DropdownMenu` al hacer click, listando cada plataforma con su nombre
-- Mantener mismos tamanos (`h-4 w-4`), colores y espaciado actuales
+1. Para cada registro, calcular la "fecha efectiva":
+   - Extraer hora y minuto del campo `date`
+   - Si hora es 0 y minuto es <= 55, restar un dia a la fecha
+   - Guardar esta fecha efectiva en un nuevo campo `effective_date`
 
-**2. `src/pages/creadores/CreadoresGrid.tsx`**
+2. Agrupar registros por clave compuesta: `creator_id || pending_creator` + `effective_date`
 
-- Mismos imports y misma logica que en la tabla
-- Envolver iconos existentes con `Tooltip`
-- Agregar icono `Globe` en la seccion de footer (junto a los otros iconos sociales)
-- Mantener `e.stopPropagation()` en los clicks para no activar el modal de vista
+3. De cada grupo, quedarse solo con el registro que tenga el `date` original mas reciente
 
-### Estructura del Tooltip (ejemplo para Instagram en tabla)
+4. Reemplazar el campo `date` visible con `effective_date` para que la tabla muestre la fecha corregida
 
-```tsx
-<TooltipProvider>
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <a href={...} target="_blank" rel="noopener noreferrer" ...>
-        <Instagram className="h-4 w-4" />
-      </a>
-    </TooltipTrigger>
-    <TooltipContent>Instagram</TooltipContent>
-  </Tooltip>
-</TooltipProvider>
-```
+### Archivo: `src/pages/sales-performance/types.ts`
 
-### Logica para links externos
+Agregar campo `effective_date: string` al tipo `EarningsRow` para almacenar la fecha corregida.
 
-```tsx
-// Construir array de links externos disponibles
-const externalLinks = [
-  c.onlyfans_url && { label: "OnlyFans", url: c.onlyfans_url },
-  c.piclink_url && { label: "Piclink", url: c.piclink_url },
-  c.linkedin_handle && { label: "LinkedIn", url: `https://linkedin.com/in/${c.linkedin_handle}` },
-  c.youtube_handle && { label: "YouTube", url: `https://youtube.com/@${c.youtube_handle}` },
-  c.chat_url && { label: "Chat", url: c.chat_url },
-].filter(Boolean);
+### Cambios en columnas y formato
 
-// Si hay 1 link: Globe con click directo
-// Si hay 2+: Globe con DropdownMenu listando opciones
-```
+La columna "Fecha" mostrara la fecha efectiva (corregida). La columna "Hora" seguira mostrando la hora real del registro original. No se eliminan columnas.
 
-### Comportamiento del icono Globe con multiples links
+### Impacto en filtros de fecha
 
-- Click en Globe abre un `DropdownMenu` con items que muestran el nombre de cada plataforma
-- Cada item abre el link en nueva pestana
-- Tooltip del Globe dice "Ver plataforma" (singular) o "Ver plataformas" (plural)
+Los filtros de fecha (`dateFrom`, `dateTo`) en `SalesPerformanceCreator.tsx` deben comparar contra `effective_date` en lugar de `date` para ser consistentes con la fecha mostrada.
 
-## Sin cambios
+### Ejemplo con Franundurraga (10 feb 2026)
 
-- No se modifican colores, tamanos ni posiciones de iconos existentes
-- No se crean componentes nuevos
-- No se modifican otros archivos
-- No se requieren migraciones
+Registros originales:
+- 10 feb 00:31 -> effective_date = 9 feb (pertenece al dia anterior)
+- 10 feb 01:00 -> effective_date = 10 feb (hora > 00:55, dia normal)
+- 10 feb 02:00 -> effective_date = 10 feb
+- 10 feb 08:00 -> effective_date = 10 feb
 
+Resultado despues de deduplicar:
+- 9 feb: registro de 10 feb 00:31 (unico registro del 9 feb en ese rango)
+- 10 feb: registro de 10 feb 08:00 (el mas reciente del dia)
+
+### Resumen de archivos modificados
+
+- `src/pages/sales-performance/types.ts` - agregar `effective_date`
+- `src/pages/sales-performance/useEarningsData.ts` - logica de fecha efectiva y deduplicacion
+- `src/pages/SalesPerformanceCreator.tsx` - filtros de fecha usan `effective_date`
+- `src/pages/sales-performance/EarningsTable.tsx` - columna Fecha muestra `effective_date`
