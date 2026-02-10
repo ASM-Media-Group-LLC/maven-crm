@@ -274,8 +274,8 @@ const NuevoCreadorForm = () => {
   };
 
   return (
-    <main className="flex-1 overflow-auto">
-      <div className="max-w-4xl mx-auto p-6 pb-24 space-y-6">
+    <main className="flex-1 overflow-auto p-6 min-w-0">
+      <div className="max-w-4xl mx-auto pb-24 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <button

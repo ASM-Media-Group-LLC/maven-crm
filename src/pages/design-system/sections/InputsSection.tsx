@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -114,6 +115,58 @@ export const InputsSection = () => (
       </div>
     </div>
 
+    {/* Tab Bars */}
+    <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Tab Bars & Filtros</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Patrón de navegación local y filtros inline. Las Tab Bars usan <code className="font-mono text-primary">variant="secondary"</code> (activo)
+        y <code className="font-mono text-primary">variant="ghost"</code> (inactivo).
+      </p>
+
+      <div className="space-y-4 max-w-2xl">
+        <div className="space-y-2">
+          <Label>Tab Bar inline</Label>
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            <Button variant="secondary" size="sm">Activo</Button>
+            <Button variant="ghost" size="sm">Inactivo</Button>
+            <Button variant="ghost" size="sm">Inactivo</Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Select Filter (placeholder descriptivo)</Label>
+          <div className="flex gap-3">
+            <Select>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                <SelectItem value="a">Categoría A</SelectItem>
+                <SelectItem value="b">Categoría B</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                <SelectItem value="activo">Activo</SelectItem>
+                <SelectItem value="inactivo">Inactivo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+          <p><strong className="text-foreground">Tab Bar:</strong> <code className="font-mono text-foreground">inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1</code></p>
+          <p><strong className="text-foreground">Select Filters:</strong> placeholder = nombre del campo, nunca "Todos". La opción "Todos" solo aparece dentro del dropdown.</p>
+          <p><strong className="text-foreground">Value:</strong> cuando no hay filtro activo, <code className="font-mono text-foreground">value={undefined}</code> para que el placeholder sea visible.</p>
+        </div>
+      </div>
+    </div>
+
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Reglas</h3>
       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -121,6 +174,8 @@ export const InputsSection = () => (
         <li>Estado de error: <code className="font-mono text-foreground">border-destructive + ring-destructive</code> + mensaje debajo</li>
         <li>Usar <code className="font-mono text-foreground">Checkbox</code> para múltiples opciones, <code className="font-mono text-foreground">Switch</code> para on/off</li>
         <li>Placeholder nunca sustituye al label</li>
+        <li>Select Filters: placeholder = nombre descriptivo del campo, no "Todos"</li>
+        <li>Tab Bars: <code className="font-mono text-foreground">secondary</code> para activo, <code className="font-mono text-foreground">ghost</code> para inactivo</li>
       </ul>
     </div>
   </section>
