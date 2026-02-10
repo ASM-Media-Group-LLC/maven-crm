@@ -1,13 +1,35 @@
+import { useMemo } from "react";
 import { Users, MessageCircle, DollarSign, RotateCcw } from "lucide-react";
+import type { EarningsRow } from "../sales-performance/types";
 
-const stats = [
-  { label: "Creadoras", value: "56", icon: Users, color: "text-success" },
-  { label: "Ganancias por mensajes", value: "$8,608.24", icon: MessageCircle, color: "text-accent" },
-  { label: "Ganancias totales", value: "$12,066.42", icon: DollarSign, color: "text-success" },
-  { label: "Reembolsos", value: "$0.00", icon: RotateCcw, color: "text-instagram-pink" },
-];
+interface Props {
+  rows: EarningsRow[];
+}
 
-const CreatorStatsCards = () => {
+const fmt = (v: number) =>
+  `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const CreatorStatsCards = ({ rows }: Props) => {
+  const stats = useMemo(() => {
+    const creatorSet = new Set<string>();
+    let messageEarnings = 0;
+    let totalEarnings = 0;
+
+    for (const r of rows) {
+      const key = r.creator_id || r.pending_creator || r.id;
+      creatorSet.add(key);
+      messageEarnings += r.message_gross ?? 0;
+      totalEarnings += r.total_earnings_gross ?? 0;
+    }
+
+    return [
+      { label: "Creadoras", value: String(creatorSet.size), icon: Users, color: "text-success" },
+      { label: "Ganancias por mensajes", value: fmt(messageEarnings), icon: MessageCircle, color: "text-accent" },
+      { label: "Ganancias totales", value: fmt(totalEarnings), icon: DollarSign, color: "text-success" },
+      { label: "Reembolsos", value: "$0.00", icon: RotateCcw, color: "text-instagram-pink" },
+    ];
+  }, [rows]);
+
   return (
     <div className="space-y-4">
       <div>
