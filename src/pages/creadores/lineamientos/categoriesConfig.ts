@@ -58,13 +58,13 @@ export const CATEGORIES: Category[] = [
   {
     category: "Gestión de Chats",
     items: [
-      { title: "Instrucciones para Chats", description: "Guía general de conversación", icon: MessageSquare },
-      { title: "Tipo de Usuarios", description: "Clasificación y trato por tipo", icon: Users },
-      { title: "Fans VIP / Whales", description: "Manejo de fans de alto valor", icon: Crown },
-      { title: "Tiempos de Respuesta", description: "SLA y tiempos esperados", icon: Clock },
-      { title: "Estrategia de Renewals", description: "Renovaciones y retención", icon: RefreshCw },
-      { title: "Mass Messages", description: "Estrategia de mensajes masivos", icon: Mail },
-      { title: "Idiomas", description: "Idiomas soportados y preferencias", icon: Languages },
+      { title: "Instrucciones para Chats", description: "Guía general de conversación", icon: MessageSquare, formType: "detail" },
+      { title: "Tipo de Usuarios", description: "Clasificación y trato por tipo", icon: Users, formType: "detail" },
+      { title: "Fans VIP / Whales", description: "Manejo de fans de alto valor", icon: Crown, formType: "detail" },
+      { title: "Tiempos de Respuesta", description: "SLA y tiempos esperados", icon: Clock, formType: "detail" },
+      { title: "Estrategia de Renewals", description: "Renovaciones y retención", icon: RefreshCw, formType: "detail" },
+      { title: "Mass Messages", description: "Estrategia de mensajes masivos", icon: Mail, formType: "detail" },
+      { title: "Idiomas", description: "Idiomas soportados y preferencias", icon: Languages, formType: "detail" },
     ],
   },
   {
