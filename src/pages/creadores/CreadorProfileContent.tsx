@@ -13,6 +13,7 @@ import InfoTabContent from "./InfoTabContent";
 import LineamientosTabContent from "./LineamientosTabContent";
 import RedesTabContent from "./RedesTabContent";
 import MonetizacionTabContent from "./MonetizacionTabContent";
+import DocumentosTabContent from "./DocumentosTabContent";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -183,7 +184,11 @@ const CreadorProfileContent = () => {
             <MonetizacionTabContent creatorId={id!} />
           </TabsContent>
 
-          {["documentos", "notas", "tickets", "historial"].map((tab) => (
+          <TabsContent value="documentos">
+            <DocumentosTabContent creatorId={id!} />
+          </TabsContent>
+
+          {["notas", "tickets", "historial"].map((tab) => (
             <TabsContent key={tab} value={tab}>
               <p className="text-sm text-muted-foreground text-center py-12">Sin datos disponibles</p>
             </TabsContent>
