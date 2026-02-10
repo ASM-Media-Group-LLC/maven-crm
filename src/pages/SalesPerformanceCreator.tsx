@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import * as XLSX from "xlsx";
-import Logo from "@/components/Logo";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import EarningsFilters from "./sales-performance/EarningsFilters";
 import EarningsTable from "./sales-performance/EarningsTable";
@@ -169,74 +170,71 @@ const SalesPerformanceCreator = () => {
   }, [filtered, visibleColumns]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/salesdashboard">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Logo size="sm" />
-          </div>
-          <div className="flex items-center gap-2">
-            <CustomMetrics visibleColumns={visibleColumns} onToggleColumn={handleToggleColumn} />
-            <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
-          </div>
-        </div>
-      </header>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
+        <DashboardSidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <DashboardTopbar />
+          <main className="flex-1 overflow-auto p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-3xl font-semibold tracking-tight">Sales Report</h2>
+              <div className="flex items-center gap-2">
+                <CustomMetrics visibleColumns={visibleColumns} onToggleColumn={handleToggleColumn} />
+                <Button variant="outline" size="sm" onClick={handleDownloadExcel} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+            </div>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        <EarningsFilters
-          documentFilter={documentFilter}
-          onDocumentFilterChange={handleDocumentFilter}
-          documentIds={documentIds}
-          relatedDocumentIds={relatedDocumentIds}
-          creatorFilter={creatorFilter}
-          onCreatorFilterChange={handleCreatorFilter}
-          creatorNames={creatorNames}
-          relatedCreatorNames={relatedCreatorNames}
-          totalCount={filtered.length}
-          searchQuery={searchQuery}
-          onSearchChange={handleSearchChange}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onDateFromChange={(d) => { setDateFrom(d); setCurrentPage(1); }}
-          onDateToChange={(d) => { setDateTo(d); setCurrentPage(1); }}
-          onToday={handleToday}
-          onYesterday={handleYesterday}
-          pageSize={pageSize}
-          onPageSizeChange={handlePageSizeChange}
-        />
-
-        <EarningsSummaryCards rows={filtered} />
-
-        {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground text-sm">Cargando datos…</div>
-        ) : (
-          <>
-            <EarningsTable
-              rows={paginatedRows}
-              sortField={sortField}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              visibleColumns={visibleColumns}
+            <EarningsFilters
+              documentFilter={documentFilter}
+              onDocumentFilterChange={handleDocumentFilter}
+              documentIds={documentIds}
+              relatedDocumentIds={relatedDocumentIds}
+              creatorFilter={creatorFilter}
+              onCreatorFilterChange={handleCreatorFilter}
+              creatorNames={creatorNames}
+              relatedCreatorNames={relatedCreatorNames}
+              totalCount={filtered.length}
+              searchQuery={searchQuery}
+              onSearchChange={handleSearchChange}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={(d) => { setDateFrom(d); setCurrentPage(1); }}
+              onDateToChange={(d) => { setDateTo(d); setCurrentPage(1); }}
+              onToday={handleToday}
+              onYesterday={handleYesterday}
+              pageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
             />
-            {pageSize !== "all" && (
-              <EarningsPagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+
+            <EarningsSummaryCards rows={filtered} />
+
+            {isLoading ? (
+              <div className="p-8 text-center text-muted-foreground text-sm">Cargando datos…</div>
+            ) : (
+              <>
+                <EarningsTable
+                  rows={paginatedRows}
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  visibleColumns={visibleColumns}
+                />
+                {pageSize !== "all" && (
+                  <EarningsPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                )}
+              </>
             )}
-          </>
-        )}
-      </main>
-    </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
   );
 };
 
