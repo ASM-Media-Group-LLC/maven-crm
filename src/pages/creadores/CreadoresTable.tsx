@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CreatorWithBusiness } from "./useCreadores";
 import { useUpdateCreador } from "./useCreadores";
+import { buildSocialUrl } from "@/lib/utils";
 import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 
@@ -216,7 +217,7 @@ const CreadoresTable = ({ creators }: Props) => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
-                          href={`https://instagram.com/${c.instagram_handle}`}
+                          href={buildSocialUrl("instagram", c.instagram_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-destructive hover:text-destructive/80"
@@ -231,7 +232,7 @@ const CreadoresTable = ({ creators }: Props) => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
-                          href={`https://tiktok.com/@${c.tiktok_handle}`}
+                          href={buildSocialUrl("tiktok", c.tiktok_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-foreground hover:text-muted-foreground text-xs font-bold"
@@ -246,7 +247,7 @@ const CreadoresTable = ({ creators }: Props) => {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
-                          href={`https://twitter.com/${c.twitter_handle}`}
+                          href={buildSocialUrl("twitter", c.twitter_handle)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-foreground hover:text-muted-foreground text-xs font-bold"
@@ -261,8 +262,8 @@ const CreadoresTable = ({ creators }: Props) => {
                     const externalLinks = [
                       c.onlyfans_url && { label: "OnlyFans", url: c.onlyfans_url },
                       c.piclink_url && { label: "Piclink", url: c.piclink_url },
-                      c.linkedin_handle && { label: "LinkedIn", url: `https://linkedin.com/in/${c.linkedin_handle}` },
-                      c.youtube_handle && { label: "YouTube", url: `https://youtube.com/@${c.youtube_handle}` },
+                      c.linkedin_handle && { label: "LinkedIn", url: buildSocialUrl("linkedin", c.linkedin_handle) },
+                      c.youtube_handle && { label: "YouTube", url: buildSocialUrl("youtube", c.youtube_handle) },
                       c.chat_url && { label: "Chat", url: c.chat_url },
                     ].filter(Boolean) as { label: string; url: string }[];
                     if (externalLinks.length === 0) return null;

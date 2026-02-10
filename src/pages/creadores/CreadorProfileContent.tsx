@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { buildSocialUrl, displayHandle } from "@/lib/utils";
 import { useCreadorById } from "./useCreadores";
 import InfoTabContent from "./InfoTabContent";
 import LineamientosTabContent from "./LineamientosTabContent";
@@ -120,9 +121,9 @@ const CreadorProfileContent = () => {
                 </a>
               )}
               {c.instagram_handle && (
-                <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer">
+                <a href={buildSocialUrl("instagram", c.instagram_handle)} target="_blank" rel="noopener noreferrer">
                   <Badge variant="secondary-soft" className="gap-1.5 cursor-pointer hover:bg-muted">
-                    <Instagram className="h-3 w-3" /> @{c.instagram_handle}
+                    <Instagram className="h-3 w-3" /> {displayHandle(c.instagram_handle)}
                   </Badge>
                 </a>
               )}

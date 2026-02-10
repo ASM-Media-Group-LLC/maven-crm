@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CreatorWithBusiness } from "./useCreadores";
+import { cleanHandle, buildSocialUrl, displayHandle } from "@/lib/utils";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -73,13 +74,14 @@ const PlatformIcon = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-const SocialLink = ({ icon, handle, url }: { icon: React.ReactNode; handle: string | null; url: string }) => {
+const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; handle: string | null; url: string; rawHandle?: string | null }) => {
   if (!handle) return null;
+  const display = rawHandle ? displayHandle(rawHandle) : handle;
   return (
     <div className="flex items-center justify-between py-3">
       <div className="flex items-center gap-3">
         <PlatformIcon>{icon}</PlatformIcon>
-        <span className="text-sm font-medium">@{handle}</span>
+        <span className="text-sm font-medium">{display}</span>
       </div>
       <a href={url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
         <ExternalLink className="h-4 w-4" />
@@ -164,10 +166,10 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
             </TabsContent>
 
             <TabsContent value="redes" className="pr-3 divide-y">
-              <SocialLink icon={<Instagram className="h-4 w-4" />} handle={c.instagram_handle} url={`https://instagram.com/${c.instagram_handle}`} />
-              <SocialLink icon={<span className="text-xs font-bold">TT</span>} handle={c.tiktok_handle} url={`https://tiktok.com/@${c.tiktok_handle}`} />
-              <SocialLink icon={<span className="text-xs font-bold">X</span>} handle={c.twitter_handle} url={`https://x.com/${c.twitter_handle}`} />
-              <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} url={`https://youtube.com/@${c.youtube_handle}`} />
+              <SocialLink icon={<Instagram className="h-4 w-4" />} handle={c.instagram_handle} rawHandle={c.instagram_handle} url={buildSocialUrl("instagram", c.instagram_handle)} />
+              <SocialLink icon={<span className="text-xs font-bold">TT</span>} handle={c.tiktok_handle} rawHandle={c.tiktok_handle} url={buildSocialUrl("tiktok", c.tiktok_handle)} />
+              <SocialLink icon={<span className="text-xs font-bold">X</span>} handle={c.twitter_handle} rawHandle={c.twitter_handle} url={buildSocialUrl("twitter", c.twitter_handle)} />
+              <SocialLink icon={<span className="text-xs font-bold">YT</span>} handle={c.youtube_handle} rawHandle={c.youtube_handle} url={buildSocialUrl("youtube", c.youtube_handle)} />
               <SocialLink icon={<span className="text-xs font-bold">OF</span>} handle={c.onlyfans_url ? "Ver perfil" : null} url={c.onlyfans_url ?? ""} />
               <SocialLink icon={<Phone className="h-4 w-4" />} handle={c.whatsapp_number} url={`https://wa.me/${c.whatsapp_number}`} />
             </TabsContent>
