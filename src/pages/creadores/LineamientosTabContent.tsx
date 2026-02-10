@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus } from "lucide-react";
+import { ClipboardList, Plus, Pencil, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +26,6 @@ import {
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 import { CATEGORIES } from "./lineamientos/categoriesConfig";
-import GuidelineItemRow from "./lineamientos/GuidelineItemRow";
 
 type Guideline = Tables<"creator_guidelines">;
 
@@ -48,12 +47,12 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const queryClient = useQueryClient();
   const queryKey = ["creator_guidelines", creatorId];
 
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [selectorOpen, setSelectorOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
-  const [prefilled, setPrefilled] = useState(false);
+  const [showList, setShowList] = useState(true);
 
   // --- Queries & Mutations ---
   const { data: guidelines = [], isLoading } = useQuery({
@@ -68,13 +67,6 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
       return data as Guideline[];
     },
   });
-
-  // Index guidelines by "category::title" for quick lookup
-  const guidelineMap = useMemo(() => {
-    const map = new Map<string, Guideline>();
-    guidelines.forEach((g) => map.set(`${g.guideline_type}::${g.title}`, g));
-    return map;
-  }, [guidelines]);
 
   const upsertMutation = useMutation({
     mutationFn: async (payload: FormData & { id?: string }) => {
@@ -117,25 +109,16 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   });
 
   // --- Handlers ---
-  const toggleExpand = (key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
   const openAddForItem = (category: string, title: string) => {
+    setSelectorOpen(false);
     setEditingId(null);
     setForm({ title, guideline_type: category, content: "" });
-    setPrefilled(true);
     setModalOpen(true);
   };
 
   const openEdit = (g: Guideline) => {
     setEditingId(g.id);
     setForm({ title: g.title, guideline_type: g.guideline_type, content: g.content });
-    setPrefilled(true);
     setModalOpen(true);
   };
 
@@ -143,7 +126,6 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     setModalOpen(false);
     setEditingId(null);
     setForm(emptyForm);
-    setPrefilled(false);
   };
 
   const handleSubmit = () => {
@@ -162,39 +144,123 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   }
 
   return (
-    <div className="space-y-6 mt-4">
-      {CATEGORIES.map((cat) => (
-        <div key={cat.category}>
-          {/* Category header */}
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              {cat.category}
-            </h3>
+    <div className="space-y-4 mt-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+            <ClipboardList className="h-5 w-5 text-muted-foreground" />
           </div>
-
-          {/* Items list */}
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-            {cat.items.map((item) => {
-              const key = `${cat.category}::${item.title}`;
-              const guideline = guidelineMap.get(key);
-              return (
-                <GuidelineItemRow
-                  key={key}
-                  item={item}
-                  guideline={guideline}
-                  expanded={expandedKeys.has(key)}
-                  onToggle={() => toggleExpand(key)}
-                  onAdd={() => openAddForItem(cat.category, item.title)}
-                  onEdit={openEdit}
-                  onDelete={(id) => setDeleteId(id)}
-                />
-              );
-            })}
+          <div>
+            <h3 className="text-sm font-semibold leading-tight">Lineamientos Operativos</h3>
+            <p className="text-xs text-muted-foreground">{guidelines.length} registrados</p>
           </div>
         </div>
-      ))}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={guidelines.length === 0}
+            onClick={() => setShowList((v) => !v)}
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Ver
+          </Button>
+          <Button size="sm" onClick={() => setSelectorOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Agregar
+          </Button>
+        </div>
+      </div>
 
-      {/* Add / Edit Modal */}
+      {/* Existing guidelines list */}
+      {showList && guidelines.length > 0 && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+          {guidelines.map((g) => (
+            <div key={g.id} className="flex items-start gap-3 px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {g.guideline_type}
+                  </span>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <span className="text-sm font-medium">{g.title}</span>
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-2">
+                  {g.content}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(g)}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive"
+                  onClick={() => setDeleteId(g.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {guidelines.length === 0 && (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          Sin lineamientos creados. Haz clic en <span className="font-medium">Agregar</span> para comenzar.
+        </div>
+      )}
+
+      {/* Category Selector Modal */}
+      <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Agregar Lineamiento</DialogTitle>
+            <DialogDescription>Selecciona una categoría e item para agregar contenido.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 mt-2">
+            {CATEGORIES.map((cat) => (
+              <div key={cat.category}>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  {cat.category}
+                </h4>
+                <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+                  {cat.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={item.title}
+                        className="flex items-center gap-3 px-3 py-2.5"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium leading-tight">{item.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => openAddForItem(cat.category, item.title)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add / Edit Content Modal */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && closeModal()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
