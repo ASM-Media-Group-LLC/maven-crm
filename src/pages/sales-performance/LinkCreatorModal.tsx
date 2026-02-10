@@ -58,9 +58,17 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
         .update({ creator_id: creatorId })
         .eq("pending_creator", pendingCreator);
       if (error) throw error;
+
+      // Update the creator's onlyfans_url with the pending_creator name
+      const { error: urlError } = await supabase
+        .from("creators")
+        .update({ onlyfans_url: `https://onlyfans.com/${pendingCreator}` })
+        .eq("id", creatorId);
+      if (urlError) throw urlError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["of_gross_earnings_performance"] });
+      queryClient.invalidateQueries({ queryKey: ["creators_for_linking"] });
       toast.success(`"${pendingCreator}" vinculado exitosamente`);
       onOpenChange(false);
     },
@@ -72,7 +80,11 @@ const LinkCreatorModal = ({ open, onOpenChange, pendingCreator, earningsRowId }:
       // Create new creator
       const { data: newCreator, error: createError } = await supabase
         .from("creators")
-        .insert({ name: newName.trim(), artistic_name: newArtisticName.trim() || pendingCreator })
+        .insert({
+          name: newName.trim(),
+          artistic_name: newArtisticName.trim() || pendingCreator,
+          onlyfans_url: `https://onlyfans.com/${pendingCreator}`,
+        })
         .select("id")
         .single();
       if (createError) throw createError;
