@@ -275,7 +275,7 @@ const NuevoCreadorForm = () => {
 
   return (
     <main className="flex-1 overflow-auto p-6 min-w-0">
-      <div className="max-w-4xl mx-auto pb-24 space-y-6">
+      <div className="max-w-6xl mx-auto pb-24 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <button
@@ -574,7 +574,7 @@ const NuevoCreadorForm = () => {
 
       {/* Footer fijo */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/95 backdrop-blur-sm px-6 py-3">
-        <div className="max-w-4xl mx-auto flex justify-end gap-3">
+        <div className="max-w-6xl mx-auto flex justify-end gap-3">
           <Button variant="outline" onClick={() => navigate("/creadores")}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={mutation.isPending}>
             <Save className="mr-2 h-4 w-4" /> {mutation.isPending ? "Guardando…" : "Guardar"}
