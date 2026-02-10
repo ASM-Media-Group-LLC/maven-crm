@@ -1,8 +1,15 @@
 import { useState } from "react";
-import { Instagram, Building2, RefreshCw } from "lucide-react";
+import { Instagram, Building2, RefreshCw, Globe } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import ViewCreadorModal from "./ViewCreadorModal";
 import type { CreatorWithBusiness } from "./useCreadores";
 
@@ -125,41 +132,112 @@ const CreadoresGrid = ({ creators }: Props) => {
                 </div>
 
                 {/* Footer: Social icons */}
+                <TooltipProvider>
                 <div className="border-t pt-3 flex gap-3">
                   {c.instagram_handle && (
-                    <a
-                      href={`https://instagram.com/${c.instagram_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Instagram className="h-4 w-4" />
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://instagram.com/${c.instagram_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Instagram className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Instagram</TooltipContent>
+                    </Tooltip>
                   )}
                   {c.tiktok_handle && (
-                    <a
-                      href={`https://tiktok.com/@${c.tiktok_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground text-xs font-bold"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      TT
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://tiktok.com/@${c.tiktok_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          TT
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>TikTok</TooltipContent>
+                    </Tooltip>
                   )}
                   {c.twitter_handle && (
-                    <a
-                      href={`https://twitter.com/${c.twitter_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground text-xs font-bold"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      𝕏
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://twitter.com/${c.twitter_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground text-xs font-bold"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          𝕏
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>X</TooltipContent>
+                    </Tooltip>
                   )}
+                  {(() => {
+                    const externalLinks = [
+                      c.onlyfans_url && { label: "OnlyFans", url: c.onlyfans_url },
+                      c.piclink_url && { label: "Piclink", url: c.piclink_url },
+                      c.linkedin_handle && { label: "LinkedIn", url: `https://linkedin.com/in/${c.linkedin_handle}` },
+                      c.youtube_handle && { label: "YouTube", url: `https://youtube.com/@${c.youtube_handle}` },
+                      c.chat_url && { label: "Chat", url: c.chat_url },
+                    ].filter(Boolean) as { label: string; url: string }[];
+                    if (externalLinks.length === 0) return null;
+                    if (externalLinks.length === 1) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={externalLinks[0].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent>{externalLinks[0].label}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                    return (
+                      <DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                className="text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Globe className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver plataformas</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                          {externalLinks.map((link) => (
+                            <DropdownMenuItem key={link.label} asChild>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                                {link.label}
+                              </a>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  })()}
                 </div>
+                </TooltipProvider>
               </CardContent>
             </Card>
           );

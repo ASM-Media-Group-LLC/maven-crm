@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye, ChevronDown } from "lucide-react";
+import { ArrowUpDown, Instagram, Building2, RefreshCw, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   Table,
@@ -209,38 +210,105 @@ const CreadoresTable = ({ creators }: Props) => {
                 ) : "—"}
               </TableCell>
               <TableCell>
+                <TooltipProvider>
                 <div className="flex gap-2">
                   {c.instagram_handle && (
-                    <a
-                      href={`https://instagram.com/${c.instagram_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-destructive hover:text-destructive/80"
-                    >
-                      <Instagram className="h-4 w-4" />
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://instagram.com/${c.instagram_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Instagram className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Instagram</TooltipContent>
+                    </Tooltip>
                   )}
                   {c.tiktok_handle && (
-                    <a
-                      href={`https://tiktok.com/@${c.tiktok_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-foreground hover:text-muted-foreground text-xs font-bold"
-                    >
-                      TT
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://tiktok.com/@${c.tiktok_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                        >
+                          TT
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>TikTok</TooltipContent>
+                    </Tooltip>
                   )}
                   {c.twitter_handle && (
-                    <a
-                      href={`https://twitter.com/${c.twitter_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-foreground hover:text-muted-foreground text-xs font-bold"
-                    >
-                      𝕏
-                    </a>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`https://twitter.com/${c.twitter_handle}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground hover:text-muted-foreground text-xs font-bold"
+                        >
+                          𝕏
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>X</TooltipContent>
+                    </Tooltip>
                   )}
+                  {(() => {
+                    const externalLinks = [
+                      c.onlyfans_url && { label: "OnlyFans", url: c.onlyfans_url },
+                      c.piclink_url && { label: "Piclink", url: c.piclink_url },
+                      c.linkedin_handle && { label: "LinkedIn", url: `https://linkedin.com/in/${c.linkedin_handle}` },
+                      c.youtube_handle && { label: "YouTube", url: `https://youtube.com/@${c.youtube_handle}` },
+                      c.chat_url && { label: "Chat", url: c.chat_url },
+                    ].filter(Boolean) as { label: string; url: string }[];
+                    if (externalLinks.length === 0) return null;
+                    if (externalLinks.length === 1) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={externalLinks[0].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent>{externalLinks[0].label}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                    return (
+                      <DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer">
+                                <Globe className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver plataformas</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="start">
+                          {externalLinks.map((link) => (
+                            <DropdownMenuItem key={link.label} asChild>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                {link.label}
+                              </a>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  })()}
                 </div>
+                </TooltipProvider>
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
