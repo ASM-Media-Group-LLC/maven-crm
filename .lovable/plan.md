@@ -1,41 +1,77 @@
 
 
-# Ajustar tab Redes al sistema de diseno
+# Redisenar modo edicion del tab Redes segun imagen de referencia
 
-## Problemas detectados
+## Objetivo
 
-1. **Divs manuales en lugar de Card**: El sistema de diseno indica "Usar siempre el componente Card, no crear divs con estilos manuales". Actualmente se usan `<div className="rounded-lg border border-border bg-card p-4 ...">` en lugar del componente `Card`.
-2. **Hover incorrecto**: Se usa `hover:bg-primary hover:border-primary` (color solido). El sistema de diseno define el patron de hover como: `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40` con `transition-all duration-200`.
-3. **Transicion incorrecta**: Se usa `transition-colors` en lugar de `transition-all`.
+Transformar el modo de edicion del tab Redes de inputs inline dentro de cards a un **formulario vertical con labels y campos full-width**, como se ve en la imagen de referencia. Adicionalmente, agregar los campos faltantes que existen en la base de datos: **LinkedIn URL** y **Chat URL**.
 
-## Cambios
+## Cambios en la visual de edicion
 
-**Archivo unico:** `src/pages/creadores/RedesTabContent.tsx`
+Actualmente, al hacer clic en "Editar", cada card muestra un input inline debajo del nombre de la plataforma. La imagen de referencia muestra un diseno diferente:
 
-### 1. Reemplazar divs manuales por componente Card
+- En modo edicion, las cards desaparecen y se reemplazan por un **formulario vertical simple**
+- Cada campo tiene un **Label** encima (ej: "Instagram URL", "Twitter/X URL") y un **Input full-width** debajo con placeholder descriptivo (ej: "https://instagram.com/username")
+- Los campos se apilan verticalmente con spacing uniforme
 
-Cada card de plataforma pasara a usar el componente `Card` de shadcn importado desde `@/components/ui/card`. Se aplicara el hover con gradiente primary del sistema de diseno en lugar del color solido actual.
+## Campos a mostrar (orden segun referencia)
 
-### 2. Aplicar hover del sistema de diseno
+| Campo | Label | Placeholder | DB column |
+|---|---|---|---|
+| Instagram | Instagram URL | https://instagram.com/username | instagram_handle |
+| WhatsApp | WhatsApp | +1234567890 o https://wa.me/... | whatsapp_number |
+| Twitter/X | Twitter/X URL | https://x.com/username | twitter_handle |
+| YouTube | YouTube URL | https://youtube.com/@channel | youtube_handle |
+| TikTok | TikTok URL | https://tiktok.com/@username | tiktok_handle |
+| LinkedIn | LinkedIn URL | https://linkedin.com/in/... | linkedin_handle |
+| OnlyFans | OnlyFans URL | https://onlyfans.com/... | onlyfans_url |
+| Chat URL | Chat URL | https://... | chat_url |
 
-Reemplazar:
+## Cambios tecnicos
+
+### Archivo: `src/pages/creadores/RedesTabContent.tsx`
+
+1. **Agregar campos a EditData y PlatformConfig**: incluir `linkedin_handle` y `chat_url`
+2. **Agregar plataformas LinkedIn y Chat URL** al array `platforms` con sus iconos, labels y placeholders
+3. **Modificar la seccion de renderizado**: cuando `isEditing` es `true`, en lugar de mostrar las cards con inputs inline, renderizar un formulario vertical con `Label` + `Input` por cada campo, usando `space-y-4` para el spacing
+4. **Cuando `isEditing` es `false`**: mantener las cards actuales con hover e icono ExternalLink sin cambios
+5. **Actualizar `handleSave`**: incluir `linkedin_handle` y `chat_url` en el update a Supabase
+6. **Actualizar `startEditing`**: inicializar `linkedin_handle` y `chat_url` desde el creator
+7. **Actualizar placeholders**: cambiar a URLs completas como referencia (ej: "https://instagram.com/username")
+8. **Importar Label**: agregar import de `@/components/ui/label`
+
+### Estructura del modo edicion
+
+```text
+Redes Sociales                    [Cancelar] [Guardar]
+Enlaces a perfiles en redes sociales
+
+Instagram URL
+[_________________________ https://instagram.com/username]
+
+WhatsApp
+[_________________________ +1234567890 o https://wa.me/...]
+
+Twitter/X URL
+[_________________________ https://x.com/username]
+
+YouTube URL
+[_________________________ https://youtube.com/@channel]
+
+TikTok URL
+[_________________________ https://tiktok.com/@username]
+
+LinkedIn URL
+[_________________________ https://linkedin.com/in/...]
+
+OnlyFans URL
+[_________________________ https://onlyfans.com/...]
+
+Chat URL
+[_________________________ https://...]
 ```
-hover:bg-primary hover:border-primary transition-colors duration-200
-```
 
-Por el patron documentado en CardsSection:
-```
-cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40
-```
+### Modo lectura (sin cambios)
 
-### 3. Eliminar clases de hover en textos e iconos hijos
+Las cards con iconos circulares, hover con gradiente y ExternalLink se mantienen identicas. Se agregan cards para LinkedIn y Chat URL.
 
-Ya no es necesario cambiar texto a `primary-foreground` en hover (el fondo ahora es un gradiente sutil, no un color solido). Se eliminan todas las clases `group-hover:text-primary-foreground` y `group-hover:bg-primary-foreground/20`.
-
-### 4. Agregar import de Card
-
-Agregar `import { Card } from "@/components/ui/card"` y eliminar las clases manuales de borde/fondo/sombra que el componente Card ya provee.
-
-## Resultado visual
-
-Las cards tendran un efecto hover sutil con escala 1.03 y gradiente primary semitransparente, consistente con las KPI/Metric Cards del design system, en lugar del cambio de color solido actual.
