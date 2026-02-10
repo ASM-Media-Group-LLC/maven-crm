@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ClipboardList, Plus, Eye } from "lucide-react";
+import { ClipboardList, Eye, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -175,22 +175,22 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             <p className="text-xs text-muted-foreground">{guidelines.length} registrados</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           <Button
-            variant="outline"
+            variant={showList && !showCategories ? "secondary" : "ghost"}
             size="sm"
             disabled={guidelines.length === 0}
-            onClick={() => setShowList((v) => !v)}
+            onClick={() => { setShowList((v) => !v); setShowCategories(false); }}
           >
             <Eye className="h-4 w-4 mr-1" />
             Ver
           </Button>
           <Button
-            variant={showCategories ? "outline" : "default"}
+            variant={showCategories ? "secondary" : "ghost"}
             size="sm"
-            onClick={() => setShowCategories((v) => !v)}
+            onClick={() => { setShowCategories((v) => !v); setShowList(false); }}
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <ClipboardList className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         </div>
