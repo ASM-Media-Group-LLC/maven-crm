@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, Building2, RefreshCw, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -316,9 +316,6 @@ const CreadoresTable = ({ creators }: Props) => {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
