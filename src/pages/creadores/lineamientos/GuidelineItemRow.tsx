@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronDown, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ interface Props {
   isSaving?: boolean;
 }
 
+const PREDEFINED_LANGUAGES = ["Español", "English", "Português", "Français", "Deutsch", "Italiano"];
+
 const GuidelineItemRow = ({
   item,
   guideline,
@@ -62,6 +65,9 @@ const GuidelineItemRow = ({
 }: Props) => {
   const Icon = item.icon;
   const isExpanded = expanded || inlineAdding;
+  const [selectedLang, setSelectedLang] = useState<string | null>(null);
+  const [showCustomLang, setShowCustomLang] = useState(false);
+  const [customLang, setCustomLang] = useState("");
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -100,14 +106,62 @@ const GuidelineItemRow = ({
         <div className="px-4 pb-4 pl-16">
           {inlineAdding ? (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Título / Concepto</Label>
-                <Input
-                  value={inlineTitle}
-                  onChange={(e) => onInlineTitleChange?.(e.target.value)}
-                  placeholder="Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
-                />
-              </div>
+              {formType === "language" && (
+                <div className="space-y-2">
+                  <Label>Idioma</Label>
+                  <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                    {PREDEFINED_LANGUAGES.map((lang) => (
+                      <Button
+                        key={lang}
+                        type="button"
+                        variant={selectedLang === lang ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setSelectedLang(lang);
+                          setShowCustomLang(false);
+                          onInlineTitleChange?.(lang);
+                        }}
+                      >
+                        {lang}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant={showCustomLang ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setShowCustomLang(true);
+                        setSelectedLang(null);
+                      }}
+                    >
+                      + Otro
+                    </Button>
+                  </div>
+                  {showCustomLang && (
+                    <Input
+                      value={customLang}
+                      onChange={(e) => {
+                        setCustomLang(e.target.value);
+                        onInlineTitleChange?.(e.target.value);
+                      }}
+                      placeholder="Escribe el idioma..."
+                      className="max-w-xs"
+                    />
+                  )}
+                </div>
+              )}
+              {formType !== "language" && (
+                <div className="space-y-1.5">
+                  <Label>Título / Concepto</Label>
+                  <Input
+                    value={inlineTitle}
+                    onChange={(e) => onInlineTitleChange?.(e.target.value)}
+                    placeholder="Ej: Foto personalizada, Videollamada 15min, Pack semanal..."
+                  />
+                </div>
+              )}
               {formType === "pricing" ? (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -141,11 +195,11 @@ const GuidelineItemRow = ({
                 </>
               ) : (
                 <div className="space-y-1.5">
-                  <Label>Descripción / Detalle</Label>
+                  <Label>{formType === "language" ? "Instrucciones del idioma" : "Descripción / Detalle"}</Label>
                   <Textarea
                     value={inlineContent}
                     onChange={(e) => onInlineContentChange?.(e.target.value)}
-                    placeholder="Describe el detalle de este lineamiento..."
+                    placeholder={formType === "language" ? "Ej: Saludo cálido, usar emojis, tono amigable..." : "Describe el detalle de este lineamiento..."}
                     rows={4}
                   />
                 </div>
