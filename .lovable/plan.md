@@ -1,34 +1,27 @@
 
-# Ajustar diseno de filtros de agencia
+
+# Mover icono RefreshCw a la esquina superior derecha de la tarjeta
 
 ## Cambio
 
-Envolver los botones de agencia en un contenedor con borde redondeado y fondo sutil, y cambiar los botones inactivos de `outline` a `ghost` para que no tengan borde individual visible. El resultado sera una barra de tabs contenida, como en la imagen de referencia.
+Mover el icono `RefreshCw` de su posicion actual (dentro de la fila de badges, con `ml-auto`) a la esquina superior derecha de la tarjeta, fuera del flujo del contenido.
 
 ## Detalle tecnico
 
-### Archivo: `src/pages/creadores/CreadoresContent.tsx`
+### Archivo: `src/pages/creadores/CreadoresGrid.tsx`
 
-Linea 58: Cambiar el `div` contenedor de:
+1. Agregar `relative` al contenedor `CardContent` (linea 82) para permitir posicionamiento absoluto del icono.
 
-```tsx
-<div className="flex flex-wrap gap-2">
-```
+2. Remover el `<RefreshCw>` de la linea 105 (dentro del div de badges).
 
-A:
+3. Agregar el icono como elemento posicionado absolutamente en la esquina superior derecha del `CardContent`:
 
 ```tsx
-<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+<CardContent className="p-4 space-y-3 relative">
+  <RefreshCw className="absolute top-4 right-4 h-3 w-3 text-muted-foreground" />
+  {/* resto del contenido sin cambios */}
+</CardContent>
 ```
 
-Lineas 60 y 69: Cambiar la variante de los botones inactivos de `"outline"` a `"ghost"` para eliminar bordes individuales. El boton activo mantiene `"secondary"`.
+4. Sin cambios en otros archivos ni en la logica del componente.
 
-- `variant={filters.agency === "" ? "secondary" : "ghost"}` (linea 60)
-- `variant={filters.agency === agency ? "secondary" : "ghost"}` (linea 69)
-
-## Resultado visual
-
-- Contenedor con borde redondeado y fondo sutil (`muted/50`)
-- Boton activo resaltado con fondo `secondary`
-- Botones inactivos sin borde, solo texto con hover
-- Spacing compacto con `gap-1` y `p-1`
