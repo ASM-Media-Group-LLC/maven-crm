@@ -55,9 +55,9 @@ const CreadoresContent = () => {
         <>
           <CreadoresKPICards counts={statusCounts} />
 
-          <div className="flex flex-wrap gap-2">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
             <Button
-              variant={filters.agency === "" ? "secondary" : "outline"}
+              variant={filters.agency === "" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => updateFilters({ agency: "" })}
             >
@@ -66,7 +66,7 @@ const CreadoresContent = () => {
             {agencies.map((agency) => (
               <Button
                 key={agency}
-                variant={filters.agency === agency ? "secondary" : "outline"}
+                variant={filters.agency === agency ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => updateFilters({ agency })}
               >
