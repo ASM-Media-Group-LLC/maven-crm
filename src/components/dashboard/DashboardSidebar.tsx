@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Users,
   Settings,
+  TrendingUp,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
@@ -23,6 +24,7 @@ import {
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Creadores", url: "/creadores", icon: Users },
+  { title: "Sales Dashboard", url: "/salesdashboard", icon: TrendingUp },
 ];
 
 const secondaryMenu = [
