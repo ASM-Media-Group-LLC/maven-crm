@@ -41,6 +41,8 @@ export default function DocumentosTabContent({ creatorId }: Props) {
   });
 
   const handleFilesUploaded = async (files: UploadedFile[]) => {
+    let successCount = 0;
+    let errorCount = 0;
     for (const f of files) {
       const { error } = await supabase.from("creator_documents").insert({
         creator_id: creatorId,
@@ -49,8 +51,17 @@ export default function DocumentosTabContent({ creatorId }: Props) {
         file_url: f.url,
       });
       if (error) {
+        errorCount++;
         toast({ title: "Error al registrar documento", description: error.message, variant: "destructive" });
+      } else {
+        successCount++;
       }
+    }
+    if (successCount > 0) {
+      toast({
+        title: "Documento(s) registrado(s)",
+        description: `${successCount} archivo(s) registrado(s) correctamente.`,
+      });
     }
     qc.invalidateQueries({ queryKey: ["creator_documents", creatorId] });
   };
