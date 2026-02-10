@@ -268,7 +268,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
                   </div>
                 </div>
               )}
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="space-y-3">
                 {cat.items.map((item) => {
                   const key = `${cat.category}|${item.title}`;
                   const guideline = guidelineLookup.get(key);

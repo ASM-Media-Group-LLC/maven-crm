@@ -28,7 +28,7 @@ const GuidelineItemRow = ({
   const Icon = item.icon;
 
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div className="rounded-lg border border-border bg-card">
       {/* Row header */}
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
@@ -65,11 +65,12 @@ const GuidelineItemRow = ({
           {guideline ? (
             <p className="text-sm whitespace-pre-wrap text-foreground">{guideline.content}</p>
           ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-muted-foreground">Sin contenido</p>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onAdd}>
-                Agregar
-              </Button>
+            <div
+              className="rounded-lg border-2 border-dashed border-border py-3 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={onAdd}
+            >
+              <Plus className="h-4 w-4 mr-2 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Agregar a {item.title}</span>
             </div>
           )}
         </div>
