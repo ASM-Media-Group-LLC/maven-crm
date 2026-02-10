@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ClipboardList, Eye, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -54,6 +55,7 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [customCategory, setCustomCategory] = useState<string | null>(null);
   const [showList, setShowList] = useState(true);
 
   // --- Queries & Mutations ---
@@ -132,13 +134,25 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
     setModalOpen(true);
   };
 
+  const openCustomForCategory = (category: string) => {
+    setEditingId(null);
+    setForm({ title: "", guideline_type: category, content: "" });
+    setCustomCategory(category);
+    setModalOpen(true);
+  };
+
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
+    setCustomCategory(null);
     setForm(emptyForm);
   };
 
   const handleSubmit = () => {
+    if (customCategory && !form.title.trim()) {
+      toast.error("Escribe el título del lineamiento");
+      return;
+    }
     if (!form.content.trim()) {
       toast.error("Escribe el contenido del lineamiento");
       return;
@@ -201,9 +215,20 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
         <div className="space-y-5">
           {CATEGORIES.map((cat) => (
             <div key={cat.category}>
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                {cat.category}
-              </h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {cat.category}
+                </h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground h-auto py-1 px-2"
+                  onClick={() => openCustomForCategory(cat.category)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Nueva categoría
+                </Button>
+              </div>
               <div className="rounded-lg border border-border bg-card overflow-hidden">
                 {cat.items.map((item) => {
                   const key = `${cat.category}|${item.title}`;
@@ -296,6 +321,16 @@ const LineamientosTabContent = ({ creatorId }: Props) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {customCategory && (
+              <div className="space-y-1.5">
+                <Label>Título</Label>
+                <Input
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Nombre del lineamiento..."
+                />
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Contenido</Label>
               <Textarea
