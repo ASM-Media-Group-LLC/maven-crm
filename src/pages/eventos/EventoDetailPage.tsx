@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel, statusVariant } from "./useEventos";
 import { useEventDetail } from "./useEventoDetail";
-import EditEventoModal from "./EditEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import GuestsTab from "./detail/GuestsTab";
 import ChecklistTab from "./detail/ChecklistTab";
@@ -29,7 +28,6 @@ const EventoDetailPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: event, isLoading } = useEventDetail(id!);
-  const [editOpen, setEditOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
 
   if (isLoading) {
@@ -96,7 +94,7 @@ const EventoDetailPage = () => {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/eventos/${id}/editar`)}>
               <Pencil className="h-4 w-4 mr-1" />Editar
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCloseOpen(true)}>
@@ -141,7 +139,6 @@ const EventoDetailPage = () => {
       </div>
 
       {/* Modals */}
-      <EditEventoModal open={editOpen} onOpenChange={setEditOpen} event={event as any} />
       <CloseEventoModal open={closeOpen} onOpenChange={setCloseOpen} event={event as any} />
     </main>
   );

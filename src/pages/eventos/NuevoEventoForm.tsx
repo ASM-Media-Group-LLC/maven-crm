@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useAddEvento, useEventLocations, useAddEventGuests } from "./useEventos";
+import { useAddEvento, useUpdateEvento, useEventLocations, useAddEventGuests, type EventRow } from "./useEventos";
 import AddGuestsModal, { type LocalGuest } from "./AddGuestsModal";
 import { cn } from "@/lib/utils";
 
@@ -42,31 +42,39 @@ function computeDuration(startH: string, startM: string, endH: string, endM: str
   return `${h}h ${m > 0 ? `${m}m` : ""}`.trim();
 }
 
-const NuevoEventoForm = () => {
+interface NuevoEventoFormProps {
+  event?: EventRow;
+  existingGuests?: LocalGuest[];
+}
+
+const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const addEvento = useAddEvento();
+  const updateEvento = useUpdateEvento();
   const addGuests = useAddEventGuests();
   const { data: locations = [] } = useEventLocations();
 
-  const [name, setName] = useState("");
-  const [eventType, setEventType] = useState("");
-  const [description, setDescription] = useState("");
-  const [multiDay, setMultiDay] = useState(false);
-  const [date, setDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [startH, setStartH] = useState("");
-  const [startM, setStartM] = useState("00");
-  const [endH, setEndH] = useState("");
-  const [endM, setEndM] = useState("00");
-  const [location, setLocation] = useState("");
+  const isEditMode = !!event;
+
+  const [name, setName] = useState(event?.name ?? "");
+  const [eventType, setEventType] = useState(event?.event_type ?? "");
+  const [description, setDescription] = useState(event?.description ?? "");
+  const [multiDay, setMultiDay] = useState(!!event?.end_date);
+  const [date, setDate] = useState(event?.date ?? "");
+  const [endDate, setEndDate] = useState(event?.end_date ?? "");
+  const [startH, setStartH] = useState(event?.start_time?.slice(0, 2) ?? "");
+  const [startM, setStartM] = useState(event?.start_time?.slice(3, 5) ?? "00");
+  const [endH, setEndH] = useState(event?.end_time?.slice(0, 2) ?? "");
+  const [endM, setEndM] = useState(event?.end_time?.slice(3, 5) ?? "00");
+  const [location, setLocation] = useState(event?.location ?? "");
   const [locationOpen, setLocationOpen] = useState(false);
-  const [locationSearch, setLocationSearch] = useState("");
-  const [maxCapacity, setMaxCapacity] = useState("");
-  const [notes, setNotes] = useState("");
+  const [locationSearch, setLocationSearch] = useState(event?.location ?? "");
+  const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity?.toString() ?? "");
+  const [notes, setNotes] = useState(event?.notes ?? "");
 
   // Guests
-  const [guests, setGuests] = useState<LocalGuest[]>([]);
+  const [guests, setGuests] = useState<LocalGuest[]>(existingGuests ?? []);
   const [guestsModalOpen, setGuestsModalOpen] = useState(false);
 
   const duration = computeDuration(startH, startM, endH, endM);
@@ -86,35 +94,57 @@ const NuevoEventoForm = () => {
       return;
     }
 
+    const formData = {
+      name: name.trim(),
+      event_type: eventType,
+      description: description || null,
+      date,
+      end_date: multiDay && endDate ? endDate : null,
+      start_time: startH ? `${startH}:${startM}:00` : null,
+      end_time: endH ? `${endH}:${endM}:00` : null,
+      location: location || null,
+      max_capacity: maxCapacity ? parseInt(maxCapacity) : null,
+      notes: notes || null,
+    };
+
     try {
-      const inserted = await addEvento.mutateAsync({
-        name: name.trim(),
-        event_type: eventType,
-        description: description || undefined,
-        date,
-        end_date: multiDay && endDate ? endDate : undefined,
-        start_time: startH ? `${startH}:${startM}:00` : undefined,
-        end_time: endH ? `${endH}:${endM}:00` : undefined,
-        location: location || undefined,
-        max_capacity: maxCapacity ? parseInt(maxCapacity) : undefined,
-        notes: notes || undefined,
-      });
+      if (isEditMode) {
+        await updateEvento.mutateAsync({ id: event.id, data: formData });
 
-      if (guests.length > 0 && inserted?.id) {
-        await addGuests.mutateAsync(
-          guests.map((g) => ({
-            event_id: inserted.id,
-            guest_type: g.type,
-            creator_id: g.creator_id ?? null,
-            guest_name: g.guest_name,
-          }))
-        );
+        // Add only new guests (those without an existing id)
+        const newGuests = guests.filter((g) => !(g as any)._existing);
+        if (newGuests.length > 0) {
+          await addGuests.mutateAsync(
+            newGuests.map((g) => ({
+              event_id: event.id,
+              guest_type: g.type,
+              creator_id: g.creator_id ?? null,
+              guest_name: g.guest_name,
+            }))
+          );
+        }
+
+        toast({ title: "Evento actualizado exitosamente" });
+        navigate(`/eventos/${event.id}`);
+      } else {
+        const inserted = await addEvento.mutateAsync(formData as any);
+
+        if (guests.length > 0 && inserted?.id) {
+          await addGuests.mutateAsync(
+            guests.map((g) => ({
+              event_id: inserted.id,
+              guest_type: g.type,
+              creator_id: g.creator_id ?? null,
+              guest_name: g.guest_name,
+            }))
+          );
+        }
+
+        toast({ title: "Evento creado exitosamente" });
+        navigate("/eventos");
       }
-
-      toast({ title: "Evento creado exitosamente" });
-      navigate("/eventos");
     } catch (err: any) {
-      toast({ title: "Error al crear evento", description: err.message, variant: "destructive" });
+      toast({ title: isEditMode ? "Error al actualizar evento" : "Error al crear evento", description: err.message, variant: "destructive" });
     }
   };
 
@@ -131,9 +161,9 @@ const NuevoEventoForm = () => {
           <ArrowLeft className="h-4 w-4" /> Volver a Eventos
         </button>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <CalendarDays className="h-6 w-6" /> Crear Evento
+          <CalendarDays className="h-6 w-6" /> {isEditMode ? "Editar Evento" : "Crear Evento"}
         </h1>
-        <p className="text-sm text-muted-foreground">Configura los detalles del evento y agrega invitados</p>
+        <p className="text-sm text-muted-foreground">{isEditMode ? "Modifica los detalles del evento" : "Configura los detalles del evento y agrega invitados"}</p>
       </header>
 
       {/* Scrollable Content */}
@@ -375,13 +405,13 @@ const NuevoEventoForm = () => {
           variant="outline"
           onClick={() => {
             toast({ title: "Edición cancelada" });
-            navigate("/eventos");
+            navigate(isEditMode ? `/eventos/${event.id}` : "/eventos");
           }}
         >
           Cancelar
         </Button>
-        <Button onClick={handleSubmit} disabled={addEvento.isPending}>
-          {addEvento.isPending ? "Guardando…" : "Crear Evento"}
+        <Button onClick={handleSubmit} disabled={addEvento.isPending || updateEvento.isPending}>
+          {(addEvento.isPending || updateEvento.isPending) ? "Guardando…" : isEditMode ? "Guardar cambios" : "Crear Evento"}
         </Button>
       </footer>
 
