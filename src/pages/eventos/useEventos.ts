@@ -18,6 +18,7 @@ export interface EventRow {
   created_at: string;
   updated_at: string;
   guest_count: number;
+  external_token: string | null;
 }
 
 export interface EventoFilters {
