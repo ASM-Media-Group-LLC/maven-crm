@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, setYear } from "date-fns";
 import { ArrowLeft, Phone, Cake } from "lucide-react";
@@ -17,6 +18,7 @@ import NotasTabContent from "./NotasTabContent";
 import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
+import ChangeStatusModal from "./ChangeStatusModal";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -70,6 +72,7 @@ const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -144,7 +147,11 @@ const CreadorProfileContent = () => {
 
           <div className="flex flex-col items-end gap-2 shrink-0">
             {c.status && (
-              <Badge variant={statusVariant[c.status] ?? "secondary-soft"}>
+              <Badge
+                variant={statusVariant[c.status] ?? "secondary-soft"}
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setStatusModalOpen(true)}
+              >
                 {statusLabel[c.status] ?? c.status}
               </Badge>
             )}
@@ -204,6 +211,15 @@ const CreadorProfileContent = () => {
           </TabsContent>
         </Tabs>
       </div>
+      {c.status && (
+        <ChangeStatusModal
+          creatorId={id!}
+          creatorName={c.name}
+          currentStatus={c.status}
+          open={statusModalOpen}
+          onOpenChange={setStatusModalOpen}
+        />
+      )}
     </main>
   );
 };
