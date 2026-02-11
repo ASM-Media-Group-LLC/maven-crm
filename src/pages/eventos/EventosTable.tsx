@@ -4,7 +4,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ArrowUpDown, Camera, Mic, Users, Video, CalendarDays,
-  MoreHorizontal, Eye, Pencil, Share2, Trash2, Lock,
+  MoreHorizontal, Eye, Pencil, Share2, Trash2, Lock, ExternalLink, ClipboardCopy,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -31,7 +31,17 @@ interface Props {
   events: EventRow[];
 }
 
-function shareEvent(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
+function copySharelink(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
+  if (!e.external_token) {
+    toast({ title: "No hay sharelink disponible", variant: "destructive" });
+    return;
+  }
+  const link = `${window.location.origin}/eventos/share/${e.external_token}`;
+  navigator.clipboard.writeText(link);
+  toast({ title: "Sharelink copiado al portapapeles" });
+}
+
+function copyResumen(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
   const text = [
     `📅 Evento: ${e.name}`,
     `Tipo: ${e.event_type}`,
@@ -40,7 +50,7 @@ function shareEvent(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
     `Estado: ${statusLabel[e.status] ?? e.status}`,
   ].filter(Boolean).join("\n");
   navigator.clipboard.writeText(text);
-  toast({ title: "Evento copiado al portapapeles" });
+  toast({ title: "Resumen copiado al portapapeles" });
 }
 
 const EventosTable = ({ events }: Props) => {
@@ -145,8 +155,11 @@ const EventosTable = ({ events }: Props) => {
                       <DropdownMenuItem onClick={() => openModal(e, setEditOpen)}>
                         <Pencil className="mr-2 h-4 w-4" />Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => shareEvent(e, toast)}>
-                        <Share2 className="mr-2 h-4 w-4" />Compartir
+                      <DropdownMenuItem onClick={() => copySharelink(e, toast)}>
+                        <ExternalLink className="mr-2 h-4 w-4" />Copiar sharelink
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => copyResumen(e, toast)}>
+                        <ClipboardCopy className="mr-2 h-4 w-4" />Copiar resumen
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => openModal(e, setCloseOpen)}>
                         <Lock className="mr-2 h-4 w-4" />Cerrar evento
