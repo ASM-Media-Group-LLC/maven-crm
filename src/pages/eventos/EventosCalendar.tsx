@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { format, isSameMonth, isSameDay, isAfter, startOfToday } from "date-fns";
+import { format, isSameMonth, isSameDay, isAfter, startOfToday, formatDistanceToNow, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
-import { Camera, Mic, Users, Video, CalendarDays } from "lucide-react";
+import { Camera, Mic, Users, Video, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 import type { EventRow } from "./useEventos";
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -31,76 +34,117 @@ const EventosCalendar = ({ events }: Props) => {
 
   const upcoming = events
     .filter((e) => isAfter(new Date(e.date), today) || isSameDay(new Date(e.date), today))
-    .slice(0, 3);
+    .slice(0, 4);
+
+  const goToToday = () => setMonth(new Date());
 
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Calendar */}
-          <div className="md:col-span-2">
-            <DayPicker
-              mode="single"
-              month={month}
-              onMonthChange={setMonth}
-              locale={es}
-              modifiers={{ hasEvent: eventDates }}
-              modifiersStyles={{
-                hasEvent: {
-                  fontWeight: "bold",
-                  textDecoration: "underline",
-                  textDecorationColor: "hsl(var(--primary))",
-                },
-              }}
-              className="w-full"
-              classNames={{
-                months: "w-full",
-                month: "w-full",
-                table: "w-full",
-                head_cell: "text-muted-foreground text-xs font-medium w-10",
-                cell: "text-center p-0 relative h-9 w-10",
-                day: "h-9 w-9 p-0 text-sm rounded-md hover:bg-accent/20",
-                day_selected: "bg-primary text-primary-foreground",
-                day_today: "bg-accent/20 font-bold",
-                nav_button: "h-7 w-7 bg-transparent p-0 text-muted-foreground hover:text-foreground",
-                caption: "flex justify-center relative items-center mb-2",
-                caption_label: "text-sm font-medium capitalize",
-              }}
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              {eventsThisMonth} eventos este mes
-            </p>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Calendar Card */}
+      <Card className="lg:col-span-2">
+        <CardContent className="p-4">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold capitalize">
+              {format(month, "MMMM yyyy", { locale: es })}
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={goToToday}>
+                Hoy
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonth(subMonths(month, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonth(addMonths(month, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          {/* Upcoming events */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Próximos eventos</h3>
-            {upcoming.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
-            ) : (
-              upcoming.map((e) => {
+          {/* DayPicker */}
+          <DayPicker
+            mode="single"
+            month={month}
+            onMonthChange={setMonth}
+            locale={es}
+            modifiers={{ hasEvent: eventDates }}
+            modifiersClassNames={{
+              hasEvent: "calendar-day-has-event",
+            }}
+            className="w-full pointer-events-auto"
+            classNames={{
+              months: "w-full",
+              month: "w-full",
+              caption: "hidden",
+              table: "w-full",
+              head_row: "flex w-full",
+              head_cell: "text-muted-foreground text-xs font-medium flex-1 text-center",
+              row: "flex w-full mt-1",
+              cell: "flex-1 text-center p-0 relative",
+              day: cn(
+                buttonVariants({ variant: "ghost" }),
+                "h-10 w-full p-0 text-sm rounded-md font-normal aria-selected:opacity-100"
+              ),
+              day_selected: "bg-primary text-primary-foreground hover:bg-primary",
+              day_today: "bg-muted text-foreground font-bold",
+              day_outside: "text-muted-foreground opacity-50",
+              day_disabled: "text-muted-foreground opacity-50",
+              nav: "hidden",
+            }}
+          />
+
+          {/* Footer */}
+          <div className="mt-3 rounded-md bg-muted/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{eventsThisMonth}</span> eventos este mes
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Upcoming Events Card */}
+      <Card>
+        <CardContent className="p-4">
+          <h3 className="text-sm font-semibold mb-4">Próximos eventos</h3>
+          {upcoming.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map((e) => {
                 const Icon = typeIcons[e.event_type] ?? CalendarDays;
+                const eventDate = new Date(e.date);
+                const relativeTime = formatDistanceToNow(eventDate, { locale: es, addSuffix: true });
+
                 return (
-                  <div key={e.id} className="flex items-start gap-2">
-                    <Icon className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm truncate font-medium">{e.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(e.date), "d MMM", { locale: es })}
-                        {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
-                      </p>
+                  <div key={e.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{e.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{relativeTime}</p>
+                        </div>
+                      </div>
+                      <Badge variant="primary-soft" className="text-[10px] shrink-0">
+                        Próximo
+                      </Badge>
                     </div>
-                    <Badge variant="primary-soft" className="text-[10px] shrink-0">
-                      Próximo
-                    </Badge>
+                    {e.location && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{e.location}</span>
+                      </div>
+                    )}
                   </div>
                 );
-              })
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
