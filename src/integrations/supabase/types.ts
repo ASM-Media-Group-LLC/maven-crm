@@ -822,6 +822,59 @@ export type Database = {
           },
         ]
       }
+      tickets: {
+        Row: {
+          assigned_to: string | null
+          company: string | null
+          created_at: string | null
+          creator_id: string
+          creator_notes: string | null
+          description: string | null
+          id: string
+          priority: string
+          status: string
+          ticket_type: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company?: string | null
+          created_at?: string | null
+          creator_id: string
+          creator_notes?: string | null
+          description?: string | null
+          id?: string
+          priority?: string
+          status?: string
+          ticket_type?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company?: string | null
+          created_at?: string | null
+          creator_id?: string
+          creator_notes?: string | null
+          description?: string | null
+          id?: string
+          priority?: string
+          status?: string
+          ticket_type?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whaticket_links: {
         Row: {
           created_at: string
