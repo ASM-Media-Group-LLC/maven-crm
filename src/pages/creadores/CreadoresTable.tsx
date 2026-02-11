@@ -121,8 +121,9 @@ const CreadoresTable = ({ creators }: Props) => {
 
   return (
     <>
+    <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
     <Table>
-      <TableHeader>
+      <TableHeader className="sticky top-0 z-10 bg-card">
         <TableRow>
           <TableHead><SortHeader label="Creador" col="name" /></TableHead>
           <TableHead><SortHeader label="Categoría" col="category" /></TableHead>
@@ -316,6 +317,7 @@ const CreadoresTable = ({ creators }: Props) => {
         )}
       </TableBody>
     </Table>
+    </div>
 
     {editingCreator && (
       <EditCreadorModal

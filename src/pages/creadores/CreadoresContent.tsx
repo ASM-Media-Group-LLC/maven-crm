@@ -31,28 +31,32 @@ const CreadoresContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
-    <main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Creadores</h1>
-          <p className="text-sm text-muted-foreground">
-            Total: {isLoading ? "…" : allCreators.length} creadores
-          </p>
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Creadores</h1>
+            <p className="text-sm text-muted-foreground">
+              Total: {isLoading ? "…" : allCreators.length} creadores
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/creadores/nuevo")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Creador
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => navigate("/creadores/nuevo")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Agregar Creador
-        </Button>
-      </div>
+      </header>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-lg" />
-          ))}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-40 rounded-lg" />
+            ))}
+          </div>
         </div>
       ) : (
-        <>
+        <div className="flex-1 overflow-auto p-6 space-y-6">
           <CreadoresKPICards counts={statusCounts} />
 
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
@@ -91,9 +95,8 @@ const CreadoresContent = () => {
           ) : (
             <CreadoresGrid creators={creators} />
           )}
-        </>
+        </div>
       )}
-
     </main>
   );
 };
