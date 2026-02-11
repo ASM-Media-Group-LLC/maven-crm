@@ -34,6 +34,7 @@ const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-s
 };
 
 const typeLabel: Record<string, string> = {
+  complaint: "Queja",
   technical: "Técnico",
   billing: "Facturación",
   content: "Contenido",
