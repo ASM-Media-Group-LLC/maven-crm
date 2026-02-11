@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Clock,
+  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Clock, X, Check, ChevronsUpDown, UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useAddEvento } from "./useEventos";
+import { useAddEvento, useEventLocations, useAddEventGuests } from "./useEventos";
+import AddGuestsModal, { type LocalGuest } from "./AddGuestsModal";
+import { cn } from "@/lib/utils";
 
 const EVENT_TYPES = [
   { value: "Shooting", label: "Shooting", icon: Camera },
@@ -41,6 +46,8 @@ const NuevoEventoForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const addEvento = useAddEvento();
+  const addGuests = useAddEventGuests();
+  const { data: locations = [] } = useEventLocations();
 
   const [name, setName] = useState("");
   const [eventType, setEventType] = useState("");
@@ -53,10 +60,25 @@ const NuevoEventoForm = () => {
   const [endH, setEndH] = useState("");
   const [endM, setEndM] = useState("00");
   const [location, setLocation] = useState("");
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationSearch, setLocationSearch] = useState("");
   const [maxCapacity, setMaxCapacity] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Guests
+  const [guests, setGuests] = useState<LocalGuest[]>([]);
+  const [guestsModalOpen, setGuestsModalOpen] = useState(false);
+
   const duration = computeDuration(startH, startM, endH, endM);
+
+  const handleAddGuests = (newGuests: LocalGuest[]) => {
+    setGuests((prev) => [...prev, ...newGuests]);
+    setGuestsModalOpen(false);
+  };
+
+  const removeGuest = (index: number) => {
+    setGuests((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async () => {
     if (!name.trim() || !eventType || !date) {
@@ -65,7 +87,7 @@ const NuevoEventoForm = () => {
     }
 
     try {
-      await addEvento.mutateAsync({
+      const inserted = await addEvento.mutateAsync({
         name: name.trim(),
         event_type: eventType,
         description: description || undefined,
@@ -77,6 +99,18 @@ const NuevoEventoForm = () => {
         max_capacity: maxCapacity ? parseInt(maxCapacity) : undefined,
         notes: notes || undefined,
       });
+
+      if (guests.length > 0 && inserted?.id) {
+        await addGuests.mutateAsync(
+          guests.map((g) => ({
+            event_id: inserted.id,
+            guest_type: g.type,
+            creator_id: g.creator_id ?? null,
+            guest_name: g.guest_name,
+          }))
+        );
+      }
+
       toast({ title: "Evento creado exitosamente" });
       navigate("/eventos");
     } catch (err: any) {
@@ -84,169 +118,280 @@ const NuevoEventoForm = () => {
     }
   };
 
+  const existingCreatorIds = guests.filter((g) => g.creator_id).map((g) => g.creator_id!);
+
   return (
-    <main className="flex-1 overflow-auto p-6 min-w-0">
-      <div className="max-w-6xl mx-auto pb-24 space-y-6">
-        {/* Header */}
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      {/* Fixed Header */}
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <button
           onClick={() => navigate("/eventos")}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ArrowLeft className="h-4 w-4" /> Volver a Eventos
         </button>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <CalendarDays className="h-6 w-6" /> Crear Evento
+        </h1>
+        <p className="text-sm text-muted-foreground">Configura los detalles del evento y agrega invitados</p>
+      </header>
 
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Crear Evento
-          </h1>
-          <p className="text-sm text-muted-foreground">Completa los detalles del nuevo evento</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Información del Evento</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre del Evento *</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Shooting Kash Agency" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tipo de Evento *</Label>
-                  <Select value={eventType} onValueChange={setEventType}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
-                    <SelectContent>
-                      {EVENT_TYPES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          <span className="flex items-center gap-2">
-                            <t.icon className="h-4 w-4" />
-                            {t.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Descripción</Label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción del evento…" rows={3} />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Switch checked={multiDay} onCheckedChange={setMultiDay} />
-                  <Label>Evento de múltiples días</Label>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left column */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Información del Evento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Fecha {multiDay ? "inicio" : ""} *</Label>
-                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    <Label>Nombre del Evento *</Label>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Shooting Kash Agency" />
                   </div>
-                  {multiDay && (
+
+                  <div className="space-y-2">
+                    <Label>Tipo de Evento *</Label>
+                    <Select value={eventType} onValueChange={setEventType}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                      <SelectContent>
+                        {EVENT_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            <span className="flex items-center gap-2">
+                              <t.icon className="h-4 w-4" />
+                              {t.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Descripción</Label>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción del evento…" rows={3} />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Switch checked={multiDay} onCheckedChange={setMultiDay} />
+                    <Label>Evento de múltiples días</Label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Fecha fin</Label>
-                      <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                      <Label>Fecha {multiDay ? "inicio" : ""} *</Label>
+                      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                    {multiDay && (
+                      <div className="space-y-2">
+                        <Label>Fecha fin</Label>
+                        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                    <div className="space-y-2">
+                      <Label>Desde (hora)</Label>
+                      <Select value={startH} onValueChange={setStartH}>
+                        <SelectTrigger><SelectValue placeholder="HH" /></SelectTrigger>
+                        <SelectContent>{HOURS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Min</Label>
+                      <Select value={startM} onValueChange={setStartM}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{MINUTES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hasta (hora)</Label>
+                      <Select value={endH} onValueChange={setEndH}>
+                        <SelectTrigger><SelectValue placeholder="HH" /></SelectTrigger>
+                        <SelectContent>{HOURS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Min</Label>
+                      <Select value={endM} onValueChange={setEndM}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{MINUTES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    {duration && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        {duration}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Location Combobox */}
+                  <div className="space-y-2">
+                    <Label>Ubicación</Label>
+                    <Popover open={locationOpen} onOpenChange={setLocationOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={locationOpen}
+                          className="w-full justify-between font-normal"
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                            {location || <span className="text-muted-foreground">Buscar o escribir ubicación...</span>}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Escribir dirección..."
+                            value={locationSearch}
+                            onValueChange={(val) => {
+                              setLocationSearch(val);
+                              setLocation(val);
+                            }}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {locationSearch ? (
+                                <p className="text-sm py-2">Se usará: <strong>{locationSearch}</strong></p>
+                              ) : (
+                                <p className="text-sm py-2">Escribe una dirección</p>
+                              )}
+                            </CommandEmpty>
+                            {locations.filter((l) =>
+                              !locationSearch || l.toLowerCase().includes(locationSearch.toLowerCase())
+                            ).length > 0 && (
+                              <CommandGroup heading="Ubicaciones anteriores">
+                                {locations
+                                  .filter((l) =>
+                                    !locationSearch || l.toLowerCase().includes(locationSearch.toLowerCase())
+                                  )
+                                  .map((loc) => (
+                                    <CommandItem
+                                      key={loc}
+                                      value={loc}
+                                      onSelect={() => {
+                                        setLocation(loc);
+                                        setLocationSearch(loc);
+                                        setLocationOpen(false);
+                                      }}
+                                    >
+                                      <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                                      {loc}
+                                      {location === loc && <Check className="ml-auto h-4 w-4" />}
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Capacidad Máxima</Label>
+                    <Input type="number" value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} placeholder="Opcional" min={1} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Notas</Label>
+                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionales…" rows={2} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right column - Guests */}
+            <div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Invitados ({guests.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {guests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
+                      <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
+                        <Users className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold">Sin invitados</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Agrega creadoras, contactos o invitados externos
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setGuestsModalOpen(true)}>
+                        <Users className="mr-2 h-4 w-4" />
+                        Agregar Invitados
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        {guests.map((g, i) => (
+                          <div key={i} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 group">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                                {g.guest_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{g.guest_name}</p>
+                                <p className="text-[10px] text-muted-foreground capitalize">{g.type === "creator" ? "Creadora" : g.type === "external" ? "Externo" : "Contacto"}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeGuest(i)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <Separator />
+                      <Button variant="outline" size="sm" className="w-full" onClick={() => setGuestsModalOpen(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Agregar más
+                      </Button>
                     </div>
                   )}
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
-                  <div className="space-y-2">
-                    <Label>Desde (hora)</Label>
-                    <Select value={startH} onValueChange={setStartH}>
-                      <SelectTrigger><SelectValue placeholder="HH" /></SelectTrigger>
-                      <SelectContent>{HOURS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Min</Label>
-                    <Select value={startM} onValueChange={setStartM}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{MINUTES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hasta (hora)</Label>
-                    <Select value={endH} onValueChange={setEndH}>
-                      <SelectTrigger><SelectValue placeholder="HH" /></SelectTrigger>
-                      <SelectContent>{HOURS.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Min</Label>
-                    <Select value={endM} onValueChange={setEndM}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{MINUTES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  {duration && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      {duration}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Ubicación</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Dirección o lugar" className="pl-9" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Capacidad Máxima</Label>
-                  <Input type="number" value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} placeholder="Opcional" min={1} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notas</Label>
-                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionales…" rows={2} />
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-
-          {/* Right column - Guests */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Invitados (0)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-8 text-center space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
-                    <Users className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold">Sin invitados</h4>
-                    <p className="text-xs text-muted-foreground">
-                      Agrega creadoras, contactos o invitados externos
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" disabled>
-                    <Users className="mr-2 h-4 w-4" />
-                    Agregar Invitados
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end">
-          <Button onClick={handleSubmit} disabled={addEvento.isPending}>
-            {addEvento.isPending ? "Guardando…" : "Guardar Evento"}
-          </Button>
         </div>
       </div>
+
+      {/* Fixed Footer */}
+      <footer className="bg-background border-t border-border px-6 py-4 flex justify-end gap-3 shrink-0">
+        <Button
+          variant="outline"
+          onClick={() => {
+            toast({ title: "Edición cancelada" });
+            navigate("/eventos");
+          }}
+        >
+          Cancelar
+        </Button>
+        <Button onClick={handleSubmit} disabled={addEvento.isPending}>
+          {addEvento.isPending ? "Guardando…" : "Crear Evento"}
+        </Button>
+      </footer>
+
+      {/* Guests Modal */}
+      <AddGuestsModal
+        open={guestsModalOpen}
+        onOpenChange={setGuestsModalOpen}
+        onConfirm={handleAddGuests}
+        existingCreatorIds={existingCreatorIds}
+      />
     </main>
   );
 };
