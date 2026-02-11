@@ -211,3 +211,29 @@ export function useUpdateEvento() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
   });
 }
+
+export function useEventGuests(eventId: string) {
+  return useQuery({
+    queryKey: ["event-guests", eventId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("event_guests")
+        .select("*, creators(name, artistic_name, profile_photo_url)")
+        .eq("event_id", eventId);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!eventId,
+  });
+}
+
+export function useUpdateGuestStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("event_guests").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["event-guests"] }),
+  });
+}

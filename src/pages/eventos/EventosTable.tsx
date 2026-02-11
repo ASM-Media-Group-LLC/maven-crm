@@ -3,7 +3,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ArrowUpDown, Camera, Mic, Users, Video, CalendarDays,
-  MoreHorizontal, Eye, Pencil, Share2, Trash2,
+  MoreHorizontal, Eye, Pencil, Share2, Trash2, Lock,
 } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -14,7 +14,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useDeleteEvento, statusLabel, statusVariant, type EventRow } from "./useEventos";
+import { statusLabel, statusVariant, type EventRow } from "./useEventos";
+import ViewEventoModal from "./ViewEventoModal";
+import EditEventoModal from "./EditEventoModal";
+import CloseEventoModal from "./CloseEventoModal";
+import DeleteEventoDialog from "./DeleteEventoDialog";
 
 const typeIcons: Record<string, React.ElementType> = {
   Shooting: Camera, Podcast: Mic, Casting: Users, Reunion: Video, Otro: CalendarDays,
@@ -26,11 +30,33 @@ interface Props {
   events: EventRow[];
 }
 
+function shareEvent(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
+  const text = [
+    `📅 Evento: ${e.name}`,
+    `Tipo: ${e.event_type}`,
+    `Fecha: ${format(new Date(e.date), "d MMM yyyy", { locale: es })}`,
+    e.location ? `📍 Ubicación: ${e.location}` : null,
+    `Estado: ${statusLabel[e.status] ?? e.status}`,
+  ].filter(Boolean).join("\n");
+  navigator.clipboard.writeText(text);
+  toast({ title: "Evento copiado al portapapeles" });
+}
+
 const EventosTable = ({ events }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(true);
-  const deleteEvento = useDeleteEvento();
   const { toast } = useToast();
+
+  const [selected, setSelected] = useState<EventRow | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const openModal = (e: EventRow, setter: (v: boolean) => void) => {
+    setSelected(e);
+    setter(true);
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -58,87 +84,105 @@ const EventosTable = ({ events }: Props) => {
     </Button>
   );
 
-  const handleDelete = (e: EventRow) => {
-    deleteEvento.mutate(e.id, {
-      onSuccess: () => toast({ title: `"${e.name}" eliminado` }),
-      onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
-    });
-  };
-
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead><SortHeader label="Evento" col="name" /></TableHead>
-          <TableHead><SortHeader label="Tipo" col="event_type" /></TableHead>
-          <TableHead><SortHeader label="Fecha" col="date" /></TableHead>
-          <TableHead><SortHeader label="Ubicación" col="location" /></TableHead>
-          <TableHead><SortHeader label="Estado" col="status" /></TableHead>
-          <TableHead>Notas</TableHead>
-          <TableHead><SortHeader label="Invitados" col="guest_count" /></TableHead>
-          <TableHead>Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sorted.map((e) => {
-          const Icon = typeIcons[e.event_type] ?? CalendarDays;
-          return (
-            <TableRow key={e.id}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="font-medium text-sm">{e.name}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-sm">{e.event_type}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {formatDistanceToNow(new Date(e.date), { addSuffix: true, locale: es })}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{e.location || "—"}</TableCell>
-              <TableCell>
-                <Badge variant={statusVariant[e.status] ?? "secondary-soft"}>
-                  {statusLabel[e.status] ?? e.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
-                {e.notes || "—"}
-              </TableCell>
-              <TableCell>
-                <span className="flex items-center gap-1 text-sm">
-                  <Users className="h-3.5 w-3.5" />
-                  {e.guest_count}
-                </span>
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem><Eye className="mr-2 h-4 w-4" />Ver detalles</DropdownMenuItem>
-                    <DropdownMenuItem><Pencil className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
-                    <DropdownMenuItem><Share2 className="mr-2 h-4 w-4" />Compartir</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(e)}>
-                      <Trash2 className="mr-2 h-4 w-4" />Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead><SortHeader label="Evento" col="name" /></TableHead>
+            <TableHead><SortHeader label="Tipo" col="event_type" /></TableHead>
+            <TableHead><SortHeader label="Fecha" col="date" /></TableHead>
+            <TableHead><SortHeader label="Ubicación" col="location" /></TableHead>
+            <TableHead><SortHeader label="Estado" col="status" /></TableHead>
+            <TableHead>Notas</TableHead>
+            <TableHead><SortHeader label="Invitados" col="guest_count" /></TableHead>
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((e) => {
+            const Icon = typeIcons[e.event_type] ?? CalendarDays;
+            return (
+              <TableRow key={e.id} className="cursor-pointer" onClick={() => openModal(e, setViewOpen)}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="font-medium text-sm">{e.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm">{e.event_type}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(e.date), { addSuffix: true, locale: es })}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{e.location || "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={statusVariant[e.status] ?? "secondary-soft"}>
+                    {statusLabel[e.status] ?? e.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                  {e.notes || "—"}
+                </TableCell>
+                <TableCell>
+                  <span className="flex items-center gap-1 text-sm">
+                    <Users className="h-3.5 w-3.5" />
+                    {e.guest_count}
+                  </span>
+                </TableCell>
+                <TableCell onClick={(ev) => ev.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openModal(e, setViewOpen)}>
+                        <Eye className="mr-2 h-4 w-4" />Ver detalles
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openModal(e, setEditOpen)}>
+                        <Pencil className="mr-2 h-4 w-4" />Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => shareEvent(e, toast)}>
+                        <Share2 className="mr-2 h-4 w-4" />Compartir
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openModal(e, setCloseOpen)}>
+                        <Lock className="mr-2 h-4 w-4" />Cerrar evento
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive" onClick={() => openModal(e, setDeleteOpen)}>
+                        <Trash2 className="mr-2 h-4 w-4" />Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {sorted.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                No se encontraron eventos.
               </TableCell>
             </TableRow>
-          );
-        })}
-        {sorted.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-              No se encontraron eventos.
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+          )}
+        </TableBody>
+      </Table>
+
+      {selected && (
+        <>
+          <ViewEventoModal
+            open={viewOpen}
+            onOpenChange={setViewOpen}
+            event={selected}
+            onEdit={() => { setViewOpen(false); setEditOpen(true); }}
+          />
+          <EditEventoModal open={editOpen} onOpenChange={setEditOpen} event={selected} />
+          <CloseEventoModal open={closeOpen} onOpenChange={setCloseOpen} event={selected} />
+          <DeleteEventoDialog open={deleteOpen} onOpenChange={setDeleteOpen} event={selected} />
+        </>
+      )}
+    </>
   );
 };
 
