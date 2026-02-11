@@ -1,66 +1,62 @@
 
+# Integrar Modal de Cambio de Estado en la Tabla de Creadores
 
-# Implementar Modal de Cambio de Estado de Creadora
+## Descripción
+Reemplazar el actual **DropdownMenu** de cambio de estado en `CreadoresTable.tsx` (líneas 172-202) con el modal `ChangeStatusModal` que ya existe en el perfil. De esta forma, el usuario verá un modal consistente con experiencia unificada para cambiar estado tanto en la tabla como en el perfil.
 
-## Descripcion
+## Cambios propuestos
 
-Crear un modal "Cambiar Estado de Creadora" que se abra al hacer clic en el Badge de estado en el perfil. El modal permite seleccionar un nuevo estado, escribir una nota obligatoria, y al confirmar actualiza el estado en la tabla `creators`, registra el cambio en `creator_history` y guarda la nota en `creator_notes`. Incluye toasts de exito, cancelacion y error.
+### 1. Editar: `src/pages/creadores/CreadoresTable.tsx`
 
-## Diseno visual (basado en la imagen)
+**Sección 1 - Importaciones (línea 29):**
+- Agregar import: `import ChangeStatusModal from "./ChangeStatusModal";`
 
-- Dialog con titulo "Cambiar Estado de Creadora" y subtitulo con el nombre de la creadora
-- Seccion "Estado Actual" mostrando el estado con indicador de color (circulo verde/azul/amarillo/rojo)
-- Select "Nuevo Estado *" con los mismos indicadores de color por opcion
-- Textarea "Nota Obligatoria *" con placeholder "Explica el motivo del cambio de estado..."
-- Texto informativo: "Esta nota se guardara en el historial y en las notas de la creadora"
-- Botones: "Cancelar" (outline) y "Cambiar Estado" (primary)
+**Sección 2 - Estado del componente (después de línea 75):**
+- Agregar estado para manejar el modal:
+  ```typescript
+  const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
+  ```
 
-## Archivos
+**Sección 3 - Reemplazar DropdownMenu (líneas 172-202):**
+- Reemplazar todo el `<DropdownMenu>` con un simple `<button>` que abre el modal:
+  ```typescript
+  <button
+    onClick={() => setStatusChangeCreator(c)}
+    className="flex items-center gap-1 focus:outline-none cursor-pointer hover:opacity-80 transition-opacity"
+  >
+    <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
+      {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
+    </Badge>
+    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+  </button>
+  ```
+  - Esto hace el badge clickeable con hover effect, sin el DropdownMenu
 
-### 1. Nuevo: `src/pages/creadores/ChangeStatusModal.tsx`
+**Sección 4 - Agregar Modal al final (antes del cierre de `<>`, línea 355):**
+- Insertar el componente ChangeStatusModal después de los modales existentes (ViewCreadorModal):
+  ```typescript
+  {statusChangeCreator && (
+    <ChangeStatusModal
+      creatorId={statusChangeCreator.id}
+      creatorName={statusChangeCreator.name}
+      currentStatus={statusChangeCreator.status ?? ""}
+      open={!!statusChangeCreator}
+      onOpenChange={(open) => {
+        if (!open) setStatusChangeCreator(null);
+      }}
+    />
+  )}
+  ```
 
-Componente modal con:
-- Props: `creatorId`, `creatorName`, `currentStatus`, `open`, `onOpenChange`
-- Select con las 5 opciones de estado (active, onboarding, paused, leaving, terminated) con indicadores de color
-- Textarea para nota obligatoria (minimo contenido requerido)
-- Al confirmar:
-  1. Actualiza `creators.status` via Supabase
-  2. Inserta registro en `creator_history` con action "Cambio de estado", old_value y new_value
-  3. Inserta nota en `creator_notes` con el motivo
-  4. Invalida queries de `creators`, `creator`, `creator_history`, `creator_notes`
-- Toasts: exito ("Estado actualizado exitosamente"), error (destructive con mensaje), cancelacion ("Edicion cancelada")
+## Flujo de interacción
+1. Usuario hace clic en el badge de estado en la tabla
+2. Se abre el modal `ChangeStatusModal`
+3. El modal permite seleccionar nuevo estado y escribir nota obligatoria
+4. Al confirmar, se actualiza el estado y se registra en historial/notas
+5. El modal se cierra y se invalidan las queries (ya implementado en `ChangeStatusModal`)
 
-### 2. Editar: `src/pages/creadores/CreadorProfileContent.tsx`
-
-- Importar `ChangeStatusModal` y agregar estado `useState` para controlar apertura del modal
-- Hacer el Badge de estado clickeable (cursor-pointer, hover) para abrir el modal
-- Renderizar el `ChangeStatusModal` pasando las props necesarias
-
-## Seccion tecnica
-
-**Colores por estado (indicador circular):**
-- active: `bg-green-500`
-- onboarding: `bg-blue-500`
-- paused: `bg-gray-400`
-- leaving: `bg-yellow-500`
-- terminated: `bg-red-500`
-
-**Flujo de datos al confirmar:**
-```text
-1. UPDATE creators SET status = newStatus WHERE id = creatorId
-2. INSERT INTO creator_history (creator_id, action, old_value, new_value, user_id)
-3. INSERT INTO creator_notes (creator_id, note_text, created_by)
-4. Invalidate queries: ["creators"], ["creator", id], ["creator_history", id], ["creator_notes", id]
-```
-
-**Validaciones:**
-- No permitir seleccionar el mismo estado actual
-- Nota obligatoria no puede estar vacia (trim)
-- Boton deshabilitado mientras guarda
-
-**Patron de toast (siguiendo NotasTabContent):**
-- Usa `toast()` importado de `@/hooks/use-toast`
-- Exito: `toast({ title: "Estado actualizado exitosamente" })`
-- Error: `toast({ title: "Error al cambiar estado", description: error.message, variant: "destructive" })`
-- Cancelacion: `toast({ title: "Edicion cancelada" })`
-
+## Ventajas
+- **Consistencia UX**: El mismo modal y flujo en tabla y perfil
+- **Experiencia mejorada**: Modal con justificación obligatoria es más formal que dropdown rápido
+- **Auditoria**: Todos los cambios de estado se registran en `creator_history` y `creator_notes`
+- **Eliminación de código**: Se borra el DropdownMenu innecesario
