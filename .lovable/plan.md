@@ -1,77 +1,89 @@
 
 
-# Ajustar Header y Footer Fijos en Nuevo Creador
+# Fijar Header y Footer en Creadores y Eventos + Scroll Interno en Tabla
 
 ## Problema
 
-El formulario de `/creadores/nuevo` usa `<main className="flex-1 overflow-auto p-6">` donde todo el contenido (incluyendo header) hace scroll. El footer usa `fixed bottom-0` que se superpone al sidebar. Esto no coincide con el patron de `/eventos/nuevo` que tiene header y footer fijos con el contenido central scrollable.
+En `/creadores` y `/eventos`, toda la pagina scrollea (header con titulo, KPIs, filtros, tabla -- todo junto). El header con el titulo y boton de accion deberia estar fijo arriba, y la tabla/grid deberia tener scroll interno para que la pantalla no crezca infinitamente.
 
 ## Solucion
 
-Aplicar el mismo patron de `NuevoEventoForm`: cambiar el `<main>` a `flex-1 flex flex-col h-full overflow-hidden`, extraer el header a un `<header>` sticky con `border-b`, mover el contenido a un `<div className="flex-1 overflow-auto p-6">`, y cambiar el footer de `fixed` a un `<footer>` integrado en el flex con `shrink-0`. Cambiar el texto "Guardar" a "Agregar creador".
+Aplicar el mismo patron de layout sticky usado en los formularios (`NuevoCreadorForm`, `NuevoEventoForm`): contenedor flex-col con header fijo (`shrink-0`), contenido scrollable (`flex-1 overflow-auto`), y en el caso de la tabla de creadores, darle una altura maxima con scroll interno.
 
-## Cambios en `src/pages/creadores/NuevoCreadorForm.tsx`
+---
 
-### 1. Cambiar el contenedor `<main>` (linea 277)
+## Cambios por archivo
 
-De:
-```
-<main className="flex-1 overflow-auto p-6 min-w-0">
-```
-A:
-```
+### 1. `src/pages/creadores/CreadoresContent.tsx`
+
+- Cambiar `<main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">` a `<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">`
+- Extraer el header (titulo "Creadores" + boton "Agregar Creador") a un `<header>` fijo con `shrink-0`, `px-6 pt-6 pb-4`, `border-b border-border`
+- Envolver el resto del contenido (KPIs, tabs agencias, filtros, tabla/grid) en `<div className="flex-1 overflow-auto p-6 space-y-6">`
+- Esto mantiene el titulo siempre visible mientras el contenido debajo scrollea
+
+### 2. `src/pages/eventos/EventosContent.tsx`
+
+- Mismo patron: cambiar `<main>` a flex-col overflow-hidden
+- Extraer header (titulo "Eventos" + boton "Crear Evento") a `<header>` fijo con `shrink-0`
+- Envolver el resto (calendario, tabs de status, filtros, tabla/grid) en `<div className="flex-1 overflow-auto p-6 space-y-6">`
+
+### 3. `src/pages/creadores/CreadoresTable.tsx`
+
+- Envolver el componente `<Table>` en un contenedor con altura maxima y scroll interno: `<div className="max-h-[calc(100vh-24rem)] overflow-auto">`
+- Hacer el `<TableHeader>` sticky con `sticky top-0 z-10 bg-card` para que los encabezados de columna siempre sean visibles al scrollear dentro de la tabla
+- Esto evita que la tabla crezca indefinidamente y empuje todo el contenido
+
+---
+
+## Seccion tecnica
+
+**Estructura de CreadoresContent (despues del cambio):**
+
+```text
 <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-```
-
-### 2. Extraer header fijo (lineas 278-297)
-
-Sacar el header del div scrollable y envolverlo en un `<header>` con estilos sticky:
-```
-<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-  <div className="flex items-center justify-between">
-    <button ...>Volver a Creadores</button>
-    <Button ...>Llenar datos de prueba</Button>
+  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+    <!-- Titulo "Creadores" + boton "Agregar Creador" -->
+  </header>
+  <div className="flex-1 overflow-auto p-6 space-y-6">
+    <!-- KPIs -->
+    <!-- Tabs agencias -->
+    <!-- Filtros -->
+    <!-- Tabla (con scroll interno) o Grid -->
   </div>
-  <h1>Nuevo Creador</h1>
-  <p>Completa los detalles del nuevo creador</p>
-</header>
+</main>
 ```
 
-### 3. Contenido scrollable (a partir de la Seccion 1)
+**Estructura de EventosContent (despues del cambio):**
 
-Envolver las 9 secciones del formulario en:
+```text
+<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+    <!-- Titulo "Eventos" + boton "Crear Evento" -->
+  </header>
+  <div className="flex-1 overflow-auto p-6 space-y-6">
+    <!-- Calendario -->
+    <!-- Tabs status -->
+    <!-- Filtros -->
+    <!-- Tabla o Grid -->
+  </div>
+</main>
 ```
-<div className="flex-1 overflow-auto p-6">
-  <div className="space-y-6">
-    <!-- Secciones 1-9 sin cambios -->
+
+**Scroll interno en CreadoresTable:**
+
+```text
+<div className="rounded-lg border border-border bg-card">
+  <!-- Toolbar (busqueda, exportar, etc.) -->
+  <div className="max-h-[calc(100vh-24rem)] overflow-auto">
+    <Table>
+      <TableHeader className="sticky top-0 z-10 bg-card">
+        ...
+      </TableHeader>
+      <TableBody>
+        ...
+      </TableBody>
+    </Table>
   </div>
 </div>
 ```
-
-Eliminar el `pb-24` que ya no es necesario (el footer ya no es `fixed`).
-
-### 4. Footer integrado en flex (lineas 576-583)
-
-De:
-```
-<div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/95 backdrop-blur-sm px-6 py-3">
-  <div className="max-w-6xl mx-auto flex justify-end gap-3">
-    <Button variant="outline">Cancelar</Button>
-    <Button><Save /> Guardar</Button>
-  </div>
-</div>
-```
-A:
-```
-<footer className="bg-background border-t border-border px-6 py-4 flex justify-end gap-3 shrink-0">
-  <Button variant="outline">Cancelar</Button>
-  <Button>Agregar creador</Button>
-</footer>
-```
-
-Cambios en el boton:
-- Texto de "Guardar" a "Agregar creador"
-- Estado loading de "Guardando..." a "Agregando..."
-- Eliminar el icono `<Save>` para coincidir con el patron de NuevoEventoForm
-- Eliminar `max-w-6xl mx-auto` del footer
 
