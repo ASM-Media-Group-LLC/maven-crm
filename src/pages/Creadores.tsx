@@ -6,7 +6,7 @@ import CreadoresContent from "./creadores/CreadoresContent";
 const Creadores = () => {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
