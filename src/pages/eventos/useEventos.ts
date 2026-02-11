@@ -136,6 +136,21 @@ export function useEventos(filters: EventoFilters) {
   };
 }
 
+export function useEventLocations() {
+  return useQuery({
+    queryKey: ["event-locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("events")
+        .select("location")
+        .not("location", "is", null);
+      if (error) throw error;
+      const unique = [...new Set((data ?? []).map((e) => e.location).filter(Boolean))] as string[];
+      return unique.sort();
+    },
+  });
+}
+
 export function useAddEvento() {
   const qc = useQueryClient();
   return useMutation({
@@ -151,7 +166,24 @@ export function useAddEvento() {
       max_capacity?: number;
       notes?: string;
     }) => {
-      const { error } = await supabase.from("events").insert(data as any);
+      const { data: inserted, error } = await supabase
+        .from("events")
+        .insert(data as any)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return inserted;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
+  });
+}
+
+export function useAddEventGuests() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (guests: { event_id: string; guest_type: string; creator_id?: string; guest_name?: string }[]) => {
+      if (guests.length === 0) return;
+      const { error } = await supabase.from("event_guests").insert(guests as any);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["events"] }),
