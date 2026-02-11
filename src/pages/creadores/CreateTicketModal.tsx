@@ -156,13 +156,49 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="ticket-assign">Asignar a</Label>
-            <Input
-              id="ticket-assign"
-              placeholder="Sin asignar"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-            />
+            <Label>Asignar a</Label>
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin asignar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alvaro">alvaro (@alvaro)</SelectItem>
+                <SelectItem value="amartinez">Ana Martinez (@amartinez)</SelectItem>
+                <SelectItem value="Andres.Gaviria">Andres Gaviria (@Andres.Gaviria)</SelectItem>
+                <SelectItem value="Brayan123">Brayan Esneider Castaño Hoyos (@Brayan123)</SelectItem>
+                <SelectItem value="carolina.jaramillo@unlok.me">Carolina Jaramillo (@carolina.jaramillo@unlok.me)</SelectItem>
+                <SelectItem value="cheryl.gonzalez@unlok.me">Cheryl Gonzalez (@cheryl.gonzalez@unlok.me)</SelectItem>
+                <SelectItem value="clopez">Carlos Lopez (@clopez)</SelectItem>
+                <SelectItem value="cruiz">Carmen Ruiz (@cruiz)</SelectItem>
+                <SelectItem value="Fabiana_Duran">Fabiana Duran (@Fabiana_Duran)</SelectItem>
+                <SelectItem value="gislaineescudero">Gislaine Escudero (@gislaineescudero)</SelectItem>
+                <SelectItem value="gracegelves260">Grace Gelves (@gracegelves260)</SelectItem>
+                <SelectItem value="Isatuiran">Isabel Tuiran (@Isatuiran)</SelectItem>
+                <SelectItem value="jmoreno">Javier Moreno (@jmoreno)</SelectItem>
+                <SelectItem value="Johanna">Johanna Riano (@Johanna)</SelectItem>
+                <SelectItem value="jorge">Jorge Restrepo (@jorge)</SelectItem>
+                <SelectItem value="jorge.restrepo">Jorge Restrepo 3 (@jorge.restrepo)</SelectItem>
+                <SelectItem value="jorge.restrepo.1">jorge.restrepo.1 (@jorge.restrepo.1)</SelectItem>
+                <SelectItem value="lizeth.jerez@unlok.me">Lizeth Jerez (@lizeth.jerez@unlok.me)</SelectItem>
+                <SelectItem value="lorena_lozano">Lorena Lozano (@lorena_lozano)</SelectItem>
+                <SelectItem value="lrodriguez">Luis Rodriguez (@lrodriguez)</SelectItem>
+                <SelectItem value="Luisroman07">Luis Carlos Ortega Roman (@Luisroman07)</SelectItem>
+                <SelectItem value="marielby">Marielby Quijada (@marielby)</SelectItem>
+                <SelectItem value="maritest">Marielby Testing (@maritest)</SelectItem>
+                <SelectItem value="mgarcia">Maria Garcia (@mgarcia)</SelectItem>
+                <SelectItem value="michel_zarate">Michel Zarate (@michel_zarate)</SelectItem>
+                <SelectItem value="mitchtest">Mitch Test (@mitchtest)</SelectItem>
+                <SelectItem value="monica.duque@unlok.me">Monica Duque (@monica.duque@unlok.me)</SelectItem>
+                <SelectItem value="Paularomero">Paula Romero (@Paularomero)</SelectItem>
+                <SelectItem value="Pepe Glaves">Grace Galvez Galvez (@Pepe Glaves)</SelectItem>
+                <SelectItem value="pepeel">peo peo (@pepeel)</SelectItem>
+                <SelectItem value="perez">Fernando Perez (@perez)</SelectItem>
+                <SelectItem value="ptorres">Pablo Torres (@ptorres)</SelectItem>
+                <SelectItem value="ruben.guzman">Ruben Guzman (@ruben.guzman)</SelectItem>
+                <SelectItem value="rusin24">rusin24 (@rusin24)</SelectItem>
+                <SelectItem value="sfernandez">Sofia Fernandez (@sfernandez)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
