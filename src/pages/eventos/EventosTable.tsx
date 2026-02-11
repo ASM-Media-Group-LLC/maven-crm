@@ -17,7 +17,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel, statusVariant, type EventRow } from "./useEventos";
 import ViewEventoModal from "./ViewEventoModal";
-import EditEventoModal from "./EditEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import DeleteEventoDialog from "./DeleteEventoDialog";
 
@@ -61,7 +60,6 @@ const EventosTable = ({ events }: Props) => {
 
   const [selected, setSelected] = useState<EventRow | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -152,7 +150,7 @@ const EventosTable = ({ events }: Props) => {
                       <DropdownMenuItem onClick={() => openModal(e, setViewOpen)}>
                         <Eye className="mr-2 h-4 w-4" />Ver detalles
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openModal(e, setEditOpen)}>
+                      <DropdownMenuItem onClick={() => navigate(`/eventos/${e.id}/editar`)}>
                         <Pencil className="mr-2 h-4 w-4" />Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => copySharelink(e, toast)}>
@@ -190,9 +188,8 @@ const EventosTable = ({ events }: Props) => {
             open={viewOpen}
             onOpenChange={setViewOpen}
             event={selected}
-            onEdit={() => { setViewOpen(false); setEditOpen(true); }}
+            onEdit={() => { setViewOpen(false); navigate(`/eventos/${selected.id}/editar`); }}
           />
-          <EditEventoModal open={editOpen} onOpenChange={setEditOpen} event={selected} />
           <CloseEventoModal open={closeOpen} onOpenChange={setCloseOpen} event={selected} />
           <DeleteEventoDialog open={deleteOpen} onOpenChange={setDeleteOpen} event={selected} />
         </>

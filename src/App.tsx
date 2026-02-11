@@ -16,6 +16,7 @@ import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
 import Eventos from "./pages/Eventos";
 import NuevoEvento from "./pages/NuevoEvento";
+import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/creadores/:id" element={<CreadorProfile />} />
             <Route path="/eventos" element={<Eventos />} />
             <Route path="/eventos/nuevo" element={<NuevoEvento />} />
+            <Route path="/eventos/:id/editar" element={<EditEvento />} />
             <Route path="/eventos/:id" element={<EventoDetail />} />
             <Route path="/eventos/share/:token" element={<EventoSharePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
