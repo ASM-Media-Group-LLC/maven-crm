@@ -41,6 +41,12 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
   const [assignedTo, setAssignedTo] = useState("");
   const [creatorNotes, setCreatorNotes] = useState("");
 
+  const handleCancel = () => {
+    reset();
+    toast({ title: "Edición cancelada" });
+    onOpenChange(false);
+  };
+
   const reset = () => {
     setTitle("");
     setDescription("");
@@ -215,8 +221,8 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+          <Button variant="outline" onClick={handleCancel} disabled={saving}>
+            Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving ? "Creando..." : "Create Ticket"}
