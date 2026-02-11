@@ -2,3 +2,6 @@ project_id = "lsagslbkliprespbyhts"
 
 [functions.ai-sales-chat]
 verify_jwt = false
+
+[functions.event-external-action]
+verify_jwt = false
