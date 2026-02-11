@@ -128,7 +128,8 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
               <Select value={ticketType} onValueChange={setTicketType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="technical">Técnico</SelectItem>
+                  <SelectItem value="complaint">Queja (Complaint)</SelectItem>
+                  <SelectItem value="technical">Técnico (Technical)</SelectItem>
                   <SelectItem value="billing">Facturación</SelectItem>
                   <SelectItem value="content">Contenido</SelectItem>
                   <SelectItem value="general">General</SelectItem>
@@ -144,10 +145,12 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
                 <SelectValue placeholder="Seleccionar compañía" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                <SelectItem value="fansly">Fansly</SelectItem>
-                <SelectItem value="piclink">PicLink</SelectItem>
-                <SelectItem value="other">Otra</SelectItem>
+                <SelectItem value="ora_miami">Ora Miami</SelectItem>
+                <SelectItem value="kash_agency">KASH Agency</SelectItem>
+                <SelectItem value="alvaroletshoot">Alvaroletshoot</SelectItem>
+                <SelectItem value="blue_app">Blue App</SelectItem>
+                <SelectItem value="piclink">piclink.me</SelectItem>
+                <SelectItem value="pagomundo">Pagomundo</SelectItem>
               </SelectContent>
             </Select>
           </div>
