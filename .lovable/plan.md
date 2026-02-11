@@ -1,55 +1,31 @@
 
 
-# Ajustar dropdown "Asignar a" en CreateTicketModal
+# Ajustar dropdown "Asignar a" y corregir modal cortado
 
-## Cambio
+## 1. Agregar opciones faltantes al dropdown "Asignar a"
 
-Reemplazar el campo `Input` actual de "Asignar a" por un `Select` dropdown con las siguientes opciones extraidas de las imagenes:
+Segun las imagenes, faltan dos personas al final de la lista:
 
 | Value | Label |
 |-------|-------|
-| (vacio) | Sin asignar |
-| alvaro | alvaro (@alvaro) |
-| amartinez | Ana Martinez (@amartinez) |
-| Andres.Gaviria | Andres Gaviria (@Andres.Gaviria) |
-| Brayan123 | Brayan Esneider Castano Hoyos (@Brayan123) |
-| carolina.jaramillo@unlok.me | Carolina Jaramillo (@carolina.jaramillo@unlok.me) |
-| cheryl.gonzalez@unlok.me | Cheryl Gonzalez (@cheryl.gonzalez@unlok.me) |
-| clopez | Carlos Lopez (@clopez) |
-| cruiz | Carmen Ruiz (@cruiz) |
-| Fabiana_Duran | Fabiana Duran (@Fabiana_Duran) |
-| gislaineescudero | Gislaine Escudero (@gislaineescudero) |
-| gracegelves260 | Grace Gelves (@gracegelves260) |
-| Isatuiran | Isabel Tuiran (@Isatuiran) |
-| jmoreno | Javier Moreno (@jmoreno) |
-| Johanna | Johanna Riano (@Johanna) |
-| jorge | Jorge Restrepo (@jorge) |
-| jorge.restrepo | Jorge Restrepo 3 (@jorge.restrepo) |
-| jorge.restrepo.1 | jorge.restrepo.1 (@jorge.restrepo.1) |
-| lizeth.jerez@unlok.me | Lizeth Jerez (@lizeth.jerez@unlok.me) |
-| lorena_lozano | Lorena Lozano (@lorena_lozano) |
-| lrodriguez | Luis Rodriguez (@lrodriguez) |
-| Luisroman07 | Luis Carlos Ortega Roman (@Luisroman07) |
-| marielby | Marielby Quijada (@marielby) |
-| maritest | Marielby Testing (@maritest) |
-| mgarcia | Maria Garcia (@mgarcia) |
-| michel_zarate | Michel Zarate (@michel_zarate) |
-| mitchtest | Mitch Test (@mitchtest) |
-| monica.duque@unlok.me | Monica Duque (@monica.duque@unlok.me) |
-| Paularomero | Paula Romero (@Paularomero) |
-| Pepe Glaves | Grace Galvez Galvez (@Pepe Glaves) |
-| pepeel | peo peo (@pepeel) |
-| perez | Fernado Perez (@perez) |
-| ptorres | Pablo Torres (@ptorres) |
-| ruben.guzman | Ruben Guzman (@ruben.guzman) |
-| rusin24 | rusin24 (@rusin24) |
-| sfernandez | Sofia Fernandez (@sfernandez) |
+| william.cujar | william cujar (@william.cujar) |
+| yeison.bello | yeison bello (@yeison.bello) |
+
+Se agregaran despues de `sfernandez` (linea 199), manteniendo el orden alfabetico.
+
+## 2. Corregir modal cortado en pantalla
+
+El modal se corta porque su contenido es mas alto que la ventana. Se aplicaran los siguientes cambios en el `DialogContent`:
+
+- Agregar `max-h-[90vh]` y `overflow-y-auto` al contenedor del formulario para que el contenido sea scrolleable dentro del modal
+- Esto permite que el modal completo (con header, formulario y footer) se vea correctamente sin cortarse
 
 ## Seccion tecnica
 
-- **Archivo**: `src/pages/creadores/CreateTicketModal.tsx`
-- Reemplazar el `Input` de "Asignar a" por un componente `Select` con placeholder "Sin asignar"
-- El estado `assignedTo` sigue siendo string; valor vacio = sin asignar
-- Ordenado alfabeticamente por nombre
-- El valor guardado en BD sera el handle/username (ej: "alvaro", "amartinez")
+**Archivo**: `src/pages/creadores/CreateTicketModal.tsx`
+
+Cambios:
+1. **Linea 84**: Agregar clase `max-h-[90vh]` al `DialogContent`
+2. **Linea 90**: Agregar `overflow-y-auto max-h-[60vh]` al div contenedor del formulario para hacerlo scrolleable
+3. **Lineas 199-200**: Agregar dos `SelectItem` nuevos para `william.cujar` y `yeison.bello`
 
