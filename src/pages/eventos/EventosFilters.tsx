@@ -8,6 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format } from "date-fns";
 import type { EventoFilters } from "./useEventos";
 
 interface Props {
@@ -26,7 +28,7 @@ const TIME_OPTIONS = [
 
 const EventosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
   <div className="flex items-center gap-3">
-    <div className="relative w-48">
+    <div className="relative flex-1">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         placeholder="Buscar eventos…"
@@ -60,19 +62,15 @@ const EventosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
       </SelectContent>
     </Select>
 
-    <Input
-      type="date"
-      className="w-[140px]"
-      value={filters.dateFrom}
-      onChange={(e) => onChange({ dateFrom: e.target.value })}
-      placeholder="Desde"
-    />
-    <Input
-      type="date"
-      className="w-[140px]"
-      value={filters.dateTo}
-      onChange={(e) => onChange({ dateTo: e.target.value })}
-      placeholder="Hasta"
+    <DateRangePicker
+      from={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
+      to={filters.dateTo ? new Date(filters.dateTo) : undefined}
+      onApply={(from, to) =>
+        onChange({
+          dateFrom: from ? format(from, "yyyy-MM-dd") : "",
+          dateTo: to ? format(to, "yyyy-MM-dd") : "",
+        })
+      }
     />
 
     <div className="ml-auto flex gap-1">

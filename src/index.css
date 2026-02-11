@@ -117,3 +117,19 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
     @apply bg-background text-foreground;
   }
 }
+
+/* Calendar event dot indicator */
+.calendar-day-has-event {
+  position: relative;
+}
+.calendar-day-has-event::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+}

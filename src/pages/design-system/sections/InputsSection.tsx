@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
-export const InputsSection = () => (
+export const InputsSection = () => {
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+
+  return (
   <section id="inputs" className="space-y-8">
     <div>
       <h2 className="text-3xl font-semibold mb-2">2.2 Inputs</h2>
@@ -167,6 +173,33 @@ export const InputsSection = () => (
       </div>
     </div>
 
+    {/* Date Range Picker */}
+    <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Date Range Picker</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Componente para selección de rangos de fecha con presets rápidos, dos calendarios y entrada manual.
+      </p>
+      <div className="space-y-4 max-w-2xl">
+        <div className="space-y-2">
+          <Label>Default</Label>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+          />
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+          <p><strong className="text-foreground">Props:</strong></p>
+          <p><code className="font-mono text-foreground">from</code>: <code className="font-mono">Date | undefined</code></p>
+          <p><code className="font-mono text-foreground">to</code>: <code className="font-mono">Date | undefined</code></p>
+          <p><code className="font-mono text-foreground">onApply</code>: <code className="font-mono">(from, to) =&gt; void</code></p>
+          <p><code className="font-mono text-foreground">placeholder?</code>: <code className="font-mono">string</code> (default: "Seleccionar fechas")</p>
+          <p className="mt-2"><strong className="text-foreground">Tokens:</strong> bg-popover, border-border, primary (selección), muted (today), pointer-events-auto</p>
+        </div>
+      </div>
+    </div>
+
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Reglas</h3>
       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -176,7 +209,9 @@ export const InputsSection = () => (
         <li>Placeholder nunca sustituye al label</li>
         <li>Select Filters: placeholder = nombre descriptivo del campo, no "Todos"</li>
         <li>Tab Bars: <code className="font-mono text-foreground">secondary</code> para activo, <code className="font-mono text-foreground">ghost</code> para inactivo</li>
+        <li>Date Range Picker: usar presets cuando la selección es predecible, inputs manuales para rangos específicos</li>
       </ul>
     </div>
   </section>
-);
+  );
+};
