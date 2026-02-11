@@ -16,6 +16,7 @@ import MonetizacionTabContent from "./MonetizacionTabContent";
 import NotasTabContent from "./NotasTabContent";
 import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
+import HistorialTabContent from "./HistorialTabContent";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -199,7 +200,7 @@ const CreadorProfileContent = () => {
           </TabsContent>
 
           <TabsContent value="historial">
-            <p className="text-sm text-muted-foreground text-center py-12">Sin datos disponibles</p>
+            <HistorialTabContent creatorId={id!} />
           </TabsContent>
         </Tabs>
       </div>
