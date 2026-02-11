@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Users, Pencil, Save, Upload, X,
+  ArrowLeft, Users, Pencil, Upload, X,
   User, Phone, Share2, Image, Settings, FileText, DollarSign, Camera, StickyNote,
 } from "lucide-react";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
@@ -274,9 +274,8 @@ const NuevoCreadorForm = () => {
   };
 
   return (
-    <main className="flex-1 overflow-auto p-6 min-w-0">
-      <div className="pb-24 space-y-6">
-        {/* Header */}
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate("/creadores")}
@@ -288,13 +287,16 @@ const NuevoCreadorForm = () => {
             <Pencil className="mr-2 h-4 w-4" /> Llenar datos de prueba
           </Button>
         </div>
-
-        <div>
+        <div className="mt-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Users className="h-6 w-6" /> Nuevo Creador
           </h1>
           <p className="text-sm text-muted-foreground">Completa los detalles del nuevo creador</p>
         </div>
+      </header>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="space-y-6">
 
         {/* Seccion 1 - Información Básica */}
         <Section icon={<User className="h-5 w-5" />} title="Información Básica">
@@ -570,17 +572,15 @@ const NuevoCreadorForm = () => {
             />
           </Field>
         </Section>
-      </div>
-
-      {/* Footer fijo */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/95 backdrop-blur-sm px-6 py-3">
-        <div className="max-w-6xl mx-auto flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate("/creadores")}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={mutation.isPending}>
-            <Save className="mr-2 h-4 w-4" /> {mutation.isPending ? "Guardando…" : "Guardar"}
-          </Button>
         </div>
       </div>
+
+      <footer className="bg-background border-t border-border px-6 py-4 flex justify-end gap-3 shrink-0">
+        <Button variant="outline" onClick={() => navigate("/creadores")}>Cancelar</Button>
+        <Button onClick={handleSubmit} disabled={mutation.isPending}>
+          {mutation.isPending ? "Agregando…" : "Agregar creador"}
+        </Button>
+      </footer>
     </main>
   );
 };
