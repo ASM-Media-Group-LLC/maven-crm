@@ -29,27 +29,31 @@ const EventosContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   return (
-    <main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Eventos</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestiona tus eventos y sesiones de contenido
-          </p>
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Eventos</h1>
+            <p className="text-sm text-muted-foreground">
+              Gestiona tus eventos y sesiones de contenido
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Crear Evento
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
-          <Plus className="mr-2 h-4 w-4" />
-          Crear Evento
-        </Button>
-      </div>
+      </header>
 
       {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-60 rounded-lg" />
-          <Skeleton className="h-40 rounded-lg" />
+        <div className="flex-1 overflow-auto p-6">
+          <div className="space-y-4">
+            <Skeleton className="h-60 rounded-lg" />
+            <Skeleton className="h-40 rounded-lg" />
+          </div>
         </div>
       ) : (
-        <>
+        <div className="flex-1 overflow-auto p-6 space-y-6">
           <EventosCalendar events={allEvents} />
 
           {/* Status tabs */}
@@ -80,7 +84,7 @@ const EventosContent = () => {
           ) : (
             <EventosGrid events={events} />
           )}
-        </>
+        </div>
       )}
     </main>
   );
