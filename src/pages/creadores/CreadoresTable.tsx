@@ -27,6 +27,7 @@ import { useUpdateCreador } from "./useCreadores";
 import { buildSocialUrl } from "@/lib/utils";
 import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
+import ChangeStatusModal from "./ChangeStatusModal";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -72,6 +73,7 @@ const CreadoresTable = ({ creators }: Props) => {
   const [sortAsc, setSortAsc] = useState(true);
   const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
+  const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
 
   const handleSort = (key: SortKey) => {
@@ -169,37 +171,15 @@ const CreadoresTable = ({ creators }: Props) => {
                 )}
               </TableCell>
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-1 focus:outline-none">
-                      <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
-                        {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
-                      </Badge>
-                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {Object.entries(statusLabel).map(([value, label]) => (
-                      <DropdownMenuItem
-                        key={value}
-                        disabled={c.status === value}
-                        onClick={() => {
-                          updateCreador.mutate(
-                            { id: c.id, data: { status: value } },
-                            {
-                              onSuccess: () => toast.success(`Estado actualizado a ${label}`),
-                              onError: () => toast.error("Error al actualizar estado"),
-                            }
-                          );
-                        }}
-                      >
-                        <Badge variant={statusVariant[value] ?? "secondary-soft"}>
-                          {label}
-                        </Badge>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <button
+                  onClick={() => setStatusChangeCreator(c)}
+                  className="flex items-center gap-1 focus:outline-none cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
+                    {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
+                  </Badge>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {flag && <span className="mr-1">{flag}</span>}
@@ -350,6 +330,18 @@ const CreadoresTable = ({ creators }: Props) => {
         open={!!viewingCreator}
         onOpenChange={(open) => { if (!open) setViewingCreator(null); }}
         creator={viewingCreator}
+      />
+    )}
+
+    {statusChangeCreator && (
+      <ChangeStatusModal
+        creatorId={statusChangeCreator.id}
+        creatorName={statusChangeCreator.name}
+        currentStatus={statusChangeCreator.status ?? ""}
+        open={!!statusChangeCreator}
+        onOpenChange={(open) => {
+          if (!open) setStatusChangeCreator(null);
+        }}
       />
     )}
   </>
