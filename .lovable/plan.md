@@ -1,89 +1,52 @@
 
+# Fix: Headers y Footers fijos en Agregar Creador y Nuevo Evento
 
-# Fijar Header y Footer en Creadores y Eventos + Scroll Interno en Tabla
+## Problema raiz
 
-## Problema
+Los formularios (`NuevoCreadorForm` y `NuevoEventoForm`) ya tienen la estructura correcta internamente (`flex flex-col h-full overflow-hidden` con header shrink-0 y contenido scrollable). Sin embargo, las paginas padre (`NuevoCreador.tsx` y `NuevoEvento.tsx`) usan `min-h-screen` en el contenedor principal, lo que permite que el contenedor crezca mas alla del viewport. Esto anula el `overflow-hidden` de los formularios porque el padre nunca los restringe en altura.
 
-En `/creadores` y `/eventos`, toda la pagina scrollea (header con titulo, KPIs, filtros, tabla -- todo junto). El header con el titulo y boton de accion deberia estar fijo arriba, y la tabla/grid deberia tener scroll interno para que la pantalla no crezca infinitamente.
+El mismo problema aplica a `Creadores.tsx` y `Eventos.tsx` (las paginas de listado).
 
 ## Solucion
 
-Aplicar el mismo patron de layout sticky usado en los formularios (`NuevoCreadorForm`, `NuevoEventoForm`): contenedor flex-col con header fijo (`shrink-0`), contenido scrollable (`flex-1 overflow-auto`), y en el caso de la tabla de creadores, darle una altura maxima con scroll interno.
-
----
+Cambiar `min-h-screen` a `h-screen overflow-hidden` en las 4 paginas wrapper para que el contenedor tenga una altura fija igual al viewport y no crezca. Esto permite que los hijos con `flex-1 overflow-hidden` funcionen correctamente.
 
 ## Cambios por archivo
 
-### 1. `src/pages/creadores/CreadoresContent.tsx`
+### 1. `src/pages/NuevoCreador.tsx` (linea 9)
 
-- Cambiar `<main className="flex-1 overflow-auto p-6 space-y-6 min-w-0">` a `<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">`
-- Extraer el header (titulo "Creadores" + boton "Agregar Creador") a un `<header>` fijo con `shrink-0`, `px-6 pt-6 pb-4`, `border-b border-border`
-- Envolver el resto del contenido (KPIs, tabs agencias, filtros, tabla/grid) en `<div className="flex-1 overflow-auto p-6 space-y-6">`
-- Esto mantiene el titulo siempre visible mientras el contenido debajo scrollea
+Cambiar:
+```
+<div className="flex min-h-screen w-full">
+```
+A:
+```
+<div className="flex h-screen w-full overflow-hidden">
+```
 
-### 2. `src/pages/eventos/EventosContent.tsx`
+### 2. `src/pages/NuevoEvento.tsx` (linea 9)
 
-- Mismo patron: cambiar `<main>` a flex-col overflow-hidden
-- Extraer header (titulo "Eventos" + boton "Crear Evento") a `<header>` fijo con `shrink-0`
-- Envolver el resto (calendario, tabs de status, filtros, tabla/grid) en `<div className="flex-1 overflow-auto p-6 space-y-6">`
+Mismo cambio:
+```
+<div className="flex min-h-screen w-full">
+```
+A:
+```
+<div className="flex h-screen w-full overflow-hidden">
+```
 
-### 3. `src/pages/creadores/CreadoresTable.tsx`
+### 3. `src/pages/Creadores.tsx` (linea 9)
 
-- Envolver el componente `<Table>` en un contenedor con altura maxima y scroll interno: `<div className="max-h-[calc(100vh-24rem)] overflow-auto">`
-- Hacer el `<TableHeader>` sticky con `sticky top-0 z-10 bg-card` para que los encabezados de columna siempre sean visibles al scrollear dentro de la tabla
-- Esto evita que la tabla crezca indefinidamente y empuje todo el contenido
+Mismo cambio para consistencia.
 
----
+### 4. `src/pages/Eventos.tsx` (linea 9)
+
+Mismo cambio para consistencia.
 
 ## Seccion tecnica
 
-**Estructura de CreadoresContent (despues del cambio):**
-
-```text
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-    <!-- Titulo "Creadores" + boton "Agregar Creador" -->
-  </header>
-  <div className="flex-1 overflow-auto p-6 space-y-6">
-    <!-- KPIs -->
-    <!-- Tabs agencias -->
-    <!-- Filtros -->
-    <!-- Tabla (con scroll interno) o Grid -->
-  </div>
-</main>
-```
-
-**Estructura de EventosContent (despues del cambio):**
-
-```text
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-    <!-- Titulo "Eventos" + boton "Crear Evento" -->
-  </header>
-  <div className="flex-1 overflow-auto p-6 space-y-6">
-    <!-- Calendario -->
-    <!-- Tabs status -->
-    <!-- Filtros -->
-    <!-- Tabla o Grid -->
-  </div>
-</main>
-```
-
-**Scroll interno en CreadoresTable:**
-
-```text
-<div className="rounded-lg border border-border bg-card">
-  <!-- Toolbar (busqueda, exportar, etc.) -->
-  <div className="max-h-[calc(100vh-24rem)] overflow-auto">
-    <Table>
-      <TableHeader className="sticky top-0 z-10 bg-card">
-        ...
-      </TableHeader>
-      <TableBody>
-        ...
-      </TableBody>
-    </Table>
-  </div>
-</div>
-```
-
+El problema es una cadena de restricciones CSS:
+- `overflow-hidden` solo funciona si el elemento tiene una altura definida
+- `h-full` hereda la altura del padre
+- Si el padre usa `min-h-screen`, puede crecer mas alla de 100vh, asi que los hijos nunca se restringen
+- Cambiando a `h-screen overflow-hidden` se fija la altura exacta al viewport, y toda la cadena de `flex-1` + `overflow-hidden`/`overflow-auto` funciona correctamente
