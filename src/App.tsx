@@ -16,6 +16,8 @@ import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
 import Eventos from "./pages/Eventos";
 import NuevoEvento from "./pages/NuevoEvento";
+import EventoDetail from "./pages/EventoDetail";
+import EventoSharePage from "./pages/eventos/EventoSharePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => (
             <Route path="/creadores/:id" element={<CreadorProfile />} />
             <Route path="/eventos" element={<Eventos />} />
             <Route path="/eventos/nuevo" element={<NuevoEvento />} />
+            <Route path="/eventos/:id" element={<EventoDetail />} />
+            <Route path="/eventos/share/:token" element={<EventoSharePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

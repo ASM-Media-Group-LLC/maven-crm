@@ -553,33 +553,137 @@ export type Database = {
         }
         Relationships: []
       }
+      event_attendance_log: {
+        Row: {
+          changed_by: string | null
+          created_at: string | null
+          event_guest_id: string
+          event_id: string
+          id: string
+          new_status: string
+          notes: string | null
+          old_status: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string | null
+          event_guest_id: string
+          event_id: string
+          id?: string
+          new_status: string
+          notes?: string | null
+          old_status?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string | null
+          event_guest_id?: string
+          event_id?: string
+          id?: string
+          new_status?: string
+          notes?: string | null
+          old_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendance_log_event_guest_id_fkey"
+            columns: ["event_guest_id"]
+            isOneToOne: false
+            referencedRelation: "event_guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendance_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_checklist_items: {
+        Row: {
+          assigned_to: string | null
+          created_at: string | null
+          event_id: string
+          id: string
+          notes: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string | null
+          event_id: string
+          id?: string
+          notes?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string | null
+          event_id?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_checklist_items_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_guests: {
         Row: {
+          cancellation_reason: string | null
           created_at: string
           creator_id: string | null
+          email: string | null
           event_id: string
           guest_name: string | null
           guest_type: string
           id: string
+          phone: string | null
           status: string
+          status_changed_by: string | null
+          status_updated_at: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           created_at?: string
           creator_id?: string | null
+          email?: string | null
           event_id: string
           guest_name?: string | null
           guest_type?: string
           id?: string
+          phone?: string | null
           status?: string
+          status_changed_by?: string | null
+          status_updated_at?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           created_at?: string
           creator_id?: string | null
+          email?: string | null
           event_id?: string
           guest_name?: string | null
           guest_type?: string
           id?: string
+          phone?: string | null
           status?: string
+          status_changed_by?: string | null
+          status_updated_at?: string | null
         }
         Relationships: [
           {
@@ -607,7 +711,10 @@ export type Database = {
           end_date: string | null
           end_time: string | null
           event_type: string
+          external_link_expires_at: string | null
+          external_token: string | null
           id: string
+          internal_token: string | null
           location: string | null
           max_capacity: number | null
           name: string
@@ -624,7 +731,10 @@ export type Database = {
           end_date?: string | null
           end_time?: string | null
           event_type: string
+          external_link_expires_at?: string | null
+          external_token?: string | null
           id?: string
+          internal_token?: string | null
           location?: string | null
           max_capacity?: number | null
           name: string
@@ -641,7 +751,10 @@ export type Database = {
           end_date?: string | null
           end_time?: string | null
           event_type?: string
+          external_link_expires_at?: string | null
+          external_token?: string | null
           id?: string
+          internal_token?: string | null
           location?: string | null
           max_capacity?: number | null
           name?: string

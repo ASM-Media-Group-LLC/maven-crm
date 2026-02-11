@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -43,6 +44,7 @@ function shareEvent(e: EventRow, toast: ReturnType<typeof useToast>["toast"]) {
 }
 
 const EventosTable = ({ events }: Props) => {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(true);
   const { toast } = useToast();
@@ -103,7 +105,7 @@ const EventosTable = ({ events }: Props) => {
           {sorted.map((e) => {
             const Icon = typeIcons[e.event_type] ?? CalendarDays;
             return (
-              <TableRow key={e.id} className="cursor-pointer" onClick={() => openModal(e, setViewOpen)}>
+              <TableRow key={e.id} className="cursor-pointer" onClick={() => navigate(`/eventos/${e.id}`)}>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
