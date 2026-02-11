@@ -81,13 +81,13 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh]">
         <DialogHeader className="pr-8">
           <DialogTitle>Crear Nuevo Ticket</DialogTitle>
           <DialogDescription>Completa los detalles del ticket de soporte</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-2">
+        <div className="grid gap-4 py-2 overflow-y-auto max-h-[60vh]">
           <div className="space-y-1.5">
             <Label htmlFor="ticket-title">Título *</Label>
             <Input
@@ -197,6 +197,8 @@ const CreateTicketModal = ({ creatorId, open, onOpenChange }: Props) => {
                 <SelectItem value="ruben.guzman">Ruben Guzman (@ruben.guzman)</SelectItem>
                 <SelectItem value="rusin24">rusin24 (@rusin24)</SelectItem>
                 <SelectItem value="sfernandez">Sofia Fernandez (@sfernandez)</SelectItem>
+                <SelectItem value="william.cujar">william cujar (@william.cujar)</SelectItem>
+                <SelectItem value="yeison.bello">yeison bello (@yeison.bello)</SelectItem>
               </SelectContent>
             </Select>
           </div>
