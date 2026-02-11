@@ -1,131 +1,180 @@
 
 
-# Redisenar Calendario, Filtros y Crear Componente DateRangePicker
+# Funcionalidades de Eventos: Ver Detalles, Editar, Compartir, Eliminar y Cerrar
 
-## Descripcion general
+## Descripcion
 
-Tres areas de trabajo:
+Implementar cinco funcionalidades completas para los eventos, accesibles desde el menu de acciones (tres puntos) en la tabla y grid de eventos:
 
-1. **Separar calendario y proximos eventos** en contenedores independientes (dos Cards lado a lado en lugar de una sola Card con grid interno).
-2. **Mejorar filtros**: ampliar input de busqueda y reemplazar los dos inputs `type="date"` por un DateRangePicker personalizado.
-3. **Crear componente DateRangePicker** reutilizable y documentarlo en el design system.
+1. **Ver detalles**: Modal con toda la informacion del evento, resumen de invitados por estado, y gestion de invitados con tabs de filtro
+2. **Editar evento**: Modal con formulario pre-poblado para modificar los campos del evento
+3. **Compartir evento**: Copiar al portapapeles un resumen del evento en texto plano
+4. **Eliminar evento**: Confirmacion con alert dialog antes de eliminar
+5. **Cerrar evento**: Modal para finalizar un evento como "completado" o "cancelado" con notas de cierre opcionales
 
 ---
 
 ## Cambios por archivo
 
-### 1. Nuevo: `src/components/ui/date-range-picker.tsx`
+### 1. Nuevo: `src/pages/eventos/ViewEventoModal.tsx`
 
-Componente reutilizable que:
-- Usa un `Popover` como contenedor
-- Trigger: boton con icono CalendarIcon y texto "Seleccionar fechas" (o el rango formateado si hay seleccion)
-- Contenido del popover:
-  - Panel izquierdo con presets rapidos: "Hoy", "Ayer", "Esta semana", "Semana pasada", "Este mes", "Mes pasado"
-  - Panel derecho con dos calendarios DayPicker lado a lado (mes actual y siguiente) en modo `range`
-  - Inputs de fecha manual (dd/mm/yyyy) debajo de los calendarios
-  - Botones "Cancelar" y "Aplicar" en el footer
-- Props: `from: Date | undefined`, `to: Date | undefined`, `onApply: (from, to) => void`, `placeholder?: string`
-- Usa tokens del sistema (bg-popover, border-border, text-foreground, primary para seleccion)
-- Incluye `pointer-events-auto` en el Calendar como indica el contexto de shadcn-datepicker
+Modal de ver detalles basado en la imagen de referencia:
 
-### 2. Editar: `src/pages/eventos/EventosCalendar.tsx`
+- **Header**: Nombre del evento como titulo, con botones "Compartir" y "Editar" a la derecha (con pr-8 para no tapar la X de cierre)
+- **Badges**: Tipo de evento y status debajo del titulo
+- **Card de info**: Fecha (relativa con formatDistanceToNow) y Ubicacion con iconos CalendarDays y MapPin
+- **Descripcion/notas**: Texto con las notas del evento
+- **Resumen de invitados**: Barra con contadores: Total, Confirmados, Pendientes, Rechazados, Reagendados, Canceladas, Sin Respuesta (colores del sistema)
+- **Seccion Invitados**: Titulo "Invitados" con subtitulo "Gestiona el estado y horarios de llegada" y boton "+ Agregar Invitados"
+- **Tabs de filtro de invitados**: Todos (N), Pendientes (N), Confirmados (N), Sin respuesta (N), Rechazados (N) usando el patron inline-flex bg-muted/50
+- **Lista de invitados**: Mostrar los invitados del evento desde `event_guests` con join a `creators` para obtener nombre. Empty state con icono Users y "No hay invitados con este estado"
+- **Acciones en invitados**: Posibilidad de cambiar el status de cada invitado (pending, confirmed, rejected)
+- Props: `open`, `onOpenChange`, `event: EventRow`
+- Fetch de invitados con `useQuery(["event-guests", eventId])` que hace select de `event_guests` con join a `creators(name, artistic_name, profile_photo_url)`
 
-**Separar en dos contenedores:**
-- Layout: `grid grid-cols-1 lg:grid-cols-3 gap-6` (en lugar del grid interno actual)
-- **Card izquierda (lg:col-span-2)**: Contiene solo el calendario DayPicker con:
-  - Header con "febrero 2026" (titulo del mes en formato largo), boton "Hoy" y flechas de navegacion
-  - El DayPicker ocupa todo el ancho de la card
-  - Indicadores de eventos (puntos azules debajo de los dias con eventos, en lugar del underline actual)
-  - Footer: barra con "N eventos este mes" en un banner con fondo accent
-- **Card derecha**: Titulo "Proximos eventos", lista vertical de eventos en cards individuales:
-  - Cada evento en su propia card con fondo card y borde
-  - Icono del tipo de evento, nombre en bold, tiempo relativo ("hace 3 horas", "en 1 dia"), ubicacion
-  - Badge "Proximo" en primary
+### 2. Nuevo: `src/pages/eventos/EditEventoModal.tsx`
 
-### 3. Editar: `src/pages/eventos/EventosFilters.tsx`
+Modal de edicion:
 
-- **Input de busqueda**: Cambiar `w-48` a `flex-1` para que se extienda al ancho disponible
-- **Eliminar** los dos `<Input type="date">` (dateFrom y dateTo)
-- **Agregar** el nuevo componente `DateRangePicker` en su lugar
-- Mantener los selects de Tipo y Horario sin cambios
-- Mantener los botones de vista (tabla/grid) al final con `ml-auto`
+- Formulario pre-poblado con los datos actuales del evento
+- Campos: Nombre, Tipo (select), Fecha inicio, Fecha fin, Hora inicio, Hora fin, Ubicacion (con el mismo Combobox de ubicaciones del formulario de creacion), Capacidad maxima, Notas/Descripcion
+- Botones: "Cancelar" y "Guardar cambios"
+- Usa `useUpdateEvento()` ya existente
+- Toast de exito al guardar
 
-### 4. Editar: `src/pages/eventos/useEventos.ts`
+### 3. Nuevo: `src/pages/eventos/CloseEventoModal.tsx`
 
-- Sin cambios en la logica de filtros (dateFrom y dateTo siguen siendo strings en el formato YYYY-MM-DD)
+Modal de cierre basado en la imagen de referencia:
 
-### 5. Editar: `src/pages/design-system/sections/InputsSection.tsx`
+- Titulo: "Cerrar Evento"
+- Subtitulo: 'Como finalizo "Nombre del evento"?'
+- **RadioGroup** con dos opciones:
+  - "Se realizo exitosamente" con icono CheckCircle en verde y descripcion "El evento se llevo a cabo segun lo planeado"
+  - "Se cancelo" con icono XCircle en rojo y descripcion "El evento no se realizo y queda cancelado"
+- **Textarea**: "Notas de cierre (opcional)" con placeholder "Agrega notas sobre como finalizo el evento..."
+- Botones: "Cancelar" y "Confirmar Cierre"
+- Al confirmar: actualiza el status del evento a "completed" o "cancelled" y opcionalmente agrega las notas de cierre al campo notes
+- Usa `useUpdateEvento()` existente
 
-Agregar nueva subseccion **"Date Range Picker"** despues de la seccion de Select:
-- Titulo "Date Range Picker"
-- Descripcion: componente para seleccion de rangos de fecha con presets rapidos
-- Ejemplo interactivo del DateRangePicker
-- Caja de documentacion con las props y tokens utilizados
+### 4. Nuevo: `src/pages/eventos/DeleteEventoDialog.tsx`
+
+AlertDialog de confirmacion:
+
+- Titulo: "Eliminar evento"
+- Descripcion: 'Estas seguro de que deseas eliminar "Nombre"? Esta accion no se puede deshacer.'
+- Botones: "Cancelar" y "Eliminar" (destructive)
+- Usa `useDeleteEvento()` existente
+- Toast de exito/error
+
+### 5. Editar: `src/pages/eventos/EventosTable.tsx`
+
+- Importar los 4 modales nuevos (ViewEventoModal, EditEventoModal, CloseEventoModal, DeleteEventoDialog)
+- Agregar estados para el evento seleccionado y cual modal esta abierto
+- Agregar opcion "Cerrar evento" en el DropdownMenu (entre Compartir y Eliminar)
+- Conectar cada DropdownMenuItem a su modal correspondiente
+- "Compartir" copia al portapapeles: "Evento: {nombre}\nTipo: {tipo}\nFecha: {fecha}\nUbicacion: {ubicacion}\nEstado: {status}" con toast de confirmacion
+
+### 6. Editar: `src/pages/eventos/EventosGrid.tsx`
+
+- Agregar los mismos modales y funcionalidades que en la tabla
+- Agregar menu de acciones (tres puntos) en cada card con las mismas opciones: Ver detalles, Editar, Compartir, Cerrar evento, Eliminar
+- Al hacer click en la card sin el menu, abrir Ver detalles
+
+### 7. Editar: `src/pages/eventos/useEventos.ts`
+
+- Agregar hook `useEventGuests(eventId)` para fetch de invitados con join a creators
+- Agregar hook `useUpdateGuestStatus()` para cambiar el status de un invitado individual
+- Agregar hook `useDeleteEventGuest()` para eliminar un invitado del evento
 
 ---
 
 ## Seccion tecnica
 
-**Estructura del DateRangePicker:**
+**Estructura del ViewEventoModal (basado en la imagen):**
+
 ```text
-<Popover>
-  <PopoverTrigger>
-    <Button variant="outline">
-      <CalendarIcon /> "Seleccionar fechas" | "11 feb - 28 feb 2026"
-    </Button>
-  </PopoverTrigger>
-  <PopoverContent className="w-auto p-0">
-    <div className="flex">
-      <!-- Presets sidebar -->
-      <div className="border-r p-3 space-y-1">
-        <Button variant="outline" size="sm">Hoy</Button>
-        <Button variant="ghost" size="sm">Ayer</Button>
-        ...
+<DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+  <DialogHeader className="pr-8">
+    <div className="flex items-start justify-between">
+      <div>
+        <DialogTitle>{event.name}</DialogTitle>
+        <div className="flex gap-2 mt-1">
+          <Badge>{event.event_type}</Badge>
+          <Badge>{statusLabel[event.status]}</Badge>
+        </div>
       </div>
-      <!-- Calendars -->
-      <div className="p-3">
-        <DayPicker mode="range" numberOfMonths={2} />
-        <div className="flex items-center gap-2 mt-3">
-          <Input placeholder="dd/mm/yyyy" />
-          <span>--</span>
-          <Input placeholder="dd/mm/yyyy" />
-        </div>
-        <div className="flex justify-end gap-2 mt-3">
-          <Button variant="ghost">Cancelar</Button>
-          <Button>Aplicar</Button>
-        </div>
+      <div className="flex gap-2">
+        <Button variant="outline">Compartir</Button>
+        <Button variant="outline">Editar</Button>
       </div>
     </div>
-  </PopoverContent>
-</Popover>
+  </DialogHeader>
+  <!-- Info card con fecha y ubicacion -->
+  <!-- Descripcion -->
+  <!-- Resumen counters -->
+  <!-- Invitados con tabs -->
+</DialogContent>
 ```
 
-**Estructura del calendario separado:**
+**Estructura del CloseEventoModal:**
+
 ```text
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <Card className="lg:col-span-2">
-    <!-- Header: titulo mes, Hoy, flechas -->
-    <!-- DayPicker full width -->
-    <!-- Footer: N eventos este mes -->
-  </Card>
-  <Card>
-    <h3>Proximos eventos</h3>
-    <!-- Cards individuales por evento -->
-  </Card>
-</div>
+<DialogContent className="sm:max-w-md">
+  <DialogHeader>
+    <DialogTitle>Cerrar Evento</DialogTitle>
+    <DialogDescription>Como finalizo "{event.name}"?</DialogDescription>
+  </DialogHeader>
+  <RadioGroup>
+    <label className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer
+                      data-[state=checked]:border-primary">
+      <RadioGroupItem value="completed" />
+      <CheckCircle className="text-green-500" />
+      <div>
+        <p className="font-medium">Se realizo exitosamente</p>
+        <p className="text-sm text-muted-foreground">...</p>
+      </div>
+    </label>
+    <!-- Similar para "cancelled" con XCircle rojo -->
+  </RadioGroup>
+  <Textarea placeholder="Agrega notas..." />
+  <DialogFooter>
+    <Button variant="outline">Cancelar</Button>
+    <Button>Confirmar Cierre</Button>
+  </DialogFooter>
+</DialogContent>
 ```
 
-**Indicadores de eventos en el calendario:**
-- En lugar de underline, usar modifiers con un pseudo-elemento (dot) debajo del numero del dia
-- Implementado via `modifiersClassNames` con una clase CSS custom que agrega un punto azul usando `after:` de Tailwind
+**Hook useEventGuests:**
 
-**Presets del DateRangePicker:**
-- Hoy: from=today, to=today
-- Ayer: from=yesterday, to=yesterday
-- Esta semana: from=startOfWeek, to=endOfWeek
-- Semana pasada: from=startOfWeek-7, to=endOfWeek-7
-- Este mes: from=startOfMonth, to=endOfMonth
-- Mes pasado: from=startOfLastMonth, to=endOfLastMonth
+```typescript
+export function useEventGuests(eventId: string) {
+  return useQuery({
+    queryKey: ["event-guests", eventId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("event_guests")
+        .select("*, creators(name, artistic_name, profile_photo_url)")
+        .eq("event_id", eventId);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!eventId,
+  });
+}
+```
 
-Todas las funciones de fecha usan `date-fns` que ya esta instalado.
+**Compartir evento (copia al portapapeles):**
+
+```typescript
+const shareText = [
+  `Evento: ${e.name}`,
+  `Tipo: ${e.event_type}`,
+  `Fecha: ${format(new Date(e.date), "d MMM yyyy", { locale: es })}`,
+  e.location ? `Ubicacion: ${e.location}` : null,
+  `Estado: ${statusLabel[e.status]}`,
+].filter(Boolean).join("\n");
+
+navigator.clipboard.writeText(shareText);
+toast({ title: "Evento copiado al portapapeles" });
+```
 
