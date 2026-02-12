@@ -1,67 +1,75 @@
 
-# Crear modal "Nuevo Lead" al hacer clic en "+ Lead"
 
-## Resumen
+# Ajustar modal "Nuevo Lead": scroll, companias, banderas, evidencia
 
-Crear un nuevo componente modal que se abre al presionar el boton "+ Lead" en el header de LeadGen. El modal sigue el patron existente de `AddCreadorModal` y el design system documentado.
+## Problemas detectados
 
-## Campos del modal (segun la imagen de referencia)
+1. **Modal cortado**: No tiene `max-h-[90vh]` ni scroll interno, causando que el contenido se corte en pantallas pequenas
+2. **Companias incorrectas**: Muestra "Compania 1/2/3" en vez de las reales (KASH Agency, alvaroletshoot, Blue app, Piclink.me, Pagomundo, Exchange, Unlok)
+3. **Banderas ausentes**: El campo Pais no muestra emojis de bandera junto al nombre del pais
+4. **Falta campo de Evidencia**: Segun la imagen, hay un campo "Evidencia (opcional)" con boton "Subir Evidencia (0/4)" y texto "Sube hasta 4 imagenes o videos como prueba de contacto"
+5. **Boton de submit**: En la referencia dice "Guardar Lead" con icono de telefono, no "Agregar Lead"
 
-1. **URL Perfil / Contacto** * - Input de texto, placeholder "https://instagram.com/..."
-2. **Plataforma** * - Select con opciones: Instagram, TikTok, Twitter/X, OnlyFans, Otra
-3. **Categoria** * - Select con opciones: A+, A, B+ (Buena), B, C
-4. **Compania / Cuenta de Origen** * - Select con placeholder "Selecciona la compania"
-5. **Pais** - Select con placeholder "Selecciona un pais"
-6. **Notas** - Textarea con placeholder "Notas adicionales..."
+## Cambios en `src/pages/leadgen/AddLeadModal.tsx`
 
-## Feedback
+### 1. Scroll del modal
+- Agregar `max-h-[90vh]` al `DialogContent`
+- Envolver el formulario en un `div` con `overflow-y-auto max-h-[60vh]` para scroll interno del contenido
 
-- Toast de exito: `{ title: "Lead agregado exitosamente" }` usando `useToast`
-- Toast de error: `{ title: "Error al agregar lead", variant: "destructive" }` usando `useToast`
+### 2. Opciones de Compania
+Reemplazar las opciones actuales por:
+- KASH Agency
+- alvaroletshoot
+- Blue app
+- Piclink.me
+- Pagomundo
+- Exchange
+- Unlok
 
-## Archivos a crear/modificar
+### 3. Banderas en Pais
+Agregar emoji de bandera antes del nombre de cada pais:
+- Mexico -> flag MX
+- Colombia -> flag CO
+- Argentina -> flag AR
+- Espana -> flag ES
+- Estados Unidos -> flag US
+- Otro (sin bandera)
 
-### Nuevo: `src/pages/leadgen/AddLeadModal.tsx`
+### 4. Campo Evidencia (opcional)
+Agregar despues de Notas:
+- Label "Evidencia (opcional)"
+- Un boton outline de ancho completo con icono Upload y texto "Subir Evidencia (N/4)"
+- Texto descriptivo debajo: "Sube hasta 4 imagenes o videos como prueba de contacto"
+- Estado local para archivos seleccionados (maximo 4)
+- Usar input type="file" oculto con accept="image/*,video/*" y multiple
+- No se suben a ningun storage (simulado como los demas campos), solo se mantiene la lista de archivos seleccionados con previsualizacion de nombres
 
-- Dialog con titulo "Nuevo Lead" y descripcion breve
-- Formulario con validacion usando `react-hook-form` + `zod`
-- Campos obligatorios: URL Perfil/Contacto, Plataforma, Categoria, Compania
-- Campos opcionales: Pais, Notas
-- Footer con botones "Cancelar" (ghost) y "Agregar Lead" (primary, sin icono)
-- Estado de carga en boton: "Agregando..."
-- Como no hay tabla de leads en Supabase, el submit simulara un guardado exitoso con un timeout breve y mostrara el toast correspondiente
-- Validacion de URL con formato basico (debe empezar con https://)
-- Ancho del modal: `max-w-lg`
-- Padding derecho en header: `pr-8` (patron estandar para evitar overlap con boton X)
+### 5. Boton submit
+- Cambiar texto de "Agregar Lead" a "Guardar Lead"
+- Agregar icono de telefono (Phone de lucide) antes del texto
+- Texto de carga: "Guardando..."
 
-### Modificar: `src/pages/leadgen/LeadGenContent.tsx`
-
-- Importar `AddLeadModal`
-- Agregar estado `const [addLeadOpen, setAddLeadOpen] = useState(false)`
-- Conectar el boton "+ Lead" con `onClick={() => setAddLeadOpen(true)}`
-- Renderizar `<AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />`
-
-## Seccion tecnica
-
-### Schema de validacion (zod)
+## Estructura resultante del modal
 
 ```text
-url_perfil: z.string().min(1, "URL requerida").url("URL invalida")
-plataforma: z.string().min(1, "Plataforma requerida")
-categoria: z.string().min(1, "Categoria requerida")
-compania: z.string().min(1, "Compania requerida")
-pais: z.string().optional()
-notas: z.string().max(500).optional()
+DialogContent (max-w-lg max-h-[90vh])
+  DialogHeader (pr-8)
+    DialogTitle: "Nuevo Lead"
+    DialogDescription
+  
+  div (overflow-y-auto max-h-[60vh] space-y-4 pr-1)
+    URL Perfil (input)
+    [Plataforma | Categoria] (grid 2 cols)
+    Compania (select - opciones reales)
+    Pais (select - con banderas)
+    Notas (textarea)
+    Evidencia (boton upload + texto helper)
+  
+  DialogFooter
+    Cancelar (ghost)
+    Guardar Lead (primary, con icono Phone)
 ```
 
-### Layout del formulario
+## Archivo modificado
 
-- URL Perfil: ancho completo
-- Plataforma + Categoria: grid 2 columnas
-- Compania: ancho completo
-- Pais: ancho completo
-- Notas: textarea ancho completo
-
-### Patron seguido
-
-Mismo patron que `AddCreadorModal`: Dialog + react-hook-form + zod + toast de hooks/use-toast. Sin sonner.
+Solo se modifica `src/pages/leadgen/AddLeadModal.tsx`.
