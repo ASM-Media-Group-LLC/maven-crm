@@ -22,7 +22,7 @@ const LeadGenContent = () => {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+    <main className="flex-1 flex flex-col h-full overflow-auto min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-start justify-between gap-4">
