@@ -10,6 +10,7 @@ import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
 import CreatorStatsCards from "./sales-dashboard/CreatorStatsCards";
 import ConcentrationChart from "./sales-dashboard/ConcentrationChart";
 import CreatorsTable from "./sales-dashboard/CreatorsTable";
+import CreatorPerformanceView from "./sales-dashboard/CreatorPerformanceView";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,7 @@ const SalesDashboard = () => {
             />
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
-            ) : (
+            ) : activeView === "Vista General" ? (
               <>
                 <EarningsSummary rows={filteredRows} comparedRows={comparedRows} />
                 <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
@@ -135,6 +136,8 @@ const SalesDashboard = () => {
                 <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
                 <CreatorsTable rows={filteredRows} comparedRows={comparedRows} />
               </>
+            ) : (
+              <CreatorPerformanceView rows={filteredRows} />
             )}
           </main>
         </div>

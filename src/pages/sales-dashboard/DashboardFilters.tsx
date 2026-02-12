@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import { Calendar, GitCompareArrows, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -42,13 +41,7 @@ const DashboardFilters = ({
   compareDateTo,
   onCompareDateChange,
 }: DashboardFiltersProps) => {
-  const navigate = useNavigate();
-
   const handleViewChange = (tab: ViewTab) => {
-    if (tab === "Rendimiento por Creadora") {
-      navigate("/salesperformancecreator");
-      return;
-    }
     onViewChange(tab);
   };
 
