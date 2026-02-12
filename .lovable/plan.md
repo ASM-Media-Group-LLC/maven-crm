@@ -1,69 +1,33 @@
 
-# Actualizar el campo "País" en el modal "Nuevo Lead" con lista completa
 
-## Cambios
+# Ajustar footer del modal "Nuevo Lead"
 
-Actualizar el select "País" en `src/pages/leadgen/AddLeadModal.tsx` reemplazando las opciones actuales (México, Colombia, Argentina, España, Estados Unidos, Otro) con la lista completa de 40 países organizados por regiones: Latinoamérica (20 países) y Europa (20 países).
+## Cambio
 
-## Estructura de las opciones de País
+En `src/pages/leadgen/AddLeadModal.tsx`, modificar el `DialogFooter`:
 
-Las opciones se presentarán en el siguiente orden:
+1. Eliminar el botón "Cancelar" (ghost)
+2. Hacer que el botón "Guardar Lead" ocupe el ancho completo con `w-full`
 
-**Sección Latinoamérica:**
-- 🇺🇸 Estados Unidos
-- 🇲🇽 México
-- 🇨🇱 Chile
-- 🇨🇴 Colombia
-- 🇦🇷 Argentina
-- 🇧🇷 Brasil
-- 🇵🇪 Perú
-- 🇻🇪 Venezuela
-- 🇪🇨 Ecuador
-- 🇧🇴 Bolivia
-- 🇵🇾 Paraguay
-- 🇺🇾 Uruguay
-- 🇨🇷 Costa Rica
-- 🇵🇦 Panamá
-- 🇩🇴 República Dominicana
-- 🇬🇹 Guatemala
-- 🇭🇳 Honduras
-- 🇳🇮 Nicaragua
-- 🇸🇻 El Salvador
-- 🇨🇺 Cuba
+## Archivo a modificar
 
-**Sección Europa:**
-- 🇪🇸 España
-- 🇫🇷 Francia
-- 🇩🇪 Alemania
-- 🇮🇹 Italia
-- 🇬🇧 Reino Unido
-- 🇵🇹 Portugal
-- 🇳🇱 Países Bajos
-- 🇧🇪 Bélgica
-- 🇨🇭 Suiza
-- 🇦🇹 Austria
-- 🇸🇪 Suecia
-- 🇳🇴 Noruega
-- 🇩🇰 Dinamarca
-- 🇫🇮 Finlandia
-- 🇵🇱 Polonia
-- 🇨🇿 República Checa
-- 🇬🇷 Grecia
-- 🇮🇪 Irlanda
-- 🇷🇴 Rumania
-- 🇭🇺 Hungría
+**`src/pages/leadgen/AddLeadModal.tsx`** - Reemplazar el contenido del `DialogFooter` actual (que tiene dos botones) por un solo botón de ancho completo.
 
-## Implementación técnica
+## Detalle técnico
 
-**Archivo a modificar:** `src/pages/leadgen/AddLeadModal.tsx`
+Cambiar de:
+```text
+<DialogFooter className="pt-4">
+  <Button variant="ghost" ...>Cancelar</Button>
+  <Button type="submit" ...>Guardar Lead</Button>
+</DialogFooter>
+```
 
-**Cambio específico:** Reemplazar el contenido del `<SelectContent>` en el campo "pais" (líneas 196-203) con todos los `<SelectItem>` correspondientes a los 40 países listados arriba, manteniendo la estructura y los emojis de bandera como prefijo de cada opción.
+A:
+```text
+<DialogFooter className="pt-4">
+  <Button type="submit" className="w-full" ...>Guardar Lead</Button>
+</DialogFooter>
+```
 
-Los valores de los SelectItem seguirán el patrón de códigos ISO de dos letras (ej: "us", "mx", "cl", etc.) para consistencia y facilidad de integración futura con bases de datos.
-
-## Notas
-
-- Se mantiene el patrón actual de emojis de bandera + nombre del país
-- No se agrega separador visual entre regiones en esta versión (Radix UI SelectContent no tiene dividers nativos sin componentes adicionales)
-- El campo "Otro" se puede remover o mantener como opción final opcional
-- La funcionalidad de selección y validación permanece igual
+Se mantiene el icono Phone y el estado de carga "Guardando...".
