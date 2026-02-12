@@ -1,28 +1,23 @@
 
 
-# Corregir scroll en la página LeadGen
+# Mostrar las dos cards KPI en una sola fila
 
-## Problema
+## Cambio
 
-El contenedor principal de `LeadGenContent.tsx` (línea 25) tiene `overflow-hidden`, lo que impide hacer scroll. Las secciones fijas (header, KPIs, tabs, filtros) ocupan mucho espacio vertical -- especialmente en pantallas pequeñas -- y no queda espacio visible para el área de contenido. Como el padre bloquea el scroll, no se puede bajar para ver el resto de la página.
+En `src/pages/leadgen/LeadGenContent.tsx`, la grilla de KPIs (linea 50) ya usa `grid-cols-1 lg:grid-cols-2`. El problema es que en pantallas medianas las cards se apilan. Se cambiara a `grid-cols-2` (sin breakpoint) para que siempre se muestren lado a lado.
 
-## Solución
+## Detalle tecnico
 
-Cambiar la estrategia de layout en `src/pages/leadgen/LeadGenContent.tsx`:
-
-- Reemplazar `overflow-hidden` por `overflow-auto` en el contenedor principal (línea 25), para que toda la página sea scrollable cuando el contenido excede el viewport.
-
-## Detalle técnico
-
-**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`, línea 25.
+**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`, linea 50.
 
 Cambiar:
 ```
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+grid grid-cols-1 lg:grid-cols-2 gap-6
 ```
 Por:
 ```
-<main className="flex-1 flex flex-col h-full overflow-auto min-w-0">
+grid grid-cols-2 gap-6
 ```
 
-Esto permite que todo el contenido de la página sea accesible mediante scroll, manteniendo el layout flex existente.
+Esto fuerza las dos cards (Cantidad y Estados) a compartir el mismo espacio horizontal en todos los tamanos de pantalla.
+
