@@ -25,7 +25,7 @@ const mockSupervisores = [
   { name: "carolina.jaramillo", email: "carolina.jaramillo@unlok.me" },
   { name: "cheryl.gonzalez", email: "cheryl.gonzalez@unlok.me" },
   { name: "Andres.Gaviria", email: "andres.gaviria@unlok.me" },
-].map((s) => ({ ...s, totalQA: 0, aPlus: 0, a: 0, bPlus: 0, b: 0, c: 0, aprobados: 0, rechazados: 0 }));
+].map((s) => ({ ...s, totalQA: 0, aPlus: 0, a: 0, bPlus: 0, b: 0, c: 0, aprobados: 0, rechazados: 0, mejorar: 0 }));
 
 const tabs = [
   { id: "leads", label: "Leads", icon: CheckSquare },
@@ -302,6 +302,7 @@ const LeadGenContent = () => {
           )}
 
           {activeTab === "supervisores" && (
+            viewMode === "list" ? (
             <Card>
               <CardContent className="pt-6 px-0">
                 <div className="max-h-[calc(100vh-24rem)] overflow-auto">
@@ -364,6 +365,68 @@ const LeadGenContent = () => {
                 </div>
               </CardContent>
             </Card>
+            ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {mockSupervisores.map((sup) => {
+                const initials = sup.name.slice(0, 2).toUpperCase();
+                return (
+                  <Card key={sup.email}>
+                    <CardContent className="p-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">{sup.name}</p>
+                            <p className="text-xs text-muted-foreground">{sup.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <CheckSquare className="h-4 w-4" />
+                          <span className="text-sm font-medium">{sup.totalQA}</span>
+                          <span className="text-xs">QA reviews</span>
+                        </div>
+                      </div>
+
+                      {/* Calificaciones */}
+                      <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border mb-3">
+                        {[
+                          { label: "A+", value: sup.aPlus, color: "text-primary" },
+                          { label: "A", value: sup.a, color: "text-green-500" },
+                          { label: "B+", value: sup.bPlus, color: "text-yellow-500" },
+                          { label: "B", value: sup.b, color: "text-muted-foreground" },
+                          { label: "C", value: sup.c, color: "text-muted-foreground" },
+                        ].map((item) => (
+                          <div key={item.label} className="bg-muted/30 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                            <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Estados */}
+                      <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden border">
+                        <div className="bg-green-500/5 p-3 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Aprobados</p>
+                          <p className="text-lg font-bold text-green-500">{sup.aprobados}</p>
+                        </div>
+                        <div className="bg-yellow-500/5 p-3 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Mejorar</p>
+                          <p className="text-lg font-bold text-yellow-500">{sup.mejorar}</p>
+                        </div>
+                        <div className="bg-destructive/5 p-3 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Rechazados</p>
+                          <p className="text-lg font-bold text-destructive">{sup.rechazados}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            )
           )}
         </div>
       </div>
