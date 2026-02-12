@@ -1,79 +1,49 @@
 
 
-# Agregar chart "Earnings by channel" y limpiar duplicados
+# Header fijo, reordenar columnas de earnings y mejorar Custom Metrics
 
-## Problemas actuales identificados
+## 1. Header fijo con scroll en el body
 
-1. **Header duplicado**: "Estadísticas de creadoras" aparece tanto en `CreatorStatsCards` como en `SalesReportSection`
-2. **Filtros redundantes**: `SalesReportSection` tiene sus propios filtros (search, creadora, document ID, fechas, Hoy/Ayer) que duplican los filtros del dashboard (`DashboardFilters`)
-3. **Falta**: Chart de "Earnings by channel" (gráfico de líneas por canal con leyenda mostrando %, monto)
+Actualmente la tabla ya tiene `sticky top-0` en el `TableHeader`, pero el contenedor usa `overflow-auto max-h-[calc(100vh-24rem)]` directamente en el `div` que envuelve el `Table`. Esto funciona para scroll vertical pero el header necesita mantenerse fijo de forma mas robusta. Se verificara que el patron actual es correcto y se ajustara si es necesario.
 
-## Nuevo orden de la Vista General (según la imagen)
+## 2. Reordenar columnas: Total Earnings, Gross Earnings, Net Earnings juntas
 
-1. EarningsTrendChart (Tendencias de Ganancias - ya existe)
-2. **EarningsByChannelChart** (nuevo - gráfico de líneas por canal)
-3. ConcentrationChart (Análisis de Concentración - ya existe)
-4. CreatorStatsCards (Creator statistics con 4 KPI cards - ya existe)
-5. SalesReportSection (tabla simplificada, sin header ni filtros redundantes)
+En `ALL_COLUMNS` dentro de `types.ts`, mover `net_earnings` para que quede inmediatamente despues de `total_earnings_gross`. Tambien renombrar para mayor claridad:
+- `total_earnings_gross` -> "Gross Earnings" (ya existe, renombrar label)
+- `net_earnings` -> "Net Earnings" (mover de posicion 20 a posicion 5, justo despues de gross)
 
-Se elimina `EarningsSummary` ya que su información (Subscriptions, Tips, Messages, etc.) se representara visualmente en el nuevo chart de canal con mas detalle.
+Nuevo orden de las primeras columnas:
+1. Artistic Name
+2. Creator OF
+3. Fecha
+4. Hora
+5. **Total Earnings** (total_earnings_gross - se mantiene como "Total Earnings")
+6. **Net Earnings** (net_earnings - movida aqui)
+7. Subscriptions
+8. Message
+9. Tips
+10. ...resto de columnas...
+11. Variacion, Tendencia, Participacion (al final)
 
-## Cambios por archivo
+## 3. Custom Metrics: cambiar de Popover a Dialog (modal)
 
-### 1. Crear `src/pages/sales-dashboard/EarningsByChannelChart.tsx`
-Gráfico de líneas multi-serie mostrando ganancias diarias por canal:
-- **Canales**: Subscriptions, Tips, Posts, Messages, Referrals, Streams
-- **Eje X**: Fechas del periodo
-- **Eje Y**: Monto en dolares
-- **Leyenda lateral derecha**: Cada canal con color, porcentaje del total, y monto total
-- Cada canal es una linea con color distinto (similar a la imagen: azul suscripciones, verde tips, rosa posts, naranja messages, cyan referrals, magenta streams)
-
-### 2. Modificar `src/pages/SalesDashboard.tsx`
-- Eliminar importacion de `EarningsSummary`
-- Agregar importacion de `EarningsByChannelChart`
-- Nuevo orden de componentes en Vista General:
-  1. EarningsTrendChart
-  2. EarningsByChannelChart (nuevo)
-  3. ConcentrationChart
-  4. CreatorStatsCards
-  5. SalesReportSection
-
-### 3. Modificar `src/pages/sales-dashboard/SalesReportSection.tsx`
-- Eliminar el header "Estadisticas de creadoras" (ya esta en CreatorStatsCards arriba)
-- Eliminar `EarningsFilters` completo (filtros de fecha, creadora, document ID ya estan en DashboardFilters)
-- Mantener solo: barra con Custom metrics + Export Excel + un campo de busqueda simple, luego la tabla y paginacion
-- Eliminar imports y estado de: `dateFrom`, `dateTo`, `documentFilter`, `creatorFilter`, `relatedCreatorNames`, `relatedDocumentIds`, `handleToday`, `handleYesterday`
-
-## Detalle tecnico del EarningsByChannelChart
-
-```text
-+--------------------------------------------------------------+---------------------+
-| Earnings by channel (i)                                      |                     |
-|                                                              | * Subscriptions  19.60%  $11,071 |
-|  10,000 -.........................................            | * Tips            8.82%   $4,982 |
-|   8,000 -.........*..........                                | * Posts           0.04%      $23 |
-|   6,000 -..--*--*---.--*---.---*..                           | * Messages       71.53%  $40,398 |
-|   4,000 -.......................--*                           | * Referrals       0%         $0 |
-|   2,000 -..==..==..==..==..==..==                            | * Streams         0%         $0 |
-|       0 -..........................                           |                     |
-|          Feb 5  Feb 6  Feb 7  Feb 8  Feb 9  Feb 10  Feb 11  |                     |
-+--------------------------------------------------------------+---------------------+
-```
-
-Datos agrupados por dia, una linea por canal. La leyenda calcula porcentaje y total de cada canal sobre el gran total.
-
-Canales y colores:
-- Subscriptions: `hsl(211, 100%, 50%)` (azul)
-- Tips: `hsl(145, 63%, 42%)` (verde)
-- Posts: `hsl(0, 84%, 60%)` (rosa/rojo)
-- Messages: `hsl(25, 95%, 53%)` (naranja)
-- Referrals: `hsl(190, 90%, 50%)` (cyan)
-- Streams: `hsl(300, 70%, 50%)` (magenta)
-
-## Archivos a crear
-- `src/pages/sales-dashboard/EarningsByChannelChart.tsx`
+Convertir el componente `CustomMetrics` de un `Popover` a un `Dialog` (modal) con:
+- Titulo "Configurar columnas"
+- Lista de todas las columnas con checkboxes para mostrar/ocultar
+- Boton de cerrar
+- Scroll interno si hay muchas columnas
+- Texto del boton cambia a "Configurar tabla"
 
 ## Archivos a modificar
-- `src/pages/SalesDashboard.tsx`
-- `src/pages/sales-dashboard/SalesReportSection.tsx`
+
+### `src/pages/sales-performance/types.ts`
+- Reordenar `ALL_COLUMNS`: mover `net_earnings` justo despues de `total_earnings_gross`
+
+### `src/pages/sales-performance/CustomMetrics.tsx`
+- Cambiar de `Popover` a `Dialog` (modal)
+- Agregar titulo "Configurar columnas"
+- Cambiar texto del boton a "Configurar tabla"
+
+### `src/pages/sales-performance/EarningsTable.tsx`
+- Verificar que el sticky header funciona correctamente (ya implementado)
 
