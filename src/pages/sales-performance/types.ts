@@ -24,6 +24,11 @@ export interface EarningsRow {
   artistic_name: string | null;
   report_time: string | null;
   effective_date: string;
+  // Calculated fields
+  net_earnings?: number | null;
+  variation_percent?: number | null;
+  trend?: string | null;
+  participation_percent?: number | null;
 }
 
 export type SortField = keyof EarningsRow;
@@ -34,7 +39,7 @@ export interface ColumnDef {
   label: string;
   defaultVisible: boolean;
   align?: "left" | "right";
-  format?: "currency" | "number" | "percent" | "text" | "date" | "document" | "time";
+  format?: "currency" | "number" | "percent" | "text" | "date" | "document" | "time" | "signed_percent" | "trend";
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
@@ -59,5 +64,9 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { key: "avg_spend_per_spender_gross", label: "Avg Spend/Spender", defaultVisible: false, align: "right", format: "currency" },
   { key: "avg_spend_per_transaction_gross", label: "Avg Spend/Transaction", defaultVisible: false, align: "right", format: "currency" },
   { key: "avg_earnings_per_fan_gross", label: "Avg Earnings/Fan", defaultVisible: false, align: "right", format: "currency" },
+  { key: "net_earnings", label: "Net Earnings", defaultVisible: true, align: "right", format: "currency" },
+  { key: "variation_percent", label: "Variación", defaultVisible: true, align: "right", format: "signed_percent" },
+  { key: "trend", label: "Tendencia", defaultVisible: true, format: "trend" },
+  { key: "participation_percent", label: "Participación", defaultVisible: true, align: "right", format: "percent" },
   { key: "document_id", label: "Document ID", defaultVisible: true, format: "document" },
 ];

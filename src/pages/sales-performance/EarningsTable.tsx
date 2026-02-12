@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, ArrowUp, ArrowDown, Link2, Unlink } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, Link2, Unlink, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -61,6 +61,12 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
       return (val as number).toLocaleString("en-US");
     case "percent":
       return (val as number).toFixed(2) + "%";
+    case "signed_percent": {
+      const n = val as number;
+      return (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
+    }
+    case "trend":
+      return String(val);
     case "date":
       return formatDate(val as string);
     case "time":
@@ -70,6 +76,15 @@ const formatCell = (row: EarningsRow, col: ColumnDef): string => {
     default:
       return String(val);
   }
+};
+
+const TrendCell = ({ value }: { value: string | null | undefined }) => {
+  if (!value) return <span className="text-muted-foreground">—</span>;
+  if (value === "Creciendo")
+    return <span className="flex items-center gap-1 text-emerald-500"><TrendingUp className="h-3.5 w-3.5" />{value}</span>;
+  if (value === "Cayendo")
+    return <span className="flex items-center gap-1 text-destructive"><TrendingDown className="h-3.5 w-3.5" />{value}</span>;
+  return <span className="flex items-center gap-1 text-muted-foreground"><Minus className="h-3.5 w-3.5" />{value}</span>;
 };
 
 const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns }: EarningsTableProps) => {
@@ -174,6 +189,17 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
                             <TooltipContent>Desvincular creador</TooltipContent>
                           </Tooltip>
                         </div>
+                      ) : col.format === "trend" ? (
+                        <TrendCell value={row[col.key] as string | null} />
+                      ) : col.format === "signed_percent" ? (
+                        <span className={
+                          (row[col.key] as number | null) == null ? "text-muted-foreground" :
+                          (row[col.key] as number) > 0 ? "text-emerald-500 font-medium" :
+                          (row[col.key] as number) < 0 ? "text-destructive font-medium" :
+                          "text-muted-foreground"
+                        }>
+                          {formatCell(row, col)}
+                        </span>
                       ) : (
                         formatCell(row, col)
                       )}

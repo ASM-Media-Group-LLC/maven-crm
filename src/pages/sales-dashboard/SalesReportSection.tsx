@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import EarningsFilters from "../sales-performance/EarningsFilters";
 import EarningsTable from "../sales-performance/EarningsTable";
 import EarningsPagination from "../sales-performance/EarningsPagination";
-import EarningsSummaryCards from "../sales-performance/EarningsSummaryCards";
 import CustomMetrics from "../sales-performance/CustomMetrics";
 import { ALL_COLUMNS, type SortField, type SortDirection, type EarningsRow } from "../sales-performance/types";
 
@@ -15,7 +14,7 @@ interface SalesReportSectionProps {
   comparedRows?: EarningsRow[];
 }
 
-const SalesReportSection = ({ rows }: SalesReportSectionProps) => {
+const SalesReportSection = ({ rows, comparedRows }: SalesReportSectionProps) => {
   const [documentFilter, setDocumentFilter] = useState<string[]>([]);
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,7 +97,45 @@ const SalesReportSection = ({ rows }: SalesReportSectionProps) => {
       result = result.filter((r) => new Date(r.effective_date) <= to);
     }
 
-    return result.sort((a, b) => {
+    // Build comparison map: pending_creator -> total gross in compared period
+    const compMap = new Map<string, number>();
+    if (comparedRows) {
+      for (const r of comparedRows) {
+        const key = r.pending_creator || r.artistic_name || "";
+        compMap.set(key, (compMap.get(key) || 0) + (r.total_earnings_gross ?? 0));
+      }
+    }
+
+    // Calculate grand total for participation
+    const grandTotal = result.reduce((s, r) => s + (r.total_earnings_gross ?? 0), 0);
+
+    // Current period totals per creator for variation
+    const currentMap = new Map<string, number>();
+    for (const r of result) {
+      const key = r.pending_creator || r.artistic_name || "";
+      currentMap.set(key, (currentMap.get(key) || 0) + (r.total_earnings_gross ?? 0));
+    }
+
+    // Enrich rows with calculated fields
+    const enriched = result.map((r) => {
+      const gross = r.total_earnings_gross ?? 0;
+      const net_earnings = gross * 0.80;
+      const participation_percent = grandTotal > 0 ? (gross / grandTotal) * 100 : 0;
+
+      const creatorKey = r.pending_creator || r.artistic_name || "";
+      const prevTotal = compMap.get(creatorKey);
+      let variation_percent: number | null = null;
+      let trend: string | null = null;
+      if (prevTotal != null && prevTotal > 0) {
+        const currentTotal = currentMap.get(creatorKey) ?? 0;
+        variation_percent = ((currentTotal - prevTotal) / prevTotal) * 100;
+        trend = variation_percent > 5 ? "Creciendo" : variation_percent < -5 ? "Cayendo" : "Estable";
+      }
+
+      return { ...r, net_earnings, variation_percent, trend, participation_percent };
+    });
+
+    return enriched.sort((a, b) => {
       const dir = sortDirection === "asc" ? 1 : -1;
       const va = a[sortField];
       const vb = b[sortField];
@@ -108,7 +145,7 @@ const SalesReportSection = ({ rows }: SalesReportSectionProps) => {
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
       return String(va).localeCompare(String(vb)) * dir;
     });
-  }, [rows, searchQuery, documentFilter, creatorFilter, dateFrom, dateTo, sortField, sortDirection]);
+  }, [rows, searchQuery, documentFilter, creatorFilter, dateFrom, dateTo, sortField, sortDirection, comparedRows]);
 
   const effectivePageSize = pageSize === "all" ? filtered.length : pageSize;
   const totalPages = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
@@ -201,8 +238,6 @@ const SalesReportSection = ({ rows }: SalesReportSectionProps) => {
         pageSize={pageSize}
         onPageSizeChange={handlePageSizeChange}
       />
-
-      <EarningsSummaryCards rows={filtered} />
 
       <EarningsTable
         rows={paginatedRows}
