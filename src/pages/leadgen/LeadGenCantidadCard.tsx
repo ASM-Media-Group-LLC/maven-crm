@@ -2,13 +2,13 @@ import { Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const categories = [
-  { name: "A+", color: "bg-primary", borderColor: "border-primary" },
-  { name: "A", color: "bg-success", borderColor: "border-success" },
-  { name: "B+", color: "bg-warning", borderColor: "border-warning" },
-  { name: "B", color: "bg-warning/60", borderColor: "border-warning/60" },
-  { name: "C", color: "bg-muted-foreground", borderColor: "border-muted-foreground" },
-  { name: "Total", color: "bg-destructive", borderColor: "border-destructive" },
-  { name: "QA", color: "bg-destructive/70", borderColor: "border-destructive/70" },
+  { name: "A+", borderColor: "border-primary", valueColor: "text-primary" },
+  { name: "A", borderColor: "border-success", valueColor: "text-success" },
+  { name: "B+", borderColor: "border-warning", valueColor: "text-warning" },
+  { name: "B", borderColor: "border-warning/60", valueColor: "text-warning/60" },
+  { name: "C", borderColor: "border-muted-foreground", valueColor: "" },
+  { name: "Total", borderColor: "border-destructive", valueColor: "text-destructive" },
+  { name: "QA", borderColor: "border-destructive/70", valueColor: "text-destructive/70" },
 ];
 
 const LeadGenCantidadCard = () => {
@@ -27,7 +27,7 @@ const LeadGenCantidadCard = () => {
           >
             <Users className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm font-medium flex-1">{cat.name}</span>
-            <span className="text-sm font-semibold tabular-nums">0</span>
+            <span className={`text-sm font-semibold tabular-nums ${cat.valueColor}`}>0</span>
           </div>
         ))}
       </CardContent>
