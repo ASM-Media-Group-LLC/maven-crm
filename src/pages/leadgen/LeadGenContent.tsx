@@ -64,14 +64,12 @@ const LeadGenContent = () => {
       {/* Scrollable content: KPIs + tabs + filters + tab content */}
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
-        {activeTab !== "supervisores" && (
-          <div className="px-6 py-4 border-b">
-            <div className="grid grid-cols-2 gap-6">
-              <LeadGenCantidadCard />
-              <LeadGenEstadosCard />
-            </div>
+        <div className="px-6 py-4 border-b">
+          <div className="grid grid-cols-2 gap-6">
+            <LeadGenCantidadCard />
+            <LeadGenEstadosCard />
           </div>
-        )}
+        </div>
 
         {/* Tab bar */}
         <div className="border-b px-6 py-2 flex items-center justify-between gap-4">
