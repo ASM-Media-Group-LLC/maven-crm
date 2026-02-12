@@ -28,19 +28,19 @@ interface AddContactoModalProps {
 }
 
 const countryCodes = [
-  { value: "+57", label: "🇨🇴 +57" },
-  { value: "+1", label: "🇺🇸 +1" },
-  { value: "+52", label: "🇲🇽 +52" },
-  { value: "+54", label: "🇦🇷 +54" },
-  { value: "+55", label: "🇧🇷 +55" },
-  { value: "+56", label: "🇨🇱 +56" },
-  { value: "+51", label: "🇵🇪 +51" },
-  { value: "+58", label: "🇻🇪 +58" },
-  { value: "+593", label: "🇪🇨 +593" },
-  { value: "+34", label: "🇪🇸 +34" },
-  { value: "+44", label: "🇬🇧 +44" },
-  { value: "+33", label: "🇫🇷 +33" },
-  { value: "+49", label: "🇩🇪 +49" },
+  { value: "+1", triggerLabel: "🇺🇸 +1", label: "🇺🇸 Estados Unidos +1" },
+  { value: "+57", triggerLabel: "🇨🇴 +57", label: "🇨🇴 Colombia +57" },
+  { value: "+56", triggerLabel: "🇨🇱 +56", label: "🇨🇱 Chile +56" },
+  { value: "+52", triggerLabel: "🇲🇽 +52", label: "🇲🇽 México +52" },
+  { value: "+54", triggerLabel: "🇦🇷 +54", label: "🇦🇷 Argentina +54" },
+  { value: "+51", triggerLabel: "🇵🇪 +51", label: "🇵🇪 Perú +51" },
+  { value: "+593", triggerLabel: "🇪🇨 +593", label: "🇪🇨 Ecuador +593" },
+  { value: "+58", triggerLabel: "🇻🇪 +58", label: "🇻🇪 Venezuela +58" },
+  { value: "+55", triggerLabel: "🇧🇷 +55", label: "🇧🇷 Brasil +55" },
+  { value: "+34", triggerLabel: "🇪🇸 +34", label: "🇪🇸 España +34" },
+  { value: "+44", triggerLabel: "🇬🇧 +44", label: "🇬🇧 Reino Unido +44" },
+  { value: "+33", triggerLabel: "🇫🇷 +33", label: "🇫🇷 Francia +33" },
+  { value: "+49", triggerLabel: "🇩🇪 +49", label: "🇩🇪 Alemania +49" },
 ];
 
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
@@ -131,7 +131,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         <SelectItem value="b+">B+ (Media Alta)</SelectItem>
                         <SelectItem value="b">B (Media)</SelectItem>
                         <SelectItem value="c">C (Básica)</SelectItem>
-                        <SelectItem value="ora-miami">Ora Miami</SelectItem>
+                        <SelectItem value="potencial">Potencial</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -159,6 +159,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         <SelectItem value="pagomundo">Pagomundo</SelectItem>
                         <SelectItem value="exchange">Exchange</SelectItem>
                         <SelectItem value="unlok">Unlok</SelectItem>
+                        <SelectItem value="ora-miami">Ora Miami</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -175,7 +176,9 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                     render={({ field }) => (
                       <Select onValueChange={field.onChange} value={field.value}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue>
+                            {countryCodes.find((c) => c.value === field.value)?.triggerLabel}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {countryCodes.map((code) => (
