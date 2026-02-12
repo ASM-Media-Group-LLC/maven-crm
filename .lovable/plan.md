@@ -1,84 +1,63 @@
 
 
-# Implementar pagina LeadGen con diseño completo
+# Redisenar la seccion inferior de LeadGen segun la imagen de referencia
 
-## Descripcion
+## Cambios principales
 
-Reemplazar el placeholder actual de LeadGen con el diseño completo mostrado en la imagen de referencia: header con titulo y botones de accion, dos tarjetas KPI lado a lado (Cantidad por categoria y Estados), y una barra de tabs inferior.
+La imagen muestra que debajo del header actual, el contenido debe reorganizarse asi:
 
-## Estructura visual
-
-La pagina se divide en tres secciones verticales:
-
-1. **Header fijo**: Titulo "LeadGen", subtitulo "Marketing y generacion de leads · 0 leads", boton primario "+ Lead" y boton outline "Contacto"
-2. **Cuerpo con dos cards en grid 2 columnas**:
-   - **CANTIDAD**: Lista de categorias (A+, A, B+, B, C, Total, QA) con borde izquierdo de color y contador
-   - **ESTADOS**: Lista de estados (Respondieron, Interesadas, No interesadas, Otros, Con Telefono) con icono de color y contador
-3. **Tab bar inferior fijo**: Tabs (Leads, Agentes, Supervisores, Rendimiento, Leads por Hora) + boton "Base de Datos" alineado a la derecha
+1. **Tab bar** (actualmente en el footer) se mueve arriba del contenido, con iconos por cada tab y el boton "Base de Datos" alineado a la derecha
+2. **Barra de filtros** nueva debajo de los tabs: input de busqueda "Buscar lead...", select de fecha "Hoy", selects de "Estado", "Calidad", "QA", y botones de vista lista/grid
+3. **Area de contenido**: Card con titulo "Leads (0)" y estado vacio "No hay leads para revisar con estos filtros"
+4. Las cards de Cantidad y Estados se mantienen pero solo se muestran en otro tab o se reemplazan por esta vista cuando el tab "Leads" esta activo
 
 ## Cambios por archivo
 
-### 1. `src/pages/LeadGen.tsx`
+### `src/pages/leadgen/LeadGenContent.tsx`
 
-- Mantener el layout wrapper con SidebarProvider, DashboardSidebar y DashboardTopbar (ya existe)
-- Reemplazar el contenido placeholder con el componente `LeadGenContent`
+- Mover la tab bar del footer a justo debajo del header
+- Agregar iconos a cada tab: Leads (CheckSquare), Agentes (Users), Supervisores (Users), Rendimiento (BarChart3), Leads por Hora (Clock)
+- Agregar barra de filtros debajo de los tabs con:
+  - Input de busqueda con icono Search y placeholder "Buscar lead..."
+  - Select con icono de calendario y valor "Hoy"
+  - Select "Estado" (placeholder)
+  - Select "Calidad" (placeholder)
+  - Select "QA" (placeholder)
+  - Dos botones de toggle vista: lista (activo, primary) y grid
+- Reemplazar el body: cuando tab es "leads", mostrar una Card con "Leads (0)" como titulo y un empty state centrado con el texto "No hay leads para revisar con estos filtros"
+- Las cards de Cantidad y Estados se pueden mostrar en otro contexto o tab
+- Eliminar el footer, ya que los tabs ahora estan arriba
 
-### 2. `src/pages/leadgen/LeadGenContent.tsx` (nuevo)
-
-- Componente principal con la estructura de la pagina
-- Header con titulo, subtitulo y botones de accion
-- Grid de 2 columnas con las cards de Cantidad y Estados
-- Tab bar inferior fijo con tabs y boton "Base de Datos"
-- Datos estaticos por ahora (todos los contadores en 0)
-- Usa el tab activo por defecto "leads"
-
-### 3. `src/pages/leadgen/LeadGenCantidadCard.tsx` (nuevo)
-
-- Card con titulo "CANTIDAD"
-- Lista de filas con: borde izquierdo coloreado, icono de usuario, nombre de categoria, contador alineado a la derecha
-- Categorias: A+ (azul), A (verde), B+ (naranja), B (amarillo), C (gris), Total (rojo), QA (rojo oscuro)
-- Cada fila usa colores del sistema de diseno (primary, success, warning, destructive, muted-foreground)
-
-### 4. `src/pages/leadgen/LeadGenEstadosCard.tsx` (nuevo)
-
-- Card con titulo "ESTADOS"
-- Lista de filas con: icono de color, nombre de estado, contador alineado a la derecha
-- Estados: Respondieron (icono tendencia), Interesadas (punto verde), No interesadas (punto rojo), Otros (punto verde claro), Con Telefono (icono reloj/telefono)
-- Usa iconos de lucide-react y colores del sistema
-
-## Seccion tecnica
-
-### Estructura del layout en LeadGenContent
+### Estructura resultante
 
 ```text
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-  <header className="shrink-0 px-6 pt-6 pb-4 border-b">
-    <!-- titulo + botones -->
-  </header>
+<main>
+  <header> (titulo LeadGen + botones, sin cambios) </header>
+  <div> (tab bar con iconos + Base de Datos) </div>
+  <div> (barra de filtros: search + selects + view toggle) </div>
   <div className="flex-1 overflow-auto p-6">
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <LeadGenCantidadCard />
-      <LeadGenEstadosCard />
-    </div>
+    <Card>
+      <CardHeader> Leads (0) </CardHeader>
+      <CardContent> empty state </CardContent>
+    </Card>
   </div>
-  <footer className="shrink-0 border-t px-6 py-3">
-    <!-- tab bar -->
-  </footer>
 </main>
 ```
 
-### Filas de la card CANTIDAD
+### Seccion tecnica
 
-Cada fila tiene un borde izquierdo de 3px con el color de la categoria, un icono de usuario (Users), el nombre y el contador alineado a la derecha. Los colores mapean a las variables del sistema:
-- A+ -> primary (azul)
-- A -> success (verde)
-- B+ -> warning (naranja/amarillo)
-- B -> warning con opacidad
-- C -> muted-foreground (gris)
-- Total -> destructive (rojo)
-- QA -> destructive con opacidad diferente
+**Tabs con iconos:**
+```text
+const tabs = [
+  { id: "leads", label: "Leads", icon: CheckSquare },
+  { id: "agentes", label: "Agentes", icon: Users },
+  { id: "supervisores", label: "Supervisores", icon: Users },
+  { id: "rendimiento", label: "Rendimiento", icon: BarChart3 },
+  { id: "leads-hora", label: "Leads por Hora", icon: Clock },
+];
+```
 
-### Tab bar inferior
+**Filtros:** Usan los componentes existentes del design system (Input, Select, Button). El toggle de vista lista/grid usa botones con variante ghost, el activo tiene fondo primary.
 
-Usa el patron de tabs inline-flex con bg-muted/50 que ya se usa en la app (similar a EventosContent). El boton "Base de Datos" va alineado a la derecha con un icono de base de datos.
+**Empty state:** Sigue el patron estandar de empty states documentado en el design system (texto centrado con muted-foreground).
 
