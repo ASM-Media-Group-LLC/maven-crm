@@ -1,42 +1,48 @@
 
 
-# Correcciones al modal "Nuevo Contacto"
+# Vista Grid para Supervisores en LeadGen
 
-## Cambios a realizar en `src/pages/leadgen/AddContactoModal.tsx`
+## Resumen
 
-### 1. Mover "Ora Miami" de Categoria Fisica a Compania
-- Eliminar `<SelectItem value="ora-miami">Ora Miami</SelectItem>` de la lista de Categoria Fisica (linea 134)
-- Agregar `<SelectItem value="ora-miami">Ora Miami</SelectItem>` a la lista de Compania (despues de Unlok)
+Agregar una vista de tarjetas (grid) para la pestana de Supervisores que se activa al seleccionar el icono de grid en la barra de filtros. La vista actual de tabla se mantiene como vista de lista. Las tarjetas siguen el diseno de la imagen de referencia.
 
-### 2. Agregar "Potencial" a Categoria Fisica
-- Agregar `<SelectItem value="potencial">Potencial</SelectItem>` al final de las opciones de Categoria Fisica
+## Cambios en el mock data
 
-### 3. Mejorar el dropdown de telefono con nombres completos de paises
-Segun la imagen de referencia, los items del dropdown deben mostrar el nombre completo del pais junto con la bandera y el codigo. Cambiar el array `countryCodes` para que los labels muestren nombres completos:
+Agregar la propiedad `mejorar` al array `mockSupervisores` (actualmente tiene: totalQA, aPlus, a, bPlus, b, c, aprobados, rechazados). Falta el campo `mejorar` que aparece en la imagen.
 
+## Cambios en `src/pages/leadgen/LeadGenContent.tsx`
+
+### 1. Actualizar mockSupervisores
+Agregar `mejorar: 0` al mapeo del array de supervisores.
+
+### 2. Modificar la pestana "supervisores" para soportar vista grid
+
+Cuando `viewMode === "list"`: mostrar la tabla actual (sin cambios).
+
+Cuando `viewMode === "grid"`: renderizar una grilla de tarjetas con el siguiente diseno por cada supervisor:
+
+**Estructura de cada tarjeta:**
+```text
++--------------------------------------------------+
+| [Avatar icon]  nombre_supervisor        0 QA reviews |
+|                email@unlok.me                        |
++--------------------------------------------------+
+| A+       | A        | B+       | B        | C       |
+| 0        | 0        | 0        | 0        | 0       |
+| (primary)| (green)  | (orange) | (gray)   | (gray)  |
++--------------------------------------------------+
+| Aprobados       | Mejorar         | Rechazados      |
+| 0 (green)       | 0 (orange)      | 0 (red)         |
++--------------------------------------------------+
 ```
-Estados Unidos +1
-Colombia +57
-Chile +56
-Mexico +52
-Argentina +54
-Peru +51
-Ecuador +593
-Venezuela +58
-Brasil +55
-Espana +34
-Reino Unido +44
-Francia +33
-Alemania +49
-```
 
-Ademas, reordenar para que coincida con la imagen: Estados Unidos primero, luego Colombia, Chile, Mexico, Argentina, Peru, Ecuador, Venezuela, Brasil, y despues los europeos.
+**Detalles de diseno:**
+- Grid de 1 columna (se adapta al ancho completo como en la imagen)
+- Cada tarjeta usa `Card` con bordes redondeados
+- Header: icono de Users (como avatar), nombre en negrita, email debajo en muted, y a la derecha un icono de CheckSquare + "0" + "QA reviews"
+- Fila de calificaciones: 5 celdas con fondo `muted/30` y bordes, labels arriba (A+, A, B+, B, C) en texto muted pequeno, valores numericos debajo con colores: A+ en primary, A en green-500, B+ en yellow-500, B y C en foreground normal
+- Fila de estados: 3 celdas con fondo ligeramente coloreado, labels arriba y valores debajo: Aprobados (green), Mejorar (yellow/orange), Rechazados (destructive/red)
 
-El trigger del select seguira mostrando solo la bandera y el codigo (ej: "🇨🇴 +57") para mantener el tamano compacto, pero los items del dropdown mostraran el nombre completo.
+### 3. Sin cambios en otros tabs ni en la barra de filtros
+La barra de filtros y el toggle list/grid ya existen y funcionan con `viewMode`. Solo se agrega la logica condicional dentro del bloque `activeTab === "supervisores"`.
 
-### Detalle tecnico
-
-Se modificara unicamente `src/pages/leadgen/AddContactoModal.tsx`:
-- Actualizar el array `countryCodes` con labels expandidos para los items del dropdown
-- Separar el label del trigger (corto) del label del item (completo) agregando una propiedad `triggerLabel` al array
-- Ajustar el render del Select para usar `triggerLabel` en el SelectValue y `label` completo en los SelectItem
