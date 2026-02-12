@@ -24,7 +24,7 @@ const LeadGenContent = () => {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-auto min-w-0">
+    <main className="flex-1 flex flex-col h-full min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-start justify-between gap-4">
@@ -47,15 +47,7 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="shrink-0 px-6 py-4 border-b">
-        <div className="grid grid-cols-2 gap-6">
-          <LeadGenCantidadCard />
-          <LeadGenEstadosCard />
-        </div>
-      </div>
-
-      {/* Tab bar */}
+      {/* Tab bar - fixed */}
       <div className="shrink-0 border-b px-6 py-2 flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           {tabs.map((tab) => {
@@ -80,7 +72,7 @@ const LeadGenContent = () => {
         </Button>
       </div>
 
-      {/* Filters bar */}
+      {/* Filters bar - fixed */}
       <div className="shrink-0 border-b px-6 py-3 flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -169,62 +161,71 @@ const LeadGenContent = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {activeTab === "leads" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Leads (0)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-16">
-                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground text-sm">
-                  No hay leads para revisar con estos filtros
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* Scrollable content: KPIs + tab content */}
+      <div className="flex-1 overflow-auto">
+        {/* KPI Cards */}
+        <div className="px-6 py-4 border-b">
+          <div className="grid grid-cols-2 gap-6">
+            <LeadGenCantidadCard />
+            <LeadGenEstadosCard />
+          </div>
+        </div>
 
-        {activeTab === "agentes" && (
-          <div className="space-y-6">
-            {/* Summary card */}
-            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-              <div className="p-6 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 text-right">
-                  <div>
-                    <p className="text-3xl font-bold text-primary">0</p>
-                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Empty state */}
+        {/* Tab content */}
+        <div className="p-6">
+          {activeTab === "leads" && (
             <Card>
-              <CardContent className="pt-6">
+              <CardHeader>
+                <CardTitle className="text-base">Leads (0)</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="flex flex-col items-center justify-center py-16">
-                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <Users className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
+                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
                   <p className="text-muted-foreground text-sm">
-                    No hay datos para esta fecha
+                    No hay leads para revisar con estos filtros
                   </p>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
+
+          {activeTab === "agentes" && (
+            <div className="space-y-6">
+              <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+                <div className="p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-right">
+                    <div>
+                      <p className="text-3xl font-bold text-primary">0</p>
+                      <p className="text-xs text-muted-foreground">Agentes Activos</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                      <Users className="h-8 w-8 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      No hay datos para esta fecha
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
 
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
