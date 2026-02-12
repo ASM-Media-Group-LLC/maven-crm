@@ -1,43 +1,71 @@
 
-# Agregar funcionalidad de subida de archivos en Nuevo Contacto
+
+# Agregar iconos a acciones del dropdown + Modales de Ver Detalle, Editar y Eliminar Contacto
 
 ## Resumen
 
-Integrar el componente `FileUploadModal` existente en el formulario `NuevoContactoForm.tsx` para habilitar la subida real de foto de perfil y fotos/videos extras al bucket `creator-files` de Supabase Storage. Se reutilizara el mismo patron usado en `NuevoCreadorForm.tsx`.
+Se agregaran iconos a cada opcion del dropdown de acciones en la tabla y grid de contactos, y se crearan tres modales: **Ver Detalle** (con info completa, enlaces sociales, historial de interacciones, botones Editar/Eliminar/Convertir y editar categoria), **Editar Contacto** (formulario pre-llenado con todos los campos del formulario de creacion), y **Eliminar Contacto** (confirmacion con AlertDialog). Tambien se agregara "Convertir a Creador" con icono de sparkles. Todo siguiendo los patrones existentes (ViewCreadorModal, EditCreadorModal, DeleteEventoDialog).
 
-## Cambios
+## Archivos a crear
 
-**Archivo a modificar:** `src/pages/contactos/NuevoContactoForm.tsx`
+### 1. `src/pages/contactos/ViewContactoModal.tsx`
+Modal de detalle del contacto (Dialog) basado en la imagen de referencia:
+- **Header**: Nombre, Ticket, pais (flag emoji), "Ingresado por: X", badge de categoria (grande, esquina derecha)
+- **Fila de metadata**: Badges outline con "Creado: fecha", "0 llamadas", "0 notas", "Compania"
+- **Acciones**: Boton "Editar" (Pencil icon), boton "Eliminar" (Trash2 icon, variant destructive), boton "Editar categoria" (Pencil icon, alineado a la derecha)
+- **Boton superior derecho**: "Convertir a Creadora" con icono Sparkles
+- **Seccion Instagram**: Icono Instagram + handle + link externo
+- **Seccion WhatsApp**: Icono MessageCircle + "Abrir chat" link
+- **Seccion "Historial de Interacciones"**: Boton "+ Registrar Interaccion", empty state "No hay interacciones registradas para este contacto. Puedes registrar llamadas, mensajes, emails, reuniones o notas."
+- Props: open, onOpenChange, contacto (Contacto), onEdit (abre EditContactoModal), onDelete (abre DeleteContactoDialog)
 
-### 1. Imports adicionales
-- Importar `FileUploadModal`, `UploadCategory`, `UploadedFile` desde `@/components/FileUploadModal`.
-- Importar `AvatarImage` de `@/components/ui/avatar`.
-- Importar `X, ImageIcon, Film, FileText` de lucide-react.
+### 2. `src/pages/contactos/EditContactoModal.tsx`
+Modal de edicion (Dialog) basado en la imagen de referencia:
+- **Header**: icono Pencil + "Editar Contacto"
+- **Formulario** (ScrollArea, max-h-[60vh]) con los mismos campos de NuevoContactoForm:
+  - Nombre del Contacto * + Categoria Fisica (grid 2 cols)
+  - Compania / Cuenta de Origen
+  - Email + Telefono (con select pais + input)
+  - Plataforma + Handle/Usuario *
+  - Notas (textarea)
+  - Foto de Perfil (con upload via FileUploadModal)
+  - Galeria de Medios / Fotos y Videos Extras (con upload)
+- **Footer**: Cancelar + "Guardar Cambios" (boton primario)
+- Pre-llena los campos con datos del contacto seleccionado
 
-### 2. Estado nuevo
-- `uploadModal`: `{ open: boolean; category: UploadCategory }` para controlar el modal.
-- `profilePhoto`: `UploadedFile | null` para la foto de perfil subida.
-- `extraFiles`: `UploadedFile[]` para los archivos extras subidos.
-- `tempId`: string generado con `crypto.randomUUID()` (o `Date.now()`) como prefijo de ruta en Storage.
+### 3. `src/pages/contactos/DeleteContactoDialog.tsx`
+AlertDialog de confirmacion (patron DeleteEventoDialog):
+- Icono de alerta (AlertTriangle)
+- Titulo: "Eliminar contacto"
+- Descripcion: "Esta accion eliminara permanentemente a **{nombre}** y todas sus interacciones asociadas. Esta accion no se puede deshacer."
+- Footer: Cancelar + Eliminar (destructive)
+- Muestra toast de confirmacion
 
-### 3. Handlers
-- `handleFilesUploaded(files)`: Si la categoria es `"piclink"` (reutilizada para foto de perfil), toma el primer archivo y lo guarda en `profilePhoto`. Si es `"extras"`, agrega al array `extraFiles`.
-- `removeExtraFile(index)`: Remueve un archivo extra del array por indice.
+## Archivos a modificar
 
-### 4. Seccion "Foto de Perfil" (lineas 222-234)
-- El boton "Subir Foto" abrira el `FileUploadModal` con categoria `"piclink"` (acepta imagenes).
-- Si hay `profilePhoto`, mostrar el `AvatarImage` con la URL subida en lugar del fallback, y un boton X para removerla.
+### 4. `src/pages/contactos/ContactosTable.tsx`
+- Importar `Eye, Pencil, Sparkles` de lucide-react
+- Agregar iconos a cada DropdownMenuItem:
+  - `Eye` + "Ver detalle"
+  - `Pencil` + "Editar"
+  - `Sparkles` + "Convertir a Creador"
+- Agregar callbacks en props: `onView(contacto)`, `onEdit(contacto)`, `onConvert(contacto)`
+- Conectar cada MenuItem al callback correspondiente
 
-### 5. Seccion "Fotos y Videos Extras" (lineas 236-246)
-- El boton "Subir Archivos" abrira el `FileUploadModal` con categoria `"extras"`.
-- Debajo, listar los archivos subidos con nombre, tamano, icono por tipo y boton X para remover cada uno.
+### 5. `src/pages/contactos/ContactosGrid.tsx`
+- Agregar DropdownMenu con las mismas acciones e iconos que la tabla
+- Conectar callbacks: `onView`, `onEdit`, `onConvert`
 
-### 6. Componente FileUploadModal
-- Renderizar una unica instancia de `FileUploadModal` controlada por `uploadModal.open` y `uploadModal.category`, con `tempId` y `onFilesUploaded`.
+### 6. `src/pages/contactos/ContactosContent.tsx`
+- Agregar estado para modales: `selectedContacto`, `viewOpen`, `editOpen`, `deleteOpen`
+- Renderizar ViewContactoModal, EditContactoModal, DeleteContactoDialog
+- Pasar callbacks onView/onEdit/onConvert a ContactosTable y ContactosGrid
+- ViewContactoModal recibe onEdit y onDelete para encadenar acciones desde el detalle
 
-### 7. Incluir archivos en submit
-- Agregar `profilePhoto` y `extraFiles` al log/toast de confirmacion (para futura persistencia en DB).
+## Detalles tecnicos
 
-## Preservacion
-- No se modifican los campos existentes del formulario, header, footer ni navegacion.
-- Se reutiliza el bucket `creator-files` ya configurado con politicas RLS publicas.
+- Los modales usan datos mock (no hay tabla en Supabase aun), asi que editar/eliminar solo mostraran toasts de confirmacion y actualizaran estado local
+- El modal de detalle usa Dialog (sm:max-w-lg), el de editar usa Dialog (sm:max-w-[600px]), el de eliminar usa AlertDialog
+- Se reutiliza FileUploadModal en EditContactoModal con el mismo patron de NuevoContactoForm
+- El boton "Convertir a Creadora" en ViewContactoModal muestra un toast informativo por ahora
+
