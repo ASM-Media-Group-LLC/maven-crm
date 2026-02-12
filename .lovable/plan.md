@@ -1,76 +1,67 @@
 
+# Crear modal "Nuevo Lead" al hacer clic en "+ Lead"
 
-# Ajustar visual de LeadGen segun imagen de referencia
+## Resumen
 
-## Diferencias detectadas
+Crear un nuevo componente modal que se abre al presionar el boton "+ Lead" en el header de LeadGen. El modal sigue el patron existente de `AddCreadorModal` y el design system documentado.
 
-Comparando la imagen de referencia con la implementacion actual, hay 4 ajustes necesarios:
+## Campos del modal (segun la imagen de referencia)
 
-1. **Orden de secciones incorrecto**: Las cards de Cantidad y Estados estan debajo de los tabs y filtros. Deben estar entre el header y los tabs.
-2. **Colores en los valores de Cantidad**: Los "0" de cada categoria deben tener el color correspondiente (azul para A+, verde para A, naranja para B+, etc.). Actualmente todos son neutrales.
-3. **Orden de botones en header**: El boton "+ Lead" (primario) debe estar a la derecha y "Contacto" (outline) a la izquierda. Actualmente estan invertidos.
-4. **Icono de calendario en filtros**: El select "Hoy" debe tener un icono de calendario a la izquierda, separado del select.
+1. **URL Perfil / Contacto** * - Input de texto, placeholder "https://instagram.com/..."
+2. **Plataforma** * - Select con opciones: Instagram, TikTok, Twitter/X, OnlyFans, Otra
+3. **Categoria** * - Select con opciones: A+, A, B+ (Buena), B, C
+4. **Compania / Cuenta de Origen** * - Select con placeholder "Selecciona la compania"
+5. **Pais** - Select con placeholder "Selecciona un pais"
+6. **Notas** - Textarea con placeholder "Notas adicionales..."
 
-## Cambios por archivo
+## Feedback
 
-### 1. `src/pages/leadgen/LeadGenContent.tsx`
+- Toast de exito: `{ title: "Lead agregado exitosamente" }` usando `useToast`
+- Toast de error: `{ title: "Error al agregar lead", variant: "destructive" }` usando `useToast`
 
-Reorganizar las secciones en este orden:
-- Header (titulo + botones, corregir orden de botones)
-- KPI Cards (Cantidad + Estados) como seccion fija (shrink-0) con padding y border-b
-- Tab bar (sin cambios)
-- Filter bar (agregar icono de calendario antes del select "Hoy")
-- Area scrollable con la card Leads (0)
+## Archivos a crear/modificar
 
-### 2. `src/pages/leadgen/LeadGenCantidadCard.tsx`
+### Nuevo: `src/pages/leadgen/AddLeadModal.tsx`
 
-Agregar colores a los valores "0" de cada categoria:
-- A+ -> text-primary
-- A -> text-success
-- B+ -> text-warning
-- B -> text-warning/60
-- C -> texto neutral (sin cambio)
-- Total -> text-destructive
-- QA -> text-destructive/70
+- Dialog con titulo "Nuevo Lead" y descripcion breve
+- Formulario con validacion usando `react-hook-form` + `zod`
+- Campos obligatorios: URL Perfil/Contacto, Plataforma, Categoria, Compania
+- Campos opcionales: Pais, Notas
+- Footer con botones "Cancelar" (ghost) y "Agregar Lead" (primary, sin icono)
+- Estado de carga en boton: "Agregando..."
+- Como no hay tabla de leads en Supabase, el submit simulara un guardado exitoso con un timeout breve y mostrara el toast correspondiente
+- Validacion de URL con formato basico (debe empezar con https://)
+- Ancho del modal: `max-w-lg`
+- Padding derecho en header: `pr-8` (patron estandar para evitar overlap con boton X)
 
-Agregar una propiedad `valueColor` a cada objeto del array de categorias y aplicarla al span del valor.
+### Modificar: `src/pages/leadgen/LeadGenContent.tsx`
 
-### 3. Sin cambios en `LeadGenEstadosCard.tsx`
-
-Ya se ve correcto segun la referencia.
+- Importar `AddLeadModal`
+- Agregar estado `const [addLeadOpen, setAddLeadOpen] = useState(false)`
+- Conectar el boton "+ Lead" con `onClick={() => setAddLeadOpen(true)}`
+- Renderizar `<AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />`
 
 ## Seccion tecnica
 
-### Estructura resultante de LeadGenContent
+### Schema de validacion (zod)
 
 ```text
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-  <header> titulo + botones (Lead primero, Contacto segundo) </header>
-  <div className="shrink-0 px-6 py-4">  <!-- KPI section fija -->
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <LeadGenCantidadCard />
-      <LeadGenEstadosCard />
-    </div>
-  </div>
-  <div> tab bar </div>
-  <div> filter bar (con icono Calendar antes de "Hoy") </div>
-  <div className="flex-1 overflow-auto p-6">
-    <Card> Leads (0) + empty state </Card>
-  </div>
-</main>
+url_perfil: z.string().min(1, "URL requerida").url("URL invalida")
+plataforma: z.string().min(1, "Plataforma requerida")
+categoria: z.string().min(1, "Categoria requerida")
+compania: z.string().min(1, "Compania requerida")
+pais: z.string().optional()
+notas: z.string().max(500).optional()
 ```
 
-### Colores en LeadGenCantidadCard
+### Layout del formulario
 
-```text
-const categories = [
-  { name: "A+", borderColor: "border-primary", valueColor: "text-primary" },
-  { name: "A", borderColor: "border-success", valueColor: "text-success" },
-  { name: "B+", borderColor: "border-warning", valueColor: "text-warning" },
-  { name: "B", borderColor: "border-warning/60", valueColor: "text-warning/60" },
-  { name: "C", borderColor: "border-muted-foreground", valueColor: "" },
-  { name: "Total", borderColor: "border-destructive", valueColor: "text-destructive" },
-  { name: "QA", borderColor: "border-destructive/70", valueColor: "text-destructive/70" },
-];
-```
+- URL Perfil: ancho completo
+- Plataforma + Categoria: grid 2 columnas
+- Compania: ancho completo
+- Pais: ancho completo
+- Notas: textarea ancho completo
 
+### Patron seguido
+
+Mismo patron que `AddCreadorModal`: Dialog + react-hook-form + zod + toast de hooks/use-toast. Sin sonner.
