@@ -1,99 +1,106 @@
 
 
-# Persistencia de Leads y Contactos en Supabase
+# Nueva Pagina: Creator Sales Overview
 
 ## Resumen
-Crear dos tablas en Supabase (`leads` y `contactos`) y conectar los formularios existentes para que los datos se guarden y se muestren desde la base de datos.
+Crear una pagina nueva en la ruta `/sales-overview` dentro del menu "Creator Sales" del sidebar. Esta pagina tendra cards de resumen con KPIs y cards operativas clickeables que abren modales con detalle, inspirada en las imagenes de referencia. La pagina `/salesdashboard` existente NO se modifica.
 
-## Paso 1: Crear tabla `leads`
-
-Migracion SQL para crear la tabla con los campos del modal AddLeadModal:
+## Estructura de la pagina
 
 ```text
-- id (uuid, PK)
-- url_perfil (text, NOT NULL)
-- plataforma (text, NOT NULL)
-- categoria (text, NOT NULL)
-- compania (text, NOT NULL)
-- pais (text)
-- notas (text)
-- evidence_urls (text[]) -- URLs de archivos de evidencia subidos
-- status (text, default 'nuevo')
-- created_at (timestamptz, default now())
-- updated_at (timestamptz, default now())
++--------------------------------------------------+
+| Creator Sales Overview                             |
+| Analitica y seguimiento  [$76.9K] [+0.0%] [67]    |
++--------------------------------------------------+
+| [Hoy] [7 dias] [Este mes]         01 feb - 12 feb |
++--------------------------------------------------+
+|  KPI CARDS (5 cards en fila)                       |
+|  Ingresos | Net Earn | Creadoras | Subiendo |Riesg|
+|  $76.9K   | $61.5K   | 67        | 3        | 2   |
++--------------------------------------------------+
+|  CARDS OPERATIVAS (2 filas x 5 cards)              |
+|  Comparativ| Top 10  | Subiendo | Bajando |AltoPo |
+|  En Riesgo | Alertas | Calendar | ClariAI | Todas |
++--------------------------------------------------+
 ```
 
-RLS: Politica permisiva ALL con `true` (igual que las demas tablas operativas del proyecto como events, tickets, etc.)
+## Datos y logica
 
-## Paso 2: Crear tabla `contactos`
+Toda la data proviene del hook existente `useEarningsData` (tabla `of_gross_earnings` + `creators`). Los calculos:
 
-Migracion SQL con los campos del modal AddContactoModal y del formulario NuevoContactoForm:
+- **Ingresos Total**: suma de `total_earnings_gross` del periodo
+- **Net Earnings**: Total * 0.80
+- **Creadoras activas**: count de creators unicos en el periodo
+- **Subiendo**: creadoras con earnings periodo actual > periodo anterior
+- **En Riesgo**: creadoras con earnings actual < periodo anterior (caida > 20%)
+- **Top 10**: ordenadas por earnings descendente
+- **Comparativas**: mini sparkline de los ultimos 4 periodos
 
-```text
-- id (uuid, PK)
-- nombre (text, NOT NULL)
-- instagram (text, NOT NULL)
-- categoria_fisica (text)
-- compania (text)
-- email (text)
-- country_code (text, default '+57')
-- telefono (text)
-- ticket (text)
-- notas (text)
-- profile_photo_url (text)
-- estado (text, default 'Nuevo')
-- pais (text)
-- created_at (timestamptz, default now())
-- updated_at (timestamptz, default now())
-```
+## Archivos nuevos
 
-RLS: Misma politica permisiva ALL con `true`.
+### 1. `src/pages/SalesOverview.tsx`
+Pagina principal con el layout SaaS estandar (Sidebar + Topbar + contenido). Contiene:
+- Filtros de periodo (reutiliza la logica de `getDateRange` de SalesDashboard)
+- Renderiza los nuevos componentes
 
-Trigger `update_updated_at_column` en ambas tablas para actualizar `updated_at` automaticamente.
+### 2. `src/pages/sales-overview/SalesOverviewHeader.tsx`
+Header con titulo "Creator Sales Overview", subtitulo, y badges inline con total earnings, variacion %, y creadoras activas.
 
-## Paso 3: Conectar AddLeadModal a Supabase
+### 3. `src/pages/sales-overview/SalesOverviewFilters.tsx`
+Filtros de periodo (Hoy, 7 dias, Este mes) con indicador de rango de fechas. Similar a DashboardFilters pero sin tabs de vista.
 
-Modificar `src/pages/leadgen/AddLeadModal.tsx`:
-- Importar `supabase` client
-- En `onSubmit`: subir archivos de evidencia al bucket `creator-files` si existen, luego insertar el registro en la tabla `leads`
-- Reemplazar el `setTimeout` falso por la insercion real
-- Agregar manejo de errores
+### 4. `src/pages/sales-overview/SalesKPICards.tsx`
+Grid de 5 KPI cards:
+- Cada card: icono, titulo, valor grande, variacion %, linea de progreso con color semantico
+- Cards "Subiendo" y "En Riesgo" clickeables (abren modal)
 
-## Paso 4: Conectar AddContactoModal a Supabase
+### 5. `src/pages/sales-overview/SalesOperationalCards.tsx`
+Grid de 10 cards operativas:
+- **Comparativas**: mini sparkline (recharts LineChart)
+- **Top 10**: lista de top 3 creadoras con nombre y monto
+- **Subiendo**: creadoras con mayor crecimiento
+- **Bajando**: creadoras con mayor caida
+- **Alto Potencial**: creadoras con +30% crecimiento
+- **En Riesgo**: monto total en riesgo
+- **Alertas**: conteo de alertas activas
+- **Calendario**: conteo de eventos del periodo
+- **Clari AI**: link a `/aisales`
+- **Todas**: resumen con distribucion
 
-Modificar `src/pages/leadgen/AddContactoModal.tsx`:
-- Importar `supabase` client
-- En `onSubmit`: insertar en la tabla `contactos`
-- Reemplazar el `setTimeout` falso
+Cada card clickeable abre `CardDetailModal`.
 
-## Paso 5: Conectar NuevoContactoForm a Supabase
+### 6. `src/pages/sales-overview/CardDetailModal.tsx`
+Dialog modal reutilizable que recibe un `cardType` y muestra:
+- Tabla de creadoras filtrada segun el contexto
+- Metricas detalladas
+- Boton para navegar al perfil
 
-Modificar `src/pages/contactos/NuevoContactoForm.tsx`:
-- En `handleSubmit`: insertar en la tabla `contactos` con todos los campos (incluyendo foto de perfil y archivos extras)
-
-## Paso 6: Mostrar leads reales en la pestana Leads de LeadGen
-
-Modificar `src/pages/leadgen/LeadGenContent.tsx`:
-- Usar `useQuery` de TanStack para cargar leads desde Supabase
-- Reemplazar el estado vacio actual por los datos reales en la pestana "leads"
-- Mostrar los leads en una tabla con columnas: URL, Plataforma, Categoria, Compania, Pais, Estado, Fecha
-- Actualizar el contador de leads en el header
-
-## Paso 7: Mostrar contactos reales en el Directorio de Contactos
-
-Modificar `src/pages/contactos/ContactosContent.tsx`:
-- Usar `useQuery` para cargar contactos desde Supabase
-- Reemplazar `mockContactos` por datos reales
-- Mantener los filtros y la logica de vista existente
-- Generar ticket IDs automaticamente
+### 7. `src/pages/sales-overview/usePeriodComparison.ts`
+Hook que recibe `allRows` y `dateRange`, calcula:
+- Periodo anterior automaticamente (misma duracion)
+- Variacion por creadora (crecimiento/caida)
+- Clasificacion: subiendo, bajando, en riesgo, alto potencial
 
 ## Archivos a modificar
-- `src/pages/leadgen/AddLeadModal.tsx` - conectar insert de leads
-- `src/pages/leadgen/AddContactoModal.tsx` - conectar insert de contactos
-- `src/pages/contactos/NuevoContactoForm.tsx` - conectar insert de contactos
-- `src/pages/leadgen/LeadGenContent.tsx` - cargar y mostrar leads reales
-- `src/pages/contactos/ContactosContent.tsx` - cargar y mostrar contactos reales
 
-## Nota importante
-Como no hay autenticacion implementada, las tablas usaran politicas RLS permisivas (igual que las demas tablas del proyecto). No se requiere `user_id` en este momento.
+### 8. `src/components/dashboard/DashboardSidebar.tsx`
+Agregar entrada "Overview" en `creatorSalesSubItems`:
+```
+{ title: "Overview", url: "/sales-overview" }
+```
+Posicionarla como primer item del submenu Creator Sales.
+
+### 9. `src/App.tsx`
+Agregar ruta:
+```
+<Route path="/sales-overview" element={<SalesOverview />} />
+```
+
+## Detalles de diseno
+
+- Las KPI cards usan el patron de hover existente (escala 1.03, gradiente) del design system
+- Colores semanticos del sistema: `text-success` para positivo, `text-destructive` para negativo, `text-warning` para alertas
+- Cards operativas con border, bg-card, rounded-lg consistente con el resto de la app
+- Modal usa el componente Dialog existente de shadcn
+- Layout full-width con `h-screen overflow-hidden` segun las constraints de layout
 
