@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      contactos: {
+        Row: {
+          categoria_fisica: string | null
+          compania: string | null
+          country_code: string | null
+          created_at: string
+          email: string | null
+          estado: string
+          id: string
+          instagram: string
+          nombre: string
+          notas: string | null
+          pais: string | null
+          profile_photo_url: string | null
+          telefono: string | null
+          ticket: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria_fisica?: string | null
+          compania?: string | null
+          country_code?: string | null
+          created_at?: string
+          email?: string | null
+          estado?: string
+          id?: string
+          instagram: string
+          nombre: string
+          notas?: string | null
+          pais?: string | null
+          profile_photo_url?: string | null
+          telefono?: string | null
+          ticket?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria_fisica?: string | null
+          compania?: string | null
+          country_code?: string | null
+          created_at?: string
+          email?: string | null
+          estado?: string
+          id?: string
+          instagram?: string
+          nombre?: string
+          notas?: string | null
+          pais?: string | null
+          profile_photo_url?: string | null
+          telefono?: string | null
+          ticket?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       creator_assignments: {
         Row: {
           closer_profile_id: string | null
@@ -762,6 +816,48 @@ export type Database = {
           start_time?: string | null
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          categoria: string
+          compania: string
+          created_at: string
+          evidence_urls: string[] | null
+          id: string
+          notas: string | null
+          pais: string | null
+          plataforma: string
+          status: string
+          updated_at: string
+          url_perfil: string
+        }
+        Insert: {
+          categoria: string
+          compania: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          notas?: string | null
+          pais?: string | null
+          plataforma: string
+          status?: string
+          updated_at?: string
+          url_perfil: string
+        }
+        Update: {
+          categoria?: string
+          compania?: string
+          created_at?: string
+          evidence_urls?: string[] | null
+          id?: string
+          notas?: string | null
+          pais?: string | null
+          plataforma?: string
+          status?: string
+          updated_at?: string
+          url_perfil?: string
         }
         Relationships: []
       }

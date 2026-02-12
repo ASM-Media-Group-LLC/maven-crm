@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Upload, X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const leadSchema = z.object({
   url_perfil: z.string().min(1, "URL requerida").url("URL inválida"),
@@ -62,16 +64,46 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const queryClient = useQueryClient();
+
   const onSubmit = async (data: LeadFormValues) => {
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Upload evidence files if any
+      let evidenceUrls: string[] = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const filePath = `leads/${crypto.randomUUID()}/${file.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("creator-files")
+            .upload(filePath, file);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage
+            .from("creator-files")
+            .getPublicUrl(filePath);
+          evidenceUrls.push(urlData.publicUrl);
+        }
+      }
+
+      const { error } = await supabase.from("leads").insert({
+        url_perfil: data.url_perfil,
+        plataforma: data.plataforma,
+        categoria: data.categoria,
+        compania: data.compania,
+        pais: data.pais || null,
+        notas: data.notas || null,
+        evidence_urls: evidenceUrls.length > 0 ? evidenceUrls : null,
+      });
+
+      if (error) throw error;
+
       toast({ title: "Lead agregado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
       form.reset();
       setFiles([]);
       onOpenChange(false);
-    } catch {
-      toast({ title: "Error al agregar lead", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Error al agregar lead", description: err.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

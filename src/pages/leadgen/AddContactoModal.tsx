@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
@@ -60,15 +62,29 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     },
   });
 
+  const queryClient = useQueryClient();
+
   const onSubmit = async (data: ContactoFormValues) => {
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const { error } = await supabase.from("contactos").insert({
+        nombre: data.nombre,
+        instagram: data.instagram,
+        categoria_fisica: data.categoriaFisica,
+        compania: data.compania || null,
+        country_code: data.paisCodigo,
+        telefono: data.telefono || null,
+        notas: data.notas || null,
+      });
+
+      if (error) throw error;
+
       toast({ title: "Contacto guardado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["contactos"] });
       form.reset();
       onOpenChange(false);
-    } catch {
-      toast({ title: "Error al guardar contacto", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

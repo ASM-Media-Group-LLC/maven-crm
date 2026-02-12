@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -101,7 +102,9 @@ const NuevoContactoForm = () => {
     if (errors[key]) setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   };
 
-  const handleSubmit = () => {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
     if (!form.categoria) e.categoria = "La categoría es obligatoria";
@@ -111,8 +114,31 @@ const NuevoContactoForm = () => {
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
       return;
     }
-    toast({ title: "Contacto guardado exitosamente" });
-    navigate("/contactos");
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from("contactos").insert({
+        nombre: form.nombre.trim(),
+        instagram: form.instagramLink.trim(),
+        categoria_fisica: form.categoria,
+        compania: form.compania || null,
+        email: form.email || null,
+        country_code: form.countryCode,
+        telefono: form.phone || null,
+        ticket: form.ticket || null,
+        notas: form.notas || null,
+        profile_photo_url: profilePhoto?.url || null,
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Contacto guardado exitosamente" });
+      navigate("/contactos");
+    } catch (err: any) {
+      toast({ title: "Error al guardar contacto", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -308,9 +334,9 @@ const NuevoContactoForm = () => {
           <Button variant="outline" onClick={() => navigate("/contactos")}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            Guardar Contacto
+            {isSaving ? "Guardando..." : "Guardar Contacto"}
           </Button>
         </div>
       </footer>
