@@ -295,10 +295,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
             </div>
 
             <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
                 <Phone className="mr-2 h-4 w-4" />
                 {isSubmitting ? "Guardando..." : "Guardar Lead"}
               </Button>
