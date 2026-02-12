@@ -132,8 +132,8 @@ const SalesDashboard = () => {
               <>
                 <EarningsSummary rows={filteredRows} comparedRows={comparedRows} />
                 <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
-                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
                 <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
+                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
                 <SalesReportSection rows={filteredRows} comparedRows={comparedRows} />
               </>
             ) : (
