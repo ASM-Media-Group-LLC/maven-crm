@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -9,6 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+
+const mockSupervisores = [
+  { name: "Luisroman07", email: "luisroman07@unlok.me" },
+  { name: "Brayan123", email: "brayan123@unlok.me" },
+  { name: "lorena_lozano", email: "lorena.lozano@unlok.me" },
+  { name: "monica.duque", email: "monica.duque@unlok.me" },
+  { name: "Fabiana_Duran", email: "fabiana.duran@unlok.me" },
+  { name: "lizeth.jerez", email: "lizeth.jerez@unlok.me" },
+  { name: "carolina.jaramillo", email: "carolina.jaramillo@unlok.me" },
+  { name: "cheryl.gonzalez", email: "cheryl.gonzalez@unlok.me" },
+  { name: "Andres.Gaviria", email: "andres.gaviria@unlok.me" },
+].map((s) => ({ ...s, totalQA: 0, aPlus: 0, a: 0, bPlus: 0, b: 0, c: 0, aprobados: 0, rechazados: 0 }));
 
 const tabs = [
   { id: "leads", label: "Leads", icon: CheckSquare },
@@ -50,12 +64,14 @@ const LeadGenContent = () => {
       {/* Scrollable content: KPIs + tabs + filters + tab content */}
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
-        <div className="px-6 py-4 border-b">
-          <div className="grid grid-cols-2 gap-6">
-            <LeadGenCantidadCard />
-            <LeadGenEstadosCard />
+        {activeTab !== "supervisores" && (
+          <div className="px-6 py-4 border-b">
+            <div className="grid grid-cols-2 gap-6">
+              <LeadGenCantidadCard />
+              <LeadGenEstadosCard />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tab bar */}
         <div className="border-b px-6 py-2 flex items-center justify-between gap-4">
@@ -86,7 +102,7 @@ const LeadGenContent = () => {
         <div className="border-b px-6 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : "Buscar lead..."} className="pl-9 h-9" />
+            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : "Buscar lead..."} className="pl-9 h-9" />
           </div>
           <div className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -102,7 +118,7 @@ const LeadGenContent = () => {
               </SelectContent>
             </Select>
           </div>
-          {activeTab === "agentes" ? (
+          {activeTab === "supervisores" ? null : activeTab === "agentes" ? (
             <Select>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Rendimiento" />
@@ -224,6 +240,63 @@ const LeadGenContent = () => {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeTab === "supervisores" && (
+            <Card>
+              <CardContent className="pt-6 px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Supervisor</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="text-center">Total QA</TableHead>
+                      <TableHead className="text-center">A+</TableHead>
+                      <TableHead className="text-center">A</TableHead>
+                      <TableHead className="text-center">B+</TableHead>
+                      <TableHead className="text-center">B</TableHead>
+                      <TableHead className="text-center">C</TableHead>
+                      <TableHead className="text-center">Aprobados</TableHead>
+                      <TableHead className="text-center">Rechazados</TableHead>
+                      <TableHead className="text-center">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mockSupervisores.map((sup) => {
+                      const initials = sup.name.slice(0, 2).toUpperCase();
+                      return (
+                        <TableRow key={sup.email}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                                  {initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium text-sm">{sup.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
+                          <TableCell className="text-center font-medium">{sup.totalQA}</TableCell>
+                          <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
+                          <TableCell className="text-center font-medium text-green-500">{sup.a}</TableCell>
+                          <TableCell className="text-center font-medium text-yellow-500">{sup.bPlus}</TableCell>
+                          <TableCell className="text-center font-medium text-yellow-500">{sup.b}</TableCell>
+                          <TableCell className="text-center font-medium">{sup.c}</TableCell>
+                          <TableCell className="text-center font-medium text-green-500">{sup.aprobados}</TableCell>
+                          <TableCell className="text-center font-medium text-destructive">{sup.rechazados}</TableCell>
+                          <TableCell className="text-center">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
