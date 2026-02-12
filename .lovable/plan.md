@@ -1,76 +1,41 @@
 
-
-# Modo Comparacion en Sales Dashboard
+# Header Fijo con Exportar CSV en Sales Dashboard
 
 ## Resumen
-Agregar un boton "Comparar" en los filtros del Sales Dashboard que active un modo de comparacion. Al activarse, aparecera un segundo selector de fechas (Periodo B) usando el componente `DateRangePicker` existente. Todas las secciones del dashboard (EarningsSummary, EarningsTrendChart, CreatorStatsCards, ConcentrationChart, CreatorsTable) mostraran los datos de ambos periodos lado a lado con indicadores de variacion porcentual.
+Agregar un header fijo (sticky) en la parte superior del area de contenido del Sales Dashboard, con el titulo "Reporte de Ventas", subtitulo "Rendimiento de ventas y analisis por creadora", y un boton "Exportar CSV" alineado a la derecha, tal como se muestra en la imagen de referencia.
 
-## Flujo del usuario
+## Cambios
+
+### 1. Modificar `src/pages/SalesDashboard.tsx`
+
+- Cambiar el contenedor principal de `min-h-screen` a `h-screen overflow-hidden` (segun el patron de layout establecido)
+- Agregar un header sticky (`shrink-0`) entre el `DashboardTopbar` y el `<main>` con:
+  - Titulo: "Reporte de Ventas" (bold, text-xl)
+  - Subtitulo: "Rendimiento de ventas y analisis por creadora" (text-sm, muted)
+  - Boton "Exportar CSV" a la derecha con icono `Download`
+  - Borde inferior sutil (`border-b border-border`)
+  - Fondo solido `bg-background` para que no se trasluzca el contenido al hacer scroll
+- La funcion de exportar CSV generara un archivo `.csv` con los datos de `filteredRows` (y `comparedRows` si el modo comparacion esta activo), incluyendo todas las columnas relevantes: creadora, fecha, total_earnings_gross, subscription_gross, message_gross, tips_gross, etc.
+
+### Logica de exportacion
+
+La funcion de exportar:
+1. Toma `filteredRows` como datos principales
+2. Genera headers CSV a partir de las columnas definidas en `ALL_COLUMNS` de `types.ts`
+3. Convierte cada fila a valores separados por comas
+4. Crea un Blob y dispara la descarga con nombre `reporte-ventas-{fecha}.csv`
+5. Si hay `comparedRows`, agrega una seccion separada en el CSV con titulo "Periodo B"
+
+### Estructura visual
 
 ```text
-Estado normal:
-[Vista General] [Rendimiento]
-[Ayer] [Hoy] [Esta semana] [Este mes]   01 feb - 12 feb   [Comparar]
-
-Al activar "Comparar":
-[Vista General] [Rendimiento]
-[Ayer] [Hoy] [Esta semana] [Este mes]   01 feb - 12 feb   [X Cerrar]
-                    vs   [DateRangePicker: Periodo B]
++--------------------------------------------------+
+| Reporte de Ventas               [Exportar CSV]    |
+| Rendimiento de ventas y analisis por creadora     |
+| ------------------------------------------------ |
+| [filtros, cards, graficos, tabla... con scroll]   |
++--------------------------------------------------+
 ```
 
-## Cambios por archivo
-
-### 1. Modificar `DashboardFilters.tsx`
-- Agregar prop `compareMode: boolean` y `onToggleCompare`
-- Agregar props `compareDateFrom`, `compareDateTo`, `onCompareDateChange`
-- Mostrar boton "Comparar" que activa el modo
-- Al activar, renderizar un segundo `DateRangePicker` para el Periodo B
-- Mostrar etiquetas "Periodo A" y "Periodo B" para claridad
-
-### 2. Modificar `SalesDashboard.tsx`
-- Agregar estado `compareMode: boolean` y `compareRange: { from, to }`
-- Calcular `comparedRows` filtrando `allRows` por el rango B
-- Pasar `comparedRows` a todos los componentes hijos cuando `compareMode` es true
-
-### 3. Modificar `EarningsSummary.tsx`
-- Agregar prop opcional `comparedRows?: EarningsRow[]`
-- Cuando existe, mostrar debajo de cada valor la variacion: valor del periodo B y el cambio porcentual (verde si positivo, rojo si negativo)
-- Layout: valor principal arriba, valor comparado y % debajo en texto mas pequeno
-
-### 4. Modificar `EarningsTrendChart.tsx`
-- Agregar prop opcional `comparedRows?: EarningsRow[]`
-- Cuando existe, mostrar dos series de barras superpuestas: Periodo A (color primario) y Periodo B (color gris/muted)
-- Alinear por dia relativo (Dia 1, Dia 2, ...) ya que los periodos pueden tener fechas distintas
-- Agregar leyenda indicando Periodo A y Periodo B
-
-### 5. Modificar `CreatorStatsCards.tsx`
-- Agregar prop opcional `comparedRows?: EarningsRow[]`
-- Mostrar el valor del periodo A, y debajo el valor del periodo B con la variacion porcentual
-
-### 6. Modificar `ConcentrationChart.tsx`
-- Agregar prop opcional `comparedRows?: EarningsRow[]`
-- Cuando existe, superponer la curva de Lorenz del Periodo B en color secundario sobre la del Periodo A
-- Agregar leyenda con ambos periodos
-
-### 7. Modificar `CreatorsTable.tsx`
-- Agregar prop opcional `comparedRows?: EarningsRow[]`
-- Agregar columnas adicionales: "Gross B", "Net B", "Variacion %"
-- La variacion se calcula por creadora comparando earnings del periodo A vs B
-- Colorear la variacion en verde (positiva) o rojo (negativa)
-
-## Detalles tecnicos
-
-- El `DateRangePicker` del Periodo B reutiliza el componente existente en `src/components/ui/date-range-picker.tsx`
-- Los calculos de variacion: `((valorA - valorB) / valorB) * 100`
-- Si valorB es 0, mostrar "Nuevo" en lugar de porcentaje infinito
-- El modo comparacion se desactiva con un boton X que limpia el estado
-
 ## Archivos a modificar
-- `src/pages/sales-dashboard/DashboardFilters.tsx` - agregar UI de comparacion
-- `src/pages/SalesDashboard.tsx` - estado y logica de comparacion
-- `src/pages/sales-dashboard/EarningsSummary.tsx` - mostrar comparacion
-- `src/pages/sales-dashboard/EarningsTrendChart.tsx` - doble serie en grafico
-- `src/pages/sales-dashboard/CreatorStatsCards.tsx` - mostrar comparacion
-- `src/pages/sales-dashboard/ConcentrationChart.tsx` - doble curva
-- `src/pages/sales-dashboard/CreatorsTable.tsx` - columnas comparativas
-
+- `src/pages/SalesDashboard.tsx` - agregar header sticky y funcion de exportar CSV
