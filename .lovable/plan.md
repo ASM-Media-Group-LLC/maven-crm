@@ -1,21 +1,28 @@
 
 
-# Invertir orden de botones en el header de LeadGen
+# Corregir scroll en la página LeadGen
 
-## Cambio
+## Problema
 
-En `src/pages/leadgen/LeadGenContent.tsx`, líneas 35-41, intercambiar el orden de los botones para que "Lead" (primario) aparezca primero y "Contacto" (outline) después.
+El contenedor principal de `LeadGenContent.tsx` (línea 25) tiene `overflow-hidden`, lo que impide hacer scroll. Las secciones fijas (header, KPIs, tabs, filtros) ocupan mucho espacio vertical -- especialmente en pantallas pequeñas -- y no queda espacio visible para el área de contenido. Como el padre bloquea el scroll, no se puede bajar para ver el resto de la página.
+
+## Solución
+
+Cambiar la estrategia de layout en `src/pages/leadgen/LeadGenContent.tsx`:
+
+- Reemplazar `overflow-hidden` por `overflow-auto` en el contenedor principal (línea 25), para que toda la página sea scrollable cuando el contenido excede el viewport.
 
 ## Detalle técnico
 
-Cambiar de:
+**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`, línea 25.
+
+Cambiar:
 ```
-Contacto | Lead
+<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
 ```
-A:
+Por:
 ```
-Lead | Contacto
+<main className="flex-1 flex flex-col h-full overflow-auto min-w-0">
 ```
 
-Solo se reordenan las dos líneas de botones dentro del div en línea 35. No hay otros cambios.
-
+Esto permite que todo el contenido de la página sea accesible mediante scroll, manteniendo el layout flex existente.
