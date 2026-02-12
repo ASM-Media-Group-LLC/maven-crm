@@ -97,10 +97,35 @@ const DashboardFilters = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{compareMode ? "Periodo A: " : ""}{dateLabel}</span>
-          </div>
+          {compareMode ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Periodo A:</span>
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>{dateLabel}</span>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-muted-foreground">vs</span>
+              {onCompareDateChange && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Periodo B:</span>
+                  <DateRangePicker
+                    from={compareDateFrom}
+                    to={compareDateTo}
+                    onApply={onCompareDateChange}
+                    placeholder="Seleccionar periodo B"
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>{dateLabel}</span>
+            </div>
+          )}
           <select className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-foreground outline-none">
             <option>Net Earnings</option>
             <option>Gross Earnings</option>
@@ -125,20 +150,6 @@ const DashboardFilters = ({
           )}
         </div>
       </div>
-
-      {/* Period B picker */}
-      {compareMode && onCompareDateChange && (
-        <div className="flex items-center gap-3 pl-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">vs Periodo B:</span>
-          <DateRangePicker
-            from={compareDateFrom}
-            to={compareDateTo}
-            onApply={onCompareDateChange}
-            placeholder="Seleccionar periodo B"
-            className="h-9 text-sm"
-          />
-        </div>
-      )}
     </div>
   );
 };
