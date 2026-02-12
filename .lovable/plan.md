@@ -1,75 +1,69 @@
 
+# Actualizar el campo "País" en el modal "Nuevo Lead" con lista completa
 
-# Ajustar modal "Nuevo Lead": scroll, companias, banderas, evidencia
+## Cambios
 
-## Problemas detectados
+Actualizar el select "País" en `src/pages/leadgen/AddLeadModal.tsx` reemplazando las opciones actuales (México, Colombia, Argentina, España, Estados Unidos, Otro) con la lista completa de 40 países organizados por regiones: Latinoamérica (20 países) y Europa (20 países).
 
-1. **Modal cortado**: No tiene `max-h-[90vh]` ni scroll interno, causando que el contenido se corte en pantallas pequenas
-2. **Companias incorrectas**: Muestra "Compania 1/2/3" en vez de las reales (KASH Agency, alvaroletshoot, Blue app, Piclink.me, Pagomundo, Exchange, Unlok)
-3. **Banderas ausentes**: El campo Pais no muestra emojis de bandera junto al nombre del pais
-4. **Falta campo de Evidencia**: Segun la imagen, hay un campo "Evidencia (opcional)" con boton "Subir Evidencia (0/4)" y texto "Sube hasta 4 imagenes o videos como prueba de contacto"
-5. **Boton de submit**: En la referencia dice "Guardar Lead" con icono de telefono, no "Agregar Lead"
+## Estructura de las opciones de País
 
-## Cambios en `src/pages/leadgen/AddLeadModal.tsx`
+Las opciones se presentarán en el siguiente orden:
 
-### 1. Scroll del modal
-- Agregar `max-h-[90vh]` al `DialogContent`
-- Envolver el formulario en un `div` con `overflow-y-auto max-h-[60vh]` para scroll interno del contenido
+**Sección Latinoamérica:**
+- 🇺🇸 Estados Unidos
+- 🇲🇽 México
+- 🇨🇱 Chile
+- 🇨🇴 Colombia
+- 🇦🇷 Argentina
+- 🇧🇷 Brasil
+- 🇵🇪 Perú
+- 🇻🇪 Venezuela
+- 🇪🇨 Ecuador
+- 🇧🇴 Bolivia
+- 🇵🇾 Paraguay
+- 🇺🇾 Uruguay
+- 🇨🇷 Costa Rica
+- 🇵🇦 Panamá
+- 🇩🇴 República Dominicana
+- 🇬🇹 Guatemala
+- 🇭🇳 Honduras
+- 🇳🇮 Nicaragua
+- 🇸🇻 El Salvador
+- 🇨🇺 Cuba
 
-### 2. Opciones de Compania
-Reemplazar las opciones actuales por:
-- KASH Agency
-- alvaroletshoot
-- Blue app
-- Piclink.me
-- Pagomundo
-- Exchange
-- Unlok
+**Sección Europa:**
+- 🇪🇸 España
+- 🇫🇷 Francia
+- 🇩🇪 Alemania
+- 🇮🇹 Italia
+- 🇬🇧 Reino Unido
+- 🇵🇹 Portugal
+- 🇳🇱 Países Bajos
+- 🇧🇪 Bélgica
+- 🇨🇭 Suiza
+- 🇦🇹 Austria
+- 🇸🇪 Suecia
+- 🇳🇴 Noruega
+- 🇩🇰 Dinamarca
+- 🇫🇮 Finlandia
+- 🇵🇱 Polonia
+- 🇨🇿 República Checa
+- 🇬🇷 Grecia
+- 🇮🇪 Irlanda
+- 🇷🇴 Rumania
+- 🇭🇺 Hungría
 
-### 3. Banderas en Pais
-Agregar emoji de bandera antes del nombre de cada pais:
-- Mexico -> flag MX
-- Colombia -> flag CO
-- Argentina -> flag AR
-- Espana -> flag ES
-- Estados Unidos -> flag US
-- Otro (sin bandera)
+## Implementación técnica
 
-### 4. Campo Evidencia (opcional)
-Agregar despues de Notas:
-- Label "Evidencia (opcional)"
-- Un boton outline de ancho completo con icono Upload y texto "Subir Evidencia (N/4)"
-- Texto descriptivo debajo: "Sube hasta 4 imagenes o videos como prueba de contacto"
-- Estado local para archivos seleccionados (maximo 4)
-- Usar input type="file" oculto con accept="image/*,video/*" y multiple
-- No se suben a ningun storage (simulado como los demas campos), solo se mantiene la lista de archivos seleccionados con previsualizacion de nombres
+**Archivo a modificar:** `src/pages/leadgen/AddLeadModal.tsx`
 
-### 5. Boton submit
-- Cambiar texto de "Agregar Lead" a "Guardar Lead"
-- Agregar icono de telefono (Phone de lucide) antes del texto
-- Texto de carga: "Guardando..."
+**Cambio específico:** Reemplazar el contenido del `<SelectContent>` en el campo "pais" (líneas 196-203) con todos los `<SelectItem>` correspondientes a los 40 países listados arriba, manteniendo la estructura y los emojis de bandera como prefijo de cada opción.
 
-## Estructura resultante del modal
+Los valores de los SelectItem seguirán el patrón de códigos ISO de dos letras (ej: "us", "mx", "cl", etc.) para consistencia y facilidad de integración futura con bases de datos.
 
-```text
-DialogContent (max-w-lg max-h-[90vh])
-  DialogHeader (pr-8)
-    DialogTitle: "Nuevo Lead"
-    DialogDescription
-  
-  div (overflow-y-auto max-h-[60vh] space-y-4 pr-1)
-    URL Perfil (input)
-    [Plataforma | Categoria] (grid 2 cols)
-    Compania (select - opciones reales)
-    Pais (select - con banderas)
-    Notas (textarea)
-    Evidencia (boton upload + texto helper)
-  
-  DialogFooter
-    Cancelar (ghost)
-    Guardar Lead (primary, con icono Phone)
-```
+## Notas
 
-## Archivo modificado
-
-Solo se modifica `src/pages/leadgen/AddLeadModal.tsx`.
+- Se mantiene el patrón actual de emojis de bandera + nombre del país
+- No se agrega separador visual entre regiones en esta versión (Radix UI SelectContent no tiene dividers nativos sin componentes adicionales)
+- El campo "Otro" se puede remover o mantener como opción final opcional
+- La funcionalidad de selección y validación permanece igual
