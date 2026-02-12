@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye } from "lucide-react";
+import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -31,6 +32,11 @@ const tabs = [
   { id: "rendimiento", label: "Rendimiento", icon: BarChart3 },
   { id: "leads-hora", label: "Leads por Hora", icon: Clock },
 ];
+
+const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+  hour: String(i).padStart(2, "0"),
+  leads: 0,
+}));
 
 const LeadGenContent = () => {
   const [activeTab, setActiveTab] = useState("leads");
@@ -101,7 +107,7 @@ const LeadGenContent = () => {
         <div className="border-b px-6 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />
+            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" || activeTab === "leads-hora" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />
           </div>
           <div className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -117,7 +123,7 @@ const LeadGenContent = () => {
               </SelectContent>
             </Select>
           </div>
-          {activeTab === "supervisores" || activeTab === "rendimiento" ? null : activeTab === "agentes" ? (
+          {activeTab === "supervisores" || activeTab === "rendimiento" || activeTab === "leads-hora" ? null : activeTab === "agentes" ? (
             <Select>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Rendimiento" />
@@ -268,6 +274,25 @@ const LeadGenContent = () => {
                   <p className="text-muted-foreground text-sm">
                     Selecciona un agente para ver su rendimiento
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === "leads-hora" && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 font-semibold mb-6">
+                  <BarChart3 className="h-5 w-5" />
+                  Leads por Hora (Hoy)
+                </div>
+                <div className="h-[300px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={hourlyData}>
+                      <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
+                      <Bar dataKey="leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
