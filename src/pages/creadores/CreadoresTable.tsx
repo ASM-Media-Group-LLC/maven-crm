@@ -131,7 +131,7 @@ const CreadoresTable = ({ creators }: Props) => {
           <TableHead><SortHeader label="Ubicación" col="country" /></TableHead>
           <TableHead><SortHeader label="Agencia" col="agency" /></TableHead>
           <TableHead>Redes</TableHead>
-          <TableHead>Acciones</TableHead>
+          <TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -295,7 +295,7 @@ const CreadoresTable = ({ creators }: Props) => {
                 </div>
                 </TooltipProvider>
               </TableCell>
-              <TableCell>
+              <TableCell className="sticky right-0 bg-card">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
                     <Pencil className="h-4 w-4" />
