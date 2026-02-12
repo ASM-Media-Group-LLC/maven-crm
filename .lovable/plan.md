@@ -1,106 +1,76 @@
 
 
-# Nueva Pagina: Creator Sales Overview
+# Modo Comparacion en Sales Dashboard
 
 ## Resumen
-Crear una pagina nueva en la ruta `/sales-overview` dentro del menu "Creator Sales" del sidebar. Esta pagina tendra cards de resumen con KPIs y cards operativas clickeables que abren modales con detalle, inspirada en las imagenes de referencia. La pagina `/salesdashboard` existente NO se modifica.
+Agregar un boton "Comparar" en los filtros del Sales Dashboard que active un modo de comparacion. Al activarse, aparecera un segundo selector de fechas (Periodo B) usando el componente `DateRangePicker` existente. Todas las secciones del dashboard (EarningsSummary, EarningsTrendChart, CreatorStatsCards, ConcentrationChart, CreatorsTable) mostraran los datos de ambos periodos lado a lado con indicadores de variacion porcentual.
 
-## Estructura de la pagina
+## Flujo del usuario
 
 ```text
-+--------------------------------------------------+
-| Creator Sales Overview                             |
-| Analitica y seguimiento  [$76.9K] [+0.0%] [67]    |
-+--------------------------------------------------+
-| [Hoy] [7 dias] [Este mes]         01 feb - 12 feb |
-+--------------------------------------------------+
-|  KPI CARDS (5 cards en fila)                       |
-|  Ingresos | Net Earn | Creadoras | Subiendo |Riesg|
-|  $76.9K   | $61.5K   | 67        | 3        | 2   |
-+--------------------------------------------------+
-|  CARDS OPERATIVAS (2 filas x 5 cards)              |
-|  Comparativ| Top 10  | Subiendo | Bajando |AltoPo |
-|  En Riesgo | Alertas | Calendar | ClariAI | Todas |
-+--------------------------------------------------+
+Estado normal:
+[Vista General] [Rendimiento]
+[Ayer] [Hoy] [Esta semana] [Este mes]   01 feb - 12 feb   [Comparar]
+
+Al activar "Comparar":
+[Vista General] [Rendimiento]
+[Ayer] [Hoy] [Esta semana] [Este mes]   01 feb - 12 feb   [X Cerrar]
+                    vs   [DateRangePicker: Periodo B]
 ```
 
-## Datos y logica
+## Cambios por archivo
 
-Toda la data proviene del hook existente `useEarningsData` (tabla `of_gross_earnings` + `creators`). Los calculos:
+### 1. Modificar `DashboardFilters.tsx`
+- Agregar prop `compareMode: boolean` y `onToggleCompare`
+- Agregar props `compareDateFrom`, `compareDateTo`, `onCompareDateChange`
+- Mostrar boton "Comparar" que activa el modo
+- Al activar, renderizar un segundo `DateRangePicker` para el Periodo B
+- Mostrar etiquetas "Periodo A" y "Periodo B" para claridad
 
-- **Ingresos Total**: suma de `total_earnings_gross` del periodo
-- **Net Earnings**: Total * 0.80
-- **Creadoras activas**: count de creators unicos en el periodo
-- **Subiendo**: creadoras con earnings periodo actual > periodo anterior
-- **En Riesgo**: creadoras con earnings actual < periodo anterior (caida > 20%)
-- **Top 10**: ordenadas por earnings descendente
-- **Comparativas**: mini sparkline de los ultimos 4 periodos
+### 2. Modificar `SalesDashboard.tsx`
+- Agregar estado `compareMode: boolean` y `compareRange: { from, to }`
+- Calcular `comparedRows` filtrando `allRows` por el rango B
+- Pasar `comparedRows` a todos los componentes hijos cuando `compareMode` es true
 
-## Archivos nuevos
+### 3. Modificar `EarningsSummary.tsx`
+- Agregar prop opcional `comparedRows?: EarningsRow[]`
+- Cuando existe, mostrar debajo de cada valor la variacion: valor del periodo B y el cambio porcentual (verde si positivo, rojo si negativo)
+- Layout: valor principal arriba, valor comparado y % debajo en texto mas pequeno
 
-### 1. `src/pages/SalesOverview.tsx`
-Pagina principal con el layout SaaS estandar (Sidebar + Topbar + contenido). Contiene:
-- Filtros de periodo (reutiliza la logica de `getDateRange` de SalesDashboard)
-- Renderiza los nuevos componentes
+### 4. Modificar `EarningsTrendChart.tsx`
+- Agregar prop opcional `comparedRows?: EarningsRow[]`
+- Cuando existe, mostrar dos series de barras superpuestas: Periodo A (color primario) y Periodo B (color gris/muted)
+- Alinear por dia relativo (Dia 1, Dia 2, ...) ya que los periodos pueden tener fechas distintas
+- Agregar leyenda indicando Periodo A y Periodo B
 
-### 2. `src/pages/sales-overview/SalesOverviewHeader.tsx`
-Header con titulo "Creator Sales Overview", subtitulo, y badges inline con total earnings, variacion %, y creadoras activas.
+### 5. Modificar `CreatorStatsCards.tsx`
+- Agregar prop opcional `comparedRows?: EarningsRow[]`
+- Mostrar el valor del periodo A, y debajo el valor del periodo B con la variacion porcentual
 
-### 3. `src/pages/sales-overview/SalesOverviewFilters.tsx`
-Filtros de periodo (Hoy, 7 dias, Este mes) con indicador de rango de fechas. Similar a DashboardFilters pero sin tabs de vista.
+### 6. Modificar `ConcentrationChart.tsx`
+- Agregar prop opcional `comparedRows?: EarningsRow[]`
+- Cuando existe, superponer la curva de Lorenz del Periodo B en color secundario sobre la del Periodo A
+- Agregar leyenda con ambos periodos
 
-### 4. `src/pages/sales-overview/SalesKPICards.tsx`
-Grid de 5 KPI cards:
-- Cada card: icono, titulo, valor grande, variacion %, linea de progreso con color semantico
-- Cards "Subiendo" y "En Riesgo" clickeables (abren modal)
+### 7. Modificar `CreatorsTable.tsx`
+- Agregar prop opcional `comparedRows?: EarningsRow[]`
+- Agregar columnas adicionales: "Gross B", "Net B", "Variacion %"
+- La variacion se calcula por creadora comparando earnings del periodo A vs B
+- Colorear la variacion en verde (positiva) o rojo (negativa)
 
-### 5. `src/pages/sales-overview/SalesOperationalCards.tsx`
-Grid de 10 cards operativas:
-- **Comparativas**: mini sparkline (recharts LineChart)
-- **Top 10**: lista de top 3 creadoras con nombre y monto
-- **Subiendo**: creadoras con mayor crecimiento
-- **Bajando**: creadoras con mayor caida
-- **Alto Potencial**: creadoras con +30% crecimiento
-- **En Riesgo**: monto total en riesgo
-- **Alertas**: conteo de alertas activas
-- **Calendario**: conteo de eventos del periodo
-- **Clari AI**: link a `/aisales`
-- **Todas**: resumen con distribucion
+## Detalles tecnicos
 
-Cada card clickeable abre `CardDetailModal`.
-
-### 6. `src/pages/sales-overview/CardDetailModal.tsx`
-Dialog modal reutilizable que recibe un `cardType` y muestra:
-- Tabla de creadoras filtrada segun el contexto
-- Metricas detalladas
-- Boton para navegar al perfil
-
-### 7. `src/pages/sales-overview/usePeriodComparison.ts`
-Hook que recibe `allRows` y `dateRange`, calcula:
-- Periodo anterior automaticamente (misma duracion)
-- Variacion por creadora (crecimiento/caida)
-- Clasificacion: subiendo, bajando, en riesgo, alto potencial
+- El `DateRangePicker` del Periodo B reutiliza el componente existente en `src/components/ui/date-range-picker.tsx`
+- Los calculos de variacion: `((valorA - valorB) / valorB) * 100`
+- Si valorB es 0, mostrar "Nuevo" en lugar de porcentaje infinito
+- El modo comparacion se desactiva con un boton X que limpia el estado
 
 ## Archivos a modificar
-
-### 8. `src/components/dashboard/DashboardSidebar.tsx`
-Agregar entrada "Overview" en `creatorSalesSubItems`:
-```
-{ title: "Overview", url: "/sales-overview" }
-```
-Posicionarla como primer item del submenu Creator Sales.
-
-### 9. `src/App.tsx`
-Agregar ruta:
-```
-<Route path="/sales-overview" element={<SalesOverview />} />
-```
-
-## Detalles de diseno
-
-- Las KPI cards usan el patron de hover existente (escala 1.03, gradiente) del design system
-- Colores semanticos del sistema: `text-success` para positivo, `text-destructive` para negativo, `text-warning` para alertas
-- Cards operativas con border, bg-card, rounded-lg consistente con el resto de la app
-- Modal usa el componente Dialog existente de shadcn
-- Layout full-width con `h-screen overflow-hidden` segun las constraints de layout
+- `src/pages/sales-dashboard/DashboardFilters.tsx` - agregar UI de comparacion
+- `src/pages/SalesDashboard.tsx` - estado y logica de comparacion
+- `src/pages/sales-dashboard/EarningsSummary.tsx` - mostrar comparacion
+- `src/pages/sales-dashboard/EarningsTrendChart.tsx` - doble serie en grafico
+- `src/pages/sales-dashboard/CreatorStatsCards.tsx` - mostrar comparacion
+- `src/pages/sales-dashboard/ConcentrationChart.tsx` - doble curva
+- `src/pages/sales-dashboard/CreatorsTable.tsx` - columnas comparativas
 
