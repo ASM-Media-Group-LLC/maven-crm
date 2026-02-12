@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   Settings,
   TrendingUp,
   ChevronRight,
@@ -36,6 +37,7 @@ import {
 
 const mainMenu = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Contactos", url: "/contactos", icon: UserPlus },
   { title: "Creadores", url: "/creadores", icon: Users },
   { title: "Eventos", url: "/eventos", icon: CalendarDays },
 ];
