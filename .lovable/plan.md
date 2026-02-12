@@ -1,70 +1,79 @@
 
-# Integrar Sales Report en "Estadísticas de Creadoras" del Sales Dashboard
 
-## Resumen
-Reemplazar el componente simplificado `CreatorsTable` en la Vista General del Sales Dashboard por un nuevo componente `SalesReportSection` que incluya toda la funcionalidad del Sales Report: filtros avanzados, KPIs, tabla detallada con columnas configurables, paginación y exportación a Excel.
+# Agregar columnas faltantes y eliminar duplicados en Sales Dashboard
 
-## Cambios
+## Analisis de duplicados
 
-### 1. Crear `src/pages/sales-dashboard/SalesReportSection.tsx`
-Nuevo componente que encapsula la lógica completa del Sales Report, adaptada para funcionar inline. Recibe `rows: EarningsRow[]` (ya filtradas por periodo) y opcionalmente `comparedRows`.
+Actualmente en la Vista General hay 3 secciones mostrando datos repetidos:
 
-Incluirá:
-- Header con título "Estadísticas de creadoras", botón "Custom metrics" y botón "Exportar Excel"
-- `EarningsFilters` (búsqueda, filtro por creadora, filtro por document ID, rango de fechas, paginación)
-- `EarningsSummaryCards` (5 KPIs: Creators, Total Earnings, Subscriptions, Messages, Tips)
-- `EarningsTable` (tabla completa con todas las columnas, ordenación, link/unlink de creadoras)
-- `EarningsPagination` (cuando la paginación no es "all")
+1. **EarningsSummary** (arriba): Total Earnings, Subscriptions, Messages, Tips, Posts, Referrals, Streams
+2. **CreatorStatsCards** (medio): Creators, Message Earnings, Total Earnings, Refunds
+3. **EarningsSummaryCards** (dentro de SalesReportSection): Creators, Total Earnings, Subscriptions, Messages, Tips
 
-Toda la lógica de estado (filtros, sort, paginación, columnas visibles, exportación Excel) se replica desde `SalesPerformanceCreator.tsx` pero operando sobre los `rows` recibidos por props en lugar de cargar datos propios.
+"Total Earnings" aparece en las 3 secciones. "Creators" aparece en 2. "Messages" aparece en 2. "Subscriptions" y "Tips" aparecen en 2.
 
-### 2. Modificar `src/pages/SalesDashboard.tsx`
-- Reemplazar la importación y uso de `CreatorsTable` por el nuevo `SalesReportSection`
-- Pasar `filteredRows` y `comparedRows` como props
-- Eliminar la importación de `CreatorsTable`
+**Accion**: Eliminar `EarningsSummaryCards` de dentro del `SalesReportSection`, ya que esa informacion ya se muestra arriba en `EarningsSummary` y `CreatorStatsCards`. La tabla de estadisticas no necesita sus propias tarjetas KPI duplicadas.
 
-### 3. Archivos reutilizados (sin modificar)
-Los siguientes componentes se reutilizan directamente:
-- `EarningsFilters` -- filtros avanzados
-- `EarningsSummaryCards` -- tarjetas KPI
-- `EarningsTable` -- tabla con todas las columnas y acciones
-- `EarningsPagination` -- controles de paginación
-- `CustomMetrics` -- selector de columnas visibles
-- `LinkCreatorModal` -- modal para vincular creadoras
+## Columnas nuevas a agregar
 
-## Detalle técnico
+Segun la imagen de referencia, la tabla necesita estas columnas adicionales:
 
-### SalesReportSection.tsx - Estructura
+| Columna | Calculo | Formato |
+|---------|---------|---------|
+| **Gross Earnings** | Ya existe como `total_earnings_gross` | currency |
+| **Net Earnings** | `total_earnings_gross * 0.80` (OF retiene 20%) | currency |
+| **Variacion** | Cambio porcentual vs periodo anterior por creadora | percent con signo |
+| **Tendencia** | Etiqueta basada en variacion: "Creciendo" / "Cayendo" / "Estable" | texto con icono |
+| **Participacion** | `earnings_creadora / total_earnings_todas * 100` | percent |
 
-```text
-+-------------------------------------------------------------------+
-| Estadísticas de creadoras    [Custom metrics] [Exportar Excel]    |
-+-------------------------------------------------------------------+
-| [Search] [Creadora: Todas v] [Document ID: Todos v]               |
-| [Desde] [Hasta] [Hoy] [Ayer]           [Por página: 50 v] N regs |
-+-------------------------------------------------------------------+
-| Creators | Total Earnings | Subscriptions | Messages | Tips       |
-+-------------------------------------------------------------------+
-| Artistic Name | Creator OF | Fecha | Hora | Total | Subs | ...   |
-| row 1...                                                          |
-| row 2...                                                          |
-+-------------------------------------------------------------------+
-| [< 1 2 3 ... >]                                                   |
-+-------------------------------------------------------------------+
+## Cambios por archivo
+
+### 1. Modificar `src/pages/sales-performance/types.ts`
+- Agregar campos calculados al tipo `EarningsRow`: `net_earnings`, `variation_percent`, `trend`, `participation_percent`
+- Agregar las nuevas columnas a `ALL_COLUMNS`:
+  - `net_earnings` (Net Earnings, currency, visible por defecto)
+  - `variation_percent` (Variacion, percent con signo, visible por defecto)
+  - `trend` (Tendencia, texto, visible por defecto)
+  - `participation_percent` (Participacion, percent, visible por defecto)
+
+### 2. Modificar `src/pages/sales-dashboard/SalesReportSection.tsx`
+- Eliminar la importacion y uso de `EarningsSummaryCards` (ya esta en la vista general arriba)
+- Calcular los campos nuevos antes de pasarlos a la tabla:
+  - `net_earnings = total_earnings_gross * 0.80`
+  - `participation_percent = (total_earnings_gross / sum_total) * 100`
+  - Para `variation_percent` y `trend`: se necesita acceso a `comparedRows` (ya esta como prop). Agrupar por creadora en ambos periodos, calcular cambio porcentual, asignar tendencia
+
+### 3. Modificar `src/pages/sales-performance/EarningsTable.tsx`
+- Agregar formateo para los nuevos tipos:
+  - `variation_percent`: mostrar con signo (+713.0%) y color (verde positivo, rojo negativo)
+  - `trend`: mostrar icono de tendencia (flecha arriba/abajo) con texto "Creciendo"/"Cayendo"/"Estable"
+  - `participation_percent`: mostrar con barra de progreso mini o solo porcentaje
+
+## Detalle tecnico
+
+### Calculo de Variacion y Tendencia
+Para cada fila (creadora + dia), se compara con el periodo anterior:
+- Se agrupan `comparedRows` por creadora
+- Se calcula el total gross del periodo anterior para esa creadora
+- `variation = ((current - previous) / previous) * 100`
+- Si `variation > 5` => "Creciendo", si `variation < -5` => "Cayendo", sino => "Estable"
+- Si no hay `comparedRows`, variacion = null y tendencia = null
+
+### Calculo de Participacion
+- `total_all = sum(total_earnings_gross)` de todas las filas filtradas
+- `participation = (row.total_earnings_gross / total_all) * 100`
+
+### Tipo EarningsRow extendido
+```typescript
+// Campos calculados opcionales
+net_earnings?: number | null;
+variation_percent?: number | null;
+trend?: string | null;
+participation_percent?: number | null;
 ```
 
-Estado interno del componente:
-- `documentFilter`, `creatorFilter`, `searchQuery` -- filtros
-- `dateFrom`, `dateTo` -- rango de fechas adicional (sobre los rows ya filtrados por periodo)
-- `sortField`, `sortDirection` -- ordenación
-- `currentPage`, `pageSize` -- paginación
-- `visibleColumns` -- columnas visibles
-- Cross-filters: `relatedCreatorNames`, `relatedDocumentIds`
-
-La exportación a Excel usa la misma lógica con `xlsx` que ya existe en `SalesPerformanceCreator`.
-
-## Archivos a crear
-- `src/pages/sales-dashboard/SalesReportSection.tsx`
-
 ## Archivos a modificar
-- `src/pages/SalesDashboard.tsx` -- reemplazar `CreatorsTable` por `SalesReportSection`
+- `src/pages/sales-performance/types.ts` -- agregar campos y columnas
+- `src/pages/sales-dashboard/SalesReportSection.tsx` -- calcular campos, eliminar EarningsSummaryCards
+- `src/pages/sales-performance/EarningsTable.tsx` -- formatear nuevas columnas con colores e iconos
+
