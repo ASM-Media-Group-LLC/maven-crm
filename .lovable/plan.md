@@ -1,31 +1,32 @@
 
-# Agregar vista "Rendimiento" al tab trigger de Rendimiento
+# Agregar vista "Leads por Hora" al tab trigger correspondiente
 
 ## Resumen
 
-Al hacer clic en la pestana "Rendimiento", se mostrara una Card con:
-- Un header que contiene un icono de Users, el titulo "Rendimiento por Agente" a la izquierda, y un Select "Todos los agentes" a la derecha.
-- Un empty state centrado con el texto "Selecciona un agente para ver su rendimiento".
+Al hacer clic en la pestana "Leads por Hora", se mostrara una Card con un grafico de barras (recharts) que muestra las horas del dia (0-23) en el eje X. Sin datos, se vera vacio con solo las etiquetas de horas. El titulo sera "Leads por Hora (Hoy)" con un icono de grafico.
 
-No se modificara ninguna otra seccion (leads, agentes, supervisores, KPI cards, filtros, tabs, header).
+No se modificara ninguna otra seccion (leads, agentes, supervisores, rendimiento, KPI cards, filtros, tabs, header).
 
 ## Detalle tecnico
 
 **Archivo:** `src/pages/leadgen/LeadGenContent.tsx`
 
-**1. Estado nuevo:**
-- Agregar `const [selectedAgente, setSelectedAgente] = useState("todos")` para el selector de agentes.
+**1. Imports adicionales:**
+- Agregar `BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer` de `recharts`.
 
-**2. Filtros condicionales (linea 119):**
-- Cuando `activeTab === "rendimiento"`: no mostrar selectores extra (igual que supervisores). Actualizar la condicion existente para incluir `"rendimiento"` junto a `"supervisores"`.
-- Actualizar el placeholder del search input para mostrar "Buscar..." cuando sea rendimiento.
+**2. Datos mock para el grafico:**
+- Crear array `hourlyData` con 24 entradas (horas 0-23), cada una con `hour` (string) y `leads: 0`.
 
-**3. Contenido del tab (despues de linea 298, dentro del div p-6):**
-- Agregar bloque `activeTab === "rendimiento"` que renderice:
+**3. Filtros condicionales:**
+- Agregar `"leads-hora"` a la condicion que oculta selectores extra (junto a `"supervisores"` y `"rendimiento"`).
+- Actualizar placeholder del search input para "Buscar..." cuando sea `"leads-hora"`.
+
+**4. Contenido del tab (dentro del div p-6, despues del bloque de supervisores):**
+- Agregar bloque `activeTab === "leads-hora"` que renderice:
   - Una `Card` con `CardContent` que contenga:
-    - Un div header con `flex items-center justify-between`:
-      - Izquierda: icono `Users` (h-5 w-5) + texto "Rendimiento por Agente" en `font-semibold`
-      - Derecha: un `Select` con placeholder "Todos los agentes" y opciones mock (Todos los agentes + nombres de agentes)
-    - Un empty state centrado con texto "Selecciona un agente para ver su rendimiento" en `text-muted-foreground`
-
-**Sin archivos nuevos.** Solo se agrega el bloque condicional de rendimiento y se ajusta el filtro.
+    - Titulo: icono `BarChart3` (h-5 w-5) + "Leads por Hora (Hoy)" en `font-semibold`, con `mb-6`
+    - `ResponsiveContainer` con altura ~300px conteniendo un `BarChart` de recharts:
+      - `XAxis` con `dataKey="hour"`, tick size pequeno
+      - `YAxis` oculto o minimo
+      - `Bar` con `dataKey="leads"`, color primary, radio redondeado
+      - Sin `CartesianGrid` o muy sutil
