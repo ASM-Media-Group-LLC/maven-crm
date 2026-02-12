@@ -5,8 +5,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import DashboardFilters from "./sales-dashboard/DashboardFilters";
-import EarningsSummary from "./sales-dashboard/EarningsSummary";
 import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
+import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
 import CreatorStatsCards from "./sales-dashboard/CreatorStatsCards";
 import ConcentrationChart from "./sales-dashboard/ConcentrationChart";
 import SalesReportSection from "./sales-dashboard/SalesReportSection";
@@ -130,8 +130,8 @@ const SalesDashboard = () => {
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : activeView === "Vista General" ? (
               <>
-                <EarningsSummary rows={filteredRows} comparedRows={comparedRows} />
                 <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
+                <EarningsByChannelChart rows={filteredRows} />
                 <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
                 <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
                 <SalesReportSection rows={filteredRows} comparedRows={comparedRows} />
