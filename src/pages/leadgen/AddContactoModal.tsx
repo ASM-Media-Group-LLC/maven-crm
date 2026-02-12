@@ -131,6 +131,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
                         <SelectItem value="b+">B+ (Media Alta)</SelectItem>
                         <SelectItem value="b">B (Media)</SelectItem>
                         <SelectItem value="c">C (Básica)</SelectItem>
+                        <SelectItem value="ora-miami">Ora Miami</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
