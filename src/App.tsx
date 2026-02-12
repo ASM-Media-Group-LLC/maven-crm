@@ -20,6 +20,8 @@ import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
 import LeadGen from "./pages/LeadGen";
+import Contactos from "./pages/Contactos";
+import NuevoContacto from "./pages/NuevoContacto";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +41,8 @@ const App = () => (
             <Route path="/aisales" element={<AiSales />} />
             <Route path="/ai-sales-config" element={<AiSalesConfig />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/contactos" element={<Contactos />} />
+            <Route path="/contactos/nuevo" element={<NuevoContacto />} />
             <Route path="/creadores" element={<Creadores />} />
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
             <Route path="/creadores/:id" element={<CreadorProfile />} />
