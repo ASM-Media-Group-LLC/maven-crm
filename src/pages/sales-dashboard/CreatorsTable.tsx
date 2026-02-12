@@ -19,10 +19,12 @@ import {
   Flag,
   ArrowUpDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
 
 interface Props {
   rows: EarningsRow[];
+  comparedRows?: EarningsRow[];
 }
 
 interface CreatorAgg {
@@ -31,34 +33,55 @@ interface CreatorAgg {
   grossEarnings: number;
   netEarnings: number;
   participation: number;
+  grossB?: number;
+  netB?: number;
+  variation?: number | null;
 }
 
 const fmt = (v: number) =>
   `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const CreatorsTable = ({ rows }: Props) => {
+const aggregateByCreator = (rows: EarningsRow[]) => {
+  const grouped = new Map<string, number>();
+  let total = 0;
+  for (const r of rows) {
+    const name = r.artistic_name || r.pending_creator || "Sin Vincular";
+    grouped.set(name, (grouped.get(name) ?? 0) + (r.total_earnings_gross ?? 0));
+    total += r.total_earnings_gross ?? 0;
+  }
+  return { grouped, total };
+};
+
+const CreatorsTable = ({ rows, comparedRows }: Props) => {
   const [search, setSearch] = useState("");
+  const hasComparison = comparedRows && comparedRows.length > 0;
 
   const creators = useMemo(() => {
-    const grouped = new Map<string, number>();
-    let total = 0;
-
-    for (const r of rows) {
-      const name = r.artistic_name || r.pending_creator || "Sin Vincular";
-      grouped.set(name, (grouped.get(name) ?? 0) + (r.total_earnings_gross ?? 0));
-      total += r.total_earnings_gross ?? 0;
-    }
+    const { grouped, total } = aggregateByCreator(rows);
+    const compAgg = comparedRows ? aggregateByCreator(comparedRows) : null;
 
     return Array.from(grouped.entries())
-      .map(([name, grossEarnings]): CreatorAgg => ({
-        name,
-        initials: name.slice(0, 2).toUpperCase(),
-        grossEarnings,
-        netEarnings: grossEarnings * 0.8,
-        participation: total > 0 ? (grossEarnings / total) * 100 : 0,
-      }))
+      .map(([name, grossEarnings]): CreatorAgg => {
+        const grossB = compAgg?.grouped.get(name);
+        const variation = grossB !== undefined && grossB > 0
+          ? ((grossEarnings - grossB) / grossB) * 100
+          : grossB === 0 && grossEarnings > 0
+            ? null // "Nuevo"
+            : grossB !== undefined ? 0 : undefined;
+
+        return {
+          name,
+          initials: name.slice(0, 2).toUpperCase(),
+          grossEarnings,
+          netEarnings: grossEarnings * 0.8,
+          participation: total > 0 ? (grossEarnings / total) * 100 : 0,
+          grossB: grossB,
+          netB: grossB !== undefined ? grossB * 0.8 : undefined,
+          variation: hasComparison ? variation : undefined,
+        };
+      })
       .sort((a, b) => b.grossEarnings - a.grossEarnings);
-  }, [rows]);
+  }, [rows, comparedRows, hasComparison]);
 
   const filtered = creators.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -107,14 +130,33 @@ const CreatorsTable = ({ rows }: Props) => {
               </TableHead>
               <TableHead className="text-xs text-right">
                 <span className="flex items-center justify-end gap-1">
-                  Gross Earnings <ArrowUpDown className="h-3 w-3" />
+                  Gross A <ArrowUpDown className="h-3 w-3" />
                 </span>
               </TableHead>
               <TableHead className="text-xs text-right">
                 <span className="flex items-center justify-end gap-1">
-                  Net Earnings <ArrowUpDown className="h-3 w-3" />
+                  Net A <ArrowUpDown className="h-3 w-3" />
                 </span>
               </TableHead>
+              {hasComparison && (
+                <>
+                  <TableHead className="text-xs text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      Gross B <ArrowUpDown className="h-3 w-3" />
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-xs text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      Net B <ArrowUpDown className="h-3 w-3" />
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-xs text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      Variación <ArrowUpDown className="h-3 w-3" />
+                    </span>
+                  </TableHead>
+                </>
+              )}
               <TableHead className="text-xs text-right">
                 <span className="flex items-center justify-end gap-1">
                   Participación <ArrowUpDown className="h-3 w-3" />
@@ -126,7 +168,7 @@ const CreatorsTable = ({ rows }: Props) => {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={hasComparison ? 8 : 5} className="text-center text-sm text-muted-foreground py-8">
                   Sin datos para el período seleccionado
                 </TableCell>
               </TableRow>
@@ -151,6 +193,27 @@ const CreatorsTable = ({ rows }: Props) => {
                   <TableCell className="text-right text-sm font-medium text-success">
                     {fmt(creator.netEarnings)}
                   </TableCell>
+                  {hasComparison && (
+                    <>
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {creator.grossB !== undefined ? fmt(creator.grossB) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {creator.netB !== undefined ? fmt(creator.netB) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {creator.variation === null ? (
+                          <span className="text-success font-medium">Nuevo</span>
+                        ) : creator.variation !== undefined ? (
+                          <span className={cn("font-medium", creator.variation >= 0 ? "text-success" : "text-destructive")}>
+                            {creator.variation >= 0 ? "+" : ""}{creator.variation.toFixed(1)}%
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">

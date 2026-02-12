@@ -7,40 +7,64 @@ import {
   Sparkles,
   UserPlus,
   Radio,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
 
 interface Props {
   rows: EarningsRow[];
+  comparedRows?: EarningsRow[];
 }
 
 const fmt = (v: number) =>
   `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const EarningsSummary = ({ rows }: Props) => {
-  const totals = useMemo(() => {
-    let totalEarnings = 0;
-    let subscriptions = 0;
-    let messages = 0;
-    let tips = 0;
+const calcVariation = (a: number, b: number) => {
+  if (b === 0) return a > 0 ? "Nuevo" : "0.0%";
+  const pct = ((a - b) / b) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+};
 
-    for (const r of rows) {
-      totalEarnings += r.total_earnings_gross ?? 0;
-      subscriptions += r.subscription_gross ?? 0;
-      messages += r.message_gross ?? 0;
-      tips += r.tips_gross ?? 0;
-    }
+const VariationBadge = ({ a, b }: { a: number; b: number }) => {
+  const label = calcVariation(a, b);
+  const isPositive = a >= b;
+  return (
+    <span className={cn("text-xs font-medium", isPositive ? "text-success" : "text-destructive")}>
+      {label}
+    </span>
+  );
+};
 
-    return { totalEarnings, subscriptions, messages, tips };
-  }, [rows]);
+const sumField = (rows: EarningsRow[], field: keyof EarningsRow) =>
+  rows.reduce((s, r) => s + ((r[field] as number) ?? 0), 0);
+
+const EarningsSummary = ({ rows, comparedRows }: Props) => {
+  const totals = useMemo(() => ({
+    totalEarnings: sumField(rows, "total_earnings_gross"),
+    subscriptions: sumField(rows, "subscription_gross"),
+    messages: sumField(rows, "message_gross"),
+    tips: sumField(rows, "tips_gross"),
+  }), [rows]);
+
+  const compTotals = useMemo(() => {
+    if (!comparedRows) return null;
+    return {
+      totalEarnings: sumField(comparedRows, "total_earnings_gross"),
+      subscriptions: sumField(comparedRows, "subscription_gross"),
+      messages: sumField(comparedRows, "message_gross"),
+      tips: sumField(comparedRows, "tips_gross"),
+    };
+  }, [comparedRows]);
 
   const metricCards = [
-    { label: "Suscripciones", value: fmt(totals.subscriptions), icon: Users, color: "text-success" },
-    { label: "Posts", value: "$0.00", icon: FileText, color: "text-primary" },
-    { label: "Mensajes", value: fmt(totals.messages), icon: MessageCircle, color: "text-instagram-pink" },
-    { label: "Propinas", value: fmt(totals.tips), icon: Sparkles, color: "text-warning" },
-    { label: "Referidos", value: "$0.00", icon: UserPlus, color: "text-destructive" },
-    { label: "Streams", value: "$0.00", icon: Radio, color: "text-accent" },
+    { label: "Suscripciones", value: fmt(totals.subscriptions), raw: totals.subscriptions, compRaw: compTotals?.subscriptions, icon: Users, color: "text-success" },
+    { label: "Posts", value: "$0.00", raw: 0, compRaw: compTotals ? 0 : undefined, icon: FileText, color: "text-primary" },
+    { label: "Mensajes", value: fmt(totals.messages), raw: totals.messages, compRaw: compTotals?.messages, icon: MessageCircle, color: "text-instagram-pink" },
+    { label: "Propinas", value: fmt(totals.tips), raw: totals.tips, compRaw: compTotals?.tips, icon: Sparkles, color: "text-warning" },
+    { label: "Referidos", value: "$0.00", raw: 0, compRaw: compTotals ? 0 : undefined, icon: UserPlus, color: "text-destructive" },
+    { label: "Streams", value: "$0.00", raw: 0, compRaw: compTotals ? 0 : undefined, icon: Radio, color: "text-accent" },
   ];
 
   return (
@@ -57,6 +81,12 @@ const EarningsSummary = ({ rows }: Props) => {
           <div>
             <p className="text-sm text-primary font-medium">Ganancias totales</p>
             <p className="text-3xl font-bold text-foreground">{fmt(totals.totalEarnings)}</p>
+            {compTotals && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-muted-foreground">B: {fmt(compTotals.totalEarnings)}</span>
+                <VariationBadge a={totals.totalEarnings} b={compTotals.totalEarnings} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -72,6 +102,12 @@ const EarningsSummary = ({ rows }: Props) => {
                   {metric.value}
                 </p>
                 <p className="text-xs text-muted-foreground">{metric.label}</p>
+                {metric.compRaw !== undefined && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] text-muted-foreground">B: {fmt(metric.compRaw)}</span>
+                    <VariationBadge a={metric.raw} b={metric.compRaw} />
+                  </div>
+                )}
               </div>
               <div className="rounded-lg bg-muted p-2">
                 <metric.icon className={`h-4 w-4 ${metric.color}`} />

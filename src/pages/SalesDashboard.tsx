@@ -30,6 +30,8 @@ const getDateRange = (period: TimePeriod): { from: Date; to: Date } => {
 const SalesDashboard = () => {
   const [activeView, setActiveView] = useState<ViewTab>("Vista General");
   const [activePeriod, setActivePeriod] = useState<TimePeriod>("Esta semana");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareRange, setCompareRange] = useState<{ from?: Date; to?: Date }>({});
   const { data: allRows = [], isLoading } = useEarningsData();
 
   const dateRange = useMemo(() => getDateRange(activePeriod), [activePeriod]);
@@ -42,6 +44,25 @@ const SalesDashboard = () => {
       return d >= from && d <= to;
     });
   }, [allRows, dateRange]);
+
+  const comparedRows = useMemo(() => {
+    if (!compareMode || !compareRange.from || !compareRange.to) return undefined;
+    const from = startOfDay(compareRange.from);
+    const to = endOfDay(compareRange.to);
+    return allRows.filter((r) => {
+      const d = new Date(r.effective_date);
+      return d >= from && d <= to;
+    });
+  }, [allRows, compareMode, compareRange]);
+
+  const handleToggleCompare = () => {
+    setCompareMode((prev) => !prev);
+    if (compareMode) setCompareRange({});
+  };
+
+  const handleCompareDateChange = (from: Date | undefined, to: Date | undefined) => {
+    setCompareRange({ from, to });
+  };
 
   return (
     <SidebarProvider>
@@ -57,16 +78,21 @@ const SalesDashboard = () => {
               onPeriodChange={setActivePeriod}
               dateFrom={dateRange.from}
               dateTo={dateRange.to}
+              compareMode={compareMode}
+              onToggleCompare={handleToggleCompare}
+              compareDateFrom={compareRange.from}
+              compareDateTo={compareRange.to}
+              onCompareDateChange={handleCompareDateChange}
             />
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
               <>
-                <EarningsSummary rows={filteredRows} />
-                <EarningsTrendChart rows={filteredRows} />
-                <CreatorStatsCards rows={filteredRows} />
-                <ConcentrationChart rows={filteredRows} />
-                <CreatorsTable rows={filteredRows} />
+                <EarningsSummary rows={filteredRows} comparedRows={comparedRows} />
+                <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
+                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
+                <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
+                <CreatorsTable rows={filteredRows} comparedRows={comparedRows} />
               </>
             )}
           </main>
