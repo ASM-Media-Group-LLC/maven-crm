@@ -7,28 +7,56 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
+  Legend,
 } from "recharts";
 import { format } from "date-fns";
 import type { EarningsRow } from "../sales-performance/types";
 
 interface Props {
   rows: EarningsRow[];
+  comparedRows?: EarningsRow[];
 }
 
-const EarningsTrendChart = ({ rows }: Props) => {
+const groupByDay = (rows: EarningsRow[]) => {
+  const grouped = new Map<string, number>();
+  for (const r of rows) {
+    const day = r.effective_date;
+    grouped.set(day, (grouped.get(day) ?? 0) + (r.total_earnings_gross ?? 0));
+  }
+  return Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, earnings], i) => ({
+      date,
+      label: format(new Date(date + "T12:00:00"), "MMM d"),
+      earnings: Math.round(earnings * 100) / 100,
+      dayIndex: i,
+    }));
+};
+
+const EarningsTrendChart = ({ rows, comparedRows }: Props) => {
   const data = useMemo(() => {
-    const grouped = new Map<string, number>();
-    for (const r of rows) {
-      const day = r.effective_date;
-      grouped.set(day, (grouped.get(day) ?? 0) + (r.total_earnings_gross ?? 0));
+    const currentData = groupByDay(rows);
+
+    if (!comparedRows || comparedRows.length === 0) {
+      return currentData.map((d) => ({ label: d.label, "Periodo A": d.earnings }));
     }
-    return Array.from(grouped.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, earnings]) => ({
-        date: format(new Date(date + "T12:00:00"), "MMM d"),
-        earnings: Math.round(earnings * 100) / 100,
-      }));
-  }, [rows]);
+
+    const compData = groupByDay(comparedRows);
+    const maxLen = Math.max(currentData.length, compData.length);
+    const merged = [];
+
+    for (let i = 0; i < maxLen; i++) {
+      merged.push({
+        label: currentData[i]?.label ?? compData[i]?.label ?? `Día ${i + 1}`,
+        "Periodo A": currentData[i]?.earnings ?? 0,
+        "Periodo B": compData[i]?.earnings ?? 0,
+      });
+    }
+
+    return merged;
+  }, [rows, comparedRows]);
+
+  const hasComparison = comparedRows && comparedRows.length > 0;
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
@@ -42,14 +70,14 @@ const EarningsTrendChart = ({ rows }: Props) => {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} barSize={40}>
+            <BarChart data={data} barSize={hasComparison ? 20 : 40}>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="hsl(var(--border))"
                 vertical={false}
               />
               <XAxis
-                dataKey="date"
+                dataKey="label"
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
@@ -70,13 +98,22 @@ const EarningsTrendChart = ({ rows }: Props) => {
                   color: "hsl(var(--foreground))",
                   fontSize: 12,
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Ganancias"]}
+                formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]}
               />
+              {hasComparison && <Legend />}
               <Bar
-                dataKey="earnings"
+                dataKey="Periodo A"
                 fill="hsl(var(--primary))"
                 radius={[4, 4, 0, 0]}
               />
+              {hasComparison && (
+                <Bar
+                  dataKey="Periodo B"
+                  fill="hsl(var(--muted-foreground))"
+                  radius={[4, 4, 0, 0]}
+                  opacity={0.5}
+                />
+              )}
             </BarChart>
           </ResponsiveContainer>
         )}
