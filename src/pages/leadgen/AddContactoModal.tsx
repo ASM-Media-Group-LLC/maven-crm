@@ -1,0 +1,231 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+
+const contactoSchema = z.object({
+  nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
+  instagram: z.string().trim().min(1, "Link de Instagram requerido").max(255, "Máximo 255 caracteres"),
+  categoriaFisica: z.string().min(1, "Categoría requerida"),
+  compania: z.string().optional(),
+  paisCodigo: z.string().default("+57"),
+  telefono: z.string().max(15, "Máximo 15 dígitos").optional(),
+  notas: z.string().max(500, "Máximo 500 caracteres").optional(),
+});
+
+type ContactoFormValues = z.infer<typeof contactoSchema>;
+
+interface AddContactoModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const countryCodes = [
+  { value: "+57", label: "🇨🇴 +57" },
+  { value: "+1", label: "🇺🇸 +1" },
+  { value: "+52", label: "🇲🇽 +52" },
+  { value: "+54", label: "🇦🇷 +54" },
+  { value: "+55", label: "🇧🇷 +55" },
+  { value: "+56", label: "🇨🇱 +56" },
+  { value: "+51", label: "🇵🇪 +51" },
+  { value: "+58", label: "🇻🇪 +58" },
+  { value: "+593", label: "🇪🇨 +593" },
+  { value: "+34", label: "🇪🇸 +34" },
+  { value: "+44", label: "🇬🇧 +44" },
+  { value: "+33", label: "🇫🇷 +33" },
+  { value: "+49", label: "🇩🇪 +49" },
+];
+
+const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<ContactoFormValues>({
+    resolver: zodResolver(contactoSchema),
+    defaultValues: {
+      nombre: "",
+      instagram: "",
+      categoriaFisica: "",
+      compania: "",
+      paisCodigo: "+57",
+      telefono: "",
+      notas: "",
+    },
+  });
+
+  const onSubmit = async (data: ContactoFormValues) => {
+    setIsSubmitting(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      toast({ title: "Contacto guardado exitosamente" });
+      form.reset();
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Error al guardar contacto", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+        <DialogHeader className="pr-8">
+          <DialogTitle>Nuevo Contacto</DialogTitle>
+          <DialogDescription>Agrega un nuevo contacto al sistema.</DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="overflow-y-auto max-h-[60vh] space-y-4 pr-1">
+              <FormField
+                control={form.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nombre completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="instagram"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Link de Instagram *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="@usuario o https://instagram.com/usuario" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="categoriaFisica"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoría Física *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona categoría" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="a+">A+ (Premium)</SelectItem>
+                        <SelectItem value="a">A (Alta)</SelectItem>
+                        <SelectItem value="b+">B+ (Media Alta)</SelectItem>
+                        <SelectItem value="b">B (Media)</SelectItem>
+                        <SelectItem value="c">C (Básica)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="compania"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Compañía</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona la compañía" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="kash-agency">KASH Agency</SelectItem>
+                        <SelectItem value="alvaroletshoot">alvaroletshoot</SelectItem>
+                        <SelectItem value="blue-app">Blue app</SelectItem>
+                        <SelectItem value="piclink">Piclink.me</SelectItem>
+                        <SelectItem value="pagomundo">Pagomundo</SelectItem>
+                        <SelectItem value="exchange">Exchange</SelectItem>
+                        <SelectItem value="unlok">Unlok</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <FormLabel>Teléfono</FormLabel>
+                <div className="grid grid-cols-[120px_1fr] gap-2">
+                  <FormField
+                    control={form.control}
+                    name="paisCodigo"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countryCodes.map((code) => (
+                            <SelectItem key={code.value} value={code.value}>
+                              {code.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="telefono"
+                    render={({ field }) => (
+                      <FormControl>
+                        <Input placeholder="Número de teléfono" {...field} />
+                      </FormControl>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="notas"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notas</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Notas adicionales..." className="resize-none" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter className="pt-4 flex-row gap-2 sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default AddContactoModal;

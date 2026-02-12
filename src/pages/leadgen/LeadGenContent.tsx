@@ -6,6 +6,7 @@ import { es } from "date-fns/locale";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import AddLeadModal from "./AddLeadModal";
+import AddContactoModal from "./AddContactoModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +45,7 @@ const LeadGenContent = () => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [selectedAgente, setSelectedAgente] = useState("todos");
+  const [addContactoOpen, setAddContactoOpen] = useState(false);
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
@@ -61,7 +63,7 @@ const LeadGenContent = () => {
               <Plus className="h-4 w-4" />
               Lead
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
               <UserPlus className="h-4 w-4" />
               Contacto
             </Button>
@@ -367,6 +369,7 @@ const LeadGenContent = () => {
       </div>
 
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
+      <AddContactoModal open={addContactoOpen} onOpenChange={setAddContactoOpen} />
     </main>
   );
 };
