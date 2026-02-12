@@ -1,32 +1,52 @@
 
-# Agregar vista "Leads por Hora" al tab trigger correspondiente
+## Actualizar Supervisores Table - Convertir campos a Badges
 
-## Resumen
+### Resumen
+Modificar la tabla de supervisores en `LeadGenContent.tsx` para que las columnas **Total QA**, **Aprobados** y **Rechazados** se rendericen como componentes Badge en lugar de texto plano, manteniendo las validantes de colores correspondientes.
 
-Al hacer clic en la pestana "Leads por Hora", se mostrara una Card con un grafico de barras (recharts) que muestra las horas del dia (0-23) en el eje X. Sin datos, se vera vacio con solo las etiquetas de horas. El titulo sera "Leads por Hora (Hoy)" con un icono de grafico.
+### Cambios Técnicos
 
-No se modificara ninguna otra seccion (leads, agentes, supervisores, rendimiento, KPI cards, filtros, tabs, header).
+**Archivo a modificar:** `src/pages/leadgen/LeadGenContent.tsx`
 
-## Detalle tecnico
+**1. Importación:**
+- Agregar `Badge` de `@/components/ui/badge` a los imports (línea 11).
 
-**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`
+**2. Actualizar celdas de la tabla (líneas 336, 342, 343):**
 
-**1. Imports adicionales:**
-- Agregar `BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer` de `recharts`.
+**Línea 336 - Total QA:**
+```tsx
+// Cambiar de:
+<TableCell className="text-center font-medium">{sup.totalQA}</TableCell>
 
-**2. Datos mock para el grafico:**
-- Crear array `hourlyData` con 24 entradas (horas 0-23), cada una con `hour` (string) y `leads: 0`.
+// A:
+<TableCell className="text-center">
+  <Badge className="justify-center">{sup.totalQA}</Badge>
+</TableCell>
+```
 
-**3. Filtros condicionales:**
-- Agregar `"leads-hora"` a la condicion que oculta selectores extra (junto a `"supervisores"` y `"rendimiento"`).
-- Actualizar placeholder del search input para "Buscar..." cuando sea `"leads-hora"`.
+**Línea 342 - Aprobados:**
+```tsx
+// Cambiar de:
+<TableCell className="text-center font-medium text-green-500">{sup.aprobados}</TableCell>
 
-**4. Contenido del tab (dentro del div p-6, despues del bloque de supervisores):**
-- Agregar bloque `activeTab === "leads-hora"` que renderice:
-  - Una `Card` con `CardContent` que contenga:
-    - Titulo: icono `BarChart3` (h-5 w-5) + "Leads por Hora (Hoy)" en `font-semibold`, con `mb-6`
-    - `ResponsiveContainer` con altura ~300px conteniendo un `BarChart` de recharts:
-      - `XAxis` con `dataKey="hour"`, tick size pequeno
-      - `YAxis` oculto o minimo
-      - `Bar` con `dataKey="leads"`, color primary, radio redondeado
-      - Sin `CartesianGrid` o muy sutil
+// A:
+<TableCell className="text-center">
+  <Badge variant="success" className="justify-center">{sup.aprobados}</Badge>
+</TableCell>
+```
+
+**Línea 343 - Rechazados:**
+```tsx
+// Cambiar de:
+<TableCell className="text-center font-medium text-destructive">{sup.rechazados}</TableCell>
+
+// A:
+<TableCell className="text-center">
+  <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
+</TableCell>
+```
+
+### Preservación
+- No se modifican otras secciones de la tabla (headers, otros campos, acciones).
+- Se mantiene la estructura y estilos del resto del componente.
+- Las otras columnas (A+, A, B+, B, C) permanecen con sus estilos de texto coloreado.
