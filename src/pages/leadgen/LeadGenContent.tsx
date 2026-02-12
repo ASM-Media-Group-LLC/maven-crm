@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import AddLeadModal from "./AddLeadModal";
@@ -82,7 +84,7 @@ const LeadGenContent = () => {
       <div className="shrink-0 border-b px-6 py-3 flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar lead..." className="pl-9 h-9" />
+          <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : "Buscar lead..."} className="pl-9 h-9" />
         </div>
         <div className="flex items-center gap-1.5">
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -98,39 +100,55 @@ const LeadGenContent = () => {
             </SelectContent>
           </Select>
         </div>
-        <Select>
-          <SelectTrigger className="w-[120px] h-9">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="nuevo">Nuevo</SelectItem>
-            <SelectItem value="contactado">Contactado</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select>
-          <SelectTrigger className="w-[120px] h-9">
-            <SelectValue placeholder="Calidad" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="a+">A+</SelectItem>
-            <SelectItem value="a">A</SelectItem>
-            <SelectItem value="b+">B+</SelectItem>
-            <SelectItem value="b">B</SelectItem>
-            <SelectItem value="c">C</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select>
-          <SelectTrigger className="w-[100px] h-9">
-            <SelectValue placeholder="QA" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="aprobado">Aprobado</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-          </SelectContent>
-        </Select>
+        {activeTab === "agentes" ? (
+          <Select>
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue placeholder="Rendimiento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="alto">Alto</SelectItem>
+              <SelectItem value="medio">Medio</SelectItem>
+              <SelectItem value="bajo">Bajo</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <>
+            <Select>
+              <SelectTrigger className="w-[120px] h-9">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="nuevo">Nuevo</SelectItem>
+                <SelectItem value="contactado">Contactado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select>
+              <SelectTrigger className="w-[120px] h-9">
+                <SelectValue placeholder="Calidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="a+">A+</SelectItem>
+                <SelectItem value="a">A</SelectItem>
+                <SelectItem value="b+">B+</SelectItem>
+                <SelectItem value="b">B</SelectItem>
+                <SelectItem value="c">C</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select>
+              <SelectTrigger className="w-[100px] h-9">
+                <SelectValue placeholder="QA" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="aprobado">Aprobado</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        )}
         <div className="flex border rounded-md">
           <Button
             variant={viewMode === "list" ? "default" : "ghost"}
@@ -167,6 +185,45 @@ const LeadGenContent = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === "agentes" && (
+          <div className="space-y-6">
+            {/* Summary card */}
+            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+              <div className="p-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-right">
+                  <div>
+                    <p className="text-3xl font-bold text-primary">0</p>
+                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Empty state */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <Users className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    No hay datos para esta fecha
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
 
