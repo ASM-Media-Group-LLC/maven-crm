@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText } from "lucide-react";
+import LeadGenCantidadCard from "./LeadGenCantidadCard";
+import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,19 +141,25 @@ const LeadGenContent = () => {
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         {activeTab === "leads" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Leads (0)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-16">
-                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground text-sm">
-                  No hay leads para revisar con estos filtros
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <LeadGenCantidadCard />
+              <LeadGenEstadosCard />
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Leads (0)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col items-center justify-center py-16">
+                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground text-sm">
+                    No hay leads para revisar con estos filtros
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </main>
