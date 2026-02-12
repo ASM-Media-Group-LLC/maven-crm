@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Phone, Upload, X } from "lucide-react";
 
 const leadSchema = z.object({
   url_perfil: z.string().min(1, "URL requerida").url("URL inválida"),
@@ -26,8 +27,12 @@ interface AddLeadModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const MAX_FILES = 4;
+
 const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const form = useForm<LeadFormValues>({
@@ -42,13 +47,28 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files;
+    if (!selected) return;
+    const newFiles = Array.from(selected);
+    setFiles((prev) => {
+      const combined = [...prev, ...newFiles];
+      return combined.slice(0, MAX_FILES);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data: LeadFormValues) => {
     setIsSubmitting(true);
     try {
-      // Simulated save — no Supabase table yet
       await new Promise((resolve) => setTimeout(resolve, 600));
       toast({ title: "Lead agregado exitosamente" });
       form.reset();
+      setFiles([]);
       onOpenChange(false);
     } catch {
       toast({ title: "Error al agregar lead", variant: "destructive" });
@@ -59,47 +79,101 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="pr-8">
           <DialogTitle>Nuevo Lead</DialogTitle>
           <DialogDescription>Agrega un nuevo lead al sistema de generación.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="url_perfil"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL Perfil / Contacto *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://instagram.com/..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="overflow-y-auto max-h-[60vh] space-y-4 pr-1">
               <FormField
                 control={form.control}
-                name="plataforma"
+                name="url_perfil"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Plataforma *</FormLabel>
+                    <FormLabel>URL Perfil / Contacto *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://instagram.com/..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="plataforma"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Plataforma *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="tiktok">TikTok</SelectItem>
+                          <SelectItem value="twitter">Twitter/X</SelectItem>
+                          <SelectItem value="onlyfans">OnlyFans</SelectItem>
+                          <SelectItem value="otra">Otra</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="categoria"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoría *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="a+">A+</SelectItem>
+                          <SelectItem value="a">A</SelectItem>
+                          <SelectItem value="b+">B+ (Buena)</SelectItem>
+                          <SelectItem value="b">B</SelectItem>
+                          <SelectItem value="c">C</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="compania"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Compañía / Cuenta de Origen *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona" />
+                          <SelectValue placeholder="Selecciona la compañía" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="instagram">Instagram</SelectItem>
-                        <SelectItem value="tiktok">TikTok</SelectItem>
-                        <SelectItem value="twitter">Twitter/X</SelectItem>
-                        <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                        <SelectItem value="otra">Otra</SelectItem>
+                        <SelectItem value="kash-agency">KASH Agency</SelectItem>
+                        <SelectItem value="alvaroletshoot">alvaroletshoot</SelectItem>
+                        <SelectItem value="blue-app">Blue app</SelectItem>
+                        <SelectItem value="piclink">Piclink.me</SelectItem>
+                        <SelectItem value="pagomundo">Pagomundo</SelectItem>
+                        <SelectItem value="exchange">Exchange</SelectItem>
+                        <SelectItem value="unlok">Unlok</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -109,99 +183,90 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
               <FormField
                 control={form.control}
-                name="categoria"
+                name="pais"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Categoría *</FormLabel>
+                    <FormLabel>País</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona" />
+                          <SelectValue placeholder="Selecciona un país" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="a+">A+</SelectItem>
-                        <SelectItem value="a">A</SelectItem>
-                        <SelectItem value="b+">B+ (Buena)</SelectItem>
-                        <SelectItem value="b">B</SelectItem>
-                        <SelectItem value="c">C</SelectItem>
+                        <SelectItem value="mx">🇲🇽 México</SelectItem>
+                        <SelectItem value="co">🇨🇴 Colombia</SelectItem>
+                        <SelectItem value="ar">🇦🇷 Argentina</SelectItem>
+                        <SelectItem value="es">🇪🇸 España</SelectItem>
+                        <SelectItem value="us">🇺🇸 Estados Unidos</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="notas"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notas</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Notas adicionales..." className="resize-none" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Evidencia */}
+              <div className="space-y-2">
+                <FormLabel>Evidencia (opcional)</FormLabel>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={files.length >= MAX_FILES}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Subir Evidencia ({files.length}/{MAX_FILES})
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Sube hasta 4 imágenes o videos como prueba de contacto
+                </p>
+                {files.length > 0 && (
+                  <ul className="space-y-1">
+                    {files.map((file, i) => (
+                      <li key={i} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 rounded px-2 py-1">
+                        <span className="truncate mr-2">{file.name}</span>
+                        <button type="button" onClick={() => removeFile(i)} className="shrink-0 hover:text-destructive">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
-            <FormField
-              control={form.control}
-              name="compania"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Compañía / Cuenta de Origen *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona la compañía" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="compania-1">Compañía 1</SelectItem>
-                      <SelectItem value="compania-2">Compañía 2</SelectItem>
-                      <SelectItem value="compania-3">Compañía 3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="pais"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>País</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un país" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="mx">México</SelectItem>
-                      <SelectItem value="co">Colombia</SelectItem>
-                      <SelectItem value="ar">Argentina</SelectItem>
-                      <SelectItem value="es">España</SelectItem>
-                      <SelectItem value="us">Estados Unidos</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notas"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notas</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Notas adicionales..." className="resize-none" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
+            <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Agregando..." : "Agregar Lead"}
+                <Phone className="mr-2 h-4 w-4" />
+                {isSubmitting ? "Guardando..." : "Guardar Lead"}
               </Button>
             </DialogFooter>
           </form>
