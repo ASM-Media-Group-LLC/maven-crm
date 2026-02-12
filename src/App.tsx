@@ -19,6 +19,7 @@ import NuevoEvento from "./pages/NuevoEvento";
 import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
+import LeadGen from "./pages/LeadGen";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/creadores/nuevo" element={<NuevoCreador />} />
             <Route path="/creadores/:id" element={<CreadorProfile />} />
             <Route path="/eventos" element={<Eventos />} />
+            <Route path="/leadgen" element={<LeadGen />} />
             <Route path="/eventos/nuevo" element={<NuevoEvento />} />
             <Route path="/eventos/:id/editar" element={<EditEvento />} />
             <Route path="/eventos/:id" element={<EventoDetail />} />
