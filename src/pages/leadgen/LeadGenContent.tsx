@@ -47,127 +47,127 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* Tab bar - fixed */}
-      <div className="shrink-0 border-b px-6 py-2 flex items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab(tab.id)}
-                className="text-xs"
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </Button>
-            );
-          })}
-        </div>
-        <Button variant="outline" size="sm">
-          <Database className="h-4 w-4" />
-          Base de Datos
-        </Button>
-      </div>
-
-      {/* Filters bar - fixed */}
-      <div className="shrink-0 border-b px-6 py-3 flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : "Buscar lead..."} className="pl-9 h-9" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          <Select defaultValue="hoy">
-            <SelectTrigger className="w-[120px] h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hoy">Hoy</SelectItem>
-              <SelectItem value="ayer">Ayer</SelectItem>
-              <SelectItem value="semana">Esta semana</SelectItem>
-              <SelectItem value="mes">Este mes</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {activeTab === "agentes" ? (
-          <Select>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="Rendimiento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="alto">Alto</SelectItem>
-              <SelectItem value="medio">Medio</SelectItem>
-              <SelectItem value="bajo">Bajo</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <>
-            <Select>
-              <SelectTrigger className="w-[120px] h-9">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="nuevo">Nuevo</SelectItem>
-                <SelectItem value="contactado">Contactado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-[120px] h-9">
-                <SelectValue placeholder="Calidad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="a+">A+</SelectItem>
-                <SelectItem value="a">A</SelectItem>
-                <SelectItem value="b+">B+</SelectItem>
-                <SelectItem value="b">B</SelectItem>
-                <SelectItem value="c">C</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-[100px] h-9">
-                <SelectValue placeholder="QA" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="aprobado">Aprobado</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
-        <div className="flex border rounded-md">
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            className="rounded-r-none h-9 w-9 p-0"
-            onClick={() => setViewMode("list")}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === "grid" ? "default" : "ghost"}
-            size="sm"
-            className="rounded-l-none h-9 w-9 p-0"
-            onClick={() => setViewMode("grid")}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Scrollable content: KPIs + tab content */}
+      {/* Scrollable content: KPIs + tabs + filters + tab content */}
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
         <div className="px-6 py-4 border-b">
           <div className="grid grid-cols-2 gap-6">
             <LeadGenCantidadCard />
             <LeadGenEstadosCard />
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div className="border-b px-6 py-2 flex items-center justify-between gap-4">
+          <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Button
+                  key={tab.id}
+                  variant={activeTab === tab.id ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab(tab.id)}
+                  className="text-xs"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </Button>
+              );
+            })}
+          </div>
+          <Button variant="outline" size="sm">
+            <Database className="h-4 w-4" />
+            Base de Datos
+          </Button>
+        </div>
+
+        {/* Filters bar */}
+        <div className="border-b px-6 py-3 flex items-center gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : "Buscar lead..."} className="pl-9 h-9" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <Select defaultValue="hoy">
+              <SelectTrigger className="w-[120px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hoy">Hoy</SelectItem>
+                <SelectItem value="ayer">Ayer</SelectItem>
+                <SelectItem value="semana">Esta semana</SelectItem>
+                <SelectItem value="mes">Este mes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {activeTab === "agentes" ? (
+            <Select>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Rendimiento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="alto">Alto</SelectItem>
+                <SelectItem value="medio">Medio</SelectItem>
+                <SelectItem value="bajo">Bajo</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <>
+              <Select>
+                <SelectTrigger className="w-[120px] h-9">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="nuevo">Nuevo</SelectItem>
+                  <SelectItem value="contactado">Contactado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select>
+                <SelectTrigger className="w-[120px] h-9">
+                  <SelectValue placeholder="Calidad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="a+">A+</SelectItem>
+                  <SelectItem value="a">A</SelectItem>
+                  <SelectItem value="b+">B+</SelectItem>
+                  <SelectItem value="b">B</SelectItem>
+                  <SelectItem value="c">C</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select>
+                <SelectTrigger className="w-[100px] h-9">
+                  <SelectValue placeholder="QA" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="aprobado">Aprobado</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-r-none h-9 w-9 p-0"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-l-none h-9 w-9 p-0"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
