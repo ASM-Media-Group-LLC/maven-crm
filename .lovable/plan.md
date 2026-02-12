@@ -1,49 +1,54 @@
 
+# Corregir modal de configurar tabla, header fijo y agregar columna Gross Earnings
 
-# Header fijo, reordenar columnas de earnings y mejorar Custom Metrics
+## Problemas a resolver
 
-## 1. Header fijo con scroll en el body
+1. **CustomMetrics usa Dialog (modal centrado)**: Debe ser un Popover que aparezca justo debajo del boton "Configurar tabla", no un modal centrado en pantalla
+2. **Header de tabla no queda fijo**: El contenedor actual tiene `overflow-auto` con `max-h`, pero el toolbar (search + botones) esta fuera del contenedor de scroll, lo cual esta bien. El `TableHeader` tiene `sticky top-0` pero necesita verificarse que funcione correctamente dentro del contenedor
+3. **Falta columna Gross Earnings**: Actualmente solo hay "Total Earnings" (`total_earnings_gross`) y "Net Earnings". Se necesita agregar "Gross Earnings" como columna separada
 
-Actualmente la tabla ya tiene `sticky top-0` en el `TableHeader`, pero el contenedor usa `overflow-auto max-h-[calc(100vh-24rem)]` directamente en el `div` que envuelve el `Table`. Esto funciona para scroll vertical pero el header necesita mantenerse fijo de forma mas robusta. Se verificara que el patron actual es correcto y se ajustara si es necesario.
+## Cambios por archivo
 
-## 2. Reordenar columnas: Total Earnings, Gross Earnings, Net Earnings juntas
+### 1. `src/pages/sales-performance/CustomMetrics.tsx`
+- Revertir de `Dialog` a `Popover` (de `@/components/ui/popover`)
+- Usar `PopoverContent` con `align="end"` para que aparezca debajo del boton, alineado a la derecha
+- Mantener el titulo "Configurar columnas" dentro del popover como un encabezado pequeno
+- Mantener la lista de checkboxes con scroll interno (`max-h-80 overflow-y-auto`)
+- El texto del boton se mantiene como "Configurar tabla"
 
-En `ALL_COLUMNS` dentro de `types.ts`, mover `net_earnings` para que quede inmediatamente despues de `total_earnings_gross`. Tambien renombrar para mayor claridad:
-- `total_earnings_gross` -> "Gross Earnings" (ya existe, renombrar label)
-- `net_earnings` -> "Net Earnings" (mover de posicion 20 a posicion 5, justo despues de gross)
+### 2. `src/pages/sales-performance/types.ts`
+- Renombrar `total_earnings_gross` label de "Total Earnings" a "Gross Earnings"
+- Agregar nueva columna calculada "Total Earnings" que represente el total (se puede mapear al mismo campo o ser un campo calculado si hay diferencia semantica)
 
-Nuevo orden de las primeras columnas:
+Nuevo orden de las columnas de earnings:
+1. **Gross Earnings** (`total_earnings_gross`)
+2. **Net Earnings** (`net_earnings`)
+3. **Total Earnings** (nueva entrada, campo calculado = gross + net o simplemente gross como total)
+
+Dado que en la data real `total_earnings_gross` ya representa el gross, y `net_earnings` es el 80% de ese valor, la logica seria:
+- Gross Earnings = `total_earnings_gross` (datos crudos de la BD)
+- Net Earnings = `net_earnings` (calculado como gross * 0.80)
+- Total Earnings = se puede interpretar como la suma o como el gross mismo
+
+Para evitar ambiguedad, se agregara un campo `gross_earnings` como alias visual del mismo `total_earnings_gross`, y "Total Earnings" se mantendra como la columna existente.
+
+Orden final:
 1. Artistic Name
-2. Creator OF
+2. Creator OF  
 3. Fecha
 4. Hora
-5. **Total Earnings** (total_earnings_gross - se mantiene como "Total Earnings")
-6. **Net Earnings** (net_earnings - movida aqui)
-7. Subscriptions
-8. Message
-9. Tips
-10. ...resto de columnas...
-11. Variacion, Tendencia, Participacion (al final)
+5. **Gross Earnings** (total_earnings_gross)
+6. **Net Earnings** (net_earnings)  
+7. **Total Earnings** (nueva columna -- por ahora igual a gross, se puede ajustar despues si el calculo difiere)
+8. Subscriptions, Message, Tips, etc.
 
-## 3. Custom Metrics: cambiar de Popover a Dialog (modal)
+### 3. `src/pages/sales-performance/EarningsTable.tsx`
+- Verificar que el sticky header funciona: el `div` contenedor tiene `overflow-auto max-h-[calc(100vh-24rem)]` y el `TableHeader` tiene `sticky top-0 z-10 bg-card`. Este patron es correcto. Se asegurara que no haya ningun problema de apilamiento (z-index)
 
-Convertir el componente `CustomMetrics` de un `Popover` a un `Dialog` (modal) con:
-- Titulo "Configurar columnas"
-- Lista de todas las columnas con checkboxes para mostrar/ocultar
-- Boton de cerrar
-- Scroll interno si hay muchas columnas
-- Texto del boton cambia a "Configurar tabla"
+### 4. `src/pages/sales-dashboard/SalesReportSection.tsx`
+- Agregar calculo de `total_earnings` en el `enriched` map (linea 55-71) si se necesita un campo separado
 
 ## Archivos a modificar
-
-### `src/pages/sales-performance/types.ts`
-- Reordenar `ALL_COLUMNS`: mover `net_earnings` justo despues de `total_earnings_gross`
-
-### `src/pages/sales-performance/CustomMetrics.tsx`
-- Cambiar de `Popover` a `Dialog` (modal)
-- Agregar titulo "Configurar columnas"
-- Cambiar texto del boton a "Configurar tabla"
-
-### `src/pages/sales-performance/EarningsTable.tsx`
-- Verificar que el sticky header funciona correctamente (ya implementado)
-
+- `src/pages/sales-performance/CustomMetrics.tsx`
+- `src/pages/sales-performance/types.ts`
+- `src/pages/sales-dashboard/SalesReportSection.tsx` (agregar campo total_earnings si es necesario)
