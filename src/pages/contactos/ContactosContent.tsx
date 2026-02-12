@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
@@ -25,19 +27,6 @@ export interface Contacto {
   creadoPor: string;
 }
 
-const mockContactos: Contacto[] = [
-  { id: "1", creacion: "11 feb, 09:44", ticket: "CT650279", nombre: "Elena Morali", estado: "Nuevo", instagram: "elenamoralireal", pais: "CO", categoria: "B+", whatsapp: "573001234567", interacciones: 0, creadoPor: "Gislaine Escudero" },
-  { id: "2", creacion: "09 feb, 17:11", ticket: "CT624759", nombre: "Angie Herrera", estado: "Nuevo", instagram: "bellacuentoss", pais: "MX", categoria: "B+", whatsapp: "5215512345678", interacciones: 0, creadoPor: "Gislaine Escudero" },
-  { id: "3", creacion: "05 feb, 17:33", ticket: "CT291823", nombre: "Isabel Gomez", estado: "Nuevo", instagram: "isabelgomezchavez", pais: "MX", categoria: "B+", whatsapp: "5215587654321", interacciones: 0, creadoPor: "william cujar" },
-  { id: "4", creacion: "05 feb, 14:14", ticket: "CT273140", nombre: "Jacquelín", estado: "Nuevo", instagram: "jacquesanta", pais: "ES", categoria: "B+", whatsapp: "34612345678", interacciones: 0, creadoPor: "Gislaine Escudero" },
-  { id: "5", creacion: "03 feb, 15:10", ticket: "CT007564", nombre: "Facundo Antunes", estado: "Nuevo", instagram: "facuaoficial", pais: "UY", categoria: "B+", whatsapp: "59891234567", interacciones: 0, creadoPor: "Gislaine Escudero" },
-  { id: "6", creacion: "03 feb, 12:49", ticket: "CT071579", nombre: "Jaqueline lopes", estado: "Nuevo", instagram: "jack_loppes_", pais: "BR", categoria: "B+", whatsapp: "5511987654321", interacciones: 0, creadoPor: "Gislaine Escudero" },
-  { id: "7", creacion: "02 feb, 18:21", ticket: "CT619870", nombre: "Camila Leon Florez", estado: "Nuevo", instagram: "camilaleonflorez", pais: "CO", categoria: "B+", whatsapp: "573109876543", interacciones: 0, creadoPor: "william cujar" },
-  { id: "8", creacion: "01 feb, 10:00", ticket: "CT512340", nombre: "Laura Martinez", estado: "Contactado", instagram: "lauramtz_", pais: "AR", categoria: "A", whatsapp: "5491112345678", interacciones: 3, creadoPor: "Gislaine Escudero" },
-  { id: "9", creacion: "28 ene, 14:30", ticket: "CT498712", nombre: "Sofia Rivera", estado: "Convertido", instagram: "sofiarivera", pais: "CL", categoria: "A+", whatsapp: "56912345678", interacciones: 5, creadoPor: "william cujar" },
-  { id: "10", creacion: "25 ene, 09:15", ticket: "CT387291", nombre: "Maria Gonzalez", estado: "Descartado", instagram: "mariag_fit", pais: "PE", categoria: "C", whatsapp: "51987654321", interacciones: 1, creadoPor: "Gislaine Escudero" },
-];
-
 const emptyFilters: ContactoFilters = {
   search: "",
   estado: "",
@@ -56,6 +45,35 @@ const ContactosContent = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const { data: dbContactos = [], isLoading } = useQuery({
+    queryKey: ["contactos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contactos")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Map DB rows to Contacto interface
+  const allContactos: Contacto[] = useMemo(() =>
+    dbContactos.map((c, i) => ({
+      id: c.id,
+      creacion: new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+      ticket: c.ticket || `CT${String(i + 1).padStart(6, "0")}`,
+      nombre: c.nombre,
+      estado: c.estado || "Nuevo",
+      instagram: c.instagram,
+      pais: c.pais || "",
+      categoria: c.categoria_fisica || "",
+      whatsapp: c.telefono ? `${c.country_code || ""}${c.telefono}` : "",
+      interacciones: 0,
+      creadoPor: "",
+    })),
+  [dbContactos]);
+
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
   const handleConvert = (c: Contacto) => {
@@ -66,7 +84,7 @@ const ContactosContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   const filtered = useMemo(() => {
-    return mockContactos.filter((c) => {
+    return allContactos.filter((c) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
         if (
@@ -80,12 +98,12 @@ const ContactosContent = () => {
       if (filters.categoria && c.categoria !== filters.categoria) return false;
       return true;
     });
-  }, [filters]);
+  }, [filters, allContactos]);
 
-  const totalContactos = mockContactos.length;
-  const nuevos = mockContactos.filter((c) => c.estado === "Nuevo").length;
-  const convertidos = mockContactos.filter((c) => c.estado === "Convertido").length;
-  const esteMes = 10;
+  const totalContactos = allContactos.length;
+  const nuevos = allContactos.filter((c) => c.estado === "Nuevo").length;
+  const convertidos = allContactos.filter((c) => c.estado === "Convertido").length;
+  const esteMes = allContactos.length;
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">

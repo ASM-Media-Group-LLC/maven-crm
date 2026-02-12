@@ -3,6 +3,7 @@ import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search,
 import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import AddLeadModal from "./AddLeadModal";
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 const mockSupervisores = [
   { name: "Luisroman07", email: "luisroman07@unlok.me" },
@@ -47,6 +49,18 @@ const LeadGenContent = () => {
   const [selectedAgente, setSelectedAgente] = useState("todos");
   const [addContactoOpen, setAddContactoOpen] = useState(false);
 
+  const { data: leads = [], isLoading: leadsLoading } = useQuery({
+    queryKey: ["leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
       {/* Header */}
@@ -55,7 +69,7 @@ const LeadGenContent = () => {
           <div>
             <h1 className="text-2xl font-semibold">LeadGen</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Marketing y generación de leads · 0 leads
+              Marketing y generación de leads · {leads.length} leads
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -200,15 +214,56 @@ const LeadGenContent = () => {
           {activeTab === "leads" && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Leads (0)</CardTitle>
+                <CardTitle className="text-base">Leads ({leads.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">
-                    No hay leads para revisar con estos filtros
-                  </p>
-                </div>
+                {leadsLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <p className="text-muted-foreground text-sm">Cargando leads...</p>
+                  </div>
+                ) : leads.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-muted-foreground text-sm">
+                      No hay leads para revisar con estos filtros
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>URL Perfil</TableHead>
+                          <TableHead>Plataforma</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead>Compañía</TableHead>
+                          <TableHead>País</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Fecha</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leads.map((lead) => (
+                          <TableRow key={lead.id}>
+                            <TableCell className="max-w-[200px]">
+                              <a href={lead.url_perfil} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate block">
+                                {lead.url_perfil}
+                              </a>
+                            </TableCell>
+                            <TableCell className="capitalize">{lead.plataforma}</TableCell>
+                            <TableCell><Badge variant="outline">{lead.categoria.toUpperCase()}</Badge></TableCell>
+                            <TableCell>{lead.compania}</TableCell>
+                            <TableCell>{lead.pais?.toUpperCase() || "—"}</TableCell>
+                            <TableCell><Badge>{lead.status}</Badge></TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {format(new Date(lead.created_at), "dd MMM, HH:mm", { locale: es })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
