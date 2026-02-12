@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, UserPlus, Upload, Save } from "lucide-react";
+import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 
 const CATEGORIES = [
   { value: "A+", label: "A+ (Premium)" },
@@ -68,6 +69,32 @@ const NuevoContactoForm = () => {
   const { toast } = useToast();
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
+  const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
+  const [extraFiles, setExtraFiles] = useState<UploadedFile[]>([]);
+  const tempId = useMemo(() => crypto.randomUUID(), []);
+
+  const handleFilesUploaded = (files: UploadedFile[]) => {
+    if (uploadModal.category === "piclink") {
+      setProfilePhoto(files[0] || null);
+    } else {
+      setExtraFiles((prev) => [...prev, ...files]);
+    }
+  };
+
+  const removeExtraFile = (index: number) => setExtraFiles((prev) => prev.filter((_, i) => i !== index));
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith("image/")) return <ImageIcon className="h-4 w-4 text-primary" />;
+    if (type.startsWith("video/")) return <Film className="h-4 w-4 text-primary" />;
+    return <FileText className="h-4 w-4 text-primary" />;
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -218,31 +245,59 @@ const NuevoContactoForm = () => {
             />
           </Field>
 
-          {/* Foto de Perfil */}
           <div>
             <Label className="text-sm font-medium">Foto de Perfil</Label>
             <div className="flex items-center gap-4 mt-2">
               <Avatar className="h-16 w-16">
+                {profilePhoto ? (
+                  <AvatarImage src={profilePhoto.url} alt="Foto de perfil" />
+                ) : null}
                 <AvatarFallback><UserPlus className="h-6 w-6 text-muted-foreground" /></AvatarFallback>
               </Avatar>
-              <Button variant="outline" size="sm">
-                <Upload className="mr-2 h-4 w-4" />
-                Subir Foto
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "piclink" })}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Subir Foto
+                </Button>
+                {profilePhoto && (
+                  <Button variant="ghost" size="sm" type="button" onClick={() => setProfilePhoto(null)}>
+                    <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Formatos: JPG, PNG, GIF. Máximo 5MB.</p>
+            {profilePhoto && <p className="text-xs text-muted-foreground mt-1">{profilePhoto.name}</p>}
+            {!profilePhoto && <p className="text-xs text-muted-foreground mt-1">Formatos: JPG, PNG, GIF. Máximo 5MB.</p>}
           </div>
 
           {/* Fotos y Videos Extras */}
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-sm font-medium">Fotos y Videos Extras</Label>
-              <p className="text-xs text-muted-foreground mt-1">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
+          <div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">Fotos y Videos Extras</Label>
+                <p className="text-xs text-muted-foreground mt-1">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
+              </div>
+              <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "extras" })}>
+                <Upload className="mr-2 h-4 w-4" />
+                Subir Archivos
+              </Button>
             </div>
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Subir Archivos
-            </Button>
+            {extraFiles.length > 0 && (
+              <div className="space-y-2 mt-3">
+                {extraFiles.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {getFileIcon(f.type)}
+                      <span className="truncate">{f.name}</span>
+                      <span className="text-muted-foreground text-xs shrink-0">{formatSize(f.size)}</span>
+                    </div>
+                    <button type="button" onClick={() => removeExtraFile(i)} className="text-muted-foreground hover:text-destructive ml-2">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -259,6 +314,14 @@ const NuevoContactoForm = () => {
           </Button>
         </div>
       </footer>
+
+      <FileUploadModal
+        open={uploadModal.open}
+        onClose={() => setUploadModal((prev) => ({ ...prev, open: false }))}
+        category={uploadModal.category}
+        tempId={tempId}
+        onFilesUploaded={handleFilesUploaded}
+      />
     </main>
   );
 };
