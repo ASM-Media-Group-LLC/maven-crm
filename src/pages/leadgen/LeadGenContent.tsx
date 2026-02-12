@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays } from "lucide-react";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,14 @@ const LeadGenContent = () => {
         </div>
       </header>
 
+      {/* KPI Cards */}
+      <div className="shrink-0 px-6 py-4 border-b">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LeadGenCantidadCard />
+          <LeadGenEstadosCard />
+        </div>
+      </div>
+
       {/* Tab bar */}
       <div className="shrink-0 border-b px-6 py-2 flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
@@ -74,17 +82,20 @@ const LeadGenContent = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar lead..." className="pl-9 h-9" />
         </div>
-        <Select defaultValue="hoy">
-          <SelectTrigger className="w-[120px] h-9">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hoy">Hoy</SelectItem>
-            <SelectItem value="ayer">Ayer</SelectItem>
-            <SelectItem value="semana">Esta semana</SelectItem>
-            <SelectItem value="mes">Este mes</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <Select defaultValue="hoy">
+            <SelectTrigger className="w-[120px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hoy">Hoy</SelectItem>
+              <SelectItem value="ayer">Ayer</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="mes">Este mes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Select>
           <SelectTrigger className="w-[120px] h-9">
             <SelectValue placeholder="Estado" />
@@ -141,25 +152,19 @@ const LeadGenContent = () => {
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         {activeTab === "leads" && (
-          <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <LeadGenCantidadCard />
-              <LeadGenEstadosCard />
-            </div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Leads (0)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">
-                    No hay leads para revisar con estos filtros
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Leads (0)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col items-center justify-center py-16">
+                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground text-sm">
+                  No hay leads para revisar con estos filtros
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </main>
