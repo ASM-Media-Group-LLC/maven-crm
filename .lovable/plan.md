@@ -1,45 +1,46 @@
 
-# Registrar Interaccion inline en ViewContactoModal
+# Headers de tabla fijos y columna de acciones siempre visible
 
 ## Resumen
 
-Reemplazar el boton "Registrar Interaccion" que actualmente muestra un toast placeholder por un formulario inline que se despliega dentro del mismo modal, sin abrir un modal separado. El formulario seguira el diseno de la imagen de referencia.
+Aplicar sticky header y columna de acciones fija (sticky right) a todas las tablas de la aplicacion que aun no lo tienen. Las tablas de Contactos y Creadores ya implementan sticky header; se extendera el patron al resto.
 
-## Cambios
+## Tablas a modificar
 
-**Archivo a modificar:** `src/pages/contactos/ViewContactoModal.tsx`
+### 1. `src/pages/eventos/EventosTable.tsx`
+- Envolver la `<Table>` en un contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`
+- Agregar `className="sticky top-0 z-10 bg-card"` al `<TableHeader>`
+- Agregar `sticky right-0 bg-card` al `<TableHead>` y `<TableCell>` de la columna "Acciones"
 
-### 1. Estado nuevo
-- `showForm`: boolean para mostrar/ocultar el formulario inline.
-- `tipoContacto`: `"nota" | "llamada"` (radio group).
-- `notas`: string (textarea).
-- `estadoContacto`: string (select: "Sin cambio", "Nuevo", "Contactado", "Interesado", "Convertido", "Rechazado").
-- `archivos`: `File[]` (input file nativo, max 10).
+### 2. `src/pages/sales-performance/EarningsTable.tsx`
+- Agregar `max-h-[calc(100vh-24rem)]` al contenedor existente (`overflow-x-auto` ya esta)
+- Agregar `className="sticky top-0 z-10 bg-card"` al `<TableHeader>`
+- Esta tabla no tiene columna de acciones visible, asi que no aplica sticky right
 
-### 2. UI del formulario inline
-Al hacer clic en "+ Registrar Interaccion", se activa `showForm = true` y el boton cambia a "Cancelar". Se despliega debajo del titulo "Historial de Interacciones":
+### 3. `src/pages/sales-dashboard/CreatorsTable.tsx`
+- Agregar `max-h-[calc(100vh-24rem)]` al contenedor existente (`overflow-x-auto`)
+- Agregar `className="sticky top-0 z-10 bg-card"` al `<TableHeader>`
+- Agregar `sticky right-0 bg-card` al `<TableHead>` y `<TableCell>` de "Acciones"
 
-- **Titulo**: "Registrar Nota" / subtitulo "Contacto: {nombre}"
-- **Tipo de Contacto**: RadioGroup con dos opciones: "Nota / Mensaje Escrito" y "Llamada"
-- **Notas**: Textarea con placeholder "Notas sobre esta interaccion"
-- **Estado del Contacto**: Select con opciones (Sin cambio, Nuevo, Contactado, Interesado, Convertido, Rechazado)
-- **Adjuntar Archivos (Fotos/Videos - max. 10)**: Input file nativo con `accept="image/*,video/*"` y `multiple`
-- **Footer del formulario**: Cancelar (cierra el form) + Guardar (muestra toast confirmacion y resetea form)
+### 4. `src/pages/leadgen/LeadGenContent.tsx` (tabla de Supervisores)
+- Envolver la `<Table>` de supervisores en un contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`
+- Agregar `className="sticky top-0 z-10 bg-card"` al `<TableHeader>`
+- Agregar `sticky right-0 bg-card` al `<TableHead>` y `<TableCell>` de "Acciones"
 
-### 3. Imports adicionales
-- `RadioGroup, RadioGroupItem` de `@/components/ui/radio-group`
-- `Label` de `@/components/ui/label`
-- `Textarea` de `@/components/ui/textarea`
-- `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` de `@/components/ui/select`
-- `Upload` de lucide-react
+### 5. `src/pages/contactos/ContactosTable.tsx` (solo acciones sticky)
+- Ya tiene sticky header. Agregar `sticky right-0 bg-card z-20` al `<TableHead>` y `<TableCell>` de la columna "Acciones"
 
-### 4. Logica de Guardar
-- Por ahora (sin Supabase), al guardar se muestra un toast "Interaccion registrada" y se resetea el formulario (showForm = false, campos vacios).
-- El boton Guardar esta deshabilitado si `notas` esta vacio.
+### 6. `src/pages/creadores/CreadoresTable.tsx` (solo acciones sticky)
+- Ya tiene sticky header. Agregar `sticky right-0 bg-card z-20` al `<TableHead>` y `<TableCell>` de la columna "Acciones"
 
-### 5. ScrollArea
-Envolver el contenido del DialogContent en un ScrollArea para que el modal no crezca demasiado cuando el formulario esta visible.
+### Tablas excluidas
+- **DocumentosTabContent** y **MonetizacionTabContent**: Son tablas pequenas dentro de tabs de perfil de creador, no requieren scroll interno ni acciones sticky.
 
-## Preservacion
-- No se modifica ningun otro archivo.
-- Toda la funcionalidad existente del modal (header, metadata, acciones, Instagram, WhatsApp, historial) se mantiene intacta.
+## Detalle tecnico
+
+Para que `sticky right-0` funcione correctamente en una tabla con scroll horizontal:
+- El `<TableHead>` de acciones recibe `className="sticky right-0 bg-card z-20"`
+- El `<TableCell>` de acciones recibe `className="sticky right-0 bg-card"`
+- Se usa `z-20` en el header para que quede sobre el body cuando ambos ejes hacen scroll
+
+El patron de sticky header usa `sticky top-0 z-10 bg-card` en el `<TableHeader>`, dentro de un contenedor con `overflow-auto` y `max-h-[calc(100vh-24rem)]`.
