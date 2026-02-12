@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpDown, ExternalLink, MessageCircle, MoreHorizontal, ChevronDown } from "lucide-react";
+import { ArrowUpDown, ExternalLink, MessageCircle, MoreHorizontal, ChevronDown, Eye, Pencil, Sparkles } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Table,
@@ -38,9 +38,12 @@ type SortKey = "creacion" | "ticket" | "nombre" | "estado" | "instagram" | "pais
 
 interface Props {
   contactos: Contacto[];
+  onView?: (contacto: Contacto) => void;
+  onEdit?: (contacto: Contacto) => void;
+  onConvert?: (contacto: Contacto) => void;
 }
 
-const ContactosTable = ({ contactos }: Props) => {
+const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("creacion");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -147,10 +150,16 @@ const ContactosTable = ({ contactos }: Props) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Ver detalle</DropdownMenuItem>
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                    <DropdownMenuItem>Convertir a Creador</DropdownMenuItem>
-                  </DropdownMenuContent>
+                     <DropdownMenuItem onClick={() => onView?.(c)}>
+                       <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => onEdit?.(c)}>
+                       <Pencil className="mr-2 h-4 w-4" /> Editar
+                     </DropdownMenuItem>
+                     <DropdownMenuItem onClick={() => onConvert?.(c)}>
+                       <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                     </DropdownMenuItem>
+                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
             </TableRow>

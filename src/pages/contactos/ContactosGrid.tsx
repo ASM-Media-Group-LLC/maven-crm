@@ -1,6 +1,11 @@
+import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import type { Contacto } from "./ContactosContent";
 
@@ -21,9 +26,12 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
 
 interface Props {
   contactos: Contacto[];
+  onView?: (contacto: Contacto) => void;
+  onEdit?: (contacto: Contacto) => void;
+  onConvert?: (contacto: Contacto) => void;
 }
 
-const ContactosGrid = ({ contactos }: Props) => {
+const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
   return (
     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       {contactos.map((c) => {
@@ -38,6 +46,7 @@ const ContactosGrid = ({ contactos }: Props) => {
           <Card
             key={c.id}
             className="overflow-hidden cursor-pointer transition-shadow duration-200 hover:shadow-md hover:border-primary/30"
+            onClick={() => onView?.(c)}
           >
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start gap-3">
@@ -56,6 +65,24 @@ const ContactosGrid = ({ contactos }: Props) => {
                     </Badge>
                   </div>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView?.(c); }}>
+                      <Eye className="mr-2 h-4 w-4" /> Ver detalle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(c); }}>
+                      <Pencil className="mr-2 h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConvert?.(c); }}>
+                      <Sparkles className="mr-2 h-4 w-4" /> Convertir a Creador
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="space-y-1">
