@@ -1,44 +1,49 @@
 
-# Agregar vista de Agentes al tab "Agentes" en LeadGen
+# Fix: Tabs y filtros no visibles sin scroll
 
-## Resumen
+## Problema
 
-Cuando el usuario hace clic en la pestana "Agentes", se mostrara una vista especifica con:
-1. **Barra de filtros adaptada**: placeholder "Buscar agente...", selector de fecha (Hoy), selector "Rendimiento", y toggle lista/grid (sin los filtros de Estado, Calidad y QA).
-2. **Card de resumen**: "Rendimiento de Agentes" con fecha actual, fondo con gradiente purpura, y contador "0 Agentes Activos" a la derecha.
-3. **Estado vacio**: Card con icono de usuarios y texto "No hay datos para esta fecha".
+Las cards KPI (Cantidad: 7 filas, Estados: 5 filas) ocupan demasiada altura vertical. Como todo el contenedor `<main>` usa `overflow-auto`, los tabs, filtros y el contenido quedan fuera de la vista y el usuario debe hacer scroll para verlos.
+
+## Solucion
+
+Reorganizar la estructura del layout para que los **tabs y filtros permanezcan siempre visibles**, moviendo el scroll solo al area que lo necesita. La seccion de KPIs pasara a ser parte del contenido scrollable junto con las cards de cada tab.
+
+### Cambio en estructura
+
+Actualmente:
+```text
+<main overflow-auto>         <-- todo scrollea junto
+  header (shrink-0)
+  KPI cards (shrink-0)       <-- ocupan mucho espacio
+  tabs (shrink-0)
+  filtros (shrink-0)
+  contenido (flex-1)
+</main>
+```
+
+Propuesto:
+```text
+<main flex-col>
+  header (shrink-0)          <-- fijo
+  tabs (shrink-0)            <-- fijo, siempre visible
+  filtros (shrink-0)         <-- fijo, siempre visible
+  <div flex-1 overflow-auto> <-- solo esta zona scrollea
+    KPI cards                <-- dentro del scroll
+    contenido tabs
+  </div>
+</main>
+```
 
 ## Detalle tecnico
 
-### Archivo a modificar: `src/pages/leadgen/LeadGenContent.tsx`
+**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`
 
-**1. Hacer la barra de filtros condicional segun el tab activo:**
+1. Quitar `overflow-auto` del `<main>` y dejarlo como `flex-1 flex flex-col h-full min-w-0`.
+2. Mover la seccion de **tabs** (lineas 58-81) justo despues del header (linea 48), antes de los KPIs.
+3. Mover la seccion de **filtros** (lineas 83-170) despues de los tabs.
+4. Envolver las **KPI cards** y el **contenido de tabs** dentro de un unico `<div className="flex-1 overflow-auto">`.
+5. Las KPI cards pasan de `shrink-0` a ser parte del contenido scrollable con padding `px-6 py-4`.
+6. Mantener el area de contenido de cada tab debajo de las KPIs dentro del mismo contenedor scrollable.
 
-- Cuando `activeTab === "agentes"`:
-  - Placeholder del input: "Buscar agente..."
-  - Mostrar solo: input de busqueda, selector de fecha (Hoy), selector de "Rendimiento", toggle lista/grid
-  - Ocultar: selectores de Estado, Calidad y QA
-- Cuando es otro tab, mantener los filtros actuales sin cambios.
-
-**2. Agregar contenido del tab "agentes" en la seccion de Content (linea 155-171):**
-
-Agregar un bloque condicional `activeTab === "agentes"` que renderice:
-
-- **Card de resumen** con:
-  - Fondo gradiente purpura (de violeta a purpura oscuro)
-  - Borde superior izquierdo con acento purpura/magenta
-  - Titulo "Rendimiento de Agentes" en color primary/magenta
-  - Subtitulo con la fecha actual formateada: "12 de febrero, 2026"
-  - A la derecha: numero grande "0" en color primary y texto "Agentes Activos" con icono de Users
-
-- **Card de estado vacio** debajo:
-  - Icono grande de Users (estilizado como en la imagen)
-  - Texto "No hay datos para esta fecha"
-
-### Imports adicionales
-
-- Usar `date-fns` (ya instalado) con locale `es` para formatear la fecha actual.
-
-### Sin archivos nuevos
-
-Todo se agrega directamente en `LeadGenContent.tsx` para mantener simplicidad. Si el componente crece mucho, se puede extraer despues.
+Esto garantiza que el usuario siempre vea los tabs y filtros sin necesidad de hacer scroll, y pueda desplazarse por las KPIs y el contenido del tab activo.
