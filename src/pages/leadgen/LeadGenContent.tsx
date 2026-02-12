@@ -36,6 +36,7 @@ const LeadGenContent = () => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [selectedAgente, setSelectedAgente] = useState("todos");
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
@@ -100,7 +101,7 @@ const LeadGenContent = () => {
         <div className="border-b px-6 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : "Buscar lead..."} className="pl-9 h-9" />
+            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />
           </div>
           <div className="flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -116,7 +117,7 @@ const LeadGenContent = () => {
               </SelectContent>
             </Select>
           </div>
-          {activeTab === "supervisores" ? null : activeTab === "agentes" ? (
+          {activeTab === "supervisores" || activeTab === "rendimiento" ? null : activeTab === "agentes" ? (
             <Select>
               <SelectTrigger className="w-[140px] h-9">
                 <SelectValue placeholder="Rendimiento" />
@@ -238,6 +239,38 @@ const LeadGenContent = () => {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {activeTab === "rendimiento" && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Users className="h-5 w-5" />
+                    Rendimiento por Agente
+                  </div>
+                  <Select value={selectedAgente} onValueChange={setSelectedAgente}>
+                    <SelectTrigger className="w-[200px] h-9">
+                      <SelectValue placeholder="Todos los agentes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos los agentes</SelectItem>
+                      {mockSupervisores.map((s) => (
+                        <SelectItem key={s.email} value={s.name}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    Selecciona un agente para ver su rendimiento
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {activeTab === "supervisores" && (
