@@ -2,10 +2,14 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
+import ViewContactoModal from "./ViewContactoModal";
+import EditContactoModal from "./EditContactoModal";
+import DeleteContactoDialog from "./DeleteContactoDialog";
 
 export interface Contacto {
   id: string;
@@ -45,7 +49,18 @@ const emptyFilters: ContactoFilters = {
 const ContactosContent = () => {
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
+  const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
+  const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
+  const handleConvert = (c: Contacto) => {
+    toast({ title: "Próximamente", description: `La conversión de "${c.nombre}" a creador estará disponible pronto.` });
+  };
 
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -105,11 +120,21 @@ const ContactosContent = () => {
         />
 
         {view === "table" ? (
-          <ContactosTable contactos={filtered} />
+          <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
         ) : (
-          <ContactosGrid contactos={filtered} />
+          <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
         )}
       </div>
+
+      <ViewContactoModal
+        open={viewOpen}
+        onOpenChange={setViewOpen}
+        contacto={selectedContacto}
+        onEdit={() => { setViewOpen(false); setEditOpen(true); }}
+        onDelete={() => { setViewOpen(false); setDeleteOpen(true); }}
+      />
+      <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
+      <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />
     </main>
   );
 };
