@@ -47,7 +47,7 @@ const LeadGenContent = () => {
 
       {/* KPI Cards */}
       <div className="shrink-0 px-6 py-4 border-b">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-6">
           <LeadGenCantidadCard />
           <LeadGenEstadosCard />
         </div>
