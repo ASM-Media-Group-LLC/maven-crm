@@ -55,6 +55,7 @@ const SalesReportSection = ({ rows, comparedRows }: SalesReportSectionProps) => 
     const enriched = result.map((r) => {
       const gross = r.total_earnings_gross ?? 0;
       const net_earnings = gross * 0.80;
+      const total_earnings = gross;
       const participation_percent = grandTotal > 0 ? (gross / grandTotal) * 100 : 0;
 
       const creatorKey = r.pending_creator || r.artistic_name || "";
@@ -67,7 +68,7 @@ const SalesReportSection = ({ rows, comparedRows }: SalesReportSectionProps) => 
         trend = variation_percent > 5 ? "Creciendo" : variation_percent < -5 ? "Cayendo" : "Estable";
       }
 
-      return { ...r, net_earnings, variation_percent, trend, participation_percent };
+      return { ...r, net_earnings, total_earnings, variation_percent, trend, participation_percent };
     });
 
     return enriched.sort((a, b) => {
