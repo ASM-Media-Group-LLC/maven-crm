@@ -47,6 +47,7 @@ const secondaryMenu = [
 ];
 
 const creatorSalesSubItems = [
+  { title: "Overview", url: "/sales-overview" },
   { title: "Dashboard", url: "/salesdashboard" },
   { title: "Sales Report", url: "/salesperformancecreator" },
   { title: "AI Sales", url: "/aisales", icon: Bot },
