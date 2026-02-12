@@ -193,14 +193,48 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                           <SelectValue placeholder="Selecciona un país" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="mx">🇲🇽 México</SelectItem>
-                        <SelectItem value="co">🇨🇴 Colombia</SelectItem>
-                        <SelectItem value="ar">🇦🇷 Argentina</SelectItem>
-                        <SelectItem value="es">🇪🇸 España</SelectItem>
-                        <SelectItem value="us">🇺🇸 Estados Unidos</SelectItem>
-                        <SelectItem value="otro">Otro</SelectItem>
-                      </SelectContent>
+                        <SelectContent>
+                          <SelectItem value="us">🇺🇸 Estados Unidos</SelectItem>
+                          <SelectItem value="mx">🇲🇽 México</SelectItem>
+                          <SelectItem value="cl">🇨🇱 Chile</SelectItem>
+                          <SelectItem value="co">🇨🇴 Colombia</SelectItem>
+                          <SelectItem value="ar">🇦🇷 Argentina</SelectItem>
+                          <SelectItem value="br">🇧🇷 Brasil</SelectItem>
+                          <SelectItem value="pe">🇵🇪 Perú</SelectItem>
+                          <SelectItem value="ve">🇻🇪 Venezuela</SelectItem>
+                          <SelectItem value="ec">🇪🇨 Ecuador</SelectItem>
+                          <SelectItem value="bo">🇧🇴 Bolivia</SelectItem>
+                          <SelectItem value="py">🇵🇾 Paraguay</SelectItem>
+                          <SelectItem value="uy">🇺🇾 Uruguay</SelectItem>
+                          <SelectItem value="cr">🇨🇷 Costa Rica</SelectItem>
+                          <SelectItem value="pa">🇵🇦 Panamá</SelectItem>
+                          <SelectItem value="do">🇩🇴 República Dominicana</SelectItem>
+                          <SelectItem value="gt">🇬🇹 Guatemala</SelectItem>
+                          <SelectItem value="hn">🇭🇳 Honduras</SelectItem>
+                          <SelectItem value="ni">🇳🇮 Nicaragua</SelectItem>
+                          <SelectItem value="sv">🇸🇻 El Salvador</SelectItem>
+                          <SelectItem value="cu">🇨🇺 Cuba</SelectItem>
+                          <SelectItem value="es">🇪🇸 España</SelectItem>
+                          <SelectItem value="fr">🇫🇷 Francia</SelectItem>
+                          <SelectItem value="de">🇩🇪 Alemania</SelectItem>
+                          <SelectItem value="it">🇮🇹 Italia</SelectItem>
+                          <SelectItem value="gb">🇬🇧 Reino Unido</SelectItem>
+                          <SelectItem value="pt">🇵🇹 Portugal</SelectItem>
+                          <SelectItem value="nl">🇳🇱 Países Bajos</SelectItem>
+                          <SelectItem value="be">🇧🇪 Bélgica</SelectItem>
+                          <SelectItem value="ch">🇨🇭 Suiza</SelectItem>
+                          <SelectItem value="at">🇦🇹 Austria</SelectItem>
+                          <SelectItem value="se">🇸🇪 Suecia</SelectItem>
+                          <SelectItem value="no">🇳🇴 Noruega</SelectItem>
+                          <SelectItem value="dk">🇩🇰 Dinamarca</SelectItem>
+                          <SelectItem value="fi">🇫🇮 Finlandia</SelectItem>
+                          <SelectItem value="pl">🇵🇱 Polonia</SelectItem>
+                          <SelectItem value="cz">🇨🇿 República Checa</SelectItem>
+                          <SelectItem value="gr">🇬🇷 Grecia</SelectItem>
+                          <SelectItem value="ie">🇮🇪 Irlanda</SelectItem>
+                          <SelectItem value="ro">🇷🇴 Rumania</SelectItem>
+                          <SelectItem value="hu">🇭🇺 Hungría</SelectItem>
+                        </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
