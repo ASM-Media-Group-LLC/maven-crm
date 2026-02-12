@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 const mockSupervisores = [
   { name: "Luisroman07", email: "luisroman07@unlok.me" },
@@ -333,14 +334,20 @@ const LeadGenContent = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
-                          <TableCell className="text-center font-medium">{sup.totalQA}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className="justify-center">{sup.totalQA}</Badge>
+                          </TableCell>
                           <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
                           <TableCell className="text-center font-medium text-green-500">{sup.a}</TableCell>
                           <TableCell className="text-center font-medium text-yellow-500">{sup.bPlus}</TableCell>
                           <TableCell className="text-center font-medium text-yellow-500">{sup.b}</TableCell>
                           <TableCell className="text-center font-medium">{sup.c}</TableCell>
-                          <TableCell className="text-center font-medium text-green-500">{sup.aprobados}</TableCell>
-                          <TableCell className="text-center font-medium text-destructive">{sup.rechazados}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="success" className="justify-center">{sup.aprobados}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
+                          </TableCell>
                           <TableCell className="text-center">
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                               <Eye className="h-4 w-4" />
