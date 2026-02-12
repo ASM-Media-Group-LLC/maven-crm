@@ -26,6 +26,7 @@ export interface EarningsRow {
   effective_date: string;
   // Calculated fields
   net_earnings?: number | null;
+  total_earnings?: number | null;
   variation_percent?: number | null;
   trend?: string | null;
   participation_percent?: number | null;
@@ -47,8 +48,9 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { key: "pending_creator", label: "Creator OF", defaultVisible: true, format: "text" },
   { key: "effective_date", label: "Fecha", defaultVisible: true, align: "right", format: "date" },
   { key: "report_time", label: "Hora", defaultVisible: true, align: "right", format: "time" },
-  { key: "total_earnings_gross", label: "Total Earnings", defaultVisible: true, align: "right", format: "currency" },
+  { key: "total_earnings_gross", label: "Gross Earnings", defaultVisible: true, align: "right", format: "currency" },
   { key: "net_earnings", label: "Net Earnings", defaultVisible: true, align: "right", format: "currency" },
+  { key: "total_earnings" as SortField, label: "Total Earnings", defaultVisible: true, align: "right", format: "currency" },
   { key: "subscription_gross", label: "Subscriptions", defaultVisible: true, align: "right", format: "currency" },
   { key: "message_gross", label: "Message", defaultVisible: true, align: "right", format: "currency" },
   { key: "tips_gross", label: "Tips", defaultVisible: true, align: "right", format: "currency" },

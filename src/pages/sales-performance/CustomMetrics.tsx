@@ -1,13 +1,7 @@
 import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ALL_COLUMNS, type SortField } from "./types";
 
@@ -17,18 +11,16 @@ interface CustomMetricsProps {
 }
 
 const CustomMetrics = ({ visibleColumns, onToggleColumn }: CustomMetricsProps) => (
-  <Dialog>
-    <DialogTrigger asChild>
+  <Popover>
+    <PopoverTrigger asChild>
       <Button variant="outline" size="sm" className="gap-2">
         <Settings2 className="h-4 w-4" />
         Configurar tabla
       </Button>
-    </DialogTrigger>
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Configurar columnas</DialogTitle>
-      </DialogHeader>
-      <ScrollArea className="max-h-[60vh] pr-4">
+    </PopoverTrigger>
+    <PopoverContent align="end" className="w-64 p-3">
+      <p className="text-sm font-medium text-foreground mb-2">Configurar columnas</p>
+      <ScrollArea className="max-h-80">
         <div className="space-y-1">
           {ALL_COLUMNS.map((col) => (
             <label
@@ -44,8 +36,8 @@ const CustomMetrics = ({ visibleColumns, onToggleColumn }: CustomMetricsProps) =
           ))}
         </div>
       </ScrollArea>
-    </DialogContent>
-  </Dialog>
+    </PopoverContent>
+  </Popover>
 );
 
 export default CustomMetrics;
