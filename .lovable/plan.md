@@ -1,36 +1,25 @@
 
-# Fix: Tabs y filtros no visibles sin scroll
+
+# Fix: KPI Cards deben estar arriba de los tabs, no debajo
 
 ## Problema
 
-Las cards KPI (Cantidad: 7 filas, Estados: 5 filas) ocupan demasiada altura vertical. Como todo el contenedor `<main>` usa `overflow-auto`, los tabs, filtros y el contenido quedan fuera de la vista y el usuario debe hacer scroll para verlos.
+Las KPI cards (Cantidad y Estados) se movieron debajo de los tabs y filtros dentro del area scrollable, pero el usuario quiere que esten **arriba de los tabs**, como estaban originalmente, separadas visualmente del tab bar.
 
 ## Solucion
 
-Reorganizar la estructura del layout para que los **tabs y filtros permanezcan siempre visibles**, moviendo el scroll solo al area que lo necesita. La seccion de KPIs pasara a ser parte del contenido scrollable junto con las cards de cada tab.
+Reubicar las KPI cards entre el header y los tabs. Para que los tabs sigan siendo visibles, el header sera el unico elemento fijo, y todo lo demas (KPIs, tabs, filtros, contenido) scrolleara junto.
 
-### Cambio en estructura
+### Nueva estructura
 
-Actualmente:
-```text
-<main overflow-auto>         <-- todo scrollea junto
-  header (shrink-0)
-  KPI cards (shrink-0)       <-- ocupan mucho espacio
-  tabs (shrink-0)
-  filtros (shrink-0)
-  contenido (flex-1)
-</main>
-```
-
-Propuesto:
 ```text
 <main flex-col>
-  header (shrink-0)          <-- fijo
-  tabs (shrink-0)            <-- fijo, siempre visible
-  filtros (shrink-0)         <-- fijo, siempre visible
-  <div flex-1 overflow-auto> <-- solo esta zona scrollea
-    KPI cards                <-- dentro del scroll
-    contenido tabs
+  header (shrink-0)              <-- unico elemento fijo
+  <div flex-1 overflow-auto>     <-- todo lo demas scrollea
+    KPI cards                    <-- arriba, separadas
+    tabs                         <-- debajo de KPIs
+    filtros                      <-- debajo de tabs
+    contenido del tab activo     <-- debajo de filtros
   </div>
 </main>
 ```
@@ -39,11 +28,10 @@ Propuesto:
 
 **Archivo:** `src/pages/leadgen/LeadGenContent.tsx`
 
-1. Quitar `overflow-auto` del `<main>` y dejarlo como `flex-1 flex flex-col h-full min-w-0`.
-2. Mover la seccion de **tabs** (lineas 58-81) justo despues del header (linea 48), antes de los KPIs.
-3. Mover la seccion de **filtros** (lineas 83-170) despues de los tabs.
-4. Envolver las **KPI cards** y el **contenido de tabs** dentro de un unico `<div className="flex-1 overflow-auto">`.
-5. Las KPI cards pasan de `shrink-0` a ser parte del contenido scrollable con padding `px-6 py-4`.
-6. Mantener el area de contenido de cada tab debajo de las KPIs dentro del mismo contenedor scrollable.
+1. Quitar `shrink-0` de la seccion de tabs (linea 51) y de filtros (linea 76).
+2. Mover el bloque de KPI cards (lineas 167-172) para que quede **antes** de los tabs, como primer hijo del contenedor scrollable `flex-1 overflow-auto`.
+3. Mover los tabs y filtros **dentro** del contenedor scrollable, despues de las KPIs.
+4. Mantener el contenido del tab activo al final del contenedor scrollable.
 
-Esto garantiza que el usuario siempre vea los tabs y filtros sin necesidad de hacer scroll, y pueda desplazarse por las KPIs y el contenido del tab activo.
+Resultado: las KPI cards vuelven a estar arriba de los tabs, el usuario puede hacer scroll para ver tabs, filtros y contenido cuando la pantalla es pequena.
+
