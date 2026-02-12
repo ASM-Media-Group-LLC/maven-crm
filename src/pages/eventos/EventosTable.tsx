@@ -96,8 +96,9 @@ const EventosTable = ({ events }: Props) => {
 
   return (
     <>
+      <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Evento" col="name" /></TableHead>
             <TableHead><SortHeader label="Tipo" col="event_type" /></TableHead>
@@ -106,7 +107,7 @@ const EventosTable = ({ events }: Props) => {
             <TableHead><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead>Notas</TableHead>
             <TableHead><SortHeader label="Invitados" col="guest_count" /></TableHead>
-            <TableHead>Acciones</TableHead>
+            <TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -139,7 +140,7 @@ const EventosTable = ({ events }: Props) => {
                     {e.guest_count}
                   </span>
                 </TableCell>
-                <TableCell onClick={(ev) => ev.stopPropagation()}>
+                <TableCell className="sticky right-0 bg-card" onClick={(ev) => ev.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -181,6 +182,7 @@ const EventosTable = ({ events }: Props) => {
           )}
         </TableBody>
       </Table>
+      </div>
 
       {selected && (
         <>

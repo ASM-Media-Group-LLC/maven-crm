@@ -96,9 +96,9 @@ const CreatorsTable = ({ rows }: Props) => {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-24rem)]">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow className="hover:bg-transparent">
               <TableHead className="text-xs">
                 <span className="flex items-center gap-1">
@@ -120,7 +120,7 @@ const CreatorsTable = ({ rows }: Props) => {
                   Participación <ArrowUpDown className="h-3 w-3" />
                 </span>
               </TableHead>
-              <TableHead className="text-xs text-right">Acciones</TableHead>
+              <TableHead className="text-xs text-right sticky right-0 bg-card z-20">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -164,7 +164,7 @@ const CreatorsTable = ({ rows }: Props) => {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right sticky right-0 bg-card">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7">
                         <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />

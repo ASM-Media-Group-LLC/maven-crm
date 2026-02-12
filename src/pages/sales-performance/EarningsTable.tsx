@@ -100,9 +100,9 @@ const EarningsTable = ({ rows, sortField, sortDirection, onSort, visibleColumns 
 
   return (
     <TooltipProvider>
-      <div className="rounded-lg border border-border bg-card overflow-x-auto">
+      <div className="rounded-lg border border-border bg-card overflow-auto max-h-[calc(100vh-24rem)]">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow className="hover:bg-transparent">
               {columns.map((col) => (
                 <TableHead key={col.key} className={`text-xs ${col.align === "right" ? "text-right" : ""}`}>

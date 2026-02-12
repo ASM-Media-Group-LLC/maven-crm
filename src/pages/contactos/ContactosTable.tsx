@@ -94,7 +94,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableHead>WhatsApp</TableHead>
             <TableHead><SortHeader label="Inter." col="interacciones" /></TableHead>
             <TableHead><SortHeader label="Creado por" col="creadoPor" /></TableHead>
-            <TableHead></TableHead>
+            <TableHead className="sticky right-0 bg-card z-20"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -142,7 +142,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
               </TableCell>
               <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
-              <TableCell>
+              <TableCell className="sticky right-0 bg-card">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">

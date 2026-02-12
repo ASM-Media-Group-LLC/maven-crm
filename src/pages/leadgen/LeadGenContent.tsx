@@ -302,8 +302,9 @@ const LeadGenContent = () => {
           {activeTab === "supervisores" && (
             <Card>
               <CardContent className="pt-6 px-0">
+                <div className="max-h-[calc(100vh-24rem)] overflow-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
                     <TableRow>
                       <TableHead>Supervisor</TableHead>
                       <TableHead>Email</TableHead>
@@ -315,7 +316,7 @@ const LeadGenContent = () => {
                       <TableHead className="text-center">C</TableHead>
                       <TableHead className="text-center">Aprobados</TableHead>
                       <TableHead className="text-center">Rechazados</TableHead>
-                      <TableHead className="text-center">Acciones</TableHead>
+                      <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -348,7 +349,7 @@ const LeadGenContent = () => {
                           <TableCell className="text-center">
                             <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center sticky right-0 bg-card">
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -358,6 +359,7 @@ const LeadGenContent = () => {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           )}
