@@ -9,7 +9,7 @@ import EarningsSummary from "./sales-dashboard/EarningsSummary";
 import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
 import CreatorStatsCards from "./sales-dashboard/CreatorStatsCards";
 import ConcentrationChart from "./sales-dashboard/ConcentrationChart";
-import CreatorsTable from "./sales-dashboard/CreatorsTable";
+import SalesReportSection from "./sales-dashboard/SalesReportSection";
 import CreatorPerformanceView from "./sales-dashboard/CreatorPerformanceView";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
@@ -134,7 +134,7 @@ const SalesDashboard = () => {
                 <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
                 <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
                 <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
-                <CreatorsTable rows={filteredRows} comparedRows={comparedRows} />
+                <SalesReportSection rows={filteredRows} comparedRows={comparedRows} />
               </>
             ) : (
               <CreatorPerformanceView rows={filteredRows} />
