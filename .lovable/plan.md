@@ -1,37 +1,44 @@
 
+# Agregar vista de Supervisores al tab "Supervisores" en LeadGen
 
-# Fix: KPI Cards deben estar arriba de los tabs, no debajo
+## Resumen
 
-## Problema
-
-Las KPI cards (Cantidad y Estados) se movieron debajo de los tabs y filtros dentro del area scrollable, pero el usuario quiere que esten **arriba de los tabs**, como estaban originalmente, separadas visualmente del tab bar.
-
-## Solucion
-
-Reubicar las KPI cards entre el header y los tabs. Para que los tabs sigan siendo visibles, el header sera el unico elemento fijo, y todo lo demas (KPIs, tabs, filtros, contenido) scrolleara junto.
-
-### Nueva estructura
-
-```text
-<main flex-col>
-  header (shrink-0)              <-- unico elemento fijo
-  <div flex-1 overflow-auto>     <-- todo lo demas scrollea
-    KPI cards                    <-- arriba, separadas
-    tabs                         <-- debajo de KPIs
-    filtros                      <-- debajo de tabs
-    contenido del tab activo     <-- debajo de filtros
-  </div>
-</main>
-```
+Cuando el usuario haga clic en la pestana "Supervisores", se mostrara:
+1. **Filtros adaptados**: placeholder "Buscar supervisor...", selector de fecha (Hoy), toggle lista/grid (sin selectores de Estado, Calidad, QA ni Rendimiento).
+2. **Sin KPI cards**: las KPI cards no se muestran en este tab.
+3. **Tabla de supervisores** con columnas: Supervisor (avatar + nombre), Email, Total QA, A+, A, B+, B, C, Aprobados, Rechazados, Acciones (icono ojo).
+4. **Datos mock** con ~10 supervisores con valores en 0, colores por columna.
 
 ## Detalle tecnico
 
-**Archivo:** `src/pages/leadgen/LeadGenContent.tsx`
+### Archivo a modificar: `src/pages/leadgen/LeadGenContent.tsx`
 
-1. Quitar `shrink-0` de la seccion de tabs (linea 51) y de filtros (linea 76).
-2. Mover el bloque de KPI cards (lineas 167-172) para que quede **antes** de los tabs, como primer hijo del contenedor scrollable `flex-1 overflow-auto`.
-3. Mover los tabs y filtros **dentro** del contenedor scrollable, despues de las KPIs.
-4. Mantener el contenido del tab activo al final del contenedor scrollable.
+**1. Imports adicionales:**
+- Agregar `Eye` de lucide-react.
+- Agregar `Avatar, AvatarFallback` de `@/components/ui/avatar`.
+- Agregar `Table, TableHeader, TableBody, TableHead, TableRow, TableCell` de `@/components/ui/table`.
 
-Resultado: las KPI cards vuelven a estar arriba de los tabs, el usuario puede hacer scroll para ver tabs, filtros y contenido cuando la pantalla es pequena.
+**2. Datos mock de supervisores:**
+Agregar un array constante `mockSupervisores` con ~10 entradas, cada una con: `name`, `email`, `totalQA`, `aPlus`, `a`, `bPlus`, `b`, `c`, `aprobados`, `rechazados`. Todos los valores numericos en 0. Nombres tomados de la referencia: Luisroman07, Brayan123, lorena_lozano, monica.duque@unlok.me, Fabiana_Duran, lizeth.jerez@unlok.me, carolina.jaramillo@unlok.me, cheryl.gonzalez@unlok.me, Andres.Gaviria.
 
+**3. Filtros condicionales (linea 89):**
+- Cuando `activeTab === "supervisores"`: placeholder "Buscar supervisor...", solo selector de fecha y toggle lista/grid (sin selectores extra).
+- Agregar la condicion al bloque condicional existente.
+
+**4. KPI cards condicionales:**
+- Ocultar las KPI cards cuando `activeTab === "supervisores"` (envolver en condicion).
+
+**5. Contenido del tab "supervisores" (dentro del bloque de tab content, linea 227):**
+- Agregar bloque `activeTab === "supervisores"` que renderice una tabla con:
+  - Header: Supervisor, Email, Total QA, A+, A, B+, B, C, Aprobados, Rechazados, Acciones
+  - Cada fila: avatar circular con iniciales (fondo primary, texto blanco), nombre, email, valores numericos con colores:
+    - A+: text-primary (azul)
+    - A: text-green-500
+    - B+: text-yellow-500
+    - B: text-yellow-500
+    - C: sin color especial
+    - Aprobados: text-green-500
+    - Rechazados: text-destructive (rojo)
+  - Columna Acciones: boton con icono Eye (ojo)
+
+**Sin archivos nuevos.** Todo se agrega en `LeadGenContent.tsx`. No se modifica ni mueve nada del layout actual (header, tabs, filtros, contenido de leads y agentes).
