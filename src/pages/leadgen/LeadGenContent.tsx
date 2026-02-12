@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays } from "lucide-react";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
+import AddLeadModal from "./AddLeadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ const tabs = [
 const LeadGenContent = () => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -35,7 +37,7 @@ const LeadGenContent = () => {
               <UserPlus className="h-4 w-4" />
               Contacto
             </Button>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setAddLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Lead
             </Button>
@@ -167,6 +169,8 @@ const LeadGenContent = () => {
           </Card>
         )}
       </div>
+
+      <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
     </main>
   );
 };
