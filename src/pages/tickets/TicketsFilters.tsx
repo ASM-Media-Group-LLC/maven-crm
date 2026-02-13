@@ -113,7 +113,7 @@ const TicketsFilters = ({
 
         <div className="flex items-center gap-1 ml-auto">
           <Button
-            variant={view === "list" ? "default" : "outline"}
+            variant={view === "list" ? "secondary" : "ghost"}
             size="icon"
             className="h-9 w-9"
             onClick={() => onViewChange("list")}
@@ -121,7 +121,7 @@ const TicketsFilters = ({
             <List className="h-4 w-4" />
           </Button>
           <Button
-            variant={view === "grid" ? "default" : "outline"}
+            variant={view === "grid" ? "secondary" : "ghost"}
             size="icon"
             className="h-9 w-9"
             onClick={() => onViewChange("grid")}

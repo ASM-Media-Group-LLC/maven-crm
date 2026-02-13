@@ -358,20 +358,29 @@ const PromologContent = () => {
   });
 
   return (
-    <main className="flex-1 overflow-auto p-6 min-w-0 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold">Promolog</h1>
-        <p className="text-sm text-muted-foreground">
-          Seguimiento promocional diario
-        </p>
-      </div>
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      {/* Header sticky */}
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Promolog</h1>
+            <p className="text-sm text-muted-foreground">
+              Seguimiento promocional diario
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => {/* open entry modal */}}>
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Entrada
+          </Button>
+        </div>
+      </header>
 
+      <div className="flex-1 overflow-auto p-6 space-y-6">
       {/* Action Bar */}
       <div className="flex flex-wrap items-center gap-2">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2">
               <CalendarDays className="h-4 w-4" />
               {formattedDate}
             </Button>
@@ -418,7 +427,7 @@ const PromologContent = () => {
           </PopoverContent>
         </Popover>
         <Button
-          variant={view === "agentes" ? "default" : "outline"}
+          variant={view === "agentes" ? "secondary" : "ghost"}
           size="sm"
           onClick={() => setView(view === "dashboard" ? "agentes" : "dashboard")}
         >
@@ -432,10 +441,6 @@ const PromologContent = () => {
         <Button variant="outline" size="sm" onClick={() => setCampaignModalOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Agregar Campaña
-        </Button>
-        <Button size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Agregar Entrada
         </Button>
       </div>
 
@@ -674,7 +679,7 @@ const PromologContent = () => {
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
-                      variant={entryView === "list" ? "default" : "ghost"}
+                      variant={entryView === "list" ? "secondary" : "ghost"}
                       size="icon"
                       className="h-8 w-8"
                       onClick={() => setEntryView("list")}
@@ -682,7 +687,7 @@ const PromologContent = () => {
                       <List className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant={entryView === "grid" ? "default" : "ghost"}
+                      variant={entryView === "grid" ? "secondary" : "ghost"}
                       size="icon"
                       className="h-8 w-8"
                       onClick={() => setEntryView("grid")}
@@ -1173,6 +1178,7 @@ const PromologContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </main>
   );
 };

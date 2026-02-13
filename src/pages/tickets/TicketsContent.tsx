@@ -71,20 +71,23 @@ const TicketsContent = () => {
   };
 
   return (
-    <main className="flex-1 overflow-auto p-6 min-w-0">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Customer Service</h1>
-          <p className="text-sm text-muted-foreground">
-            Gestión de soporte y escalaciones
-          </p>
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Customer Service</h1>
+            <p className="text-sm text-muted-foreground">
+              Gestión de soporte y escalaciones
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Nuevo Ticket
+          </Button>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Nuevo Ticket
-        </Button>
-      </div>
+      </header>
 
+      <div className="flex-1 overflow-auto p-6 space-y-4">
       <Tabs defaultValue="list">
         <TabsList className="mb-4">
           <TabsTrigger value="list">Lista de Tickets</TabsTrigger>
@@ -144,6 +147,7 @@ const TicketsContent = () => {
           />
         </>
       )}
+      </div>
     </main>
   );
 };

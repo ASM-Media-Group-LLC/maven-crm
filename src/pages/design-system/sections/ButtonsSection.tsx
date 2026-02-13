@@ -73,12 +73,34 @@ export const ButtonsSection = () => (
     </div>
 
     <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Uso contextual</h3>
+      <div className="space-y-3">
+        {[
+          { context: "Acción principal del header de página", variant: "outline", example: "Crear Evento, Agregar Creador, Nuevo Ticket" },
+          { context: "Toggle activo (list/grid, tabs)", variant: "secondary", example: "Icono List seleccionado" },
+          { context: "Toggle inactivo", variant: "ghost", example: "Icono Grid no seleccionado" },
+          { context: "Acción principal dentro de modal/form", variant: "default", example: "Guardar, Crear" },
+          { context: "Acciones destructivas", variant: "destructive", example: "Eliminar" },
+          { context: "Acciones secundarias en modales", variant: "outline", example: "Cancelar" },
+        ].map((rule) => (
+          <div key={rule.context} className="flex flex-wrap items-center gap-4 border-b border-border pb-3">
+            <code className="font-mono text-xs text-primary bg-muted px-2 py-1 rounded min-w-[100px]">{rule.variant}</code>
+            <p className="text-sm font-medium flex-1 min-w-[200px]">{rule.context}</p>
+            <p className="text-sm text-muted-foreground">{rule.example}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Reglas</h3>
       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
         <li>Máximo un botón <code className="font-mono text-foreground">default</code> (primary) por sección/grupo de acciones</li>
         <li>Siempre usar la variante semántica — <code className="font-mono text-destructive">✗ className="bg-red-500"</code></li>
         <li>Para loading: deshabilitar + icono <code className="font-mono text-foreground">Loader2</code> con <code className="font-mono text-foreground">animate-spin</code></li>
         <li>Botones con icono solo: usar <code className="font-mono text-foreground">size="icon"</code>, no padding manual</li>
+        <li>Header de página: siempre <code className="font-mono text-foreground">variant="outline"</code>, nunca <code className="font-mono text-foreground">default</code></li>
+        <li>Toggles (list/grid): activo = <code className="font-mono text-foreground">secondary</code>, inactivo = <code className="font-mono text-foreground">ghost</code></li>
       </ul>
     </div>
   </section>

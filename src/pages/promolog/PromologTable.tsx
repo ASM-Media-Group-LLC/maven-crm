@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ArrowUpDown, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,7 +25,9 @@ import { type PromologEntry } from "./PromologEntryCard";
 
 interface Props {
   entries: PromologEntry[];
+  onView?: (entry: PromologEntry) => void;
   onEdit?: (entry: PromologEntry) => void;
+  onDelete?: (entry: PromologEntry) => void;
 }
 
 type SortKey = "ticket" | "model" | "network" | "platform" | "result" | "agent" | "date";
@@ -66,7 +69,7 @@ const resultVariant: Record<string, string> = {
   "Pendiente": "bg-muted text-muted-foreground",
 };
 
-const PromologTable = ({ entries, onEdit }: Props) => {
+const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -171,9 +174,18 @@ const PromologTable = ({ entries, onEdit }: Props) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onView?.(entry)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Ver detalle
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEdit?.(entry)}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
