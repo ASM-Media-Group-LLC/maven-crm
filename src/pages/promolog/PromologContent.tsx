@@ -353,23 +353,26 @@ const PromologContent = () => {
           </div>
 
           {/* Filters (collapsible) */}
-          <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
-                />
-                Filtros
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2">
-              <Card>
-                <CardContent className="p-4 text-sm text-muted-foreground">
-                  Filtros próximamente...
-                </CardContent>
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start">
+                    <Filter className="h-4 w-4" />
+                    Filtros
+                    <ChevronDown
+                      className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3">
+                  <p className="text-sm text-muted-foreground">
+                    Filtros próximamente...
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
 
           {/* Tabs */}
           <Tabs defaultValue="tabla">
