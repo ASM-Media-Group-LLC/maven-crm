@@ -1,37 +1,66 @@
 
 
-## Agregar fondos de color a las cards de Red Social y Plataforma
+## Agregar fondo a la seccion de Filtros en Promolog
 
 ### Problema
-Las cards de "Red Social" y "Plataforma" no tienen fondo de color. Actualmente usan el fondo default del componente Card (bg-card). Segun el diseno de referencia, cada card deberia tener un fondo sutil del color de su marca.
+La seccion colapsable de "Filtros" no tiene fondo, se ve como un boton flotante sin contexto visual. Las demas secciones (Red Social, Plataforma, KPI cards) ya tienen fondos y estructura visual definida.
 
 ### Solucion
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Cambio 1 - Agregar propiedad `bg` a los datos mock:**
+Envolver el `Collapsible` completo dentro de una `Card` con fondo sutil (`bg-muted/30`) para darle contexto visual y consistencia con el resto de la pagina.
 
-Agregar un campo `bg` (clase de Tailwind) a cada elemento de `socialCards` y `platformCards`:
+**Cambio (lineas 355-372):**
 
-| Card | Fondo |
-|---|---|
-| Instagram | `bg-pink-500/10` |
-| TikTok | `bg-slate-500/10` |
-| X | `bg-slate-500/10` |
-| Telegram | `bg-blue-500/10` |
-| OnlyFans | `bg-blue-500/10` |
-| Unlok | `bg-purple-500/10` |
-| Otra | `bg-muted/50` |
-
-Los fondos usan opacidad baja (`/10`) para ser sutiles y no interferir con la legibilidad del texto.
-
-**Cambio 2 - Aplicar el fondo en el render:**
-
-En ambos `.map()` (lineas 315 y 333), pasar la clase `bg` al componente `Card`:
-
+Antes:
 ```tsx
-<Card key={s.name} className={s.bg}>
+<Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+  <CollapsibleTrigger asChild>
+    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+      <ChevronDown ... />
+      Filtros
+    </Button>
+  </CollapsibleTrigger>
+  <CollapsibleContent className="pt-2">
+    <Card>
+      <CardContent className="p-4 text-sm text-muted-foreground">
+        Filtros proximamente...
+      </CardContent>
+    </Card>
+  </CollapsibleContent>
+</Collapsible>
 ```
 
-Esto sobreescribe el `bg-card` default del componente Card con el fondo de color sutil correspondiente a cada red/plataforma.
+Despues:
+```tsx
+<Card className="bg-muted/30">
+  <CardContent className="p-4">
+    <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start">
+          <Filter className="h-4 w-4" />
+          Filtros
+          <ChevronDown
+            className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+          />
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3">
+        <p className="text-sm text-muted-foreground">
+          Filtros proximamente...
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
+  </CardContent>
+</Card>
+```
+
+### Cambios clave
+- Card envolvente con `bg-muted/30` como fondo sutil
+- Boton ocupa todo el ancho (`w-full justify-start`) para mejor area de click
+- Icono `Filter` agregado al lado izquierdo del texto
+- `ChevronDown` movido a la derecha con `ml-auto`
+- Se elimina la Card interna redundante dentro del CollapsibleContent
+- Contenido del filtro queda directamente como texto sin card anidada
 
