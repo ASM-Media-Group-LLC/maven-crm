@@ -52,6 +52,7 @@ const SalesOverview = () => {
   const getModalCreators = () => {
     if (!modalType) return [];
     switch (modalType) {
+      case "gross": case "net": case "creators": return comparison.creators;
       case "rising": return comparison.rising;
       case "at_risk": return comparison.atRisk;
       case "falling": return comparison.falling;

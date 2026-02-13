@@ -13,6 +13,7 @@ import EarningsPagination from "./sales-performance/EarningsPagination";
 import EarningsSummaryCards from "./sales-performance/EarningsSummaryCards";
 import CustomMetrics from "./sales-performance/CustomMetrics";
 import { ALL_COLUMNS, type SortField, type SortDirection } from "./sales-performance/types";
+import ClariAiFab from "@/components/ClariAiFab";
 
 const SalesPerformanceCreator = () => {
   const [documentFilter, setDocumentFilter] = useState<string[]>([]);
@@ -234,6 +235,7 @@ const SalesPerformanceCreator = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };

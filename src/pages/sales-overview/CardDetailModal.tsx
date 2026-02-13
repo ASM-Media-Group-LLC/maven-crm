@@ -25,6 +25,9 @@ const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
 const TITLES: Record<string, string> = {
+  gross: "Desglose de Ingresos Total",
+  net: "Desglose de Net Earnings",
+  creators: "Todas las Creadoras",
   rising: "Creadoras Subiendo",
   at_risk: "Creadoras en Riesgo",
   falling: "Creadoras Bajando",

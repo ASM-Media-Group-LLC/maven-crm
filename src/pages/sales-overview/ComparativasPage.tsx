@@ -13,6 +13,7 @@ import ProyeccionCard from "./comparativas/ProyeccionCard";
 import DesgloseRevenueCard from "./comparativas/DesgloseRevenueCard";
 import RankingCards from "./comparativas/RankingCards";
 import ComparativaTable from "./comparativas/ComparativaTable";
+import ClariAiFab from "@/components/ClariAiFab";
 
 type Period = "Hoy" | "7 días" | "Este mes";
 
@@ -124,6 +125,7 @@ const ComparativasPage = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };

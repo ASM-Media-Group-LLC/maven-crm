@@ -17,6 +17,7 @@ import {
   getAiConfig,
   saveAiConfig,
 } from "@/lib/ai-config";
+import ClariAiFab from "@/components/ClariAiFab";
 
 const AiSalesConfig = () => {
   const [config, setConfig] = useState<AiConfig>(getAiConfig);
@@ -146,6 +147,7 @@ const AiSalesConfig = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };
