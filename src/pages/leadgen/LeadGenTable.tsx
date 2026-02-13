@@ -132,7 +132,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
           {sorted.map((lead) => {
             const cat = lead.categoria.toLowerCase();
             return (
-              <TableRow key={lead.id}>
+              <TableRow key={lead.id} className="cursor-pointer" onClick={() => onView?.(lead)}>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {format(new Date(lead.created_at), "hh:mm a", { locale: es })}
                 </TableCell>
@@ -146,6 +146,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                     href={lead.url_perfil}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                   >
                     {getPlatformIcon(lead.plataforma)}
@@ -176,7 +177,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
-                <TableCell className="sticky right-0 bg-card">
+                <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
                       <Eye className="h-4 w-4" />
