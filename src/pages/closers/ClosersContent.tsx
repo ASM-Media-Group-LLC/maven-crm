@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Columns3, List, LayoutGrid } from "lucide-react";
+import { Plus, Search, List, LayoutGrid } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useDeals, STAGES, SOURCES } from "./useDeals";
 import ClosersKPICards from "./ClosersKPICards";
-import PipelineBoard from "./PipelineBoard";
+
 import ClosersTable from "./ClosersTable";
 import ClosersGrid from "./ClosersGrid";
 import NewDealModal from "./NewDealModal";
 
-type ViewMode = "pipeline" | "table" | "grid";
+type ViewMode = "table" | "grid";
 
 const ClosersContent = () => {
   const { deals, isLoading, createDeal } = useDeals();
   const [showNewDeal, setShowNewDeal] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
+  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [search, setSearch] = useState("");
   const [selectedStage, setSelectedStage] = useState("");
   const [selectedSource, setSelectedSource] = useState("");
@@ -98,13 +98,6 @@ const ClosersContent = () => {
 
           <div className="ml-auto flex gap-1">
             <Button
-              variant={viewMode === "pipeline" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setViewMode("pipeline")}
-            >
-              <Columns3 className="h-4 w-4" />
-            </Button>
-            <Button
               variant={viewMode === "table" ? "secondary" : "ghost"}
               size="icon"
               onClick={() => setViewMode("table")}
@@ -124,8 +117,6 @@ const ClosersContent = () => {
         {/* Views */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando...</p>
-        ) : viewMode === "pipeline" ? (
-          <PipelineBoard deals={filtered} />
         ) : viewMode === "table" ? (
           <ClosersTable deals={filtered} />
         ) : (
