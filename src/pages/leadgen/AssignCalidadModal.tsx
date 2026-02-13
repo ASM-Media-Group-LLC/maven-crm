@@ -41,9 +41,9 @@ const calidadOptions = [
 ];
 
 const puntuacionOptions = [
-  { value: "alto", label: "Alto" },
-  { value: "medio", label: "Medio" },
-  { value: "bajo", label: "Bajo" },
+  { value: "alto", label: "Alto — Excelente trabajo" },
+  { value: "medio", label: "Medio — Trabajo aceptable" },
+  { value: "bajo", label: "Bajo — Necesita mejorar" },
 ];
 
 const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
