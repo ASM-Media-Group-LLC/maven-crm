@@ -2,6 +2,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import DashboardContent from "@/components/dashboard/DashboardContent";
+import ClariAiFab from "@/components/ClariAiFab";
 
 const Dashboard = () => {
   return (
@@ -13,6 +14,7 @@ const Dashboard = () => {
           <DashboardContent />
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };
