@@ -25,7 +25,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       subtitle: null,
       icon: DollarSign,
       color: "text-primary",
-      bgColor: "bg-primary/10",
+      bgColor: "bg-primary/20",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
       progress: 100,
       route: null,
     },
@@ -38,7 +39,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       subtitle: null,
       icon: Wallet,
       color: "text-success",
-      bgColor: "bg-success/10",
+      bgColor: "bg-success/20",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
       progress: 80,
       route: null,
     },
@@ -51,7 +53,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       subtitle: `${data.activeCreators} activas`,
       icon: Users,
       color: "text-accent",
-      bgColor: "bg-accent/10",
+      bgColor: "bg-accent/20",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
       progress: Math.min((data.activeCreators / Math.max(data.creators.length, 1)) * 100, 100),
       route: null,
     },
@@ -64,7 +67,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       subtitle: "crecimiento positivo",
       icon: TrendingUp,
       color: "text-success",
-      bgColor: "bg-success/10",
+      bgColor: "bg-success/20",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
       progress: Math.min((data.rising.length / Math.max(data.activeCreators, 1)) * 100, 100),
       route: "/sales-overview/subiendo",
     },
@@ -77,7 +81,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       subtitle: "necesitan atención",
       icon: AlertTriangle,
       color: "text-destructive",
-      bgColor: "bg-destructive/10",
+      bgColor: "bg-destructive/20",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40",
       progress: Math.min((data.atRisk.length / Math.max(data.activeCreators, 1)) * 100, 100),
       route: "/sales-overview/en-riesgo",
     },
@@ -88,18 +93,18 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       {cards.map((card) => (
         <Card
           key={card.id}
-          className="cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg"
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${card.hoverClass}`}
           onClick={() => card.route ? navigate(card.route) : onCardClick(card.id)}
         >
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-start justify-between">
               <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
-              <div className={`p-1.5 rounded-md ${card.bgColor}`}>
-                <card.icon className={`h-4 w-4 ${card.color}`} />
+              <div className={`flex h-9 w-9 items-center justify-center rounded-md ${card.bgColor}`}>
+                <card.icon className={`h-5 w-5 ${card.color}`} />
               </div>
             </div>
             <div className="space-y-1">
-              <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+              <p className={`text-3xl font-bold ${card.color}`}>{card.value}</p>
               {card.change !== 0 && (
                 <p className={`text-xs ${card.change >= 0 ? "text-success" : "text-destructive"}`}>
                   {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs anterior
