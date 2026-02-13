@@ -1,66 +1,64 @@
 
+## Quitar hover y agregar filtros a la seccion de Filtros
 
-## Agregar fondo a la seccion de Filtros en Promolog
+### Cambios en `src/pages/promolog/PromologContent.tsx`
 
-### Problema
-La seccion colapsable de "Filtros" no tiene fondo, se ve como un boton flotante sin contexto visual. Las demas secciones (Red Social, Plataforma, KPI cards) ya tienen fondos y estructura visual definida.
+**1. Quitar hover del boton trigger**
+Reemplazar `variant="ghost"` por clases manuales sin hover: `hover:bg-transparent hover:text-muted-foreground` o usar un `div` con cursor pointer en lugar de Button.
 
-### Solucion
+**2. Agregar 3 selectores dentro del CollapsibleContent**
+Segun la imagen de referencia, cuando se expande la seccion de Filtros se muestran 3 dropdowns en un grid de 3 columnas:
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
+| Filtro | Placeholder | Opciones |
+|---|---|---|
+| Creador/a | Todos | Lista de creadores (mock) |
+| Red Social | Todas | Instagram, TikTok, X, Telegram |
+| Estado | Todos | Si, Parcial, No |
 
-Envolver el `Collapsible` completo dentro de una `Card` con fondo sutil (`bg-muted/30`) para darle contexto visual y consistencia con el resto de la pagina.
+### Detalle tecnico
 
-**Cambio (lineas 355-372):**
+- Linea 360: cambiar el `Button` para quitar el hover, agregando `hover:bg-transparent hover:text-muted-foreground` al className
+- Lineas 368-372: reemplazar el placeholder text con un grid de 3 columnas con componentes `Select` de shadcn:
 
-Antes:
 ```tsx
-<Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-  <CollapsibleTrigger asChild>
-    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-      <ChevronDown ... />
-      Filtros
-    </Button>
-  </CollapsibleTrigger>
-  <CollapsibleContent className="pt-2">
-    <Card>
-      <CardContent className="p-4 text-sm text-muted-foreground">
-        Filtros proximamente...
-      </CardContent>
-    </Card>
-  </CollapsibleContent>
-</Collapsible>
+<CollapsibleContent className="pt-4">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Creador/a</label>
+      <Select>
+        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todos</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Red Social</label>
+      <Select>
+        <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todas</SelectItem>
+          <SelectItem value="instagram">Instagram</SelectItem>
+          <SelectItem value="tiktok">TikTok</SelectItem>
+          <SelectItem value="x">X</SelectItem>
+          <SelectItem value="telegram">Telegram</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Estado</label>
+      <Select>
+        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todos</SelectItem>
+          <SelectItem value="si">Si</SelectItem>
+          <SelectItem value="parcial">Parcial</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+</CollapsibleContent>
 ```
 
-Despues:
-```tsx
-<Card className="bg-muted/30">
-  <CardContent className="p-4">
-    <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start">
-          <Filter className="h-4 w-4" />
-          Filtros
-          <ChevronDown
-            className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`}
-          />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-3">
-        <p className="text-sm text-muted-foreground">
-          Filtros proximamente...
-        </p>
-      </CollapsibleContent>
-    </Collapsible>
-  </CardContent>
-</Card>
-```
-
-### Cambios clave
-- Card envolvente con `bg-muted/30` como fondo sutil
-- Boton ocupa todo el ancho (`w-full justify-start`) para mejor area de click
-- Icono `Filter` agregado al lado izquierdo del texto
-- `ChevronDown` movido a la derecha con `ml-auto`
-- Se elimina la Card interna redundante dentro del CollapsibleContent
-- Contenido del filtro queda directamente como texto sin card anidada
-
+- Agregar imports de `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` desde `@/components/ui/select` (ya importado en otros archivos del proyecto)
