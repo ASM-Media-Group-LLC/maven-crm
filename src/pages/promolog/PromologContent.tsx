@@ -382,7 +382,7 @@ const PromologContent = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <label className="text-sm font-medium">Creador/a</label>
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
@@ -396,7 +396,7 @@ const PromologContent = () => {
                       </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <label className="text-sm font-medium">Red Social</label>
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
@@ -409,7 +409,7 @@ const PromologContent = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <label className="text-sm font-medium">Estado</label>
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
