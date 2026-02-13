@@ -1,93 +1,86 @@
 
-## Objetivo
-Hacer que el badge de "Calidad" en la tabla de Leads sea un dropdown interactivo que permita cambiar la categoría del lead directamente desde la tabla sin abrir un modal separado.
 
-## Contexto Actual
-- `LeadGenTable.tsx` (línea 155-162): Muestra el badge de calidad con un `ChevronDown` que visualmente sugiere interactividad, pero no está funcional.
-- `LeadGenContent.tsx`: Usa `useQuery` para cargar los leads desde Supabase, pero no tiene un callback para actualizar la categoría.
-- El patrón de actualización existe en el codebase (ver `useCreadores.ts` línea 159-162): usa `useMutation` con `supabase.from("table").update(data).eq("id", id)`.
+# Modal "Ver Detalle" de Lead
 
-## Solución Propuesta
+## Resumen
 
-### 1. Crear un Hook `useUpdateLeadCategoria`
-Crear un nuevo hook en `src/pages/leadgen/useLeadGen.ts` (o similar) que:
-- Use `useMutation` de TanStack Query para actualizar la categoría
-- Ejecute `supabase.from("leads").update({ categoria }).eq("id", leadId)`
-- Invalide el queryKey de "leads" después de actualizar para refrescar la tabla
+Crear un modal de detalle de lead que aparezca al hacer clic en el badge de Estado (o desde el menu de acciones "Ver detalle"). El modal sigue el diseno de la imagen de referencia y el patron del design system establecido en `ViewContactoModal.tsx`.
 
-### 2. Modificar `LeadGenTable.tsx`
-Reemplazar la celda de Calidad (línea 155-162) con:
-- Un componente renderizado con `DropdownMenu` en lugar del `div` simple
-- El trigger será el badge existente
-- El contenido del dropdown tendrá 5 items: A+, A, B+, B, C
-- Cada item ejecutará la mutación al hacer click
-- Agregar prop `onCategoriaChange?: (leadId: string, newCategoria: string) => void` al componente (o directamente usar el hook dentro del componente)
+## Layout del Modal (segun imagen)
 
-### 3. Integrar la mutación en `LeadGenContent.tsx`
-Importar el hook `useUpdateLeadCategoria` y:
-- Pasar una función callback a `LeadGenTable` que ejecute la mutación
-- O directamente usar el hook dentro de `LeadGenTable` para evitar prop drilling
-
-## Archivos a Modificar
-
-**Crear:**
-- `src/pages/leadgen/useLeadGen.ts` (nuevo hook con `useUpdateLeadCategoria`)
-
-**Modificar:**
-- `src/pages/leadgen/LeadGenTable.tsx` -- Reemplazar la celda de Calidad (línea 155-162) con un DropdownMenu interactivo. Importar el hook y ejecutar la mutación al cambiar la categoría.
-- `src/pages/leadgen/LeadGenContent.tsx` -- Pasar el callback necesario a `LeadGenTable` si es necesario (opcional si se usa el hook directamente).
-
-## Detalles Técnicos
-
-**Hook `useUpdateLeadCategoria`:**
-```tsx
-export const useUpdateLeadCategoria = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, categoria }: { id: string; categoria: string }) => {
-      const { error } = await supabase.from("leads").update({ categoria }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-    },
-  });
-};
+```text
++--------------------------------------------------+
+| Lead                        [Convertir a Contacto] X |
+|                                                    |
+| #LG1663855   [A+]   Instagram                    |
+|                                                    |
+| +----------------+------------------+-----------+  |
+| | CREADO POR     | FECHA DE ENTRADA | HORA      |  |
+| | Johanna123     | 12 feb 2026      | 07:09 AM  |  |
+| +----------------+------------------+-----------+  |
+| | UBICACION      | FUENTE           | COMPANIA  |  |
+| | CO Colombia    | Ver (link)       | KASH...   |  |
+| +----------------+------------------+-----------+  |
+|                                                    |
+| Notas del Lead                                    |
+| "test"                                            |
+|                                                    |
+| Notas Adicionales              [+ Agregar]        |
+| (empty state icon)                                |
+| No hay notas adicionales                          |
++--------------------------------------------------+
 ```
 
-**Dropdown en LeadGenTable:**
-```tsx
-<TableCell>
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="sm" className="h-8 -ml-2 flex items-center gap-1">
-        <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-          {lead.categoria.toUpperCase()}
-        </Badge>
-        <ChevronDown className="h-3 w-3 text-muted-foreground" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="start">
-      {["a+", "a", "b+", "b", "c"].map((cat) => (
-        <DropdownMenuItem
-          key={cat}
-          onClick={() => mutation.mutate({ id: lead.id, categoria: cat })}
-        >
-          {cat.toUpperCase()}
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
-```
+## Origen de datos (tabla `leads`)
 
-**Constraint del Design System:**
-- Sin valores hardcoded de color -- usar variantes de Badge existentes
-- El DropdownMenu sigue el patrón de dropdowns existentes en la tabla (como el de Acciones)
-- El comportamiento de invalidar el queryKey mantiene la tabla sincronizada con la BD
+| Campo del modal     | Campo en schema          |
+|---------------------|--------------------------|
+| Ticket              | `id` -> `#LG` + ultimos 7 chars |
+| Calidad (badge)     | `categoria`              |
+| Plataforma          | `plataforma`             |
+| Creado por          | Placeholder "—" (no existe en schema) |
+| Fecha de entrada    | `created_at` formateado  |
+| Hora                | `created_at` formateado HH:mm AM |
+| Ubicacion           | `pais` con emoji bandera |
+| Fuente              | `url_perfil` como link   |
+| Compania            | `compania`               |
+| Notas del Lead      | `notas`                  |
+| Notas Adicionales   | Seccion futura (empty state por ahora) |
 
-## Beneficios
-- Cambio rápido de categoría sin abrir modal
-- UX inline consistente con patrones de tablas editable en sistemas modernos
-- Sincronización automática con Supabase vía TanStack Query
-- Sin necesidad de refrescar la página
+## Archivos a crear
+
+### `src/pages/leadgen/ViewLeadModal.tsx`
+
+Componente Dialog siguiendo el patron de `ViewContactoModal.tsx`:
+
+- **Dialog** con `sm:max-w-lg p-0` y `ScrollArea` con `max-h-[80vh]`
+- **Header**: Titulo "Lead" a la izquierda, boton "Convertir a Contacto" con icono `Sparkles` a la derecha (con `pr-8` para no solapar el boton X)
+- **Metadata row**: Badge outline con ticket ID (font-mono), Badge de calidad con variante semantica, texto de plataforma
+- **Grid de info** (3 columnas, 2 filas): Cards con borde `border rounded-lg p-3` mostrando label (text-xs text-muted-foreground uppercase) y valor
+  - Fila 1: Creado por, Fecha de entrada (format "dd MMM yyyy"), Hora (format "hh:mm:ss a" + timezone)
+  - Fila 2: Ubicacion (emoji bandera + pais), Fuente (link a url_perfil), Compania
+- **Notas del Lead**: Seccion con icono MessageCircle, muestra `lead.notas` o "Sin notas"
+- **Notas Adicionales**: Header con boton "+ Agregar", empty state con icono MessageCircle y texto "No hay notas adicionales"
+- **Props**: `open`, `onOpenChange`, `lead: Lead | null`
+
+## Archivos a modificar
+
+### `src/pages/leadgen/LeadGenContent.tsx`
+
+- Agregar estado `viewLeadOpen` y `selectedLead`
+- Importar y renderizar `ViewLeadModal`
+- Pasar callbacks `onView` y `onEdit` a `LeadGenTable`
+
+### `src/pages/leadgen/LeadGenTable.tsx`
+
+- Ya tiene props `onView` y `onEdit` definidos -- no requiere cambios
+
+## Patrones del design system aplicados
+
+- Dialog con `p-0` y ScrollArea interna (patron de ViewContactoModal)
+- Badge variants semanticos para calidad (`success-soft`, `primary-soft`, etc.)
+- Padding derecho en header (`pr-8`) para evitar solapamiento con boton X
+- Iconos de plataforma usando componentes existentes (InstagramIcon, etc.)
+- Sin valores hardcoded de color
+- Boton "Convertir a Contacto" con variante outline y icono Sparkles (mismo patron que ViewContactoModal)
+
