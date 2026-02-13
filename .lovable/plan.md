@@ -1,91 +1,48 @@
 
 
-## Mejoras al Modal de Crear Tarea
+## Fix: Combobox de usuarios muestra vacio
 
-Dos cambios principales: reemplazar el select de usuario por un combobox con buscador, y agregar opciones flexibles de fecha/duracion.
+### Problema
 
----
+La query que carga los usuarios para el combobox filtra por `company_id` del perfil del usuario autenticado. Como el perfil actual tiene `company_id: null`, la query nunca se ejecuta y el combobox siempre muestra "No se encontraron usuarios".
 
-### 1. Select de usuario con buscador (Combobox)
+### Solucion
 
-Reemplazar el `Select` de Radix por un **Popover + Command** (cmdk) que ya existe en el proyecto. Esto permite escribir para filtrar usuarios por nombre.
-
-**Componente**: Se usara `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandItem` directamente en `CreateTaskModal.tsx`.
-
-Comportamiento:
-- Click en el trigger abre un popover con campo de busqueda
-- Escribir filtra la lista de perfiles por nombre
-- Click en un item selecciona y cierra el popover
-- Muestra el nombre seleccionado en el trigger
+Modificar la logica en `useTareas.ts` para que, cuando `company_id` sea `null`, al menos incluya al usuario actual como opcion asignable. Esto cubre el caso de usuarios que aun no estan asociados a una empresa.
 
 ---
 
-### 2. Modo de duracion flexible: Fecha inicio/fin O Duracion corta
+### Archivo a modificar: `src/pages/tareas/useTareas.ts`
 
-Agregar un toggle/tabs para elegir entre dos modos:
+Cambiar la query `companyProfiles` para manejar el caso de `company_id: null`:
 
-**Modo A - "Duración"** (para tareas cortas):
-- Campos de Horas y Minutos (igual que ahora)
-- `due_at` = now + duracion
-
-**Modo B - "Fecha inicio / fin"** (para tareas con rango):
-- DatePicker para fecha de inicio (opcional, default = ahora)
-- DatePicker para fecha de fin (obligatorio)
-- Campos de hora (HH:MM) para la hora especifica de cada fecha
-- `due_at` = fecha fin + hora fin
-
-Se implementara con los componentes `Tabs` existentes y el `Calendar`/`Popover` del sistema de diseno (shadcn datepicker pattern con `pointer-events-auto`).
-
----
-
-### 3. Archivos modificados
-
-**`src/pages/tareas/CreateTaskModal.tsx`**:
-- Reemplazar Select por Popover+Command combobox para asignacion de usuario
-- Agregar Tabs con dos opciones: "Duracion" y "Fecha inicio/fin"
-- Agregar estados para: modo seleccionado, fecha inicio, fecha fin, hora inicio, hora fin
-- Actualizar logica de `handleSubmit` para calcular `due_at` segun el modo elegido
-- Agregar validaciones segun modo (duracion > 0 o fecha fin obligatoria)
-
-**`src/pages/tareas/useTareas.ts`**:
-- Actualizar la interfaz de `createTask.mutationFn` para aceptar `due_at` directamente (calculado en el modal) en lugar de solo horas/minutos
-- Mantener compatibilidad con ambos modos
-
----
-
-### 4. Detalle tecnico del Combobox
+- Si `company_id` existe: comportamiento actual (traer todos los perfiles de la empresa)
+- Si `company_id` es `null`: traer al menos el perfil del usuario autenticado para que pueda auto-asignarse tareas
 
 ```text
-Popover
-  PopoverTrigger (Button con estilo de input)
-    -> Muestra nombre seleccionado o "Selecciona usuario"
-  PopoverContent (z-50, bg-popover)
-    Command
-      CommandInput (campo de busqueda)
-      CommandList
-        CommandEmpty -> "No se encontraron usuarios"
-        CommandGroup
-          CommandItem (por cada perfil)
-            -> Check icon si esta seleccionado
-            -> full_name
+queryFn: async () => {
+  if (profile?.company_id) {
+    // Traer todos los perfiles de la misma empresa
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("company_id", profile.company_id);
+    return data || [];
+  }
+  // Sin company_id: devolver solo el perfil del usuario actual
+  return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
+}
+```
+
+Tambien cambiar la condicion `enabled` para que se ejecute cuando el perfil existe, no solo cuando hay `company_id`:
+
+```text
+enabled: !!profile
 ```
 
 ---
 
-### 5. Detalle tecnico de los Tabs de duracion
+### Por que ocurre esto
 
-```text
-Tabs (defaultValue="duration")
-  TabsList
-    TabsTrigger "Duracion"
-    TabsTrigger "Fecha"
-  TabsContent "duration"
-    -> Input Horas + Input Minutos (igual que ahora)
-  TabsContent "date"
-    -> Popover+Calendar para Fecha inicio + Input hora (HH:MM)
-    -> Popover+Calendar para Fecha fin + Input hora (HH:MM)
-```
+El sistema asume que todos los usuarios estan asociados a una empresa (`company_id`), pero el registro actual no tiene esa asociacion configurada. Este fix asegura que el flujo funcione en ambos casos.
 
-Logica de calculo:
-- Modo duracion: `due_at = new Date(Date.now() + h*3600000 + m*60000)`
-- Modo fecha: `due_at = combinacion de fecha_fin + hora_fin` como ISO string
