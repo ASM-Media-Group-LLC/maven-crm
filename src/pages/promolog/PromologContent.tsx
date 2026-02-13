@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,6 +18,9 @@ import {
   AlertTriangle,
   TrendingUp,
   CheckCircle,
+  Upload,
+  ExternalLink,
+  X as XMark,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -30,14 +33,36 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
+
+const networkOptions = [
+  { value: "instagram", label: "Instagram", icon: InstagramIcon },
+  { value: "tiktok", label: "TikTok", icon: TikTokIcon },
+  { value: "x", label: "X", icon: XIcon },
+  { value: "telegram", label: "Telegram", icon: TelegramIcon },
+] as const;
+
+const platformOptions = [
+  { value: "onlyfans", label: "OnlyFans" },
+  { value: "unlok", label: "Unlok" },
+  { value: "otra", label: "Otra" },
+] as const;
+
+const contactTypeOptions = [
+  { value: "hablaron", label: "Hablaron" },
+  { value: "textearon", label: "Textearon" },
+  { value: "mensaje_voz", label: "Mensaje de Voz" },
+] as const;
 
 
 
@@ -194,6 +219,39 @@ const PromologContent = () => {
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
   const [sortOrder, setSortOrder] = useState("pendientes");
+
+  // Registration modal state
+  const { toast } = useToast();
+  const [selectedCreatorForEntry, setSelectedCreatorForEntry] = useState<typeof creators[0] | null>(null);
+  const [entryModalOpen, setEntryModalOpen] = useState(false);
+  const [entryResult, setEntryResult] = useState<"si" | "no">("si");
+  const [entryNetwork, setEntryNetwork] = useState<string>("");
+  const [entryPlatform, setEntryPlatform] = useState<string>("");
+  const [entryContactType, setEntryContactType] = useState<string>("");
+  const [entryNotes, setEntryNotes] = useState<string>("");
+  const [entryEvidencePreview, setEntryEvidencePreview] = useState<string>("");
+  const entryFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleEntryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setEntryEvidencePreview(url);
+    }
+  };
+
+  const resetEntryModal = () => {
+    setEntryResult("si");
+    setEntryNetwork("");
+    setEntryPlatform("");
+    setEntryContactType("");
+    setEntryNotes("");
+    setEntryEvidencePreview("");
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  };
 
   const countryFlags: Record<string, string> = {
     colombia: "🇨🇴", mexico: "🇲🇽", argentina: "🇦🇷", chile: "🇨🇱", peru: "🇵🇪",
@@ -741,7 +799,12 @@ const PromologContent = () => {
                 <Card
                   key={creator.id}
                   className="relative cursor-pointer transition-colors hover:bg-muted/50"
-                  onClick={() => setCreatorsModalOpen(false)}
+                  onClick={() => {
+                    setSelectedCreatorForEntry(creator);
+                    resetEntryModal();
+                    setEntryModalOpen(true);
+                    setCreatorsModalOpen(false);
+                  }}
                 >
                   <CardContent className="flex flex-col items-center p-3 gap-2">
                     {/* Status indicator */}
@@ -785,6 +848,242 @@ const PromologContent = () => {
               ))}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Registration Modal */}
+      <Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Registrar Promoción</DialogTitle>
+            <DialogDescription className="sr-only">
+              Registrar una nueva entrada de promoción para esta creadora
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedCreatorForEntry && (
+            <>
+              {/* Creator card */}
+              <Card className="bg-muted">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    {selectedCreatorForEntry.profile_photo_url ? (
+                      <AvatarImage src={selectedCreatorForEntry.profile_photo_url} alt={selectedCreatorForEntry.name} />
+                    ) : null}
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                      {getInitials(selectedCreatorForEntry.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">{selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {selectedCreatorForEntry.instagram_handle && (
+                        <span className="flex items-center gap-0.5">
+                          <InstagramIcon className="h-3 w-3" />
+                          @{selectedCreatorForEntry.instagram_handle}
+                        </span>
+                      )}
+                      {selectedCreatorForEntry.twitter_handle && (
+                        <span className="flex items-center gap-0.5">
+                          <XIcon className="h-3 w-3" />
+                          @{selectedCreatorForEntry.twitter_handle}
+                        </span>
+                      )}
+                      {selectedCreatorForEntry.tiktok_handle && (
+                        <span className="flex items-center gap-0.5">
+                          <TikTokIcon className="h-3 w-3" />
+                          @{selectedCreatorForEntry.tiktok_handle}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Promotion status */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">¿Promocionó Hoy?</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEntryResult("si")}
+                    className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                      entryResult === "si"
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <Check className="h-4 w-4" />
+                    Sí Promocionó
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryResult("no")}
+                    className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                      entryResult === "no"
+                        ? "bg-secondary text-secondary-foreground"
+                        : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    <X className="h-4 w-4" />
+                    No Promocionó
+                  </button>
+                </div>
+              </div>
+
+              {/* Conditional fields when "Sí Promocionó" */}
+              {entryResult === "si" && (
+                <>
+                  {/* Network selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">
+                      Red Social <span className="text-destructive">*</span>
+                    </span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {networkOptions.map((opt) => {
+                        const Icon = opt.icon;
+                        const isSelected = entryNetwork === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setEntryNetwork(opt.value)}
+                            className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "border-2 border-primary bg-accent text-accent-foreground"
+                                : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5" />
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Platform selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">
+                      Plataforma <span className="text-destructive">*</span>
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {platformOptions.map((opt) => {
+                        const isSelected = entryPlatform === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setEntryPlatform(opt.value)}
+                            className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "border-2 border-primary bg-accent text-accent-foreground"
+                                : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Contact type selection */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">
+                      Tipo de Contacto <span className="text-destructive">*</span>
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {contactTypeOptions.map((opt) => {
+                        const isSelected = entryContactType === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setEntryContactType(opt.value)}
+                            className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "border-2 border-primary bg-accent text-accent-foreground"
+                                : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Notas</span>
+                    <Textarea
+                      value={entryNotes}
+                      onChange={(e) => setEntryNotes(e.target.value)}
+                      placeholder="Agregar notas..."
+                      className="min-h-[80px]"
+                    />
+                  </div>
+
+                  {/* Evidence upload */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
+                    <div
+                      className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => entryFileInputRef.current?.click()}
+                    >
+                      <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Subir Evidencia</span>
+                      <input
+                        ref={entryFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleEntryFileChange}
+                      />
+                    </div>
+                    {entryEvidencePreview && (
+                      <div className="space-y-2">
+                        <img
+                          src={entryEvidencePreview}
+                          alt="Evidencia"
+                          className="w-full rounded-md border border-input max-h-48 object-contain"
+                        />
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          onClick={() => window.open(entryEvidencePreview, "_blank")}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Abrir en nueva pestaña
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setEntryModalOpen(false);
+                  toast({ title: "Registro cancelado" });
+                }}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEntryModalOpen(false);
+                    toast({
+                      title: "Promoción registrada",
+                      description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.`,
+                    });
+                  }}
+                >
+                  Guardar Entrada
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </main>
