@@ -1,44 +1,96 @@
 
+## Implementar flujo de selección de creadora y apertura del modal de registro de promoción
 
-## Ajustes del modal "Selecciona una Creadora" segun el sistema de diseno
+### Resumen
+Cuando el usuario hace clic en una tarjeta de creadora en el modal "Selecciona una Creadora", se debe:
+1. Capturar los datos de la creadora seleccionada
+2. Cerrar el modal de selección
+3. Abrir un nuevo modal de registro de promoción (similar a PromologEntryCard) con los datos de la creadora precargados
 
-### Problemas detectados
+### Cambios en `src/pages/promolog/PromologContent.tsx`
 
-El modal recien implementado tiene varios colores hardcoded que violan las restricciones del sistema de diseno:
+**1. Nuevos estados (línea 196)**:
+```typescript
+const [selectedCreatorForEntry, setSelectedCreatorForEntry] = useState<typeof creators[0] | null>(null);
+const [entryModalOpen, setEntryModalOpen] = useState(false);
+```
 
-1. **`text-green-500`** en KPIs "Total Creadoras" y "Completadas Hoy" (lineas 697, 709) - debe usar `text-success`
-2. **`text-orange-500`** en KPI "Pendientes" (linea 703) - debe usar `text-warning`
-3. **`border-amber-600/50`** en el avatar del creador (linea 753) - debe usar un color del sistema como `border-warning` o `border-muted-foreground/50`
-4. **`bg-destructive`** en el indicador de estado (linea 749) - este si esta correcto, usa token del sistema
+**2. Actualizar el onClick de las tarjetas de creadora en el grid del modal (línea 743)**:
 
-### Detalle tecnico
+Cambiar de:
+```typescript
+onClick={() => setCreatorsModalOpen(false)}
+```
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
+A:
+```typescript
+onClick={() => {
+  setSelectedCreatorForEntry(creator);
+  setEntryModalOpen(true);
+  setCreatorsModalOpen(false);
+}}
+```
 
-| Linea | Actual | Corregido |
-|-------|--------|-----------|
-| 697 | `text-green-500` | `text-success` |
-| 703 | `text-orange-500` | `text-warning` |
-| 709 | `text-green-500` | `text-success` |
-| 753 | `border-amber-600/50` | `border-muted-foreground/50` |
+**3. Agregar nuevo Dialog modal de registro de promoción (después del Dialog de selección, antes del cierre de `</main>`)**:
 
-Ademas, las tarjetas KPI dentro del modal no siguen el patron operacional con borde superior de 3px que se usa en el resto de Promolog. Se agregara `border-t-[3px]` con colores semanticos del sistema a las 3 tarjetas KPI del modal para mantener consistencia visual:
+Crear un nuevo `<Dialog>` que contenga:
+- **DialogHeader**: "Registrar Promoción"
+- **Tarjeta de creadora**: Avatar, nombre, handle, redes sociales
+- **Selector "¿Promocionó Hoy?"**: Botones Si/No
+- **Campos condicionales** (igual al flujo existente en PromologEntryCard):
+  - Cuando "Sí": Red Social, Plataforma, Tipo de Contacto, Notas, Evidencia
+  - Cuando "No": Ningún campo adicional
+- **Botones de acción**: "Cancelar" y "Guardar Entrada"
 
-- Total Creadoras: `border-t-success`
-- Pendientes: `border-t-warning`
-- Completadas Hoy: `border-t-success`
+**4. Estructura técnica del nuevo Dialog**:
 
-### Nota adicional sobre KPIs principales (lineas 362-404)
+```typescript
+<Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
+  <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+    <DialogHeader className="pr-8">
+      <DialogTitle>Registrar Promoción</DialogTitle>
+    </DialogHeader>
+    
+    {/* Creator card */}
+    {selectedCreatorForEntry && (
+      <>
+        <Card className="bg-muted">
+          {/* Avatar, nombre, handle, redes sociales */}
+        </Card>
 
-Las 4 tarjetas KPI principales de Promolog tambien tienen colores hardcoded en el borde superior (`border-t-purple-500`, `border-t-blue-500`, `border-t-red-500`, `border-t-green-500`) y en los valores (`text-green-500`, `text-blue-500`, `text-red-500`). Estos se corregiran para usar tokens del sistema:
+        {/* Promoción status */}
+        <div className="space-y-2">
+          <span className="text-sm font-medium">¿Promocionó Hoy?</span>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Si/No buttons */}
+          </div>
+        </div>
 
-| Linea | Actual | Corregido |
-|-------|--------|-----------|
-| 364 | `border-t-purple-500` | `border-t-accent` |
-| 370 | `text-green-500` | `text-success` |
-| 374 | `border-t-blue-500` | `border-t-primary` |
-| 380 | `text-blue-500` | `text-primary` |
-| 384 | `border-t-red-500` | `border-t-destructive` |
-| 390 | `text-red-500` | `text-destructive` |
-| 394 | `border-t-green-500` | `border-t-success` |
+        {/* Conditional fields (Si Promocionó) */}
+        {/* Red Social, Platform, Contact Type, Notes, Evidence */}
+
+        {/* Footer buttons */}
+        <DialogFooter>
+          {/* Cancelar y Guardar Entrada */}
+        </DialogFooter>
+      </>
+    )}
+  </DialogContent>
+</Dialog>
+```
+
+**5. Reutilización de lógica**: 
+
+Se pueden reutilizar los mismos estados y lógica de campos que ya existen en `PromologEntryCard.tsx` para mantener consistencia:
+- Estados: `editResult`, `editNetwork`, `editPlatform`, `editContactType`, `editNotes`, `editEvidencePreview`
+- Opciones: `networkOptions`, `platformOptions`, `contactTypeOptions`
+- Funciones helper: `getInitials()`
+
+**6. Integración con base de datos (futura)**:
+
+El botón "Guardar Entrada" debería insertar un nuevo registro en la tabla `promolog_entries` con los campos recolectados, pero por ahora puede mostrar un toast de confirmación.
+
+### Nota técnica
+
+El nuevo modal de registro seguirá el mismo patrón visual y de funcionalidad que el modal de edición en `PromologEntryCard`, pero como nuevo "creador" sin datos previos. Los valores iniciales serán vacíos excepto el nombre y datos del creador.
 
