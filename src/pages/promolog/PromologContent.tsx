@@ -21,6 +21,8 @@ import {
   Upload,
   ExternalLink,
   X as XMark,
+  List,
+  LayoutGrid,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,8 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
+import PromologTable from "./PromologTable";
+import PromologGrid from "./PromologGrid";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -220,6 +224,7 @@ const PromologContent = () => {
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
   const [sortOrder, setSortOrder] = useState("pendientes");
+  const [entryView, setEntryView] = useState<"list" | "grid">("list");
 
   // Registration modal state
   const { toast } = useToast();
@@ -661,16 +666,39 @@ const PromologContent = () => {
               {/* Entradas Recientes */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Entradas Recientes</h2>
-                  <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(true)}>
-                    <Filter className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">Entradas Recientes</h2>
+                    <span className="text-sm text-muted-foreground">
+                      {filteredEntries.length} entradas
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant={entryView === "list" ? "default" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEntryView("list")}
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={entryView === "grid" ? "default" : "ghost"}
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEntryView("grid")}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(true)}>
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  {filteredEntries.map((entry) => (
-                    <PromologEntryCard key={entry.id} entry={entry} />
-                  ))}
-                </div>
+                {entryView === "list" ? (
+                  <PromologTable entries={filteredEntries} />
+                ) : (
+                  <PromologGrid entries={filteredEntries} />
+                )}
               </div>
             </TabsContent>
 
