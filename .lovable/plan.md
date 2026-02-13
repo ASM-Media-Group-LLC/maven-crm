@@ -1,67 +1,110 @@
 
-# Mejoras al Dashboard de Sales Overview
 
-## 1. Clari AI FAB visible en todas las paginas de Creator Sales
+# Dashboard Principal Completo
 
-Actualmente el FAB solo esta en `SalesOverview.tsx`. Se agregara a las siguientes paginas:
+## Resumen
 
-- `src/pages/SalesDashboard.tsx` (Sales Report)
-- `src/pages/SalesPerformanceCreator.tsx` (Sale Report v.1)
-- `src/pages/AiSalesConfig.tsx` (AI Config)
-- `src/pages/sales-overview/ComparativasPage.tsx`
-- `src/pages/sales-overview/Top10Page.tsx`
-- `src/pages/sales-overview/SubiendoPage.tsx`
-- `src/pages/sales-overview/BajandoPage.tsx`
-- `src/pages/sales-overview/AltoPotencialPage.tsx`
-- `src/pages/sales-overview/EnRiesgoPage.tsx`
+Redisenar completamente el `DashboardContent.tsx` para replicar la estructura mostrada en las imagenes de referencia. El dashboard incluira 5 tarjetas KPI superiores, un grafico de rendimiento semanal, un feed de actividad reciente, distribucion de pipeline (donut), top 5 creadoras, grafico de deals semanales, y 3 tarjetas operacionales inferiores (Customer Service, Closers, Scripts and Tools).
 
-No se agrega a `AiSales.tsx` porque esa pagina ya ES el chat de Clari AI.
+## Estructura Visual
 
-En cada archivo se importa `ClariAiFab` y se coloca justo antes de cerrar `</SidebarProvider>`.
+La pagina se organiza en 4 filas:
 
-## 2. Acceso a Sales Report desde el Dashboard
+1. **Header**: Titulo "Dashboard" + subtitulo + botones de accion
+2. **5 KPI Cards**: Total Creators, Active Tickets, Promotion Compliance, New Leads Today, Deals in Progress
+3. **Fila media** (2 columnas): Rendimiento Semanal (chart lineas) | Actividad Reciente (feed)
+4. **Fila inferior parte 1** (3 columnas): Distribucion Pipeline (donut) | Top 5 Creadores (lista numerada) | Deals Semanales (bar chart)
+5. **Fila inferior parte 2** (3 columnas): Customer Service | Closers | Scripts and Tools
 
-Se agregara una nueva card operacional en `SalesOperationalCards.tsx` con:
-- Titulo: "Sales Report"
-- Icono: `FileText` de lucide
-- Accion: `navigate("/salesdashboard")`
-- Contenido: texto "Ver reporte completo"
+## Cambios Detallados
 
-El grid pasara de 5 a 6 cards.
+### 1. Redisenar `src/components/dashboard/DashboardContent.tsx`
 
-## 3. Card de Creadoras mostrando activas e inactivas
+Reescribir el componente completo con las siguientes secciones:
 
-En `SalesKPICards.tsx`, la card "Creadoras" actualmente muestra solo `data.activeCreators`. Se modificara para mostrar:
-- Valor principal: total de creadoras (activas + inactivas) = `data.creators.length`
-- Subtitulo: `"{activas} activas / {inactivas} inactivas"`
+**Header:**
+- Titulo: "Dashboard" (`text-2xl font-bold`)
+- Subtitulo: "Vista general de toda la operacion en tiempo real" (`text-sm text-muted-foreground`)
 
-Esto da visibilidad completa del roster.
+**KPI Cards (grid-cols-5):**
+Cada card muestra icono, titulo, valor grande coloreado y un subtexto descriptivo:
+- **Total Creators**: Usa `useCreadores` hook para contar total de creators. Icono `Users`, color `text-primary`. Subtexto: variacion porcentual.
+- **Active Tickets**: Query a tabla `tickets` filtrando `status != 'resolved'`. Icono `Ticket`, color `text-destructive`. Subtexto: "X closed".
+- **Promotion Compliance**: Placeholder con valor "--" o "39%". Icono `CalendarCheck`, color `text-warning`. Subtexto: "Weekly average".
+- **New Leads Today**: Query a tabla `leads` filtrando por `created_at` de hoy. Icono `MessageSquare`, color `text-accent`. Subtexto: "X interested".
+- **Deals in Progress**: Query a tabla `leads` filtrando por status relevante. Icono `Phone`, color `text-success`. Subtexto: "X closed".
 
-## 4. Fix: cards de Ingresos Total, Net Earnings y Creadoras no muestran informacion
+**Rendimiento Semanal (lg:col-span-2):**
+- Card con titulo "Rendimiento Semanal" y subtitulo "Leads, Deals y Compliance"
+- Grafico de lineas (Recharts) con 3 series: Leads, Deals, Compliance %
+- Eje X: Lun-Dom
+- Datos reales si estan disponibles, sino placeholder con datos de ejemplo
 
-**Causa raiz**: Al hacer click en estas cards, se llama `onCardClick(card.id)` con los IDs `"gross"`, `"net"` y `"creators"`. Pero en `SalesOverview.tsx`, la funcion `getModalCreators()` no tiene cases para estos IDs en el switch, asi que retorna un array vacio `[]` y el modal muestra "No hay datos para este periodo."
+**Actividad Reciente:**
+- Card con titulo "Actividad Reciente" y subtitulo "Ultimas acciones del sistema"
+- Lista de los ultimos tickets creados (query a `tickets` ordenados por `created_at desc limit 5`)
+- Cada item muestra: icono rojo, titulo del ticket, fecha formateada
 
-**Solucion**: Agregar los cases faltantes en `getModalCreators()`:
-- `"gross"` y `"net"`: mostrar `comparison.creators` (todas las creadoras con sus earnings)
-- `"creators"`: mostrar `comparison.creators`
+**Distribucion Pipeline (donut):**
+- Card con PieChart (Recharts) tipo donut
+- Datos de leads agrupados por status (New, Contacted, In Call, Closed)
+- Leyenda debajo con colores y conteos
 
-Y agregar titulos en `CardDetailModal.tsx`:
-- `gross`: "Desglose de Ingresos Total"
-- `net`: "Desglose de Net Earnings"
-- `creators`: "Todas las Creadoras"
+**Top 5 Creadores:**
+- Card con lista numerada del 1-5
+- Usa datos de `useCreadores` o `useEarningsData` para obtener los top 5 por earnings
+- Cada fila: numero en circulo, nombre, subtexto con followers/earnings
+
+**Deals Semanales:**
+- Card con BarChart (Recharts) 
+- Barras verdes por dia de la semana (Lun-Dom)
+- Datos placeholder inicialmente
+
+**3 Tarjetas Operacionales (grid-cols-3):**
+
+Cada tarjeta tiene un borde superior coloreado y lista de items con badges numericos:
+
+- **Customer Service** (borde rosa/destructive):
+  - Icono `Headphones`, subtitulo "Tickets de soporte"
+  - Items: "Urgentes" (badge count), "Cerrados" (badge count)
+  - Footer: "Tasa Resolucion: X%"
+
+- **Closers** (borde azul/primary):
+  - Icono `Phone`, subtitulo "Actividad de ventas"
+  - Items: "En llamada" (badge), "Cerrados" (badge), "Pipeline" (badge)
+
+- **Scripts and Tools** (borde morado/accent):
+  - Icono `FileCode`, subtitulo "Recursos del equipo"
+  - Items: "Scripts activos" (badge), "Templates" (badge), "Objetivos" (badge)
+
+### 2. Agregar `ClariAiFab` al Dashboard principal
+
+Importar y colocar `ClariAiFab` en `src/pages/Dashboard.tsx` dentro del `SidebarProvider`.
+
+### 3. Limpiar `DashboardMetricCard.tsx`
+
+Se mantiene pero se actualiza para soportar las nuevas props: `subtitle` (texto descriptivo), `valueColor` (color del valor principal), y se remueve el icono de trend para usar el subtitulo en su lugar.
+
+## Datos y Queries
+
+- **Creators**: Reutiliza `useCreadores` existente (tabla `creators`)
+- **Tickets**: Query directa a tabla `tickets` (ya existe en Supabase)
+- **Leads**: Query directa a tabla `leads` (ya existe en Supabase)
+- **Earnings**: Reutiliza `useEarningsData` existente
+- **Deals/Compliance/Scripts**: Datos placeholder inicialmente (no hay tablas dedicadas)
 
 ## Archivos a modificar
 
-- `src/pages/SalesDashboard.tsx` -- agregar ClariAiFab
-- `src/pages/SalesPerformanceCreator.tsx` -- agregar ClariAiFab
-- `src/pages/AiSalesConfig.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/ComparativasPage.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/Top10Page.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/SubiendoPage.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/BajandoPage.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/AltoPotencialPage.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/EnRiesgoPage.tsx` -- agregar ClariAiFab
-- `src/pages/sales-overview/SalesOperationalCards.tsx` -- agregar card "Sales Report"
-- `src/pages/sales-overview/SalesKPICards.tsx` -- mostrar activas e inactivas en card Creadoras
-- `src/pages/SalesOverview.tsx` -- agregar cases "gross", "net", "creators" en getModalCreators
-- `src/pages/sales-overview/CardDetailModal.tsx` -- agregar titulos para gross, net, creators
+- `src/components/dashboard/DashboardContent.tsx` -- rediseno completo
+- `src/components/dashboard/DashboardMetricCard.tsx` -- actualizar props para subtitulo y color
+- `src/pages/Dashboard.tsx` -- agregar ClariAiFab
+
+## Detalles tecnicos
+
+- Se usan `useQuery` de TanStack para las queries de tickets y leads directamente en DashboardContent
+- Los graficos usan Recharts (LineChart, PieChart, BarChart) ya instalado
+- Las tarjetas operacionales inferiores usan un borde superior de 3px con `border-t-[3px]` y colores semanticos
+- Los badges numericos en las tarjetas operacionales usan `Badge` con colores personalizados
+- El layout sigue el patron existente: `main` con `flex-1 overflow-auto p-6 space-y-6`
+- Header consistente con el resto de paginas: `text-2xl font-bold` para titulo
+
