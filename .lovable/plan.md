@@ -1,28 +1,60 @@
 
-
-## Limitar el ancho del dropdown de Creador/a al mismo tamaño del input
+## Actualizar opciones del dropdown de "Red Social" en Filtros
 
 ### Problema
-El dropdown del Select de "Creador/a" se expande mas alla del ancho del trigger porque los nombres de los creadores son largos. Radix usa `min-w-[var(--radix-select-trigger-width)]` pero no limita el ancho maximo, asi que el contenido empuja el popover.
+Las opciones actuales del dropdown de "Red Social" en la sección de Filtros de `/promolog` son limitadas y no incluyen todas las plataformas requeridas.
 
-### Solucion
-En el archivo `src/components/ui/select.tsx`, agregar `max-w-[var(--radix-select-trigger-width)]` al Viewport del SelectContent (linea 82) para que el dropdown nunca sea mas ancho que el trigger. Los textos largos se cortaran con overflow hidden automaticamente.
+### Opciones Actuales (líneas 404-408)
+- Todas
+- Instagram
+- TikTok
+- X
+- Telegram
 
-### Detalle tecnico
+### Opciones Requeridas
+- Todos
+- Instagram
+- TikTok
+- X/Twitter
+- OnlyFans
+- Treat
+- Telegram
 
-**Archivo:** `src/components/ui/select.tsx`
+### Solución
+Actualizar los `SelectItem` en el dropdown de "Red Social" (líneas 404-408 en `src/pages/promolog/PromologContent.tsx`) para incluir:
+1. Cambiar "X" a "X/Twitter" para mayor claridad
+2. Agregar "OnlyFans" como nueva opción
+3. Agregar "Treat" como nueva opción
 
-**Cambio en linea 82:**
+### Detalle Técnico
 
-Cambiar:
-```
-"h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
+
+**Cambio (líneas 404-408):**
+
+Reemplazar:
+```tsx
+<SelectItem value="__all__">Todas</SelectItem>
+<SelectItem value="instagram">Instagram</SelectItem>
+<SelectItem value="tiktok">TikTok</SelectItem>
+<SelectItem value="x">X</SelectItem>
+<SelectItem value="telegram">Telegram</SelectItem>
 ```
 
 Por:
-```
-"h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]"
+```tsx
+<SelectItem value="__all__">Todos</SelectItem>
+<SelectItem value="instagram">Instagram</SelectItem>
+<SelectItem value="tiktok">TikTok</SelectItem>
+<SelectItem value="x">X/Twitter</SelectItem>
+<SelectItem value="onlyfans">OnlyFans</SelectItem>
+<SelectItem value="treat">Treat</SelectItem>
+<SelectItem value="telegram">Telegram</SelectItem>
 ```
 
-Esto fuerza al viewport del dropdown a nunca exceder el ancho del trigger. Los items con texto largo se truncaran visualmente dentro del espacio disponible.
+### Cambios Clave
+- Mantener los valores (`value`) en minúsculas para compatibilidad con backend/filtros
+- Cambiar el label de "X" a "X/Twitter" para claridad
+- Mantener "Todas" como placeholder, pero cambiar el valor "Todas" a "Todos" para consistencia con el label de otras secciones
+- Insertar "OnlyFans" y "Treat" en las posiciones apropiadas del orden lógico de redes sociales
 
