@@ -1,96 +1,110 @@
 
-## Implementar flujo de selección de creadora y apertura del modal de registro de promoción
 
-### Resumen
-Cuando el usuario hace clic en una tarjeta de creadora en el modal "Selecciona una Creadora", se debe:
-1. Capturar los datos de la creadora seleccionada
-2. Cerrar el modal de selección
-3. Abrir un nuevo modal de registro de promoción (similar a PromologEntryCard) con los datos de la creadora precargados
+## Ajustar boton "Agregar Campaña" y crear modal "Nueva Campaña Mensual"
 
-### Cambios en `src/pages/promolog/PromologContent.tsx`
+### Cambios en el boton
 
-**1. Nuevos estados (línea 196)**:
-```typescript
-const [selectedCreatorForEntry, setSelectedCreatorForEntry] = useState<typeof creators[0] | null>(null);
-const [entryModalOpen, setEntryModalOpen] = useState(false);
+**Archivo:** `src/pages/promolog/PromologContent.tsx` (linea 410-413)
+
+Cambiar el icono de `Settings` a `Plus` para que sea consistente con el boton "Agregar Entrada":
+
+```tsx
+// Antes
+<Settings className="mr-2 h-4 w-4" />
+
+// Despues
+<Plus className="mr-2 h-4 w-4" />
 ```
 
-**2. Actualizar el onClick de las tarjetas de creadora en el grid del modal (línea 743)**:
+Agregar `onClick` para abrir el nuevo modal.
 
-Cambiar de:
+### Nuevo estado
+
+Agregar estado para controlar el modal y los campos del formulario:
+
 ```typescript
-onClick={() => setCreatorsModalOpen(false)}
+const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+const [campaignCreator, setCampaignCreator] = useState("");
+const [campaignMonth, setCampaignMonth] = useState("");
+const [campaignGoalMonthly, setCampaignGoalMonthly] = useState("");
+const [campaignGoalWeekly, setCampaignGoalWeekly] = useState("");
 ```
 
-A:
-```typescript
-onClick={() => {
-  setSelectedCreatorForEntry(creator);
-  setEntryModalOpen(true);
-  setCreatorsModalOpen(false);
-}}
-```
+### Nuevo Dialog modal "Nueva Campaña Mensual"
 
-**3. Agregar nuevo Dialog modal de registro de promoción (después del Dialog de selección, antes del cierre de `</main>`)**:
+Replicar el diseno de la imagen de referencia con los siguientes elementos:
 
-Crear un nuevo `<Dialog>` que contenga:
-- **DialogHeader**: "Registrar Promoción"
-- **Tarjeta de creadora**: Avatar, nombre, handle, redes sociales
-- **Selector "¿Promocionó Hoy?"**: Botones Si/No
-- **Campos condicionales** (igual al flujo existente en PromologEntryCard):
-  - Cuando "Sí": Red Social, Plataforma, Tipo de Contacto, Notas, Evidencia
-  - Cuando "No": Ningún campo adicional
-- **Botones de acción**: "Cancelar" y "Guardar Entrada"
+1. **Header**: Titulo "Nueva Campaña Mensual" con boton X de cierre
+2. **Campo "Creador/a *"**: Select dropdown con las creadoras existentes (usando la query de `creators` ya disponible), placeholder "Seleccionar creador/a"
+3. **Campo "Mes/Año *"**: Input tipo `month` para seleccionar mes y año
+4. **Campos en fila (grid-cols-2)**:
+   - "Objetivo Mensual *": Input numerico, placeholder "Ej: 20"
+   - "Objetivo Semanal *": Input numerico, placeholder "Ej: 5"
+5. **Footer**: Botones "Cancelar" (variant outline) y "Crear Campaña" (variant default/primary)
 
-**4. Estructura técnica del nuevo Dialog**:
+### Estructura del Dialog
 
-```typescript
-<Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
-  <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+```tsx
+<Dialog open={campaignModalOpen} onOpenChange={setCampaignModalOpen}>
+  <DialogContent className="sm:max-w-[500px]">
     <DialogHeader className="pr-8">
-      <DialogTitle>Registrar Promoción</DialogTitle>
+      <DialogTitle>Nueva Campaña Mensual</DialogTitle>
     </DialogHeader>
-    
-    {/* Creator card */}
-    {selectedCreatorForEntry && (
-      <>
-        <Card className="bg-muted">
-          {/* Avatar, nombre, handle, redes sociales */}
-        </Card>
-
-        {/* Promoción status */}
+    <div className="space-y-4">
+      {/* Creador/a */}
+      <div className="space-y-2">
+        <Label>Creador/a *</Label>
+        <Select value={campaignCreator} onValueChange={setCampaignCreator}>
+          <SelectTrigger><SelectValue placeholder="Seleccionar creador/a" /></SelectTrigger>
+          <SelectContent>
+            {creators.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Mes/Año */}
+      <div className="space-y-2">
+        <Label>Mes/Año *</Label>
+        <Input type="month" />
+      </div>
+      {/* Objetivos en grid */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-          <div className="grid grid-cols-2 gap-3">
-            {/* Si/No buttons */}
-          </div>
+          <Label>Objetivo Mensual *</Label>
+          <Input type="number" placeholder="Ej: 20" />
         </div>
-
-        {/* Conditional fields (Si Promocionó) */}
-        {/* Red Social, Platform, Contact Type, Notes, Evidence */}
-
-        {/* Footer buttons */}
-        <DialogFooter>
-          {/* Cancelar y Guardar Entrada */}
-        </DialogFooter>
-      </>
-    )}
+        <div className="space-y-2">
+          <Label>Objetivo Semanal *</Label>
+          <Input type="number" placeholder="Ej: 5" />
+        </div>
+      </div>
+    </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>Cancelar</Button>
+      <Button onClick={handleCreateCampaign}>Crear Campaña</Button>
+    </DialogFooter>
   </DialogContent>
 </Dialog>
 ```
 
-**5. Reutilización de lógica**: 
+### Imports adicionales
 
-Se pueden reutilizar los mismos estados y lógica de campos que ya existen en `PromologEntryCard.tsx` para mantener consistencia:
-- Estados: `editResult`, `editNetwork`, `editPlatform`, `editContactType`, `editNotes`, `editEvidencePreview`
-- Opciones: `networkOptions`, `platformOptions`, `contactTypeOptions`
-- Funciones helper: `getInitials()`
+Agregar `Label` desde `@/components/ui/label` (ya disponible en el proyecto).
 
-**6. Integración con base de datos (futura)**:
+### Accion "Crear Campaña"
 
-El botón "Guardar Entrada" debería insertar un nuevo registro en la tabla `promolog_entries` con los campos recolectados, pero por ahora puede mostrar un toast de confirmación.
+El boton mostrara un toast de confirmacion por ahora (sin integracion con base de datos):
 
-### Nota técnica
+```typescript
+const handleCreateCampaign = () => {
+  toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
+  setCampaignModalOpen(false);
+};
+```
 
-El nuevo modal de registro seguirá el mismo patrón visual y de funcionalidad que el modal de edición en `PromologEntryCard`, pero como nuevo "creador" sin datos previos. Los valores iniciales serán vacíos excepto el nombre y datos del creador.
+### Tokens del sistema de diseno
+
+- Todos los campos usaran los componentes existentes de shadcn (Input, Select, Label)
+- Sin colores hardcoded
+- Footer sigue la convencion: Cancelar (outline) a la izquierda, accion primaria a la derecha
+- Padding del header con `pr-8` para no interferir con el boton X
 
