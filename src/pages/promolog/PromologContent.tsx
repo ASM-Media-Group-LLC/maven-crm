@@ -44,7 +44,7 @@ const platformCards = [
     name: "OnlyFans",
     value: 5,
     icon: (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white text-xs font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
         OF
       </span>
     ),
@@ -53,7 +53,7 @@ const platformCards = [
     name: "Unlok",
     value: 0,
     icon: (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white text-xs font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">
         U
       </span>
     ),
@@ -62,7 +62,7 @@ const platformCards = [
     name: "Otra",
     value: 0,
     icon: (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Info className="h-4 w-4" />
       </span>
     ),
@@ -328,7 +328,7 @@ const PromologContent = () => {
             {/* Plataforma */}
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Plataforma</p>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {platformCards.map((p) => (
                   <Card key={p.name}>
                     <CardContent className="flex items-center gap-3 p-4">
