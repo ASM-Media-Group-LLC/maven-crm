@@ -1,110 +1,200 @@
 
 
-## Ajustar boton "Agregar Campaña" y crear modal "Nueva Campaña Mensual"
+## Landing Page, Login, Registro y Proteccion de Rutas para Maven CRM
 
-### Cambios en el boton
+Este plan extiende el sistema actual sin romper nada existente. Se crean nuevas paginas publicas, autenticacion con Supabase Auth, y proteccion de rutas para el area interna.
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx` (linea 410-413)
+---
 
-Cambiar el icono de `Settings` a `Plus` para que sea consistente con el boton "Agregar Entrada":
+### 1. Base de Datos - Migracion SQL
 
-```tsx
-// Antes
-<Settings className="mr-2 h-4 w-4" />
+Crear las tablas `companies`, `profiles` y `user_roles` con RLS y triggers:
 
-// Despues
-<Plus className="mr-2 h-4 w-4" />
+```sql
+-- Companies table
+CREATE TABLE public.companies (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+
+-- Profiles table
+CREATE TABLE public.profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name text,
+  avatar_url text,
+  company_id uuid REFERENCES public.companies(id),
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- User roles (enum + table)
+CREATE TYPE public.app_role AS ENUM ('admin', 'manager', 'employee');
+
+CREATE TABLE public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  role app_role NOT NULL,
+  UNIQUE (user_id, role)
+);
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+-- Security definer function for role checks
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role
+  )
+$$;
+
+-- RLS policies for profiles
+CREATE POLICY "Users can view own profile" ON public.profiles
+  FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles
+  FOR UPDATE TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Users can insert own profile" ON public.profiles
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+
+-- RLS policies for companies
+CREATE POLICY "Authenticated users can view companies" ON public.companies
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated users can insert companies" ON public.companies
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+-- RLS for user_roles
+CREATE POLICY "Users can view own roles" ON public.user_roles
+  FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+-- Trigger to auto-create profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name)
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'full_name');
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (NEW.id, 'employee');
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
 
-Agregar `onClick` para abrir el nuevo modal.
+---
 
-### Nuevo estado
+### 2. Nuevos Archivos a Crear
 
-Agregar estado para controlar el modal y los campos del formulario:
+| Archivo | Proposito |
+|---------|-----------|
+| `src/pages/Landing.tsx` | Landing page publica |
+| `src/pages/Login.tsx` | Pagina de inicio de sesion |
+| `src/pages/Register.tsx` | Pagina de registro |
+| `src/components/ProtectedRoute.tsx` | Wrapper para rutas autenticadas |
+| `src/hooks/useAuth.tsx` | Hook + contexto de autenticacion |
 
-```typescript
-const [campaignModalOpen, setCampaignModalOpen] = useState(false);
-const [campaignCreator, setCampaignCreator] = useState("");
-const [campaignMonth, setCampaignMonth] = useState("");
-const [campaignGoalMonthly, setCampaignGoalMonthly] = useState("");
-const [campaignGoalWeekly, setCampaignGoalWeekly] = useState("");
+---
+
+### 3. Landing Page (`src/pages/Landing.tsx`)
+
+Basada en la imagen de referencia, con el mismo fondo oscuro y tokens del sistema:
+
+- **Navbar**: Logo (componente `Logo` existente, size "sm"), enlaces internos (Funcionalidades), boton "Iniciar Sesion" (outline) y "Registrarse" (primary)
+- **Hero**: Badge "Plataforma completa para agencias de creadores", Logo grande (size "lg"), subtitulo, CTAs "Crear cuenta" y "Iniciar sesion"
+- **Modulos Grid**: 6 cards (3x2) con icono coloreado, titulo, descripcion y metrica. Cards con `bg-card border border-border` 
+- **Metricas**: Seccion con 4 stats (215+, 2.3K+, 24/7, Crecimiento) en fila
+- **Footer**: Logo + tagline
+
+Colores de iconos de modulos usando tokens: `bg-accent`, `bg-primary`, `bg-success`, `bg-warning`, `bg-destructive`, `bg-primary`
+
+---
+
+### 4. Login (`src/pages/Login.tsx`)
+
+- Fondo oscuro (hereda del tema dark)
+- Card centrada con `max-w-md`
+- Campos: Email, Contrasena (con validacion zod)
+- Boton primario "Iniciar Sesion"
+- Links a Registro y Recuperar contrasena
+- Usa `supabase.auth.signInWithPassword()`
+- Redirige a `/dashboard` al autenticar
+- Toast de error si falla
+
+---
+
+### 5. Registro (`src/pages/Register.tsx`)
+
+- Misma estetica que Login
+- Campos: Nombre completo, Email, Contrasena, Confirmar contrasena, Empresa (opcional)
+- Validacion con zod (contrasenas coinciden, email valido, min 6 caracteres)
+- Usa `supabase.auth.signUp()` con `data: { full_name }`
+- Si se proporciona empresa, crea registro en `companies` y actualiza `profiles.company_id`
+- Redirige a `/dashboard`
+- `emailRedirectTo: window.location.origin`
+
+---
+
+### 6. Auth Hook (`src/hooks/useAuth.tsx`)
+
+Contexto React con:
+- `user`: usuario actual de Supabase
+- `session`: sesion activa
+- `loading`: estado de carga
+- `signOut()`: funcion de cierre de sesion
+
+Implementa `onAuthStateChange` listener (configurado ANTES de `getSession()`) segun las mejores practicas de Supabase.
+
+---
+
+### 7. Protected Route (`src/components/ProtectedRoute.tsx`)
+
+- Envuelve children
+- Si `loading` muestra spinner
+- Si no hay `user`, redirige a `/login`
+- Si hay `user`, renderiza children
+
+---
+
+### 8. Cambios en Archivos Existentes
+
+**`src/App.tsx`**:
+- Envolver todo en `AuthProvider`
+- Ruta `/` apunta a `Landing` (publica)
+- Ruta `/login` y `/register` (publicas, redirigen a `/dashboard` si ya autenticado)
+- Todas las demas rutas envueltas en `<ProtectedRoute>`
+- La pagina Index actual se elimina (Landing la reemplaza)
+
+**`src/components/dashboard/DashboardTopbar.tsx`**:
+- Agregar boton de logout que llame a `signOut()`
+
+---
+
+### 9. Flujo de Navegacion
+
+```text
+Usuario no autenticado:
+  / (Landing) --> /login o /register
+  /dashboard --> redirige a /login
+  
+Usuario autenticado:
+  / (Landing) --> puede acceder normalmente
+  /login --> redirige a /dashboard
+  /register --> redirige a /dashboard
+  /dashboard --> acceso normal
 ```
 
-### Nuevo Dialog modal "Nueva Campaña Mensual"
+---
 
-Replicar el diseno de la imagen de referencia con los siguientes elementos:
+### 10. Tokens del Sistema de Diseno
 
-1. **Header**: Titulo "Nueva Campaña Mensual" con boton X de cierre
-2. **Campo "Creador/a *"**: Select dropdown con las creadoras existentes (usando la query de `creators` ya disponible), placeholder "Seleccionar creador/a"
-3. **Campo "Mes/Año *"**: Input tipo `month` para seleccionar mes y año
-4. **Campos en fila (grid-cols-2)**:
-   - "Objetivo Mensual *": Input numerico, placeholder "Ej: 20"
-   - "Objetivo Semanal *": Input numerico, placeholder "Ej: 5"
-5. **Footer**: Botones "Cancelar" (variant outline) y "Crear Campaña" (variant default/primary)
-
-### Estructura del Dialog
-
-```tsx
-<Dialog open={campaignModalOpen} onOpenChange={setCampaignModalOpen}>
-  <DialogContent className="sm:max-w-[500px]">
-    <DialogHeader className="pr-8">
-      <DialogTitle>Nueva Campaña Mensual</DialogTitle>
-    </DialogHeader>
-    <div className="space-y-4">
-      {/* Creador/a */}
-      <div className="space-y-2">
-        <Label>Creador/a *</Label>
-        <Select value={campaignCreator} onValueChange={setCampaignCreator}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar creador/a" /></SelectTrigger>
-          <SelectContent>
-            {creators.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      {/* Mes/Año */}
-      <div className="space-y-2">
-        <Label>Mes/Año *</Label>
-        <Input type="month" />
-      </div>
-      {/* Objetivos en grid */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Objetivo Mensual *</Label>
-          <Input type="number" placeholder="Ej: 20" />
-        </div>
-        <div className="space-y-2">
-          <Label>Objetivo Semanal *</Label>
-          <Input type="number" placeholder="Ej: 5" />
-        </div>
-      </div>
-    </div>
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>Cancelar</Button>
-      <Button onClick={handleCreateCampaign}>Crear Campaña</Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
-```
-
-### Imports adicionales
-
-Agregar `Label` desde `@/components/ui/label` (ya disponible en el proyecto).
-
-### Accion "Crear Campaña"
-
-El boton mostrara un toast de confirmacion por ahora (sin integracion con base de datos):
-
-```typescript
-const handleCreateCampaign = () => {
-  toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
-  setCampaignModalOpen(false);
-};
-```
-
-### Tokens del sistema de diseno
-
-- Todos los campos usaran los componentes existentes de shadcn (Input, Select, Label)
-- Sin colores hardcoded
-- Footer sigue la convencion: Cancelar (outline) a la izquierda, accion primaria a la derecha
-- Padding del header con `pr-8` para no interferir con el boton X
+Todos los elementos nuevos usaran exclusivamente:
+- Fondos: `bg-background`, `bg-card`, `bg-muted`
+- Textos: `text-foreground`, `text-muted-foreground`
+- Bordes: `border-border`
+- Botones: variantes existentes de shadcn (default, outline, ghost)
+- Gradientes: Solo el gradiente de marca existente (`from-accent to-primary`)
+- Sin colores hardcoded, sin sombras para hover
 
