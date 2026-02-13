@@ -11,17 +11,19 @@ interface CreateTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   profiles: { id: string; full_name: string | null }[];
+  projectId?: string;
   onSubmit: (data: {
     title: string;
     description?: string;
     assigned_to: string;
     duration_hours: number;
     duration_minutes: number;
+    project_id?: string;
   }) => void;
   isLoading?: boolean;
 }
 
-const CreateTaskModal = ({ open, onOpenChange, profiles, onSubmit, isLoading }: CreateTaskModalProps) => {
+const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, isLoading }: CreateTaskModalProps) => {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -43,7 +45,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, onSubmit, isLoading }: 
       toast({ title: "Error", description: "La duración debe ser mayor a 0.", variant: "destructive" });
       return;
     }
-    onSubmit({ title: title.trim(), description: description.trim() || undefined, assigned_to: assignedTo, duration_hours: hours, duration_minutes: minutes });
+    onSubmit({ title: title.trim(), description: description.trim() || undefined, assigned_to: assignedTo, duration_hours: hours, duration_minutes: minutes, project_id: projectId });
     setTitle(""); setDescription(""); setAssignedTo(""); setHours(0); setMinutes(0);
     onOpenChange(false);
   };

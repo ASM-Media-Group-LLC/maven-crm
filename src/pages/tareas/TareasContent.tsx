@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
-import { Plus, CheckSquare, AlertTriangle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTareas, type Task } from "./useTareas";
@@ -7,8 +8,13 @@ import TaskCard from "./TaskCard";
 import CreateTaskModal from "./CreateTaskModal";
 import OverdueReasonModal from "./OverdueReasonModal";
 
-const TareasContent = () => {
-  const { tasks, isLoading, companyProfiles, createTask, completeTask, submitOverdueReason } = useTareas();
+interface TareasContentProps {
+  projectId: string;
+}
+
+const TareasContent = ({ projectId }: TareasContentProps) => {
+  const navigate = useNavigate();
+  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
 
@@ -58,7 +64,12 @@ const TareasContent = () => {
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Tareas</h1>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold">{projectName || "Tareas"}</h1>
+        </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
         </Button>
@@ -94,6 +105,7 @@ const TareasContent = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         profiles={companyProfiles}
+        projectId={projectId}
         onSubmit={(data) => createTask.mutate(data)}
         isLoading={createTask.isPending}
       />

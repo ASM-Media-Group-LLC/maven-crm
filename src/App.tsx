@@ -35,6 +35,7 @@ import Promolog from "./pages/Promolog";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
 import Tareas from "./pages/Tareas";
+import TareaProject from "./pages/TareaProject";
 import TaskSharePage from "./pages/tareas/TaskSharePage";
 import NotFound from "./pages/NotFound";
 
@@ -79,6 +80,7 @@ const App = () => (
               <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
               <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
+              <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
               <Route path="/eventos/nuevo" element={<ProtectedRoute><NuevoEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
