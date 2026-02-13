@@ -1,19 +1,20 @@
 
-## Ajustar estilos del botón "No Promocionó"
+
+## Ocultar Red Social cuando se selecciona "No Promocionó"
 
 ### Cambio en `src/pages/promolog/PromologEntryCard.tsx`
 
-Según la imagen de referencia, el botón "No Promocionó" cuando está seleccionado debe usar color azul/primary (como aparece en la captura), no púrpura como está actualmente.
+Actualmente la seccion de "Red Social" (lineas 241-267) se muestra siempre, independientemente de si se selecciona "Si Promociono" o "No Promociono". Segun la imagen de referencia, cuando se selecciona "No Promociono" solo deben aparecer:
 
-### Detalle técnico
+1. Tarjeta del creador (avatar + nombre + handle)
+2. Botones "Si Promociono" / "No Promociono"
+3. Botones "Cancelar" / "Guardar Cambios"
 
-**Archivo:** `src/pages/promolog/PromologEntryCard.tsx` (línea 231)
+### Detalle tecnico
 
-**Cambio necesario:**
-- Línea 231: Cambiar `bg-purple-500` por `bg-blue-500` (o `bg-primary` según el sistema de diseño)
-- El botón "Sí Promocionó" (línea 220) se mantiene sin cambios con `bg-cyan-500`
+**Archivo:** `src/pages/promolog/PromologEntryCard.tsx`
 
-**Comportamiento esperado:**
-- "Sí Promocionó" seleccionado → fondo cyan/primary ✓ (sin cambios)
-- "No Promocionó" seleccionado → fondo azul/blue-500 (cambio de púrpura a azul)
-- Ambos botones no seleccionados → borde outline (sin cambios)
+**Cambio:** Mover la seccion de Red Social (lineas 241-267) dentro del bloque condicional `{editResult === "si" && (...)}` que ya existe en la linea 270, para que solo se muestre cuando se selecciona "Si Promociono".
+
+Esto significa que el bloque condicional pasara de contener solo Plataforma, Tipo de Contacto, Notas y Evidencia, a contener tambien la seccion de Red Social como primer elemento.
+
