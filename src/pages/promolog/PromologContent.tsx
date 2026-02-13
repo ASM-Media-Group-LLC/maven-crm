@@ -180,11 +180,11 @@ const PromologContent = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {kpiCards.map((card) => (
           <Card key={card.title} className={`border-t-[3px] ${card.borderColor}`}>
-            <CardContent className="flex items-start gap-4 p-5">
+            <CardContent className="flex items-start gap-4 px-5 py-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <card.icon className="h-5 w-5 text-muted-foreground" />
               </div>
-              <div className="flex-1 space-y-0.5">
+              <div className="flex-1 space-y-0">
                 <p className="text-xs font-medium text-muted-foreground">
                   {card.title}
                 </p>
