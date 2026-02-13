@@ -1,7 +1,10 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -12,6 +15,9 @@ import {
 
 interface Props {
   tickets: TicketWithCreator[];
+  onView: (ticket: TicketWithCreator) => void;
+  onEdit: (ticket: TicketWithCreator) => void;
+  onDelete: (ticket: TicketWithCreator) => void;
 }
 
 const priorityVariant: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
@@ -35,7 +41,7 @@ const priorityColor: Record<string, string> = {
   low: "text-muted-foreground",
 };
 
-const TicketsList = ({ tickets }: Props) => {
+const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
   if (tickets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -56,7 +62,8 @@ const TicketsList = ({ tickets }: Props) => {
         return (
           <Card
             key={ticket.id}
-            className={`p-4 transition-colors hover:bg-muted/30 ${isUrgent ? "border-destructive/40 bg-destructive/5" : ""}`}
+            className={`p-4 transition-colors hover:bg-muted/30 cursor-pointer ${isUrgent ? "border-destructive/40 bg-destructive/5" : ""}`}
+            onClick={() => onView(ticket)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0 space-y-1">
@@ -98,6 +105,33 @@ const TicketsList = ({ tickets }: Props) => {
                     {TYPE_LABELS[ticket.ticket_type] || ticket.ticket_type}
                   </Badge>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(ticket); }}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver detalle</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(ticket); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Editar</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(ticket); }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eliminar</TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </Card>
