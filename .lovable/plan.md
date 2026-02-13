@@ -1,35 +1,67 @@
 
+# Mejoras al Dashboard de Sales Overview
 
-# Limpiar cards operacionales y hacer el FAB mas sutil
+## 1. Clari AI FAB visible en todas las paginas de Creator Sales
 
-## Resumen
+Actualmente el FAB solo esta en `SalesOverview.tsx`. Se agregara a las siguientes paginas:
 
-Se eliminaran las cards "Calendario" y "Todas" del grid operacional, y se simplificara el boton flotante de Clari AI para que sea mas sutil (sin el circulo "AI" girando).
+- `src/pages/SalesDashboard.tsx` (Sales Report)
+- `src/pages/SalesPerformanceCreator.tsx` (Sale Report v.1)
+- `src/pages/AiSalesConfig.tsx` (AI Config)
+- `src/pages/sales-overview/ComparativasPage.tsx`
+- `src/pages/sales-overview/Top10Page.tsx`
+- `src/pages/sales-overview/SubiendoPage.tsx`
+- `src/pages/sales-overview/BajandoPage.tsx`
+- `src/pages/sales-overview/AltoPotencialPage.tsx`
+- `src/pages/sales-overview/EnRiesgoPage.tsx`
 
-## Cambios
+No se agrega a `AiSales.tsx` porque esa pagina ya ES el chat de Clari AI.
 
-### 1. Eliminar cards "Calendario" y "Todas" de `SalesOperationalCards.tsx`
+En cada archivo se importa `ClariAiFab` y se coloca justo antes de cerrar `</SidebarProvider>`.
 
-Remover los objetos con `id: "calendar"` y `id: "todas"` del array de cards. El grid pasara de 7 a 5 cards (Comparativas, Top 10, Bajando, Alto Potencial, Alertas). Tambien se eliminaran los imports no usados (`CalendarDays`, `LayoutGrid`) y el prop `eventCount` que ya no sera necesario.
+## 2. Acceso a Sales Report desde el Dashboard
 
-### 2. Simplificar el boton flotante en `ClariAiFab.tsx`
+Se agregara una nueva card operacional en `SalesOperationalCards.tsx` con:
+- Titulo: "Sales Report"
+- Icono: `FileText` de lucide
+- Accion: `navigate("/salesdashboard")`
+- Contenido: texto "Ver reporte completo"
 
-**Quitar**: El badge circular con texto "AI" que flota sobre el boton (el `<span>` con `absolute -top-1 -right-1`).
+El grid pasara de 5 a 6 cards.
 
-**Simplificar animacion**: Reemplazar `animate-clari-pulse` (box-shadow pulsante) por un efecto mas sutil: solo un brillo suave en reposo usando `shadow-md` y en hover `hover:shadow-xl hover:scale-110`. Sin animacion continua, el boton se vera elegante pero sin distracciones.
+## 3. Card de Creadoras mostrando activas e inactivas
 
-### 3. Verificacion de headers (sin cambios necesarios)
+En `SalesKPICards.tsx`, la card "Creadoras" actualmente muestra solo `data.activeCreators`. Se modificara para mostrar:
+- Valor principal: total de creadoras (activas + inactivas) = `data.creators.length`
+- Subtitulo: `"{activas} activas / {inactivas} inactivas"`
 
-Se revisaron todos los headers de las paginas internas (Top10Page, SubiendoPage, BajandoPage, AltoPotencialPage, EnRiesgoPage, ComparativasHeader) y todos usan el mismo patron consistente:
-- Breadcrumb: `text-xs text-muted-foreground` con `ChevronRight h-3 w-3`
-- Titulo: `text-2xl font-bold text-foreground`
-- Subtitulo: `text-sm text-muted-foreground`
-- Filtros de periodo: `flex gap-1 bg-muted/50 rounded-lg p-1` con `Button size="sm" className="text-xs"`
+Esto da visibilidad completa del roster.
 
-No se requieren cambios en los headers ya que son consistentes.
+## 4. Fix: cards de Ingresos Total, Net Earnings y Creadoras no muestran informacion
+
+**Causa raiz**: Al hacer click en estas cards, se llama `onCardClick(card.id)` con los IDs `"gross"`, `"net"` y `"creators"`. Pero en `SalesOverview.tsx`, la funcion `getModalCreators()` no tiene cases para estos IDs en el switch, asi que retorna un array vacio `[]` y el modal muestra "No hay datos para este periodo."
+
+**Solucion**: Agregar los cases faltantes en `getModalCreators()`:
+- `"gross"` y `"net"`: mostrar `comparison.creators` (todas las creadoras con sus earnings)
+- `"creators"`: mostrar `comparison.creators`
+
+Y agregar titulos en `CardDetailModal.tsx`:
+- `gross`: "Desglose de Ingresos Total"
+- `net`: "Desglose de Net Earnings"
+- `creators`: "Todas las Creadoras"
 
 ## Archivos a modificar
 
-- `src/pages/sales-overview/SalesOperationalCards.tsx` -- eliminar cards "calendar" y "todas", limpiar imports y props
-- `src/components/ClariAiFab.tsx` -- quitar badge "AI", simplificar animacion
-
+- `src/pages/SalesDashboard.tsx` -- agregar ClariAiFab
+- `src/pages/SalesPerformanceCreator.tsx` -- agregar ClariAiFab
+- `src/pages/AiSalesConfig.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/ComparativasPage.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/Top10Page.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/SubiendoPage.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/BajandoPage.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/AltoPotencialPage.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/EnRiesgoPage.tsx` -- agregar ClariAiFab
+- `src/pages/sales-overview/SalesOperationalCards.tsx` -- agregar card "Sales Report"
+- `src/pages/sales-overview/SalesKPICards.tsx` -- mostrar activas e inactivas en card Creadoras
+- `src/pages/SalesOverview.tsx` -- agregar cases "gross", "net", "creators" en getModalCreators
+- `src/pages/sales-overview/CardDetailModal.tsx` -- agregar titulos para gross, net, creators
