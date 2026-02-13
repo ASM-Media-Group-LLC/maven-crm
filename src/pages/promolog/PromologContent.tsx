@@ -401,10 +401,12 @@ const PromologContent = () => {
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">Todas</SelectItem>
+                          <SelectItem value="__all__">Todos</SelectItem>
                           <SelectItem value="instagram">Instagram</SelectItem>
                           <SelectItem value="tiktok">TikTok</SelectItem>
-                          <SelectItem value="x">X</SelectItem>
+                          <SelectItem value="x">X/Twitter</SelectItem>
+                          <SelectItem value="onlyfans">OnlyFans</SelectItem>
+                          <SelectItem value="treat">Treat</SelectItem>
                           <SelectItem value="telegram">Telegram</SelectItem>
                         </SelectContent>
                       </Select>
