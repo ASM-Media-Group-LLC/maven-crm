@@ -11,7 +11,6 @@ import {
   Check,
   Minus,
   X,
-  ChevronDown,
   Filter,
   Table2,
   Info,
@@ -27,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -367,68 +366,71 @@ const PromologContent = () => {
             </p>
           </div>
 
-          {/* Filters (collapsible) */}
-          <Card className="bg-muted/30">
-            <CardContent className="p-4">
-              <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start hover:bg-transparent hover:text-muted-foreground">
-                    <Filter className="h-4 w-4" />
-                    Filtros
-                    <ChevronDown
-                      className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`}
-                    />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-2 w-full">
-                      <label className="text-sm font-medium">Creador/a</label>
-                      <Select>
-                        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                        <SelectItem value="__all__">Todos</SelectItem>
-                        {creators.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2 w-full">
-                      <label className="text-sm font-medium">Red Social</label>
-                      <Select>
-                        <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          <SelectItem value="instagram">Instagram</SelectItem>
-                          <SelectItem value="tiktok">TikTok</SelectItem>
-                          <SelectItem value="x">X/Twitter</SelectItem>
-                          <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                          <SelectItem value="treat">Treat</SelectItem>
-                          <SelectItem value="telegram">Telegram</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2 w-full">
-                      <label className="text-sm font-medium">Estado</label>
-                      <Select>
-                        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          <SelectItem value="promociono">Promocionó</SelectItem>
-                          <SelectItem value="no_promociono">No promocionó</SelectItem>
-                          <SelectItem value="promocion_parcial">Promoción Parcial</SelectItem>
-                          <SelectItem value="pendiente">Pendiente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-          </Card>
+          {/* Filters Sheet */}
+          <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Filtros de Tickets</SheetTitle>
+              </SheetHeader>
+              <div className="space-y-6 py-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Promocionó?</label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos</SelectItem>
+                      <SelectItem value="promociono">Promocionó</SelectItem>
+                      <SelectItem value="no_promociono">No promocionó</SelectItem>
+                      <SelectItem value="promocion_parcial">Promoción Parcial</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Modelo</label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Todas las modelos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todas las modelos</SelectItem>
+                      {creators.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Categoría de Modelo</label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todas las categorías</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Red Social</label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Todas las redes" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todas las redes</SelectItem>
+                      <SelectItem value="instagram">Instagram</SelectItem>
+                      <SelectItem value="tiktok">TikTok</SelectItem>
+                      <SelectItem value="x">X/Twitter</SelectItem>
+                      <SelectItem value="onlyfans">OnlyFans</SelectItem>
+                      <SelectItem value="treat">Treat</SelectItem>
+                      <SelectItem value="telegram">Telegram</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <SheetFooter className="flex flex-col gap-2 sm:flex-col">
+                <Button variant="outline" className="w-full">Limpiar filtros</Button>
+                <Button className="w-full" onClick={() => setFiltersOpen(false)}>Aplicar filtros</Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
 
           {/* Tabs */}
           <Tabs defaultValue="tabla">
@@ -452,7 +454,7 @@ const PromologContent = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Entradas Recientes</h2>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(true)}>
                     <Filter className="h-4 w-4" />
                   </Button>
                 </div>
