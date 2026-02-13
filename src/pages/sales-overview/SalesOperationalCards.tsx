@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  BarChart3, Trophy, TrendingUp, TrendingDown, Zap,
-  AlertTriangle, Bell, CalendarDays, Bot, LayoutGrid,
+  BarChart3, Trophy, TrendingDown, Zap,
+  Bell, CalendarDays, LayoutGrid,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
@@ -103,16 +103,6 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
       content: (
         <p className="text-2xl font-bold text-foreground">{eventCount}</p>
       ),
-    },
-    {
-      id: "clari_ai",
-      title: "Clari AI",
-      icon: Bot,
-      iconColor: "text-primary",
-      content: (
-        <p className="text-xs text-muted-foreground">Chat con IA</p>
-      ),
-      onClick: () => navigate("/aisales"),
     },
     {
       id: "todas",
