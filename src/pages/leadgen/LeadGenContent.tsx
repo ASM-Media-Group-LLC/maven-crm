@@ -194,7 +194,7 @@ const LeadGenContent = () => {
               </Select>
             </>
           )}
-          <div className="flex gap-1">
+          <div className="ml-auto flex gap-1">
             <Button
               variant={viewMode === "list" ? "secondary" : "ghost"}
               size="icon"

@@ -218,9 +218,9 @@ const PromologContent = () => {
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
   
   const [selectedCreator, setSelectedCreator] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("__all__");
-  const [selectedCategory, setSelectedCategory] = useState("__all__");
-  const [selectedNetwork, setSelectedNetwork] = useState("__all__");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
   const [sortOrder, setSortOrder] = useState("pendientes");
@@ -328,7 +328,7 @@ const PromologContent = () => {
   const [searchEntry, setSearchEntry] = useState("");
 
   const filteredEntries = mockEntries.filter((entry) => {
-    if (selectedStatus !== "__all__") {
+    if (selectedStatus !== "") {
       const statusMap: Record<string, string> = {
         si_promociono: "Sí",
         no_promociono: "No",
@@ -337,8 +337,8 @@ const PromologContent = () => {
       };
       if (entry.result !== statusMap[selectedStatus]) return false;
     }
-    if (selectedNetwork !== "__all__" && entry.network !== selectedNetwork) return false;
-    if (selectedCategory !== "__all__") {
+    if (selectedNetwork !== "" && entry.network !== selectedNetwork) return false;
+    if (selectedCategory !== "") {
       // filter by creator category if needed
     }
     if (searchEntry) {
@@ -584,7 +584,7 @@ const PromologContent = () => {
                       onChange={(e) => setSearchEntry(e.target.value)}
                     />
                   </div>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
                     <SelectTrigger className="w-[140px] h-9">
                       <SelectValue placeholder="Estado" />
                     </SelectTrigger>
@@ -596,7 +596,7 @@ const PromologContent = () => {
                       <SelectItem value="pendiente">Pendiente</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
+                  <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
                     <SelectTrigger className="w-[140px] h-9">
                       <SelectValue placeholder="Red Social" />
                     </SelectTrigger>
@@ -608,7 +608,7 @@ const PromologContent = () => {
                       <SelectItem value="telegram">Telegram</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
                     <SelectTrigger className="w-[140px] h-9">
                       <SelectValue placeholder="Categoría" />
                     </SelectTrigger>
