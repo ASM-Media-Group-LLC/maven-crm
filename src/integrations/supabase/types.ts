@@ -1110,6 +1110,60 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          assigned_to: string
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          due_at: string
+          duration_hours: number
+          duration_minutes: number
+          id: string
+          overdue_reason: string | null
+          share_token: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to: string
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          due_at: string
+          duration_hours?: number
+          duration_minutes?: number
+          id?: string
+          overdue_reason?: string | null
+          share_token?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          due_at?: string
+          duration_hours?: number
+          duration_minutes?: number
+          id?: string
+          overdue_reason?: string | null
+          share_token?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tickets: {
         Row: {
           assigned_to: string | null
@@ -1210,6 +1264,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_task_by_share_token: {
+        Args: { _token: string }
+        Returns: {
+          assigned_to: string
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          due_at: string
+          duration_hours: number
+          duration_minutes: number
+          id: string
+          overdue_reason: string | null
+          share_token: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
