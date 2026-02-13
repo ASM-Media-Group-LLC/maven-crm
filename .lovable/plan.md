@@ -1,44 +1,81 @@
 
 
-## Convertir filtros de Promolog a panel lateral (Sheet)
+## Actualizar filtros del Sheet en Promolog
 
-### Problema
-Actualmente los filtros estan dentro de un Collapsible inline en la pagina. El usuario quiere que al hacer clic en el boton de filtros (icono de Filter en "Entradas Recientes"), se abra un panel lateral derecho (Sheet) con el titulo "Filtros de Tickets" y los filtros organizados verticalmente, tal como se ve en la imagen de referencia.
+### Cambios a realizar en `src/pages/promolog/PromologContent.tsx`
 
-### Cambios en la imagen de referencia
-El panel lateral incluye:
-- Titulo "Filtros de Tickets" con boton de cierre (X)
-- Campo "Promociono?" con dropdown (Todos)
-- Campo "Modelo" con dropdown (Todas las modelos)
-- Campo "Categoria de Modelo" con dropdown (Todas las categorias)
-- Campo "Red Social" con dropdown (Todas las redes)
-- Boton "Limpiar filtros" (outline)
-- Boton "Aplicar filtros" (primario)
+### 1. Renombrar label del primer campo
+Cambiar "Promociono?" a "¿Promociono?" (con signos de interrogacion en espanol).
 
-### Solucion
+### 2. Actualizar opciones del dropdown de estado
+Reemplazar las opciones actuales por:
+- Todos
+- Si promociono
+- No promociono
+- Parcial
+- Pendiente
+
+### 3. Agregar busqueda en el dropdown de Modelo
+Reemplazar el `Select` del campo "Modelo" por un componente `Popover` + `Command` (cmdk, ya instalado) que permita:
+- Un input de busqueda para filtrar creators por nombre o alias
+- Lista scrollable de creators filtrados
+- Seleccion de un creator que cierra el popover y muestra el nombre seleccionado
+- Estado local para el valor seleccionado y el termino de busqueda
+
+### 4. Cargar categorias reales en "Categoria de Modelo"
+Las categorias existentes en la base de datos son: A+, A, B+, B, C. Se agregara una query con `useQuery` para obtener las categorias distintas de la tabla `creators` y poblar el dropdown dinamicamente.
+
+### Detalle Tecnico
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-1. **Eliminar el bloque Collapsible de filtros** (lineas 370-431): Remover la Card con el Collapsible que contiene los filtros inline, ya que seran reemplazados por el Sheet.
+**Cambio 1 - Label y opciones del primer campo (lineas 377-386):**
+```tsx
+<label className="text-sm font-medium">¿Promociono?</label>
+<Select>
+  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+  <SelectContent>
+    <SelectItem value="__all__">Todos</SelectItem>
+    <SelectItem value="si_promociono">Si promociono</SelectItem>
+    <SelectItem value="no_promociono">No promociono</SelectItem>
+    <SelectItem value="parcial">Parcial</SelectItem>
+    <SelectItem value="pendiente">Pendiente</SelectItem>
+  </SelectContent>
+</Select>
+```
 
-2. **Reemplazar el boton de Filter en "Entradas Recientes"** (linea 455): Conectar el boton de filtros existente (icono Filter) para que abra el Sheet en lugar de no hacer nada.
+**Cambio 2 - Modelo con busqueda (lineas 389-401):**
+Reemplazar el Select por un Popover + Command (cmdk):
+- Agregar imports: `Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem` desde `@/components/ui/command`
+- Agregar imports: `Search` desde lucide-react
+- Agregar estado local: `modeloSearch` para el termino de busqueda y `selectedCreator` para el valor seleccionado
+- Filtrar creators por nombre o artistic_name segun el termino de busqueda
+- Mostrar un boton trigger que muestra "Todas las modelos" o el nombre del creator seleccionado
+- El Command mostrara la lista filtrable con CommandInput
 
-3. **Agregar el Sheet con los filtros**: Usar el componente Sheet (side="right") con:
-   - SheetHeader con titulo "Filtros de Tickets"
-   - 4 campos de filtro en layout vertical (space-y-6):
-     - "Promociono?" con opciones: Todos, Promociono, No promociono, Promocion Parcial, Pendiente
-     - "Modelo" con la lista de creators de la base de datos (placeholder "Todas las modelos")
-     - "Categoria de Modelo" con opciones: Todas las categorias (placeholder por ahora)
-     - "Red Social" con opciones: Todas las redes, Instagram, TikTok, X/Twitter, OnlyFans, Treat, Telegram
-   - SheetFooter con dos botones: "Limpiar filtros" (variant outline) y "Aplicar filtros" (variant default/primario)
-
-4. **Reutilizar el estado `filtersOpen`** existente para controlar la apertura/cierre del Sheet.
-
-5. **Agregar imports**: Importar Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter desde `@/components/ui/sheet`.
-
-6. **Remover imports innecesarios**: Eliminar Collapsible, CollapsibleTrigger, CollapsibleContent y ChevronDown ya que no se usaran mas en este componente.
-
-### Detalle tecnico
-
-El boton de filtros en la seccion "Entradas Recientes" (linea 455) pasara a tener `onClick={() => setFiltersOpen(true)}`. El Sheet usara `open={filtersOpen}` y `onOpenChange={setFiltersOpen}` para controlar su visibilidad. Los campos del Sheet seguiran un layout vertical con `space-y-6` y cada campo tendra su label (`text-sm font-medium`) encima del Select.
+**Cambio 3 - Categorias dinamicas (lineas 403-410):**
+- Agregar una query para obtener categorias distintas:
+```tsx
+const { data: categories = [] } = useQuery({
+  queryKey: ["creator-categories"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("creators")
+      .select("category")
+      .not("category", "is", null);
+    if (error) throw error;
+    const unique = [...new Set(data.map(d => d.category))].sort();
+    return unique;
+  },
+});
+```
+- Poblar el dropdown con las categorias obtenidas:
+```tsx
+<SelectContent>
+  <SelectItem value="__all__">Todas las categorias</SelectItem>
+  {categories.map((cat) => (
+    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+  ))}
+</SelectContent>
+```
 
