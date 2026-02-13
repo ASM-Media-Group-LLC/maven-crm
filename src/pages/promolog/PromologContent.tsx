@@ -39,6 +39,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -232,6 +233,22 @@ const PromologContent = () => {
   const [entryEvidencePreview, setEntryEvidencePreview] = useState<string>("");
   const entryFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Campaign modal state
+  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [campaignCreator, setCampaignCreator] = useState("");
+  const [campaignMonth, setCampaignMonth] = useState("");
+  const [campaignGoalMonthly, setCampaignGoalMonthly] = useState("");
+  const [campaignGoalWeekly, setCampaignGoalWeekly] = useState("");
+
+  const handleCreateCampaign = () => {
+    toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
+    setCampaignModalOpen(false);
+    setCampaignCreator("");
+    setCampaignMonth("");
+    setCampaignGoalMonthly("");
+    setCampaignGoalWeekly("");
+  };
+
   const handleEntryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -407,8 +424,8 @@ const PromologContent = () => {
           <Target className="mr-2 h-4 w-4" />
           Ver Campañas
         </Button>
-        <Button variant="outline" size="sm">
-          <Settings className="mr-2 h-4 w-4" />
+        <Button variant="outline" size="sm" onClick={() => setCampaignModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
           Agregar Campaña
         </Button>
         <Button size="sm">
@@ -1084,6 +1101,48 @@ const PromologContent = () => {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Campaign Modal */}
+      <Dialog open={campaignModalOpen} onOpenChange={setCampaignModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Nueva Campaña Mensual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Creador/a *</Label>
+              <Select value={campaignCreator} onValueChange={setCampaignCreator}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar creador/a" />
+                </SelectTrigger>
+                <SelectContent>
+                  {creators.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Mes/Año *</Label>
+              <Input type="month" value={campaignMonth} onChange={(e) => setCampaignMonth(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Objetivo Mensual *</Label>
+                <Input type="number" placeholder="Ej: 20" value={campaignGoalMonthly} onChange={(e) => setCampaignGoalMonthly(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Objetivo Semanal *</Label>
+                <Input type="number" placeholder="Ej: 5" value={campaignGoalWeekly} onChange={(e) => setCampaignGoalWeekly(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateCampaign}>Crear Campaña</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
