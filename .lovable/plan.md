@@ -1,23 +1,37 @@
 
 
-## Ajustar cards de Red Social y Plataforma al mismo tamaño
+## Agregar fondos de color a las cards de Red Social y Plataforma
 
 ### Problema
-Las cards de "Red Social" (4 columnas) y "Plataforma" (3 columnas) tienen tamaños diferentes porque usan grids distintos (`grid-cols-4` vs `grid-cols-3`). Las de plataforma se ven mas anchas.
+Las cards de "Red Social" y "Plataforma" no tienen fondo de color. Actualmente usan el fondo default del componente Card (bg-card). Segun el diseno de referencia, cada card deberia tener un fondo sutil del color de su marca.
 
 ### Solucion
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Cambio 1 - Unificar grid de Plataforma:**
-Cambiar el grid de plataforma de `grid-cols-3` a `grid-cols-2 sm:grid-cols-4` para que ambas secciones usen el mismo grid. Las 3 cards de plataforma ocuparan 3 de las 4 columnas, dejando la cuarta vacia, pero todas las cards tendran el mismo ancho que las de red social.
+**Cambio 1 - Agregar propiedad `bg` a los datos mock:**
 
-**Cambio 2 - Unificar iconos de plataforma:**
-Los iconos de las social cards usan `h-6 w-6` pero los de plataforma usan `h-8 w-8` (circulos). Reducir los circulos de plataforma a `h-6 w-6` para que coincidan visualmente con los iconos de redes sociales.
+Agregar un campo `bg` (clase de Tailwind) a cada elemento de `socialCards` y `platformCards`:
 
-### Detalle tecnico
+| Card | Fondo |
+|---|---|
+| Instagram | `bg-pink-500/10` |
+| TikTok | `bg-slate-500/10` |
+| X | `bg-slate-500/10` |
+| Telegram | `bg-blue-500/10` |
+| OnlyFans | `bg-blue-500/10` |
+| Unlok | `bg-purple-500/10` |
+| Otra | `bg-muted/50` |
 
-Linea 331: cambiar `grid-cols-3` a `grid-cols-2 sm:grid-cols-4`
+Los fondos usan opacidad baja (`/10`) para ser sutiles y no interferir con la legibilidad del texto.
 
-Iconos de plataforma (datos mock, lineas ~47-68): cambiar `h-8 w-8` a `h-6 w-6` en los 3 spans de iconos de plataforma, y reducir el texto interno de `text-xs` a `text-[10px]` para que quepa en el circulo mas pequeno.
+**Cambio 2 - Aplicar el fondo en el render:**
+
+En ambos `.map()` (lineas 315 y 333), pasar la clase `bg` al componente `Card`:
+
+```tsx
+<Card key={s.name} className={s.bg}>
+```
+
+Esto sobreescribe el `bg-card` default del componente Card con el fondo de color sutil correspondiente a cada red/plataforma.
 
