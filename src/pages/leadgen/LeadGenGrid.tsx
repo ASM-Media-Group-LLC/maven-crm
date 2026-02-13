@@ -73,7 +73,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
           return (
             <Card
               key={lead.id}
-              className="cursor-pointer hover:shadow-md transition-shadow relative"
+              className="cursor-pointer hover:bg-muted/50 transition-colors relative"
               onClick={() => onView?.(lead)}
             >
               <CardContent className="p-3 space-y-2">
