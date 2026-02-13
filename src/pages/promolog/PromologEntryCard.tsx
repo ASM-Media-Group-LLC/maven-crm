@@ -238,37 +238,37 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             </div>
           </div>
 
-          {/* Network selection */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium">
-              Red Social <span className="text-destructive">*</span>
-            </span>
-            <div className="grid grid-cols-4 gap-2">
-              {networkOptions.map((opt) => {
-                const Icon = opt.icon;
-                const isSelected = editNetwork === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setEditNetwork(opt.value)}
-                    className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${
-                      isSelected
-                        ? "border-2 border-primary bg-accent text-accent-foreground"
-                        : "border border-input bg-background text-muted-foreground hover:bg-accent"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Conditional fields when "Sí Promocionó" */}
           {editResult === "si" && (
             <>
+              {/* Network selection */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">
+                  Red Social <span className="text-destructive">*</span>
+                </span>
+                <div className="grid grid-cols-4 gap-2">
+                  {networkOptions.map((opt) => {
+                    const Icon = opt.icon;
+                    const isSelected = editNetwork === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setEditNetwork(opt.value)}
+                        className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? "border-2 border-primary bg-accent text-accent-foreground"
+                            : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Platform selection */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">
