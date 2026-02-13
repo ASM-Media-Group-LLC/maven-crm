@@ -8,6 +8,7 @@ import {
   Bot,
   CalendarDays,
   Activity,
+  Megaphone,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -126,6 +127,21 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel>Operaciones</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Promolog">
+                  <NavLink
+                    to="/promolog"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <Megaphone className="h-4 w-4 shrink-0" />
+                    <span>Promolog</span>
+                    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
+                      97
+                    </span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="LeadGen">
                   <NavLink
