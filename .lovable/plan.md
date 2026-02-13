@@ -1,35 +1,61 @@
 
 
-# Redisenar tabla de Leads para coincidir con la imagen de referencia
+# Ajustar tabla de Leads al sistema de diseno
 
-## Resumen
+## Problema actual
 
-Cambiar las columnas y el estilo visual de la tabla de Leads en `LeadGenContent.tsx` para que coincida con el diseno de la imagen: columnas Hora, Ticket, Handle, Agente, Calidad, Estado, Pais (con bandera), Contacto, QA y Acciones.
+La tabla de Leads no sigue los patrones del sistema de diseno establecidos en la aplicacion (ContactosTable como referencia). Tiene los siguientes problemas:
 
-## Columnas nuevas vs actuales
+- No tiene ordenacion (sorting) en las columnas -- el sistema de diseno requiere sorting en todas las columnas
+- Usa colores hardcoded (`bg-green-500`, `bg-yellow-500`) en vez de las variantes del Badge del design system (`success-soft`, `primary-soft`, etc.)
+- Usa emojis para iconos de plataforma en vez de los componentes de icono existentes (`InstagramIcon`, `TikTokIcon`, `XIcon`)
+- La tabla esta envuelta en un `Card` innecesario en vez del contenedor `rounded-lg border border-border` estandar
+- La columna de Acciones usa solo un boton Eye en vez del patron DropdownMenu con `MoreHorizontal` usado en el resto de tablas
+- No hay columna de ordenacion (SortHeader) como en ContactosTable
 
-| Imagen (nuevo)  | Origen de datos                                                  |
-|-----------------|------------------------------------------------------------------|
-| Hora            | `created_at` formateado como "HH:mm AM/PM"                      |
-| Ticket          | ID corto generado: `#LG` + ultimos 7 chars del UUID             |
-| Handle          | Icono de plataforma + handle extraido de `url_perfil` con `cleanHandle` de utils |
-| Agente          | No existe en schema, mostrar placeholder "—"                    |
-| Calidad         | `categoria` mostrada como badge coloreado (A+ primary, A success, B+ warning, etc.) con dropdown chevron |
-| Estado          | `status` mapeado a labels legibles ("nuevo" -> "Sin resp.", etc.) |
-| Pais            | `pais` mostrado como emoji de bandera (CO -> bandera Colombia)   |
-| Contacto        | Placeholder "—"                                                  |
-| QA              | Placeholder "—"                                                  |
-| Acciones        | Boton Eye (ver) + dropdown de calidad QA                         |
+## Solucion
 
-## Cambios visuales clave
+Extraer la tabla de leads a un componente separado `LeadGenTable.tsx` siguiendo exactamente el patron de `ContactosTable.tsx`, e integrarlo en `LeadGenContent.tsx`.
 
-- **Badge de Calidad**: Fondo verde solido para B+/A, colores segun categoria, con icono ChevronDown
-- **Bandera de pais**: Convertir codigo ISO a emoji de bandera (ej: "co" -> la bandera de Colombia)
-- **Ticket ID**: Badge oscuro con texto verde/primary como `#LG1663855`
-- **Handle**: Icono de plataforma (Instagram, TikTok, etc.) seguido de `@handle`
-- **Acciones sticky**: Columna sticky a la derecha con icono de ojo y selector de QA
+## Cambios detallados
 
-## Archivos a modificar
+### 1. Crear `src/pages/leadgen/LeadGenTable.tsx`
 
-- `src/pages/leadgen/LeadGenContent.tsx` -- Redisenar la seccion de tabla de leads (lineas 232-265 aprox): cambiar columnas de TableHeader y celdas de TableBody para coincidir con la imagen. Agregar funciones helper para generar ticket ID, extraer handle, convertir pais a emoji, y mapear colores de categoria.
+Nuevo componente siguiendo el patron exacto de `ContactosTable.tsx`:
 
+- **SortHeader**: Boton ghost con `ArrowUpDown` para cada columna sorteable
+- **Contenedor**: `max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border`
+- **Header sticky**: `sticky top-0 z-10 bg-card`
+- **Columnas**: Hora, Ticket, Handle, Agente, Calidad, Estado, Pais, Contacto, QA, Acciones (sticky right)
+- **Badge variants del design system**:
+  - Calidad: `A+` = `success-soft`, `A` = `primary-soft`, `B+` = `warning-soft`, `B` = `secondary-soft`, `C` = `destructive-soft`
+  - Estado: `nuevo` = `primary-soft`, `contactado` = `warning-soft`, `cerrado` = `success-soft`, `rechazado` = `destructive-soft`
+- **Iconos de plataforma**: Usar `InstagramIcon`, `TikTokIcon`, `XIcon` existentes en vez de emojis
+- **Acciones**: DropdownMenu con `MoreHorizontal` trigger, items: "Ver detalle" (Eye), "Editar" (Pencil)
+- **Sorting**: Estado de sort local con `useState`, sorting por todas las columnas
+- **Bandera de pais**: Mantener la funcion `countryToFlag` (emojis de bandera son el enfoque correcto para banderas)
+- **Ticket**: Badge con `variant="outline"` y clases `font-mono text-xs`
+
+### 2. Modificar `src/pages/leadgen/LeadGenContent.tsx`
+
+- Remover la tabla inline (lineas 256-339 aprox) y el Card wrapper
+- Importar y usar `<LeadGenTable leads={leads} />` en su lugar
+- Remover los helpers que se moveran al nuevo componente (`getTicketId`, `cleanHandle`, `getPlatformIcon`, `countryToFlag`, `calidadColors`, `statusLabels`)
+- Mantener el loading state y empty state en LeadGenContent, solo pasar leads al componente cuando hay datos
+
+### Seccion tecnica
+
+**Archivos a crear:**
+- `src/pages/leadgen/LeadGenTable.tsx`
+
+**Archivos a modificar:**
+- `src/pages/leadgen/LeadGenContent.tsx` -- reemplazar tabla inline por componente LeadGenTable
+
+**Patrones del design system aplicados:**
+- Sorting con `ArrowUpDown` en todas las columnas (constraint obligatorio)
+- Badge variants semanticos (`success-soft`, `primary-soft`, `warning-soft`, `destructive-soft`, `secondary-soft`)
+- Contenedor con `rounded-lg border border-border` (no Card)
+- Header sticky con `bg-card`
+- Acciones sticky right con DropdownMenu + MoreHorizontal
+- Iconos de marca (InstagramIcon, TikTokIcon, XIcon) en vez de emojis
+- Sin valores hardcoded de color
