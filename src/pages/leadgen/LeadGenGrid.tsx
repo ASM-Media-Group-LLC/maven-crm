@@ -1,4 +1,5 @@
-import { ExternalLink, Eye, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Eye, Medal } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -8,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cleanHandle } from "@/lib/utils";
+import AssignCalidadModal from "./AssignCalidadModal";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -57,6 +59,8 @@ interface Props {
 }
 
 const LeadGenGrid = ({ leads, onView }: Props) => {
+  const [calidadLead, setCalidadLead] = useState<Lead | null>(null);
+
   return (
     <div className="space-y-4">
       <p className="text-sm font-medium text-muted-foreground">
@@ -72,8 +76,8 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
               className="cursor-pointer hover:shadow-md transition-shadow relative"
               onClick={() => onView?.(lead)}
             >
-              <CardContent className="p-4 space-y-3">
-                {/* Header: Ticket + Ver Perfil + Quality badge */}
+              <CardContent className="p-3 space-y-2">
+                {/* Header */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
@@ -96,8 +100,8 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                   </Badge>
                 </div>
 
-                {/* Body rows */}
-                <div className="space-y-2 text-sm">
+                {/* Body */}
+                <div className="space-y-1.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Agente:</span>
                     <span className="font-medium">—</span>
@@ -123,7 +127,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
                     className="flex-1"
@@ -132,8 +136,13 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                     <Eye className="h-4 w-4 mr-1" />
                     Ver Detalles
                   </Button>
-                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
-                    <UserPlus className="h-4 w-4" />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => setCalidadLead(lead)}
+                  >
+                    <Medal className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>
@@ -146,6 +155,12 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
           <p className="text-muted-foreground text-sm">No hay leads para mostrar</p>
         </div>
       )}
+
+      <AssignCalidadModal
+        open={!!calidadLead}
+        onOpenChange={(open) => { if (!open) setCalidadLead(null); }}
+        lead={calidadLead}
+      />
     </div>
   );
 };
