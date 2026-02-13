@@ -13,6 +13,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -82,6 +83,7 @@ const contactTypeOptions = [
 ] as const;
 
 const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
+  const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [editResult, setEditResult] = useState<"si" | "no">(
     entry.result === "Si" ? "si" : "no"
@@ -369,12 +371,18 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setEditOpen(false);
+              toast({ title: "Edición cancelada" });
+            }}>
               Cancelar
             </Button>
             <Button
               className="bg-cyan-500 hover:bg-cyan-600 text-white"
-              onClick={() => setEditOpen(false)}
+              onClick={() => {
+                setEditOpen(false);
+                toast({ title: "Promoción actualizada", description: `Los cambios para ${entry.name} han sido guardados.` });
+              }}
             >
               Guardar Cambios
             </Button>
