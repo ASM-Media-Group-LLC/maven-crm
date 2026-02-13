@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CalendarDays,
   Users,
+  Search,
   Target,
   Settings,
   Plus,
@@ -24,11 +25,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -160,11 +164,11 @@ const agentsData = [
 
 const PromologContent = () => {
   const { data: creators = [] } = useQuery({
-    queryKey: ["creators-dropdown"],
+    queryKey: ["creators-promolog"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("creators")
-        .select("id, name, artistic_name")
+        .select("id, name, artistic_name, category, country, country_code, status, profile_photo_url, instagram_handle, twitter_handle, tiktok_handle")
         .order("name");
       if (error) throw error;
       return data;
@@ -187,6 +191,60 @@ const PromologContent = () => {
   const [selectedStatus, setSelectedStatus] = useState("__all__");
   const [selectedCategory, setSelectedCategory] = useState("__all__");
   const [selectedNetwork, setSelectedNetwork] = useState("__all__");
+  const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
+  const [searchCreator, setSearchCreator] = useState("");
+  const [sortOrder, setSortOrder] = useState("pendientes");
+
+  const countryFlags: Record<string, string> = {
+    colombia: "🇨🇴", mexico: "🇲🇽", argentina: "🇦🇷", chile: "🇨🇱", peru: "🇵🇪",
+    venezuela: "🇻🇪", ecuador: "🇪🇨", españa: "🇪🇸", "estados unidos": "🇺🇸", brasil: "🇧🇷",
+    uruguay: "🇺🇾", "costa rica": "🇨🇷", panama: "🇵🇦", "república dominicana": "🇩🇴",
+  };
+
+  const getCountryFlag = (country?: string | null) => {
+    if (!country) return "🌎";
+    return countryFlags[country.toLowerCase()] || "🌎";
+  };
+
+  const getCategoryBadgeVariant = (cat?: string | null): "default" | "success" | "warning" | "secondary" | "destructive" => {
+    switch (cat) {
+      case "A+": return "default";
+      case "A": return "success";
+      case "B+": return "warning";
+      case "B": return "warning";
+      case "C": return "secondary";
+      default: return "secondary";
+    }
+  };
+
+  const filteredCreators = useMemo(() => {
+    let list = [...creators];
+    if (searchCreator) {
+      const q = searchCreator.toLowerCase();
+      list = list.filter(c => c.name.toLowerCase().includes(q) || (c.artistic_name?.toLowerCase().includes(q)));
+    }
+    switch (sortOrder) {
+      case "pendientes":
+        list.sort((a, b) => {
+          const aP = a.status !== "active" ? 0 : 1;
+          const bP = b.status !== "active" ? 0 : 1;
+          return aP - bP;
+        });
+        break;
+      case "alfabetico":
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case "categoria":
+        const catOrder: Record<string, number> = { "A+": 0, A: 1, "B+": 2, B: 3, C: 4 };
+        list.sort((a, b) => (catOrder[a.category ?? "C"] ?? 5) - (catOrder[b.category ?? "C"] ?? 5));
+        break;
+    }
+    return list;
+  }, [creators, searchCreator, sortOrder]);
+
+  const completedToday = filteredCreators.filter(c => c.status === "active").length;
+  const pendingCreators = filteredCreators.length - completedToday;
+
   const [appliedFilters, setAppliedFilters] = useState({
     status: "__all__",
     creator: "",
@@ -303,13 +361,13 @@ const PromologContent = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-t-[3px] border-t-purple-500">
+        <Card className="border-t-[3px] border-t-purple-500 cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setCreatorsModalOpen(true)}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold text-green-500">142</p>
+            <p className="text-2xl font-bold text-green-500">{creators.length}</p>
             <p className="text-xs text-muted-foreground">Registradas en sistema - Filtrando</p>
           </CardContent>
         </Card>
@@ -623,6 +681,112 @@ const PromologContent = () => {
           </div>
         </div>
       )}
+
+      {/* Creators Selection Modal */}
+      <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Todas - Selecciona una Creadora</DialogTitle>
+          </DialogHeader>
+
+          {/* Modal KPIs */}
+          <div className="grid grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Creadoras</p>
+                <p className="text-xl font-bold text-green-500">{creators.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 text-center">
+                <p className="text-xs text-muted-foreground">Pendientes</p>
+                <p className="text-xl font-bold text-orange-500">{pendingCreators}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 text-center">
+                <p className="text-xs text-muted-foreground">Completadas Hoy</p>
+                <p className="text-xl font-bold text-green-500">{completedToday}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search & Sort */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar creadora..."
+                value={searchCreator}
+                onChange={(e) => setSearchCreator(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pendientes">Pendientes Primero</SelectItem>
+                <SelectItem value="alfabetico">Alfabético (A-Z)</SelectItem>
+                <SelectItem value="categoria">Por Categoría</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Creators Grid */}
+          <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-1">
+              {filteredCreators.map((creator) => (
+                <Card
+                  key={creator.id}
+                  className="relative cursor-pointer transition-colors hover:bg-muted/50"
+                  onClick={() => setCreatorsModalOpen(false)}
+                >
+                  <CardContent className="flex flex-col items-center p-3 gap-2">
+                    {/* Status indicator */}
+                    {creator.status !== "active" && (
+                      <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-destructive" />
+                    )}
+
+                    {/* Avatar */}
+                    <Avatar className="h-12 w-12 border-2 border-amber-600/50">
+                      {creator.profile_photo_url ? (
+                        <AvatarImage src={creator.profile_photo_url} alt={creator.name} />
+                      ) : null}
+                      <AvatarFallback className="bg-muted text-sm font-medium">
+                        {creator.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    {/* Name */}
+                    <p className="text-xs font-medium text-center truncate w-full">
+                      {creator.artistic_name || creator.name}
+                    </p>
+
+                    {/* Country flag */}
+                    <span className="text-sm">{getCountryFlag(creator.country)}</span>
+
+                    {/* Social icons */}
+                    <div className="flex items-center gap-1.5">
+                      {creator.instagram_handle && <InstagramIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {creator.twitter_handle && <XIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                      {creator.tiktok_handle && <TikTokIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </div>
+
+                    {/* Category badge */}
+                    {creator.category && (
+                      <Badge variant={getCategoryBadgeVariant(creator.category)} className="text-[10px] px-1.5 py-0">
+                        {creator.category}
+                      </Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
