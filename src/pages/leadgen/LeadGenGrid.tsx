@@ -66,7 +66,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
       <p className="text-sm font-medium text-muted-foreground">
         Leads ({leads.length})
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {leads.map((lead) => {
           const cat = lead.categoria.toLowerCase();
           const createdAt = new Date(lead.created_at);
