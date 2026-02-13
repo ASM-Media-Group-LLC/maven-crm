@@ -171,24 +171,42 @@ const PromologContent = () => {
     },
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["creator-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("creators")
-        .select("category")
-        .not("category", "is", null);
-      if (error) throw error;
-      const unique = [...new Set(data.map((d) => d.category))].sort();
-      return unique;
-    },
-  });
+  const categoryOptions = [
+    { value: "A+", label: "A+ - Excelente" },
+    { value: "A", label: "A - Muy buena" },
+    { value: "B+", label: "B+ - Buena plus" },
+    { value: "B", label: "B - Buena" },
+    { value: "C", label: "C - Regular" },
+  ];
 
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedCreator, setSelectedCreator] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("__all__");
+  const [selectedCategory, setSelectedCategory] = useState("__all__");
+  const [selectedNetwork, setSelectedNetwork] = useState("__all__");
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: "__all__",
+    creator: "",
+    category: "__all__",
+    network: "__all__",
+  });
+
+  const filteredEntries = mockEntries.filter((entry) => {
+    if (appliedFilters.status !== "__all__") {
+      const statusMap: Record<string, string> = {
+        si_promociono: "Sí",
+        no_promociono: "No",
+        parcial: "Parcial",
+        pendiente: "Pendiente",
+      };
+      if (entry.result !== statusMap[appliedFilters.status]) return false;
+    }
+    if (appliedFilters.network !== "__all__" && entry.network !== appliedFilters.network) return false;
+    return true;
+  });
 
   const formattedDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
@@ -392,7 +410,7 @@ const PromologContent = () => {
               <div className="space-y-6 py-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">¿Promocionó?</label>
-                  <Select>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                     <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todos</SelectItem>
@@ -443,19 +461,19 @@ const PromologContent = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Categoría de Modelo</label>
-                  <Select>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todas las categorías</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat!}>{cat}</SelectItem>
+                      {categoryOptions.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Red Social</label>
-                  <Select>
+                  <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
                     <SelectTrigger><SelectValue placeholder="Todas las redes" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todas las redes</SelectItem>
@@ -470,8 +488,21 @@ const PromologContent = () => {
                 </div>
               </div>
               <SheetFooter className="flex flex-col gap-2 sm:flex-col">
-                <Button variant="outline" className="w-full">Limpiar filtros</Button>
-                <Button className="w-full" onClick={() => setFiltersOpen(false)}>Aplicar filtros</Button>
+                <Button variant="outline" className="w-full" onClick={() => {
+                  setSelectedStatus("__all__");
+                  setSelectedCreator("");
+                  setSelectedCategory("__all__");
+                  setSelectedNetwork("__all__");
+                }}>Limpiar filtros</Button>
+                <Button className="w-full" onClick={() => {
+                  setAppliedFilters({
+                    status: selectedStatus,
+                    creator: selectedCreator,
+                    category: selectedCategory,
+                    network: selectedNetwork,
+                  });
+                  setFiltersOpen(false);
+                }}>Aplicar filtros</Button>
               </SheetFooter>
             </SheetContent>
           </Sheet>
@@ -503,7 +534,7 @@ const PromologContent = () => {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {mockEntries.map((entry) => (
+                  {filteredEntries.map((entry) => (
                     <PromologEntryCard key={entry.id} entry={entry} />
                   ))}
                 </div>
