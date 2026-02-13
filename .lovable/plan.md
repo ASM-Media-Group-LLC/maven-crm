@@ -1,35 +1,23 @@
 
 
-## Restaurar tarjetas KPI de metricas en Promolog
+## Ajustar cards de Red Social y Plataforma al mismo tamaño
 
 ### Problema
-Las 4 tarjetas KPI que estaban arriba fueron eliminadas en el ultimo cambio. Segun la imagen de referencia, deben estar presentes entre la barra de acciones y el contenido condicional.
+Las cards de "Red Social" (4 columnas) y "Plataforma" (3 columnas) tienen tamaños diferentes porque usan grids distintos (`grid-cols-4` vs `grid-cols-3`). Las de plataforma se ven mas anchas.
 
-### Cambios en `src/pages/promolog/PromologContent.tsx`
+### Solucion
 
-**Agregar imports adicionales:**
-- `AlertTriangle, TrendingUp, CheckCircle` de lucide-react
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Agregar array de datos mock para las KPI cards (antes del componente):**
+**Cambio 1 - Unificar grid de Plataforma:**
+Cambiar el grid de plataforma de `grid-cols-3` a `grid-cols-2 sm:grid-cols-4` para que ambas secciones usen el mismo grid. Las 3 cards de plataforma ocuparan 3 de las 4 columnas, dejando la cuarta vacia, pero todas las cards tendran el mismo ancho que las de red social.
 
-| Tarjeta | Valor | Color borde superior | Color valor | Icono | Subtitulo |
-|---|---|---|---|---|---|
-| Total Modelos | 142 | purple/magenta | green | Users | Registradas en sistema - Filtrando |
-| Tickets ingresados | 6 | blue | blue | CheckCircle | Tickets ingresados hoy |
-| NO Chequeadas | 128 | red | red | AlertTriangle | Equipo no las reviso |
-| Completadas Hoy | 6 | green | foreground | TrendingUp | Tickets ingresados hoy |
+**Cambio 2 - Unificar iconos de plataforma:**
+Los iconos de las social cards usan `h-6 w-6` pero los de plataforma usan `h-8 w-8` (circulos). Reducir los circulos de plataforma a `h-6 w-6` para que coincidan visualmente con los iconos de redes sociales.
 
-**Insertar seccion de KPI cards entre la Action Bar (linea 247) y el contenido condicional (linea 249):**
-- Grid de 4 columnas (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4`)
-- Cada card con borde superior de 3px del color correspondiente (usando `border-t-[3px]`)
-- Layout interno: titulo arriba a la izquierda, icono arriba a la derecha, valor grande abajo a la izquierda, subtitulo debajo
-- Esta seccion es visible en ambas vistas (dashboard y agentes)
+### Detalle tecnico
 
-### Estructura visual de cada card
-```text
-+--[border-top color]--+
-| Total Modelos   [ic] |
-| 142                  |
-| Registradas...       |
-+-----------------------+
-```
+Linea 331: cambiar `grid-cols-3` a `grid-cols-2 sm:grid-cols-4`
+
+Iconos de plataforma (datos mock, lineas ~47-68): cambiar `h-8 w-8` a `h-6 w-6` en los 3 spans de iconos de plataforma, y reducir el texto interno de `text-xs` a `text-[10px]` para que quepa en el circulo mas pequeno.
+
