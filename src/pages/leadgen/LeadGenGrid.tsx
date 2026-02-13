@@ -1,0 +1,153 @@
+import { ExternalLink, Eye, UserPlus } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cleanHandle } from "@/lib/utils";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Lead = Tables<"leads">;
+
+const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "a+": "success-soft",
+  a: "primary-soft",
+  "b+": "warning-soft",
+  b: "secondary-soft",
+  c: "destructive-soft",
+};
+
+const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
+  nuevo: "primary-soft",
+  contactado: "warning-soft",
+  cerrado: "success-soft",
+  rechazado: "destructive-soft",
+};
+
+const statusLabels: Record<string, string> = {
+  nuevo: "Sin resp.",
+  contactado: "Contactado",
+  en_llamada: "En llamada",
+  cerrado: "Cerrado",
+  rechazado: "Rechazado",
+};
+
+const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
+
+const countryToFlag = (code: string | null) => {
+  if (!code || code.length < 2) return "🌍";
+  const c = code.toUpperCase().slice(0, 2);
+  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+};
+
+const getPlatformIcon = (plataforma: string) => {
+  const p = plataforma.toLowerCase();
+  if (p.includes("instagram")) return <InstagramIcon className="h-4 w-4" />;
+  if (p.includes("tiktok")) return <TikTokIcon className="h-4 w-4" />;
+  if (p.includes("twitter") || p.includes("x")) return <XIcon className="h-4 w-4" />;
+  return <ExternalLink className="h-4 w-4 text-muted-foreground" />;
+};
+
+interface Props {
+  leads: Lead[];
+  onView?: (lead: Lead) => void;
+}
+
+const LeadGenGrid = ({ leads, onView }: Props) => {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium text-muted-foreground">
+        Leads ({leads.length})
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {leads.map((lead) => {
+          const cat = lead.categoria.toLowerCase();
+          const createdAt = new Date(lead.created_at);
+          return (
+            <Card
+              key={lead.id}
+              className="cursor-pointer hover:shadow-md transition-shadow relative"
+              onClick={() => onView?.(lead)}
+            >
+              <CardContent className="p-4 space-y-3">
+                {/* Header: Ticket + Ver Perfil + Quality badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {getTicketId(lead.id)}
+                    </Badge>
+                    <a
+                      href={lead.url_perfil}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {getPlatformIcon(lead.plataforma)}
+                      <span className="truncate max-w-[100px]">Ver Perfil</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+                    {lead.categoria.toUpperCase()}
+                  </Badge>
+                </div>
+
+                {/* Body rows */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Agente:</span>
+                    <span className="font-medium">—</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Fecha:</span>
+                    <span className="font-medium">
+                      {format(createdAt, "d MMM yyyy", { locale: es })} · {format(createdAt, "hh:mm a")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Estado:</span>
+                    <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
+                      {statusLabels[lead.status] || lead.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">País:</span>
+                    <span className="font-medium">
+                      {countryToFlag(lead.pais)} {lead.pais || "—"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => onView?.(lead)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    Ver Detalles
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      {leads.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16">
+          <p className="text-muted-foreground text-sm">No hay leads para mostrar</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default LeadGenGrid;
