@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, MessageCircle, Plus, Save, Sparkles } from "lucide-react";
+import { ExternalLink, MessageCircle, Plus, Save, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import ConvertLeadModal from "./ConvertLeadModal";
 
 type Lead = Tables<"leads">;
 
@@ -62,6 +63,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
   const queryClient = useQueryClient();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteText, setNoteText] = useState("");
+  const [showConvertModal, setShowConvertModal] = useState(false);
 
   const { data: notes = [] } = useQuery({
     queryKey: ["lead_notes", lead?.id],
@@ -126,14 +128,9 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
                   variant="outline"
                   size="sm"
                   className="gap-1 shrink-0"
-                  onClick={() =>
-                    toast({
-                      title: "Funcionalidad próximamente",
-                      description: "La conversión a contacto estará disponible pronto.",
-                    })
-                  }
+                  onClick={() => setShowConvertModal(true)}
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <UserCheck className="h-3.5 w-3.5" />
                   Convertir a Contacto
                 </Button>
               </div>
@@ -273,6 +270,18 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
           </div>
         </ScrollArea>
       </DialogContent>
+
+      {lead && (
+        <ConvertLeadModal
+          open={showConvertModal}
+          onOpenChange={setShowConvertModal}
+          lead={lead}
+          onConverted={() => {
+            setShowConvertModal(false);
+            onOpenChange(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 };
