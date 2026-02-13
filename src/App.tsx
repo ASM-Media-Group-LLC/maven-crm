@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesOverview from "./pages/SalesOverview";
+import ComparativasPage from "./pages/sales-overview/ComparativasPage";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
 import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/sales-overview" element={<SalesOverview />} />
+            <Route path="/sales-overview/comparativas" element={<ComparativasPage />} />
             <Route path="/salesdashboard" element={<SalesDashboard />} />
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
             <Route path="/aisales" element={<AiSales />} />
