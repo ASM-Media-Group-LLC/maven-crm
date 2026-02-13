@@ -361,37 +361,37 @@ const PromologContent = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-t-[3px] border-t-purple-500 cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setCreatorsModalOpen(true)}>
+        <Card className="border-t-[3px] border-t-accent cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setCreatorsModalOpen(true)}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold text-green-500">{creators.length}</p>
+            <p className="text-2xl font-bold text-success">{creators.length}</p>
             <p className="text-xs text-muted-foreground">Registradas en sistema - Filtrando</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-blue-500">
+        <Card className="border-t-[3px] border-t-primary">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold text-blue-500">6</p>
+            <p className="text-2xl font-bold text-primary">6</p>
             <p className="text-xs text-muted-foreground">Tickets ingresados hoy</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-red-500">
+        <Card className="border-t-[3px] border-t-destructive">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="text-2xl font-bold text-red-500">128</p>
+            <p className="text-2xl font-bold text-destructive">128</p>
             <p className="text-xs text-muted-foreground">Equipo no las revisó</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-green-500">
+        <Card className="border-t-[3px] border-t-success">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
@@ -691,22 +691,22 @@ const PromologContent = () => {
 
           {/* Modal KPIs */}
           <div className="grid grid-cols-3 gap-3">
-            <Card>
+            <Card className="border-t-[3px] border-t-success">
               <CardContent className="p-3 text-center">
                 <p className="text-xs text-muted-foreground">Total Creadoras</p>
-                <p className="text-xl font-bold text-green-500">{creators.length}</p>
+                <p className="text-xl font-bold text-success">{creators.length}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-t-[3px] border-t-warning">
               <CardContent className="p-3 text-center">
                 <p className="text-xs text-muted-foreground">Pendientes</p>
-                <p className="text-xl font-bold text-orange-500">{pendingCreators}</p>
+                <p className="text-xl font-bold text-warning">{pendingCreators}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="border-t-[3px] border-t-success">
               <CardContent className="p-3 text-center">
                 <p className="text-xs text-muted-foreground">Completadas Hoy</p>
-                <p className="text-xl font-bold text-green-500">{completedToday}</p>
+                <p className="text-xl font-bold text-success">{completedToday}</p>
               </CardContent>
             </Card>
           </div>
@@ -750,7 +750,7 @@ const PromologContent = () => {
                     )}
 
                     {/* Avatar */}
-                    <Avatar className="h-12 w-12 border-2 border-amber-600/50">
+                    <Avatar className="h-12 w-12 border-2 border-muted-foreground/50">
                       {creator.profile_photo_url ? (
                         <AvatarImage src={creator.profile_photo_url} alt={creator.name} />
                       ) : null}
