@@ -625,6 +625,53 @@ export type Database = {
         }
         Relationships: []
       }
+      deals: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          prospect_handle: string
+          source: string
+          stage: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          prospect_handle: string
+          source?: string
+          stage?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          prospect_handle?: string
+          source?: string
+          stage?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_attendance_log: {
         Row: {
           changed_by: string | null

@@ -31,6 +31,7 @@ import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
 import LeadGen from "./pages/LeadGen";
+import Closers from "./pages/Closers";
 import Promolog from "./pages/Promolog";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/creadores/:id" element={<ProtectedRoute><CreadorProfile /></ProtectedRoute>} />
               <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
               <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
+              <Route path="/closers" element={<ProtectedRoute><Closers /></ProtectedRoute>} />
               <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
