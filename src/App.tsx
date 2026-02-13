@@ -27,6 +27,7 @@ import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
 import LeadGen from "./pages/LeadGen";
+import Promolog from "./pages/Promolog";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
 import NotFound from "./pages/NotFound";
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="/creadores/:id" element={<CreadorProfile />} />
             <Route path="/eventos" element={<Eventos />} />
             <Route path="/leadgen" element={<LeadGen />} />
+            <Route path="/promolog" element={<Promolog />} />
             <Route path="/eventos/nuevo" element={<NuevoEvento />} />
             <Route path="/eventos/:id/editar" element={<EditEvento />} />
             <Route path="/eventos/:id" element={<EventoDetail />} />
