@@ -4,7 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import Index from "./pages/Index";
+import { AuthProvider } from "@/hooks/useAuth";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesOverview from "./pages/SalesOverview";
@@ -38,40 +42,47 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/design-system" element={<DesignSystem />} />
-            <Route path="/sales-overview" element={<SalesOverview />} />
-            <Route path="/sales-overview/comparativas" element={<ComparativasPage />} />
-            <Route path="/sales-overview/top10" element={<Top10Page />} />
-            <Route path="/sales-overview/subiendo" element={<SubiendoPage />} />
-            <Route path="/sales-overview/bajando" element={<BajandoPage />} />
-            <Route path="/sales-overview/alto-potencial" element={<AltoPotencialPage />} />
-            <Route path="/sales-overview/en-riesgo" element={<EnRiesgoPage />} />
-            <Route path="/salesdashboard" element={<SalesDashboard />} />
-            <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
-            <Route path="/aisales" element={<AiSales />} />
-            <Route path="/ai-sales-config" element={<AiSalesConfig />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/contactos" element={<Contactos />} />
-            <Route path="/contactos/nuevo" element={<NuevoContacto />} />
-            <Route path="/creadores" element={<Creadores />} />
-            <Route path="/creadores/nuevo" element={<NuevoCreador />} />
-            <Route path="/creadores/:id" element={<CreadorProfile />} />
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/leadgen" element={<LeadGen />} />
-            <Route path="/promolog" element={<Promolog />} />
-            <Route path="/eventos/nuevo" element={<NuevoEvento />} />
-            <Route path="/eventos/:id/editar" element={<EditEvento />} />
-            <Route path="/eventos/:id" element={<EventoDetail />} />
-            <Route path="/eventos/share/:token" element={<EventoSharePage />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/eventos/share/:token" element={<EventoSharePage />} />
+
+              {/* Protected routes */}
+              <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />
+              <Route path="/sales-overview" element={<ProtectedRoute><SalesOverview /></ProtectedRoute>} />
+              <Route path="/sales-overview/comparativas" element={<ProtectedRoute><ComparativasPage /></ProtectedRoute>} />
+              <Route path="/sales-overview/top10" element={<ProtectedRoute><Top10Page /></ProtectedRoute>} />
+              <Route path="/sales-overview/subiendo" element={<ProtectedRoute><SubiendoPage /></ProtectedRoute>} />
+              <Route path="/sales-overview/bajando" element={<ProtectedRoute><BajandoPage /></ProtectedRoute>} />
+              <Route path="/sales-overview/alto-potencial" element={<ProtectedRoute><AltoPotencialPage /></ProtectedRoute>} />
+              <Route path="/sales-overview/en-riesgo" element={<ProtectedRoute><EnRiesgoPage /></ProtectedRoute>} />
+              <Route path="/salesdashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
+              <Route path="/salesperformancecreator" element={<ProtectedRoute><SalesPerformanceCreator /></ProtectedRoute>} />
+              <Route path="/aisales" element={<ProtectedRoute><AiSales /></ProtectedRoute>} />
+              <Route path="/ai-sales-config" element={<ProtectedRoute><AiSalesConfig /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
+              <Route path="/contactos/nuevo" element={<ProtectedRoute><NuevoContacto /></ProtectedRoute>} />
+              <Route path="/creadores" element={<ProtectedRoute><Creadores /></ProtectedRoute>} />
+              <Route path="/creadores/nuevo" element={<ProtectedRoute><NuevoCreador /></ProtectedRoute>} />
+              <Route path="/creadores/:id" element={<ProtectedRoute><CreadorProfile /></ProtectedRoute>} />
+              <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
+              <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
+              <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
+              <Route path="/eventos/nuevo" element={<ProtectedRoute><NuevoEvento /></ProtectedRoute>} />
+              <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
+              <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
