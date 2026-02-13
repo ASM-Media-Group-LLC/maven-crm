@@ -1,42 +1,53 @@
 
+## Agregar Notificaciones de Toast para Acciones de Cancelación
 
-## Cambios en el Modal de Detalle del Lead
+### Problema Identificado
+Los modales `ViewLeadModal.tsx` y `ConvertLeadModal.tsx` tienen notificaciones de éxito y error para operaciones de base de datos, pero faltan las notificaciones de cancelación cuando el usuario cierra los formularios o los modales sin guardar cambios.
 
-### 1. Cambiar icono del boton "Convertir a Contacto"
+### Solución
 
-Reemplazar el icono `Sparkles` por `UserCheck` de lucide-react en el boton del header del modal.
+#### 1. En `ViewLeadModal.tsx` - Agregar toast al cancelar la nota
+Modificar la función `handleCancelNote()` (línea 113-116) para agregar un toast de cancelación antes de limpiar el estado.
 
-### 2. Crear modal de confirmacion "Convertir Lead a Contacto"
+**Cambio:**
+```tsx
+const handleCancelNote = () => {
+  setNoteText("");
+  setShowNoteForm(false);
+  toast({ title: "Edición cancelada" });
+};
+```
 
-Nuevo componente `src/pages/leadgen/ConvertLeadModal.tsx` que replica el diseno de la imagen:
+#### 2. En `ConvertLeadModal.tsx` - Agregar toast al cancelar la conversión
+Crear un handler personalizado para el botón "Cancelar" que agregue un toast antes de cerrar el modal.
 
-- **Header**: Icono `ArrowRight` + titulo "Convertir Lead a Contacto"
-- **Descripcion**: "Este lead sera transferido al modulo de Closers como un contacto nuevo."
-- **Card "Datos que se transferiran"**: Lista con bullet points mostrando:
-  - Handle: extraido de `url_perfil` del lead
-  - Plataforma: `lead.plataforma`
-  - Pais: `lead.pais`
-  - Compania: `lead.compania`
-  - Ticket: ticket ID del lead
-- **Info banner**: Fondo `bg-primary/10` con icono de bombilla y texto "El lead quedara marcado como 'contactado' y el contacto sera asignado al modulo de Closers."
-- **Footer**: Botones "Cancelar" (outline) y "Confirmar Conversion" (primary)
+**Cambio:**
+```tsx
+const handleCancel = () => {
+  toast({ title: "Conversión cancelada" });
+  onOpenChange(false);
+};
+```
 
-### 3. Funcionalidad de conversion
+Luego actualizar el botón "Cancelar" (línea 111):
+```tsx
+<Button 
+  variant="outline" 
+  onClick={handleCancel}
+  disabled={convert.isPending}
+>
+  Cancelar
+</Button>
+```
 
-Al confirmar:
-1. Insertar en tabla `contactos` con datos mapeados del lead (nombre del handle, instagram del url_perfil, pais, compania)
-2. Actualizar `leads.status` a `"contactado"`
-3. Invalidar queries de leads y contactos
-4. Mostrar toast de exito y cerrar ambos modales
+### Patrón Consistente
+Todas las acciones de cancelación usarán:
+- `{ title: "Edición cancelada" }` para cancelación de formularios
+- `{ title: "Conversión cancelada" }` para cancelación de operaciones destructivas
+- Sin variante (usa la variante default/neutral)
+- Sin description
+- Sigue el estándar `useToast` ya implementado en la aplicación
 
-### 4. Integrar en ViewLeadModal
-
-- Agregar estado `showConvertModal` en `ViewLeadModal`
-- El boton "Convertir a Contacto" abre `ConvertLeadModal` en vez de mostrar toast
-- Pasar el lead actual como prop
-
-### Archivos
-
-- **Crear**: `src/pages/leadgen/ConvertLeadModal.tsx`
-- **Modificar**: `src/pages/leadgen/ViewLeadModal.tsx` (cambiar icono a `UserCheck`, integrar `ConvertLeadModal`)
-
+### Archivos a Modificar
+- `src/pages/leadgen/ViewLeadModal.tsx` - Agregar toast a `handleCancelNote()`
+- `src/pages/leadgen/ConvertLeadModal.tsx` - Crear `handleCancel()` y agregar toast al botón "Cancelar"
