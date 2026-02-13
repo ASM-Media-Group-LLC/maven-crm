@@ -1,64 +1,46 @@
 
-## Quitar hover y agregar filtros a la seccion de Filtros
 
-### Cambios en `src/pages/promolog/PromologContent.tsx`
+## Cargar creadores desde Supabase en el dropdown de Filtros
 
-**1. Quitar hover del boton trigger**
-Reemplazar `variant="ghost"` por clases manuales sin hover: `hover:bg-transparent hover:text-muted-foreground` o usar un `div` con cursor pointer en lugar de Button.
+### Archivo: `src/pages/promolog/PromologContent.tsx`
 
-**2. Agregar 3 selectores dentro del CollapsibleContent**
-Segun la imagen de referencia, cuando se expande la seccion de Filtros se muestran 3 dropdowns en un grid de 3 columnas:
+**Cambio 1 - Agregar imports:**
+- Importar `useQuery` de `@tanstack/react-query`
+- Importar `supabase` de `@/integrations/supabase/client`
 
-| Filtro | Placeholder | Opciones |
-|---|---|---|
-| Creador/a | Todos | Lista de creadores (mock) |
-| Red Social | Todas | Instagram, TikTok, X, Telegram |
-| Estado | Todos | Si, Parcial, No |
-
-### Detalle tecnico
-
-- Linea 360: cambiar el `Button` para quitar el hover, agregando `hover:bg-transparent hover:text-muted-foreground` al className
-- Lineas 368-372: reemplazar el placeholder text con un grid de 3 columnas con componentes `Select` de shadcn:
+**Cambio 2 - Agregar query de creadores:**
+Dentro del componente `PromologContent`, agregar un `useQuery` que traiga los creadores:
 
 ```tsx
-<CollapsibleContent className="pt-4">
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Creador/a</label>
-      <Select>
-        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Red Social</label>
-      <Select>
-        <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todas</SelectItem>
-          <SelectItem value="instagram">Instagram</SelectItem>
-          <SelectItem value="tiktok">TikTok</SelectItem>
-          <SelectItem value="x">X</SelectItem>
-          <SelectItem value="telegram">Telegram</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Estado</label>
-      <Select>
-        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos</SelectItem>
-          <SelectItem value="si">Si</SelectItem>
-          <SelectItem value="parcial">Parcial</SelectItem>
-          <SelectItem value="no">No</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-</CollapsibleContent>
+const { data: creators = [] } = useQuery({
+  queryKey: ["creators-dropdown"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("creators")
+      .select("id, name, artistic_name")
+      .order("name");
+    if (error) throw error;
+    return data;
+  },
+});
 ```
 
-- Agregar imports de `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` desde `@/components/ui/select` (ya importado en otros archivos del proyecto)
+**Cambio 3 - Actualizar el Select de Creador/a (lineas 373-378):**
+Reemplazar el dropdown estatico con los creadores cargados de la base de datos:
+
+```tsx
+<Select>
+  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+  <SelectContent>
+    <SelectItem value="__all__">Todos</SelectItem>
+    {creators.map((c) => (
+      <SelectItem key={c.id} value={c.id}>
+        {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+Esto muestra el nombre completo del creador y, si tiene nombre artistico, lo agrega entre parentesis para facilitar la identificacion.
+
