@@ -73,16 +73,18 @@ export const useTareas = (projectId?: string) => {
   });
 
   const { data: companyProfiles = [] } = useQuery({
-    queryKey: ["company-profiles", profile?.company_id],
+    queryKey: ["company-profiles", profile?.company_id, profile?.id],
     queryFn: async () => {
-      if (!profile?.company_id) return [];
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .eq("company_id", profile.company_id);
-      return data || [];
+      if (profile?.company_id) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("company_id", profile.company_id);
+        return data || [];
+      }
+      return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
     },
-    enabled: !!profile?.company_id,
+    enabled: !!profile,
   });
 
   const createTask = useMutation({
