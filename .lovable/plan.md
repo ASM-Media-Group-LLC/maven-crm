@@ -1,20 +1,19 @@
 
+## Ajustar estilos del botón "No Promocionó"
 
-## Agregar toasts de exito y error al modal "Editar Promocion"
+### Cambio en `src/pages/promolog/PromologEntryCard.tsx`
 
-### Cambios en `src/pages/promolog/PromologEntryCard.tsx`
+Según la imagen de referencia, el botón "No Promocionó" cuando está seleccionado debe usar color azul/primary (como aparece en la captura), no púrpura como está actualmente.
 
-Se agregaran notificaciones toast usando el hook `useToast` (siguiendo el patron del proyecto) para los botones "Guardar Cambios" y "Cancelar" del modal de edicion.
+### Detalle técnico
 
-### Detalle tecnico
+**Archivo:** `src/pages/promolog/PromologEntryCard.tsx` (línea 231)
 
-1. **Import**: Agregar `import { useToast } from "@/hooks/use-toast";`
-2. **Hook**: Agregar `const { toast } = useToast();` dentro del componente
-3. **Boton "Guardar Cambios"** (linea 375-380): Mostrar toast de exito con titulo "Promocion actualizada" y descripcion con el nombre del creador, luego cerrar el modal
-4. **Boton "Cancelar"** (linea 372-374): Mostrar toast informativo con titulo "Edicion cancelada" (siguiendo el patron existente del proyecto), luego cerrar el modal
+**Cambio necesario:**
+- Línea 231: Cambiar `bg-purple-500` por `bg-blue-500` (o `bg-primary` según el sistema de diseño)
+- El botón "Sí Promocionó" (línea 220) se mantiene sin cambios con `bg-cyan-500`
 
-### Comportamiento esperado
-- Al hacer clic en "Guardar Cambios": toast de exito con `{ title: "Promocion actualizada", description: "Los cambios para [nombre] han sido guardados." }`
-- Al hacer clic en "Cancelar": toast con `{ title: "Edicion cancelada" }`
-- Si hay un error (futuro con Supabase): toast con `{ title: "Error al guardar", variant: "destructive" }`
-
+**Comportamiento esperado:**
+- "Sí Promocionó" seleccionado → fondo cyan/primary ✓ (sin cambios)
+- "No Promocionó" seleccionado → fondo azul/blue-500 (cambio de púrpura a azul)
+- Ambos botones no seleccionados → borde outline (sin cambios)
