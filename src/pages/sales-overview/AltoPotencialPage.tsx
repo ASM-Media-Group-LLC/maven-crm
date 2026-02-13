@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import ClariAiFab from "@/components/ClariAiFab";
 
 type Period = "Hoy" | "7 días" | "Este mes";
 const periods: Period[] = ["Hoy", "7 días", "Este mes"];
@@ -136,6 +137,7 @@ const AltoPotencialPage = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };

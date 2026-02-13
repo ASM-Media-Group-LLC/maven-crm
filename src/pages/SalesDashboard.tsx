@@ -14,6 +14,7 @@ import CreatorPerformanceView from "./sales-dashboard/CreatorPerformanceView";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
+import ClariAiFab from "@/components/ClariAiFab";
 import type { ViewTab, TimePeriod } from "./sales-dashboard/DashboardFilters";
 import type { EarningsRow } from "./sales-performance/types";
 
@@ -142,6 +143,7 @@ const SalesDashboard = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };

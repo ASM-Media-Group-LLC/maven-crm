@@ -47,10 +47,10 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
     {
       id: "creators",
       title: "Creadoras",
-      value: data.activeCreators.toString(),
+      value: data.creators.length.toString(),
       change: 0,
       previousValue: null,
-      subtitle: `${data.activeCreators} activas`,
+      subtitle: `${data.activeCreators} activas / ${data.creators.length - data.activeCreators} inactivas`,
       icon: Users,
       color: "text-accent",
       bgColor: "bg-accent/20",

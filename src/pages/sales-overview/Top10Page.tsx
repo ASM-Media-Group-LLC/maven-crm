@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import ClariAiFab from "@/components/ClariAiFab";
 
 type Period = "Hoy" | "7 días" | "Este mes";
 const periods: Period[] = ["Hoy", "7 días", "Este mes"];
@@ -176,6 +177,7 @@ const Top10Page = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };
