@@ -90,14 +90,12 @@ export const useTareas = (projectId?: string) => {
       title: string;
       description?: string;
       assigned_to: string;
+      due_at: string;
       duration_hours: number;
       duration_minutes: number;
       project_id?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
-      const dueAt = new Date(
-        Date.now() + task.duration_hours * 3600000 + task.duration_minutes * 60000
-      ).toISOString();
 
       const { error } = await supabase.from("tasks" as any).insert({
         title: task.title,
@@ -108,7 +106,7 @@ export const useTareas = (projectId?: string) => {
         project_id: task.project_id || null,
         duration_hours: task.duration_hours,
         duration_minutes: task.duration_minutes,
-        due_at: dueAt,
+        due_at: task.due_at,
       } as any);
       if (error) throw error;
     },
