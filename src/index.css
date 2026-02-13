@@ -118,6 +118,11 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   }
 }
 
+/* Hero gradient background */
+.hero-gradient {
+  background: radial-gradient(ellipse at center top, hsl(var(--accent) / 0.08) 0%, transparent 60%);
+}
+
 /* Calendar event dot indicator */
 .calendar-day-has-event {
   position: relative;

@@ -71,15 +71,15 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+      <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md transition-all duration-300">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Logo size="sm" />
           <div className="hidden items-center gap-6 md:flex">
-            <a href="#funcionalidades" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Funcionalidades
+            <a href="#funcionalidades" className="story-link text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <span>Funcionalidades</span>
             </a>
-            <a href="#metricas" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-              Métricas
+            <a href="#metricas" className="story-link text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <span>Métricas</span>
             </a>
           </div>
           <div className="flex items-center gap-3">
@@ -94,15 +94,18 @@ const Landing = () => {
       </nav>
 
       {/* Hero */}
-      <section className="flex flex-col items-center px-4 pb-20 pt-16 text-center md:pt-24">
-        <Badge variant="secondary" className="mb-8 text-sm font-normal">
+      <section className="hero-gradient flex flex-col items-center px-4 pb-20 pt-16 text-center md:pt-24">
+        <Badge variant="secondary" className="mb-8 animate-fade-in-up text-sm font-normal">
           Plataforma completa para agencias de creadores
         </Badge>
-        <Logo size="lg" className="mb-6" />
-        <p className="mx-auto mb-10 max-w-2xl text-lg text-muted-foreground md:text-xl">
+        <div className="animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+          <Logo size="lg" className="mb-6" />
+        </div>
+        <p className="mx-auto mb-4 max-w-2xl animate-fade-in-up text-lg text-muted-foreground md:text-xl" style={{ animationDelay: "200ms" }}>
           La plataforma todo-en-uno para gestionar creadores, ventas, leads, eventos y operaciones de tu agencia.
         </p>
-        <div className="flex items-center gap-4">
+        <div className="mb-10 h-1 w-24 animate-fade-in-up rounded-full bg-gradient-to-r from-accent to-primary" style={{ animationDelay: "250ms" }} />
+        <div className="flex animate-fade-in-up items-center gap-4" style={{ animationDelay: "300ms" }}>
           <Button size="lg" asChild>
             <Link to="/register">Crear cuenta</Link>
           </Button>
@@ -114,16 +117,17 @@ const Landing = () => {
 
       {/* Modules Grid */}
       <section id="funcionalidades" className="mx-auto max-w-6xl px-4 pb-20">
-        <h2 className="mb-10 text-center text-2xl font-bold md:text-3xl">
+        <h2 className="mb-10 animate-fade-in-up text-center text-2xl font-bold md:text-3xl">
           Todo lo que necesitas en un solo lugar
         </h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {modules.map((mod) => (
+          {modules.map((mod, i) => (
             <div
               key={mod.title}
-              className="rounded-lg border border-border bg-card p-6 transition-colors hover:bg-muted/50"
+              className="group animate-fade-in-up rounded-lg border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:bg-muted/50"
+              style={{ animationDelay: `${i * 100}ms` }}
             >
-              <div className={`mb-4 inline-flex rounded-lg ${mod.color} p-3`}>
+              <div className={`mb-4 inline-flex rounded-lg ${mod.color} p-3 transition-transform duration-300 group-hover:scale-110`}>
                 <mod.icon className="h-6 w-6 text-white" />
               </div>
               <h3 className="mb-2 text-lg font-semibold">{mod.title}</h3>
@@ -137,9 +141,9 @@ const Landing = () => {
       {/* Stats */}
       <section id="metricas" className="border-t border-border bg-card py-16">
         <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 px-4 md:grid-cols-4">
-          {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center text-center">
-              <stat.icon className="mb-3 h-8 w-8 text-primary" />
+          {stats.map((stat, i) => (
+            <div key={stat.label} className="flex animate-fade-in-up flex-col items-center text-center" style={{ animationDelay: `${i * 100}ms` }}>
+              <stat.icon className="mb-3 h-8 w-8 animate-float text-primary" />
               <span className="text-3xl font-bold">{stat.value}</span>
               <span className="mt-1 text-sm text-muted-foreground">{stat.label}</span>
             </div>
@@ -148,7 +152,8 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-10">
+      <footer className="py-10">
+        <div className="mx-auto mb-10 h-px w-full max-w-6xl bg-gradient-to-r from-transparent via-border to-transparent" />
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4">
           <Logo size="sm" />
           <p className="text-sm text-muted-foreground">
