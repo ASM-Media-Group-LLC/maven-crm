@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarDays, Clock, User, CheckCircle, Pencil, Check, X as XMark } from "lucide-react";
+import { useState, useRef } from "react";
+import { CalendarDays, Clock, User, CheckCircle, Pencil, Check, X as XMark, ExternalLink, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -68,17 +69,46 @@ const networkOptions = [
   { value: "telegram", label: "Telegram", icon: TelegramIcon },
 ] as const;
 
+const platformOptions = [
+  { value: "onlyfans", label: "OnlyFans" },
+  { value: "unlok", label: "Unlok" },
+  { value: "otra", label: "Otra" },
+] as const;
+
+const contactTypeOptions = [
+  { value: "hablaron", label: "Hablaron" },
+  { value: "textearon", label: "Textearon" },
+  { value: "mensaje_voz", label: "Mensaje de Voz" },
+] as const;
+
 const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
   const [editOpen, setEditOpen] = useState(false);
   const [editResult, setEditResult] = useState<"si" | "no">(
     entry.result === "Si" ? "si" : "no"
   );
   const [editNetwork, setEditNetwork] = useState<string>(entry.network);
+  const [editPlatform, setEditPlatform] = useState<string>(entry.platform?.toLowerCase() || "");
+  const [editContactType, setEditContactType] = useState<string>("");
+  const [editNotes, setEditNotes] = useState<string>(entry.notes);
+  const [editEvidencePreview, setEditEvidencePreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleOpenEdit = () => {
     setEditResult(entry.result === "Si" ? "si" : "no");
     setEditNetwork(entry.network);
+    setEditPlatform(entry.platform?.toLowerCase() || "");
+    setEditContactType("");
+    setEditNotes(entry.notes);
+    setEditEvidencePreview("");
     setEditOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setEditEvidencePreview(url);
+    }
   };
 
   return (
@@ -143,7 +173,7 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
 
       {/* Edit Modal */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader className="pr-8">
             <DialogTitle>Editar Promoción</DialogTitle>
             <DialogDescription className="sr-only">
@@ -233,6 +263,110 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
               })}
             </div>
           </div>
+
+          {/* Conditional fields when "Sí Promocionó" */}
+          {editResult === "si" && (
+            <>
+              {/* Platform selection */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">
+                  Plataforma <span className="text-destructive">*</span>
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {platformOptions.map((opt) => {
+                    const isSelected = editPlatform === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setEditPlatform(opt.value)}
+                        className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? "border-2 border-primary bg-accent text-accent-foreground"
+                            : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Contact type selection */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">
+                  Tipo de Contacto <span className="text-destructive">*</span>
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {contactTypeOptions.map((opt) => {
+                    const isSelected = editContactType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setEditContactType(opt.value)}
+                        className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? "border-2 border-primary bg-accent text-accent-foreground"
+                            : "border border-input bg-background text-muted-foreground hover:bg-accent"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Notas</span>
+                <Textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Agregar notas..."
+                  className="min-h-[80px]"
+                />
+              </div>
+
+              {/* Evidence upload */}
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
+                <div
+                  className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Upload Evidence</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                {editEvidencePreview && (
+                  <div className="space-y-2">
+                    <img
+                      src={editEvidencePreview}
+                      alt="Evidencia"
+                      className="w-full rounded-md border border-input max-h-48 object-contain"
+                    />
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      onClick={() => window.open(editEvidencePreview, "_blank")}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Abrir en nueva pestaña
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>
