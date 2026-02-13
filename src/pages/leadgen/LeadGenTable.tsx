@@ -179,9 +179,16 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                   </DropdownMenu>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
-                    {statusLabels[lead.status] || lead.status}
-                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 -ml-2"
+                    onClick={() => onView?.(lead)}
+                  >
+                    <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
+                      {statusLabels[lead.status] || lead.status}
+                    </Badge>
+                  </Button>
                 </TableCell>
                 <TableCell className="text-center text-lg">
                   {countryToFlag(lead.pais)}
