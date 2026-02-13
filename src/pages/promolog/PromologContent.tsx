@@ -5,13 +5,14 @@ import {
   Target,
   Settings,
   Plus,
-  CheckCircle,
-  AlertTriangle,
-  TrendingUp,
   Send,
   Check,
   Minus,
   X,
+  ChevronDown,
+  Filter,
+  Table2,
+  Info,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -21,46 +22,115 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
-
-const kpiCards = [
-  {
-    title: "Total Modelos",
-    value: "142",
-    subtitle: "Registradas en sistema - Filtrando",
-    icon: Users,
-    borderColor: "border-t-primary",
-  },
-  {
-    title: "Tickets ingresados",
-    value: "5",
-    subtitle: "Tickets ingresados hoy",
-    icon: CheckCircle,
-    borderColor: "border-t-green-500",
-  },
-  {
-    title: "⚠️ NO Chequeadas",
-    value: "129",
-    subtitle: "Equipo no las revisó",
-    icon: AlertTriangle,
-    borderColor: "border-t-destructive",
-  },
-  {
-    title: "Completadas Hoy",
-    value: "5",
-    subtitle: "Tickets ingresados hoy",
-    icon: TrendingUp,
-    borderColor: "border-t-muted-foreground",
-  },
-];
+import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 
 const socialCards = [
   { name: "Instagram", value: 3, icon: <InstagramIcon className="h-6 w-6" /> },
   { name: "TikTok", value: 0, icon: <TikTokIcon className="h-6 w-6" /> },
   { name: "X", value: 2, icon: <XIcon className="h-6 w-6" /> },
   { name: "Telegram", value: 0, icon: <Send className="h-6 w-6" /> },
+];
+
+const platformCards = [
+  {
+    name: "OnlyFans",
+    value: 5,
+    icon: (
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white text-xs font-bold">
+        OF
+      </span>
+    ),
+  },
+  {
+    name: "Unlok",
+    value: 0,
+    icon: (
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white text-xs font-bold">
+        U
+      </span>
+    ),
+  },
+  {
+    name: "Otra",
+    value: 0,
+    icon: (
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Info className="h-4 w-4" />
+      </span>
+    ),
+  },
+];
+
+const mockEntries: PromologEntry[] = [
+  {
+    id: "1",
+    ticketNumber: "PL065201",
+    name: "Desieee Daniela Gonzalez angel",
+    handle: "deziig",
+    network: "instagram",
+    platform: "OnlyFans",
+    result: "Sí",
+    date: "13 feb 2026",
+    time: "10:05 AM",
+    agent: "lorena_lozano",
+    notes: "CC promociona en IG, publica foto",
+  },
+  {
+    id: "2",
+    ticketNumber: "PL068144",
+    name: "Veronica Sanchez",
+    network: "x",
+    platform: "OnlyFans",
+    result: "Sí",
+    date: "13 feb 2026",
+    time: "09:57 AM",
+    agent: "lorena_lozano",
+    notes: "CC promociona en reddit, publica foto",
+  },
+  {
+    id: "3",
+    ticketNumber: "PL111676",
+    name: "Valentin Magallanes",
+    handle: "valentin.only",
+    network: "instagram",
+    platform: "OnlyFans",
+    result: "Sí",
+    date: "13 feb 2026",
+    time: "09:53 AM",
+    agent: "lorena_lozano",
+    notes: "CC promociona en IG, publica video",
+  },
+  {
+    id: "4",
+    ticketNumber: "PL641620",
+    name: "Elizabeth Loaiza",
+    handle: "elizabethloaiza",
+    network: "instagram",
+    platform: "OnlyFans",
+    result: "Sí",
+    date: "13 feb 2026",
+    time: "09:48 AM",
+    agent: "lorena_lozano",
+    notes: "CC promociona en IG, publica foto",
+  },
+  {
+    id: "5",
+    ticketNumber: "PL492883",
+    name: "Alejandra Rojas Soto",
+    handle: "alemiarojas",
+    network: "x",
+    platform: "OnlyFans",
+    result: "Sí",
+    date: "13 feb 2026",
+    time: "09:25 AM",
+    agent: "lorena_lozano",
+    notes: "CC promociona en X, publica video",
+  },
 ];
 
 const agentsData = [
@@ -81,6 +151,7 @@ const PromologContent = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const formattedDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
@@ -91,7 +162,6 @@ const PromologContent = () => {
   const shortDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
     month: "short",
-    year: "numeric",
   });
 
   return (
@@ -176,50 +246,131 @@ const PromologContent = () => {
         </Button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiCards.map((card) => (
-          <Card key={card.title} className={`border-t-[3px] ${card.borderColor}`}>
-            <CardContent className="flex items-start gap-4 px-5 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <card.icon className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="flex-1 space-y-0">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {card.title}
-                </p>
-                <p className="text-2xl font-bold tracking-tight">{card.value}</p>
-                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Conditional: Social Section or Agents Section */}
+      {/* Conditional: Dashboard or Agents */}
       {view === "dashboard" ? (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold">
-              Promociones por Red Social y Plataforma{" "}
-              <span className="text-sm font-normal text-muted-foreground">
-                (solo tickets &apos;Sí&apos;)
-              </span>
-            </h2>
-            <p className="text-sm text-muted-foreground">Red Social</p>
+        <div className="space-y-6">
+          {/* Social & Platform Section */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                Promociones por Red Social y Plataforma{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  (solo tickets &apos;Sí&apos;)
+                </span>
+              </h2>
+            </div>
+
+            {/* Red Social */}
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Red Social</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {socialCards.map((s) => (
+                  <Card key={s.name}>
+                    <CardContent className="flex items-center gap-3 p-4">
+                      {s.icon}
+                      <div>
+                        <p className="text-xs text-muted-foreground">{s.name}</p>
+                        <p className="text-xl font-bold">{s.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Plataforma */}
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Plataforma</p>
+              <div className="grid grid-cols-3 gap-4">
+                {platformCards.map((p) => (
+                  <Card key={p.name}>
+                    <CardContent className="flex items-center gap-3 p-4">
+                      {p.icon}
+                      <div>
+                        <p className="text-xs text-muted-foreground">{p.name}</p>
+                        <p className="text-xl font-bold">{p.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer date range */}
+            <p className="text-xs text-center text-muted-foreground">
+              Mostrando datos del {shortDate} al {shortDate}
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {socialCards.map((s) => (
-              <Card key={s.name}>
-                <CardContent className="flex flex-col items-center justify-center gap-2 p-5">
-                  {s.icon}
-                  <p className="text-xs text-muted-foreground">{s.name}</p>
-                  <p className="text-2xl font-bold">{s.value}</p>
+          {/* Filters (collapsible) */}
+          <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+                />
+                Filtros
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <Card>
+                <CardContent className="p-4 text-sm text-muted-foreground">
+                  Filtros próximamente...
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Tabs */}
+          <Tabs defaultValue="tabla">
+            <TabsList>
+              <TabsTrigger value="tabla" className="gap-1.5">
+                <Table2 className="h-4 w-4" />
+                Tabla
+              </TabsTrigger>
+              <TabsTrigger value="calendario" className="gap-1.5">
+                <CalendarDays className="h-4 w-4" />
+                Calendario
+              </TabsTrigger>
+              <TabsTrigger value="campanas" className="gap-1.5">
+                <Target className="h-4 w-4" />
+                Campañas
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tabla">
+              {/* Entradas Recientes */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Entradas Recientes</h2>
+                  <Button variant="ghost" size="sm">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {mockEntries.map((entry) => (
+                    <PromologEntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="calendario">
+              <Card>
+                <CardContent className="p-6 text-sm text-muted-foreground text-center">
+                  Vista de calendario próximamente...
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="campanas">
+              <Card>
+                <CardContent className="p-6 text-sm text-muted-foreground text-center">
+                  Vista de campañas próximamente...
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       ) : (
         <div className="space-y-3">
