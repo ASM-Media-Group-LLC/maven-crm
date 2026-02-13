@@ -6,7 +6,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, List, LayoutGrid } from "lucide-react";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -32,6 +33,8 @@ interface Props {
   onDateFromChange: (v: string) => void;
   dateTo: string;
   onDateToChange: (v: string) => void;
+  view: "list" | "grid";
+  onViewChange: (v: "list" | "grid") => void;
 }
 
 const TicketsFilters = ({
@@ -43,6 +46,7 @@ const TicketsFilters = ({
   assignedTo, onAssignedToChange,
   dateFrom, onDateFromChange,
   dateTo, onDateToChange,
+  view, onViewChange,
 }: Props) => {
   return (
     <div className="space-y-3">
@@ -57,55 +61,74 @@ const TicketsFilters = ({
           />
         </div>
 
-        <Select value={priority} onValueChange={onPriorityChange}>
+        <Select value={priority || undefined} onValueChange={(v) => onPriorityChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Prioridad" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="__all__">Todas</SelectItem>
             {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
               <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={ticketType} onValueChange={onTicketTypeChange}>
+        <Select value={ticketType || undefined} onValueChange={(v) => onTicketTypeChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             {Object.entries(TYPE_LABELS).map(([k, v]) => (
               <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={onStatusChange}>
+        <Select value={status || undefined} onValueChange={(v) => onStatusChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[130px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             {Object.entries(STATUS_LABELS).map(([k, v]) => (
               <SelectItem key={k} value={k}>{v}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={company} onValueChange={onCompanyChange}>
+        <Select value={company || undefined} onValueChange={(v) => onCompanyChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="Compañía" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="__all__">Todas</SelectItem>
             {COMPANIES.map((c) => (
               <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select value={assignedTo} onValueChange={onAssignedToChange}>
+        <Select value={assignedTo || undefined} onValueChange={(v) => onAssignedToChange(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="Asignado" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             {TEAM_MEMBERS.map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-1 ml-auto">
+          <Button
+            variant={view === "list" ? "default" : "outline"}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => onViewChange("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={view === "grid" ? "default" : "outline"}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => onViewChange("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

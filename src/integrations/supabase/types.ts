@@ -1255,6 +1255,41 @@ export type Database = {
           },
         ]
       }
+      ticket_comments: {
+        Row: {
+          author_email: string | null
+          author_name: string
+          content: string
+          created_at: string | null
+          id: string
+          ticket_id: string
+        }
+        Insert: {
+          author_email?: string | null
+          author_name: string
+          content: string
+          created_at?: string | null
+          id?: string
+          ticket_id: string
+        }
+        Update: {
+          author_email?: string | null
+          author_name?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assigned_to: string | null

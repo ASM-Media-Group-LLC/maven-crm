@@ -92,6 +92,15 @@ export interface TicketWithCreator {
   creators?: { name: string; artistic_name: string | null; instagram_handle: string | null } | null;
 }
 
+export interface TicketComment {
+  id: string;
+  ticket_id: string;
+  author_name: string;
+  author_email: string | null;
+  content: string;
+  created_at: string | null;
+}
+
 export function useTickets() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -131,6 +140,34 @@ export function useTickets() {
     },
   });
 
+  const updateTicket = useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
+      const { error } = await supabase.from("tickets").update(updates).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Ticket actualizado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al actualizar ticket", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTicket = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tickets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Ticket eliminado exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ["tickets-module"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al eliminar ticket", description: error.message, variant: "destructive" });
+    },
+  });
+
   const creatorsQuery = useQuery({
     queryKey: ["creators-for-tickets"],
     queryFn: async () => {
@@ -143,5 +180,35 @@ export function useTickets() {
     },
   });
 
-  return { ticketsQuery, createTicket, creatorsQuery };
+  const useTicketComments = (ticketId: string) => {
+    return useQuery({
+      queryKey: ["ticket-comments", ticketId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from("ticket_comments" as any)
+          .select("*")
+          .eq("ticket_id", ticketId)
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        return data as unknown as TicketComment[];
+      },
+      enabled: !!ticketId,
+    });
+  };
+
+  const addComment = useMutation({
+    mutationFn: async (comment: { ticket_id: string; author_name: string; author_email?: string; content: string }) => {
+      const { error } = await supabase.from("ticket_comments" as any).insert(comment as any);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      toast({ title: "Comentario agregado" });
+      queryClient.invalidateQueries({ queryKey: ["ticket-comments", variables.ticket_id] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error al agregar comentario", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return { ticketsQuery, createTicket, updateTicket, deleteTicket, creatorsQuery, useTicketComments, addComment };
 }
