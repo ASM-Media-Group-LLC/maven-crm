@@ -1,20 +1,28 @@
 
 
-## Agregar hover a las tarjetas del Board de LeadGen
+## Hacer el hover de las tarjetas visible
 
-### Cambio
+### Problema
 
-**Archivo**: `src/pages/leadgen/LeadGenGrid.tsx` (linea 74)
+El componente `Card` base aplica `bg-card` como fondo solido. Al agregar `hover:bg-muted/50`, el cambio de color es practicamente imperceptible porque `muted` con 50% de opacidad se mezcla de forma muy similar al fondo de la card.
 
-Actualizar la clase de la Card para reemplazar `hover:shadow-md` por un hover basado en cambio de background, siguiendo las reglas del sistema de diseno (prohibido usar sombras como indicador de hover):
+### Solucion
+
+**Archivo**: `src/pages/leadgen/LeadGenGrid.tsx` (linea 76)
+
+Cambiar el hover para usar un efecto combinado mas visible: borde con color primario y un fondo muted sin transparencia.
 
 ```tsx
 // De:
-className="cursor-pointer hover:shadow-md transition-shadow relative"
+className="cursor-pointer hover:bg-muted/50 transition-colors relative"
 
 // A:
-className="cursor-pointer hover:bg-muted/50 transition-colors relative"
+className="cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all relative"
 ```
 
-Esto aplica un fondo sutil `muted/50` al pasar el cursor, consistente con el patron `hover:bg-accent` definido en la seccion 1.7 de estados globales del design system, usando `transition-colors` en lugar de `transition-shadow`.
+Esto agrega `hover:border-primary/30` que cambia el borde de la tarjeta a un tono sutil del color primario, haciendolo claramente visible. Se usa `transition-all` para animar tanto el fondo como el borde. Este patron ya se usa en las tarjetas del grid de Eventos (`EventosGrid.tsx` linea 70: `hover:shadow-md hover:border-primary/30`).
+
+### Resultado
+
+Al pasar el cursor sobre la tarjeta, el borde se tornara al color primario con 30% de opacidad, dando un feedback visual claro e inmediato.
 
