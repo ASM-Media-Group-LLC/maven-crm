@@ -125,7 +125,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
             <TableHead><SortHeader label="Contacto" col="contacto" /></TableHead>
             <TableHead><SortHeader label="QA" col="qa" /></TableHead>
-            <TableHead className="sticky right-0 bg-card z-20"></TableHead>
+            <TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -155,28 +155,9 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 -ml-2 flex items-center gap-1">
-                        <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                          {lead.categoria.toUpperCase()}
-                        </Badge>
-                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {["a+", "a", "b+", "b", "c"].map((c) => (
-                        <DropdownMenuItem
-                          key={c}
-                          onClick={() => updateCategoria.mutate({ id: lead.id, categoria: c })}
-                        >
-                          <Badge variant={calidadVariant[c] ?? "secondary-soft"} className="mr-2">
-                            {c.toUpperCase()}
-                          </Badge>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+                    {lead.categoria.toUpperCase()}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Button
@@ -196,21 +177,33 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="sticky right-0 bg-card">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onView?.(lead)}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver detalle
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit?.(lead)}>
-                        <Pencil className="mr-2 h-4 w-4" /> Editar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 flex items-center gap-1">
+                          <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+                            {lead.categoria.toUpperCase()}
+                          </Badge>
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {["a+", "a", "b+", "b", "c"].map((c) => (
+                          <DropdownMenuItem
+                            key={c}
+                            onClick={() => updateCategoria.mutate({ id: lead.id, categoria: c })}
+                          >
+                            <Badge variant={calidadVariant[c] ?? "secondary-soft"} className="mr-2">
+                              {c.toUpperCase()}
+                            </Badge>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             );
