@@ -1,53 +1,34 @@
 
-## Agregar Notificaciones de Toast para Acciones de Cancelación
 
-### Problema Identificado
-Los modales `ViewLeadModal.tsx` y `ConvertLeadModal.tsx` tienen notificaciones de éxito y error para operaciones de base de datos, pero faltan las notificaciones de cancelación cuando el usuario cierra los formularios o los modales sin guardar cambios.
+## Actualizar columna de Acciones en la tabla de LeadGen
 
-### Solución
+### Cambios
 
-#### 1. En `ViewLeadModal.tsx` - Agregar toast al cancelar la nota
-Modificar la función `handleCancelNote()` (línea 113-116) para agregar un toast de cancelación antes de limpiar el estado.
+**Archivo**: `src/pages/leadgen/LeadGenTable.tsx`
 
-**Cambio:**
-```tsx
-const handleCancelNote = () => {
-  setNoteText("");
-  setShowNoteForm(false);
-  toast({ title: "Edición cancelada" });
-};
+#### 1. Agregar el texto "Acciones" al encabezado de la columna sticky
+Actualmente la linea 128 tiene el `TableHead` vacio. Se cambiara a mostrar el texto "Acciones".
+
+```
+<TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
 ```
 
-#### 2. En `ConvertLeadModal.tsx` - Agregar toast al cancelar la conversión
-Crear un handler personalizado para el botón "Cancelar" que agregue un toast antes de cerrar el modal.
+#### 2. Reemplazar el menu de tres puntos por acciones inline visibles
+Segun la imagen de referencia, la columna de acciones muestra directamente:
+- Un boton con icono de ojo (`Eye`) para ver detalle
+- El dropdown de calidad (badge "A+" con chevron) reubicado aqui
 
-**Cambio:**
-```tsx
-const handleCancel = () => {
-  toast({ title: "Conversión cancelada" });
-  onOpenChange(false);
-};
-```
+**Cambio en la celda de acciones** (lineas 198-214): Reemplazar el `DropdownMenu` de tres puntos por un layout `flex` con:
+- Boton `Eye` (ghost, icon) que ejecuta `onView?.(lead)`
+- El dropdown de calidad existente (badge + chevron + menu de categorias) movido desde la columna "Calidad" actual
 
-Luego actualizar el botón "Cancelar" (línea 111):
-```tsx
-<Button 
-  variant="outline" 
-  onClick={handleCancel}
-  disabled={convert.isPending}
->
-  Cancelar
-</Button>
-```
+#### 3. Simplificar la columna "Calidad"
+La columna "Calidad" original (lineas 157-179) se simplificara para mostrar solo el badge estatico sin el dropdown, ya que la interaccion de cambio de calidad se movera a la columna de acciones.
 
-### Patrón Consistente
-Todas las acciones de cancelación usarán:
-- `{ title: "Edición cancelada" }` para cancelación de formularios
-- `{ title: "Conversión cancelada" }` para cancelación de operaciones destructivas
-- Sin variante (usa la variante default/neutral)
-- Sin description
-- Sigue el estándar `useToast` ya implementado en la aplicación
+### Resultado visual esperado
+La columna "Acciones" (sticky right) mostrara en cada fila:
+- Icono de ojo para ver detalle
+- Badge de calidad con chevron desplegable para cambiar categoria
 
-### Archivos a Modificar
-- `src/pages/leadgen/ViewLeadModal.tsx` - Agregar toast a `handleCancelNote()`
-- `src/pages/leadgen/ConvertLeadModal.tsx` - Crear `handleCancel()` y agregar toast al botón "Cancelar"
+Esto replica el diseno 1:1 de la imagen de referencia.
+
