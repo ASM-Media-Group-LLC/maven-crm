@@ -1,46 +1,66 @@
 
+## Ajustar ancho de los dropdowns de filtros para que ocupen todo el ancho disponible
 
-## Cargar creadores desde Supabase en el dropdown de Filtros
+### Problema
+Los tres dropdowns (Creador/a, Red Social, Estado) en la sección de Filtros no ocupan todo el ancho de su contenedor. Se ven estrechos comparado con otros elementos de la página.
 
-### Archivo: `src/pages/promolog/PromologContent.tsx`
+### Causa Técnica
+Los `Select` components de shadcn/ui utilizan `w-full` en el `SelectTrigger`, pero como están dentro de divs con `space-y-2`, necesitan que su contenedor padre también tenga `w-full` para expandirse correctamente.
 
-**Cambio 1 - Agregar imports:**
-- Importar `useQuery` de `@tanstack/react-query`
-- Importar `supabase` de `@/integrations/supabase/client`
+### Solución
+Agregar `w-full` a cada div contenedor dentro del grid de filtros para asegurar que los Select components tengan espacio suficiente para expandirse.
 
-**Cambio 2 - Agregar query de creadores:**
-Dentro del componente `PromologContent`, agregar un `useQuery` que traiga los creadores:
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-```tsx
-const { data: creators = [] } = useQuery({
-  queryKey: ["creators-dropdown"],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("creators")
-      .select("id, name, artistic_name")
-      .order("name");
-    if (error) throw error;
-    return data;
-  },
-});
-```
+**Cambio (líneas 383-425):**
 
-**Cambio 3 - Actualizar el Select de Creador/a (lineas 373-378):**
-Reemplazar el dropdown estatico con los creadores cargados de la base de datos:
+Actualizar el grid de filtros para que cada columna tenga `w-full`:
 
 ```tsx
-<Select>
-  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Todos</SelectItem>
-    {creators.map((c) => (
-      <SelectItem key={c.id} value={c.id}>
-        {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  <div className="space-y-2 w-full">
+    <label className="text-sm font-medium">Creador/a</label>
+    <Select>
+      <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__all__">Todos</SelectItem>
+        {creators.map((c) => (
+          <SelectItem key={c.id} value={c.id}>
+            {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+  <div className="space-y-2 w-full">
+    <label className="text-sm font-medium">Red Social</label>
+    <Select>
+      <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__all__">Todas</SelectItem>
+        <SelectItem value="instagram">Instagram</SelectItem>
+        <SelectItem value="tiktok">TikTok</SelectItem>
+        <SelectItem value="x">X</SelectItem>
+        <SelectItem value="telegram">Telegram</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+  <div className="space-y-2 w-full">
+    <label className="text-sm font-medium">Estado</label>
+    <Select>
+      <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__all__">Todos</SelectItem>
+        <SelectItem value="si">Sí</SelectItem>
+        <SelectItem value="parcial">Parcial</SelectItem>
+        <SelectItem value="no">No</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+</div>
 ```
 
-Esto muestra el nombre completo del creador y, si tiene nombre artistico, lo agrega entre parentesis para facilitar la identificacion.
+### Cambios clave
+- Agregar `w-full` a cada div contenedor (`space-y-2 w-full`) para que los `Select` components puedan expandirse al ancho completo de su celda en el grid
+- Los `SelectTrigger` ya tienen `w-full` en el componente base, pero necesitan que su padre tenga ancho definido para funcionar correctamente
 
