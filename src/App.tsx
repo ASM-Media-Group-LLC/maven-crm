@@ -32,6 +32,7 @@ import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
 import LeadGen from "./pages/LeadGen";
 import Closers from "./pages/Closers";
+import Tickets from "./pages/Tickets";
 import Promolog from "./pages/Promolog";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
@@ -80,6 +81,7 @@ const App = () => (
               <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
               <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
               <Route path="/closers" element={<ProtectedRoute><Closers /></ProtectedRoute>} />
+              <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
               <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
