@@ -1,60 +1,50 @@
 
-## Actualizar opciones del dropdown de "Red Social" en Filtros
+## Actualizar opciones del dropdown de "Estado" en Filtros de Promolog
 
 ### Problema
-Las opciones actuales del dropdown de "Red Social" en la sección de Filtros de `/promolog` son limitadas y no incluyen todas las plataformas requeridas.
+Las opciones actuales del dropdown de "Estado" no reflejan los estados reales del sistema de Promolog.
 
-### Opciones Actuales (líneas 404-408)
-- Todas
-- Instagram
-- TikTok
-- X
-- Telegram
+### Opciones Actuales (líneas 419-422)
+- Todos
+- Sí
+- Parcial
+- No
 
 ### Opciones Requeridas
 - Todos
-- Instagram
-- TikTok
-- X/Twitter
-- OnlyFans
-- Treat
-- Telegram
+- Promocionó
+- No promocionó
+- Promoción Parcial
+- Pendiente
 
 ### Solución
-Actualizar los `SelectItem` en el dropdown de "Red Social" (líneas 404-408 en `src/pages/promolog/PromologContent.tsx`) para incluir:
-1. Cambiar "X" a "X/Twitter" para mayor claridad
-2. Agregar "OnlyFans" como nueva opción
-3. Agregar "Treat" como nueva opción
+Actualizar los `SelectItem` en el dropdown de "Estado" (líneas 419-422 en `src/pages/promolog/PromologContent.tsx`) para reflejar los estados correctos del negocio.
 
 ### Detalle Técnico
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Cambio (líneas 404-408):**
+**Cambio (líneas 419-422):**
 
 Reemplazar:
 ```tsx
-<SelectItem value="__all__">Todas</SelectItem>
-<SelectItem value="instagram">Instagram</SelectItem>
-<SelectItem value="tiktok">TikTok</SelectItem>
-<SelectItem value="x">X</SelectItem>
-<SelectItem value="telegram">Telegram</SelectItem>
+<SelectItem value="__all__">Todos</SelectItem>
+<SelectItem value="si">Sí</SelectItem>
+<SelectItem value="parcial">Parcial</SelectItem>
+<SelectItem value="no">No</SelectItem>
 ```
 
 Por:
 ```tsx
 <SelectItem value="__all__">Todos</SelectItem>
-<SelectItem value="instagram">Instagram</SelectItem>
-<SelectItem value="tiktok">TikTok</SelectItem>
-<SelectItem value="x">X/Twitter</SelectItem>
-<SelectItem value="onlyfans">OnlyFans</SelectItem>
-<SelectItem value="treat">Treat</SelectItem>
-<SelectItem value="telegram">Telegram</SelectItem>
+<SelectItem value="promociono">Promocionó</SelectItem>
+<SelectItem value="no_promociono">No promocionó</SelectItem>
+<SelectItem value="promocion_parcial">Promoción Parcial</SelectItem>
+<SelectItem value="pendiente">Pendiente</SelectItem>
 ```
 
 ### Cambios Clave
-- Mantener los valores (`value`) en minúsculas para compatibilidad con backend/filtros
-- Cambiar el label de "X" a "X/Twitter" para claridad
-- Mantener "Todas" como placeholder, pero cambiar el valor "Todas" a "Todos" para consistencia con el label de otras secciones
-- Insertar "OnlyFans" y "Treat" en las posiciones apropiadas del orden lógico de redes sociales
-
+- Mantener los valores (`value`) en minúsculas con guiones bajos para compatibilidad con backend/filtros
+- Cambiar los labels a terminología de negocio más clara: "Promocionó", "No promocionó", "Promoción Parcial", "Pendiente"
+- Mantener "Todos" como primera opción para filtro general
+- Los valores están diseñados para ser utilizables en consultas de base de datos o lógica de filtrado
