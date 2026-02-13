@@ -1,34 +1,29 @@
 
 
-## Actualizar columna de Acciones en la tabla de LeadGen
+## Hacer toda la fila de la tabla clickeable para abrir el modal
 
-### Cambios
+### Cambio
 
 **Archivo**: `src/pages/leadgen/LeadGenTable.tsx`
 
-#### 1. Agregar el texto "Acciones" al encabezado de la columna sticky
-Actualmente la linea 128 tiene el `TableHead` vacio. Se cambiara a mostrar el texto "Acciones".
+Agregar `onClick` y `cursor-pointer` al `TableRow` de cada lead (linea 135) para que al hacer clic en cualquier celda se abra el modal de detalle.
 
+```tsx
+<TableRow 
+  key={lead.id} 
+  className="cursor-pointer" 
+  onClick={() => onView?.(lead)}
+>
 ```
-<TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
-```
 
-#### 2. Reemplazar el menu de tres puntos por acciones inline visibles
-Segun la imagen de referencia, la columna de acciones muestra directamente:
-- Un boton con icono de ojo (`Eye`) para ver detalle
-- El dropdown de calidad (badge "A+" con chevron) reubicado aqui
+Para evitar que los clics en elementos interactivos (enlace del handle, dropdown de calidad, boton de ojo) tambien disparen el modal, se agregara `e.stopPropagation()` en:
 
-**Cambio en la celda de acciones** (lineas 198-214): Reemplazar el `DropdownMenu` de tres puntos por un layout `flex` con:
-- Boton `Eye` (ghost, icon) que ejecuta `onView?.(lead)`
-- El dropdown de calidad existente (badge + chevron + menu de categorias) movido desde la columna "Calidad" actual
+- El enlace `<a>` del handle (linea 145): agregar `onClick={(e) => e.stopPropagation()}`
+- El boton de estado (linea 163): ya llama `onView`, no necesita cambio
+- La celda sticky de acciones (linea 179): agregar `onClick={(e) => e.stopPropagation()}` para que el dropdown de calidad y el boton de ojo funcionen independientemente sin doble disparo
 
-#### 3. Simplificar la columna "Calidad"
-La columna "Calidad" original (lineas 157-179) se simplificara para mostrar solo el badge estatico sin el dropdown, ya que la interaccion de cambio de calidad se movera a la columna de acciones.
-
-### Resultado visual esperado
-La columna "Acciones" (sticky right) mostrara en cada fila:
-- Icono de ojo para ver detalle
-- Badge de calidad con chevron desplegable para cambiar categoria
-
-Esto replica el diseno 1:1 de la imagen de referencia.
+### Resultado
+- Clic en Hora, Ticket, Agente, Calidad (badge estatico), Estado, Pais, Contacto, QA abre el modal
+- Clic en el enlace del handle abre el perfil externo (no el modal)
+- Clic en acciones (ojo, dropdown calidad) funciona como antes sin abrir el modal dos veces
 
