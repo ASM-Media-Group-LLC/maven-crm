@@ -1,28 +1,60 @@
 
+## Nueva pagina Promolog
 
-## Hacer el hover de las tarjetas visible
+### Resumen
+Crear la pagina `/promolog` con el layout estandar de la app (Sidebar + Topbar + contenido) y agregarla al sidebar en el grupo "Operaciones", encima de LeadGen, con un badge numerico.
 
-### Problema
+### Archivos a crear
 
-El componente `Card` base aplica `bg-card` como fondo solido. Al agregar `hover:bg-muted/50`, el cambio de color es practicamente imperceptible porque `muted` con 50% de opacidad se mezcla de forma muy similar al fondo de la card.
+#### 1. `src/pages/Promolog.tsx`
+Pagina wrapper con el layout estandar (SidebarProvider, DashboardSidebar, DashboardTopbar) igual que LeadGen.tsx.
 
-### Solucion
+#### 2. `src/pages/promolog/PromologContent.tsx`
+Componente principal con las siguientes secciones:
 
-**Archivo**: `src/pages/leadgen/LeadGenGrid.tsx` (linea 76)
+**Header fijo:**
+- Titulo "Promolog" (text-2xl font-semibold)
+- Subtitulo "Seguimiento promocional diario" (text-sm text-muted-foreground)
 
-Cambiar el hover para usar un efecto combinado mas visible: borde con color primario y un fondo muted sin transparencia.
+**Barra de acciones:**
+- Selector de fecha mostrando la fecha actual (formato "13 de febrero, 2026") con icono de calendario
+- Boton "Ver Agentes" con icono de usuarios
+- Boton "Ver Campanas" con icono de target/settings
+- Boton "Agregar Campana" con icono de settings
+- Boton primario "+ Agregar Entrada"
 
-```tsx
-// De:
-className="cursor-pointer hover:bg-muted/50 transition-colors relative"
+**4 tarjetas KPI** (grid de 4 columnas) con borde superior de 3px de color:
+- **Total Modelos**: borde purple/primary, icono de usuarios, valor 142, subtexto "Registradas en sistema - Filtrando"
+- **Tickets ingresados**: borde green/success, icono check-circle, valor 5, subtexto "Tickets ingresados hoy"
+- **NO Chequeadas**: borde red/destructive, icono warning triangle, valor 129, subtexto "Equipo no las reviso" (con emoji de alerta en el titulo)
+- **Completadas Hoy**: borde sin color especial o con color neutro, icono trending-up, valor 5, subtexto "Tickets ingresados hoy"
 
-// A:
-className="cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all relative"
-```
+**Seccion "Promociones por Red Social y Plataforma":**
+- Titulo "Promociones por Red Social y Plataforma (solo tickets 'Si')"
+- Subtitulo "Red Social"
+- 4 tarjetas con iconos de redes sociales reutilizando los componentes existentes (InstagramIcon, TikTokIcon, XIcon) mas un icono de Telegram (Send de lucide-react):
+  - Instagram: 3
+  - TikTok: 0
+  - X: 2
+  - Telegram: 0
 
-Esto agrega `hover:border-primary/30` que cambia el borde de la tarjeta a un tono sutil del color primario, haciendolo claramente visible. Se usa `transition-all` para animar tanto el fondo como el borde. Este patron ya se usa en las tarjetas del grid de Eventos (`EventosGrid.tsx` linea 70: `hover:shadow-md hover:border-primary/30`).
+Los datos seran mock/estaticos por ahora ya que no hay tabla de Supabase para Promolog.
 
-### Resultado
+### Archivos a modificar
 
-Al pasar el cursor sobre la tarjeta, el borde se tornara al color primario con 30% de opacidad, dando un feedback visual claro e inmediato.
+#### 3. `src/components/dashboard/DashboardSidebar.tsx`
+- Agregar el item "Promolog" en el grupo "Operaciones", antes de LeadGen
+- Usar el icono `Megaphone` de lucide-react
+- Incluir un badge con el numero 97 (como se ve en la imagen)
 
+#### 4. `src/App.tsx`
+- Importar el componente Promolog
+- Agregar la ruta `<Route path="/promolog" element={<Promolog />} />`
+
+### Detalles tecnicos
+
+- Las tarjetas KPI seguiran el patron de las tarjetas operacionales del Dashboard principal (borde superior de 3px con color semantico)
+- El layout usara `h-screen overflow-hidden` en el wrapper y `flex-1 overflow-auto` en el contenido scrollable, consistente con el patron de LeadGen
+- Los iconos de redes sociales reutilizaran InstagramIcon, TikTokIcon y XIcon existentes
+- Para Telegram se usara el icono `Send` de lucide-react como aproximacion
+- Los valores son estaticos/mock, listos para conectar a Supabase cuando se cree la tabla correspondiente
