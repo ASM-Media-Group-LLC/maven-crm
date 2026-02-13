@@ -60,24 +60,6 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
       onClick: () => navigate("/sales-overview/top10"),
     },
     {
-      id: "rising",
-      title: "Subiendo",
-      icon: TrendingUp,
-      iconColor: "text-success",
-      content: (
-        <div className="space-y-1">
-          {data.rising.slice(0, 2).map((c) => (
-            <div key={c.creatorKey} className="flex items-center justify-between text-xs">
-              <span className="truncate max-w-[80px]">{c.artisticName || "—"}</span>
-              <span className="text-success">+{c.changePercent.toFixed(0)}%</span>
-            </div>
-          ))}
-          {data.rising.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
-        </div>
-      ),
-      onClick: () => navigate("/sales-overview/subiendo"),
-    },
-    {
       id: "falling",
       title: "Bajando",
       icon: TrendingDown,
@@ -104,16 +86,6 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
         <p className="text-2xl font-bold text-accent">{data.highPotential.length}</p>
       ),
       onClick: () => navigate("/sales-overview/alto-potencial"),
-    },
-    {
-      id: "at_risk",
-      title: "En Riesgo",
-      icon: AlertTriangle,
-      iconColor: "text-destructive",
-      content: (
-        <p className="text-2xl font-bold text-destructive">{fmt(atRiskTotal)}</p>
-      ),
-      onClick: () => navigate("/sales-overview/en-riesgo"),
     },
     {
       id: "alerts",
