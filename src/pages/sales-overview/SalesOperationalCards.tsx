@@ -1,8 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  BarChart3, Trophy, TrendingDown, Zap,
-  Bell, CalendarDays, LayoutGrid,
+  BarChart3, Trophy, TrendingDown, Zap, Bell,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
@@ -11,13 +10,12 @@ interface Props {
   data: PeriodComparisonResult;
   onCardClick: (type: string) => void;
   sparklineData?: { value: number }[];
-  eventCount?: number;
 }
 
 const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
-const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCount = 0 }: Props) => {
+const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props) => {
   const navigate = useNavigate();
 
   const atRiskTotal = data.atRisk.reduce((s, c) => s + c.currentEarnings, 0);
@@ -94,25 +92,6 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
       iconColor: "text-warning",
       content: (
         <p className="text-2xl font-bold text-warning">{alertCount}</p>
-      ),
-    },
-    {
-      id: "calendar",
-      title: "Calendario",
-      icon: CalendarDays,
-      content: (
-        <p className="text-2xl font-bold text-foreground">{eventCount}</p>
-      ),
-    },
-    {
-      id: "todas",
-      title: "Todas",
-      icon: LayoutGrid,
-      content: (
-        <div className="space-y-1 text-xs">
-          <div className="flex justify-between"><span>Total</span><span className="font-medium">{data.creators.length}</span></div>
-          <div className="flex justify-between"><span>Activas</span><span className="text-success font-medium">{data.activeCreators}</span></div>
-        </div>
       ),
     },
   ];
