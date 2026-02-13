@@ -34,6 +34,8 @@ import LeadGen from "./pages/LeadGen";
 import Promolog from "./pages/Promolog";
 import Contactos from "./pages/Contactos";
 import NuevoContacto from "./pages/NuevoContacto";
+import Tareas from "./pages/Tareas";
+import TaskSharePage from "./pages/tareas/TaskSharePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +54,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
+              <Route path="/tareas/share/:token" element={<TaskSharePage />} />
 
               {/* Protected routes */}
               <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />
@@ -75,6 +78,7 @@ const App = () => (
               <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
               <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
               <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
+              <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/eventos/nuevo" element={<ProtectedRoute><NuevoEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
