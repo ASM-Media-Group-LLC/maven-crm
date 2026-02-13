@@ -1,37 +1,14 @@
 
 
-## Modulo de Closers - Gestion de Deals y Llamadas
+## Modulo de Tickets - Customer Service en Operaciones
 
-Nuevo modulo completo dentro de Operaciones para gestionar deals de ventas con pipeline visual.
+Nuevo modulo independiente para gestionar todos los tickets de soporte, accesible desde el sidebar. La tabla `tickets` ya existe en la base de datos con RLS configurada, por lo que no se necesitan migraciones SQL.
 
 ---
 
-### 1. Migracion SQL - Tabla `deals`
+### 1. No se requiere migracion SQL
 
-Crear tabla con los campos necesarios para el pipeline de closers:
-
-```text
-CREATE TABLE public.deals (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  prospect_handle TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT 'LeadGen',
-  stage TEXT NOT NULL DEFAULT 'Nuevo',
-  assigned_to UUID REFERENCES auth.users(id),
-  created_by UUID REFERENCES auth.users(id) DEFAULT auth.uid(),
-  company_id UUID REFERENCES public.companies(id),
-  notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-Stages posibles: Nuevo, Contactado, Llamada Agendada, En Llamada, No Show, Cerrado, Perdido.
-
-Sources posibles: LeadGen, Inbound, Otro.
-
-RLS policies:
-- SELECT: usuarios autenticados ven solo deals de su company o los que crearon
-- INSERT/UPDATE/DELETE: usuarios autenticados, mismo filtro
+La tabla `tickets` ya existe con las columnas necesarias: `id`, `creator_id`, `title`, `description`, `priority`, `status`, `ticket_type`, `company`, `assigned_to`, `creator_notes`, `created_at`, `updated_at`. Las RLS policies ya estan configuradas con acceso completo para usuarios autenticados.
 
 ---
 
@@ -39,12 +16,12 @@ RLS policies:
 
 | Archivo | Proposito |
 |---------|-----------|
-| `src/pages/Closers.tsx` | Pagina wrapper (mismo patron que LeadGen.tsx) |
-| `src/pages/closers/ClosersContent.tsx` | Layout principal: header, KPIs, seccion Contactos, Pipeline |
-| `src/pages/closers/ClosersKPICards.tsx` | 4 tarjetas KPI: Tasa Conversion, Total Llamadas, Contestadas, En Progreso |
-| `src/pages/closers/PipelineBoard.tsx` | 7 columnas del pipeline (Nuevo, Contactado, etc.) con contadores y listado de deals |
-| `src/pages/closers/NewDealModal.tsx` | Modal "Crear Nuevo Deal" con campos: Prospect Handle, Fuente (LeadGen/Inbound/Otro), Etapa Inicial |
-| `src/pages/closers/useDeals.ts` | Hook con queries y mutations (CRUD) para la tabla deals |
+| `src/pages/Tickets.tsx` | Pagina wrapper (mismo patron que Closers.tsx) con SidebarProvider, DashboardSidebar y Topbar |
+| `src/pages/tickets/TicketsContent.tsx` | Layout principal: header "Customer Service" + subtitulo + boton "Nuevo Ticket", filtros, y lista de tickets |
+| `src/pages/tickets/TicketsList.tsx` | Lista de tickets con tarjetas mostrando: numero de ticket, titulo, creador, asignado, descripcion, fecha, compania, badges de prioridad y estado |
+| `src/pages/tickets/CreateTicketModal.tsx` | Modal para crear ticket (reutiliza la logica del existente pero sin requerir `creatorId`, todo en espanol). Campos: Titulo, Descripcion, Prioridad (Baja/Media/Alta/Urgente), Tipo (Queja/Tecnico/Facturacion/Contenido/General), Compania (Ora Miami/KASH Agency/alvaroletshoot/Blu app/piclink.me/Pagomundo), Asignar a (lista de ~37 miembros), Notas |
+| `src/pages/tickets/useTickets.ts` | Hook con query para listar todos los tickets (con join a creators para mostrar nombre) y mutation para crear tickets |
+| `src/pages/tickets/TicketsFilters.tsx` | Barra de filtros: busqueda por texto, selectores de prioridad/tipo/estado/compania/asignado, rango de fechas |
 
 ---
 
@@ -52,42 +29,50 @@ RLS policies:
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/App.tsx` | Agregar ruta `/closers` con import y ProtectedRoute |
-| `src/components/dashboard/DashboardSidebar.tsx` | Agregar enlace "Closers" en la seccion Operaciones (icono Phone) |
+| `src/App.tsx` | Agregar ruta `/tickets` con import y ProtectedRoute |
+| `src/components/dashboard/DashboardSidebar.tsx` | Agregar enlace "Tickets" en la seccion Operaciones (icono Ticket) |
 
 ---
 
 ### 4. Detalle de componentes
 
-**ClosersContent.tsx** - Layout basado en las imagenes de referencia:
-- Header: "Closers" + subtitulo "Gestion de deals y llamadas" + boton "+ New Deal"
-- 4 KPI cards con borde superior de 3px (patron operacional existente):
-  - Tasa Conversion (accent) - porcentaje de deals cerrados
-  - Total Llamadas (primary) - conteo total
-  - Contestadas (success) - con tasa de respuesta
-  - En Progreso (purple/destructive) - deals activos
-- Seccion "Contactos" (placeholder por ahora)
-- Seccion "Pipeline de Ventas" - 7 columnas con tarjetas de deals
+**TicketsContent.tsx** - Basado en la imagen de referencia:
+- Header: "Customer Service" + "Gestion de soporte y escalaciones" + boton "+ Nuevo Ticket"
+- Tabs: "Lista de Tickets" y "Calendario" (calendario como placeholder)
+- Barra de filtros: campo de busqueda + selectores multiples
+- Rango de fechas: "Desde" / "Hasta"
+- Contador de tickets: "X tickets"
+- Listado vertical de tarjetas de tickets
 
-**NewDealModal.tsx** - Todo en espanol:
-- Campo: "Prospect Handle" (placeholder: @username)
-- Select "Fuente": opciones LeadGen, Inbound, Otro
-- Select "Etapa Inicial": opciones Nuevo, Contactado, Llamada Agendada, En Llamada, No Show, Cerrado, Perdido
-- Boton: "Crear Deal"
+**TicketsList.tsx** - Cada tarjeta de ticket muestra:
+- Numero de ticket (formato #XXXXXX con color por prioridad)
+- Titulo en negrita
+- "Creado por: @handle" y "Asignado a: @handle o Sin asignar"
+- Descripcion/preview del contenido
+- Fecha de creacion formateada
+- Badge de compania (si existe)
+- Badges de prioridad (Urgente=destructive, Alta=warning, Media=primary, Baja=secondary) y estado (Abierto, En Progreso, Resuelto, Cerrado)
+- Tickets urgentes con fondo sutil de alerta (como en la imagen)
 
-**PipelineBoard.tsx** - Grid de 7 columnas:
-- Cada columna tiene titulo, badge con conteo, barra de color unica, y lista de deals filtrados por stage
-- Colores por etapa usando tokens semanticos: primary (Nuevo), accent (Contactado), info (Llamada Agendada), primary (En Llamada), destructive (No Show), success (Cerrado), muted (Perdido)
+**CreateTicketModal.tsx** - Todo en espanol:
+- Titulo: "Crear Nuevo Ticket"
+- Subtitulo: "Completa el formulario para crear un ticket de escalacion"
+- Campos: Titulo, Descripcion, Prioridad (Baja/Media/Alta/Urgente), Tipo de Ticket (Queja/Tecnico/Facturacion/Contenido/General), Compania/Cuenta de Origen, Asignar a (lista completa de miembros), Notas sobre el creator
+- Botones: "Cancelar" y "Crear Ticket"
+- El campo `creator_id` sera opcional en este contexto (se puede crear sin vincularlo a un creador especifico, o agregar un selector de creador)
+
+**TicketsFilters.tsx**:
+- Input de busqueda con placeholder "Buscar por titulo, descripcion, numero de ticket..."
+- Selectores: Prioridad (Todas/Baja/Media/Alta/Urgente), Tipo (Todos), Estado (Todas), Compania (Todas), Asignado (Todos)
+- Date range: Desde / Hasta
 
 ---
 
-### 5. Flujo del usuario
+### 5. Consideracion sobre creator_id
 
-1. Usuario navega a Closers desde el sidebar
-2. Ve KPIs resumen y pipeline vacio
-3. Click en "+ New Deal" abre modal en espanol
-4. Llena prospect handle, selecciona fuente y etapa
-5. Click "Crear Deal" inserta en Supabase
-6. Deal aparece en la columna correspondiente del pipeline
-7. Los KPIs se actualizan automaticamente
+La tabla `tickets` tiene `creator_id` como NOT NULL. Para el modulo independiente de Tickets, necesitaremos una de estas opciones:
+- Agregar un selector de creador en el modal (Select que carga la lista de creators desde Supabase)
+- O modificar la columna a nullable
+
+La opcion recomendada es agregar un selector de creador en el modal, ya que los tickets siempre estan relacionados con un creador. Se agregara un campo "Creador" con un select que lista todos los creadores disponibles.
 
