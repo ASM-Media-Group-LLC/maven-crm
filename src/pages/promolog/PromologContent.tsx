@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CalendarDays,
   Users,
@@ -9,8 +10,12 @@ import {
   TrendingUp,
   Send,
 } from "lucide-react";
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -54,7 +59,10 @@ const socialCards = [
 ];
 
 const PromologContent = () => {
-  const today = new Date().toLocaleDateString("es-ES", {
+  const [date, setDate] = useState<Date>(new Date());
+  const [open, setOpen] = useState(false);
+
+  const formattedDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -72,10 +80,54 @@ const PromologContent = () => {
 
       {/* Action Bar */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm">
-          <CalendarDays className="mr-2 h-4 w-4" />
-          {today}
-        </Button>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button size="sm" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              {formattedDate}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={(d) => {
+                if (d) {
+                  setDate(d);
+                  setOpen(false);
+                }
+              }}
+              locale={es}
+              weekStartsOn={1}
+              className="p-3 pointer-events-auto"
+            />
+            <Separator />
+            <div className="flex items-center gap-2 p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDate(new Date());
+                  setOpen(false);
+                }}
+              >
+                Hoy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() - 7);
+                  setDate(d);
+                  setOpen(false);
+                }}
+              >
+                7 días
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
         <Button variant="outline" size="sm">
           <Users className="mr-2 h-4 w-4" />
           Ver Agentes
