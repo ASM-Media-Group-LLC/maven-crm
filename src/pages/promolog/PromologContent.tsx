@@ -32,7 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -216,7 +216,7 @@ const PromologContent = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("__all__");
   const [selectedCategory, setSelectedCategory] = useState("__all__");
@@ -325,24 +325,26 @@ const PromologContent = () => {
   const completedToday = filteredCreators.filter(c => c.status === "active").length;
   const pendingCreators = filteredCreators.length - completedToday;
 
-  const [appliedFilters, setAppliedFilters] = useState({
-    status: "__all__",
-    creator: "",
-    category: "__all__",
-    network: "__all__",
-  });
+  const [searchEntry, setSearchEntry] = useState("");
 
   const filteredEntries = mockEntries.filter((entry) => {
-    if (appliedFilters.status !== "__all__") {
+    if (selectedStatus !== "__all__") {
       const statusMap: Record<string, string> = {
         si_promociono: "Sí",
         no_promociono: "No",
         parcial: "Parcial",
         pendiente: "Pendiente",
       };
-      if (entry.result !== statusMap[appliedFilters.status]) return false;
+      if (entry.result !== statusMap[selectedStatus]) return false;
     }
-    if (appliedFilters.network !== "__all__" && entry.network !== appliedFilters.network) return false;
+    if (selectedNetwork !== "__all__" && entry.network !== selectedNetwork) return false;
+    if (selectedCategory !== "__all__") {
+      // filter by creator category if needed
+    }
+    if (searchEntry) {
+      const q = searchEntry.toLowerCase();
+      if (!entry.name.toLowerCase().includes(q) && !entry.ticketNumber.toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -544,112 +546,6 @@ const PromologContent = () => {
             </p>
           </div>
 
-          {/* Filters Sheet */}
-          <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <SheetContent side="right">
-              <SheetHeader>
-                <SheetTitle>Filtros de Tickets</SheetTitle>
-              </SheetHeader>
-              <div className="space-y-6 py-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">¿Promocionó?</label>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todos</SelectItem>
-                      <SelectItem value="si_promociono">Sí promocionó</SelectItem>
-                      <SelectItem value="no_promociono">No promocionó</SelectItem>
-                      <SelectItem value="parcial">Parcial</SelectItem>
-                      <SelectItem value="pendiente">Pendiente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Modelo</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between font-normal">
-                        {selectedCreator
-                          ? creators.find((c) => c.id === selectedCreator)?.name ?? "Todas las modelos"
-                          : "Todas las modelos"}
-                        <Filter className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Buscar modelo..." />
-                        <CommandList>
-                          <CommandEmpty>No se encontraron modelos.</CommandEmpty>
-                          <CommandGroup>
-                            <CommandItem
-                              value="__all__"
-                              onSelect={() => setSelectedCreator("")}
-                            >
-                              Todas las modelos
-                            </CommandItem>
-                            {creators.map((c) => (
-                              <CommandItem
-                                key={c.id}
-                                value={`${c.name} ${c.artistic_name ?? ""}`}
-                                onSelect={() => setSelectedCreator(c.id)}
-                              >
-                                {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Categoría de Modelo</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todas las categorías</SelectItem>
-                      {categoryOptions.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Red Social</label>
-                  <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
-                    <SelectTrigger><SelectValue placeholder="Todas las redes" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todas las redes</SelectItem>
-                      <SelectItem value="instagram">Instagram</SelectItem>
-                      <SelectItem value="tiktok">TikTok</SelectItem>
-                      <SelectItem value="x">X/Twitter</SelectItem>
-                      <SelectItem value="onlyfans">OnlyFans</SelectItem>
-                      <SelectItem value="treat">Treat</SelectItem>
-                      <SelectItem value="telegram">Telegram</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <SheetFooter className="flex flex-col gap-2 sm:flex-col">
-                <Button variant="outline" className="w-full" onClick={() => {
-                  setSelectedStatus("__all__");
-                  setSelectedCreator("");
-                  setSelectedCategory("__all__");
-                  setSelectedNetwork("__all__");
-                }}>Limpiar filtros</Button>
-                <Button className="w-full" onClick={() => {
-                  setAppliedFilters({
-                    status: selectedStatus,
-                    creator: selectedCreator,
-                    category: selectedCategory,
-                    network: selectedNetwork,
-                  });
-                  setFiltersOpen(false);
-                }}>Aplicar filtros</Button>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
-
           {/* Tabs */}
           <Tabs defaultValue="tabla">
             <TabsList>
@@ -670,14 +566,60 @@ const PromologContent = () => {
             <TabsContent value="tabla">
               {/* Entradas Recientes */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">Entradas Recientes</h2>
-                    <span className="text-sm text-muted-foreground">
-                      {filteredEntries.length} entradas
-                    </span>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">Entradas Recientes</h2>
+                  <span className="text-sm text-muted-foreground">
+                    {filteredEntries.length} entradas
+                  </span>
+                </div>
+
+                {/* Inline filters */}
+                <div className="flex items-center gap-3">
+                  <div className="relative w-48">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar entrada..."
+                      className="pl-9 h-9"
+                      value={searchEntry}
+                      onChange={(e) => setSearchEntry(e.target.value)}
+                    />
                   </div>
-                  <div className="flex items-center gap-1">
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos</SelectItem>
+                      <SelectItem value="si_promociono">Sí</SelectItem>
+                      <SelectItem value="no_promociono">No</SelectItem>
+                      <SelectItem value="parcial">Parcial</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedNetwork} onValueChange={setSelectedNetwork}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Red Social" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todas</SelectItem>
+                      <SelectItem value="instagram">Instagram</SelectItem>
+                      <SelectItem value="tiktok">TikTok</SelectItem>
+                      <SelectItem value="x">X</SelectItem>
+                      <SelectItem value="telegram">Telegram</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todas</SelectItem>
+                      {categoryOptions.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="ml-auto flex gap-1">
                     <Button
                       variant={entryView === "list" ? "secondary" : "ghost"}
                       size="icon"
@@ -693,9 +635,6 @@ const PromologContent = () => {
                       onClick={() => setEntryView("grid")}
                     >
                       <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setFiltersOpen(true)}>
-                      <Filter className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

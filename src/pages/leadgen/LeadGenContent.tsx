@@ -78,7 +78,7 @@ const LeadGenContent = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setAddLeadOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setAddLeadOpen(true)}>
               <Plus className="h-4 w-4" />
               Lead
             </Button>
@@ -194,19 +194,19 @@ const LeadGenContent = () => {
               </Select>
             </>
           )}
-          <div className="flex border rounded-md">
+          <div className="flex gap-1">
             <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-r-none h-9 w-9 p-0"
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-9 w-9"
               onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-l-none h-9 w-9 p-0"
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-9 w-9"
               onClick={() => setViewMode("grid")}
             >
               <LayoutGrid className="h-4 w-4" />
