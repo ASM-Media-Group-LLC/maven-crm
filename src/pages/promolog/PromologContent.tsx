@@ -9,6 +9,9 @@ import {
   AlertTriangle,
   TrendingUp,
   Send,
+  Check,
+  Minus,
+  X,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -16,6 +19,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -58,13 +63,34 @@ const socialCards = [
   { name: "Telegram", value: 0, icon: <Send className="h-6 w-6" /> },
 ];
 
+const agentsData = [
+  {
+    name: "lorena_lozano",
+    tickets: 5,
+    si: 5,
+    parcial: 0,
+    no: 0,
+    badges: [
+      { label: "IG", value: 3 },
+      { label: "X", value: 2 },
+    ],
+  },
+];
+
 const PromologContent = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
 
   const formattedDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
+    year: "numeric",
+  });
+
+  const shortDate = date.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
     year: "numeric",
   });
 
@@ -128,9 +154,13 @@ const PromologContent = () => {
             </div>
           </PopoverContent>
         </Popover>
-        <Button variant="outline" size="sm">
+        <Button
+          variant={view === "agentes" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView(view === "dashboard" ? "agentes" : "dashboard")}
+        >
           <Users className="mr-2 h-4 w-4" />
-          Ver Agentes
+          {view === "dashboard" ? "Ver Agentes" : "Ver Dashboard"}
         </Button>
         <Button variant="outline" size="sm">
           <Target className="mr-2 h-4 w-4" />
@@ -166,30 +196,96 @@ const PromologContent = () => {
         ))}
       </div>
 
-      {/* Social Section */}
-      <div className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            Promociones por Red Social y Plataforma{" "}
-            <span className="text-sm font-normal text-muted-foreground">
-              (solo tickets &apos;Sí&apos;)
-            </span>
-          </h2>
-          <p className="text-sm text-muted-foreground">Red Social</p>
-        </div>
+      {/* Conditional: Social Section or Agents Section */}
+      {view === "dashboard" ? (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Promociones por Red Social y Plataforma{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                (solo tickets &apos;Sí&apos;)
+              </span>
+            </h2>
+            <p className="text-sm text-muted-foreground">Red Social</p>
+          </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {socialCards.map((s) => (
-            <Card key={s.name}>
-              <CardContent className="flex flex-col items-center justify-center gap-2 p-5">
-                {s.icon}
-                <p className="text-xs text-muted-foreground">{s.name}</p>
-                <p className="text-2xl font-bold">{s.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {socialCards.map((s) => (
+              <Card key={s.name}>
+                <CardContent className="flex flex-col items-center justify-center gap-2 p-5">
+                  {s.icon}
+                  <p className="text-xs text-muted-foreground">{s.name}</p>
+                  <p className="text-2xl font-bold">{s.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold">Desempeño por Agente</h2>
+            <p className="text-sm text-muted-foreground">
+              Mostrando {agentsData.length} agente con actividad entre {shortDate} - {shortDate}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {agentsData.map((agent) => (
+              <Card key={agent.name}>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-muted">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">{agent.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {agent.tickets} tickets ingresados
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15">
+                        <Check className="h-3 w-3 text-green-600" />
+                      </span>
+                      <span className="text-sm font-medium">{agent.si}</span>
+                      <span className="text-xs text-muted-foreground">Sí</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15">
+                        <Minus className="h-3 w-3 text-yellow-600" />
+                      </span>
+                      <span className="text-sm font-medium">{agent.parcial}</span>
+                      <span className="text-xs text-muted-foreground">Parcial</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15">
+                        <X className="h-3 w-3 text-red-600" />
+                      </span>
+                      <span className="text-sm font-medium">{agent.no}</span>
+                      <span className="text-xs text-muted-foreground">No</span>
+                    </div>
+
+                    <Separator orientation="vertical" className="h-8" />
+
+                    <div className="flex items-center gap-1.5">
+                      {agent.badges.map((b) => (
+                        <Badge key={b.label} variant="outline" className="text-xs">
+                          {b.label} {b.value}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </main>
   );
 };
