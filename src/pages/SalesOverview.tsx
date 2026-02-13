@@ -10,6 +10,7 @@ import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
 import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
 import { useEarningsData } from "./sales-performance/useEarningsData";
+import ClariAiFab from "@/components/ClariAiFab";
 
 const getDateRange = (period: OverviewPeriod): { from: Date; to: Date } => {
   const now = new Date();
@@ -101,6 +102,7 @@ const SalesOverview = () => {
           </main>
         </div>
       </div>
+      <ClariAiFab />
     </SidebarProvider>
   );
 };
