@@ -1,61 +1,93 @@
 
+## Objetivo
+Hacer que el badge de "Calidad" en la tabla de Leads sea un dropdown interactivo que permita cambiar la categoría del lead directamente desde la tabla sin abrir un modal separado.
 
-# Ajustar tabla de Leads al sistema de diseno
+## Contexto Actual
+- `LeadGenTable.tsx` (línea 155-162): Muestra el badge de calidad con un `ChevronDown` que visualmente sugiere interactividad, pero no está funcional.
+- `LeadGenContent.tsx`: Usa `useQuery` para cargar los leads desde Supabase, pero no tiene un callback para actualizar la categoría.
+- El patrón de actualización existe en el codebase (ver `useCreadores.ts` línea 159-162): usa `useMutation` con `supabase.from("table").update(data).eq("id", id)`.
 
-## Problema actual
+## Solución Propuesta
 
-La tabla de Leads no sigue los patrones del sistema de diseno establecidos en la aplicacion (ContactosTable como referencia). Tiene los siguientes problemas:
+### 1. Crear un Hook `useUpdateLeadCategoria`
+Crear un nuevo hook en `src/pages/leadgen/useLeadGen.ts` (o similar) que:
+- Use `useMutation` de TanStack Query para actualizar la categoría
+- Ejecute `supabase.from("leads").update({ categoria }).eq("id", leadId)`
+- Invalide el queryKey de "leads" después de actualizar para refrescar la tabla
 
-- No tiene ordenacion (sorting) en las columnas -- el sistema de diseno requiere sorting en todas las columnas
-- Usa colores hardcoded (`bg-green-500`, `bg-yellow-500`) en vez de las variantes del Badge del design system (`success-soft`, `primary-soft`, etc.)
-- Usa emojis para iconos de plataforma en vez de los componentes de icono existentes (`InstagramIcon`, `TikTokIcon`, `XIcon`)
-- La tabla esta envuelta en un `Card` innecesario en vez del contenedor `rounded-lg border border-border` estandar
-- La columna de Acciones usa solo un boton Eye en vez del patron DropdownMenu con `MoreHorizontal` usado en el resto de tablas
-- No hay columna de ordenacion (SortHeader) como en ContactosTable
+### 2. Modificar `LeadGenTable.tsx`
+Reemplazar la celda de Calidad (línea 155-162) con:
+- Un componente renderizado con `DropdownMenu` en lugar del `div` simple
+- El trigger será el badge existente
+- El contenido del dropdown tendrá 5 items: A+, A, B+, B, C
+- Cada item ejecutará la mutación al hacer click
+- Agregar prop `onCategoriaChange?: (leadId: string, newCategoria: string) => void` al componente (o directamente usar el hook dentro del componente)
 
-## Solucion
+### 3. Integrar la mutación en `LeadGenContent.tsx`
+Importar el hook `useUpdateLeadCategoria` y:
+- Pasar una función callback a `LeadGenTable` que ejecute la mutación
+- O directamente usar el hook dentro de `LeadGenTable` para evitar prop drilling
 
-Extraer la tabla de leads a un componente separado `LeadGenTable.tsx` siguiendo exactamente el patron de `ContactosTable.tsx`, e integrarlo en `LeadGenContent.tsx`.
+## Archivos a Modificar
 
-## Cambios detallados
+**Crear:**
+- `src/pages/leadgen/useLeadGen.ts` (nuevo hook con `useUpdateLeadCategoria`)
 
-### 1. Crear `src/pages/leadgen/LeadGenTable.tsx`
+**Modificar:**
+- `src/pages/leadgen/LeadGenTable.tsx` -- Reemplazar la celda de Calidad (línea 155-162) con un DropdownMenu interactivo. Importar el hook y ejecutar la mutación al cambiar la categoría.
+- `src/pages/leadgen/LeadGenContent.tsx` -- Pasar el callback necesario a `LeadGenTable` si es necesario (opcional si se usa el hook directamente).
 
-Nuevo componente siguiendo el patron exacto de `ContactosTable.tsx`:
+## Detalles Técnicos
 
-- **SortHeader**: Boton ghost con `ArrowUpDown` para cada columna sorteable
-- **Contenedor**: `max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border`
-- **Header sticky**: `sticky top-0 z-10 bg-card`
-- **Columnas**: Hora, Ticket, Handle, Agente, Calidad, Estado, Pais, Contacto, QA, Acciones (sticky right)
-- **Badge variants del design system**:
-  - Calidad: `A+` = `success-soft`, `A` = `primary-soft`, `B+` = `warning-soft`, `B` = `secondary-soft`, `C` = `destructive-soft`
-  - Estado: `nuevo` = `primary-soft`, `contactado` = `warning-soft`, `cerrado` = `success-soft`, `rechazado` = `destructive-soft`
-- **Iconos de plataforma**: Usar `InstagramIcon`, `TikTokIcon`, `XIcon` existentes en vez de emojis
-- **Acciones**: DropdownMenu con `MoreHorizontal` trigger, items: "Ver detalle" (Eye), "Editar" (Pencil)
-- **Sorting**: Estado de sort local con `useState`, sorting por todas las columnas
-- **Bandera de pais**: Mantener la funcion `countryToFlag` (emojis de bandera son el enfoque correcto para banderas)
-- **Ticket**: Badge con `variant="outline"` y clases `font-mono text-xs`
+**Hook `useUpdateLeadCategoria`:**
+```tsx
+export const useUpdateLeadCategoria = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, categoria }: { id: string; categoria: string }) => {
+      const { error } = await supabase.from("leads").update({ categoria }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+};
+```
 
-### 2. Modificar `src/pages/leadgen/LeadGenContent.tsx`
+**Dropdown en LeadGenTable:**
+```tsx
+<TableCell>
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="ghost" size="sm" className="h-8 -ml-2 flex items-center gap-1">
+        <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+          {lead.categoria.toUpperCase()}
+        </Badge>
+        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start">
+      {["a+", "a", "b+", "b", "c"].map((cat) => (
+        <DropdownMenuItem
+          key={cat}
+          onClick={() => mutation.mutate({ id: lead.id, categoria: cat })}
+        >
+          {cat.toUpperCase()}
+        </DropdownMenuItem>
+      ))}
+    </DropdownMenuContent>
+  </DropdownMenu>
+</TableCell>
+```
 
-- Remover la tabla inline (lineas 256-339 aprox) y el Card wrapper
-- Importar y usar `<LeadGenTable leads={leads} />` en su lugar
-- Remover los helpers que se moveran al nuevo componente (`getTicketId`, `cleanHandle`, `getPlatformIcon`, `countryToFlag`, `calidadColors`, `statusLabels`)
-- Mantener el loading state y empty state en LeadGenContent, solo pasar leads al componente cuando hay datos
+**Constraint del Design System:**
+- Sin valores hardcoded de color -- usar variantes de Badge existentes
+- El DropdownMenu sigue el patrón de dropdowns existentes en la tabla (como el de Acciones)
+- El comportamiento de invalidar el queryKey mantiene la tabla sincronizada con la BD
 
-### Seccion tecnica
-
-**Archivos a crear:**
-- `src/pages/leadgen/LeadGenTable.tsx`
-
-**Archivos a modificar:**
-- `src/pages/leadgen/LeadGenContent.tsx` -- reemplazar tabla inline por componente LeadGenTable
-
-**Patrones del design system aplicados:**
-- Sorting con `ArrowUpDown` en todas las columnas (constraint obligatorio)
-- Badge variants semanticos (`success-soft`, `primary-soft`, `warning-soft`, `destructive-soft`, `secondary-soft`)
-- Contenedor con `rounded-lg border border-border` (no Card)
-- Header sticky con `bg-card`
-- Acciones sticky right con DropdownMenu + MoreHorizontal
-- Iconos de marca (InstagramIcon, TikTokIcon, XIcon) en vez de emojis
-- Sin valores hardcoded de color
+## Beneficios
+- Cambio rápido de categoría sin abrir modal
+- UX inline consistente con patrones de tablas editable en sistemas modernos
+- Sincronización automática con Supabase vía TanStack Query
+- Sin necesidad de refrescar la página
