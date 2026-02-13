@@ -33,6 +33,11 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const handleCancel = () => {
+    toast({ title: "Conversión cancelada" });
+    onOpenChange(false);
+  };
+
   const handle = extractHandle(lead.url_perfil);
   const ticketId = getTicketId(lead.id);
 
@@ -108,7 +113,7 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={convert.isPending}>
+          <Button variant="outline" onClick={handleCancel} disabled={convert.isPending}>
             Cancelar
           </Button>
           <Button onClick={() => convert.mutate()} disabled={convert.isPending}>
