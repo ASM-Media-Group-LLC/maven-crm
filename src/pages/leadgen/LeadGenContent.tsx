@@ -9,6 +9,7 @@ import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import LeadGenTable from "./LeadGenTable";
 import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
+import ViewLeadModal from "./ViewLeadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +50,8 @@ const LeadGenContent = () => {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [selectedAgente, setSelectedAgente] = useState("todos");
   const [addContactoOpen, setAddContactoOpen] = useState(false);
+  const [viewLeadOpen, setViewLeadOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<(typeof leads)[number] | null>(null);
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ["leads"],
@@ -226,7 +229,10 @@ const LeadGenContent = () => {
                   </p>
                 </div>
               ) : (
-                <LeadGenTable leads={leads} />
+                <LeadGenTable
+                  leads={leads}
+                  onView={(lead) => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                />
               )}
             </>
           )}
@@ -451,6 +457,7 @@ const LeadGenContent = () => {
 
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
       <AddContactoModal open={addContactoOpen} onOpenChange={setAddContactoOpen} />
+      <ViewLeadModal open={viewLeadOpen} onOpenChange={setViewLeadOpen} lead={selectedLead} />
     </main>
   );
 };
