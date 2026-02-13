@@ -1,118 +1,45 @@
 
 
-# Crear paginas internas para cards del Dashboard y agregar animaciones hover
+# Eliminar cards duplicadas y mejorar hover de KPI Cards principales
 
-## Resumen
+## Problema identificado
 
-Se crearan paginas internas dedicadas para cada card importante del Dashboard (Top 10, Subiendo, Bajando, Alto Potencial, En Riesgo) y se agregaran animaciones hover a las KPI cards superiores. Cada pagina seguira el mismo patron de layout que ComparativasPage.
+Hay **dos cards duplicadas** entre las dos secciones:
+- **"Subiendo"** aparece tanto en las KPI cards de arriba como en las cards operacionales de abajo
+- **"En Riesgo"** aparece en ambas secciones tambien
+
+Ademas, las KPI cards principales (arriba) deben ser **visualmente mas grandes** y tener el **mismo estilo de hover con gradiente** que se usa en las cards de Creadores (`hover:bg-gradient-to-br hover:from-{color}/15 hover:to-transparent hover:border-{color}/40`).
 
 ## Cambios
 
-### 1. Animaciones hover en SalesKPICards
+### 1. Eliminar duplicados en `SalesOperationalCards.tsx`
 
-Actualizar `SalesKPICards.tsx` para que **todas** las cards tengan animaciones hover (scale 1.03, shadow, cursor pointer) y naveguen a sus paginas internas correspondientes. Agregar tambien la info de "Anterior: $X" debajo del cambio porcentual, y "X activas" / "crecimiento positivo" / "necesitan atencion" como subtexto descriptivo debajo del valor, tal como se ve en la imagen de referencia (image-48).
+Remover las cards "Subiendo" (id: `rising`) y "En Riesgo" (id: `at_risk`) del array de cards operacionales, ya que esa informacion ya esta en las KPI cards superiores. El grid operacional pasara de 10 a 8 cards.
 
-Estructura visual por card (basada en la imagen):
-- **Ingresos Total**: valor grande en primary, "+X.X% vs anterior", barra de progreso, "Anterior: $X"
-- **Net Earnings**: igual pero en success
-- **Creadoras**: valor + "X activas"
-- **Subiendo**: valor + "crecimiento positivo" + "Filtro activo" (clickable, navega a /sales-overview/subiendo)
-- **En Riesgo**: valor + "necesitan atencion" + "Clic para filtrar" (clickable, navega a /sales-overview/en-riesgo)
+### 2. Mejorar estilo de `SalesKPICards.tsx`
 
-Todas con `hover:scale-[1.03] hover:shadow-lg cursor-pointer transition-all duration-200`.
+**Tamano mas grande:**
+- Aumentar padding de `p-4` a `p-5`
+- Aumentar tamano del valor de `text-2xl` a `text-3xl`
+- Aumentar tamano del icono container de `p-1.5` a `h-9 w-9`
+- Aumentar icono de `h-4 w-4` a `h-5 w-5`
 
-### 2. Navegacion en SalesOperationalCards
+**Hover con gradiente** (igual al de Creadores):
+Cada card tendra su propio `hoverClass` basado en su color:
+- Ingresos Total (primary): `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40`
+- Net Earnings (success): `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40`
+- Creadoras (accent): `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40`
+- Subiendo (success): mismo que Net Earnings
+- En Riesgo (destructive): `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40`
 
-Actualizar las cards operacionales para que naveguen a sus paginas internas:
-- Top 10 -> `/sales-overview/top10`
-- Subiendo -> `/sales-overview/subiendo`
-- Bajando -> `/sales-overview/bajando`
-- Alto Potencial -> `/sales-overview/alto-potencial`
-- En Riesgo -> `/sales-overview/en-riesgo`
-- Las demas (Alertas, Calendario, Clari AI, Todas) mantienen su comportamiento actual
+Todas con `transition-all duration-200` y `hover:shadow-lg`.
 
-### 3. Pagina Top 10 (`/sales-overview/top10`)
+### 3. Cards operacionales se mantienen mas compactas
 
-Basada en image-45:
-- **Header**: Breadcrumb "Creator Sales > Top 10", titulo "Top 10" con subtitulo "Mejores performers", filtros de periodo
-- **Podio visual**: 3 cards en fila (2do, 1ro, 3ro) con el 1ro mas grande y elevado al centro. Cada card muestra:
-  - Badge de posicion (numero en circulo naranja)
-  - Avatar circular con iniciales
-  - Nombre artistico
-  - Monto en formato $XK
-  - Indicador de redes sociales (iconos pequenos)
-- **Card de Concentracion**: barra inferior mostrando "Concentracion del Top 10: X%" con monto "$X de $Y" y "del ingreso total"
-- **Tabla restante**: posiciones 4-10 con avatar, nombre, earnings, cambio %
-
-### 4. Pagina Subiendo (`/sales-overview/subiendo`)
-
-Basada en image-46:
-- **Header**: Breadcrumb "Creator Sales > Subiendo", titulo "Subiendo" con subtitulo "Crecimiento positivo", filtros
-- **3 KPI cards**:
-  - Creadoras subiendo: conteo con icono TrendingUp en verde
-  - Crecimiento promedio: porcentaje con icono Zap en azul
-  - Momentum (2+ meses): conteo con icono Flame en naranja
-- **Tabla**: titulo "Ordenadas por mayor crecimiento", columnas: Creadora (avatar + nombre), Crecimiento %, Earnings actual, Earnings anterior
-- **Empty state**: "No hay creadoras con tendencia al alza en este periodo"
-
-### 5. Pagina Bajando (`/sales-overview/bajando`)
-
-Basada en image-47:
-- **Header**: Breadcrumb "Creator Sales > Bajando", titulo "Bajando" con subtitulo "Necesitan atencion", filtros
-- **3 KPI cards**:
-  - Creadoras bajando: conteo con icono TrendingDown en rojo
-  - Perdida total: monto negativo con icono DollarSign en naranja
-  - Impacto vs ingreso total: porcentaje con icono AlertTriangle en amarillo
-- **Tabla**: titulo "Analisis por severidad de caida", columnas: Creadora, Severidad (badge critica/moderada/leve), Earnings actual, Perdida, Variacion %
-- **Empty state**: "No hay creadoras con tendencia a la baja en este periodo"
-
-### 6. Pagina Alto Potencial (`/sales-overview/alto-potencial`)
-
-Estructura similar a Subiendo pero con enfasis en crecimiento mayor a 30%:
-- **Header**: Breadcrumb "Creator Sales > Alto Potencial", titulo "Alto Potencial" con subtitulo "Crecimiento excepcional"
-- **3 KPI cards**: Creadoras alto potencial, Crecimiento promedio, Revenue generado
-- **Tabla**: ordenada por mayor crecimiento, mismas columnas que Subiendo
-- **Empty state**: "No hay creadoras con alto potencial en este periodo"
-
-### 7. Pagina En Riesgo (`/sales-overview/en-riesgo`)
-
-Estructura similar a Bajando pero mas severa (caida mayor a 20%):
-- **Header**: Breadcrumb "Creator Sales > En Riesgo", titulo "En Riesgo" con subtitulo "Requieren accion inmediata"
-- **3 KPI cards**: Creadoras en riesgo, Perdida total, Impacto vs ingreso total
-- **Tabla**: "Analisis por severidad de riesgo", columnas: Creadora, Severidad, Earnings actual, Perdida, Variacion %
-- **Empty state**: "No hay creadoras en riesgo en este periodo"
-
-### 8. Rutas en App.tsx
-
-Agregar 5 nuevas rutas:
-```text
-/sales-overview/top10
-/sales-overview/subiendo
-/sales-overview/bajando
-/sales-overview/alto-potencial
-/sales-overview/en-riesgo
-```
-
-## Archivos a crear
-
-- `src/pages/sales-overview/Top10Page.tsx` -- pagina completa con podio y tabla
-- `src/pages/sales-overview/SubiendoPage.tsx` -- pagina con KPIs y tabla de crecimiento
-- `src/pages/sales-overview/BajandoPage.tsx` -- pagina con KPIs y tabla de caida
-- `src/pages/sales-overview/AltoPotencialPage.tsx` -- pagina con KPIs y tabla
-- `src/pages/sales-overview/EnRiesgoPage.tsx` -- pagina con KPIs y tabla
+Las cards operacionales (Comparativas, Top 10, Bajando, Alto Potencial, Alertas, Calendario, Clari AI, Todas) mantienen su tamano actual de `p-4` para crear una jerarquia visual clara entre las KPI principales y las operacionales.
 
 ## Archivos a modificar
 
-- `src/pages/sales-overview/SalesKPICards.tsx` -- animaciones hover en todas las cards, navegacion, subtextos descriptivos
-- `src/pages/sales-overview/SalesOperationalCards.tsx` -- navegacion a paginas internas para top10, subiendo, bajando, alto_potencial, at_risk
-- `src/App.tsx` -- agregar 5 nuevas rutas
-
-## Detalles tecnicos
-
-- Cada pagina reutiliza el layout SidebarProvider + DashboardSidebar + DashboardTopbar
-- Los datos se obtienen del hook `useEarningsData` y `usePeriodComparison` existentes
-- El podio de Top 10 usa un layout flex con la card central mas alta (py-8 vs py-4) y con fondo destacado (bg gradient sutil)
-- Los badges de severidad en Bajando/En Riesgo se calculan: critica (caida mayor 50%), moderada (20-50%), leve (menor 20%)
-- Los filtros de periodo reutilizan el mismo patron de ComparativasHeader
-- Todas las tablas implementan sticky header y empty states
+- `src/pages/sales-overview/SalesKPICards.tsx` -- hover con gradiente y tamano mas grande
+- `src/pages/sales-overview/SalesOperationalCards.tsx` -- eliminar cards "Subiendo" y "En Riesgo"
 
