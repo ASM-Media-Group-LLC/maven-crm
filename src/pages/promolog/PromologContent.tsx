@@ -33,16 +33,17 @@ import XIcon from "@/components/icons/XIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 
 const socialCards = [
-  { name: "Instagram", value: 3, icon: <InstagramIcon className="h-6 w-6" /> },
-  { name: "TikTok", value: 0, icon: <TikTokIcon className="h-6 w-6" /> },
-  { name: "X", value: 2, icon: <XIcon className="h-6 w-6" /> },
-  { name: "Telegram", value: 0, icon: <Send className="h-6 w-6" /> },
+  { name: "Instagram", value: 3, icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
+  { name: "TikTok", value: 0, icon: <TikTokIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
+  { name: "X", value: 2, icon: <XIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
+  { name: "Telegram", value: 0, icon: <Send className="h-6 w-6" />, bg: "bg-blue-500/10" },
 ];
 
 const platformCards = [
   {
     name: "OnlyFans",
     value: 5,
+    bg: "bg-blue-500/10",
     icon: (
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
         OF
@@ -52,6 +53,7 @@ const platformCards = [
   {
     name: "Unlok",
     value: 0,
+    bg: "bg-purple-500/10",
     icon: (
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">
         U
@@ -61,6 +63,7 @@ const platformCards = [
   {
     name: "Otra",
     value: 0,
+    bg: "bg-muted/50",
     icon: (
       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Info className="h-4 w-4" />
@@ -312,7 +315,7 @@ const PromologContent = () => {
               <p className="text-sm text-muted-foreground">Red Social</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {socialCards.map((s) => (
-                  <Card key={s.name}>
+                  <Card key={s.name} className={s.bg}>
                     <CardContent className="flex items-center gap-3 p-4">
                       {s.icon}
                       <div>
@@ -330,7 +333,7 @@ const PromologContent = () => {
               <p className="text-sm text-muted-foreground">Plataforma</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {platformCards.map((p) => (
-                  <Card key={p.name}>
+                  <Card key={p.name} className={p.bg}>
                     <CardContent className="flex items-center gap-3 p-4">
                       {p.icon}
                       <div>
