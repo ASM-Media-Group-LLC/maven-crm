@@ -1,45 +1,53 @@
 
+## Ajustar altura de las tarjetas KPI en Promolog
 
-## Vista "Ver Agentes" en Promolog
+### Problema
+Las tarjetas KPI se ven demasiado altas/largas. Actualmente tienen mucho espaciado vertical (`space-y-0.5` entre elementos) y padding generoso (`p-5`).
 
-### Resumen
-Al hacer clic en "Ver Agentes", la pagina cambia para mostrar una seccion de "Desempeno por Agente" en lugar de la seccion de redes sociales. El boton cambia su texto a "Ver Dashboard" para volver a la vista original.
+### Solución propuesta
 
-### Cambios en `src/pages/promolog/PromologContent.tsx`
+**Archivo a modificar:** `src/pages/promolog/PromologContent.tsx`
 
-**1. Nuevo estado para controlar la vista:**
-- Agregar `useState<"dashboard" | "agentes">` inicializado en `"dashboard"`
+**Cambios en la sección "KPI Cards" (línea 182-196):**
 
-**2. Cambio en el boton "Ver Agentes":**
-- Cuando la vista es `"dashboard"`: muestra "Ver Agentes" con `variant="outline"`
-- Cuando la vista es `"agentes"`: muestra "Ver Dashboard" con estilo primario (sin variant, fondo primary) -- el boton actua como toggle
+1. **Reducir padding vertical**: cambiar `p-5` a `px-5 py-3` (padding horizontal 1.25rem, vertical 0.75rem)
+   - Esto reduce significativamente el espacio vertical sin afectar el espaciado horizontal
 
-**3. Datos mock de agentes:**
-- Array estatico con la informacion del agente visible en la imagen:
-  - `lorena_lozano`: 5 tickets ingresados, Si: 5 (verde), Parcial: 0 (amarillo), No: 0 (rojo), badges: IG 3, X 2
+2. **Comprimir espaciado entre elementos**: cambiar `space-y-0.5` a `space-y-0` (eliminar espacios verticales entre título, valor y subtítulo)
+   - Los elementos estarán más pegados, creando una tarjeta más compacta
 
-**4. Seccion "Desempeno por Agente" (reemplaza la seccion Social cuando vista es "agentes"):**
-- Titulo: "Desempeno por Agente" (text-lg font-semibold)
-- Subtitulo: "Mostrando 1 agente con actividad entre 13 feb - 13 feb 2026" (dinamico segun fecha seleccionada)
-- Card con cada agente mostrando:
-  - Icono de usuario (avatar circular con icono Users)
-  - Nombre en negrita: "lorena_lozano"
-  - Subtexto: "5 tickets ingresados"
-  - Indicadores de estado a la derecha:
-    - Circulo verde + numero (Si)
-    - Circulo amarillo + numero (Parcial)
-    - Circulo rojo + numero (No)
-  - Separador vertical
-  - Badges: "IG 3" y "X 2" con estilo outline
+3. **Opcional - Reducir tamaño de fuentes**:
+   - El título `text-xs` se mantiene igual
+   - El valor `text-2xl` podría reducirse a `text-xl` si aún se ve muy grande
+   - El subtítulo `text-xs` se mantiene igual
 
-**5. Renderizado condicional:**
-- Si `view === "dashboard"`: muestra la seccion de redes sociales (actual)
-- Si `view === "agentes"`: muestra la seccion de Desempeno por Agente
-- Las tarjetas KPI se mantienen visibles en ambas vistas
+### Cambios específicos
 
-### Estructura visual de la fila de agente
-```text
-[ Avatar ]  lorena_lozano          [check]5  [minus]0  [x]0  |  [IG 3]  [X 2]
-            5 tickets ingresados     Si      Parcial    No
+```tsx
+// Antes
+<CardContent className="flex items-start gap-4 p-5">
+  <div>...</div>
+  <div className="flex-1 space-y-0.5">
+    {/* contenido */}
+  </div>
+</CardContent>
+
+// Después
+<CardContent className="flex items-start gap-4 px-5 py-3">
+  <div>...</div>
+  <div className="flex-1 space-y-0">
+    {/* contenido */}
+  </div>
+</CardContent>
 ```
 
+### Impacto
+- Las tarjetas serán notablemente más compactas verticalmente
+- Se mantiene la legibilidad del contenido
+- El diseño general se verá más limpio y denso
+- Las 4 columnas en desktop seguirán siendo visibles sin cambios en el grid
+
+### Alternativas si se necesita más compresión
+- Cambiar el valor de `text-2xl` a `text-xl` para números más pequeños
+- Cambiar el icono a `h-4 w-4` (actualmente es `h-5 w-5`)
+- Cambiar contenedor de icono de `h-10 w-10` a `h-9 w-9`
