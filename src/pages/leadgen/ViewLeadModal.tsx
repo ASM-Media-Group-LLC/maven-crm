@@ -113,6 +113,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
   const handleCancelNote = () => {
     setNoteText("");
     setShowNoteForm(false);
+    toast({ title: "Edición cancelada" });
   };
 
   return (
