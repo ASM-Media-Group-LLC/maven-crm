@@ -1,101 +1,124 @@
 
 
-## Correccion de Acciones en Tablas y Vista Tabla/Grid en Promolog
+## Estandarizar Promolog, Tickets y Botones al Patron Definido
 
-Dos cambios principales: (1) reemplazar tooltips por DropdownMenu en la tabla de tickets para seguir el patron estandar, y (2) agregar vistas de tabla y grid en Promolog.
+Cuatro correcciones para alinear Promolog y Tickets con el patron de Creadores/Eventos, y documentar las reglas de uso de botones en el Design System.
 
 ---
 
-### 1. Archivo modificado: `src/pages/tickets/TicketsList.tsx`
+### 1. Restructurar header de PromologContent
 
-Reemplazar los 3 botones con Tooltip por un unico **DropdownMenu** con icono `MoreHorizontal`, siguiendo exactamente el patron de EventosTable, ContactosTable y LeadGenTable:
+**Problema:** El header actual esta dentro de un `<main>` con scroll general. No tiene el patron de header sticky con `border-b` y el boton "Agregar Entrada" esta en una barra de acciones separada, lejos del titulo.
 
-**Antes (actual):**
+**Solucion:** Reestructurar para seguir exactamente el patron de EventosContent/CreadoresContent:
+
 ```text
-<Tooltip><TooltipTrigger><Button><Eye /></Button></TooltipTrigger><TooltipContent>Ver</TooltipContent></Tooltip>
-<Tooltip><TooltipTrigger><Button><Pencil /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-<Tooltip><TooltipTrigger><Button><Trash2 /></Button></TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
+<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-2xl font-bold">Promolog</h1>
+        <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
+      </div>
+      <Button variant="outline">
+        <Plus className="mr-2 h-4 w-4" /> Agregar Entrada
+      </Button>
+    </div>
+  </header>
+  <div className="flex-1 overflow-auto p-6 space-y-6">
+    {/* action bar (fecha, agentes, campanas), KPIs, filtros inline, tabla/grid */}
+  </div>
+</main>
 ```
 
-**Despues (patron estandar):**
+Los botones secundarios de la barra de acciones (fecha, ver agentes, campanas) se mueven al area scrollable debajo del header. Los filtros (Sheet lateral) y el toggle list/grid se extraen a una fila de filtros inline siguiendo el patron de EventosFilters, justo antes de la tabla/grid, fuera del Sheet.
+
+---
+
+### 2. Restructurar header de TicketsContent
+
+**Problema:** Mismo issue: el header de Tickets esta dentro de un `<main>` con scroll general, sin la estructura sticky.
+
+**Solucion:** Aplicar el mismo patron:
+
 ```text
-<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="ghost" size="icon" className="h-8 w-8">
-      <MoreHorizontal className="h-4 w-4" />
-    </Button>
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="end">
-    <DropdownMenuItem> <Eye /> Ver detalle </DropdownMenuItem>
-    <DropdownMenuItem> <Pencil /> Editar </DropdownMenuItem>
-    <DropdownMenuSeparator />
-    <DropdownMenuItem className="text-destructive"> <Trash2 /> Eliminar </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+  <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-2xl font-bold">Customer Service</h1>
+        <p className="text-sm text-muted-foreground">Gestion de soporte y escalaciones</p>
+      </div>
+      <Button variant="outline">
+        <Plus className="mr-2 h-4 w-4" /> Nuevo Ticket
+      </Button>
+    </div>
+  </header>
+  <div className="flex-1 overflow-auto p-6 space-y-6">
+    {/* tabs, filtros, tabla/grid */}
+  </div>
+</main>
 ```
 
-- Eliminar imports de Tooltip, TooltipContent, TooltipTrigger
-- Agregar imports de DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, MoreHorizontal
-- El `stopPropagation` se mueve al `<TableCell>` onClick como en EventosTable
+---
+
+### 3. Agregar acciones completas en PromologTable
+
+**Problema:** El DropdownMenu de la tabla solo tiene "Editar". Falta "Ver detalle" y "Eliminar" con separador, como en todas las demas tablas.
+
+**Solucion:** Agregar props `onView` y `onDelete` al componente y completar el DropdownMenu:
+
+```text
+<DropdownMenuContent align="end">
+  <DropdownMenuItem> <Eye /> Ver detalle </DropdownMenuItem>
+  <DropdownMenuItem> <Pencil /> Editar </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem className="text-destructive"> <Trash2 /> Eliminar </DropdownMenuItem>
+</DropdownMenuContent>
+```
 
 ---
 
-### 2. Archivo nuevo: `src/pages/promolog/PromologTable.tsx`
+### 4. Corregir variante de botones de toggle list/grid
 
-Nueva tabla estandar para las entradas de Promolog, con el mismo patron de todas las demas tablas:
+**Problema:** En Tickets y Promolog, el toggle usa `variant="default"` (azul/primary) para el activo. En Creadores y Eventos usa `variant="secondary"` (gris) para el activo y `variant="ghost"` para el inactivo. Esto crea inconsistencia visual -- en unos modulos el toggle aparece azul/violeta, en otros gris.
 
-**Columnas:**
+**Patron correcto** (de CreadoresFilters y EventosFilters):
+- Activo: `variant="secondary"`
+- Inactivo: `variant="ghost"`
 
-| Columna | Contenido | Ordenable |
-|---------|-----------|-----------|
-| Ticket | Numero PL con badge outline font-mono | Si |
-| Modelo | Nombre + @handle | Si |
-| Red Social | Badge con icono de red (Instagram/X/TikTok/Telegram) | Si |
-| Plataforma | Badge outline (OnlyFans/Unlok/Otra) | Si |
-| Resultado | Badge coloreado (Si=green, Parcial=yellow, No=red) | Si |
-| Agente | Nombre del agente | Si |
-| Fecha | dd MMM yyyy + hora | Si |
-| Acciones | DropdownMenu con MoreHorizontal (Editar) | No |
+**Archivos a corregir:**
+- `TicketsFilters.tsx`: cambiar `variant="default"` a `variant="secondary"` y `variant="outline"` a `variant="ghost"`
+- `PromologContent.tsx`: cambiar `variant="default"` a `variant="secondary"` y `variant="ghost"` (ya correcto el inactivo)
 
-**Patrones:**
-- Contenedor: `max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border`
-- TableHeader: `sticky top-0 z-10 bg-card`
-- Columna Acciones: `sticky right-0 bg-card z-20`
-- SortHeader con ArrowUpDown
-- Fila clickeable para abrir detalle/edicion
-- Empty state con colSpan
+Ademas, el boton principal del header ("Agregar Entrada", "Nuevo Ticket") debe usar `variant="outline"` como en Creadores ("Agregar Creador") y Eventos ("Crear Evento"), no `variant="default"`.
 
 ---
 
-### 3. Archivo nuevo: `src/pages/promolog/PromologGrid.tsx`
+### 5. Actualizar Design System - Seccion de Botones
 
-Vista de grid con tarjetas basada en el componente `PromologEntryCard` existente pero en un layout de grid responsivo:
+**Problema:** La seccion de botones documenta las variantes pero no las reglas de uso contextual, lo que causa confusion sobre cuando usar primary vs outline.
 
-- Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4`
-- Cada tarjeta reutiliza la estructura visual del `PromologEntryCard` actual
-- Empty state cuando no hay entradas
+**Agregar subseccion "Uso contextual"** en ButtonsSection.tsx:
 
----
-
-### 4. Archivo modificado: `src/pages/promolog/PromologContent.tsx`
-
-Cambios en la seccion de "Entradas Recientes" (dentro del TabsContent "tabla"):
-
-- Agregar estado `entryView` para toggle Lista/Grid (`"list" | "grid"`)
-- Agregar toggle con iconos `List` y `LayoutGrid` junto al titulo "Entradas Recientes" y el boton de filtros
-- Renderizar condicionalmente:
-  - `entryView === "list"` -> `<PromologTable entries={filteredEntries} />`
-  - `entryView === "grid"` -> `<PromologGrid entries={filteredEntries} />`
-- Agregar contador de entradas: `{filteredEntries.length} entradas`
+| Contexto | Variante | Ejemplo |
+|----------|----------|---------|
+| Accion principal del header de pagina | `outline` | "Crear Evento", "Agregar Creador", "Nuevo Ticket" |
+| Toggle activo (list/grid, tabs) | `secondary` | Icono List seleccionado |
+| Toggle inactivo | `ghost` | Icono Grid no seleccionado |
+| Accion principal dentro de un modal/form | `default` | "Guardar", "Crear" |
+| Acciones destructivas | `destructive` | "Eliminar" |
+| Acciones secundarias en modales | `outline` | "Cancelar" |
 
 ---
 
-### 5. Resumen de archivos
+### Resumen de archivos
 
 | Archivo | Accion | Cambio |
 |---------|--------|--------|
-| `src/pages/tickets/TicketsList.tsx` | Modificar | Reemplazar Tooltips por DropdownMenu con MoreHorizontal |
-| `src/pages/promolog/PromologTable.tsx` | Crear | Tabla estandar para entradas de Promolog |
-| `src/pages/promolog/PromologGrid.tsx` | Crear | Vista grid con tarjetas de entradas |
-| `src/pages/promolog/PromologContent.tsx` | Modificar | Agregar toggle List/Grid y renderizar tabla o grid |
+| `src/pages/promolog/PromologContent.tsx` | Modificar | Reestructurar header sticky, mover filtros inline, corregir toggle variant |
+| `src/pages/tickets/TicketsContent.tsx` | Modificar | Reestructurar header sticky, mover boton al header |
+| `src/pages/tickets/TicketsFilters.tsx` | Modificar | Corregir variant del toggle list/grid |
+| `src/pages/promolog/PromologTable.tsx` | Modificar | Agregar acciones Ver detalle y Eliminar al DropdownMenu |
+| `src/pages/design-system/sections/ButtonsSection.tsx` | Modificar | Agregar subseccion de uso contextual |
 
