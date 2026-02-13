@@ -1,20 +1,21 @@
 import { useState } from "react";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye, ChevronDown } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
+import LeadGenTable from "./LeadGenTable";
 import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 
 const mockSupervisores = [
@@ -41,48 +42,6 @@ const hourlyData = Array.from({ length: 24 }, (_, i) => ({
   hour: String(i).padStart(2, "0"),
   leads: 0,
 }));
-
-const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
-
-const cleanHandle = (url: string) => {
-  try {
-    const u = new URL(url);
-    return u.pathname.replace(/^\//, "").replace(/\/$/, "") || url;
-  } catch {
-    return url;
-  }
-};
-
-const getPlatformIcon = (plataforma: string) => {
-  const p = plataforma.toLowerCase();
-  if (p.includes("instagram")) return "📸";
-  if (p.includes("tiktok")) return "🎵";
-  if (p.includes("twitter") || p.includes("x")) return "𝕏";
-  if (p.includes("onlyfans")) return "💎";
-  return "🔗";
-};
-
-const countryToFlag = (code: string | null) => {
-  if (!code || code.length < 2) return "🌍";
-  const c = code.toUpperCase().slice(0, 2);
-  return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
-};
-
-const calidadColors: Record<string, string> = {
-  "a+": "bg-primary text-primary-foreground",
-  a: "bg-green-500 text-white",
-  "b+": "bg-yellow-500 text-white",
-  b: "bg-yellow-600 text-white",
-  c: "bg-muted text-muted-foreground",
-};
-
-const statusLabels: Record<string, string> = {
-  nuevo: "Sin resp.",
-  contactado: "Contactado",
-  en_llamada: "En llamada",
-  cerrado: "Cerrado",
-  rechazado: "Rechazado",
-};
 
 const LeadGenContent = () => {
   const [activeTab, setActiveTab] = useState("leads");
@@ -254,89 +213,22 @@ const LeadGenContent = () => {
         {/* Tab content */}
         <div className="p-6">
           {activeTab === "leads" && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Leads ({leads.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {leadsLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <p className="text-muted-foreground text-sm">Cargando leads...</p>
-                  </div>
-                ) : leads.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground text-sm">
-                      No hay leads para revisar con estos filtros
-                    </p>
-                  </div>
-                ) : (
-                  <div className="max-h-[calc(100vh-24rem)] overflow-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-10 bg-card">
-                        <TableRow>
-                          <TableHead className="w-[70px]">Hora</TableHead>
-                          <TableHead>Ticket</TableHead>
-                          <TableHead>Handle</TableHead>
-                          <TableHead>Agente</TableHead>
-                          <TableHead className="text-center">Calidad</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead className="text-center">País</TableHead>
-                          <TableHead>Contacto</TableHead>
-                          <TableHead className="text-center">QA</TableHead>
-                          <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {leads.map((lead) => {
-                          const cat = lead.categoria.toLowerCase();
-                          return (
-                            <TableRow key={lead.id}>
-                              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                                {format(new Date(lead.created_at), "hh:mm a", { locale: es })}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="bg-muted font-mono text-xs text-primary">
-                                  {getTicketId(lead.id)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <a href={lead.url_perfil} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm hover:underline text-foreground">
-                                  <span>{getPlatformIcon(lead.plataforma)}</span>
-                                  <span className="truncate max-w-[140px]">@{cleanHandle(lead.url_perfil)}</span>
-                                </a>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">—</TableCell>
-                              <TableCell className="text-center">
-                                <Badge className={`${calidadColors[cat] || "bg-muted text-muted-foreground"} gap-0.5 text-xs`}>
-                                  {lead.categoria.toUpperCase()}
-                                  <ChevronDown className="h-3 w-3" />
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {statusLabels[lead.status] || lead.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-center text-lg">
-                                {countryToFlag(lead.pais)}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">—</TableCell>
-                              <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
-                              <TableCell className="text-center sticky right-0 bg-card">
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <>
+              {leadsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <p className="text-muted-foreground text-sm">Cargando leads...</p>
+                </div>
+              ) : leads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground text-sm">
+                    No hay leads para revisar con estos filtros
+                  </p>
+                </div>
+              ) : (
+                <LeadGenTable leads={leads} />
+              )}
+            </>
           )}
 
           {activeTab === "agentes" && (
