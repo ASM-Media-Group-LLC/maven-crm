@@ -1,52 +1,47 @@
 
 
-## Hover en tarjetas de Promolog + Modal "Editar Promocion"
+## Agregar campos condicionales al modal "Editar Promocion"
 
-### 1. Hover en PromologEntryCard
+### Cambios en `src/pages/promolog/PromologEntryCard.tsx`
 
-Segun el sistema de diseno, las tarjetas usan cambios de fondo o bordes sutiles en hover (no sombras). Se agregara al componente Card en `PromologEntryCard.tsx` la clase `transition-colors hover:bg-muted/50` para un efecto de fondo sutil al pasar el cursor.
+Se agregaran 4 nuevas secciones al modal que solo aparecen cuando `editResult === "si"` (Si Promociono):
 
-**Archivo:** `src/pages/promolog/PromologEntryCard.tsx`
+### 1. Plataforma (toggle buttons, grid 3 columnas)
+Opciones: OnlyFans, Unlok, Otra. Misma estetica que los botones de Red Social (borde primary cuando seleccionado). Nuevo estado: `editPlatform`.
 
-### 2. Modal "Editar Promocion"
+### 2. Tipo de Contacto (toggle buttons, grid 3 columnas)
+Opciones: Hablaron, Textearon, Mensaje de Voz. Misma estetica. Nuevo estado: `editContactType`.
 
-Se creara un modal (Dialog) que se abre al hacer clic en "Editar" con la siguiente estructura segun la imagen de referencia:
+### 3. Notas (textarea)
+Un campo de texto libre con label "Notas". Nuevo estado: `editNotes`, inicializado con `entry.notes`.
 
-- **Titulo:** "Editar Promocion" (con pr-8 para no chocar con el boton X)
-- **Card de creador:** Fondo oscuro/muted con Avatar (iniciales), nombre completo y handle con icono de red social
-- **Seccion "¿Promociono Hoy?":** Dos botones grandes lado a lado:
-  - "Si Promociono" (fondo cyan/primary, con icono check) 
-  - "No Promociono" (fondo purple, con icono X)
-  - Seleccion toggle: al hacer clic en uno se resalta y el otro se desactiva
-- **Seccion "Red Social *":** 4 botones en fila horizontal (Instagram, TikTok, X, Telegram) con iconos, seleccion toggle
-- **Footer:** Botones "Cancelar" (outline) y "Guardar Cambios" (primary/cyan)
+### 4. Evidencia (Pantallazo)
+- Label "Evidencia (Pantallazo)" con subtexto "Upload Evidence"
+- Input file (accept image) para seleccionar archivo
+- Preview de la imagen seleccionada debajo del input
+- Boton "Abrir en nueva pestana" que abre la imagen en una nueva tab
+- Nuevo estado: `editEvidence` (File | null) y `editEvidencePreview` (string URL)
 
-### Detalle Tecnico
+### Detalle tecnico
 
-**Archivo:** `src/pages/promolog/PromologEntryCard.tsx`
-
-Cambios:
-- Agregar estado `editOpen` para controlar el modal
-- Conectar boton "Editar" con `onClick={() => setEditOpen(true)}`
-- Agregar estados locales para la seleccion: `editResult` (si/no) y `editNetwork` (instagram/tiktok/x/telegram)
-- Inicializar estados con los valores actuales del entry
-- Importar Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
-- Agregar clase hover al Card: `transition-colors hover:bg-muted/50`
-
-Estructura del modal:
+**Nuevos estados:**
 ```
-Dialog
-  DialogContent (max-w-lg)
-    DialogHeader
-      DialogTitle "Editar Promocion"
-    Card con avatar + nombre + handle
-    Seccion "¿Promociono Hoy?"
-      2 botones toggle (Si / No)
-    Seccion "Red Social *"
-      4 botones toggle (Instagram, TikTok, X, Telegram)
-    DialogFooter
-      Button "Cancelar" (outline)
-      Button "Guardar Cambios" (primary, bg-cyan-500)
+editPlatform: string (onlyfans | unlok | otra)
+editContactType: string (hablaron | textearon | mensaje_voz)
+editNotes: string
+editEvidence: File | null
+editEvidencePreview: string
 ```
 
-Los botones de seleccion usaran estilos condicionales: el seleccionado tendra fondo de color (cyan para "Si", purple para "No", y borde primary para red social), mientras que los no seleccionados tendran variant outline.
+**Inicializacion en handleOpenEdit:**
+- `editPlatform` se inicializa con el platform del entry (lowercase)
+- `editContactType` se inicializa vacio
+- `editNotes` se inicializa con `entry.notes`
+- `editEvidence` y `editEvidencePreview` se resetean
+
+**Estructura condicional:** Todo el bloque de Plataforma + Tipo de Contacto + Notas + Evidencia se envuelve en `{editResult === "si" && (...)}` para que solo aparezca cuando se selecciona "Si Promociono".
+
+**Imports adicionales:** `ExternalLink` de lucide-react, `Textarea` de `@/components/ui/textarea`.
+
+**Scroll:** Se agregara `max-h-[80vh] overflow-y-auto` al DialogContent para que el modal sea scrollable cuando hay muchos campos visibles.
+
