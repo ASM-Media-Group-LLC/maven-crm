@@ -29,10 +29,13 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
+
+
 
 const socialCards = [
   { name: "Instagram", value: 3, icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
@@ -168,10 +171,24 @@ const PromologContent = () => {
     },
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["creator-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("category")
+        .not("category", "is", null);
+      if (error) throw error;
+      const unique = [...new Set(data.map((d) => d.category))].sort();
+      return unique;
+    },
+  });
+
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedCreator, setSelectedCreator] = useState("");
 
   const formattedDate = date.toLocaleDateString("es-ES", {
     day: "numeric",
@@ -374,31 +391,55 @@ const PromologContent = () => {
               </SheetHeader>
               <div className="space-y-6 py-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Promocionó?</label>
+                  <label className="text-sm font-medium">¿Promocionó?</label>
                   <Select>
                     <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todos</SelectItem>
-                      <SelectItem value="promociono">Promocionó</SelectItem>
+                      <SelectItem value="si_promociono">Sí promocionó</SelectItem>
                       <SelectItem value="no_promociono">No promocionó</SelectItem>
-                      <SelectItem value="promocion_parcial">Promoción Parcial</SelectItem>
+                      <SelectItem value="parcial">Parcial</SelectItem>
                       <SelectItem value="pendiente">Pendiente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Modelo</label>
-                  <Select>
-                    <SelectTrigger><SelectValue placeholder="Todas las modelos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todas las modelos</SelectItem>
-                      {creators.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between font-normal">
+                        {selectedCreator
+                          ? creators.find((c) => c.id === selectedCreator)?.name ?? "Todas las modelos"
+                          : "Todas las modelos"}
+                        <Filter className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar modelo..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron modelos.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="__all__"
+                              onSelect={() => setSelectedCreator("")}
+                            >
+                              Todas las modelos
+                            </CommandItem>
+                            {creators.map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={`${c.name} ${c.artistic_name ?? ""}`}
+                                onSelect={() => setSelectedCreator(c.id)}
+                              >
+                                {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Categoría de Modelo</label>
@@ -406,6 +447,9 @@ const PromologContent = () => {
                     <SelectTrigger><SelectValue placeholder="Todas las categorías" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todas las categorías</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat!}>{cat}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
