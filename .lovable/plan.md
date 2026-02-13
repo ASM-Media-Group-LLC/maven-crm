@@ -1,19 +1,20 @@
 
 
-## Ajustar grid a 2 tarjetas por fila
+## Agregar hover a las tarjetas del Board de LeadGen
 
 ### Cambio
 
-**Archivo**: `src/pages/leadgen/LeadGenGrid.tsx` (linea 79)
+**Archivo**: `src/pages/leadgen/LeadGenGrid.tsx` (linea 74)
 
-Cambiar la clase de la grilla de:
-```
-grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4
-```
-a:
-```
-grid grid-cols-1 sm:grid-cols-2 gap-4
+Actualizar la clase de la Card para reemplazar `hover:shadow-md` por un hover basado en cambio de background, siguiendo las reglas del sistema de diseno (prohibido usar sombras como indicador de hover):
+
+```tsx
+// De:
+className="cursor-pointer hover:shadow-md transition-shadow relative"
+
+// A:
+className="cursor-pointer hover:bg-muted/50 transition-colors relative"
 ```
 
-Esto elimina el breakpoint `lg:grid-cols-3` para que en pantallas medianas y grandes siempre se muestren maximo 2 tarjetas por fila.
+Esto aplica un fondo sutil `muted/50` al pasar el cursor, consistente con el patron `hover:bg-accent` definido en la seccion 1.7 de estados globales del design system, usando `transition-colors` en lugar de `transition-shadow`.
 
