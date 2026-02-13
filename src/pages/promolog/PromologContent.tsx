@@ -13,6 +13,9 @@ import {
   Filter,
   Table2,
   Info,
+  AlertTriangle,
+  TrendingUp,
+  CheckCircle,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -244,6 +247,50 @@ const PromologContent = () => {
           <Plus className="mr-2 h-4 w-4" />
           Agregar Entrada
         </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-t-[3px] border-t-purple-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold text-green-500">142</p>
+            <p className="text-xs text-muted-foreground">Registradas en sistema - Filtrando</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-[3px] border-t-blue-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold text-blue-500">6</p>
+            <p className="text-xs text-muted-foreground">Tickets ingresados hoy</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-[3px] border-t-red-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold text-red-500">128</p>
+            <p className="text-xs text-muted-foreground">Equipo no las revisó</p>
+          </CardContent>
+        </Card>
+        <Card className="border-t-[3px] border-t-green-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-2xl font-bold">6</p>
+            <p className="text-xs text-muted-foreground">Tickets ingresados hoy</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Conditional: Dashboard or Agents */}
