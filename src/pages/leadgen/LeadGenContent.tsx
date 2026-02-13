@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import LeadGenTable from "./LeadGenTable";
+import LeadGenGrid from "./LeadGenGrid";
 import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
 import ViewLeadModal from "./ViewLeadModal";
@@ -221,18 +222,25 @@ const LeadGenContent = () => {
                 <div className="flex items-center justify-center py-16">
                   <p className="text-muted-foreground text-sm">Cargando leads...</p>
                 </div>
-              ) : leads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">
-                    No hay leads para revisar con estos filtros
-                  </p>
-                </div>
-              ) : (
-                <LeadGenTable
+              ) : viewMode === "grid" ? (
+                <LeadGenGrid
                   leads={leads}
                   onView={(lead) => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
+              ) : (
+                leads.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-muted-foreground text-sm">
+                      No hay leads para revisar con estos filtros
+                    </p>
+                  </div>
+                ) : (
+                  <LeadGenTable
+                    leads={leads}
+                    onView={(lead) => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                  />
+                )
               )}
             </>
           )}
