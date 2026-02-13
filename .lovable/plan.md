@@ -1,63 +1,42 @@
 
 
-## Mejoras al Modal de Detalle del Lead
+## Cambios en el Modal de Detalle del Lead
 
-### 1. Hacer el modal mas amplio
+### 1. Cambiar icono del boton "Convertir a Contacto"
 
-Cambiar el ancho maximo del `DialogContent` de `sm:max-w-lg` (~32rem) a `sm:max-w-2xl` (~42rem) para que el contenido respire mejor y el grid de informacion no se vea apretado.
+Reemplazar el icono `Sparkles` por `UserCheck` de lucide-react en el boton del header del modal.
 
-### 2. Funcionalidad de Notas Adicionales
+### 2. Crear modal de confirmacion "Convertir Lead a Contacto"
 
-Segun la imagen de referencia, al hacer clic en "+ Agregar" debe aparecer:
-- Un `Textarea` con placeholder "Escribe tu nota..."
-- Dos botones: "Guardar" (variante primary con icono de disco) y "Cancelar" (variante outline)
+Nuevo componente `src/pages/leadgen/ConvertLeadModal.tsx` que replica el diseno de la imagen:
 
-**Persistencia**: Como no existe una tabla separada para notas adicionales de leads, se necesita crear una tabla `lead_notes` en Supabase con la estructura:
-- `id` (uuid, PK)
-- `lead_id` (uuid, FK a leads)
-- `note_text` (text)
-- `created_at` (timestamptz)
+- **Header**: Icono `ArrowRight` + titulo "Convertir Lead a Contacto"
+- **Descripcion**: "Este lead sera transferido al modulo de Closers como un contacto nuevo."
+- **Card "Datos que se transferiran"**: Lista con bullet points mostrando:
+  - Handle: extraido de `url_perfil` del lead
+  - Plataforma: `lead.plataforma`
+  - Pais: `lead.pais`
+  - Compania: `lead.compania`
+  - Ticket: ticket ID del lead
+- **Info banner**: Fondo `bg-primary/10` con icono de bombilla y texto "El lead quedara marcado como 'contactado' y el contacto sera asignado al modulo de Closers."
+- **Footer**: Botones "Cancelar" (outline) y "Confirmar Conversion" (primary)
 
-Las notas guardadas se mostraran como una lista debajo del formulario, con fecha y texto.
+### 3. Funcionalidad de conversion
 
-### 3. Archivos a modificar
+Al confirmar:
+1. Insertar en tabla `contactos` con datos mapeados del lead (nombre del handle, instagram del url_perfil, pais, compania)
+2. Actualizar `leads.status` a `"contactado"`
+3. Invalidar queries de leads y contactos
+4. Mostrar toast de exito y cerrar ambos modales
 
-**Crear:**
-- Migracion SQL para tabla `lead_notes` con RLS habilitado
+### 4. Integrar en ViewLeadModal
 
-**Modificar:**
-- `src/pages/leadgen/ViewLeadModal.tsx`:
-  - Cambiar `sm:max-w-lg` a `sm:max-w-2xl`
-  - Agregar estado local `showNoteForm` (toggle al hacer clic en "+ Agregar")
-  - Cuando `showNoteForm` es true: mostrar `Textarea` + botones "Guardar" y "Cancelar"
-  - Cuando `showNoteForm` es false: mostrar empty state o lista de notas existentes
-  - Agregar `useQuery` para cargar notas de `lead_notes` y `useMutation` para insertar nuevas notas
-  - El boton "Cancelar" limpia el textarea y oculta el formulario
+- Agregar estado `showConvertModal` en `ViewLeadModal`
+- El boton "Convertir a Contacto" abre `ConvertLeadModal` en vez de mostrar toast
+- Pasar el lead actual como prop
 
-### 4. Detalle tecnico del formulario de notas
+### Archivos
 
-```text
-Estado inicial:
-  [Notas Adicionales]              [+ Agregar]
-  (icono) No hay notas adicionales
-
-Al hacer clic en "+ Agregar":
-  [Notas Adicionales]
-  +------------------------------------------+
-  | Escribe tu nota...                       |
-  |                                          |
-  +------------------------------------------+
-  [Guardar]  [Cancelar]
-
-Despues de guardar:
-  [Notas Adicionales]              [+ Agregar]
-  - "Texto de la nota"  |  13 feb 2026
-```
-
-### 5. Patron de diseño
-- Textarea usa el componente existente `@/components/ui/textarea`
-- Boton "Guardar" con variante `default` e icono `Save`
-- Boton "Cancelar" con variante `outline`
-- Lista de notas guardadas con texto + fecha formateada
-- Sin valores hardcoded de color
+- **Crear**: `src/pages/leadgen/ConvertLeadModal.tsx`
+- **Modificar**: `src/pages/leadgen/ViewLeadModal.tsx` (cambiar icono a `UserCheck`, integrar `ConvertLeadModal`)
 
