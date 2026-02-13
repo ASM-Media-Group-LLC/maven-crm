@@ -41,6 +41,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
           )}
         </div>
       ),
+      onClick: () => navigate("/sales-overview/comparativas"),
     },
     {
       id: "top10",
