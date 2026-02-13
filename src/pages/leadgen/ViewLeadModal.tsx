@@ -1,6 +1,8 @@
-import { ExternalLink, MessageCircle, Plus, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, MessageCircle, Plus, Save, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -11,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Lead = Tables<"leads">;
@@ -55,15 +59,63 @@ const InfoCard = ({ label, children }: { label: string; children: React.ReactNod
 
 const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteText, setNoteText] = useState("");
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ["lead_notes", lead?.id],
+    queryFn: async () => {
+      if (!lead) return [];
+      const { data, error } = await supabase
+        .from("lead_notes" as any)
+        .select("*")
+        .eq("lead_id", lead.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{ id: string; lead_id: string; note_text: string; created_at: string }>;
+    },
+    enabled: !!lead && open,
+  });
+
+  const addNote = useMutation({
+    mutationFn: async (text: string) => {
+      if (!lead) throw new Error("No lead");
+      const { error } = await supabase
+        .from("lead_notes" as any)
+        .insert({ lead_id: lead.id, note_text: text });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lead_notes", lead?.id] });
+      setNoteText("");
+      setShowNoteForm(false);
+      toast({ title: "Nota guardada" });
+    },
+    onError: () => {
+      toast({ title: "Error al guardar nota", variant: "destructive" });
+    },
+  });
 
   if (!lead) return null;
 
   const cat = lead.categoria.toLowerCase();
   const createdDate = new Date(lead.created_at);
 
+  const handleSaveNote = () => {
+    const trimmed = noteText.trim();
+    if (!trimmed) return;
+    addNote.mutate(trimmed);
+  };
+
+  const handleCancelNote = () => {
+    setNoteText("");
+    setShowNoteForm(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0">
+      <DialogContent className="sm:max-w-2xl p-0">
         <ScrollArea className="max-h-[80vh]">
           <div className="p-6 space-y-4">
             {/* Header */}
@@ -157,24 +209,66 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
                   <MessageCircle className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold">Notas Adicionales</h3>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    toast({
-                      title: "Funcionalidad próximamente",
-                      description: "Agregar notas adicionales estará disponible pronto.",
-                    })
-                  }
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Agregar
-                </Button>
+                {!showNoteForm && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNoteForm(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Agregar
+                  </Button>
+                )}
               </div>
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <MessageCircle className="h-8 w-8 mb-2 opacity-40" />
-                <p className="text-sm">No hay notas adicionales</p>
-              </div>
+
+              {showNoteForm && (
+                <div className="space-y-3 mb-4">
+                  <Textarea
+                    placeholder="Escribe tu nota..."
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveNote}
+                      disabled={!noteText.trim() || addNote.isPending}
+                    >
+                      <Save className="h-3.5 w-3.5 mr-1" />
+                      Guardar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelNote}
+                      disabled={addNote.isPending}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {notes.length > 0 ? (
+                <div className="space-y-3">
+                  {notes.map((note) => (
+                    <div key={note.id} className="border rounded-lg p-3 space-y-1">
+                      <p className="text-sm">{note.note_text}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(note.created_at), "dd MMM yyyy, hh:mm a", { locale: es })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !showNoteForm && (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <MessageCircle className="h-8 w-8 mb-2 opacity-40" />
+                    <p className="text-sm">No hay notas adicionales</p>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </ScrollArea>

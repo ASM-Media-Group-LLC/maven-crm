@@ -819,6 +819,35 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_notes: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          note_text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          note_text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           categoria: string
