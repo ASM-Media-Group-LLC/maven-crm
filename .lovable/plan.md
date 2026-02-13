@@ -1,14 +1,30 @@
 
 
-## Modulo de Tickets - Customer Service en Operaciones
+## Tickets Module - Mejoras: Filtros, Vistas, Detalle y Acciones CRUD
 
-Nuevo modulo independiente para gestionar todos los tickets de soporte, accesible desde el sidebar. La tabla `tickets` ya existe en la base de datos con RLS configurada, por lo que no se necesitan migraciones SQL.
+Mejoras al modulo de Tickets existente: filtros con placeholder descriptivo (patron de Creadores/Eventos), toggle Lista/Grid, modal de detalle con comentarios, y acciones de editar/eliminar.
 
 ---
 
-### 1. No se requiere migracion SQL
+### 1. Migracion SQL - Tabla `ticket_comments`
 
-La tabla `tickets` ya existe con las columnas necesarias: `id`, `creator_id`, `title`, `description`, `priority`, `status`, `ticket_type`, `company`, `assigned_to`, `creator_notes`, `created_at`, `updated_at`. Las RLS policies ya estan configuradas con acceso completo para usuarios autenticados.
+Se necesita una nueva tabla para soportar los comentarios del detalle del ticket (como se ve en la imagen de referencia):
+
+```text
+CREATE TABLE public.ticket_comments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  ticket_id UUID NOT NULL REFERENCES public.tickets(id) ON DELETE CASCADE,
+  author_name TEXT NOT NULL,
+  author_email TEXT,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.ticket_comments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can manage ticket comments"
+  ON public.ticket_comments FOR ALL
+  TO authenticated USING (true) WITH CHECK (true);
+```
 
 ---
 
@@ -16,12 +32,10 @@ La tabla `tickets` ya existe con las columnas necesarias: `id`, `creator_id`, `t
 
 | Archivo | Proposito |
 |---------|-----------|
-| `src/pages/Tickets.tsx` | Pagina wrapper (mismo patron que Closers.tsx) con SidebarProvider, DashboardSidebar y Topbar |
-| `src/pages/tickets/TicketsContent.tsx` | Layout principal: header "Customer Service" + subtitulo + boton "Nuevo Ticket", filtros, y lista de tickets |
-| `src/pages/tickets/TicketsList.tsx` | Lista de tickets con tarjetas mostrando: numero de ticket, titulo, creador, asignado, descripcion, fecha, compania, badges de prioridad y estado |
-| `src/pages/tickets/CreateTicketModal.tsx` | Modal para crear ticket (reutiliza la logica del existente pero sin requerir `creatorId`, todo en espanol). Campos: Titulo, Descripcion, Prioridad (Baja/Media/Alta/Urgente), Tipo (Queja/Tecnico/Facturacion/Contenido/General), Compania (Ora Miami/KASH Agency/alvaroletshoot/Blu app/piclink.me/Pagomundo), Asignar a (lista de ~37 miembros), Notas |
-| `src/pages/tickets/useTickets.ts` | Hook con query para listar todos los tickets (con join a creators para mostrar nombre) y mutation para crear tickets |
-| `src/pages/tickets/TicketsFilters.tsx` | Barra de filtros: busqueda por texto, selectores de prioridad/tipo/estado/compania/asignado, rango de fechas |
+| `src/pages/tickets/TicketsGrid.tsx` | Vista de tarjetas en grid (4 columnas) con badges de prioridad/estado/tipo, click para abrir detalle |
+| `src/pages/tickets/ViewTicketModal.tsx` | Modal de detalle del ticket con info completa (numero, titulo, descripcion, compania, tipo, asignado, status, prioridad) + seccion de comentarios con formulario para agregar |
+| `src/pages/tickets/EditTicketModal.tsx` | Modal de edicion reutilizando estructura de CreateTicketModal, pre-poblado con datos existentes |
+| `src/pages/tickets/DeleteTicketDialog.tsx` | AlertDialog de confirmacion para eliminar ticket (patron de DeleteContactoDialog) |
 
 ---
 
@@ -29,50 +43,59 @@ La tabla `tickets` ya existe con las columnas necesarias: `id`, `creator_id`, `t
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/App.tsx` | Agregar ruta `/tickets` con import y ProtectedRoute |
-| `src/components/dashboard/DashboardSidebar.tsx` | Agregar enlace "Tickets" en la seccion Operaciones (icono Ticket) |
+| `src/pages/tickets/TicketsFilters.tsx` | Refactorizar al patron de CreadoresFilters: usar `value \|\| undefined` + `__all__` trick para mostrar placeholder descriptivo ("Prioridad", "Tipo", etc.) en vez de "Todas". Agregar toggle Lista/Grid con iconos List y LayoutGrid |
+| `src/pages/tickets/TicketsContent.tsx` | Agregar estado de vista (list/grid), pasar a filtros. Renderizar TicketsList o TicketsGrid segun vista. Eliminar la segunda fila de filtros de fecha (integrar inline) |
+| `src/pages/tickets/TicketsList.tsx` | Agregar columna de acciones por ticket: iconos/botones para Ver (Eye), Editar (Pencil), Eliminar (Trash2). Abrir modales correspondientes |
+| `src/pages/tickets/useTickets.ts` | Agregar mutations: updateTicket, deleteTicket. Agregar query y mutation para ticket_comments (listar y crear) |
 
 ---
 
 ### 4. Detalle de componentes
 
-**TicketsContent.tsx** - Basado en la imagen de referencia:
-- Header: "Customer Service" + "Gestion de soporte y escalaciones" + boton "+ Nuevo Ticket"
-- Tabs: "Lista de Tickets" y "Calendario" (calendario como placeholder)
-- Barra de filtros: campo de busqueda + selectores multiples
-- Rango de fechas: "Desde" / "Hasta"
-- Contador de tickets: "X tickets"
-- Listado vertical de tarjetas de tickets
+**TicketsFilters.tsx** - Refactorizado:
+- Mismo patron que CreadoresFilters/EventosFilters: `value={value || undefined}` + `onValueChange={(v) => onChange(v === "__all__" ? "" : v)}`
+- Placeholders descriptivos: "Prioridad", "Tipo", "Estado", "Compania", "Asignado"
+- Toggle List/Grid al final (ml-auto)
+- Fechas integradas en la misma fila o eliminadas del segundo row
 
-**TicketsList.tsx** - Cada tarjeta de ticket muestra:
-- Numero de ticket (formato #XXXXXX con color por prioridad)
-- Titulo en negrita
-- "Creado por: @handle" y "Asignado a: @handle o Sin asignar"
-- Descripcion/preview del contenido
+**TicketsGrid.tsx**:
+- Grid de 4 columnas (sm:2, md:3, lg:4)
+- Cada tarjeta: numero de ticket coloreado, titulo, creador handle, badges (prioridad, estado, tipo), fecha
+- Click abre ViewTicketModal
+- Botones de accion con stopPropagation (Editar, Eliminar)
+
+**ViewTicketModal.tsx** - Basado en las imagenes de referencia:
+- Header: #XXXXXX + Titulo del ticket
 - Fecha de creacion formateada
-- Badge de compania (si existe)
-- Badges de prioridad (Urgente=destructive, Alta=warning, Media=primary, Baja=secondary) y estado (Abierto, En Progreso, Resuelto, Cerrado)
-- Tickets urgentes con fondo sutil de alerta (como en la imagen)
+- Seccion "Description" con texto
+- "Compania / Cuenta de Origen" con badge
+- "Tipo de Ticket" con badge coloreado
+- "Asignado a" con selector inline para cambiar asignacion
+- "Status" y "Priority" como selects editables inline
+- Seccion "Comments" con lista de comentarios (autor, email, contenido, fecha)
+- Formulario: textarea "Write a comment..." + boton "Agregar Comentario"
+- Footer: botones Editar y Eliminar
 
-**CreateTicketModal.tsx** - Todo en espanol:
-- Titulo: "Crear Nuevo Ticket"
-- Subtitulo: "Completa el formulario para crear un ticket de escalacion"
-- Campos: Titulo, Descripcion, Prioridad (Baja/Media/Alta/Urgente), Tipo de Ticket (Queja/Tecnico/Facturacion/Contenido/General), Compania/Cuenta de Origen, Asignar a (lista completa de miembros), Notas sobre el creator
-- Botones: "Cancelar" y "Crear Ticket"
-- El campo `creator_id` sera opcional en este contexto (se puede crear sin vincularlo a un creador especifico, o agregar un selector de creador)
+**EditTicketModal.tsx**:
+- Misma estructura que CreateTicketModal
+- Pre-poblado con datos del ticket seleccionado
+- Boton "Guardar Cambios" en vez de "Crear Ticket"
 
-**TicketsFilters.tsx**:
-- Input de busqueda con placeholder "Buscar por titulo, descripcion, numero de ticket..."
-- Selectores: Prioridad (Todas/Baja/Media/Alta/Urgente), Tipo (Todos), Estado (Todas), Compania (Todas), Asignado (Todos)
-- Date range: Desde / Hasta
+**DeleteTicketDialog.tsx**:
+- AlertDialog con icono AlertTriangle
+- Texto: "Eliminar ticket" + descripcion con titulo del ticket
+- Botones: Cancelar / Eliminar (destructive)
+- Ejecuta deleteTicket mutation
 
 ---
 
-### 5. Consideracion sobre creator_id
+### 5. Flujo de acciones
 
-La tabla `tickets` tiene `creator_id` como NOT NULL. Para el modulo independiente de Tickets, necesitaremos una de estas opciones:
-- Agregar un selector de creador en el modal (Select que carga la lista de creators desde Supabase)
-- O modificar la columna a nullable
-
-La opcion recomendada es agregar un selector de creador en el modal, ya que los tickets siempre estan relacionados con un creador. Se agregara un campo "Creador" con un select que lista todos los creadores disponibles.
+1. Usuario ve lista o grid de tickets con filtros descriptivos
+2. Click en ticket abre ViewTicketModal con toda la info + comentarios
+3. Desde el detalle puede cambiar status/prioridad/asignado inline
+4. Puede agregar comentarios
+5. Boton "Editar" abre EditTicketModal para cambios completos
+6. Boton "Eliminar" abre DeleteTicketDialog para confirmacion
+7. Desde la lista/grid tambien hay iconos de accion rapida (ver, editar, eliminar)
 
