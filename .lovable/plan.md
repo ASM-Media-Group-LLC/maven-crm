@@ -1,129 +1,91 @@
 
 
-## Agregar Proyectos (Spaces) al modulo de Tareas
+## Mejoras al Modal de Crear Tarea
 
-Se introduce una capa de "Proyectos" encima de las tareas. El flujo sera: primero crear un proyecto, luego dentro de ese proyecto crear tareas.
-
----
-
-### 1. Migracion SQL - Tabla `task_projects`
-
-Nueva tabla para almacenar los proyectos:
-
-```sql
-CREATE TABLE public.task_projects (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  description text,
-  company_id uuid,
-  created_by uuid NOT NULL,
-  status text NOT NULL DEFAULT 'active',  -- active, archived
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE public.task_projects ENABLE ROW LEVEL SECURITY;
-
--- RLS: misma logica de company_id
-CREATE POLICY "Users can view company projects"
-  ON public.task_projects FOR SELECT TO authenticated
-  USING (company_id IN (
-    SELECT company_id FROM profiles WHERE id = auth.uid()
-  ) OR created_by = auth.uid());
-
-CREATE POLICY "Authenticated users can create projects"
-  ON public.task_projects FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = created_by);
-
-CREATE POLICY "Creators can update projects"
-  ON public.task_projects FOR UPDATE TO authenticated
-  USING (auth.uid() = created_by);
-
--- Trigger updated_at
-CREATE TRIGGER update_task_projects_updated_at
-  BEFORE UPDATE ON public.task_projects
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
--- Agregar columna project_id a tasks
-ALTER TABLE public.tasks ADD COLUMN project_id uuid REFERENCES public.task_projects(id);
-```
-
-La columna `project_id` en `tasks` es nullable para no romper tareas existentes.
+Dos cambios principales: reemplazar el select de usuario por un combobox con buscador, y agregar opciones flexibles de fecha/duracion.
 
 ---
 
-### 2. Nuevo flujo de navegacion
+### 1. Select de usuario con buscador (Combobox)
 
-La pagina `/tareas` cambia a una vista de dos niveles:
+Reemplazar el `Select` de Radix por un **Popover + Command** (cmdk) que ya existe en el proyecto. Esto permite escribir para filtrar usuarios por nombre.
 
-- **Vista principal** (`/tareas`): Lista de proyectos como cards. Cada card muestra nombre, descripcion, cantidad de tareas activas/vencidas/completadas, y un mini-resumen.
-- **Vista de proyecto** (`/tareas/:projectId`): Muestra las tareas de ese proyecto especifico (la vista actual de TaskCards + KPIs, filtrada por `project_id`).
+**Componente**: Se usara `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandItem` directamente en `CreateTaskModal.tsx`.
 
----
-
-### 3. Archivos nuevos
-
-| Archivo | Proposito |
-|---------|-----------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Vista principal: lista de proyectos con KPIs globales y boton "Nuevo Proyecto" |
-| `src/pages/tareas/CreateProjectModal.tsx` | Modal para crear proyecto (nombre, descripcion) |
-| `src/pages/tareas/useProjects.ts` | Hook con queries/mutations para proyectos |
-| `src/pages/TareaProject.tsx` | Pagina wrapper para la vista de un proyecto especifico |
+Comportamiento:
+- Click en el trigger abre un popover con campo de busqueda
+- Escribir filtra la lista de perfiles por nombre
+- Click en un item selecciona y cierra el popover
+- Muestra el nombre seleccionado en el trigger
 
 ---
 
-### 4. Archivos modificados
+### 2. Modo de duracion flexible: Fecha inicio/fin O Duracion corta
 
-**`src/App.tsx`**:
-- Agregar ruta protegida `/tareas/:projectId` para `TareaProject`
+Agregar un toggle/tabs para elegir entre dos modos:
 
-**`src/pages/Tareas.tsx`**:
-- Cambiar contenido a `ProjectsListContent` en lugar de `TareasContent`
+**Modo A - "Duración"** (para tareas cortas):
+- Campos de Horas y Minutos (igual que ahora)
+- `due_at` = now + duracion
 
-**`src/pages/tareas/TareasContent.tsx`**:
-- Recibir `projectId` como prop
-- Filtrar tareas por `project_id`
-- Agregar breadcrumb o boton para volver a `/tareas`
-- Mostrar nombre del proyecto en el header
+**Modo B - "Fecha inicio / fin"** (para tareas con rango):
+- DatePicker para fecha de inicio (opcional, default = ahora)
+- DatePicker para fecha de fin (obligatorio)
+- Campos de hora (HH:MM) para la hora especifica de cada fecha
+- `due_at` = fecha fin + hora fin
+
+Se implementara con los componentes `Tabs` existentes y el `Calendar`/`Popover` del sistema de diseno (shadcn datepicker pattern con `pointer-events-auto`).
+
+---
+
+### 3. Archivos modificados
 
 **`src/pages/tareas/CreateTaskModal.tsx`**:
-- Agregar `project_id` al formulario de creacion (pasado como prop, no seleccionable)
+- Reemplazar Select por Popover+Command combobox para asignacion de usuario
+- Agregar Tabs con dos opciones: "Duracion" y "Fecha inicio/fin"
+- Agregar estados para: modo seleccionado, fecha inicio, fecha fin, hora inicio, hora fin
+- Actualizar logica de `handleSubmit` para calcular `due_at` segun el modo elegido
+- Agregar validaciones segun modo (duracion > 0 o fecha fin obligatoria)
 
 **`src/pages/tareas/useTareas.ts`**:
-- Agregar `project_id` al tipo `Task`
-- Filtrar query por `project_id` cuando se pasa como parametro
-- Incluir `project_id` en la mutation de crear tarea
+- Actualizar la interfaz de `createTask.mutationFn` para aceptar `due_at` directamente (calculado en el modal) en lugar de solo horas/minutos
+- Mantener compatibilidad con ambos modos
 
 ---
 
-### 5. ProjectsListContent - Estructura
+### 4. Detalle tecnico del Combobox
 
-- Header: "Proyectos" + boton "Nuevo Proyecto"
-- KPIs globales: Total proyectos, Proyectos activos, Total tareas pendientes
-- Grid de cards de proyecto, cada una con:
-  - Nombre del proyecto
-  - Descripcion (truncada)
-  - Mini contadores: X activas, X vencidas, X completadas
-  - Click en la card navega a `/tareas/{projectId}`
-
----
-
-### 6. CreateProjectModal
-
-Campos:
-- Nombre (text, requerido)
-- Descripcion (textarea, opcional)
-
-Al crear:
-- Inserta con `created_by = auth.uid()`, `company_id` del perfil
-- Toast de confirmacion
-- Recarga la lista
+```text
+Popover
+  PopoverTrigger (Button con estilo de input)
+    -> Muestra nombre seleccionado o "Selecciona usuario"
+  PopoverContent (z-50, bg-popover)
+    Command
+      CommandInput (campo de busqueda)
+      CommandList
+        CommandEmpty -> "No se encontraron usuarios"
+        CommandGroup
+          CommandItem (por cada perfil)
+            -> Check icon si esta seleccionado
+            -> full_name
+```
 
 ---
 
-### 7. Seccion tecnica
+### 5. Detalle tecnico de los Tabs de duracion
 
-- `useProjects.ts` usa `@tanstack/react-query` con el mismo patron de `useTareas`
-- Las queries de tareas por proyecto usan `.eq("project_id", projectId)` como filtro adicional
-- La TaskSharePage no cambia (sigue funcionando con share_token individual)
-- El sidebar sigue apuntando a `/tareas` (que ahora muestra proyectos)
+```text
+Tabs (defaultValue="duration")
+  TabsList
+    TabsTrigger "Duracion"
+    TabsTrigger "Fecha"
+  TabsContent "duration"
+    -> Input Horas + Input Minutos (igual que ahora)
+  TabsContent "date"
+    -> Popover+Calendar para Fecha inicio + Input hora (HH:MM)
+    -> Popover+Calendar para Fecha fin + Input hora (HH:MM)
+```
+
+Logica de calculo:
+- Modo duracion: `due_at = new Date(Date.now() + h*3600000 + m*60000)`
+- Modo fecha: `due_at = combinacion de fecha_fin + hora_fin` como ISO string
