@@ -1,7 +1,8 @@
-import { Check, Clock, AlertTriangle, Share2 } from "lucide-react";
+import { Check, Clock, AlertTriangle, Share2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCountdown } from "./useCountdown";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,9 +12,11 @@ interface TaskCardProps {
   task: Task;
   onComplete: (id: string) => void;
   onJustify: (task: Task) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
-const TaskCard = ({ task, onComplete, onJustify }: TaskCardProps) => {
+const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { display, isOverdue, isWarning } = useCountdown(task.due_at);
@@ -54,7 +57,31 @@ const TaskCard = ({ task, onComplete, onJustify }: TaskCardProps) => {
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
             )}
           </div>
-          {statusBadge()}
+          <div className="flex items-center gap-1">
+            {statusBadge()}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onEdit && (
+                  <DropdownMenuItem onClick={() => onEdit(task)}>
+                    <Pencil className="mr-2 h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share2 className="mr-2 h-4 w-4" /> Compartir
+                </DropdownMenuItem>
+                {onDelete && (
+                  <DropdownMenuItem className="text-destructive" onClick={() => onDelete(task)}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         <div className={`text-2xl font-mono font-bold text-center ${countdownColor}`}>
@@ -78,9 +105,6 @@ const TaskCard = ({ task, onComplete, onJustify }: TaskCardProps) => {
               <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Justificar
             </Button>
           )}
-          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={handleShare}>
-            <Share2 className="h-3.5 w-3.5" />
-          </Button>
         </div>
       </CardContent>
     </Card>

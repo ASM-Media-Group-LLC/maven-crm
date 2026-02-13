@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTareas, type Task } from "./useTareas";
 import TaskCard from "./TaskCard";
 import CreateTaskModal from "./CreateTaskModal";
+import EditTaskModal from "./EditTaskModal";
+import DeleteTaskDialog from "./DeleteTaskDialog";
 import OverdueReasonModal from "./OverdueReasonModal";
+import TasksTable from "./TasksTable";
 
 interface TareasContentProps {
   projectId: string;
@@ -14,9 +17,12 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason, updateTask, deleteTask } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
+  const [editTarget, setEditTarget] = useState<Task | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const now = Date.now();
 
@@ -25,10 +31,10 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       const getOrder = (t: Task) => {
         if (t.status === "completed") return 4;
         const due = new Date(t.due_at).getTime();
-        if (due <= now && !t.overdue_reason) return 0; // overdue no justified
-        if (due <= now) return 1; // overdue justified
-        if (due - now < 30 * 60 * 1000) return 2; // warning
-        return 3; // active
+        if (due <= now && !t.overdue_reason) return 0;
+        if (due <= now) return 1;
+        if (due - now < 30 * 60 * 1000) return 2;
+        return 3;
       };
       return getOrder(a) - getOrder(b) || new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     });
@@ -70,9 +76,14 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           </Button>
           <h1 className="text-xl font-bold">{projectName || "Tareas"}</h1>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}>
+            {viewMode === "grid" ? <List className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -93,10 +104,26 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         <p className="text-sm text-muted-foreground text-center py-8">Cargando tareas...</p>
       ) : sortedTasks.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-8">No hay tareas aún. Crea la primera.</p>
+      ) : viewMode === "list" ? (
+        <TasksTable
+          tasks={sortedTasks}
+          profiles={companyProfiles}
+          onComplete={handleComplete}
+          onJustify={setJustifyTask}
+          onEdit={setEditTarget}
+          onDelete={setDeleteTarget}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedTasks.map((task) => (
-            <TaskCard key={task.id} task={task} onComplete={handleComplete} onJustify={setJustifyTask} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onComplete={handleComplete}
+              onJustify={setJustifyTask}
+              onEdit={setEditTarget}
+              onDelete={setDeleteTarget}
+            />
           ))}
         </div>
       )}
@@ -108,6 +135,26 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
         projectId={projectId}
         onSubmit={(data) => createTask.mutate(data)}
         isLoading={createTask.isPending}
+      />
+
+      <EditTaskModal
+        open={!!editTarget}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+        task={editTarget}
+        profiles={companyProfiles}
+        onSubmit={(data) => updateTask.mutate(data)}
+        isLoading={updateTask.isPending}
+      />
+
+      <DeleteTaskDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        taskTitle={deleteTarget?.title || ""}
+        onConfirm={() => {
+          if (deleteTarget) deleteTask.mutate(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+        isLoading={deleteTask.isPending}
       />
 
       <OverdueReasonModal

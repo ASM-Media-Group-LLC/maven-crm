@@ -80,6 +80,40 @@ export const useProjects = () => {
     },
   });
 
+  const updateProject = useMutation({
+    mutationFn: async (project: { id: string; name: string; description?: string }) => {
+      const { error } = await supabase
+        .from("task_projects" as any)
+        .update({ name: project.name, description: project.description || null } as any)
+        .eq("id", project.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      toast({ title: "Proyecto actualizado", description: "El proyecto fue actualizado exitosamente." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el proyecto.", variant: "destructive" });
+    },
+  });
+
+  const deleteProject = useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase
+        .from("task_projects" as any)
+        .delete()
+        .eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      toast({ title: "Proyecto eliminado", description: "El proyecto fue eliminado exitosamente." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo eliminar el proyecto.", variant: "destructive" });
+    },
+  });
+
   const getProjectTaskCounts = (projectId: string) => {
     const now = Date.now();
     let active = 0, overdue = 0, completed = 0;
@@ -97,6 +131,8 @@ export const useProjects = () => {
     isLoading,
     profile,
     createProject,
+    updateProject,
+    deleteProject,
     getProjectTaskCounts,
   };
 };

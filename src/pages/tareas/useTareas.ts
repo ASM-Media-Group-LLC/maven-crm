@@ -157,6 +157,57 @@ export const useTareas = (projectId?: string) => {
     },
   });
 
+  const updateTask = useMutation({
+    mutationFn: async (task: {
+      id: string;
+      title: string;
+      description?: string;
+      assigned_to: string;
+      due_at: string;
+      duration_hours: number;
+      duration_minutes: number;
+    }) => {
+      const { error } = await supabase
+        .from("tasks" as any)
+        .update({
+          title: task.title,
+          description: task.description || null,
+          assigned_to: task.assigned_to,
+          due_at: task.due_at,
+          duration_hours: task.duration_hours,
+          duration_minutes: task.duration_minutes,
+        } as any)
+        .eq("id", task.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      toast({ title: "Tarea actualizada", description: "La tarea fue actualizada exitosamente." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar la tarea.", variant: "destructive" });
+    },
+  });
+
+  const deleteTask = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from("tasks" as any)
+        .delete()
+        .eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      toast({ title: "Tarea eliminada", description: "La tarea fue eliminada exitosamente." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo eliminar la tarea.", variant: "destructive" });
+    },
+  });
+
   return {
     tasks,
     isLoading,
@@ -166,5 +217,7 @@ export const useTareas = (projectId?: string) => {
     createTask,
     completeTask,
     submitOverdueReason,
+    updateTask,
+    deleteTask,
   };
 };
