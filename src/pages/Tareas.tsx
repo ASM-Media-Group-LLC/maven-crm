@@ -1,7 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
-import TareasContent from "./tareas/TareasContent";
+import ProjectsListContent from "./tareas/ProjectsListContent";
 
 const Tareas = () => {
   return (
@@ -10,7 +10,7 @@ const Tareas = () => {
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
-          <TareasContent />
+          <ProjectsListContent />
         </div>
       </div>
     </SidebarProvider>

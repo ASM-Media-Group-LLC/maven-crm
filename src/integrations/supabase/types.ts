@@ -1110,6 +1110,39 @@ export type Database = {
           },
         ]
       }
+      task_projects: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string
@@ -1123,6 +1156,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          project_id: string | null
           share_token: string | null
           status: string
           title: string
@@ -1140,6 +1174,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          project_id?: string | null
           share_token?: string | null
           status?: string
           title: string
@@ -1157,12 +1192,21 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          project_id?: string | null
           share_token?: string | null
           status?: string
           title?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "task_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tickets: {
         Row: {
@@ -1278,6 +1322,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          project_id: string | null
           share_token: string | null
           status: string
           title: string

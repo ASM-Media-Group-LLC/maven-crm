@@ -10,6 +10,7 @@ export interface Task {
   assigned_to: string;
   created_by: string;
   company_id: string | null;
+  project_id: string | null;
   status: string;
   duration_hours: number;
   duration_minutes: number;
@@ -21,7 +22,7 @@ export interface Task {
   updated_at: string | null;
 }
 
-export const useTareas = () => {
+export const useTareas = (projectId?: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,16 +42,34 @@ export const useTareas = () => {
   });
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["tasks", user?.id],
+    queryKey: ["tasks", user?.id, projectId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("tasks" as any)
         .select("*")
         .order("due_at", { ascending: true });
+      if (projectId) {
+        query = query.eq("project_id", projectId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as unknown as Task[];
     },
     enabled: !!user,
+  });
+
+  const { data: projectData } = useQuery({
+    queryKey: ["task-project-detail", projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const { data } = await supabase
+        .from("task_projects" as any)
+        .select("name")
+        .eq("id", projectId)
+        .single();
+      return data as unknown as { name: string } | null;
+    },
+    enabled: !!projectId,
   });
 
   const { data: companyProfiles = [] } = useQuery({
@@ -73,6 +92,7 @@ export const useTareas = () => {
       assigned_to: string;
       duration_hours: number;
       duration_minutes: number;
+      project_id?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
       const dueAt = new Date(
@@ -85,6 +105,7 @@ export const useTareas = () => {
         assigned_to: task.assigned_to,
         created_by: user.id,
         company_id: profile.company_id,
+        project_id: task.project_id || null,
         duration_hours: task.duration_hours,
         duration_minutes: task.duration_minutes,
         due_at: dueAt,
@@ -93,6 +114,7 @@ export const useTareas = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
       toast({ title: "Tarea creada", description: "La tarea fue creada exitosamente." });
     },
     onError: () => {
@@ -110,6 +132,7 @@ export const useTareas = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
       toast({ title: "Tarea completada", description: "La tarea fue marcada como completada." });
     },
     onError: () => {
@@ -138,6 +161,7 @@ export const useTareas = () => {
     tasks,
     isLoading,
     profile,
+    projectName: projectData?.name || null,
     companyProfiles,
     createTask,
     completeTask,
