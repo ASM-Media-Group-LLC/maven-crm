@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cleanHandle } from "@/lib/utils";
 import type { Tables } from "@/integrations/supabase/types";
+import { useUpdateLeadCategoria } from "./useLeadGen";
 
 type Lead = Tables<"leads">;
 
@@ -76,6 +77,7 @@ interface Props {
 const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
+  const updateCategoria = useUpdateLeadCategoria();
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -153,12 +155,28 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">—</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                      {lead.categoria.toUpperCase()}
-                    </Badge>
-                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 -ml-2 flex items-center gap-1">
+                        <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+                          {lead.categoria.toUpperCase()}
+                        </Badge>
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {["a+", "a", "b+", "b", "c"].map((c) => (
+                        <DropdownMenuItem
+                          key={c}
+                          onClick={() => updateCategoria.mutate({ id: lead.id, categoria: c })}
+                        >
+                          <Badge variant={calidadVariant[c] ?? "secondary-soft"} className="mr-2">
+                            {c.toUpperCase()}
+                          </Badge>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
                 <TableCell>
                   <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
