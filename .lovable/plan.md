@@ -1,113 +1,52 @@
 
 
-## Actualizar categorias y funcionalidad de filtros en Promolog
+## Hover en tarjetas de Promolog + Modal "Editar Promocion"
 
-### Cambios a realizar en `src/pages/promolog/PromologContent.tsx`
+### 1. Hover en PromologEntryCard
 
-### 1. Categorias con labels descriptivos
-Reemplazar la renderizacion dinamica de categorias (lineas 448-452) por opciones fijas con labels descriptivos segun la imagen:
-- A+ - Excelente
-- A - Muy buena
-- B+ - Buena plus
-- B - Buena
-- C - Regular
+Segun el sistema de diseno, las tarjetas usan cambios de fondo o bordes sutiles en hover (no sombras). Se agregara al componente Card en `PromologEntryCard.tsx` la clase `transition-colors hover:bg-muted/50` para un efecto de fondo sutil al pasar el cursor.
 
-Se eliminara la query dinamica de categorias (`creator-categories`) ya que las opciones son fijas.
+**Archivo:** `src/pages/promolog/PromologEntryCard.tsx`
 
-### 2. Estado controlado para todos los filtros
-Agregar estados para cada filtro:
-- `selectedStatus` (string) - para "¿Promociono?"
-- `selectedCategory` (string) - para "Categoria de Modelo"  
-- `selectedNetwork` (string) - para "Red Social"
-- `selectedCreator` ya existe
+### 2. Modal "Editar Promocion"
 
-Conectar cada Select con su estado usando `value` y `onValueChange`.
+Se creara un modal (Dialog) que se abre al hacer clic en "Editar" con la siguiente estructura segun la imagen de referencia:
 
-### 3. Funcionalidad "Limpiar filtros"
-El boton "Limpiar filtros" reseteara todos los estados a sus valores por defecto (cadena vacia o "__all__").
-
-### 4. Funcionalidad "Aplicar filtros"
-El boton "Aplicar filtros" cerrara el Sheet y filtrara las entradas (`mockEntries`) segun los valores seleccionados:
-- Filtrar por `result` segun el estado seleccionado
-- Filtrar por `name`/creator segun el modelo seleccionado
-- Filtrar por `network` segun la red social seleccionada
-- La categoria de modelo no aplica directamente a las entradas mock por ahora, pero el estado quedara listo
-
-Se agregara un estado `appliedFilters` que se actualiza al hacer clic en "Aplicar filtros", y las entradas mostradas se filtraran segun esos filtros aplicados.
+- **Titulo:** "Editar Promocion" (con pr-8 para no chocar con el boton X)
+- **Card de creador:** Fondo oscuro/muted con Avatar (iniciales), nombre completo y handle con icono de red social
+- **Seccion "¿Promociono Hoy?":** Dos botones grandes lado a lado:
+  - "Si Promociono" (fondo cyan/primary, con icono check) 
+  - "No Promociono" (fondo purple, con icono X)
+  - Seleccion toggle: al hacer clic en uno se resalta y el otro se desactiva
+- **Seccion "Red Social *":** 4 botones en fila horizontal (Instagram, TikTok, X, Telegram) con iconos, seleccion toggle
+- **Footer:** Botones "Cancelar" (outline) y "Guardar Cambios" (primary/cyan)
 
 ### Detalle Tecnico
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
+**Archivo:** `src/pages/promolog/PromologEntryCard.tsx`
 
-**Nuevos estados (despues de linea 191):**
-```tsx
-const [selectedStatus, setSelectedStatus] = useState("__all__");
-const [selectedCategory, setSelectedCategory] = useState("__all__");
-const [selectedNetwork, setSelectedNetwork] = useState("__all__");
+Cambios:
+- Agregar estado `editOpen` para controlar el modal
+- Conectar boton "Editar" con `onClick={() => setEditOpen(true)}`
+- Agregar estados locales para la seleccion: `editResult` (si/no) y `editNetwork` (instagram/tiktok/x/telegram)
+- Inicializar estados con los valores actuales del entry
+- Importar Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+- Agregar clase hover al Card: `transition-colors hover:bg-muted/50`
 
-// Filtros aplicados (se actualizan al hacer clic en "Aplicar")
-const [appliedFilters, setAppliedFilters] = useState({
-  status: "__all__",
-  creator: "",
-  category: "__all__",
-  network: "__all__",
-});
+Estructura del modal:
+```
+Dialog
+  DialogContent (max-w-lg)
+    DialogHeader
+      DialogTitle "Editar Promocion"
+    Card con avatar + nombre + handle
+    Seccion "¿Promociono Hoy?"
+      2 botones toggle (Si / No)
+    Seccion "Red Social *"
+      4 botones toggle (Instagram, TikTok, X, Telegram)
+    DialogFooter
+      Button "Cancelar" (outline)
+      Button "Guardar Cambios" (primary, bg-cyan-500)
 ```
 
-**Logica de filtrado:**
-```tsx
-const filteredEntries = mockEntries.filter((entry) => {
-  if (appliedFilters.status !== "__all__") {
-    const statusMap: Record<string, string> = {
-      si_promociono: "Si",
-      no_promociono: "No",
-      parcial: "Parcial",
-      pendiente: "Pendiente",
-    };
-    if (entry.result !== statusMap[appliedFilters.status]) return false;
-  }
-  if (appliedFilters.creator && entry.id) {
-    // Filtrar por creator name match
-  }
-  if (appliedFilters.network !== "__all__" && entry.network !== appliedFilters.network) return false;
-  return true;
-});
-```
-
-**Categorias fijas (reemplazar lineas 448-452):**
-```tsx
-<SelectContent>
-  <SelectItem value="__all__">Todas las categorias</SelectItem>
-  <SelectItem value="A+">A+ - Excelente</SelectItem>
-  <SelectItem value="A">A - Muy buena</SelectItem>
-  <SelectItem value="B+">B+ - Buena plus</SelectItem>
-  <SelectItem value="B">B - Buena</SelectItem>
-  <SelectItem value="C">C - Regular</SelectItem>
-</SelectContent>
-```
-
-**Limpiar filtros (linea 473):**
-```tsx
-<Button variant="outline" className="w-full" onClick={() => {
-  setSelectedStatus("__all__");
-  setSelectedCreator("");
-  setSelectedCategory("__all__");
-  setSelectedNetwork("__all__");
-}}>Limpiar filtros</Button>
-```
-
-**Aplicar filtros (linea 474):**
-```tsx
-<Button className="w-full" onClick={() => {
-  setAppliedFilters({
-    status: selectedStatus,
-    creator: selectedCreator,
-    category: selectedCategory,
-    network: selectedNetwork,
-  });
-  setFiltersOpen(false);
-}}>Aplicar filtros</Button>
-```
-
-**Eliminar:** La query `creator-categories` (lineas 174-185) ya no sera necesaria ya que las categorias son fijas.
-
+Los botones de seleccion usaran estilos condicionales: el seleccionado tendra fondo de color (cyan para "Si", purple para "No", y borde primary para red social), mientras que los no seleccionados tendran variant outline.
