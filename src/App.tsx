@@ -9,6 +9,11 @@ import DesignSystem from "./pages/DesignSystem";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesOverview from "./pages/SalesOverview";
 import ComparativasPage from "./pages/sales-overview/ComparativasPage";
+import Top10Page from "./pages/sales-overview/Top10Page";
+import SubiendoPage from "./pages/sales-overview/SubiendoPage";
+import BajandoPage from "./pages/sales-overview/BajandoPage";
+import AltoPotencialPage from "./pages/sales-overview/AltoPotencialPage";
+import EnRiesgoPage from "./pages/sales-overview/EnRiesgoPage";
 import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
 import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
@@ -40,6 +45,11 @@ const App = () => (
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/sales-overview" element={<SalesOverview />} />
             <Route path="/sales-overview/comparativas" element={<ComparativasPage />} />
+            <Route path="/sales-overview/top10" element={<Top10Page />} />
+            <Route path="/sales-overview/subiendo" element={<SubiendoPage />} />
+            <Route path="/sales-overview/bajando" element={<BajandoPage />} />
+            <Route path="/sales-overview/alto-potencial" element={<AltoPotencialPage />} />
+            <Route path="/sales-overview/en-riesgo" element={<EnRiesgoPage />} />
             <Route path="/salesdashboard" element={<SalesDashboard />} />
             <Route path="/salesperformancecreator" element={<SalesPerformanceCreator />} />
             <Route path="/aisales" element={<AiSales />} />

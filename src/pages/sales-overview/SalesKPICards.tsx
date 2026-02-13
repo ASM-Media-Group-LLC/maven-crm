@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { DollarSign, Wallet, Users, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -12,61 +13,73 @@ const fmt = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(0)}`;
 
 const SalesKPICards = ({ data, onCardClick }: Props) => {
+  const navigate = useNavigate();
+
   const cards = [
     {
       id: "gross",
-      title: "Ingresos Brutos",
+      title: "Ingresos Total",
       value: fmt(data.totalCurrent),
       change: data.totalChangePercent,
+      previousValue: fmt(data.totalPrevious),
+      subtitle: null,
       icon: DollarSign,
       color: "text-primary",
       bgColor: "bg-primary/10",
       progress: 100,
-      clickable: false,
+      route: null,
     },
     {
       id: "net",
       title: "Net Earnings",
       value: fmt(data.totalCurrent * 0.8),
       change: data.totalChangePercent,
+      previousValue: fmt(data.totalPrevious * 0.8),
+      subtitle: null,
       icon: Wallet,
       color: "text-success",
       bgColor: "bg-success/10",
       progress: 80,
-      clickable: false,
+      route: null,
     },
     {
       id: "creators",
-      title: "Creadoras Activas",
+      title: "Creadoras",
       value: data.activeCreators.toString(),
       change: 0,
+      previousValue: null,
+      subtitle: `${data.activeCreators} activas`,
       icon: Users,
       color: "text-accent",
       bgColor: "bg-accent/10",
       progress: Math.min((data.activeCreators / Math.max(data.creators.length, 1)) * 100, 100),
-      clickable: false,
+      route: null,
     },
     {
       id: "rising",
       title: "Subiendo",
       value: data.rising.length.toString(),
       change: 0,
+      previousValue: null,
+      subtitle: "crecimiento positivo",
       icon: TrendingUp,
       color: "text-success",
       bgColor: "bg-success/10",
       progress: Math.min((data.rising.length / Math.max(data.activeCreators, 1)) * 100, 100),
-      clickable: true,
+      route: "/sales-overview/subiendo",
     },
     {
       id: "at_risk",
       title: "En Riesgo",
       value: data.atRisk.length.toString(),
       change: 0,
+      previousValue: null,
+      subtitle: "necesitan atención",
       icon: AlertTriangle,
       color: "text-destructive",
       bgColor: "bg-destructive/10",
       progress: Math.min((data.atRisk.length / Math.max(data.activeCreators, 1)) * 100, 100),
-      clickable: true,
+      route: "/sales-overview/en-riesgo",
     },
   ];
 
@@ -75,8 +88,8 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
       {cards.map((card) => (
         <Card
           key={card.id}
-          className={`transition-all duration-200 ${card.clickable ? "cursor-pointer hover:scale-[1.03] hover:shadow-lg" : ""}`}
-          onClick={() => card.clickable && onCardClick(card.id)}
+          className="cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg"
+          onClick={() => card.route ? navigate(card.route) : onCardClick(card.id)}
         >
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -89,8 +102,14 @@ const SalesKPICards = ({ data, onCardClick }: Props) => {
               <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
               {card.change !== 0 && (
                 <p className={`text-xs ${card.change >= 0 ? "text-success" : "text-destructive"}`}>
-                  {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs periodo anterior
+                  {card.change >= 0 ? "+" : ""}{card.change.toFixed(1)}% vs anterior
                 </p>
+              )}
+              {card.previousValue && (
+                <p className="text-xs text-muted-foreground">Anterior: {card.previousValue}</p>
+              )}
+              {card.subtitle && (
+                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
               )}
             </div>
             <Progress value={card.progress} className="h-1" />
