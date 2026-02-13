@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   CalendarDays,
   Users,
@@ -155,6 +157,18 @@ const agentsData = [
 ];
 
 const PromologContent = () => {
+  const { data: creators = [] } = useQuery({
+    queryKey: ["creators-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("id, name, artistic_name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const [date, setDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"dashboard" | "agentes">("dashboard");
@@ -373,8 +387,13 @@ const PromologContent = () => {
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                        </SelectContent>
+                        <SelectItem value="__all__">Todos</SelectItem>
+                        {creators.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}{c.artistic_name ? ` (${c.artistic_name})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
