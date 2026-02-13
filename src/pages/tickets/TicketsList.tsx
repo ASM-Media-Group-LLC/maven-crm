@@ -1,10 +1,18 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, Eye, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -41,102 +49,161 @@ const priorityColor: Record<string, string> = {
   low: "text-muted-foreground",
 };
 
+type SortKey = "ticket" | "creator" | "priority" | "type" | "status" | "company" | "assigned" | "date";
+
+const getSortValue = (ticket: TicketWithCreator, key: SortKey): string => {
+  switch (key) {
+    case "ticket": return ticket.title.toLowerCase();
+    case "creator": return (ticket.creators?.instagram_handle || ticket.creators?.artistic_name || ticket.creators?.name || "").toLowerCase();
+    case "priority": return ticket.priority;
+    case "type": return ticket.ticket_type;
+    case "status": return ticket.status;
+    case "company": return ticket.company || "";
+    case "assigned": return ticket.assigned_to || "";
+    case "date": return ticket.created_at || "";
+    default: return "";
+  }
+};
+
 const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  };
+
+  const sorted = [...tickets].sort((a, b) => {
+    const aVal = getSortValue(a, sortKey);
+    const bVal = getSortValue(b, sortKey);
+    const cmp = aVal.localeCompare(bVal);
+    return sortAsc ? cmp : -cmp;
+  });
+
+  const SortHeader = ({ label, sortKeyName }: { label: string; sortKeyName: SortKey }) => (
+    <Button variant="ghost" size="sm" className="h-8 -ml-3 text-xs font-medium" onClick={() => handleSort(sortKeyName)}>
+      {label}
+      <ArrowUpDown className="ml-1 h-3 w-3" />
+    </Button>
+  );
+
   if (tickets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <p className="text-lg font-medium">No hay tickets</p>
-        <p className="text-sm">Crea un nuevo ticket para comenzar</p>
+      <div className="rounded-lg border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead colSpan={9} className="text-center py-16 text-muted-foreground">
+                <p className="text-lg font-medium">No hay tickets</p>
+                <p className="text-sm">Crea un nuevo ticket para comenzar</p>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+        </Table>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {tickets.map((ticket) => {
-        const ticketNum = ticket.id.slice(0, 6).toUpperCase();
-        const creatorHandle = ticket.creators?.instagram_handle || ticket.creators?.artistic_name || ticket.creators?.name || "—";
-        const companyLabel = COMPANIES.find((c) => c.value === ticket.company)?.label;
-        const isUrgent = ticket.priority === "urgent";
+    <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-card">
+          <TableRow>
+            <TableHead><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
+            <TableHead><SortHeader label="Creador" sortKeyName="creator" /></TableHead>
+            <TableHead><SortHeader label="Prioridad" sortKeyName="priority" /></TableHead>
+            <TableHead><SortHeader label="Tipo" sortKeyName="type" /></TableHead>
+            <TableHead><SortHeader label="Estado" sortKeyName="status" /></TableHead>
+            <TableHead><SortHeader label="Compañía" sortKeyName="company" /></TableHead>
+            <TableHead><SortHeader label="Asignado" sortKeyName="assigned" /></TableHead>
+            <TableHead><SortHeader label="Fecha" sortKeyName="date" /></TableHead>
+            <TableHead className="sticky right-0 bg-card z-20 text-right">Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((ticket) => {
+            const ticketNum = ticket.id.slice(0, 6).toUpperCase();
+            const creatorHandle = ticket.creators?.instagram_handle || ticket.creators?.artistic_name || ticket.creators?.name || "—";
+            const companyLabel = COMPANIES.find((c) => c.value === ticket.company)?.label || "—";
+            const isUrgent = ticket.priority === "urgent";
 
-        return (
-          <Card
-            key={ticket.id}
-            className={`p-4 transition-colors hover:bg-muted/30 cursor-pointer ${isUrgent ? "border-destructive/40 bg-destructive/5" : ""}`}
-            onClick={() => onView(ticket)}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-mono font-bold ${priorityColor[ticket.priority] || "text-muted-foreground"}`}>
-                    #{ticketNum}
-                  </span>
-                  <h3 className="text-sm font-semibold truncate">{ticket.title}</h3>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Creado por: @{creatorHandle}</span>
-                  <span>•</span>
-                  <span>
-                    Asignado a: {ticket.assigned_to ? `@${ticket.assigned_to}` : "Sin asignar"}
-                  </span>
-                </div>
-
-                {ticket.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">{ticket.description}</p>
-                )}
-
-                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                  {ticket.created_at && (
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+            return (
+              <TableRow
+                key={ticket.id}
+                className={`cursor-pointer ${isUrgent ? "bg-destructive/5" : ""}`}
+                onClick={() => onView(ticket)}
+              >
+                <TableCell className="min-w-[200px]">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-mono font-bold ${priorityColor[ticket.priority] || "text-muted-foreground"}`}>
+                      #{ticketNum}
                     </span>
-                  )}
-                  {companyLabel && (
-                    <Badge variant="outline" className="text-[10px]">{companyLabel}</Badge>
-                  )}
+                    <span className="text-sm font-medium truncate">{ticket.title}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">@{creatorHandle}</TableCell>
+                <TableCell>
                   <Badge variant={priorityVariant[ticket.priority] || "secondary"} className="text-[10px]">
                     {PRIORITY_LABELS[ticket.priority] || ticket.priority}
                   </Badge>
-                  <Badge variant={statusVariant[ticket.status] || "outline"} className="text-[10px]">
-                    {STATUS_LABELS[ticket.status] || ticket.status}
-                  </Badge>
+                </TableCell>
+                <TableCell>
                   <Badge variant="outline" className="text-[10px]">
                     {TYPE_LABELS[ticket.ticket_type] || ticket.ticket_type}
                   </Badge>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(ticket); }}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Ver detalle</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(ticket); }}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Editar</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(ticket); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Eliminar</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          </Card>
-        );
-      })}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={statusVariant[ticket.status] || "outline"} className="text-[10px]">
+                    {STATUS_LABELS[ticket.status] || ticket.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-[10px]">{companyLabel}</Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {ticket.assigned_to ? `@${ticket.assigned_to}` : "Sin asignar"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                  {ticket.created_at ? format(new Date(ticket.created_at), "dd MMM yyyy", { locale: es }) : "—"}
+                </TableCell>
+                <TableCell className="sticky right-0 bg-card">
+                  <div className="flex items-center justify-end gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(ticket); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Ver detalle</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(ticket); }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Editar</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(ticket); }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Eliminar</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 };
