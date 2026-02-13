@@ -57,6 +57,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
           ))}
         </div>
       ),
+      onClick: () => navigate("/sales-overview/top10"),
     },
     {
       id: "rising",
@@ -74,6 +75,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
           {data.rising.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
         </div>
       ),
+      onClick: () => navigate("/sales-overview/subiendo"),
     },
     {
       id: "falling",
@@ -91,6 +93,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
           {data.falling.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
         </div>
       ),
+      onClick: () => navigate("/sales-overview/bajando"),
     },
     {
       id: "high_potential",
@@ -100,6 +103,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
       content: (
         <p className="text-2xl font-bold text-accent">{data.highPotential.length}</p>
       ),
+      onClick: () => navigate("/sales-overview/alto-potencial"),
     },
     {
       id: "at_risk",
@@ -109,6 +113,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [], eventCou
       content: (
         <p className="text-2xl font-bold text-destructive">{fmt(atRiskTotal)}</p>
       ),
+      onClick: () => navigate("/sales-overview/en-riesgo"),
     },
     {
       id: "alerts",
