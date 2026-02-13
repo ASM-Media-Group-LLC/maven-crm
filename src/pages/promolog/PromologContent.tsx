@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -357,7 +358,7 @@ const PromologContent = () => {
             <CardContent className="p-4">
               <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground w-full justify-start hover:bg-transparent hover:text-muted-foreground">
                     <Filter className="h-4 w-4" />
                     Filtros
                     <ChevronDown
@@ -365,10 +366,43 @@ const PromologContent = () => {
                     />
                   </Button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-3">
-                  <p className="text-sm text-muted-foreground">
-                    Filtros próximamente...
-                  </p>
+                <CollapsibleContent className="pt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Creador/a</label>
+                      <Select>
+                        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Red Social</label>
+                      <Select>
+                        <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="tiktok">TikTok</SelectItem>
+                          <SelectItem value="x">X</SelectItem>
+                          <SelectItem value="telegram">Telegram</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Estado</label>
+                      <Select>
+                        <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          <SelectItem value="si">Sí</SelectItem>
+                          <SelectItem value="parcial">Parcial</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             </CardContent>
