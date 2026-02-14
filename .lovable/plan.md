@@ -1,66 +1,52 @@
 
 
-## 1. Footer: Agregar tagline oficial debajo del logo
+## 1. Espacio superior en la seccion de modulos
 
-En el footer del Landing, debajo de `<Logo size="sm" />`, reemplazar el texto actual ("La plataforma CRM para agencias de creadores de contenido.") por el tagline oficial usado en la pantalla de inicio de sesion:
+Agregar `pt-20` a la seccion `#funcionalidades` (linea 125) para crear separacion visual respecto al hero. Actualmente solo tiene `pb-20` y el titulo queda pegado al fondo del hero.
 
-**"La plataforma integral para gestionar, escalar y optimizar tus operaciones."**
+## 2. Animaciones adicionales en el Hero
 
-Mismo estilo: `text-sm text-muted-foreground`.
+El hero ya tiene `animate-fade-in-up` con delays escalonados, pero se puede enriquecer:
 
-## 2. Hero: Fondo dinamico con animated blobs y waves
+- Agregar una animacion de pulso sutil a la linea gradiente decorativa (linea 112): `animate-pulse` con opacidad reducida
+- Agregar hover animado a los botones CTA: `transition-all duration-300 hover:scale-105` y un efecto glow sutil en el boton principal
+- Agregar `animate-float` al Badge del hero para darle movimiento continuo sutil
 
-Reemplazar el actual `hero-gradient` (un simple radial-gradient estatico) por los mismos componentes animados del auth:
+## 3. Mejora del Footer
 
-- Agregar `AnimatedGradientBackground` (blobs fluidos animados)
-- Agregar `AnimatedWaves` (ondas SVG con bordes luminosos)
-- Cambiar el fondo base del hero a `bg-[hsl(240,10%,2%)]` (negro profundo, igual que auth)
-- Asegurar que el contenido del hero tenga `relative z-10` para estar sobre las animaciones
+Transformar el footer minimalista actual en una version mas rica y dinamica:
 
-## 3. Modulos: Cards con efecto glass
+- Agregar navegacion interna con links a secciones (Funcionalidades, Metricas) y links de auth (Iniciar sesion, Registrarse)
+- Agregar un CTA final tipo "call to action" antes del footer: una seccion con glass-card, titulo motivacional y boton de registro
+- Agregar `AnimatedGradientBackground` al footer para continuidad visual con el hero
+- Agregar iconos decorativos con `animate-float` y texto de copyright con el ano actual
+- La linea divisoria gradiente se mantiene
 
-Reemplazar las cards actuales de modulos (border + bg-card) por el patron `glass-card-subtle`:
+### Estructura del nuevo footer:
 
-- Aplicar `glass-card-subtle` como clase base
-- Agregar hover animado: `transition-all duration-300 hover:scale-[1.02]` con cambio de borde a `hover:border-white/15`
-- Cambiar texto a colores claros (`text-white`, `text-white/60`) ya que el fondo sera oscuro
+```text
+--- CTA Section (glass-card con fondo animado) ---
+"Listo para escalar tu agencia?"
+Subtitulo + boton [Comenzar ahora]
 
-## 4. Stats: Fondo con glass effect
-
-La seccion de metricas actualmente usa `bg-card`. Cambiar a un fondo sutil con glass:
-
-- Fondo: quitar `bg-card border-t` y usar un gradiente sutil con blur
-- Cada stat card: envolver en un contenedor con `glass-card-subtle` y padding
-- Mantener las animaciones float existentes
-
-## 5. Navbar: Adaptar al fondo oscuro del hero
-
-- Cambiar `bg-background/80` a `bg-[hsl(240,10%,2%)]/80` para que se integre con el fondo oscuro
-- Agregar `backdrop-blur-xl` para mejor efecto de profundidad
-- Borde: cambiar `border-border` a `border-white/[0.06]`
-
-## 6. Footer: Estilo oscuro coherente
-
-- Fondo oscuro `bg-[hsl(240,10%,2%)]`
-- Linea divisoria: gradiente con `via-white/10` en lugar de `via-border`
-- Texto en `text-white/60`
+--- Footer ---
+Logo + tagline oficial
+Links de navegacion (Funcionalidades | Metricas | Iniciar sesion)
+Linea gradiente
+"2026 Clari. Todos los derechos reservados."
+```
 
 ## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/Landing.tsx` | Importar AnimatedGradientBackground y AnimatedWaves; redisenar hero, cards, stats, navbar y footer con glass effects y fondo oscuro; actualizar tagline del footer |
+| `src/pages/Landing.tsx` | Agregar pt-20 a seccion modulos; agregar animaciones al hero (float en badge, pulse en linea, hover en CTAs); redisenar footer con CTA section, navegacion y fondo animado |
 
-Solo se modifica un archivo. Los componentes de animacion (`AnimatedGradientBackground`, `AnimatedWaves`) y las utilidades CSS (`glass-card`, `glass-card-subtle`) ya existen y se reutilizan directamente.
+## Detalle tecnico
 
-## Detalle visual del resultado
+- Se usan las animaciones ya existentes: `animate-fade-in-up`, `animate-float`, `animate-pulse`
+- Se reutiliza `AnimatedGradientBackground` para el CTA section del footer
+- Se usan `glass-card` y `glass-card-subtle` ya definidos en el CSS
+- Los hover effects usan clases de Tailwind sin valores hardcoded
+- Los links de navegacion del footer usan `story-link` para la animacion de underline
 
-```text
-Navbar:  fondo oscuro blur, borde sutil blanco/6%
-Hero:    fondo negro con blobs animados + waves, badge glass, logo, tagline, CTAs
-Modulos: cards glass-card-subtle con hover scale, iconos con color, fondo oscuro continuo
-Stats:   cards glass individuales, iconos flotantes, fondo oscuro
-Footer:  logo + tagline oficial, fondo oscuro, linea gradiente sutil
-```
-
-Todo el landing se convierte en una experiencia visual oscura e inmersiva, coherente con la pantalla de autenticacion, usando los mismos efectos de glass y animaciones que ya estan definidos en el sistema de diseno.
