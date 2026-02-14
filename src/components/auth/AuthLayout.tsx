@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import Logo from "@/components/Logo";
+import AnimatedGradientBackground from "./AnimatedGradientBackground";
 import ParticlesBackground from "./ParticlesBackground";
 
 interface AuthLayoutProps {
@@ -10,7 +11,8 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
   return (
     <div className="flex min-h-screen">
       {/* Decorative left panel */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[hsl(var(--accent))] via-[hsl(240,8%,12%)] to-[hsl(var(--primary)/0.3)]">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[hsl(240,8%,6%)]">
+        <AnimatedGradientBackground />
         <ParticlesBackground />
         <div className="relative z-10 flex flex-col items-center justify-center w-full px-12">
           <Logo size="lg" />
