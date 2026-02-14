@@ -20,22 +20,58 @@ const ResetPassword = () => {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    let retryInterval: ReturnType<typeof setInterval> | null = null;
+    let safetyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const isRecoveryRedirect = hashParams.get("type") === "recovery";
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (!isMounted) return;
       if (event === "PASSWORD_RECOVERY") {
         setRecoveryReady(true);
         setChecking(false);
+        if (retryInterval) clearInterval(retryInterval);
+        if (safetyTimeout) clearTimeout(safetyTimeout);
       }
     });
 
-    // Also check if already in a recovery session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setRecoveryReady(true);
-      }
-      setChecking(false);
-    });
+    if (isRecoveryRedirect) {
+      // Hash fragments present — poll getSession until Supabase processes them
+      const startTime = Date.now();
+      retryInterval = setInterval(async () => {
+        if (!isMounted) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setRecoveryReady(true);
+          setChecking(false);
+          if (retryInterval) clearInterval(retryInterval);
+          if (safetyTimeout) clearTimeout(safetyTimeout);
+        }
+      }, 500);
 
-    return () => subscription.unsubscribe();
+      // Safety timeout: stop waiting after 5 seconds
+      safetyTimeout = setTimeout(() => {
+        if (!isMounted) return;
+        if (retryInterval) clearInterval(retryInterval);
+        setChecking(false); // Will show "invalid link" if recoveryReady is still false
+      }, 5000);
+    } else {
+      // No hash fragments — single check
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session) setRecoveryReady(true);
+        setChecking(false);
+      });
+    }
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+      if (retryInterval) clearInterval(retryInterval);
+      if (safetyTimeout) clearTimeout(safetyTimeout);
+    };
   }, []);
 
   const hasMinLength = password.length >= 8;
