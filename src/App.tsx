@@ -9,6 +9,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import DesignSystem from "./pages/DesignSystem";
 import Docs from "./pages/Docs";
 import SalesDashboard from "./pages/SalesDashboard";
@@ -57,6 +59,8 @@ const App = () => (
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
 
