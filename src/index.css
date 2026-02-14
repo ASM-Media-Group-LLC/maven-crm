@@ -139,6 +139,20 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   background-color: hsl(var(--primary));
 }
 
+/* Glass card utilities */
+.glass-card {
+  @apply backdrop-blur-2xl border rounded-2xl;
+  background: hsl(0 0% 100% / 0.03);
+  border-color: hsl(0 0% 100% / 0.08);
+  box-shadow: 0 0 80px -20px hsl(var(--accent) / 0.3);
+}
+
+.glass-card-subtle {
+  @apply backdrop-blur-md border rounded-2xl;
+  background: hsl(0 0% 100% / 0.02);
+  border-color: hsl(0 0% 100% / 0.06);
+}
+
 /* Auth animated gradient blobs */
 @keyframes blob-move-1 {
   0% { transform: translate(0, 0) scale(1); }
