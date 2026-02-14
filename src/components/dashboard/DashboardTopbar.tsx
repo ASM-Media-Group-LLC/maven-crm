@@ -58,6 +58,19 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Theme toggle */}
+          {mounted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
+            >
+              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+          )}
+
           {/* Language dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -76,18 +89,6 @@ const DashboardTopbar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-          )}
 
           {/* Notifications */}
           <Popover>
