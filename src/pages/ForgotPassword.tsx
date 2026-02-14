@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Logo from "@/components/Logo";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,32 +38,29 @@ const ForgotPassword = () => {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4 lg:items-start">
-          <Link to="/" className="lg:hidden">
-            <Logo size="sm" />
-          </Link>
-          <h2 className="text-2xl font-bold">Recuperar contraseña</h2>
-          <p className="text-sm text-muted-foreground text-center lg:text-left">
+      <div className="space-y-6">
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Recuperar contraseña</h2>
+          <p className="text-sm text-white/50 text-center">
             Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
           </p>
         </div>
 
         {sent ? (
-          <div className="rounded-lg border border-border bg-card p-6 space-y-4 text-center">
-            <p className="text-sm text-foreground">
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-white/70">
               Si el correo está registrado, recibirás un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada.
             </p>
-            <Link to="/login" className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
+            <Link to="/login" className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white hover:underline">
               <ArrowLeft className="h-4 w-4" />
               Volver a iniciar sesión
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+              <Label htmlFor="email" className="text-white/70">Email</Label>
+              <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -74,7 +70,7 @@ const ForgotPassword = () => {
         )}
 
         <div className="flex flex-col items-center gap-2 text-sm">
-          <Link to="/login" className="inline-flex items-center gap-2 text-primary hover:underline">
+          <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
             <ArrowLeft className="h-4 w-4" />
             Volver a iniciar sesión
           </Link>

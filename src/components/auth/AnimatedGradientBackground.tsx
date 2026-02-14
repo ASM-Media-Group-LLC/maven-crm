@@ -1,60 +1,74 @@
 const AnimatedGradientBackground = () => {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Blob 1 - Red/Destructive - top left */}
+      {/* Blob 1 - Red/Destructive */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "70%",
+          height: "70%",
+          top: "-20%",
+          left: "-15%",
+          background: "hsl(0, 84%, 60%)",
+          filter: "blur(120px)",
+          opacity: 0.5,
+          animation: "blob-move-1 20s ease-in-out infinite",
+        }}
+      />
+      {/* Blob 2 - Blue/Primary */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "75%",
+          height: "75%",
+          bottom: "-25%",
+          right: "-20%",
+          background: "hsl(211, 100%, 50%)",
+          filter: "blur(130px)",
+          opacity: 0.45,
+          animation: "blob-move-2 25s ease-in-out infinite",
+        }}
+      />
+      {/* Blob 3 - Purple/Accent */}
       <div
         className="absolute rounded-full"
         style={{
           width: "60%",
           height: "60%",
-          top: "-10%",
-          left: "-10%",
-          background: "hsl(0, 84%, 60%)",
+          top: "20%",
+          left: "30%",
+          background: "hsl(271, 91%, 50%)",
           filter: "blur(100px)",
-          opacity: 0.5,
-          animation: "blob-move-1 12s ease-in-out infinite alternate",
+          opacity: 0.35,
+          animation: "blob-move-3 18s ease-in-out infinite",
         }}
       />
-      {/* Blob 2 - Blue/Primary - center bottom */}
+      {/* Blob 4 - Pink */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: "55%",
+          height: "55%",
+          bottom: "10%",
+          left: "-10%",
+          background: "hsl(340, 82%, 59%)",
+          filter: "blur(110px)",
+          opacity: 0.3,
+          animation: "blob-move-4 22s ease-in-out infinite",
+        }}
+      />
+      {/* Blob 5 - Warm accent for extra dynamics */}
       <div
         className="absolute rounded-full"
         style={{
           width: "50%",
           height: "50%",
-          bottom: "-5%",
-          left: "25%",
-          background: "hsl(211, 100%, 50%)",
-          filter: "blur(120px)",
-          opacity: 0.45,
-          animation: "blob-move-2 10s ease-in-out infinite alternate",
-        }}
-      />
-      {/* Blob 3 - Purple/Accent - center */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: "45%",
-          height: "45%",
-          top: "30%",
-          left: "20%",
-          background: "hsl(271, 91%, 50%)",
-          filter: "blur(80px)",
-          opacity: 0.35,
-          animation: "blob-move-3 15s ease-in-out infinite alternate",
-        }}
-      />
-      {/* Blob 4 - Pink - transition between red and blue */}
-      <div
-        className="absolute rounded-full"
-        style={{
-          width: "40%",
-          height: "40%",
-          top: "50%",
-          left: "5%",
-          background: "hsl(340, 82%, 59%)",
-          filter: "blur(100px)",
-          opacity: 0.25,
-          animation: "blob-move-4 8s ease-in-out infinite alternate",
+          top: "-10%",
+          right: "10%",
+          background: "hsl(25, 95%, 53%)",
+          filter: "blur(140px)",
+          opacity: 0.2,
+          animation: "blob-move-5 24s ease-in-out infinite",
         }}
       />
     </div>

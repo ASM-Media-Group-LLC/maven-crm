@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Logo from "@/components/Logo";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,18 +51,15 @@ const Login = () => {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4 lg:items-start">
-          <Link to="/" className="lg:hidden">
-            <Logo size="sm" />
-          </Link>
-          <h2 className="text-2xl font-bold">Iniciar sesión</h2>
-          <p className="text-sm text-muted-foreground">Ingresa tus credenciales para acceder al CRM</p>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Iniciar sesión</h2>
+          <p className="text-sm text-white/50">Ingresa tus credenciales para acceder al CRM</p>
         </div>
 
-        <form onSubmit={handleLogin} className="rounded-lg border border-border bg-card p-6 space-y-5">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-white/70">Email</Label>
             <Input
               id="email"
               type="email"
@@ -71,10 +67,11 @@ const Login = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
+              className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password" className="text-white/70">Contraseña</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -83,13 +80,13 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="pr-10"
+                className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30"
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
               >
@@ -104,12 +101,12 @@ const Login = () => {
         </form>
 
         <div className="flex flex-col items-center gap-2 text-sm">
-          <Link to="/forgot-password" className="text-primary hover:underline">
+          <Link to="/forgot-password" className="text-white/60 hover:text-white hover:underline">
             ¿Olvidaste tu contraseña?
           </Link>
-          <span className="text-muted-foreground">
+          <span className="text-white/40">
             ¿No tienes cuenta?{" "}
-            <Link to="/register" className="text-primary hover:underline">Regístrate</Link>
+            <Link to="/register" className="text-white/60 hover:text-white hover:underline">Regístrate</Link>
           </span>
         </div>
       </div>

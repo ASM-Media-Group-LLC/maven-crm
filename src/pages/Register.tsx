@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Logo from "@/components/Logo";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -92,93 +91,42 @@ const Register = () => {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4 lg:items-start">
-          <Link to="/" className="lg:hidden">
-            <Logo size="sm" />
-          </Link>
-          <h2 className="text-2xl font-bold">Crear cuenta</h2>
-          <p className="text-sm text-muted-foreground">Regístrate para empezar a usar Maven CRM</p>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Crear cuenta</h2>
+          <p className="text-sm text-white/50">Regístrate para empezar a usar Maven CRM</p>
         </div>
 
-        <form onSubmit={handleRegister} className="rounded-lg border border-border bg-card p-6 space-y-5">
+        <form onSubmit={handleRegister} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="fullName">Nombre completo *</Label>
-            <Input
-              id="fullName"
-              placeholder="Tu nombre completo"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              autoComplete="name"
-            />
+            <Label htmlFor="fullName" className="text-white/70">Nombre completo *</Label>
+            <Input id="fullName" placeholder="Tu nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="tu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
+            <Label htmlFor="email" className="text-white/70">Email *</Label>
+            <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña *</Label>
+            <Label htmlFor="password" className="text-white/70">Contraseña *</Label>
             <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-              >
+              <Input id="password" type={showPassword ? "text" : "password"} placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
+            <Label htmlFor="confirmPassword" className="text-white/70">Confirmar contraseña *</Label>
             <div className="relative">
-              <Input
-                id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Repite tu contraseña"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                tabIndex={-1}
-              >
+              <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} placeholder="Repite tu contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+              <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowConfirmPassword(!showConfirmPassword)} tabIndex={-1}>
                 {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="company">Empresa (opcional)</Label>
-            <Input
-              id="company"
-              placeholder="Nombre de tu empresa"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-            />
+            <Label htmlFor="company" className="text-white/70">Empresa (opcional)</Label>
+            <Input id="company" placeholder="Nombre de tu empresa" value={company} onChange={(e) => setCompany(e.target.value)} className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -187,9 +135,9 @@ const Register = () => {
         </form>
 
         <div className="flex flex-col items-center gap-2 text-sm">
-          <span className="text-muted-foreground">
+          <span className="text-white/40">
             ¿Ya tienes cuenta?{" "}
-            <Link to="/login" className="text-primary hover:underline">Inicia sesión</Link>
+            <Link to="/login" className="text-white/60 hover:text-white hover:underline">Inicia sesión</Link>
           </span>
         </div>
       </div>
