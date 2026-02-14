@@ -218,7 +218,7 @@ const DashboardContent = () => {
 
       {/* Row 2: Weekly Performance + Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
             <CardDescription>Leads, Deals y Compliance</CardDescription>
@@ -241,7 +241,7 @@ const DashboardContent = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Actividad Reciente</CardTitle>
             <CardDescription>Últimas acciones del sistema</CardDescription>
@@ -277,7 +277,7 @@ const DashboardContent = () => {
       {/* Row 3: Pipeline + Top 5 + Deals Semanales */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Pipeline Donut */}
-        <Card>
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Distribución Pipeline</CardTitle>
             <CardDescription>Leads por estado</CardDescription>
@@ -325,7 +325,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Top 5 Creators */}
-        <Card>
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
             <CardDescription>Por ingresos totales</CardDescription>
@@ -354,7 +354,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Deals Semanales */}
-        <Card>
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-success/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Deals Semanales</CardTitle>
             <CardDescription>Deals cerrados por día</CardDescription>
@@ -378,7 +378,7 @@ const DashboardContent = () => {
       {/* Row 4: Operational Cards */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Customer Service */}
-        <Card className="border-t-[3px] border-t-destructive">
+        <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Headphones className="h-5 w-5 text-destructive" />
@@ -411,7 +411,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Closers */}
-        <Card className="border-t-[3px] border-t-primary">
+        <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Phone className="h-5 w-5 text-primary" />
@@ -438,7 +438,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Scripts and Tools */}
-        <Card className="border-t-[3px] border-t-accent">
+        <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <FileCode className="h-5 w-5 text-accent" />
