@@ -100,7 +100,7 @@ const Landing = () => {
         <AnimatedGradientBackground />
         <AnimatedWaves />
         <div className="relative z-10 flex flex-col items-center px-4 text-center">
-          <Badge variant="secondary" className="glass-card-subtle mb-8 animate-fade-in-up border-white/10 bg-white/5 text-sm font-normal text-white/80">
+          <Badge variant="secondary" className="glass-card-subtle mb-8 animate-fade-in-up animate-float border-white/10 bg-white/5 text-sm font-normal text-white/80">
             Plataforma completa para agencias de creadores
           </Badge>
           <div className="animate-fade-in-up" style={{ animationDelay: "100ms" }}>
@@ -109,12 +109,12 @@ const Landing = () => {
           <p className="mx-auto mb-4 max-w-2xl animate-fade-in-up text-lg text-white/60 md:text-xl" style={{ animationDelay: "200ms" }}>
             La plataforma todo-en-uno para gestionar creadores, ventas, leads, eventos y operaciones de tu agencia.
           </p>
-          <div className="mb-10 h-1 w-24 animate-fade-in-up rounded-full bg-gradient-to-r from-accent to-primary" style={{ animationDelay: "250ms" }} />
+          <div className="mb-10 h-1 w-24 animate-fade-in-up animate-pulse rounded-full bg-gradient-to-r from-accent to-primary opacity-80" style={{ animationDelay: "250ms" }} />
           <div className="flex animate-fade-in-up items-center gap-4" style={{ animationDelay: "300ms" }}>
-            <Button size="lg" asChild>
+            <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
               <Link to="/register">Crear cuenta</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild className="border-white/10 text-white hover:bg-white/10">
+            <Button size="lg" variant="outline" asChild className="border-white/10 text-white transition-all duration-300 hover:scale-105 hover:bg-white/10">
               <Link to="/login">Iniciar sesión</Link>
             </Button>
           </div>
@@ -122,7 +122,7 @@ const Landing = () => {
       </section>
 
       {/* Modules Grid */}
-      <section id="funcionalidades" className="mx-auto max-w-6xl px-4 pb-20">
+      <section id="funcionalidades" className="mx-auto max-w-6xl px-4 pb-20 pt-20">
         <h2 className="mb-10 animate-fade-in-up text-center text-2xl font-bold text-white md:text-3xl">
           Todo lo que necesitas en un solo lugar
         </h2>
@@ -161,13 +161,49 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* CTA Section */}
+      <section className="relative overflow-hidden py-20">
+        <AnimatedGradientBackground />
+        <div className="relative z-10 mx-auto max-w-3xl px-4 text-center">
+          <div className="glass-card p-10 md:p-14">
+            <Zap className="mx-auto mb-4 h-10 w-10 animate-float text-primary" />
+            <h2 className="mb-4 text-2xl font-bold text-white md:text-3xl">
+              ¿Listo para escalar tu agencia?
+            </h2>
+            <p className="mb-8 text-white/60">
+              Únete a las agencias que ya optimizan sus operaciones con Clari.
+            </p>
+            <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
+              <Link to="/register">Comenzar ahora</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-[hsl(240,10%,2%)] py-10">
-        <div className="mx-auto mb-10 h-px w-full max-w-6xl bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4">
           <Logo size="sm" />
           <p className="text-sm text-white/60">
             La plataforma integral para gestionar, escalar y optimizar tus operaciones.
+          </p>
+          <nav className="flex flex-wrap items-center justify-center gap-6">
+            <a href="#funcionalidades" className="story-link text-sm text-white/60 transition-colors hover:text-white">
+              <span>Funcionalidades</span>
+            </a>
+            <a href="#metricas" className="story-link text-sm text-white/60 transition-colors hover:text-white">
+              <span>Métricas</span>
+            </a>
+            <Link to="/login" className="story-link text-sm text-white/60 transition-colors hover:text-white">
+              <span>Iniciar sesión</span>
+            </Link>
+            <Link to="/register" className="story-link text-sm text-white/60 transition-colors hover:text-white">
+              <span>Registrarse</span>
+            </Link>
+          </nav>
+          <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          <p className="text-xs text-white/40">
+            © {new Date().getFullYear()} Clari. Todos los derechos reservados.
           </p>
         </div>
       </footer>
