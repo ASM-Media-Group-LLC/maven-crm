@@ -1,37 +1,87 @@
 
 
-## Mejoras en Login/Registro y asignacion de rol Admin
+## Flujo completo de recuperacion de contrasena
 
-### 1. Toggle de visibilidad de contrasena
+### Enfoque tecnico
 
-Agregar un boton con icono `Eye`/`EyeOff` dentro de los campos de contrasena en ambas paginas para alternar entre `type="password"` y `type="text"`.
+Supabase Auth incluye soporte nativo para recuperacion de contrasena mediante `resetPasswordForEmail()` y `updateUser()`. No se necesita crear tablas de tokens ni edge functions. Supabase gestiona internamente la generacion del token, la expiracion (1 hora por defecto) y el uso unico.
 
-**Archivos a modificar:**
+El flujo es:
+1. Usuario solicita reset en `/forgot-password`
+2. Supabase envia email con enlace que redirige a `/reset-password`
+3. Al hacer clic en el enlace, Supabase establece una sesion temporal con evento `PASSWORD_RECOVERY`
+4. La pagina `/reset-password` detecta ese evento y permite al usuario establecer nueva contrasena via `updateUser({ password })`
 
-- `src/pages/Login.tsx`: Agregar estado `showPassword` y boton toggle en el campo de contrasena
-- `src/pages/Register.tsx`: Agregar estados `showPassword` y `showConfirmPassword` con toggles en ambos campos
+### Archivos a crear
 
-Patron visual: el icono se posiciona con `absolute right-3 top-1/2 -translate-y-1/2` dentro de un contenedor `relative`. Se usa `Button variant="ghost" size="icon"` con iconos `Eye`/`EyeOff` de Lucide.
+| Archivo | Proposito |
+|---------|-----------|
+| `src/pages/ForgotPassword.tsx` | Formulario de solicitud de recuperacion |
+| `src/pages/ResetPassword.tsx` | Formulario para establecer nueva contrasena |
 
-### 2. Mensaje de verificacion por correo en registro
-
-Despues de un registro exitoso, en lugar de redirigir directamente al dashboard, mostrar un toast informativo indicando que se envio un correo de verificacion.
-
-**Cambio en `src/pages/Register.tsx`:**
-- Reemplazar el toast actual y `navigate("/dashboard")` por un toast con titulo "Cuenta creada" y descripcion "Te enviamos un correo de verificacion. Revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta."
-- Redirigir a `/login` en lugar de `/dashboard` para que el usuario inicie sesion despues de verificar
-
-### 3. Asignar rol admin a johanna.riano@unlok.me
-
-El usuario ya existe con `id: 2d2c4570-0cf6-4144-89bb-67d5bd96179c` y tiene rol `employee`. Se actualizara su rol a `admin` mediante una operacion de datos.
-
-**Operacion:** Actualizar el registro en `user_roles` donde `user_id = '2d2c4570-0cf6-4144-89bb-67d5bd96179c'` cambiando `role` de `employee` a `admin`.
-
-### Resumen de archivos
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/Login.tsx` | Agregar toggle de visibilidad en campo contrasena |
-| `src/pages/Register.tsx` | Agregar toggles de visibilidad en campos contrasena + mensaje de verificacion por correo |
-| Base de datos | Actualizar rol de johanna.riano@unlok.me a admin |
+| `src/App.tsx` | Agregar rutas publicas `/forgot-password` y `/reset-password` |
+| `src/pages/Login.tsx` | Agregar enlace "Olvidaste tu contrasena?" debajo del formulario |
+
+### Detalle de cada pagina
+
+**`/forgot-password` - Solicitar recuperacion**
+
+- Mismo diseno visual que Login: fondo `bg-background`, card centrada con `border-border bg-card`, Logo arriba
+- Campo: Email con validacion de formato
+- Boton: "Enviar enlace de recuperacion" (variante `default`, `w-full`)
+- Al enviar: llama `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
+- Mensaje neutro siempre (no revela si el email existe): "Si el correo esta registrado, recibiras un enlace para restablecer tu contrasena."
+- Enlace para volver a Login
+- Toggle de visibilidad no aplica (solo campo email)
+- Estado de loading con `Loader2` en el boton
+
+**`/reset-password` - Establecer nueva contrasena**
+
+- Mismo diseno visual que Login
+- Al montar, escucha `supabase.auth.onAuthStateChange` para detectar evento `PASSWORD_RECOVERY`
+- Si no hay sesion de recovery: muestra mensaje de error con opcion de solicitar nuevo enlace (link a `/forgot-password`)
+- Si hay sesion valida: muestra formulario con:
+  - Campo: Nueva contrasena (con toggle Eye/EyeOff)
+  - Campo: Confirmar contrasena (con toggle Eye/EyeOff)
+  - Validaciones client-side:
+    - Minimo 8 caracteres
+    - Al menos 1 mayuscula
+    - Al menos 1 numero
+    - Ambas contrasenas coinciden
+  - Indicador visual de requisitos (texto `text-xs` con color condicional `text-green-500`/`text-muted-foreground`)
+  - Boton: "Actualizar contrasena" (variante `default`, `w-full`)
+- Al confirmar: llama `supabase.auth.updateUser({ password })`
+- Exito: toast "Contrasena actualizada" + redirect a `/login`
+- Error: toast destructivo con mensaje de error
+
+**Modificacion en Login.tsx**
+
+Agregar debajo del enlace "Registrate":
+```text
+Olvidaste tu contrasena? -> Link a /forgot-password
+```
+
+**Modificacion en App.tsx**
+
+Agregar dos rutas publicas (junto a `/login` y `/register`):
+```text
+<Route path="/forgot-password" element={<ForgotPassword />} />
+<Route path="/reset-password" element={<ResetPassword />} />
+```
+
+### Seguridad
+
+- El token es gestionado por Supabase (generacion, expiracion de 1 hora, uso unico)
+- No se almacena informacion sensible en el frontend
+- Mensaje neutro en forgot-password para no revelar existencia de cuentas
+- Validaciones de fortaleza de contrasena en el cliente
+- `updateUser` solo funciona con sesion de recovery activa (Supabase lo valida server-side)
+
+### Sin cambios en base de datos
+
+No se requieren migraciones ni tablas adicionales. Supabase maneja todo el flujo de tokens internamente.
 
