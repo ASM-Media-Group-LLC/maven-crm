@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { startOfDay, endOfDay, startOfWeek, startOfMonth, subMonths, startOfMonth as som } from "date-fns";
+import { startOfWeek, startOfToday, endOfDay, subMonths, startOfMonth as som } from "date-fns";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import SalesOverviewHeader from "./sales-overview/SalesOverviewHeader";
-import SalesOverviewFilters, { type OverviewPeriod } from "./sales-overview/SalesOverviewFilters";
+import SalesOverviewFilters from "./sales-overview/SalesOverviewFilters";
 import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
@@ -12,26 +12,24 @@ import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import ClariAiFab from "@/components/ClariAiFab";
 
-const getDateRange = (period: OverviewPeriod): { from: Date; to: Date } => {
-  const now = new Date();
-  const today = startOfDay(now);
-  switch (period) {
-    case "Hoy":
-      return { from: today, to: today };
-    case "Esta semana":
-      return { from: startOfWeek(today, { weekStartsOn: 1 }), to: today };
-    case "Este mes":
-      return { from: startOfMonth(today), to: today };
-  }
-};
-
 const SalesOverview = () => {
-  const [activePeriod, setActivePeriod] = useState<OverviewPeriod>("Esta semana");
+  const today = startOfToday();
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfWeek(today, { weekStartsOn: 1 }));
+  const [dateTo, setDateTo] = useState<Date | undefined>(today);
   const [modalType, setModalType] = useState<string | null>(null);
   const { data: allRows = [], isLoading } = useEarningsData();
 
-  const dateRange = useMemo(() => getDateRange(activePeriod), [activePeriod]);
+  const dateRange = useMemo(() => ({
+    from: dateFrom ?? today,
+    to: dateTo ?? today,
+  }), [dateFrom, dateTo, today]);
+
   const comparison = usePeriodComparison(allRows, dateRange);
+
+  const handleDateChange = (from: Date | undefined, to: Date | undefined) => {
+    setDateFrom(from);
+    setDateTo(to);
+  };
 
   // Sparkline: last 4 months totals
   const sparklineData = useMemo(() => {
@@ -81,10 +79,9 @@ const SalesOverview = () => {
                   activeCreators={comparison.activeCreators}
                 />
                 <SalesOverviewFilters
-                  activePeriod={activePeriod}
-                  onPeriodChange={setActivePeriod}
-                  dateFrom={dateRange.from}
-                  dateTo={dateRange.to}
+                  from={dateFrom}
+                  to={dateTo}
+                  onDateChange={handleDateChange}
                 />
                 <SalesKPICards data={comparison} onCardClick={setModalType} />
                 <SalesOperationalCards

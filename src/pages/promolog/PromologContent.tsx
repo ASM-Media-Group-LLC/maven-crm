@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -433,7 +434,7 @@ const PromologContent = () => {
                 <p className="text-sm text-muted-foreground">Red Social</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {socialCards.map((s) => (
-                    <Card key={s.name} className={s.bg}>
+                    <Card key={s.name} className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
                       <CardContent className="flex items-center gap-3 p-4">
                         {s.icon}
                         <div>
@@ -449,7 +450,7 @@ const PromologContent = () => {
                 <p className="text-sm text-muted-foreground">Plataforma</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {platformCards.map((p) => (
-                    <Card key={p.name} className={p.bg}>
+                    <Card key={p.name} className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
                       <CardContent className="flex items-center gap-3 p-4">
                         {p.icon}
                         <div>
