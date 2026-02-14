@@ -138,3 +138,13 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   border-radius: 50%;
   background-color: hsl(var(--primary));
 }
+
+/* Auth particles animations */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.8; }
+}
+@keyframes float-particle {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-20px) translateX(10px); }
+}

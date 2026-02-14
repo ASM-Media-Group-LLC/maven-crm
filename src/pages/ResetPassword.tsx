@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
+import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, ArrowLeft, Check, X } from "lucide-react";
@@ -38,7 +39,6 @@ const ResetPassword = () => {
     });
 
     if (isRecoveryRedirect) {
-      // Hash fragments present — poll getSession until Supabase processes them
       const startTime = Date.now();
       retryInterval = setInterval(async () => {
         if (!isMounted) return;
@@ -51,14 +51,12 @@ const ResetPassword = () => {
         }
       }, 500);
 
-      // Safety timeout: stop waiting after 5 seconds
       safetyTimeout = setTimeout(() => {
         if (!isMounted) return;
         if (retryInterval) clearInterval(retryInterval);
-        setChecking(false); // Will show "invalid link" if recoveryReady is still false
+        setChecking(false);
       }, 5000);
     } else {
-      // No hash fragments — single check
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!isMounted) return;
         if (session) setRecoveryReady(true);
@@ -117,10 +115,10 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthLayout>
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <Link to="/">
+        <div className="flex flex-col items-center gap-4 lg:items-start">
+          <Link to="/" className="lg:hidden">
             <Logo size="sm" />
           </Link>
           <h2 className="text-2xl font-bold">Restablecer contraseña</h2>
@@ -141,23 +139,8 @@ const ResetPassword = () => {
             <div className="space-y-2">
               <Label htmlFor="password">Nueva contraseña</Label>
               <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
+                <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-10" />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
@@ -166,23 +149,8 @@ const ResetPassword = () => {
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirmar contraseña</Label>
               <div className="relative">
-                <Input
-                  id="confirm"
-                  type={showConfirm ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  tabIndex={-1}
-                >
+                <Input id="confirm" type={showConfirm ? "text" : "password"} placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" className="pr-10" />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
                   {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
@@ -209,7 +177,7 @@ const ResetPassword = () => {
           </Link>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 
