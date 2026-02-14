@@ -1,45 +1,65 @@
 
 
-## Aplicar animacion hover en KPI cards del Dashboard y Tareas + corregir titulo
+## Gradiente animado en el panel izquierdo del Auth
 
-### Problemas detectados
+### Concepto
 
-1. **Dashboard** (`DashboardMetricCard.tsx`): Las cards KPI superiores no tienen el efecto hover con escala y gradiente que si tienen Creadores, Contactos, Sales Overview, etc.
-2. **Tareas** (`ProjectsListContent.tsx`): Las 3 KPI cards tampoco tienen la animacion hover.
-3. **Tareas** (`ProjectsListContent.tsx`): El titulo del header dice "Proyectos" en lugar de "Tareas".
+Reemplazar el fondo estatico del panel izquierdo por un gradiente animado que se desplaza suavemente, inspirado en la imagen de referencia. Los colores usados seran del design system: `accent` (purple 271 91% 50%), `primary` (blue 211 100% 50%), y `destructive` (red 0 84% 60%), sobre un fondo oscuro.
 
-### Patron de animacion a aplicar
+### Cambios
 
-El efecto estandar usado en el resto de la plataforma es:
+#### 1. Nuevo componente: `AnimatedGradientBackground.tsx`
+
+Crear `src/components/auth/AnimatedGradientBackground.tsx` que renderiza multiples "blobs" de color con posicion absoluta y una animacion CSS que los desplaza lentamente. Cada blob es un `div` grande con `border-radius: 50%`, `filter: blur(80-120px)`, y una animacion `@keyframes` que mueve su posicion (`translate`) en un ciclo suave de 10-15 segundos.
+
+Blobs propuestos:
+- Blob 1 (rojo/destructive): esquina superior izquierda, grande
+- Blob 2 (azul/primary): centro-inferior, mediano
+- Blob 3 (purple/accent): centro, mediano
+- Blob 4 (rosa claro): entre rojo y azul, sutil
+
+Cada blob tiene su propia animacion con diferentes duraciones y trayectorias para crear un efecto organico.
+
+#### 2. Keyframes en `index.css`
+
+Agregar keyframes `blob-move-1`, `blob-move-2`, `blob-move-3`, `blob-move-4` que desplazan cada blob en trayectorias diferentes usando `translate` y `scale`. Duraciones entre 8s y 15s, `infinite alternate ease-in-out`.
+
+#### 3. Actualizar `AuthLayout.tsx`
+
+- Reemplazar el `bg-gradient-to-br from-[...] via-[...] to-[...]` estatico por un fondo oscuro solido (`bg-[hsl(240,8%,6%)]`)
+- Reemplazar `<ParticlesBackground />` por `<AnimatedGradientBackground />`
+- Mantener las particulas como capa superior (opcional, encima del gradiente) para conservar profundidad
+
+#### 4. Mantener `ParticlesBackground.tsx` sin cambios
+
+Las particulas se mantienen como capa adicional sobre el gradiente animado para dar textura.
+
+### Estructura visual
 
 ```text
-transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-{color}/15 hover:to-transparent hover:border-{color}/40
+Panel izquierdo:
+  [bg oscuro solido hsl(240,8%,6%)]
+    [AnimatedGradientBackground]
+      Blob rojo (top-left, blur 100px, animacion lenta)
+      Blob azul (center-bottom, blur 120px, animacion media)
+      Blob purple (center, blur 80px, animacion lenta)
+      Blob rosa (transicion, blur 100px, animacion media)
+    [ParticlesBackground - particulas blancas encima]
+    [Logo + texto centrado - z-10]
 ```
 
-Cada card tiene un color semantico asociado (primary, success, warning, destructive, accent) que determina el gradiente del hover.
-
-### Cambios por archivo
+### Archivos
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/dashboard/DashboardMetricCard.tsx` | Agregar prop `hoverClass` y aplicarla al `<Card>` con `transition-all duration-200 cursor-default` |
-| `src/components/dashboard/DashboardContent.tsx` | Agregar `hoverClass` a cada KPI con el color correspondiente (primary, warning, success, accent, destructive) |
-| `src/pages/tareas/ProjectsListContent.tsx` | (1) Cambiar titulo "Proyectos" a "Tareas" y subtitulo a "Gestion de tareas y proyectos". (2) Agregar `hoverClass` a cada KPI card y aplicar el efecto hover con `transition-all duration-200` |
+| `src/components/auth/AnimatedGradientBackground.tsx` | Nuevo - blobs de color con animacion CSS |
+| `src/components/auth/AuthLayout.tsx` | Reemplazar fondo estatico por fondo oscuro + AnimatedGradientBackground + ParticlesBackground |
+| `src/index.css` | Agregar keyframes blob-move-1 a blob-move-4 |
 
-### Detalle tecnico
+### Colores (del design system)
 
-**DashboardMetricCard.tsx**: Agregar prop opcional `hoverClass?: string` a la interfaz. En el `<Card>`, aplicar `className={cn("transition-all duration-200", hoverClass)}`.
-
-**DashboardContent.tsx**: Mapear colores a cada KPI:
-- Total Creators: primary
-- Active Tickets: warning
-- Compliance: success
-- New Leads: accent
-- Deals: destructive (o primary segun corresponda)
-
-**ProjectsListContent.tsx**: En el array `kpis`, agregar `hoverClass` a cada item:
-- Total Proyectos: primary
-- Proyectos Activos: primary
-- Tareas Pendientes: warning
-
-Y en el render, aplicar `className={cn("transition-all duration-200", kpi.hoverClass)}` al `<Card>`.
+- Rojo: `hsl(0, 84%, 60%)` - destructive
+- Azul: `hsl(211, 100%, 50%)` - primary
+- Purple: `hsl(271, 91%, 50%)` - accent
+- Rosa: `hsl(340, 82%, 59%)` - instagram-pink (ya en el sistema)
+- Fondo: `hsl(240, 8%, 6%)` - version mas oscura del background dark
