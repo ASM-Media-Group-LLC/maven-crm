@@ -8,14 +8,14 @@ interface AuthLayoutProps {
 
 const AuthLayout = ({ children }: AuthLayoutProps) => {
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[hsl(240,10%,4%)]">
+    <div className="min-h-screen relative overflow-hidden bg-[hsl(240,10%,2%)]">
       <AnimatedGradientBackground />
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
-        <Logo size="lg" />
-        <p className="text-white/50 mt-2 mb-8 text-lg font-light tracking-wide">
-          Gestiona tus creadores
+        <Logo size="sm" />
+        <p className="text-white/40 mt-2 mb-8 text-sm font-light tracking-wide text-center max-w-xs">
+          La plataforma integral para gestionar, escalar y optimizar tus operaciones.
         </p>
-        <div className="w-full max-w-md backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 shadow-2xl">
+        <div className="w-full max-w-md backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]">
           {children}
         </div>
       </div>
