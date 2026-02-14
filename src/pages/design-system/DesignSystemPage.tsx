@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
-import { Sun, Moon } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ColorsSection } from "./sections/ColorsSection";
@@ -32,27 +30,7 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
-const ThemeToggle = () => {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) return null;
-
-  const isDark = theme === "dark";
-
-  return (
-    <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors bg-muted hover:bg-muted/80 text-foreground"
-      aria-label={`Cambiar a tema ${isDark ? "claro" : "oscuro"}`}
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      <span>{isDark ? "Light" : "Dark"}</span>
-    </button>
-  );
-};
 
 const DesignSystemPage = () => {
   const [activeTab, setActiveTab] = useState<TabId>("foundations");
@@ -66,7 +44,6 @@ const DesignSystemPage = () => {
             <h1 className="text-2xl font-bold">Design System</h1>
             <Badge variant="secondary" className="text-xs">v1.0.0</Badge>
           </div>
-          <ThemeToggle />
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           Referencia completa de tokens de diseño y componentes UI · React + Tailwind CSS · Light / Dark mode

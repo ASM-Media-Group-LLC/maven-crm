@@ -1,4 +1,5 @@
-import { Bell, Search, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, Search, LogOut, Sun, Moon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,11 +7,16 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "next-themes";
 
 const DashboardTopbar = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const handleLogout = async () => {
     await signOut();
@@ -38,6 +44,17 @@ const DashboardTopbar = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        {mounted && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+          >
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="text-muted-foreground" disabled>
           <Bell className="h-5 w-5" />
         </Button>
