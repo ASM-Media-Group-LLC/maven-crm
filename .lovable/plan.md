@@ -1,35 +1,50 @@
 
 
-## Integrar Design System dentro del layout principal de la plataforma
+## Organizar el Design System en 5 secciones navegables
 
-### Problema
-La pagina `/design-system` se renderiza sin el `SidebarProvider`, `DashboardSidebar` ni `DashboardTopbar`. Por eso no aparece ni el sidebar ni el topbar de la plataforma: el modulo esta "suelto", a diferencia de todas las demas paginas protegidas como `/dashboard`, `/creadores`, `/eventos`, etc.
+### Situacion actual
+Todas las 18 sub-secciones se renderizan en una sola pagina scrollable con una barra horizontal plana. El usuario quiere 5 secciones principales claramente diferenciadas.
 
 ### Solucion
-Envolver el contenido del Design System con el mismo layout wrapper que usan las demas paginas.
+Convertir las 5 categorias en tabs principales usando el patron estandar de tab navigation de la plataforma (`inline-flex` con `bg-muted/50`). Cada tab muestra unicamente las sub-secciones que le corresponden.
 
-### Cambio unico
+### Las 5 secciones
 
-**Archivo: `src/pages/DesignSystem.tsx`**
+| Tab | Contenido |
+|-----|-----------|
+| Design Foundations | Colores, Tipografia, Espaciado, Bordes, Sombras, Z-Index, Estados |
+| Component Library | Botones, Inputs, Dropdowns, Cards, Modales, Feedback, Data Display |
+| Layout & Patterns | Page Layouts, Composicion |
+| Icons & Logos | Iconografia, Avatares |
+| Docs & Accessibility | Docs & a11y |
 
-Aplicar el patron estandar de layout (igual que `Dashboard.tsx`, `Creadores.tsx`, etc.):
+### Cambios tecnicos
 
+**Archivo: `src/pages/design-system/DesignSystemPage.tsx`**
+
+1. Reemplazar el estado `activeId` (scroll-based) por un estado `activeTab` con valores: `"foundations"`, `"components"`, `"layout"`, `"icons"`, `"docs"`
+2. Eliminar el `IntersectionObserver` y la logica de `scrollTo` (ya no se necesita scroll entre secciones de distintas categorias)
+3. En la barra horizontal, reemplazar los botones individuales por 5 botones de tab (uno por seccion) usando el patron estandar: contenedor `inline-flex rounded-lg border bg-muted/50 p-1`, boton activo con variante `secondary`, inactivo con `ghost`
+4. Renderizar condicionalmente solo las secciones del tab activo dentro del area scrollable
+5. Mantener el header y ThemeToggle sin cambios
+
+Estructura visual:
+
+```text
++--------------------------------------------------------+
+| Header: "Design System"  [v1.0.0]      [Light/Dark]   |
+| Referencia completa de tokens...                       |
++--------------------------------------------------------+
+| [Design Foundations] [Component Library] [Layout & P.] |
+| [Icons & Logos] [Docs & Accessibility]                 |
++--------------------------------------------------------+
+|                                                        |
+|  (solo las secciones del tab activo)                   |
+|                                                        |
++--------------------------------------------------------+
 ```
-SidebarProvider
-  div.flex.min-h-screen.w-full
-    DashboardSidebar
-    div.flex.flex-1.flex-col
-      DashboardTopbar
-      DesignSystemPage    <-- contenido actual sin cambios
-  ClariAiFab
-```
-
-Esto hara que el sidebar y topbar de la plataforma aparezcan normalmente, y el contenido del Design System (con su header propio y tab bar horizontal) se renderice en el area de contenido principal, exactamente igual que cualquier otro modulo.
-
-No se requiere ningun cambio en `DesignSystemPage.tsx` ya que su layout interno (`flex-1 flex flex-col h-full overflow-hidden`) esta disenado para encajar en el area de contenido.
-
-### Archivo
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/DesignSystem.tsx` | Envolver con SidebarProvider, DashboardSidebar, DashboardTopbar y ClariAiFab |
+| `src/pages/design-system/DesignSystemPage.tsx` | Reemplazar navegacion scroll por tabs con renderizado condicional por seccion |
+
