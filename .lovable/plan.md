@@ -1,65 +1,41 @@
 
 
-## Gradiente animado en el panel izquierdo del Auth
+## Dos cambios: eliminar particulas + definir boton primary con gradiente
 
-### Concepto
+### 1. Eliminar particulas del auth
 
-Reemplazar el fondo estatico del panel izquierdo por un gradiente animado que se desplaza suavemente, inspirado en la imagen de referencia. Los colores usados seran del design system: `accent` (purple 271 91% 50%), `primary` (blue 211 100% 50%), y `destructive` (red 0 84% 60%), sobre un fondo oscuro.
+Remover el componente `ParticlesBackground` del `AuthLayout.tsx` para que solo queden los blobs de gradiente animado moviéndose suavemente, más fiel a la imagen de referencia. Los blobs actuales ya tienen buena cobertura de color; sin las particulas el efecto será más limpio y enfocado.
 
-### Cambios
+Tambien se ajustarán los blobs para que la composición sea más similar a la referencia:
+- Blob rojo más grande y saturado (opacity 0.5)
+- Blob azul más prominente y centrado (opacity 0.45)
+- Blob purple más sutil como transición
+- Rosa más difuminado
 
-#### 1. Nuevo componente: `AnimatedGradientBackground.tsx`
+### 2. Boton primary con gradiente azul-violeta
 
-Crear `src/components/auth/AnimatedGradientBackground.tsx` que renderiza multiples "blobs" de color con posicion absoluta y una animacion CSS que los desplaza lentamente. Cada blob es un `div` grande con `border-radius: 50%`, `filter: blur(80-120px)`, y una animacion `@keyframes` que mueve su posicion (`translate`) en un ciclo suave de 10-15 segundos.
+Actualizar la variante `default` del botón para usar un gradiente consistente con el branding del logo Maven (from-accent to-primary). Esto unifica la identidad visual y resuelve la ambiguedad actual.
 
-Blobs propuestos:
-- Blob 1 (rojo/destructive): esquina superior izquierda, grande
-- Blob 2 (azul/primary): centro-inferior, mediano
-- Blob 3 (purple/accent): centro, mediano
-- Blob 4 (rosa claro): entre rojo y azul, sutil
+El hover oscurecerá ligeramente el gradiente con un overlay.
 
-Cada blob tiene su propia animacion con diferentes duraciones y trayectorias para crear un efecto organico.
-
-#### 2. Keyframes en `index.css`
-
-Agregar keyframes `blob-move-1`, `blob-move-2`, `blob-move-3`, `blob-move-4` que desplazan cada blob en trayectorias diferentes usando `translate` y `scale`. Duraciones entre 8s y 15s, `infinite alternate ease-in-out`.
-
-#### 3. Actualizar `AuthLayout.tsx`
-
-- Reemplazar el `bg-gradient-to-br from-[...] via-[...] to-[...]` estatico por un fondo oscuro solido (`bg-[hsl(240,8%,6%)]`)
-- Reemplazar `<ParticlesBackground />` por `<AnimatedGradientBackground />`
-- Mantener las particulas como capa superior (opcional, encima del gradiente) para conservar profundidad
-
-#### 4. Mantener `ParticlesBackground.tsx` sin cambios
-
-Las particulas se mantienen como capa adicional sobre el gradiente animado para dar textura.
-
-### Estructura visual
-
-```text
-Panel izquierdo:
-  [bg oscuro solido hsl(240,8%,6%)]
-    [AnimatedGradientBackground]
-      Blob rojo (top-left, blur 100px, animacion lenta)
-      Blob azul (center-bottom, blur 120px, animacion media)
-      Blob purple (center, blur 80px, animacion lenta)
-      Blob rosa (transicion, blur 100px, animacion media)
-    [ParticlesBackground - particulas blancas encima]
-    [Logo + texto centrado - z-10]
-```
-
-### Archivos
+### Cambios por archivo
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/auth/AnimatedGradientBackground.tsx` | Nuevo - blobs de color con animacion CSS |
-| `src/components/auth/AuthLayout.tsx` | Reemplazar fondo estatico por fondo oscuro + AnimatedGradientBackground + ParticlesBackground |
-| `src/index.css` | Agregar keyframes blob-move-1 a blob-move-4 |
+| `src/components/auth/AuthLayout.tsx` | Eliminar import y uso de `ParticlesBackground` |
+| `src/components/auth/AnimatedGradientBackground.tsx` | Ajustar opacidades y tamaños de los blobs para mayor intensidad |
+| `src/components/ui/button.tsx` | Variante `default`: cambiar de `bg-primary` a gradiente `bg-gradient-to-r from-accent to-primary` con hover via `hover:opacity-90` |
+| `src/index.css` | Eliminar los keyframes `twinkle` y `float-particle` (ya no se usan) |
 
-### Colores (del design system)
+### Detalle del boton
 
-- Rojo: `hsl(0, 84%, 60%)` - destructive
-- Azul: `hsl(211, 100%, 50%)` - primary
-- Purple: `hsl(271, 91%, 50%)` - accent
-- Rosa: `hsl(340, 82%, 59%)` - instagram-pink (ya en el sistema)
-- Fondo: `hsl(240, 8%, 6%)` - version mas oscura del background dark
+```text
+Antes:  "bg-primary text-primary-foreground hover:bg-primary/90"
+Despues: "bg-gradient-to-r from-accent to-primary text-primary-foreground hover:opacity-90"
+```
+
+Esto aplica automaticamente a todos los botones `default` en la plataforma (formularios de auth, modales, etc.), manteniendo coherencia con el gradiente del logo Maven.
+
+### Nota sobre el outline button
+
+El boton `outline` actualmente usa `hover:bg-accent hover:text-accent-foreground` (violeta en hover). Esto se mantiene sin cambios ya que es correcto para acciones secundarias en headers de pagina, segun las reglas de uso contextual documentadas.
