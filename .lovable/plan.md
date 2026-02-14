@@ -1,28 +1,39 @@
 
 
-## Ajuste de colores del gradiente auth
-
-### Problema
-El blob rojo (destructive) y el rosa no encajan con la estetica moderna oscura. El fondo necesita ser mas oscuro con subtonos exclusivamente azules y violetas.
+## Refinamiento visual del Auth: fondo negro, glass mas impactante, logo pequeno y nuevo tagline
 
 ### Cambios
 
-#### `src/components/auth/AnimatedGradientBackground.tsx`
+#### 1. `src/components/auth/AuthLayout.tsx`
+- Fondo base mas negro: cambiar de `hsl(240,10%,4%)` a `hsl(240,10%,2%)` (casi negro puro)
+- Logo: cambiar de `size="lg"` a `size="sm"`
+- Tagline: cambiar texto de "Gestiona tus creadores" a "La plataforma integral para gestionar, escalar y optimizar tus operaciones."
+- Glass card: intensificar el efecto aumentando blur, ajustando bordes y agregando un sutil glow/shadow violeta
 
-Reemplazar los colores de los 5 blobs:
+Glass card mejorada:
+```text
+Antes:  backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 shadow-2xl
+Despues: backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]
+```
 
-| Blob | Antes | Despues |
-|------|-------|---------|
-| Blob 1 | Rojo `hsl(0, 84%, 60%)` opacity 0.5 | Azul profundo `hsl(211, 100%, 50%)` opacity 0.4 |
-| Blob 2 | Azul `hsl(211, 100%, 50%)` opacity 0.45 | Violeta `hsl(271, 91%, 50%)` opacity 0.35 |
-| Blob 3 | Purple `hsl(271, 91%, 50%)` opacity 0.35 | Azul oscuro `hsl(220, 80%, 40%)` opacity 0.4 |
-| Blob 4 | Rosa `hsl(340, 82%, 59%)` opacity 0.3 | Violeta profundo `hsl(260, 70%, 35%)` opacity 0.3 |
-| Blob 5 | Naranja `hsl(25, 95%, 53%)` opacity 0.2 | Indigo sutil `hsl(240, 60%, 45%)` opacity 0.25 |
+#### 2. `src/components/auth/AnimatedGradientBackground.tsx`
+- Reducir opacidades generales (0.15 - 0.3) para que el fondo se sienta mas oscuro/negro con acentos sutiles de color
+- Mantener los colores azul-violeta actuales pero mas tenues
+- Ajustar posiciones para concentrar mas color en las esquinas y bordes, dejando el centro mas oscuro (donde va la card)
 
-#### `src/components/auth/AuthLayout.tsx`
+Nuevas opacidades:
+| Blob | Color actual (mantener) | Opacidad actual | Opacidad nueva |
+|------|------------------------|-----------------|----------------|
+| 1 | Azul hsl(211,100%,50%) | 0.4 | 0.25 |
+| 2 | Violeta hsl(271,91%,50%) | 0.35 | 0.3 |
+| 3 | Azul oscuro hsl(220,80%,40%) | 0.4 | 0.2 |
+| 4 | Violeta profundo hsl(260,70%,35%) | 0.3 | 0.25 |
+| 5 | Indigo hsl(240,60%,45%) | 0.25 | 0.15 |
 
-Oscurecer el fondo base de `hsl(240,8%,6%)` a `hsl(240,10%,4%)` para mayor contraste y profundidad.
+#### 3. `src/pages/Login.tsx`
+- Actualizar textos de inputs para usar estilos mas oscuros y consistentes con la referencia (los inputs ya tienen bg-white/10 que es correcto)
 
-### Resultado
-Paleta exclusivamente azul-violeta-indigo sobre fondo casi negro, consistente con primary y accent del design system, sin rojos ni naranjas.
+### Archivos a modificar
+- `src/components/auth/AuthLayout.tsx` - fondo, logo, tagline, glass card
+- `src/components/auth/AnimatedGradientBackground.tsx` - opacidades reducidas
 
