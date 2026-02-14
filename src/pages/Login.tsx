@@ -103,6 +103,9 @@ const Login = () => {
         </form>
 
         <div className="flex flex-col items-center gap-2 text-sm">
+          <Link to="/forgot-password" className="text-primary hover:underline">
+            ¿Olvidaste tu contraseña?
+          </Link>
           <span className="text-muted-foreground">
             ¿No tienes cuenta?{" "}
             <Link to="/register" className="text-primary hover:underline">Regístrate</Link>
