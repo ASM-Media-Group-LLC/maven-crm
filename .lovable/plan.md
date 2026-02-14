@@ -1,63 +1,57 @@
 
 
-## Fix: Recuperacion de contrasena - Deteccion robusta de sesion de recovery
+## Submenu accesible en sidebar contraido + Logo favicon "M"
 
-### Problema identificado
+### 1. Logo con version favicon cuando el sidebar esta contraido
 
-Hay una condicion de carrera en `ResetPassword.tsx`:
+**Archivo: `src/components/Logo.tsx`**
 
-1. Supabase redirige a `/reset-password#access_token=...&type=recovery`
-2. La app carga. `AuthProvider` registra su `onAuthStateChange` primero
-3. El cliente Supabase procesa los fragmentos del hash de forma asincrona
-4. `ResetPassword` monta y registra su propio `onAuthStateChange`, pero el evento `PASSWORD_RECOVERY` ya fue disparado
-5. `getSession()` podria ejecutarse antes de que el hash sea procesado, retornando `null`
-6. Resultado: el usuario ve "El enlace es invalido o ha expirado" aunque el enlace sea valido
+Agregar una prop `collapsed` (o reutilizar el tamano `xs`) para que cuando el sidebar este contraido, el logo muestre solo la "M" con el gradiente, sin "aven" ni "CRM".
 
-### Solucion
+Cambio concreto:
+- Agregar prop opcional `collapsed?: boolean`
+- Cuando `collapsed` es `true`, renderizar solo la letra "M" con el mismo gradiente (`bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent`) y tamano apropiado para el sidebar contraido (3rem de ancho)
+- Cuando `collapsed` es `false`, mostrar el logo completo "MavenCRM" como actualmente
 
-Modificar `ResetPassword.tsx` para:
+**Archivo: `src/components/dashboard/DashboardSidebar.tsx`**
 
-1. **Detectar hash fragments en la URL**: Si la URL contiene `type=recovery` en el hash, esperar a que el evento se procese antes de mostrar error
-2. **Agregar timeout de seguridad**: Si despues de 5 segundos no se detecta sesion ni evento, mostrar el error
-3. **Reintentar `getSession()` despues del evento**: Usar un intervalo corto para re-verificar la sesion si hay hash fragments presentes
+Pasar `collapsed={collapsed}` al componente Logo en lugar de solo cambiar el tamano.
 
-### Archivo a modificar
+### 2. Submenu "Creator Sales" accesible en sidebar contraido
+
+Actualmente el submenu usa `Collapsible` + `CollapsibleContent`, que se oculta completamente cuando el sidebar esta en modo icono (`group-data-[collapsible=icon]:overflow-hidden`). Esto hace que los subitems sean inaccesibles.
+
+**Solucion:** Cuando el sidebar esta contraido, reemplazar el `Collapsible` por un `DropdownMenu` que se abre al hacer hover/click sobre el icono de `TrendingUp`. Esto permite acceder a los subitems desde un popover lateral sin expandir el sidebar.
+
+**Archivo: `src/components/dashboard/DashboardSidebar.tsx`**
+
+Cambio concreto:
+- Importar `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem` de `@/components/ui/dropdown-menu`
+- Envolver el bloque del submenu Creator Sales en una condicion:
+  - **Si `collapsed` es `true`**: Renderizar un `DropdownMenu` con trigger en el boton del sidebar (icono `TrendingUp`), y los subitems como `DropdownMenuItem` que navegan a sus rutas respectivas usando `useNavigate`
+  - **Si `collapsed` es `false`**: Mantener el `Collapsible` actual sin cambios
+
+### Detalle tecnico del DropdownMenu en modo colapsado
+
+```text
+collapsed === true:
+  DropdownMenu
+    DropdownMenuTrigger -> SidebarMenuButton con icono TrendingUp + tooltip
+    DropdownMenuContent side="right" align="start"
+      DropdownMenuItem -> "Dashboard" -> navigate("/sales-overview")
+      DropdownMenuItem -> "Sales Report" -> navigate("/salesdashboard")
+      DropdownMenuItem -> "Sale Report v.1" -> navigate("/salesperformancecreator")
+      DropdownMenuItem -> "AI Sales" -> navigate("/aisales")
+      DropdownMenuItem -> "AI Config" -> navigate("/ai-sales-config")
+
+collapsed === false:
+  (sin cambios - Collapsible actual)
+```
+
+### Resumen de archivos
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/ResetPassword.tsx` | Reescribir logica de deteccion de sesion de recovery |
-
-### Detalle tecnico del cambio en ResetPassword.tsx
-
-Reemplazar el `useEffect` actual por una logica mas robusta:
-
-```text
-useEffect:
-  1. Registrar onAuthStateChange para PASSWORD_RECOVERY
-  2. Detectar si hay hash fragments con type=recovery en la URL
-  3. Si hay hash fragments:
-     - Esperar a que onAuthStateChange dispare PASSWORD_RECOVERY
-     - Fallback: reintentar getSession() cada 500ms hasta 5 segundos
-  4. Si NO hay hash fragments:
-     - Verificar getSession() una vez
-     - Si hay sesion, mostrar formulario
-     - Si no, mostrar error inmediatamente
-  5. Timeout maximo de 5 segundos para evitar loading infinito
-```
-
-La deteccion de hash fragments se hace con:
-```text
-const hashParams = new URLSearchParams(window.location.hash.substring(1));
-const isRecoveryRedirect = hashParams.get("type") === "recovery";
-```
-
-Si `isRecoveryRedirect` es true, el componente espera pacientemente a que el cliente Supabase procese los tokens antes de decidir si el enlace es valido o no.
-
-### Comportamiento esperado despues del fix
-
-1. Usuario solicita recovery en `/forgot-password` → email enviado
-2. Usuario hace clic en el enlace del email → redirigido a `/reset-password#access_token=...&type=recovery`
-3. Pagina muestra spinner de carga mientras procesa los tokens
-4. Una vez procesado, muestra el formulario de nueva contrasena
-5. Usuario establece nueva contrasena → toast de exito → redirigido a `/login`
+| `src/components/Logo.tsx` | Agregar prop `collapsed` para mostrar solo "M" cuando esta contraido |
+| `src/components/dashboard/DashboardSidebar.tsx` | Pasar `collapsed` al Logo + reemplazar Collapsible por DropdownMenu cuando esta colapsado |
 
