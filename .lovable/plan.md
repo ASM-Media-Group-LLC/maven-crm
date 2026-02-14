@@ -1,39 +1,36 @@
 
 
-## Refinamiento visual del Auth: fondo negro, glass mas impactante, logo pequeno y nuevo tagline
+## Ajuste de logo y contraste tipografico en Auth
 
-### Cambios
+### Problemas detectados
 
-#### 1. `src/components/auth/AuthLayout.tsx`
-- Fondo base mas negro: cambiar de `hsl(240,10%,4%)` a `hsl(240,10%,2%)` (casi negro puro)
-- Logo: cambiar de `size="lg"` a `size="sm"`
-- Tagline: cambiar texto de "Gestiona tus creadores" a "La plataforma integral para gestionar, escalar y optimizar tus operaciones."
-- Glass card: intensificar el efecto aumentando blur, ajustando bordes y agregando un sutil glow/shadow violeta
+1. **Logo demasiado pequeno**: `size="sm"` usa `text-2xl` (1.5rem). Necesita ser `size="md"` que usa `text-4xl` (2.25rem) - un punto intermedio entre el sm actual y el lg anterior.
 
-Glass card mejorada:
-```text
-Antes:  backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 shadow-2xl
-Despues: backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]
-```
+2. **"CRM" poco legible**: El Logo usa `text-muted-foreground` para "CRM", que sobre el fondo casi negro (`hsl(240,10%,2%)`) no tiene suficiente contraste. Solucion: usar `text-white/60` en vez de `text-muted-foreground` cuando se usa en contexto auth.
 
-#### 2. `src/components/auth/AnimatedGradientBackground.tsx`
-- Reducir opacidades generales (0.15 - 0.3) para que el fondo se sienta mas oscuro/negro con acentos sutiles de color
-- Mantener los colores azul-violeta actuales pero mas tenues
-- Ajustar posiciones para concentrar mas color en las esquinas y bordes, dejando el centro mas oscuro (donde va la card)
+3. **Tagline poco legible**: `text-white/40` con `text-sm` es demasiado tenue. Subir a `text-white/60` y `text-sm` (mantener tamano pero mejorar opacidad).
 
-Nuevas opacidades:
-| Blob | Color actual (mantener) | Opacidad actual | Opacidad nueva |
-|------|------------------------|-----------------|----------------|
-| 1 | Azul hsl(211,100%,50%) | 0.4 | 0.25 |
-| 2 | Violeta hsl(271,91%,50%) | 0.35 | 0.3 |
-| 3 | Azul oscuro hsl(220,80%,40%) | 0.4 | 0.2 |
-| 4 | Violeta profundo hsl(260,70%,35%) | 0.3 | 0.25 |
-| 5 | Indigo hsl(240,60%,45%) | 0.25 | 0.15 |
+4. **Textos dentro de la card**: Los labels usan `text-white/70` y subtitulos `text-white/50` - estos estan bien pero vale revisar consistencia.
 
-#### 3. `src/pages/Login.tsx`
-- Actualizar textos de inputs para usar estilos mas oscuros y consistentes con la referencia (los inputs ya tienen bg-white/10 que es correcto)
+### Cambios por archivo
 
-### Archivos a modificar
-- `src/components/auth/AuthLayout.tsx` - fondo, logo, tagline, glass card
-- `src/components/auth/AnimatedGradientBackground.tsx` - opacidades reducidas
+#### `src/components/auth/AuthLayout.tsx`
+- Logo: cambiar `size="sm"` a `size="md"`
+- Tagline: cambiar `text-white/40` a `text-white/60`
+
+#### `src/components/Logo.tsx`
+- No modificar el componente global. En su lugar, pasar un className desde AuthLayout para sobreescribir el color de "CRM" en contexto oscuro. Alternativa: agregar una prop `variant` al Logo.
+
+La solucion mas limpia sin modificar Logo.tsx globalmente es pasar `className` con un override CSS. Pero `text-muted-foreground` en el span interno no se puede sobreescribir facilmente con className en el wrapper.
+
+Solucion: modificar Logo.tsx para aceptar una prop `lightCRM` o simplemente cambiar `text-muted-foreground` a `text-white/50` que funciona bien tanto en el sidebar (fondo oscuro) como en auth. Revisando el sidebar tambien usa fondo oscuro, asi que `text-white/50` es consistente.
+
+**Cambio en Logo.tsx**: reemplazar `text-muted-foreground` por `text-white/50` en el span de "CRM". Esto mantiene legibilidad en todos los contextos oscuros del app.
+
+### Resumen de cambios
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/auth/AuthLayout.tsx` | Logo `size="md"`, tagline `text-white/60` |
+| `src/components/Logo.tsx` | "CRM" span: `text-muted-foreground` a `text-white/50` |
 
