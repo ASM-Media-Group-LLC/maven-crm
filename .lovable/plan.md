@@ -1,59 +1,66 @@
 
-## 1. Operaciones (Sales Overview): Reemplazar selector de periodo por DateRangePicker
 
-Actualmente `SalesOverviewFilters.tsx` usa tres botones fijos ("Hoy", "Esta semana", "Este mes") y muestra un rango de fecha estatico. Se reemplazara por el componente `DateRangePicker` (el mismo que usa Eventos), que ya incluye presets rapidos (Hoy, Ayer, Esta semana, etc.) y calendario dual.
+## 1. Footer: Agregar tagline oficial debajo del logo
 
-**Archivo: `src/pages/sales-overview/SalesOverviewFilters.tsx`**
-- Importar `DateRangePicker` de `@/components/ui/date-range-picker`
-- Reemplazar los botones de periodo y el display de fecha por un unico `DateRangePicker`
-- Cambiar la interfaz Props para recibir `from`, `to` y `onDateChange` en lugar de `activePeriod` y `onPeriodChange`
+En el footer del Landing, debajo de `<Logo size="sm" />`, reemplazar el texto actual ("La plataforma CRM para agencias de creadores de contenido.") por el tagline oficial usado en la pantalla de inicio de sesion:
 
-**Archivo: `src/pages/SalesOverview.tsx`**
-- Reemplazar el estado `activePeriod` por estados `dateFrom` y `dateTo` (inicializados con "Esta semana")
-- Pasar los nuevos props al componente de filtros
-- Adaptar el calculo de `dateRange` para usar los estados directamente
+**"La plataforma integral para gestionar, escalar y optimizar tus operaciones."**
 
-## 2. Uniformizar tamano de barras de busqueda
+Mismo estilo: `text-sm text-muted-foreground`.
 
-El patron estandar sera `relative flex-1` sin restriccion `max-w-*`, permitiendo que la barra ocupe todo el espacio disponible. Solo se usara `max-w-xs` cuando haya 4+ filtros adicionales en la misma linea.
+## 2. Hero: Fondo dinamico con animated blobs y waves
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/promolog/PromologContent.tsx` (linea 318) | Cambiar `max-w-xs` a `flex-1` sin max (tiene 4 selects + date + view toggle, pero el date es compacto) -- en realidad con tantos filtros conviene mantener `max-w-xs`. Se mantiene. |
-| `src/pages/leadgen/LeadGenContent.tsx` (linea 130) | Cambiar `max-w-xs` a `flex-1` sin max -- misma situacion, se mantiene |
-| `src/pages/tareas/TareasContent.tsx` (linea 124) | Cambiar `max-w-sm` a `flex-1` (pocos filtros, puede expandirse) |
-| `src/pages/tareas/ProjectsListContent.tsx` (linea 75) | Cambiar `max-w-sm` a `flex-1` |
+Reemplazar el actual `hero-gradient` (un simple radial-gradient estatico) por los mismos componentes animados del auth:
 
-Conclusion: Las barras con pocos filtros (Tareas, Proyectos, Eventos) usaran `flex-1` sin restriccion. Las que tienen muchos filtros (Promolog, LeadGen) mantendran `max-w-xs`. El objetivo es que todas las barras con la misma cantidad de filtros se vean iguales.
+- Agregar `AnimatedGradientBackground` (blobs fluidos animados)
+- Agregar `AnimatedWaves` (ondas SVG con bordes luminosos)
+- Cambiar el fondo base del hero a `bg-[hsl(240,10%,2%)]` (negro profundo, igual que auth)
+- Asegurar que el contenido del hero tenga `relative z-10` para estar sobre las animaciones
 
-## 3. Promolog: Hover animado en KPI cards y social cards
+## 3. Modulos: Cards con efecto glass
 
-**KPI Cards (lineas 383-423)**: Agregar el patron estandar de hover:
-- `transition-all duration-200 cursor-pointer hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40`
-- Cada card usa su color semantico: accent, primary, destructive, success
+Reemplazar las cards actuales de modulos (border + bg-card) por el patron `glass-card-subtle`:
 
-**Social Cards (lineas 434-446)**: Agregar hover animado:
-- `transition-all duration-200 cursor-pointer hover:scale-[1.03] hover:shadow-lg`
+- Aplicar `glass-card-subtle` como clase base
+- Agregar hover animado: `transition-all duration-300 hover:scale-[1.02]` con cambio de borde a `hover:border-white/15`
+- Cambiar texto a colores claros (`text-white`, `text-white/60`) ya que el fondo sera oscuro
 
-**Platform Cards (lineas 450-462)**: Mismo patron de hover que social cards.
+## 4. Stats: Fondo con glass effect
+
+La seccion de metricas actualmente usa `bg-card`. Cambiar a un fondo sutil con glass:
+
+- Fondo: quitar `bg-card border-t` y usar un gradiente sutil con blur
+- Cada stat card: envolver en un contenedor con `glass-card-subtle` y padding
+- Mantener las animaciones float existentes
+
+## 5. Navbar: Adaptar al fondo oscuro del hero
+
+- Cambiar `bg-background/80` a `bg-[hsl(240,10%,2%)]/80` para que se integre con el fondo oscuro
+- Agregar `backdrop-blur-xl` para mejor efecto de profundidad
+- Borde: cambiar `border-border` a `border-white/[0.06]`
+
+## 6. Footer: Estilo oscuro coherente
+
+- Fondo oscuro `bg-[hsl(240,10%,2%)]`
+- Linea divisoria: gradiente con `via-white/10` en lugar de `via-border`
+- Texto en `text-white/60`
 
 ## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/sales-overview/SalesOverviewFilters.tsx` | Reemplazar por DateRangePicker |
-| `src/pages/SalesOverview.tsx` | Adaptar estado y props para DateRangePicker |
-| `src/pages/promolog/PromologContent.tsx` | Agregar hover animado a KPI, social y platform cards |
-| `src/pages/tareas/TareasContent.tsx` | Quitar max-w-sm del buscador |
-| `src/pages/tareas/ProjectsListContent.tsx` | Quitar max-w-sm del buscador |
+| `src/pages/Landing.tsx` | Importar AnimatedGradientBackground y AnimatedWaves; redisenar hero, cards, stats, navbar y footer con glass effects y fondo oscuro; actualizar tagline del footer |
 
-## Detalle tecnico
+Solo se modifica un archivo. Los componentes de animacion (`AnimatedGradientBackground`, `AnimatedWaves`) y las utilidades CSS (`glass-card`, `glass-card-subtle`) ya existen y se reutilizan directamente.
 
-Para SalesOverview, el estado cambia de:
+## Detalle visual del resultado
+
 ```text
-activePeriod: OverviewPeriod  -->  dateFrom: Date, dateTo: Date
+Navbar:  fondo oscuro blur, borde sutil blanco/6%
+Hero:    fondo negro con blobs animados + waves, badge glass, logo, tagline, CTAs
+Modulos: cards glass-card-subtle con hover scale, iconos con color, fondo oscuro continuo
+Stats:   cards glass individuales, iconos flotantes, fondo oscuro
+Footer:  logo + tagline oficial, fondo oscuro, linea gradiente sutil
 ```
 
-Se inicializa con el rango de "Esta semana" y el `DateRangePicker` permite seleccionar cualquier rango. Los componentes hijos (`SalesKPICards`, `SalesOperationalCards`) ya reciben datos filtrados a traves de `usePeriodComparison`, que usa `dateRange`, asi que solo hay que asegurar que `dateRange` se derive de los nuevos estados.
-
-Para las cards de Promolog, el patron de hover sigue exactamente el documentado en el Design System (seccion Card Hover Animations).
+Todo el landing se convierte en una experiencia visual oscura e inmersiva, coherente con la pantalla de autenticacion, usando los mismos efectos de glass y animaciones que ya estan definidos en el sistema de diseno.
