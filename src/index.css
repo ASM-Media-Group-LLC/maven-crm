@@ -139,6 +139,24 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   background-color: hsl(var(--primary));
 }
 
+/* Auth animated gradient blobs */
+@keyframes blob-move-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(15%, 20%) scale(1.15); }
+}
+@keyframes blob-move-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-20%, -15%) scale(1.1); }
+}
+@keyframes blob-move-3 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(10%, -25%) scale(1.2); }
+}
+@keyframes blob-move-4 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(25%, 10%) scale(1.1); }
+}
+
 /* Auth particles animations */
 @keyframes twinkle {
   0%, 100% { opacity: 0.15; }
