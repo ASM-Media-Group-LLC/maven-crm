@@ -1,43 +1,59 @@
 
+## 1. Operaciones (Sales Overview): Reemplazar selector de periodo por DateRangePicker
 
-## 1. Eliminar dividers (border-b) de las barras internas en Promolog y LeadGen
+Actualmente `SalesOverviewFilters.tsx` usa tres botones fijos ("Hoy", "Esta semana", "Este mes") y muestra un rango de fecha estatico. Se reemplazara por el componente `DateRangePicker` (el mismo que usa Eventos), que ya incluye presets rapidos (Hoy, Ayer, Esta semana, etc.) y calendario dual.
 
-Actualmente tanto Promolog como LeadGen tienen multiples lineas `border-b` separando el tab bar y la barra de filtros del contenido. Otros modulos como Closers no usan estas lineas divisorias entre secciones internas, solo el header tiene `border-b`. Para mantener uniformidad:
+**Archivo: `src/pages/sales-overview/SalesOverviewFilters.tsx`**
+- Importar `DateRangePicker` de `@/components/ui/date-range-picker`
+- Reemplazar los botones de periodo y el display de fecha por un unico `DateRangePicker`
+- Cambiar la interfaz Props para recibir `from`, `to` y `onDateChange` en lugar de `activePeriod` y `onPeriodChange`
 
-**Promolog (`src/pages/promolog/PromologContent.tsx`):**
-- Linea 289: quitar `border-b` del tab bar
-- Linea 315: quitar `border-b` de la barra de filtros
-- Linea 329: quitar el `<Separator />` dentro del popover del calendario (este es un separador dentro de un componente de UI, se mantiene)
+**Archivo: `src/pages/SalesOverview.tsx`**
+- Reemplazar el estado `activePeriod` por estados `dateFrom` y `dateTo` (inicializados con "Esta semana")
+- Pasar los nuevos props al componente de filtros
+- Adaptar el calculo de `dateRange` para usar los estados directamente
 
-**LeadGen (`src/pages/leadgen/LeadGenContent.tsx`):**
-- Linea 96: quitar `border-b` del contenedor de KPIs
-- Linea 104: quitar `border-b` del tab bar
-- Linea 129: quitar `border-b` de la barra de filtros
+## 2. Uniformizar tamano de barras de busqueda
 
-El unico `border-b` que se mantiene es el del header principal (ya que es el patron estandar en toda la plataforma).
+El patron estandar sera `relative flex-1` sin restriccion `max-w-*`, permitiendo que la barra ocupe todo el espacio disponible. Solo se usara `max-w-xs` cuando haya 4+ filtros adicionales en la misma linea.
 
-## 2. Mover "Agregar Campana" al header, antes de "Agregar Entrada"
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/promolog/PromologContent.tsx` (linea 318) | Cambiar `max-w-xs` a `flex-1` sin max (tiene 4 selects + date + view toggle, pero el date es compacto) -- en realidad con tantos filtros conviene mantener `max-w-xs`. Se mantiene. |
+| `src/pages/leadgen/LeadGenContent.tsx` (linea 130) | Cambiar `max-w-xs` a `flex-1` sin max -- misma situacion, se mantiene |
+| `src/pages/tareas/TareasContent.tsx` (linea 124) | Cambiar `max-w-sm` a `flex-1` (pocos filtros, puede expandirse) |
+| `src/pages/tareas/ProjectsListContent.tsx` (linea 75) | Cambiar `max-w-sm` a `flex-1` |
 
-Actualmente "Agregar Campana" esta en el lado derecho del tab bar. Se movera al header, colocandolo justo antes del boton "Agregar Entrada", ambos con `variant="outline"`. Esto sigue el patron de LeadGen que tiene multiples botones de accion en el header.
+Conclusion: Las barras con pocos filtros (Tareas, Proyectos, Eventos) usaran `flex-1` sin restriccion. Las que tienen muchos filtros (Promolog, LeadGen) mantendran `max-w-xs`. El objetivo es que todas las barras con la misma cantidad de filtros se vean iguales.
 
-```text
-Header:
-  Promolog                              [+ Agregar Campana] [+ Agregar Entrada]
-  Seguimiento promocional diario
-```
+## 3. Promolog: Hover animado en KPI cards y social cards
+
+**KPI Cards (lineas 383-423)**: Agregar el patron estandar de hover:
+- `transition-all duration-200 cursor-pointer hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40`
+- Cada card usa su color semantico: accent, primary, destructive, success
+
+**Social Cards (lineas 434-446)**: Agregar hover animado:
+- `transition-all duration-200 cursor-pointer hover:scale-[1.03] hover:shadow-lg`
+
+**Platform Cards (lineas 450-462)**: Mismo patron de hover que social cards.
 
 ## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/promolog/PromologContent.tsx` | Quitar border-b de tab bar y filtros; mover boton "Agregar Campana" al header |
-| `src/pages/leadgen/LeadGenContent.tsx` | Quitar border-b de KPIs, tab bar y filtros |
+| `src/pages/sales-overview/SalesOverviewFilters.tsx` | Reemplazar por DateRangePicker |
+| `src/pages/SalesOverview.tsx` | Adaptar estado y props para DateRangePicker |
+| `src/pages/promolog/PromologContent.tsx` | Agregar hover animado a KPI, social y platform cards |
+| `src/pages/tareas/TareasContent.tsx` | Quitar max-w-sm del buscador |
+| `src/pages/tareas/ProjectsListContent.tsx` | Quitar max-w-sm del buscador |
 
 ## Detalle tecnico
 
-En Promolog:
-- El boton "Agregar Campana" se elimina de la linea 307-310 (dentro del tab bar) y se agrega en el header (linea 281) como un segundo boton antes de "Agregar Entrada"
-- Se eliminan las clases `border-b` de los divs en lineas 289 y 315
+Para SalesOverview, el estado cambia de:
+```text
+activePeriod: OverviewPeriod  -->  dateFrom: Date, dateTo: Date
+```
 
-En LeadGen:
-- Se eliminan las clases `border-b` de los divs en lineas 96, 104 y 129
+Se inicializa con el rango de "Esta semana" y el `DateRangePicker` permite seleccionar cualquier rango. Los componentes hijos (`SalesKPICards`, `SalesOperationalCards`) ya reciben datos filtrados a traves de `usePeriodComparison`, que usa `dateRange`, asi que solo hay que asegurar que `dateRange` se derive de los nuevos estados.
+
+Para las cards de Promolog, el patron de hover sigue exactamente el documentado en el Design System (seccion Card Hover Animations).
