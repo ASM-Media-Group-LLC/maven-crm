@@ -1,62 +1,70 @@
 
 
-## Animaciones hover en cards del Dashboard y colores de acento en el Sidebar
+## Fix Creator Sales hover + Glass Effect system-wide + Documentacion en Design System
 
-### 1. Cards del Dashboard - Animaciones hover mejoradas
+### Problema 1: Creator Sales sin hover azul
 
-#### KPI Cards (ya tienen hover con scale y gradiente - se mantienen)
-Las 5 KPI cards superiores ya tienen animaciones hover avanzadas. No se modifican.
+El `CollapsibleTrigger` y el `DropdownMenuTrigger` de "Creator Sales" usan `SidebarMenuButton` sin clases custom de hover. Esto hace que hereden el estilo base gris (`hover:bg-sidebar-accent`) del componente sidebar en lugar del azul (`hover:bg-primary/10`) que tienen los demas items del grupo Menu.
 
-#### Cards de graficos y contenido (Row 2 y Row 3) - NUEVAS animaciones
-Las 6 cards de contenido (Rendimiento Semanal, Actividad Reciente, Pipeline, Top 5, Deals Semanales) actualmente no tienen hover. Se agregara:
-- Transicion suave de borde: `hover:border-primary/30` (o color semantico correspondiente)
-- Elevacion sutil sin sombra: `hover:translate-y-[-2px]` con `transition-all duration-300`
+**Solucion**: Agregar `className` con las clases de hover azul al `SidebarMenuButton` de Creator Sales, tanto en la version colapsada (dropdown) como expandida (collapsible). Tambien aplicar hover azul a los sub-items.
 
-#### Cards operacionales (Row 4) - NUEVAS animaciones
-Las 3 cards con borde superior de color (Customer Service, Closers, Scripts) recibiran:
-- `hover:translate-y-[-2px]` para efecto de elevacion
-- Fondo con gradiente sutil del color correspondiente: `hover:bg-gradient-to-b hover:from-[color]/5 hover:to-transparent`
-- `transition-all duration-300`
+**Archivo**: `src/components/dashboard/DashboardSidebar.tsx`
 
-Mapeo de colores por card operacional:
-| Card | Color del borde | Hover gradient |
-|------|----------------|----------------|
-| Customer Service | destructive | `hover:from-destructive/5` |
-| Closers | primary | `hover:from-primary/5` |
-| Scripts & Tools | accent | `hover:from-accent/5` |
+Cambios especificos:
+- Linea 111: Agregar `hover:bg-primary/10 hover:text-primary` al SidebarMenuButton del dropdown
+- Linea 136: Agregar `hover:bg-primary/10 hover:text-primary` al SidebarMenuButton del collapsible trigger
+- Lineas 146-150: Agregar hover azul a los SidebarMenuSubButton items
 
-### 2. Sidebar - Colores de acento diferenciados
+---
 
-Actualmente todos los items del sidebar usan el mismo `hover:bg-sidebar-accent` gris. Se diferenciaran por grupo usando colores del sistema:
+### Problema 2: Glass Effect como utilidad reutilizable
 
-#### Grupo "Menu" (items principales)
-- Hover: `hover:bg-primary/10 hover:text-primary`
-- Activo: `bg-primary/15 text-primary border-l-2 border-l-primary font-medium`
+El efecto glass existe en `AuthLayout.tsx` (linea 20) como clases inline:
+```
+backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]
+```
 
-#### Grupo "Operaciones"
-- Hover: `hover:bg-accent/10 hover:text-accent`
-- Activo: `bg-accent/15 text-accent border-l-2 border-l-accent font-medium`
+Se creara una clase CSS reutilizable `.glass-card` en `src/index.css` y una variante mas ligera `.glass-card-subtle` para uso en el dashboard.
 
-#### Grupo "Recursos"
-- Hover: `hover:bg-muted hover:text-foreground` (mantener neutro)
-- Activo: `bg-muted text-foreground font-medium`
+**Archivo**: `src/index.css`
 
-Esto crea una jerarquia visual clara: azul para navegacion principal, violeta para operaciones, neutro para recursos.
+Nuevas clases utilitarias:
+| Clase | Uso | Propiedades |
+|-------|-----|-------------|
+| `.glass-card` | Modales, cards destacadas | `backdrop-blur-2xl`, `bg-white/[0.03]`, `border border-white/[0.08]`, sombra violeta |
+| `.glass-card-subtle` | Cards de dashboard, paneles | `backdrop-blur-md`, `bg-white/[0.02]`, `border border-white/[0.06]`, sin sombra de color |
 
-### Archivos a modificar
+---
+
+### Problema 3: Documentar en Design System
+
+Agregar una seccion "Glass Cards & Effects" dentro de la seccion de Cards del design system.
+
+**Archivo**: `src/pages/design-system/sections/CardsSection.tsx`
+
+Agregar al final de la seccion:
+- Titulo "Glass Cards"
+- Descripcion del patron
+- 2-3 ejemplos visuales (glass-card y glass-card-subtle) con fondo oscuro para que se aprecie el efecto
+- Codigo de referencia con las clases CSS
+- Reglas de uso (cuando usar glass vs card normal)
+
+Tambien agregar documentacion de las animaciones hover de cards en la seccion de GlobalStatesSection.
+
+**Archivo**: `src/pages/design-system/sections/GlobalStatesSection.tsx`
+
+Agregar:
+- Seccion "Card Hover Animations" con los patrones documentados (translate-y, gradient hover, border-color transitions)
+- Referencia a las animaciones wave del auth
+
+---
+
+### Resumen de archivos
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/dashboard/DashboardContent.tsx` | Agregar clases hover a las 9 cards de contenido y operacionales |
-| `src/components/dashboard/DashboardSidebar.tsx` | Diferenciar colores hover/active por grupo de navegacion |
-
-### Detalles tecnicos
-
-En `DashboardContent.tsx`:
-- Cards Row 2-3: agregar `className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30"` (variando color por card)
-- Cards Row 4: agregar hover gradient al className existente, ej: `"border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent"`
-
-En `DashboardSidebar.tsx`:
-- Reemplazar las clases `hover:bg-sidebar-accent hover:text-sidebar-accent-foreground` y `activeClassName` por las variantes coloreadas segun el grupo
-- Para el submenu "Creator Sales", mantener el color primary heredado del grupo Menu
+| `src/components/dashboard/DashboardSidebar.tsx` | Agregar hover azul a Creator Sales (trigger + sub-items) |
+| `src/index.css` | Crear clases `.glass-card` y `.glass-card-subtle` |
+| `src/pages/design-system/sections/CardsSection.tsx` | Documentar Glass Cards con ejemplos visuales |
+| `src/pages/design-system/sections/GlobalStatesSection.tsx` | Documentar patrones de hover animado en cards |
 
