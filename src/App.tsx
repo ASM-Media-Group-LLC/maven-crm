@@ -10,6 +10,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import DesignSystem from "./pages/DesignSystem";
+import Docs from "./pages/Docs";
 import SalesDashboard from "./pages/SalesDashboard";
 import SalesOverview from "./pages/SalesOverview";
 import ComparativasPage from "./pages/sales-overview/ComparativasPage";
@@ -61,6 +62,7 @@ const App = () => (
 
               {/* Protected routes */}
               <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />
+              <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
               <Route path="/sales-overview" element={<ProtectedRoute><SalesOverview /></ProtectedRoute>} />
               <Route path="/sales-overview/comparativas" element={<ProtectedRoute><ComparativasPage /></ProtectedRoute>} />
               <Route path="/sales-overview/top10" element={<ProtectedRoute><Top10Page /></ProtectedRoute>} />

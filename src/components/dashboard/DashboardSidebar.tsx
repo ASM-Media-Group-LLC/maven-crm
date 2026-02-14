@@ -13,6 +13,7 @@ import {
   Phone,
   Ticket,
   Palette,
+  FileText,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -200,6 +201,18 @@ const DashboardSidebar = () => {
                   >
                     <Palette className="h-4 w-4 shrink-0" />
                     <span>Design System</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Documentacion">
+                  <NavLink
+                    to="/docs"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span>Documentacion</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
