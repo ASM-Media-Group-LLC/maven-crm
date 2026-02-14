@@ -103,9 +103,9 @@ const SalesDashboard = () => {
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
-          <div className="shrink-0 flex items-center justify-between border-b border-border bg-background px-6 py-4">
+          <div className="shrink-0 flex items-center justify-between border-b border-border bg-background px-6 pt-6 pb-4">
             <div>
-              <h1 className="text-xl font-bold text-foreground">Reporte de Ventas</h1>
+              <h1 className="text-2xl font-bold text-foreground">Reporte de Ventas</h1>
               <p className="text-sm text-muted-foreground">Rendimiento de ventas y análisis por creadora</p>
             </div>
             <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCSV}>

@@ -16,7 +16,7 @@ const ProjectsListContent = () => {
   const navigate = useNavigate();
   const { projects, isLoading, createProject, updateProject, deleteProject, getProjectTaskCounts } = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
