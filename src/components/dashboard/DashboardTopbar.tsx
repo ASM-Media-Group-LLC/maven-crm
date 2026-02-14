@@ -1,51 +1,42 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, Sun, Moon, LogOut, KeyRound } from "lucide-react";
+import { Bell, Search, Sun, Moon, LogOut, KeyRound, Languages } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ChangePasswordModal from "./ChangePasswordModal";
+import GlobalSearchCommand from "./GlobalSearchCommand";
 
 const DashboardTopbar = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const { t, language, toggleLanguage } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   const handleLogout = async () => {
     await signOut();
-    toast({ title: "Sesión cerrada", description: "Has cerrado sesión correctamente." });
+    toast({ title: t("topbar.logoutSuccess"), description: t("topbar.logoutDesc") });
     navigate("/login");
   };
 
   const fullName = user?.user_metadata?.full_name || "Usuario";
   const email = user?.email || "";
-  const initials = fullName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const initials = fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <>
@@ -53,20 +44,38 @@ const DashboardTopbar = () => {
         <SidebarTrigger />
 
         <div className="flex flex-1 justify-center">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input disabled placeholder="Search…" className="pl-9" />
-          </div>
+          <Button
+            variant="outline"
+            onClick={() => setSearchOpen(true)}
+            className="relative w-full max-w-md justify-start text-muted-foreground font-normal h-9"
+          >
+            <Search className="mr-2 h-4 w-4" />
+            <span className="flex-1 text-left">{t("topbar.search")}</span>
+            <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+              <span className="text-xs">⌘</span>K
+            </kbd>
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Language toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground"
+            onClick={toggleLanguage}
+            title={language === "es" ? "Switch to English" : "Cambiar a Español"}
+          >
+            <Languages className="h-5 w-5" />
+          </Button>
+
           {mounted && (
             <Button
               variant="ghost"
               size="icon"
               className="text-muted-foreground"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+              title={theme === "dark" ? t("topbar.lightMode") : t("topbar.darkMode")}
             >
               {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
@@ -83,8 +92,8 @@ const DashboardTopbar = () => {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72 p-4">
-              <p className="text-sm font-medium mb-2">Notificaciones</p>
-              <p className="text-xs text-muted-foreground">Sin notificaciones nuevas.</p>
+              <p className="text-sm font-medium mb-2">{t("topbar.notifications")}</p>
+              <p className="text-xs text-muted-foreground">{t("topbar.noNotifications")}</p>
             </PopoverContent>
           </Popover>
 
@@ -113,17 +122,18 @@ const DashboardTopbar = () => {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setPasswordModalOpen(true)}>
                 <KeyRound className="mr-2 h-4 w-4" />
-                Cambiar contraseña
+                {t("topbar.changePassword")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                Cerrar sesión
+                {t("topbar.logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
+      <GlobalSearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
       <ChangePasswordModal open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />
     </>
   );
