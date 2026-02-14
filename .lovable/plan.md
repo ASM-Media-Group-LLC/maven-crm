@@ -1,87 +1,63 @@
 
 
-## Flujo completo de recuperacion de contrasena
+## Fix: Recuperacion de contrasena - Deteccion robusta de sesion de recovery
 
-### Enfoque tecnico
+### Problema identificado
 
-Supabase Auth incluye soporte nativo para recuperacion de contrasena mediante `resetPasswordForEmail()` y `updateUser()`. No se necesita crear tablas de tokens ni edge functions. Supabase gestiona internamente la generacion del token, la expiracion (1 hora por defecto) y el uso unico.
+Hay una condicion de carrera en `ResetPassword.tsx`:
 
-El flujo es:
-1. Usuario solicita reset en `/forgot-password`
-2. Supabase envia email con enlace que redirige a `/reset-password`
-3. Al hacer clic en el enlace, Supabase establece una sesion temporal con evento `PASSWORD_RECOVERY`
-4. La pagina `/reset-password` detecta ese evento y permite al usuario establecer nueva contrasena via `updateUser({ password })`
+1. Supabase redirige a `/reset-password#access_token=...&type=recovery`
+2. La app carga. `AuthProvider` registra su `onAuthStateChange` primero
+3. El cliente Supabase procesa los fragmentos del hash de forma asincrona
+4. `ResetPassword` monta y registra su propio `onAuthStateChange`, pero el evento `PASSWORD_RECOVERY` ya fue disparado
+5. `getSession()` podria ejecutarse antes de que el hash sea procesado, retornando `null`
+6. Resultado: el usuario ve "El enlace es invalido o ha expirado" aunque el enlace sea valido
 
-### Archivos a crear
+### Solucion
 
-| Archivo | Proposito |
-|---------|-----------|
-| `src/pages/ForgotPassword.tsx` | Formulario de solicitud de recuperacion |
-| `src/pages/ResetPassword.tsx` | Formulario para establecer nueva contrasena |
+Modificar `ResetPassword.tsx` para:
 
-### Archivos a modificar
+1. **Detectar hash fragments en la URL**: Si la URL contiene `type=recovery` en el hash, esperar a que el evento se procese antes de mostrar error
+2. **Agregar timeout de seguridad**: Si despues de 5 segundos no se detecta sesion ni evento, mostrar el error
+3. **Reintentar `getSession()` despues del evento**: Usar un intervalo corto para re-verificar la sesion si hay hash fragments presentes
+
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/App.tsx` | Agregar rutas publicas `/forgot-password` y `/reset-password` |
-| `src/pages/Login.tsx` | Agregar enlace "Olvidaste tu contrasena?" debajo del formulario |
+| `src/pages/ResetPassword.tsx` | Reescribir logica de deteccion de sesion de recovery |
 
-### Detalle de cada pagina
+### Detalle tecnico del cambio en ResetPassword.tsx
 
-**`/forgot-password` - Solicitar recuperacion**
+Reemplazar el `useEffect` actual por una logica mas robusta:
 
-- Mismo diseno visual que Login: fondo `bg-background`, card centrada con `border-border bg-card`, Logo arriba
-- Campo: Email con validacion de formato
-- Boton: "Enviar enlace de recuperacion" (variante `default`, `w-full`)
-- Al enviar: llama `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
-- Mensaje neutro siempre (no revela si el email existe): "Si el correo esta registrado, recibiras un enlace para restablecer tu contrasena."
-- Enlace para volver a Login
-- Toggle de visibilidad no aplica (solo campo email)
-- Estado de loading con `Loader2` en el boton
-
-**`/reset-password` - Establecer nueva contrasena**
-
-- Mismo diseno visual que Login
-- Al montar, escucha `supabase.auth.onAuthStateChange` para detectar evento `PASSWORD_RECOVERY`
-- Si no hay sesion de recovery: muestra mensaje de error con opcion de solicitar nuevo enlace (link a `/forgot-password`)
-- Si hay sesion valida: muestra formulario con:
-  - Campo: Nueva contrasena (con toggle Eye/EyeOff)
-  - Campo: Confirmar contrasena (con toggle Eye/EyeOff)
-  - Validaciones client-side:
-    - Minimo 8 caracteres
-    - Al menos 1 mayuscula
-    - Al menos 1 numero
-    - Ambas contrasenas coinciden
-  - Indicador visual de requisitos (texto `text-xs` con color condicional `text-green-500`/`text-muted-foreground`)
-  - Boton: "Actualizar contrasena" (variante `default`, `w-full`)
-- Al confirmar: llama `supabase.auth.updateUser({ password })`
-- Exito: toast "Contrasena actualizada" + redirect a `/login`
-- Error: toast destructivo con mensaje de error
-
-**Modificacion en Login.tsx**
-
-Agregar debajo del enlace "Registrate":
 ```text
-Olvidaste tu contrasena? -> Link a /forgot-password
+useEffect:
+  1. Registrar onAuthStateChange para PASSWORD_RECOVERY
+  2. Detectar si hay hash fragments con type=recovery en la URL
+  3. Si hay hash fragments:
+     - Esperar a que onAuthStateChange dispare PASSWORD_RECOVERY
+     - Fallback: reintentar getSession() cada 500ms hasta 5 segundos
+  4. Si NO hay hash fragments:
+     - Verificar getSession() una vez
+     - Si hay sesion, mostrar formulario
+     - Si no, mostrar error inmediatamente
+  5. Timeout maximo de 5 segundos para evitar loading infinito
 ```
 
-**Modificacion en App.tsx**
-
-Agregar dos rutas publicas (junto a `/login` y `/register`):
+La deteccion de hash fragments se hace con:
 ```text
-<Route path="/forgot-password" element={<ForgotPassword />} />
-<Route path="/reset-password" element={<ResetPassword />} />
+const hashParams = new URLSearchParams(window.location.hash.substring(1));
+const isRecoveryRedirect = hashParams.get("type") === "recovery";
 ```
 
-### Seguridad
+Si `isRecoveryRedirect` es true, el componente espera pacientemente a que el cliente Supabase procese los tokens antes de decidir si el enlace es valido o no.
 
-- El token es gestionado por Supabase (generacion, expiracion de 1 hora, uso unico)
-- No se almacena informacion sensible en el frontend
-- Mensaje neutro en forgot-password para no revelar existencia de cuentas
-- Validaciones de fortaleza de contrasena en el cliente
-- `updateUser` solo funciona con sesion de recovery activa (Supabase lo valida server-side)
+### Comportamiento esperado despues del fix
 
-### Sin cambios en base de datos
-
-No se requieren migraciones ni tablas adicionales. Supabase maneja todo el flujo de tokens internamente.
+1. Usuario solicita recovery en `/forgot-password` → email enviado
+2. Usuario hace clic en el enlace del email → redirigido a `/reset-password#access_token=...&type=recovery`
+3. Pagina muestra spinner de carga mientras procesa los tokens
+4. Una vez procesado, muestra el formulario de nueva contrasena
+5. Usuario establece nueva contrasena → toast de exito → redirigido a `/login`
 
