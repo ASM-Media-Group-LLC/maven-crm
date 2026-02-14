@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
+import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -69,7 +70,6 @@ const Register = () => {
       return;
     }
 
-    // If company name provided, create company and link to profile
     if (company.trim() && data.user) {
       const { data: companyData } = await supabase
         .from("companies")
@@ -91,10 +91,10 @@ const Register = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+    <AuthLayout>
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <Link to="/">
+        <div className="flex flex-col items-center gap-4 lg:items-start">
+          <Link to="/" className="lg:hidden">
             <Logo size="sm" />
           </Link>
           <h2 className="text-2xl font-bold">Crear cuenta</h2>
@@ -193,7 +193,7 @@ const Register = () => {
           </span>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 

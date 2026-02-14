@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
+import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -37,14 +38,14 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthLayout>
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <Link to="/">
+        <div className="flex flex-col items-center gap-4 lg:items-start">
+          <Link to="/" className="lg:hidden">
             <Logo size="sm" />
           </Link>
           <h2 className="text-2xl font-bold">Recuperar contraseña</h2>
-          <p className="text-sm text-muted-foreground text-center">
+          <p className="text-sm text-muted-foreground text-center lg:text-left">
             Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
           </p>
         </div>
@@ -63,14 +64,7 @@ const ForgotPassword = () => {
           <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-6 space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="tu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
+              <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -86,7 +80,7 @@ const ForgotPassword = () => {
           </Link>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 

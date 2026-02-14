@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
+import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -50,10 +51,10 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <AuthLayout>
       <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4">
-          <Link to="/">
+        <div className="flex flex-col items-center gap-4 lg:items-start">
+          <Link to="/" className="lg:hidden">
             <Logo size="sm" />
           </Link>
           <h2 className="text-2xl font-bold">Iniciar sesión</h2>
@@ -112,7 +113,7 @@ const Login = () => {
           </span>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 
