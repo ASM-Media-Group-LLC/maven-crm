@@ -7,7 +7,7 @@ import Logo from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Register = () => {
   const { user, loading: authLoading } = useAuth();
@@ -18,6 +18,8 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [company, setCompany] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (authLoading) {
@@ -84,8 +86,8 @@ const Register = () => {
     }
 
     setLoading(false);
-    toast({ title: "Cuenta creada", description: "Bienvenido a Maven CRM." });
-    navigate("/dashboard");
+    toast({ title: "Cuenta creada", description: "Te enviamos un correo de verificación. Revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta." });
+    navigate("/login");
   };
 
   return (
@@ -123,25 +125,51 @@ const Register = () => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Contraseña *</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              placeholder="Repite tu contraseña"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Repite tu contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="company">Empresa (opcional)</Label>
