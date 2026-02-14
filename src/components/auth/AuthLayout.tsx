@@ -8,7 +8,7 @@ interface AuthLayoutProps {
 
 const AuthLayout = ({ children }: AuthLayoutProps) => {
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[hsl(240,8%,6%)]">
+    <div className="min-h-screen relative overflow-hidden bg-[hsl(240,10%,4%)]">
       <AnimatedGradientBackground />
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
         <Logo size="lg" />
