@@ -86,6 +86,35 @@ export const CardsSection = () => (
       </div>
     </div>
 
+    {/* Glass Cards */}
+    <div>
+      <h3 className="text-xl font-medium mb-2 text-muted-foreground">Glass Cards</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Efecto glassmorphism para cards premium. Usa <code className="font-mono text-primary">.glass-card</code> para
+        modales y cards destacadas, y <code className="font-mono text-primary">.glass-card-subtle</code> para paneles secundarios.
+        Requiere fondo oscuro para apreciarse correctamente.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 rounded-xl bg-[hsl(240,8%,10%)] p-8">
+        <div className="glass-card p-6 space-y-2">
+          <p className="text-sm font-medium text-white">glass-card</p>
+          <p className="text-xs text-white/60">
+            Backdrop blur intenso + sombra de acento. Ideal para modales, formularios de auth y cards hero.
+          </p>
+        </div>
+        <div className="glass-card-subtle p-6 space-y-2">
+          <p className="text-sm font-medium text-white">glass-card-subtle</p>
+          <p className="text-xs text-white/60">
+            Blur y opacidad reducidos, sin sombra de color. Para paneles, sidebars y cards de dashboard en dark mode.
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+        <p><strong className="text-foreground">glass-card:</strong> <code className="font-mono text-foreground">backdrop-blur-2xl bg-white/[0.03] border-white/[0.08] shadow accent glow</code></p>
+        <p><strong className="text-foreground">glass-card-subtle:</strong> <code className="font-mono text-foreground">backdrop-blur-md bg-white/[0.02] border-white/[0.06] sin shadow</code></p>
+        <p><strong className="text-foreground">Regla:</strong> Solo usar sobre fondos oscuros. En light mode usar <code className="font-mono text-foreground">Card</code> estándar.</p>
+      </div>
+    </div>
+
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Reglas</h3>
       <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -95,6 +124,7 @@ export const CardsSection = () => (
         <li>No anidar Cards dentro de Cards</li>
         <li>Padding estándar: <code className="font-mono text-foreground">p-6</code> (ya incluido en los sub-componentes)</li>
         <li>KPI Cards: siempre asociar un color temático y aplicar el hover con gradiente correspondiente</li>
+        <li>Glass Cards: solo sobre fondos oscuros, usar <code className="font-mono text-foreground">.glass-card</code> o <code className="font-mono text-foreground">.glass-card-subtle</code></li>
       </ul>
     </div>
   </section>

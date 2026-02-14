@@ -108,7 +108,7 @@ const DashboardSidebar = () => {
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton tooltip="Creator Sales" className={isCreatorSalesActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}>
+                      <SidebarMenuButton tooltip="Creator Sales" className={`hover:bg-primary/10 hover:text-primary ${isCreatorSalesActive ? "bg-primary/15 text-primary font-medium" : ""}`}>
                         <TrendingUp className="h-4 w-4 shrink-0" />
                         <span>Creator Sales</span>
                       </SidebarMenuButton>
@@ -133,7 +133,7 @@ const DashboardSidebar = () => {
                 >
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Creator Sales">
+                      <SidebarMenuButton tooltip="Creator Sales" className="hover:bg-primary/10 hover:text-primary">
                         <TrendingUp className="h-4 w-4 shrink-0" />
                         <span>Creator Sales</span>
                         <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
@@ -146,6 +146,7 @@ const DashboardSidebar = () => {
                             <SidebarMenuSubButton
                               asChild
                               isActive={pathname === item.url}
+                              className="hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:text-primary"
                             >
                               <NavLink to={item.url}>{item.title}</NavLink>
                             </SidebarMenuSubButton>
