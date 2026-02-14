@@ -10,9 +10,23 @@ const sizeClasses = {
 interface LogoProps {
   size?: keyof typeof sizeClasses;
   className?: string;
+  collapsed?: boolean;
 }
 
-const Logo = ({ size = "lg", className }: LogoProps) => {
+const Logo = ({ size = "lg", className, collapsed }: LogoProps) => {
+  if (collapsed) {
+    return (
+      <h1
+        className={cn(
+          "font-bold tracking-tight select-none text-2xl",
+          className
+        )}
+      >
+        <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">M</span>
+      </h1>
+    );
+  }
+
   return (
     <h1
       className={cn(

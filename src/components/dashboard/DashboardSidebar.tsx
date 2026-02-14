@@ -15,7 +15,7 @@ import {
   Palette,
   FileText,
 } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
 import {
@@ -23,6 +23,12 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -65,6 +71,7 @@ const DashboardSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const isCreatorSalesActive = creatorSalesSubItems.some(
     (item) => pathname === item.url
@@ -73,7 +80,7 @@ const DashboardSidebar = () => {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-3">
-        <Logo size={collapsed ? "xs" : "sm"} />
+        <Logo size="sm" collapsed={collapsed} />
       </SidebarHeader>
 
       <SidebarContent>
@@ -97,34 +104,58 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               ))}
 
-              <Collapsible
-                defaultOpen={isCreatorSalesActive}
-                className="group/collapsible"
-              >
+              {collapsed ? (
                 <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip="Creator Sales">
-                      <TrendingUp className="h-4 w-4 shrink-0" />
-                      <span>Creator Sales</span>
-                      <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton tooltip="Creator Sales" className={isCreatorSalesActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""}>
+                        <TrendingUp className="h-4 w-4 shrink-0" />
+                        <span>Creator Sales</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
                       {creatorSalesSubItems.map((item) => (
-                        <SidebarMenuSubItem key={item.url}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={pathname === item.url}
-                          >
-                            <NavLink to={item.url}>{item.title}</NavLink>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
+                        <DropdownMenuItem
+                          key={item.url}
+                          onClick={() => navigate(item.url)}
+                          className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}
+                        >
+                          {item.title}
+                        </DropdownMenuItem>
                       ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </SidebarMenuItem>
-              </Collapsible>
+              ) : (
+                <Collapsible
+                  defaultOpen={isCreatorSalesActive}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip="Creator Sales">
+                        <TrendingUp className="h-4 w-4 shrink-0" />
+                        <span>Creator Sales</span>
+                        <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {creatorSalesSubItems.map((item) => (
+                          <SidebarMenuSubItem key={item.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathname === item.url}
+                            >
+                              <NavLink to={item.url}>{item.title}</NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
