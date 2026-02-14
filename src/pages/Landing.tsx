@@ -171,7 +171,7 @@ const Landing = () => {
               ¿Listo para escalar tu agencia?
             </h2>
             <p className="mb-8 text-white/60">
-              Únete a las agencias que ya optimizan sus operaciones con Clari.
+              Únete a las agencias que ya optimizan sus operaciones con Maven.
             </p>
             <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
               <Link to="/register">Comenzar ahora</Link>
@@ -203,7 +203,7 @@ const Landing = () => {
           </nav>
           <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} Clari. Todos los derechos reservados.
+            © {new Date().getFullYear()} Maven CRM. Todos los derechos reservados.
           </p>
         </div>
       </footer>
