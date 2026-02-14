@@ -1,62 +1,43 @@
 
 
-## 1. Topbar: Modo claro/oscuro antes de idiomas
+## 1. Eliminar dividers (border-b) de las barras internas en Promolog y LeadGen
 
-En `DashboardTopbar.tsx`, mover el boton de tema (Sun/Moon) antes del dropdown de idiomas (Globe). Actualmente el orden es: Globe > Sun/Moon > Bell > Avatar. El nuevo orden sera: Sun/Moon > Globe > Bell > Avatar.
+Actualmente tanto Promolog como LeadGen tienen multiples lineas `border-b` separando el tab bar y la barra de filtros del contenido. Otros modulos como Closers no usan estas lineas divisorias entre secciones internas, solo el header tiene `border-b`. Para mantener uniformidad:
 
-## 2. Promolog: Consolidar "Ver Agentes" y "Ver Campanas" dentro del tab bar
+**Promolog (`src/pages/promolog/PromologContent.tsx`):**
+- Linea 289: quitar `border-b` del tab bar
+- Linea 315: quitar `border-b` de la barra de filtros
+- Linea 329: quitar el `<Separator />` dentro del popover del calendario (este es un separador dentro de un componente de UI, se mantiene)
 
-Actualmente Promolog tiene:
-- Una **barra de acciones** suelta (lineas 382-447) con botones "Ver Agentes", "Ver Campanas", "Agregar Campana" y un date picker
-- Un **TabsList** separado mas abajo con pestanas "Tabla", "Calendario", "Campanas"
+**LeadGen (`src/pages/leadgen/LeadGenContent.tsx`):**
+- Linea 96: quitar `border-b` del contenedor de KPIs
+- Linea 104: quitar `border-b` del tab bar
+- Linea 129: quitar `border-b` de la barra de filtros
 
-Esto genera duplicacion ("Ver Campanas" y la tab "Campanas" son lo mismo) y desorganizacion.
+El unico `border-b` que se mantiene es el del header principal (ya que es el patron estandar en toda la plataforma).
 
-**Solucion**: Unificar todo en un unico tab bar al estilo LeadGen:
+## 2. Mover "Agregar Campana" al header, antes de "Agregar Entrada"
 
-```text
-Tab bar (border-b, inline-flex bg-muted/50):
-[Dashboard] [Agentes] [Campanas] [Calendario]          [+ Agregar Campana]
-```
-
-- "Dashboard" reemplaza la vista principal (KPIs + social cards + entradas)
-- "Agentes" reemplaza el boton "Ver Agentes"
-- "Campanas" consolida "Ver Campanas" y la tab duplicada
-- "Calendario" se mantiene
-- Eliminar los botones sueltos "Ver Agentes" y "Ver Campanas"
-- El boton "Agregar Campana" se mueve al lado derecho del tab bar (como "Base de Datos" en LeadGen)
-
-## 3. Promolog: Mover filtro de fecha a la barra de filtros
-
-El date picker (calendario de fecha) actualmente esta en la barra de acciones suelta. Se movera a la **barra de filtros** (la linea con buscador, estado, red social, etc.), siguiendo el patron de LeadGen que tiene el filtro de fecha en esa misma barra.
+Actualmente "Agregar Campana" esta en el lado derecho del tab bar. Se movera al header, colocandolo justo antes del boton "Agregar Entrada", ambos con `variant="outline"`. Esto sigue el patron de LeadGen que tiene multiples botones de accion en el header.
 
 ```text
-Filters bar (border-b, px-6 py-3):
-[Buscar...] [Fecha ▼] [Estado ▼] [Red Social ▼] [Categoria ▼]    [List] [Grid]
+Header:
+  Promolog                              [+ Agregar Campana] [+ Agregar Entrada]
+  Seguimiento promocional diario
 ```
-
-## 4. Uniformidad visual de tab bars en toda la plataforma
-
-El patron estandar (ya implementado en LeadGen) es:
-
-```text
-Tab bar: border-b px-6 py-2, contenedor inline-flex bg-muted/50 p-1 rounded-lg
-Botones: variant="secondary" (activo) / variant="ghost" (inactivo), size="sm", text-xs
-Sin dividers dentro del tab bar
-Color: usa los tokens de secondary (neutro), NO primary/accent
-Accion adicional: alineada a la derecha con variant="outline"
-```
-
-En Promolog se aplicara este mismo patron exacto. No se usan dividers entre tabs, no se usan colores violeta o azul para las tabs (solo secondary/ghost), manteniendo consistencia con LeadGen, Tickets y el resto de modulos.
 
 ## Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/dashboard/DashboardTopbar.tsx` | Reordenar: tema antes de idioma |
-| `src/pages/promolog/PromologContent.tsx` | Consolidar tab bar + mover fecha a filtros + uniformizar estilos |
+| `src/pages/promolog/PromologContent.tsx` | Quitar border-b de tab bar y filtros; mover boton "Agregar Campana" al header |
+| `src/pages/leadgen/LeadGenContent.tsx` | Quitar border-b de KPIs, tab bar y filtros |
 
-## Detalle tecnico del tab bar unificado en Promolog
+## Detalle tecnico
 
-Se reemplazara el sistema actual de `view === "dashboard" | "agentes"` + `Tabs` por un unico estado `activeTab` con valores: "dashboard", "agentes", "campanas", "calendario". El tab bar usara botones con el patron `inline-flex bg-muted/50 p-1 rounded-lg` identico a LeadGen. Los filtros inline (buscador, estado, red social, categoria, view toggle) se mostraran condicionalmente segun la tab activa (solo en "dashboard").
+En Promolog:
+- El boton "Agregar Campana" se elimina de la linea 307-310 (dentro del tab bar) y se agrega en el header (linea 281) como un segundo boton antes de "Agregar Entrada"
+- Se eliminan las clases `border-b` de los divs en lineas 289 y 315
 
+En LeadGen:
+- Se eliminan las clases `border-b` de los divs en lineas 96, 104 y 129
