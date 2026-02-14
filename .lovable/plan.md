@@ -1,59 +1,62 @@
 
 
-## Formas ondulantes animadas para el fondo Auth
+## Animaciones hover en cards del Dashboard y colores de acento en el Sidebar
 
-### Objetivo
-Agregar curvas/ondas SVG animadas con efecto de flujo que se muevan sutilmente por el fondo, creando una sensacion premium y tech. Inspirado en la referencia de ondas fluidas con particulas, pero adaptado a la paleta azul-violeta existente.
+### 1. Cards del Dashboard - Animaciones hover mejoradas
 
-### Nuevo componente: `src/components/auth/AnimatedWaves.tsx`
+#### KPI Cards (ya tienen hover con scale y gradiente - se mantienen)
+Las 5 KPI cards superiores ya tienen animaciones hover avanzadas. No se modifican.
 
-Crear un componente con 2-3 curvas SVG tipo onda que se animan con movimiento lento y continuo. Cada onda tendra:
-- Path SVG con curvas bezier suaves
-- Gradiente lineal azul-violeta con opacidad baja
-- Animacion CSS de desplazamiento horizontal lento (30-40s por ciclo)
-- Efecto de brillo sutil en los bordes (stroke con gradiente semi-transparente)
+#### Cards de graficos y contenido (Row 2 y Row 3) - NUEVAS animaciones
+Las 6 cards de contenido (Rendimiento Semanal, Actividad Reciente, Pipeline, Top 5, Deals Semanales) actualmente no tienen hover. Se agregara:
+- Transicion suave de borde: `hover:border-primary/30` (o color semantico correspondiente)
+- Elevacion sutil sin sombra: `hover:translate-y-[-2px]` con `transition-all duration-300`
 
-Estructura de cada onda:
-```text
-SVG fullscreen (viewBox responsive)
-  defs: linearGradient azul-violeta
-  path: curva bezier con fill gradiente (opacity 0.06-0.12)
-  path: misma curva con stroke gradiente para borde luminoso (opacity 0.15-0.25)
-```
+#### Cards operacionales (Row 4) - NUEVAS animaciones
+Las 3 cards con borde superior de color (Customer Service, Closers, Scripts) recibiran:
+- `hover:translate-y-[-2px]` para efecto de elevacion
+- Fondo con gradiente sutil del color correspondiente: `hover:bg-gradient-to-b hover:from-[color]/5 hover:to-transparent`
+- `transition-all duration-300`
 
-Animaciones (3 ondas con distintos timings):
-- Onda 1: movimiento horizontal + vertical sutil, 35s ciclo
-- Onda 2: movimiento inverso, 28s ciclo  
-- Onda 3: mas pequena y rapida, 22s ciclo
+Mapeo de colores por card operacional:
+| Card | Color del borde | Hover gradient |
+|------|----------------|----------------|
+| Customer Service | destructive | `hover:from-destructive/5` |
+| Closers | primary | `hover:from-primary/5` |
+| Scripts & Tools | accent | `hover:from-accent/5` |
 
-### Keyframes en `src/index.css`
+### 2. Sidebar - Colores de acento diferenciados
 
-Agregar 3 nuevos keyframes para el movimiento ondulante:
-```text
-wave-drift-1: translateX(-5%) a translateX(5%) con rotacion sutil
-wave-drift-2: translateX(5%) a translateX(-5%) (inverso)
-wave-drift-3: translateY(-3%) a translateY(3%) con escala sutil
-```
+Actualmente todos los items del sidebar usan el mismo `hover:bg-sidebar-accent` gris. Se diferenciaran por grupo usando colores del sistema:
 
-### Integracion en `src/components/auth/AuthLayout.tsx`
+#### Grupo "Menu" (items principales)
+- Hover: `hover:bg-primary/10 hover:text-primary`
+- Activo: `bg-primary/15 text-primary border-l-2 border-l-primary font-medium`
 
-Importar y agregar `AnimatedWaves` despues de `AnimatedGradientBackground`, antes del contenido z-10. Las ondas estaran en z-[1] para quedar entre los blobs difusos y el contenido.
+#### Grupo "Operaciones"
+- Hover: `hover:bg-accent/10 hover:text-accent`
+- Activo: `bg-accent/15 text-accent border-l-2 border-l-accent font-medium`
 
-### Detalle tecnico de las ondas
+#### Grupo "Recursos"
+- Hover: `hover:bg-muted hover:text-foreground` (mantener neutro)
+- Activo: `bg-muted text-foreground font-medium`
 
-Las formas SVG seran curvas bezier amplias que cruzan la pantalla diagonalmente, simulando ondas de flujo. Cada una tendra:
-- `fill` con gradiente de `hsl(271,91%,50%)` a `hsl(211,100%,50%)` a muy baja opacidad (0.06-0.12)
-- `stroke` con gradiente similar pero mas brillante (0.2-0.3) y stroke-width fino (1-1.5px) para simular el efecto de borde luminoso de la referencia
-- `filter: blur(1px)` en el fill para suavizar bordes
+Esto crea una jerarquia visual clara: azul para navegacion principal, violeta para operaciones, neutro para recursos.
 
-### Archivos a modificar/crear
+### Archivos a modificar
 
-| Archivo | Accion |
+| Archivo | Cambio |
 |---------|--------|
-| `src/components/auth/AnimatedWaves.tsx` | Crear - componente con 3 ondas SVG animadas |
-| `src/index.css` | Agregar 3 keyframes de wave-drift |
-| `src/components/auth/AuthLayout.tsx` | Importar y renderizar AnimatedWaves |
+| `src/components/dashboard/DashboardContent.tsx` | Agregar clases hover a las 9 cards de contenido y operacionales |
+| `src/components/dashboard/DashboardSidebar.tsx` | Diferenciar colores hover/active por grupo de navegacion |
 
-### Resultado esperado
-Fondo negro con blobs difusos azul-violeta (existentes) + ondas fluidas sutiles con bordes luminosos que se mueven lentamente, creando profundidad y una estetica premium/tech sin sobrecargar visualmente.
+### Detalles tecnicos
+
+En `DashboardContent.tsx`:
+- Cards Row 2-3: agregar `className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30"` (variando color por card)
+- Cards Row 4: agregar hover gradient al className existente, ej: `"border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent"`
+
+En `DashboardSidebar.tsx`:
+- Reemplazar las clases `hover:bg-sidebar-accent hover:text-sidebar-accent-foreground` y `activeClassName` por las variantes coloreadas segun el grupo
+- Para el submenu "Creator Sales", mantener el color primary heredado del grupo Menu
 
