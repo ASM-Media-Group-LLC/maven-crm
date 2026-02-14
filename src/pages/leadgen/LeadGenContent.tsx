@@ -93,7 +93,7 @@ const LeadGenContent = () => {
       {/* Scrollable content: KPIs + tabs + filters + tab content */}
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
-        <div className="px-6 py-4 border-b">
+        <div className="px-6 py-4">
           <div className="grid grid-cols-2 gap-6">
             <LeadGenCantidadCard />
             <LeadGenEstadosCard />
@@ -101,7 +101,7 @@ const LeadGenContent = () => {
         </div>
 
         {/* Tab bar */}
-        <div className="border-b px-6 py-2 flex items-center justify-between gap-4">
+        <div className="px-6 py-2 flex items-center justify-between gap-4">
           <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -126,7 +126,7 @@ const LeadGenContent = () => {
         </div>
 
         {/* Filters bar */}
-        <div className="border-b px-6 py-3 flex items-center gap-3">
+        <div className="px-6 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" || activeTab === "leads-hora" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />

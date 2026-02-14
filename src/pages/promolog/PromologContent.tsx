@@ -278,15 +278,21 @@ const PromologContent = () => {
             <h1 className="text-2xl font-bold">Promolog</h1>
             <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
           </div>
-          <Button variant="outline" onClick={() => { /* open entry modal */ }}>
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Entrada
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setCampaignModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Campaña
+            </Button>
+            <Button variant="outline" onClick={() => { /* open entry modal */ }}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Entrada
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Tab bar */}
-      <div className="border-b px-6 py-2 flex items-center justify-between gap-4 shrink-0">
+      <div className="px-6 py-2 flex items-center gap-4 shrink-0">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           {tabItems.map((tab) => {
             const Icon = tab.icon;
@@ -304,15 +310,11 @@ const PromologContent = () => {
             );
           })}
         </div>
-        <Button variant="outline" size="sm" onClick={() => setCampaignModalOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Agregar Campaña
-        </Button>
       </div>
 
       {/* Filters bar - visible on dashboard tab */}
       {activeTab === "dashboard" && (
-        <div className="border-b px-6 py-3 flex items-center gap-3 shrink-0">
+        <div className="px-6 py-3 flex items-center gap-3 shrink-0">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
