@@ -11,7 +11,7 @@ const AnimatedGradientBackground = () => {
           left: "-10%",
           background: "hsl(0, 84%, 60%)",
           filter: "blur(100px)",
-          opacity: 0.4,
+          opacity: 0.5,
           animation: "blob-move-1 12s ease-in-out infinite alternate",
         }}
       />
@@ -25,7 +25,7 @@ const AnimatedGradientBackground = () => {
           left: "25%",
           background: "hsl(211, 100%, 50%)",
           filter: "blur(120px)",
-          opacity: 0.35,
+          opacity: 0.45,
           animation: "blob-move-2 10s ease-in-out infinite alternate",
         }}
       />
