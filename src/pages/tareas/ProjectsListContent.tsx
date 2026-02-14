@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,9 +37,9 @@ const ProjectsListContent = () => {
   }, 0);
 
   const kpis = [
-    { label: "Total Proyectos", value: projects.length, icon: FolderOpen, color: "text-primary" },
-    { label: "Proyectos Activos", value: projects.filter((p) => p.status === "active").length, icon: Clock, color: "text-primary" },
-    { label: "Tareas Pendientes", value: totalPending, icon: AlertTriangle, color: "text-warning" },
+    { label: "Total Proyectos", value: projects.length, icon: FolderOpen, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "Proyectos Activos", value: projects.filter((p) => p.status === "active").length, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "Tareas Pendientes", value: totalPending, icon: AlertTriangle, color: "text-warning", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
   ];
 
   return (
@@ -46,8 +47,8 @@ const ProjectsListContent = () => {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Proyectos</h1>
-            <p className="text-sm text-muted-foreground">Gestión de proyectos y tareas</p>
+            <h1 className="text-2xl font-bold">Tareas</h1>
+            <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
           <Button variant="outline" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo Proyecto
@@ -58,7 +59,7 @@ const ProjectsListContent = () => {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {kpis.map((kpi) => (
-            <Card key={kpi.label}>
+            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
               <CardContent className="flex items-center gap-3 p-4">
                 <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
                 <div>

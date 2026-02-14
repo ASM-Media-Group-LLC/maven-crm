@@ -8,11 +8,12 @@ interface DashboardMetricCardProps {
   icon: LucideIcon;
   subtitle?: string;
   valueColor?: string;
+  hoverClass?: string;
 }
 
-const DashboardMetricCard = ({ label, value, icon: MetricIcon, subtitle, valueColor }: DashboardMetricCardProps) => {
+const DashboardMetricCard = ({ label, value, icon: MetricIcon, subtitle, valueColor, hoverClass }: DashboardMetricCardProps) => {
   return (
-    <Card>
+    <Card className={cn("transition-all duration-200 cursor-default", hoverClass)}>
       <CardContent className="flex items-start gap-4 p-5">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
           <MetricIcon className="h-5 w-5 text-muted-foreground" />

@@ -152,6 +152,7 @@ const DashboardContent = () => {
       icon: Users,
       valueColor: "text-primary",
       subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
     },
     {
       label: "Active Tickets",
@@ -159,6 +160,7 @@ const DashboardContent = () => {
       icon: Ticket,
       valueColor: "text-destructive",
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40",
     },
     {
       label: "Promotion Compliance",
@@ -166,6 +168,7 @@ const DashboardContent = () => {
       icon: CalendarCheck,
       valueColor: "text-warning",
       subtitle: "Weekly average",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40",
     },
     {
       label: "New Leads Today",
@@ -173,6 +176,7 @@ const DashboardContent = () => {
       icon: MessageSquare,
       valueColor: "text-accent",
       subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
     },
     {
       label: "Deals in Progress",
@@ -180,6 +184,7 @@ const DashboardContent = () => {
       icon: Phone,
       valueColor: "text-success",
       subtitle: leadsLoading ? "" : `${leadsData?.closedCount ?? 0} cerrados`,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40",
     },
   ];
 
