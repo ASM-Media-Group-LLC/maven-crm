@@ -36,7 +36,7 @@ const Logo = ({ size = "lg", className, collapsed }: LogoProps) => {
       )}
     >
       <span className="bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Maven</span>
-      <span className="text-muted-foreground font-light">CRM</span>
+      <span className="text-white/50 font-light">CRM</span>
     </h1>
   );
 };
