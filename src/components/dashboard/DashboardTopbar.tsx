@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, Sun, Moon, LogOut, KeyRound, Languages } from "lucide-react";
+import { Bell, Search, Sun, Moon, LogOut, KeyRound, Globe, Check } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -21,7 +21,7 @@ const DashboardTopbar = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const { t, language, toggleLanguage } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -58,16 +58,24 @@ const DashboardTopbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Language toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground"
-            onClick={toggleLanguage}
-            title={language === "es" ? "Switch to English" : "Cambiar a Español"}
-          >
-            <Languages className="h-5 w-5" />
-          </Button>
+          {/* Language dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground">
+                <Globe className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => setLanguage("es")} className="flex items-center justify-between">
+                Español
+                {language === "es" && <Check className="h-4 w-4 text-primary" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setLanguage("en")} className="flex items-center justify-between">
+                English
+                {language === "en" && <Check className="h-4 w-4 text-primary" />}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {mounted && (
             <Button
