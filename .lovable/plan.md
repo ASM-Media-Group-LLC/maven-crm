@@ -1,70 +1,85 @@
 
 
-## Fix Creator Sales hover + Glass Effect system-wide + Documentacion en Design System
+## Fix Sidebar Hovers + Glass Effect + Topbar Account & Notifications
 
-### Problema 1: Creator Sales sin hover azul
+### 1. Sidebar: Fix Recursos y Settings hover + Glass effect
 
-El `CollapsibleTrigger` y el `DropdownMenuTrigger` de "Creator Sales" usan `SidebarMenuButton` sin clases custom de hover. Esto hace que hereden el estilo base gris (`hover:bg-sidebar-accent`) del componente sidebar en lugar del azul (`hover:bg-primary/10`) que tienen los demas items del grupo Menu.
+**Problema**: Los items de "Recursos" (Design System, Documentacion) y "Settings" usan `hover:bg-muted hover:text-foreground` que es practicamente invisible en dark mode.
 
-**Solucion**: Agregar `className` con las clases de hover azul al `SidebarMenuButton` de Creator Sales, tanto en la version colapsada (dropdown) como expandida (collapsible). Tambien aplicar hover azul a los sub-items.
+**Solucion**: Reemplazar el hover neutro por un efecto glass con gradiente violeta-azul. Se creara una clase CSS `.sidebar-glass-hover` en `src/index.css` que aplique:
+- `backdrop-blur-md`
+- Fondo con gradiente sutil de primary a accent (azul a violeta) con opacidad baja
+- Borde semi-transparente
+- Transicion suave
 
-**Archivo**: `src/components/dashboard/DashboardSidebar.tsx`
-
-Cambios especificos:
-- Linea 111: Agregar `hover:bg-primary/10 hover:text-primary` al SidebarMenuButton del dropdown
-- Linea 136: Agregar `hover:bg-primary/10 hover:text-primary` al SidebarMenuButton del collapsible trigger
-- Lineas 146-150: Agregar hover azul a los SidebarMenuSubButton items
-
----
-
-### Problema 2: Glass Effect como utilidad reutilizable
-
-El efecto glass existe en `AuthLayout.tsx` (linea 20) como clases inline:
-```
-backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-2xl shadow-[0_0_80px_-20px_hsl(271,91%,50%,0.3)]
+```text
+.sidebar-glass-hover:hover {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.08));
+  backdrop-filter: blur(12px);
+  border-color: hsl(0 0% 100% / 0.06);
+}
 ```
 
-Se creara una clase CSS reutilizable `.glass-card` en `src/index.css` y una variante mas ligera `.glass-card-subtle` para uso en el dashboard.
+Estado activo para Recursos/Settings:
+```text
+.sidebar-glass-active {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--accent) / 0.12));
+  border-left: 2px solid hsl(var(--accent));
+  color: hsl(var(--accent));
+}
+```
 
-**Archivo**: `src/index.css`
+**Archivo**: `src/index.css` - agregar las 2 clases utilitarias
+**Archivo**: `src/components/dashboard/DashboardSidebar.tsx` - aplicar las nuevas clases a Recursos y Settings
 
-Nuevas clases utilitarias:
-| Clase | Uso | Propiedades |
-|-------|-----|-------------|
-| `.glass-card` | Modales, cards destacadas | `backdrop-blur-2xl`, `bg-white/[0.03]`, `border border-white/[0.08]`, sombra violeta |
-| `.glass-card-subtle` | Cards de dashboard, paneles | `backdrop-blur-md`, `bg-white/[0.02]`, `border border-white/[0.06]`, sin sombra de color |
+### 2. Topbar: Notificaciones funcionales
 
----
+Habilitar el boton de notificaciones (quitar `disabled`) y agregar un popover/dropdown con estado vacio ("Sin notificaciones nuevas") como placeholder funcional con un badge de conteo.
 
-### Problema 3: Documentar en Design System
+### 3. Topbar: Cuenta de usuario con avatar, nombre y correo
 
-Agregar una seccion "Glass Cards & Effects" dentro de la seccion de Cards del design system.
+Reemplazar el avatar suelto + boton logout por un componente de cuenta completo:
+- Avatar con iniciales (ya existe)
+- Nombre del usuario (`user.user_metadata.full_name` o "Usuario")
+- Email del usuario (`user.email`)
+- Al hacer click se abre un `DropdownMenu` con:
+  - Header: Avatar + nombre + email
+  - Separador
+  - Opcion "Cambiar contrasena" (abre modal con formulario)
+  - Opcion "Cerrar sesion" (ejecuta signOut existente)
+- Eliminar el boton LogOut suelto (se mueve dentro del dropdown)
 
-**Archivo**: `src/pages/design-system/sections/CardsSection.tsx`
+### 4. Modal de cambio de contrasena
 
-Agregar al final de la seccion:
-- Titulo "Glass Cards"
-- Descripcion del patron
-- 2-3 ejemplos visuales (glass-card y glass-card-subtle) con fondo oscuro para que se aprecie el efecto
-- Codigo de referencia con las clases CSS
-- Reglas de uso (cuando usar glass vs card normal)
+Crear un `Dialog` simple con:
+- Input de nueva contrasena (con toggle de visibilidad)
+- Input de confirmar contrasena
+- Boton "Actualizar contrasena" que llama a `supabase.auth.updateUser({ password })`
+- Validacion de que ambas contrasenas coincidan
+- Toast de confirmacion
 
-Tambien agregar documentacion de las animaciones hover de cards en la seccion de GlobalStatesSection.
-
-**Archivo**: `src/pages/design-system/sections/GlobalStatesSection.tsx`
-
-Agregar:
-- Seccion "Card Hover Animations" con los patrones documentados (translate-y, gradient hover, border-color transitions)
-- Referencia a las animaciones wave del auth
-
----
-
-### Resumen de archivos
+### Archivos a modificar/crear
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/dashboard/DashboardSidebar.tsx` | Agregar hover azul a Creator Sales (trigger + sub-items) |
-| `src/index.css` | Crear clases `.glass-card` y `.glass-card-subtle` |
-| `src/pages/design-system/sections/CardsSection.tsx` | Documentar Glass Cards con ejemplos visuales |
-| `src/pages/design-system/sections/GlobalStatesSection.tsx` | Documentar patrones de hover animado en cards |
+| `src/index.css` | Agregar `.sidebar-glass-hover` y `.sidebar-glass-active` |
+| `src/components/dashboard/DashboardSidebar.tsx` | Aplicar glass hover a Recursos y Settings |
+| `src/components/dashboard/DashboardTopbar.tsx` | Redisenar zona de cuenta con dropdown + notificaciones activas |
+| `src/components/dashboard/ChangePasswordModal.tsx` | Crear - modal para cambiar contrasena |
+
+### Estructura del Topbar rediseñado
+
+```text
+[SidebarTrigger] [---- Search ----] [ThemeToggle] [Bell+Badge] [Avatar + Nombre ▼]
+                                                                     |
+                                                              DropdownMenu:
+                                                              ┌──────────────────┐
+                                                              │ Avatar           │
+                                                              │ Nombre completo  │
+                                                              │ email@correo.com │
+                                                              ├──────────────────┤
+                                                              │ Cambiar password │
+                                                              │ Cerrar sesion    │
+                                                              └──────────────────┘
+```
 
