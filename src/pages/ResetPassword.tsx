@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Logo from "@/components/Logo";
 import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -116,41 +115,38 @@ const ResetPassword = () => {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex flex-col items-center gap-4 lg:items-start">
-          <Link to="/" className="lg:hidden">
-            <Logo size="sm" />
-          </Link>
-          <h2 className="text-2xl font-bold">Restablecer contraseña</h2>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Restablecer contraseña</h2>
         </div>
 
         {!recoveryReady ? (
-          <div className="rounded-lg border border-border bg-card p-6 space-y-4 text-center">
-            <p className="text-sm text-destructive font-medium">El enlace es inválido o ha expirado.</p>
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-red-400 font-medium">El enlace es inválido o ha expirado.</p>
+            <p className="text-sm text-white/50">
               Solicita un nuevo enlace de recuperación para restablecer tu contraseña.
             </p>
             <Link to="/forgot-password">
-              <Button variant="outline" className="w-full mt-2">Solicitar nuevo enlace</Button>
+              <Button variant="outline" className="w-full mt-2 border-white/10 text-white hover:bg-white/10">Solicitar nuevo enlace</Button>
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="password">Nueva contraseña</Label>
+              <Label htmlFor="password" className="text-white/70">Nueva contraseña</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-10" />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
+                <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm">Confirmar contraseña</Label>
+              <Label htmlFor="confirm" className="text-white/70">Confirmar contraseña</Label>
               <div className="relative">
-                <Input id="confirm" type={showConfirm ? "text" : "password"} placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" className="pr-10" />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
+                <Input id="confirm" type={showConfirm ? "text" : "password"} placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" className="pr-10 bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white/50 hover:text-white hover:bg-white/10" onClick={() => setShowConfirm(!showConfirm)} tabIndex={-1}>
                   {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
@@ -171,7 +167,7 @@ const ResetPassword = () => {
         )}
 
         <div className="flex flex-col items-center gap-2 text-sm">
-          <Link to="/login" className="inline-flex items-center gap-2 text-primary hover:underline">
+          <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
             <ArrowLeft className="h-4 w-4" />
             Volver a iniciar sesión
           </Link>
