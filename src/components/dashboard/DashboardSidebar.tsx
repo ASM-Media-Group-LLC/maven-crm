@@ -12,6 +12,7 @@ import {
   CheckSquare,
   Phone,
   Ticket,
+  Palette,
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -179,6 +180,26 @@ const DashboardSidebar = () => {
                   >
                     <Ticket className="h-4 w-4 shrink-0" />
                     <span>Tickets</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Recursos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Design System">
+                  <NavLink
+                    to="/design-system"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  >
+                    <Palette className="h-4 w-4 shrink-0" />
+                    <span>Design System</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
