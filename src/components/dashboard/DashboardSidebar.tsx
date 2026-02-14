@@ -228,8 +228,8 @@ const DashboardSidebar = () => {
                 <SidebarMenuButton asChild tooltip="Design System">
                   <NavLink
                     to="/design-system"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted hover:text-foreground"
-                    activeClassName="bg-muted text-foreground font-medium"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
+                    activeClassName="sidebar-glass-active font-medium"
                   >
                     <Palette className="h-4 w-4 shrink-0" />
                     <span>Design System</span>
@@ -240,8 +240,8 @@ const DashboardSidebar = () => {
                 <SidebarMenuButton asChild tooltip="Documentacion">
                   <NavLink
                     to="/docs"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted hover:text-foreground"
-                    activeClassName="bg-muted text-foreground font-medium"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
+                    activeClassName="sidebar-glass-active font-medium"
                   >
                     <FileText className="h-4 w-4 shrink-0" />
                     <span>Documentacion</span>
@@ -262,8 +262,8 @@ const DashboardSidebar = () => {
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink
                       to={item.url}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted hover:text-foreground"
-                      activeClassName="bg-muted text-foreground font-medium"
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
+                      activeClassName="sidebar-glass-active font-medium"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>

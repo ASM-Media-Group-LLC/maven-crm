@@ -153,6 +153,22 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   border-color: hsl(0 0% 100% / 0.06);
 }
 
+/* Sidebar glass hover effect */
+.sidebar-glass-hover {
+  @apply transition-all duration-200 border border-transparent;
+}
+.sidebar-glass-hover:hover {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.08));
+  backdrop-filter: blur(12px);
+  border-color: hsl(0 0% 100% / 0.06);
+}
+
+.sidebar-glass-active {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--accent) / 0.12)) !important;
+  border-left: 2px solid hsl(var(--accent));
+  color: hsl(var(--accent));
+}
+
 /* Auth animated gradient blobs */
 @keyframes blob-move-1 {
   0% { transform: translate(0, 0) scale(1); }
