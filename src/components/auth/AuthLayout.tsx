@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Logo from "@/components/Logo";
 import AnimatedGradientBackground from "./AnimatedGradientBackground";
+import AnimatedWaves from "./AnimatedWaves";
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -10,6 +11,7 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
   return (
     <div className="min-h-screen relative overflow-hidden bg-[hsl(240,10%,2%)]">
       <AnimatedGradientBackground />
+      <AnimatedWaves />
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
         <Logo size="md" />
         <p className="text-white/60 mt-2 mb-8 text-sm font-light tracking-wide text-center max-w-xs">
