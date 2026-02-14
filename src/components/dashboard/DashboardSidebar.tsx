@@ -1,81 +1,55 @@
 import {
-  LayoutDashboard,
-  Users,
-  UserPlus,
-  Settings,
-  TrendingUp,
-  ChevronRight,
-  Bot,
-  CalendarDays,
-  Activity,
-  Megaphone,
-  CheckSquare,
-  Phone,
-  Ticket,
-  Palette,
-  FileText,
+  LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
+  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
-  SidebarFooter,
-  SidebarSeparator,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub,
+  SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
 } from "@/components/ui/sidebar";
+import { useLanguage } from "@/hooks/useLanguage";
 
-const mainMenu = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Contactos", url: "/contactos", icon: UserPlus },
-  { title: "Tareas", url: "/tareas", icon: CheckSquare },
-  { title: "Creadores", url: "/creadores", icon: Users },
-  { title: "Eventos", url: "/eventos", icon: CalendarDays },
-];
-
-const secondaryMenu = [
-  { title: "Settings", url: "/dashboard/settings", icon: Settings },
-];
-
-const creatorSalesSubItems = [
-  { title: "Dashboard", url: "/sales-overview" },
-  { title: "Sales Report", url: "/salesdashboard" },
-  { title: "Sale Report v.1", url: "/salesperformancecreator" },
-  { title: "AI Sales", url: "/aisales", icon: Bot },
-  { title: "AI Config", url: "/ai-sales-config" },
-];
+const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover";
+const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 
 const DashboardSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
-  const isCreatorSalesActive = creatorSalesSubItems.some(
-    (item) => pathname === item.url
-  );
+  const mainMenu = [
+    { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("nav.contacts"), url: "/contactos", icon: UserPlus },
+    { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare },
+    { title: t("nav.creators"), url: "/creadores", icon: Users },
+    { title: t("nav.events"), url: "/eventos", icon: CalendarDays },
+  ];
+
+  const creatorSalesSubItems = [
+    { title: "Dashboard", url: "/sales-overview" },
+    { title: t("nav.salesReport"), url: "/salesdashboard" },
+    { title: t("nav.salesReportV1"), url: "/salesperformancecreator" },
+    { title: t("nav.aiSales"), url: "/aisales", icon: Bot },
+    { title: t("nav.aiConfig"), url: "/ai-sales-config" },
+  ];
+
+  const operationsMenu = [
+    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: 97 },
+    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity },
+    { title: t("nav.closers"), url: "/closers", icon: Phone },
+    { title: t("nav.tickets"), url: "/tickets", icon: Ticket },
+  ];
+
+  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url);
 
   return (
     <Sidebar collapsible="icon">
@@ -85,18 +59,13 @@ const DashboardSidebar = () => {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("sidebar.menu")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainMenu.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/dashboard"}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary"
-                      activeClassName="bg-primary/15 text-primary border-l-2 border-l-primary font-medium"
-                    >
+                    <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                     </NavLink>
@@ -108,18 +77,14 @@ const DashboardSidebar = () => {
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton tooltip="Creator Sales" className={`hover:bg-primary/10 hover:text-primary ${isCreatorSalesActive ? "bg-primary/15 text-primary font-medium" : ""}`}>
+                      <SidebarMenuButton tooltip={t("nav.creatorSales")} className={`sidebar-glass-hover ${isCreatorSalesActive ? "sidebar-glass-active font-medium" : ""}`}>
                         <TrendingUp className="h-4 w-4 shrink-0" />
-                        <span>Creator Sales</span>
+                        <span>{t("nav.creatorSales")}</span>
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
                       {creatorSalesSubItems.map((item) => (
-                        <DropdownMenuItem
-                          key={item.url}
-                          onClick={() => navigate(item.url)}
-                          className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}
-                        >
+                        <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
                           {item.title}
                         </DropdownMenuItem>
                       ))}
@@ -127,15 +92,12 @@ const DashboardSidebar = () => {
                   </DropdownMenu>
                 </SidebarMenuItem>
               ) : (
-                <Collapsible
-                  defaultOpen={isCreatorSalesActive}
-                  className="group/collapsible"
-                >
+                <Collapsible defaultOpen={isCreatorSalesActive} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Creator Sales" className="hover:bg-primary/10 hover:text-primary">
+                      <SidebarMenuButton tooltip={t("nav.creatorSales")} className="sidebar-glass-hover">
                         <TrendingUp className="h-4 w-4 shrink-0" />
-                        <span>Creator Sales</span>
+                        <span>{t("nav.creatorSales")}</span>
                         <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
@@ -143,11 +105,7 @@ const DashboardSidebar = () => {
                       <SidebarMenuSub>
                         {creatorSalesSubItems.map((item) => (
                           <SidebarMenuSubItem key={item.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === item.url}
-                              className="hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/15 data-[active=true]:text-primary"
-                            >
+                            <SidebarMenuSubButton asChild isActive={pathname === item.url} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
                               <NavLink to={item.url}>{item.title}</NavLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -162,89 +120,45 @@ const DashboardSidebar = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Operaciones</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("sidebar.operations")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Promolog">
-                  <NavLink
-                    to="/promolog"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent/10 hover:text-accent"
-                    activeClassName="bg-accent/15 text-accent border-l-2 border-l-accent font-medium"
-                  >
-                    <Megaphone className="h-4 w-4 shrink-0" />
-                    <span>Promolog</span>
-                    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
-                      97
-                    </span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="LeadGen">
-                  <NavLink
-                    to="/leadgen"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent/10 hover:text-accent"
-                    activeClassName="bg-accent/15 text-accent border-l-2 border-l-accent font-medium"
-                  >
-                    <Activity className="h-4 w-4 shrink-0" />
-                    <span>LeadGen</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Closers">
-                  <NavLink
-                    to="/closers"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent/10 hover:text-accent"
-                    activeClassName="bg-accent/15 text-accent border-l-2 border-l-accent font-medium"
-                  >
-                    <Phone className="h-4 w-4 shrink-0" />
-                    <span>Closers</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Tickets">
-                  <NavLink
-                    to="/tickets"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent/10 hover:text-accent"
-                    activeClassName="bg-accent/15 text-accent border-l-2 border-l-accent font-medium"
-                  >
-                    <Ticket className="h-4 w-4 shrink-0" />
-                    <span>Tickets</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {operationsMenu.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    <NavLink to={item.url} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.title}</span>
+                      {"badge" in item && item.badge != null && (
+                        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
+                          {item.badge}
+                        </span>
+                      )}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Recursos</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("sidebar.resources")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Design System">
-                  <NavLink
-                    to="/design-system"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
-                    activeClassName="sidebar-glass-active font-medium"
-                  >
+                <SidebarMenuButton asChild tooltip={t("nav.designSystem")}>
+                  <NavLink to="/design-system" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                     <Palette className="h-4 w-4 shrink-0" />
-                    <span>Design System</span>
+                    <span>{t("nav.designSystem")}</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Documentacion">
-                  <NavLink
-                    to="/docs"
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
-                    activeClassName="sidebar-glass-active font-medium"
-                  >
+                <SidebarMenuButton asChild tooltip={t("nav.docs")}>
+                  <NavLink to="/docs" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                     <FileText className="h-4 w-4 shrink-0" />
-                    <span>Documentacion</span>
+                    <span>{t("nav.docs")}</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -257,20 +171,14 @@ const DashboardSidebar = () => {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {secondaryMenu.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink
-                      to={item.url}
-                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover"
-                      activeClassName="sidebar-glass-active font-medium"
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip={t("nav.settings")}>
+                  <NavLink to="/dashboard/settings" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                    <Settings className="h-4 w-4 shrink-0" />
+                    <span>{t("nav.settings")}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
