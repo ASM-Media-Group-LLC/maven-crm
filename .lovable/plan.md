@@ -1,54 +1,48 @@
 
-## Aplicar Sticky Headers a todas las tablas del sistema
+## Estandarización de Tipografía en Encabezados de Tabla
 
-He verificado todas las tablas principales del sistema. La mayoría ya implementa el patrón de encabezados fijos, pero algunas tablas secundarias o modales aún no lo tienen. Este plan detalla la estandarización de estas tablas restantes.
+### Problema
+El usuario notó que la palabra "Acciones" en la tabla de Promolog se ve más grande que otros títulos. Esto ocurre porque algunos títulos (los que permiten ordenar) usan explícitamente `text-xs` a través de un botón, mientras que otros heredan el tamaño por defecto `text-sm` del componente `TableHead`.
 
-### Estrategia de estandarización
+### Solución
+Estandarizar todos los encabezados de tabla de todo el sistema para que utilicen consistentemente `text-xs`. Esto no solo resuelve el problema visual en Promolog, sino que mejora la consistencia y el aspecto profesional de todos los paneles de datos de la aplicación.
 
-Para que el encabezado sea fijo (`sticky top-0`), se requiere:
-1.  **Contenedor con scroll**: El elemento `Table` debe estar envuelto en un `div` con `overflow-auto` y una altura máxima (`max-h`).
-2.  **Clases de TableHeader**: El componente `TableHeader` debe tener las clases `sticky top-0 z-10 bg-card` para que se mantenga visible y opaco sobre el contenido que hace scroll.
+### Pasos de implementación
 
-### Tablas a actualizar
+#### 1. Actualización Global del Componente TableHead
+Modificar `src/components/ui/table.tsx` para que todos los `TableHead` utilicen `text-xs` por defecto.
+- Añadir `text-xs` a la clase del componente `TableHead`.
 
-#### 1. Tabla de Tareas (`src/pages/tareas/TasksTable.tsx`)
-Actualmente tiene un borde simple sin límite de altura.
-- Añadir contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`.
-- Añadir clases sticky al `TableHeader`.
+#### 2. Actualización de Botones de Ordenación (SortHeaders)
+Asegurar que los botones utilizados para ordenar columnas también utilicen `text-xs`. Actualmente, algunos lo tienen y otros no.
+- **src/pages/promolog/PromologTable.tsx**: (Ya lo tiene, solo verificaremos consistencia).
+- **src/pages/contactos/ContactosTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/creadores/CreadoresTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/leadgen/LeadGenTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/eventos/EventosTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/tareas/TasksTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/tareas/ProjectsTable.tsx**: Añadir `text-xs` a `SortHeader`.
+- **src/pages/closers/ClosersTable.tsx**: Añadir `text-xs` a `SortHeader`.
 
-#### 2. Tabla de Proyectos (`src/pages/tareas/ProjectsTable.tsx`)
-Similar a la de tareas.
-- Añadir contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`.
-- Añadir clases sticky al `TableHeader`.
+#### 3. Limpieza de Texto en Encabezados Estáticos
+Asegurar que los encabezados que son solo texto (como "Acciones", "Notas", "WhatsApp") se vean idénticos al resto ahora que el componente base será `text-xs`.
 
-#### 3. Modal de Detalle de Tarjeta (`src/pages/sales-overview/CardDetailModal.tsx`)
-Esta tabla se muestra dentro de un modal y puede ser larga.
-- Añadir contenedor con `max-h-[500px] overflow-auto`.
-- Añadir clases sticky al `TableHeader`.
+### Beneficios
+- **Consistencia Visual**: Todas las tablas tendrán el mismo tamaño de fuente en sus encabezados.
+- **Jerarquía de Información**: Los encabezados en `text-xs` contrastan mejor con los datos en `text-sm`, facilitando la lectura.
+- **Densidad de Datos**: Permite tablas más compactas y eficientes en pantallas de gestión.
 
-#### 4. Tab de Documentos en Perfil de Creador (`src/pages/creadores/DocumentosTabContent.tsx`)
-- Envolver la tabla en un `div` con `max-h-[400px] overflow-auto`.
-- Añadir clases sticky al `TableHeader`.
+### Detalles técnicos específicos por archivo
 
-#### 5. Tab de Monetización en Perfil de Creador (`src/pages/creadores/MonetizacionTabContent.tsx`)
-- Envolver la tabla en un `div` con `max-h-[400px] overflow-auto`.
-- Añadir clases sticky al `TableHeader`.
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/ui/table.tsx` | Añadir `text-xs` a `TableHead` |
+| `src/pages/promolog/PromologTable.tsx` | (Mantener `text-xs` en SortHeader y el componente base cubrirá "Acciones") |
+| `src/pages/contactos/ContactosTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/creadores/CreadoresTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/leadgen/LeadGenTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/eventos/EventosTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/tareas/TasksTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/tareas/ProjectsTable.tsx` | Añadir `text-xs` a `SortHeader` |
+| `src/pages/closers/ClosersTable.tsx` | Añadir `text-xs` a `SortHeader` |
 
-#### 6. Tabla Comparativa (`src/pages/sales-overview/comparativas/ComparativaTable.tsx`)
-Ya tiene el contenedor, pero usa clases sticky individuales en cada `TableHead`. 
-- Simplificar aplicando `sticky top-0 z-10 bg-card` directamente al `TableHeader`.
-
-### Resumen de cambios técnicos
-
-````text
-| Archivo | Cambio principal |
-|---------|------------------|
-| TasksTable.tsx | Añadir wrapper overflow-auto y sticky classes al Header |
-| ProjectsTable.tsx | Añadir wrapper overflow-auto y sticky classes al Header |
-| CardDetailModal.tsx | Añadir wrapper max-h y sticky classes al Header |
-| DocumentosTabContent.tsx | Añadir wrapper max-h y sticky classes al Header |
-| MonetizacionTabContent.tsx | Añadir wrapper max-h y sticky classes al Header |
-| ComparativaTable.tsx | Centralizar sticky classes en TableHeader |
-````
-
-Este cambio garantiza que la experiencia de navegación sea consistente en todo el sistema, permitiendo que los títulos de las columnas siempre sean visibles mientras el usuario explora los datos.
