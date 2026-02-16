@@ -22,6 +22,7 @@ import {
   LayoutGrid,
   Send,
   Eye,
+  ChevronUp,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -152,6 +154,8 @@ const PromologContent = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [selectedCreatorFilter, setSelectedCreatorFilter] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
   const [sortOrder, setSortOrder] = useState("pendientes");
@@ -312,26 +316,6 @@ const PromologContent = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
           </div>
-          <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="si_promociono">Sí</SelectItem>
-              <SelectItem value="no_promociono">No</SelectItem>
-              <SelectItem value="parcial">Parcial</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              <SelectItem value="instagram">Instagram</SelectItem>
-              <SelectItem value="tiktok">TikTok</SelectItem>
-              <SelectItem value="x">X</SelectItem>
-              <SelectItem value="telegram">Telegram</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
             <SelectContent>
@@ -449,6 +433,91 @@ const PromologContent = () => {
               <p className="text-xs text-center text-muted-foreground">
                 Mostrando datos del {shortDate} al {shortDate}
               </p>
+            </div>
+
+            {/* Collapsible Filters Section */}
+            <Card>
+              <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <CollapsibleTrigger asChild>
+                  <button className="flex w-full items-center justify-between p-4 text-sm font-semibold hover:bg-muted/50 transition-colors rounded-t-lg">
+                    <span>Filtros</span>
+                    <ChevronUp className={cn("h-4 w-4 transition-transform duration-200", !filtersOpen && "rotate-180")} />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-4 pb-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Creador/a</Label>
+                      <Select value={selectedCreatorFilter || undefined} onValueChange={(v) => setSelectedCreatorFilter(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          {creators.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Red Social</Label>
+                      <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todas</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="tiktok">TikTok</SelectItem>
+                          <SelectItem value="x">X</SelectItem>
+                          <SelectItem value="telegram">Telegram</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Estado</Label>
+                      <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos</SelectItem>
+                          <SelectItem value="si_promociono">Sí</SelectItem>
+                          <SelectItem value="no_promociono">No</SelectItem>
+                          <SelectItem value="parcial">Parcial</SelectItem>
+                          <SelectItem value="pendiente">Pendiente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+
+            {/* View Tabs */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
+              <Button
+                variant={entryView === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setEntryView("list")}
+              >
+                <Table2 className="h-4 w-4" />
+                Tabla
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setActiveTab("calendario")}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Calendario
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => setActiveTab("campanas")}
+              >
+                <Target className="h-4 w-4" />
+                Campañas
+              </Button>
             </div>
 
             {/* Entries */}
