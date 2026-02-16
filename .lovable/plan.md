@@ -1,103 +1,127 @@
 
 
-## Ciclo de vida completo para tareas + KPIs actualizados
+## Filtros avanzados en /tareas + Compartir y Archivar proyectos
 
-### Problema actual
+### Resumen
 
-Las tareas solo manejan dos estados reales (`active` y `completed`), mientras que las subtareas ya tienen un ciclo completo (pendiente, en progreso, pausada, completada). Las tareas necesitan el mismo nivel de control: cambiar estado, asignar, fecha de inicio, fecha de fin, y que las vencidas aparezcan correctamente. Los KPIs no reflejan estos estados.
+Agregar filtros adicionales a la vista de proyectos (/tareas) para filtrar por miembro asignado y por prioridad de tareas. Ademas, agregar funcionalidad de "Compartir" (generar link publico al proyecto) y "Archivar" (cambiar estado sin eliminar) a cada proyecto.
 
 ---
 
-### Cambios en base de datos
+### 1. Filtros adicionales en /tareas
 
-Agregar columna `start_at` a la tabla `tasks` para fecha de inicio planificada:
+Actualmente solo hay filtro de busqueda y filtro de estado (activo/archivado). Se agregaran:
+
+| Filtro | Tipo | Opciones |
+|--------|------|----------|
+| Miembro | Select con buscador | Lista de perfiles de la compania |
+| Prioridad (tareas) | Select | Baja, Media, Alta, Urgente |
+
+**Logica de filtrado por miembro**: Un proyecto aparece si tiene al menos un miembro que coincida con el filtro seleccionado (usando la lista de `allMembers`).
+
+**Logica de filtrado por prioridad**: Un proyecto aparece si tiene al menos una tarea con la prioridad seleccionada (usando `allTasks`).
+
+**Archivo**: `ProjectsListContent.tsx` - agregar dos selectores nuevos entre el filtro de Estado y los toggles de vista.
+
+---
+
+### 2. Archivar proyectos
+
+La tabla `task_projects` ya tiene un campo `status` con valor `active`. Se usara el valor `archived` para proyectos archivados.
+
+**Cambios**:
+- `useProjects.ts`: Actualmente filtra solo `status = 'active'`. Cambiar para traer todos los proyectos y filtrar en el frontend. Agregar mutacion `archiveProject` que hace `update({ status: 'archived' })`.
+- `ProjectsListContent.tsx`: Agregar opcion "Archivar" en el dropdown de acciones del proyecto (al lado de Editar y Eliminar). Si el proyecto ya esta archivado, mostrar "Reactivar".
+- `ProjectsTable.tsx`: Agregar columna "Estado" y la opcion de Archivar/Reactivar en el dropdown de acciones.
+- Las KPIs de "Total Proyectos" mostraran solo los activos por defecto, a menos que el filtro de estado sea "archivado" o "todos".
+
+---
+
+### 3. Compartir proyectos
+
+Implementar un enlace publico para compartir la vista resumida de un proyecto (similar a como ya funciona con tareas individuales via `share_token`).
+
+**Cambios en base de datos**:
+
+Agregar columna `share_token` a la tabla `task_projects`:
 
 ```sql
-ALTER TABLE tasks ADD COLUMN start_at timestamp with time zone;
+ALTER TABLE task_projects ADD COLUMN share_token text DEFAULT (gen_random_uuid())::text;
 ```
 
----
+Crear funcion RPC para acceso publico (similar a `get_task_by_share_token`):
 
-### Flujo de estados para tareas
+```sql
+CREATE OR REPLACE FUNCTION get_project_by_share_token(_token text)
+RETURNS SETOF task_projects
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT * FROM task_projects WHERE share_token = _token LIMIT 1;
+$$;
+```
 
-| Estado | Transiciones posibles |
-|--------|----------------------|
-| `active` (pendiente) | Iniciar, Completar |
-| `in_progress` | Pausar, Completar |
-| `paused` | Reanudar, Completar |
-| `overdue` (vencida) | Justificar, luego Completar |
-| `completed` | Estado final |
+Y una funcion para obtener las tareas del proyecto sin autenticacion:
 
-Se reutiliza el mismo patron de dropdown de estado que ya funciona en las subtareas.
+```sql
+CREATE OR REPLACE FUNCTION get_tasks_by_project_share_token(_token text)
+RETURNS SETOF tasks
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT t.* FROM tasks t
+  INNER JOIN task_projects p ON t.project_id = p.id
+  WHERE p.share_token = _token;
+$$;
+```
 
----
-
-### Cambios por archivo
+**Cambios por archivo**:
 
 | Archivo | Cambio |
 |---------|--------|
-| **Nueva migracion** | Agregar `start_at` a tabla `tasks` |
-| `src/pages/tareas/useTareas.ts` | (1) Agregar `start_at` a interface Task. (2) Nueva mutacion `updateTaskStatus` para cambiar estado con timestamps. (3) Actualizar `createTask` y `updateTask` para manejar `start_at`. |
-| `src/pages/tareas/TaskListView.tsx` | Agregar grupo "PAUSADAS" a las secciones colapsables. Actualizar la logica de agrupacion para manejar `in_progress` y `paused` como estados reales del campo `status` (no derivados del countdown). |
-| `src/pages/tareas/TaskListRow.tsx` | Agregar dropdown de estado (igual que SubtaskItem) en lugar del boton simple de completar. Mostrar fecha de inicio junto a fecha de fin. Pasar `onStatusChange` como prop. |
-| `src/pages/tareas/TaskCard.tsx` | Reemplazar botones Completar/Justificar por dropdown de estado con las mismas transiciones. Mostrar fechas inicio/fin. |
-| `src/pages/tareas/TasksTable.tsx` | Reemplazar badge de estado estatico por dropdown de estado clickeable. Agregar columna de fecha inicio. |
-| `src/pages/tareas/TareasContent.tsx` | (1) Actualizar KPIs: 5 cards (Pendientes, En curso, Pausadas, Vencidas, Completadas). (2) Actualizar filtro de estado con las 5 opciones. (3) Agregar `updateTaskStatus` al flujo. (4) Actualizar `getTaskStatus` para leer el campo `status` directamente en lugar de derivarlo del countdown. |
-| `src/pages/tareas/CreateTaskModal.tsx` | En modo "fecha", incluir `start_at` en el payload que se envia al crear la tarea. |
-| `src/pages/tareas/EditTaskModal.tsx` | Agregar campo de fecha de inicio. Agregar selector de estado. Enviar `start_at` y `status` en la actualizacion. |
-| `src/pages/tareas/ProjectsListContent.tsx` | Actualizar KPIs de proyectos para mostrar desglose por estado (en curso, pausadas ademas de activas/vencidas/completadas). Actualizar `getProjectTaskCounts` en `useProjects.ts`. |
-| `src/pages/tareas/useProjects.ts` | Ampliar `getProjectTaskCounts` para devolver `{ pending, in_progress, paused, overdue, completed }`. |
+| **Nueva migracion** | Agregar `share_token` a `task_projects` + crear las 2 funciones RPC |
+| `src/pages/tareas/useProjects.ts` | Actualizar interface `TaskProject` con `share_token`. Agregar mutacion `archiveProject(id, status)`. Cambiar query para traer todos los proyectos (sin filtro de status). |
+| `src/pages/tareas/ProjectsListContent.tsx` | (1) Agregar filtros de Miembro y Prioridad. (2) Agregar opciones "Archivar/Reactivar" y "Compartir" en el dropdown de cada proyecto card. (3) "Compartir" copia el link al clipboard y muestra toast. |
+| `src/pages/tareas/ProjectsTable.tsx` | Agregar columna Estado. Agregar opciones "Archivar/Reactivar" y "Compartir" en el dropdown de acciones. |
+| **Nuevo archivo**: `src/pages/tareas/ProjectSharePage.tsx` | Pagina publica que muestra nombre del proyecto, descripcion, y lista de tareas con su estado/prioridad/fecha. Sin autenticacion requerida. |
+| `src/pages/TareaProjectShare.tsx` | Wrapper de pagina para la ruta `/tareas/share/:token`. |
+| `src/App.tsx` | Agregar ruta `/tareas/share/:token` apuntando a `TareaProjectShare`. |
 
 ---
 
 ### Detalle tecnico
 
-#### 1. Dropdown de estado en tareas (nuevo patron compartido)
-
-Se aplica el mismo patron que ya existe en `SubtaskItem.tsx`:
+#### Filtros en ProjectsListContent
 
 ```text
-[Pendiente]    --> Iniciar | Completar
-[En progreso]  --> Pausar | Completar
-[Pausada]      --> Reanudar | Completar
-[Vencida]      --> Justificar (luego Completar)
-[Completada]   --> (sin menu)
+[Buscar proyecto...]  [Estado v]  [Miembro v]  [Prioridad v]  [List] [Grid]
 ```
 
-Logica de timestamps:
-- "Iniciar": status=in_progress, started_at=now() (si no existe)
-- "Pausar": status=paused
-- "Reanudar": status=in_progress
-- "Completar": status=completed, completed_at=now()
+- Miembro: filtra proyectos donde el miembro seleccionado es parte del proyecto (`allMembers`).
+- Prioridad: filtra proyectos que tengan al menos una tarea con esa prioridad. Se necesita extender la query de `allTasks` en `useProjects.ts` para incluir el campo `priority`.
 
-Las tareas vencidas siguen requiriendo justificacion antes de completarse (flujo existente preservado).
+#### Dropdown de acciones del proyecto (Grid y Table)
 
-#### 2. KPIs actualizados en TareasContent
+```text
+| Editar          |
+| Compartir       |  <-- nuevo, copia link
+| Archivar        |  <-- nuevo, cambia status
+| Eliminar        |  <-- ya existe
+```
 
-De 3 cards a 5:
+Si el proyecto esta archivado, "Archivar" se reemplaza por "Reactivar".
 
-| KPI | Icono | Color |
-|-----|-------|-------|
-| Pendientes | Clock | primary |
-| En curso | Play | primary |
-| Pausadas | Pause | warning (yellow) |
-| Vencidas | AlertTriangle | destructive |
-| Completadas | CheckSquare | emerald |
+#### Pagina publica de proyecto
 
-La logica de conteo usara el campo `status` directamente, con una verificacion adicional de `due_at` para detectar vencidas (si `status` no es `completed` y `due_at` ya paso).
+URL: `/tareas/share/:token`
 
-#### 3. KPIs de proyectos
+Mostrara:
+- Logo de la app
+- Nombre y descripcion del proyecto
+- Lista de tareas con: titulo, estado (badge), prioridad (badge), fecha limite
+- Sin opciones de edicion (solo lectura)
 
-Las cards de proyecto en `ProjectsListContent` mostraran el desglose ampliado: pendientes, en curso, pausadas, vencidas, completadas.
+#### KPIs ajustados
 
-#### 4. Fechas en todas las vistas
-
-Todas las vistas (ClickUp, Grid, Tabla) mostraran:
-- Fecha de inicio (`start_at`) si existe
-- Fecha de fin/limite (`due_at`)
-- Ambas en formato `dd/MM/yy`
-
-#### 5. Drag-and-drop
-
-El drag-and-drop ya existe y funciona en la vista Grid (DraggableGrid) y en subtareas. No requiere cambios adicionales. La vista ClickUp mantiene el orden por posicion dentro de cada grupo.
+El KPI "Total Proyectos" contara solo los proyectos que pasan los filtros activos. Si el filtro de estado esta en "archivado", mostrara los archivados. Si no hay filtro, mostrara solo activos (comportamiento actual).
 
