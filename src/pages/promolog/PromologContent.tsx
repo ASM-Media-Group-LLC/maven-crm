@@ -531,23 +531,21 @@ const PromologContent = () => {
                       </Select>
                     </div>
                   </div>
-                  {(selectedCreatorFilter !== "" || selectedNetwork !== "" || selectedStatus !== "") && (
-                    <div className="flex justify-end px-4 pb-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs text-muted-foreground"
-                        onClick={() => {
-                          setSelectedCreatorFilter("");
-                          setSelectedNetwork("");
-                          setSelectedStatus("");
-                        }}
-                      >
-                        <X className="mr-1 h-3.5 w-3.5" />
-                        Limpiar filtros
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex justify-end px-4 pb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground"
+                      onClick={() => {
+                        setSelectedCreatorFilter("");
+                        setSelectedNetwork("");
+                        setSelectedStatus("");
+                      }}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Limpiar filtros
+                    </Button>
+                  </div>
                 </CollapsibleContent>
               </Collapsible>
             </Card>
