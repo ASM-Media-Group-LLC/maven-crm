@@ -118,7 +118,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
-            <TableHead><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
+            <TableHead className="sticky left-0 z-20 bg-card"><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
             <TableHead><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
             <TableHead><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
             <TableHead><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
@@ -131,7 +131,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
         <TableBody>
           {sorted.map((entry) => (
             <TableRow key={entry.id} className="cursor-pointer" onClick={() => onEdit?.(entry)}>
-              <TableCell>
+              <TableCell className="sticky left-0 z-10 bg-card">
                 <Badge variant="outline" className="text-xs font-mono">{entry.ticketNumber}</Badge>
               </TableCell>
               <TableCell className="min-w-[180px]">
