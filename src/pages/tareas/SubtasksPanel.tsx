@@ -140,17 +140,17 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
       </div>
 
       {/* Creation form — all fields always visible */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap">
         <Input
           placeholder="Nueva subtarea..."
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="h-7 text-xs flex-1 min-w-[120px]"
+          className="h-9 text-sm flex-1 min-w-[180px]"
         />
 
         <Select value={newPriority || undefined} onValueChange={setNewPriority}>
-          <SelectTrigger className="h-7 text-[10px] w-[85px] shrink-0">
+          <SelectTrigger className="h-8 text-xs w-[90px] shrink-0">
             <SelectValue placeholder="Prioridad" />
           </SelectTrigger>
           <SelectContent>
@@ -163,8 +163,8 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("h-7 text-[10px] px-2 shrink-0", !newDueDate && "text-muted-foreground")}>
-              <CalendarIcon className="h-2.5 w-2.5 mr-1" />
+            <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", !newDueDate && "text-muted-foreground")}>
+              <CalendarIcon className="h-3 w-3 mr-1" />
               {newDueDate ? format(newDueDate, "dd/MM/yy") : "Fecha"}
             </Button>
           </PopoverTrigger>
@@ -176,7 +176,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
         {profiles.length > 0 && (
           <Popover open={assignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-7 text-[10px] px-2 shrink-0 w-[100px] justify-start", !newAssignedTo && "text-muted-foreground")}>
+              <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0 w-[100px] justify-start", !newAssignedTo && "text-muted-foreground")}>
                 <span className="truncate">{newAssignedTo ? selectedAssignName || "Asignar" : "Asignar"}</span>
               </Button>
             </PopoverTrigger>
@@ -214,7 +214,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0"
+          className="h-8 w-8 shrink-0"
           onClick={handleAdd}
           disabled={!newTitle.trim() || createSubtask.isPending}
         >
