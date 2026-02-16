@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, CheckCircle2, Trash2, GripVertical, ChevronDown, ChevronRight, Flag, CalendarIcon, User, Pencil, X, Check } from "lucide-react";
+import { Trash2, GripVertical, ChevronDown, ChevronRight, Flag, CalendarIcon, User, Pencil, X, Check, Circle, Play, Pause, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { priorityConfig } from "./PrioritySelect";
@@ -17,10 +18,9 @@ import type { Subtask } from "./useSubtasks";
 interface SubtaskItemProps {
   subtask: Subtask;
   profiles: { id: string; full_name: string | null }[];
-  onStart: (id: string) => void;
-  onComplete: (id: string) => void;
+  onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
-  onUpdate: (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null }) => void;
+  onUpdate: (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null; start_at?: string | null; status?: string }) => void;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -28,12 +28,38 @@ interface SubtaskItemProps {
   depth?: number;
 }
 
-const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdate, onDragStart, onDragOver, onDrop, index, depth = 0 }: SubtaskItemProps) => {
+const statusConfig: Record<string, { label: string; className: string; icon: typeof Circle }> = {
+  pending: { label: "Pendiente", className: "bg-secondary text-secondary-foreground", icon: Circle },
+  in_progress: { label: "En progreso", className: "bg-primary/20 text-primary border-primary/30", icon: Play },
+  paused: { label: "Pausada", className: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30", icon: Pause },
+  completed: { label: "Completada", className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
+};
+
+const getStatusTransitions = (status: string) => {
+  switch (status) {
+    case "pending": return [
+      { status: "in_progress", label: "Iniciar", icon: Play },
+      { status: "completed", label: "Completar", icon: CheckCircle2 },
+    ];
+    case "in_progress": return [
+      { status: "paused", label: "Pausar", icon: Pause },
+      { status: "completed", label: "Completar", icon: CheckCircle2 },
+    ];
+    case "paused": return [
+      { status: "in_progress", label: "Reanudar", icon: Play },
+      { status: "completed", label: "Completar", icon: CheckCircle2 },
+    ];
+    default: return [];
+  }
+};
+
+const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, onDragStart, onDragOver, onDrop, index, depth = 0 }: SubtaskItemProps) => {
   const [childrenOpen, setChildrenOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(subtask.title);
   const [editPriority, setEditPriority] = useState(subtask.priority);
   const [editDueDate, setEditDueDate] = useState<Date | undefined>(subtask.due_at ? new Date(subtask.due_at) : undefined);
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>(subtask.start_at ? new Date(subtask.start_at) : undefined);
   const [editAssignedTo, setEditAssignedTo] = useState(subtask.assigned_to || "");
   const [editAssignPopoverOpen, setEditAssignPopoverOpen] = useState(false);
 
@@ -41,11 +67,14 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
   const assignedProfile = profiles.find(p => p.id === subtask.assigned_to);
   const editAssignedName = profiles.find(p => p.id === editAssignedTo)?.full_name || "";
   const maxDepth = 3;
+  const config = statusConfig[subtask.status] || statusConfig.pending;
+  const transitions = getStatusTransitions(subtask.status);
 
   const handleStartEdit = () => {
     setEditTitle(subtask.title);
     setEditPriority(subtask.priority);
     setEditDueDate(subtask.due_at ? new Date(subtask.due_at) : undefined);
+    setEditStartDate(subtask.start_at ? new Date(subtask.start_at) : undefined);
     setEditAssignedTo(subtask.assigned_to || "");
     setEditing(true);
   };
@@ -56,24 +85,47 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
       title: editTitle.trim() || subtask.title,
       priority: editPriority,
       due_at: editDueDate ? editDueDate.toISOString() : null,
+      start_at: editStartDate ? editStartDate.toISOString() : null,
       assigned_to: editAssignedTo || null,
     });
     setEditing(false);
   };
 
-  const handleCancelEdit = () => {
-    setEditing(false);
-  };
+  const handleCancelEdit = () => setEditing(false);
 
   const handleEditKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSaveEdit();
     if (e.key === "Escape") handleCancelEdit();
   };
 
-  const statusBadge = () => {
-    if (subtask.status === "completed") return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">Completada</Badge>;
-    if (subtask.status === "in_progress") return <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">En progreso</Badge>;
-    return <Badge variant="secondary" className="text-[10px]">Pendiente</Badge>;
+  const StatusBadge = () => {
+    const Icon = config.icon;
+    if (subtask.status === "completed") {
+      return (
+        <Badge className={cn(config.className, "text-[10px] gap-1 cursor-default")}>
+          <Icon className="h-2.5 w-2.5" />
+          {config.label}
+        </Badge>
+      );
+    }
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Badge className={cn(config.className, "text-[10px] gap-1 cursor-pointer hover:opacity-80 transition-opacity")}>
+            <Icon className="h-2.5 w-2.5" />
+            {config.label}
+          </Badge>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[140px]">
+          {transitions.map(t => (
+            <DropdownMenuItem key={t.status} onClick={() => onStatusChange(subtask.id, t.status)} className="text-xs gap-2">
+              <t.icon className="h-3.5 w-3.5" />
+              {t.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
   };
 
   if (editing) {
@@ -112,9 +164,21 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
 
           <Popover>
             <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2", !editStartDate && "text-muted-foreground")}>
+                <CalendarIcon className="h-2.5 w-2.5 mr-1" />
+                {editStartDate ? `Inicio: ${format(editStartDate, "dd/MM/yy")}` : "Inicio"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={editStartDate} onSelect={setEditStartDate} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2", !editDueDate && "text-muted-foreground")}>
                 <CalendarIcon className="h-2.5 w-2.5 mr-1" />
-                {editDueDate ? format(editDueDate, "dd/MM/yy") : "Fecha"}
+                {editDueDate ? `Fin: ${format(editDueDate, "dd/MM/yy")}` : "Fin"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -184,10 +248,16 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
             </p>
           </div>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {subtask.start_at && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                <CalendarIcon className="h-2.5 w-2.5" />
+                Inicio: {format(new Date(subtask.start_at), "dd/MM/yy")}
+              </span>
+            )}
             {subtask.due_at && (
               <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                 <CalendarIcon className="h-2.5 w-2.5" />
-                {format(new Date(subtask.due_at), "dd/MM/yy")}
+                Fin: {format(new Date(subtask.due_at), "dd/MM/yy")}
               </span>
             )}
             {assignedProfile && (
@@ -196,32 +266,12 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
                 {assignedProfile.full_name || "Sin nombre"}
               </span>
             )}
-            {subtask.started_at && (
-              <span className="text-[10px] text-muted-foreground">
-                Inicio: {format(new Date(subtask.started_at), "dd/MM HH:mm")}
-              </span>
-            )}
-            {subtask.completed_at && (
-              <span className="text-[10px] text-muted-foreground">
-                Fin: {format(new Date(subtask.completed_at), "dd/MM HH:mm")}
-              </span>
-            )}
           </div>
         </div>
 
-        {statusBadge()}
+        <StatusBadge />
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {subtask.status === "pending" && (
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onStart(subtask.id)} title="Iniciar">
-              <Play className="h-3 w-3" />
-            </Button>
-          )}
-          {subtask.status === "in_progress" && (
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onComplete(subtask.id)} title="Completar">
-              <CheckCircle2 className="h-3 w-3" />
-            </Button>
-          )}
           <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={handleStartEdit} title="Editar">
             <Pencil className="h-3 w-3" />
           </Button>
