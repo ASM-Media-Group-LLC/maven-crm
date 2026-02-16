@@ -48,8 +48,8 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   // Date mode
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("18:00");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
   const selectedProfile = profiles.find((p) => p.id === assignedTo);
 
@@ -62,8 +62,8 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     setTimeMode("duration");
     setStartDate(undefined);
     setEndDate(undefined);
-    setStartTime("09:00");
-    setEndTime("18:00");
+    setStartTime("");
+    setEndTime("");
     setPriority("medium");
   };
 
@@ -95,15 +95,21 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
         toast({ title: "Error", description: "La fecha de fin es obligatoria.", variant: "destructive" });
         return;
       }
-      const [endH, endM] = endTime.split(":").map(Number);
       const end = new Date(endDate);
-      end.setHours(endH || 0, endM || 0, 0, 0);
+      if (endTime) {
+        const [endH, endM] = endTime.split(":").map(Number);
+        end.setHours(endH || 0, endM || 0, 0, 0);
+      } else {
+        end.setHours(23, 59, 59, 0);
+      }
       dueAt = end.toISOString();
 
       // Calculate approximate duration for display
       const start = startDate ? new Date(startDate) : new Date();
-      const [startH, startM] = startTime.split(":").map(Number);
-      start.setHours(startH || 0, startM || 0, 0, 0);
+      if (startTime) {
+        const [startH, startM] = startTime.split(":").map(Number);
+        start.setHours(startH || 0, startM || 0, 0, 0);
+      }
       const diffMs = Math.max(end.getTime() - start.getTime(), 0);
       durationH = Math.floor(diffMs / 3600000);
       durationM = Math.floor((diffMs % 3600000) / 60000);
@@ -220,7 +226,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
                         <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-28" />
+                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-28" placeholder="--:--" />
                   </div>
                 </div>
 
@@ -239,8 +245,9 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
                         <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus className="p-3 pointer-events-auto" />
                       </PopoverContent>
                     </Popover>
-                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-28" />
+                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-28" placeholder="--:--" />
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Si no se indica hora, se usará 23:59</p>
                 </div>
               </TabsContent>
             </Tabs>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useProjectMembers } from "./useProjectMembers";
 
 export interface TaskProject {
   id: string;
@@ -62,18 +63,29 @@ export const useProjects = () => {
   });
 
   const createProject = useMutation({
-    mutationFn: async (project: { name: string; description?: string }) => {
+    mutationFn: async (project: { name: string; description?: string; memberIds?: string[] }) => {
       if (!user || !profile) throw new Error("Not authenticated");
-      const { error } = await supabase.from("task_projects" as any).insert({
+      const { data, error } = await supabase.from("task_projects" as any).insert({
         name: project.name,
         description: project.description || null,
         created_by: user.id,
         company_id: profile.company_id,
-      } as any);
+      } as any).select("id").single();
       if (error) throw error;
+      
+      // Add members if provided
+      if (project.memberIds && project.memberIds.length > 0 && data) {
+        const rows = project.memberIds.map(uid => ({
+          project_id: (data as any).id,
+          user_id: uid,
+          role: "member",
+        }));
+        await supabase.from("project_members" as any).insert(rows as any);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-members"] });
       toast({ title: "Proyecto creado", description: "El proyecto fue creado exitosamente." });
     },
     onError: () => {
@@ -82,15 +94,29 @@ export const useProjects = () => {
   });
 
   const updateProject = useMutation({
-    mutationFn: async (project: { id: string; name: string; description?: string }) => {
+    mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[] }) => {
       const { error } = await supabase
         .from("task_projects" as any)
         .update({ name: project.name, description: project.description || null } as any)
         .eq("id", project.id);
       if (error) throw error;
+
+      // Update members if provided
+      if (project.memberIds !== undefined) {
+        await supabase.from("project_members" as any).delete().eq("project_id", project.id);
+        if (project.memberIds.length > 0) {
+          const rows = project.memberIds.map(uid => ({
+            project_id: project.id,
+            user_id: uid,
+            role: "member",
+          }));
+          await supabase.from("project_members" as any).insert(rows as any);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-members"] });
       toast({ title: "Proyecto actualizado", description: "El proyecto fue actualizado exitosamente." });
     },
     onError: () => {

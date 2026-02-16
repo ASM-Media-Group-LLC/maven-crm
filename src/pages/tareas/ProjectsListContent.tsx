@@ -1,13 +1,19 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useProjects, type TaskProject } from "./useProjects";
+import { useProjectMembers } from "./useProjectMembers";
 import DraggableGrid from "./DraggableGrid";
 import CreateProjectModal from "./CreateProjectModal";
 import EditProjectModal from "./EditProjectModal";
@@ -15,8 +21,43 @@ import DeleteProjectDialog from "./DeleteProjectDialog";
 import ProjectsTable from "./ProjectsTable";
 
 const ProjectsListContent = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { projects, isLoading, createProject, updateProject, deleteProject, getProjectTaskCounts, reorderProjects } = useProjects();
+  const { projects, isLoading, profile, createProject, updateProject, deleteProject, getProjectTaskCounts, reorderProjects } = useProjects();
+
+  // Fetch company profiles for member selector
+  const { data: companyProfiles = [] } = useQuery({
+    queryKey: ["company-profiles", profile?.company_id],
+    queryFn: async () => {
+      if (profile?.company_id) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("company_id", profile.company_id);
+        return data || [];
+      }
+      return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
+    },
+    enabled: !!profile,
+  });
+
+  // Fetch all project members for display
+  const { data: allMembers = [] } = useQuery({
+    queryKey: ["all-project-members"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("project_members" as any)
+        .select("*");
+      if (error) throw error;
+      return (data || []) as unknown as { id: string; project_id: string; user_id: string; role: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const getMembersForProject = (projectId: string) => {
+    const memberUserIds = allMembers.filter(m => m.project_id === projectId).map(m => m.user_id);
+    return companyProfiles.filter(p => memberUserIds.includes(p.id));
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
@@ -143,16 +184,45 @@ const ProjectsListContent = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-primary" /> {counts.active} activas
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3 text-destructive" /> {counts.overdue} vencidas
-                      </span>
-                      <span className="flex items-center gap-1 text-emerald-400">
-                        ✓ {counts.completed}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-primary" /> {counts.active} activas
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3 text-destructive" /> {counts.overdue} vencidas
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-400">
+                          ✓ {counts.completed}
+                        </span>
+                      </div>
+                      {(() => {
+                        const projectMembers = getMembersForProject(project.id);
+                        if (projectMembers.length === 0) return null;
+                        return (
+                          <TooltipProvider>
+                            <div className="flex -space-x-1.5">
+                              {projectMembers.slice(0, 3).map(m => (
+                                <Tooltip key={m.id}>
+                                  <TooltipTrigger asChild>
+                                    <Avatar className="h-5 w-5 border border-background">
+                                      <AvatarFallback className="text-[8px] bg-muted">
+                                        {(m.full_name || "?").charAt(0).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="text-xs">{m.full_name || "Sin nombre"}</TooltipContent>
+                                </Tooltip>
+                              ))}
+                              {projectMembers.length > 3 && (
+                                <Avatar className="h-5 w-5 border border-background">
+                                  <AvatarFallback className="text-[8px] bg-muted">+{projectMembers.length - 3}</AvatarFallback>
+                                </Avatar>
+                              )}
+                            </div>
+                          </TooltipProvider>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -167,6 +237,7 @@ const ProjectsListContent = () => {
         onOpenChange={setCreateOpen}
         onSubmit={(data) => createProject.mutate(data)}
         isLoading={createProject.isPending}
+        profiles={companyProfiles}
       />
 
       <EditProjectModal
@@ -175,6 +246,8 @@ const ProjectsListContent = () => {
         project={editProject}
         onSubmit={(data) => updateProject.mutate(data)}
         isLoading={updateProject.isPending}
+        profiles={companyProfiles}
+        currentMemberIds={editProject ? allMembers.filter(m => m.project_id === editProject.id).map(m => m.user_id) : []}
       />
 
       <DeleteProjectDialog

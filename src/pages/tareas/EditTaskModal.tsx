@@ -71,9 +71,13 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       return;
     }
 
-    const [endH, endM] = endTime.split(":").map(Number);
     const end = new Date(endDate);
-    end.setHours(endH || 0, endM || 0, 0, 0);
+    if (endTime) {
+      const [endH, endM] = endTime.split(":").map(Number);
+      end.setHours(endH || 0, endM || 0, 0, 0);
+    } else {
+      end.setHours(23, 59, 59, 0);
+    }
 
     const diffMs = Math.max(end.getTime() - Date.now(), 0);
     const durationH = Math.floor(diffMs / 3600000);
@@ -156,8 +160,9 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
                   <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus className="p-3 pointer-events-auto" />
                 </PopoverContent>
               </Popover>
-              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-28" />
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-28" placeholder="--:--" />
             </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Si no se indica hora, se usará 23:59</p>
           </div>
 
           <div className="flex justify-end gap-2">

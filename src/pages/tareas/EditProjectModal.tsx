@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { TaskProject } from "./useProjects";
 
@@ -11,21 +16,32 @@ interface EditProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: TaskProject | null;
-  onSubmit: (data: { id: string; name: string; description?: string }) => void;
+  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[] }) => void;
   isLoading?: boolean;
+  profiles?: { id: string; full_name: string | null }[];
+  currentMemberIds?: string[];
 }
 
-const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading }: EditProjectModalProps) => {
+const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [] }: EditProjectModalProps) => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   useEffect(() => {
     if (project) {
       setName(project.name);
       setDescription(project.description || "");
+      setSelectedMembers(currentMemberIds);
     }
-  }, [project]);
+  }, [project, currentMemberIds]);
+
+  const toggleMember = (id: string) => {
+    setSelectedMembers(prev =>
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +49,12 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading }: 
       toast({ title: "Error", description: "El nombre es obligatorio.", variant: "destructive" });
       return;
     }
-    onSubmit({ id: project.id, name: name.trim(), description: description.trim() || undefined });
+    onSubmit({
+      id: project.id,
+      name: name.trim(),
+      description: description.trim() || undefined,
+      memberIds: selectedMembers,
+    });
     onOpenChange(false);
   };
 
@@ -52,6 +73,56 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading }: 
             <Label htmlFor="edit-project-desc">Descripción</Label>
             <Textarea id="edit-project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          {profiles.length > 0 && (
+            <div>
+              <Label>Miembros del proyecto</Label>
+              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                    {selectedMembers.length > 0
+                      ? `${selectedMembers.length} miembro(s)`
+                      : "Agregar miembros"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar usuario..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron usuarios</CommandEmpty>
+                      <CommandGroup>
+                        {profiles.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.full_name || "Sin nombre"}
+                            onSelect={() => toggleMember(p.id)}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", selectedMembers.includes(p.id) ? "opacity-100" : "opacity-0")} />
+                            {p.full_name || "Sin nombre"}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {selectedMembers.map(id => {
+                    const p = profiles.find(pr => pr.id === id);
+                    return (
+                      <Badge key={id} variant="secondary" className="text-xs gap-1">
+                        {p?.full_name || "Sin nombre"}
+                        <X className="h-3 w-3 cursor-pointer" onClick={() => toggleMember(id)} />
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={isLoading}>{isLoading ? "Guardando..." : "Guardar"}</Button>
