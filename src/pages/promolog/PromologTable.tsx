@@ -118,9 +118,9 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
-            <TableHead><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
-            <TableHead><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
-            <TableHead><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
+            <TableHead className="sticky left-0 z-20 bg-card"><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
+            <TableHead className="sticky left-[120px] z-20 bg-card"><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
+            <TableHead className="sticky left-[300px] z-20 bg-card"><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
             <TableHead><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
             <TableHead><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
             <TableHead><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
@@ -131,10 +131,10 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
         <TableBody>
           {sorted.map((entry) => (
             <TableRow key={entry.id} className="cursor-pointer" onClick={() => onEdit?.(entry)}>
-              <TableCell>
+              <TableCell className="sticky left-0 z-10 bg-card">
                 <Badge variant="outline" className="text-xs font-mono">{entry.ticketNumber}</Badge>
               </TableCell>
-              <TableCell className="min-w-[180px]">
+              <TableCell className="sticky left-[120px] z-10 bg-card min-w-[180px]">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{entry.name}</span>
                   {entry.handle && (
@@ -142,7 +142,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
                   )}
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="sticky left-[300px] z-10 bg-card">
                 <Badge variant="outline" className="gap-1 text-xs">
                   <NetworkIcon network={entry.network} />
                   {networkLabel[entry.network] || entry.network}
