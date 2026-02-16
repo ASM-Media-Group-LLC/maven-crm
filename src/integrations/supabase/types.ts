@@ -1215,6 +1215,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          position: number
           status: string
           updated_at: string | null
         }
@@ -1225,6 +1226,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          position?: number
           status?: string
           updated_at?: string | null
         }
@@ -1235,6 +1237,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          position?: number
           status?: string
           updated_at?: string | null
         }
@@ -1253,6 +1256,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          position: number
           priority: string
           project_id: string | null
           share_token: string | null
@@ -1272,6 +1276,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          position?: number
           priority?: string
           project_id?: string | null
           share_token?: string | null
@@ -1291,6 +1296,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          position?: number
           priority?: string
           project_id?: string | null
           share_token?: string | null
@@ -1457,6 +1463,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          position: number
           priority: string
           project_id: string | null
           share_token: string | null

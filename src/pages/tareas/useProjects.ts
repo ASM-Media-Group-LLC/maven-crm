@@ -40,6 +40,7 @@ export const useProjects = () => {
         .from("task_projects" as any)
         .select("*")
         .eq("status", "active")
+        .order("position", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as unknown as TaskProject[];
@@ -126,6 +127,20 @@ export const useProjects = () => {
     return { active, overdue, completed };
   };
 
+  const reorderProjects = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const updates = orderedIds.map((id, index) =>
+        supabase.from("task_projects" as any).update({ position: index } as any).eq("id", id)
+      );
+      const results = await Promise.all(updates);
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+    },
+  });
+
   return {
     projects,
     isLoading,
@@ -134,5 +149,6 @@ export const useProjects = () => {
     updateProject,
     deleteProject,
     getProjectTaskCounts,
+    reorderProjects,
   };
 };

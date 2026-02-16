@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useProjects, type TaskProject } from "./useProjects";
+import DraggableGrid from "./DraggableGrid";
 import CreateProjectModal from "./CreateProjectModal";
 import EditProjectModal from "./EditProjectModal";
 import DeleteProjectDialog from "./DeleteProjectDialog";
@@ -15,9 +16,9 @@ import ProjectsTable from "./ProjectsTable";
 
 const ProjectsListContent = () => {
   const navigate = useNavigate();
-  const { projects, isLoading, createProject, updateProject, deleteProject, getProjectTaskCounts } = useProjects();
+  const { projects, isLoading, createProject, updateProject, deleteProject, getProjectTaskCounts, reorderProjects } = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
@@ -108,12 +109,13 @@ const ProjectsListContent = () => {
             onDelete={setDeleteTarget}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProjects.map((project) => {
+          <DraggableGrid
+            items={filteredProjects}
+            onReorder={(ids) => reorderProjects.mutate(ids)}
+            renderItem={(project) => {
               const counts = getProjectTaskCounts(project.id);
               return (
                 <Card
-                  key={project.id}
                   className="cursor-pointer transition-colors hover:bg-muted/50"
                   onClick={() => navigate(`/tareas/${project.id}`)}
                 >
@@ -155,8 +157,8 @@ const ProjectsListContent = () => {
                   </CardContent>
                 </Card>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 
