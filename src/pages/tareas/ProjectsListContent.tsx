@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,10 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { useProjects, type TaskProject } from "./useProjects";
 import { useProjectMembers } from "./useProjectMembers";
+import { priorityConfig } from "./PrioritySelect";
 import DraggableGrid from "./DraggableGrid";
 import CreateProjectModal from "./CreateProjectModal";
 import EditProjectModal from "./EditProjectModal";
@@ -22,8 +24,9 @@ import ProjectsTable from "./ProjectsTable";
 
 const ProjectsListContent = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const { projects, isLoading, profile, createProject, updateProject, deleteProject, getProjectTaskCounts, reorderProjects } = useProjects();
+  const { projects, allTasks, isLoading, profile, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, reorderProjects } = useProjects();
 
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id],
@@ -56,24 +59,42 @@ const ProjectsListContent = () => {
     const memberUserIds = allMembers.filter(m => m.project_id === projectId).map(m => m.user_id);
     return companyProfiles.filter(p => memberUserIds.includes(p.id));
   };
+
   const [createOpen, setCreateOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [memberFilter, setMemberFilter] = useState<string>("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("");
+
+  const handleShare = (project: TaskProject) => {
+    if (project.share_token) {
+      const url = `${window.location.origin}/tareas/project-share/${project.share_token}`;
+      navigator.clipboard.writeText(url);
+      toast({ title: "Link copiado", description: "El enlace público fue copiado al portapapeles." });
+    }
+  };
+
+  const handleArchive = (project: TaskProject) => {
+    const newStatus = project.status === "archived" ? "active" : "archived";
+    archiveProject.mutate({ id: project.id, status: newStatus });
+  };
 
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = !statusFilter || p.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesMember = !memberFilter || allMembers.some(m => m.project_id === p.id && m.user_id === memberFilter);
+      const matchesPriority = !priorityFilter || allTasks.some(t => t.project_id === p.id && t.priority === priorityFilter);
+      return matchesSearch && matchesStatus && matchesMember && matchesPriority;
     });
-  }, [projects, search, statusFilter]);
+  }, [projects, search, statusFilter, memberFilter, priorityFilter, allMembers, allTasks]);
 
   const totalCounts = useMemo(() => {
     let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
-    projects.forEach((p) => {
+    filteredProjects.forEach((p) => {
       const c = getProjectTaskCounts(p.id);
       pending += c.pending;
       in_progress += c.in_progress;
@@ -82,15 +103,43 @@ const ProjectsListContent = () => {
       completed += c.completed;
     });
     return { pending, in_progress, paused, overdue, completed };
-  }, [projects, getProjectTaskCounts]);
+  }, [filteredProjects, getProjectTaskCounts]);
 
   const kpis = [
-    { label: "Total Proyectos", value: projects.length, icon: FolderOpen, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "Total Proyectos", value: filteredProjects.length, icon: FolderOpen, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
     { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
     { label: "En curso", value: totalCounts.in_progress, icon: Play, color: "text-blue-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-blue-500/15 hover:to-transparent hover:border-blue-500/40" },
     { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "text-destructive", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
     { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "text-emerald-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-emerald-500/15 hover:to-transparent hover:border-emerald-500/40" },
   ];
+
+  const renderProjectActions = (project: TaskProject, stopProp: boolean = true) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={stopProp ? (e) => e.stopPropagation() : undefined}>
+        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={stopProp ? (e) => e.stopPropagation() : undefined}>
+        <DropdownMenuItem onClick={() => setEditProject(project)}>
+          <Pencil className="mr-2 h-4 w-4" /> Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleShare(project)}>
+          <Share2 className="mr-2 h-4 w-4" /> Compartir
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleArchive(project)}>
+          {project.status === "archived" ? (
+            <><RotateCcw className="mr-2 h-4 w-4" /> Reactivar</>
+          ) : (
+            <><Archive className="mr-2 h-4 w-4" /> Archivar</>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(project)}>
+          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -136,6 +185,33 @@ const ProjectsListContent = () => {
               <SelectItem value="archived">Archivado</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={memberFilter || undefined} onValueChange={(v) => setMemberFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Miembro" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              {companyProfiles.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter || undefined} onValueChange={(v) => setPriorityFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              {Object.entries(priorityConfig).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <span className="flex items-center gap-2">
+                    <Flag className={`h-3 w-3 ${config.color}`} />
+                    {config.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-1 ml-auto">
             <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")}>
               <List className="h-4 w-4" />
@@ -156,6 +232,8 @@ const ProjectsListContent = () => {
             getProjectTaskCounts={getProjectTaskCounts}
             onEdit={setEditProject}
             onDelete={setDeleteTarget}
+            onShare={handleShare}
+            onArchive={handleArchive}
           />
         ) : (
           <DraggableGrid
@@ -165,32 +243,23 @@ const ProjectsListContent = () => {
               const counts = getProjectTaskCounts(project.id);
               return (
                 <Card
-                  className="cursor-pointer transition-colors hover:bg-muted/50"
+                  className={cn("cursor-pointer transition-colors hover:bg-muted/50", project.status === "archived" && "opacity-60")}
                   onClick={() => navigate(`/tareas/${project.id}`)}
                 >
                   <CardContent className="p-5 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">{project.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-base truncate">{project.name}</h3>
+                          {project.status === "archived" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Archivado</span>
+                          )}
+                        </div>
                         {project.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
                         )}
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenuItem onClick={() => setEditProject(project)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(project)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {renderProjectActions(project)}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">

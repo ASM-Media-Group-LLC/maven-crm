@@ -1270,6 +1270,7 @@ export type Database = {
           id: string
           name: string
           position: number
+          share_token: string | null
           status: string
           updated_at: string | null
         }
@@ -1281,6 +1282,7 @@ export type Database = {
           id?: string
           name: string
           position?: number
+          share_token?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -1292,6 +1294,7 @@ export type Database = {
           id?: string
           name?: string
           position?: number
+          share_token?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -1506,7 +1509,58 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_project_by_share_token: {
+        Args: { _token: string }
+        Returns: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          position: number
+          share_token: string | null
+          status: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "task_projects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_task_by_share_token: {
+        Args: { _token: string }
+        Returns: {
+          assigned_to: string
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          due_at: string
+          duration_hours: number
+          duration_minutes: number
+          id: string
+          overdue_reason: string | null
+          position: number
+          priority: string
+          project_id: string | null
+          share_token: string | null
+          start_at: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_tasks_by_project_share_token: {
         Args: { _token: string }
         Returns: {
           assigned_to: string
