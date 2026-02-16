@@ -1,26 +1,24 @@
 
 
-## Fijar columnas Ticket, Modelo y Red Social en la tabla de Promolog
+## Corregir columnas sticky en PromologTable
 
-### Objetivo
-Al hacer scroll horizontal en la tabla de entradas recientes, las primeras 3 columnas (Ticket, Modelo, Red Social) permaneceran fijas a la izquierda para poder identificar cada fila en todo momento. Esto sigue el mismo patron que la columna "Acciones" que ya esta fija a la derecha.
+### Problema
+Se aplicaron clases `sticky left-X` a las columnas Ticket, Modelo y Red Social tanto en los headers como en las celdas del body. El usuario solo quiere que los **titulos del header** queden fijos al hacer scroll vertical (que ya funciona con `sticky top-0`), no columnas fijas horizontalmente.
+
+### Solucion
+Revertir todas las clases `sticky left-X z-20 bg-card` de los `TableHead` y `sticky left-X z-10 bg-card` de los `TableCell` del body que se agregaron en el ultimo cambio.
 
 ### Cambios en `src/pages/promolog/PromologTable.tsx`
 
-**Headers (TableHead) - lineas 121-123:**
-- **Ticket**: agregar `sticky left-0 z-20 bg-card`
-- **Modelo**: agregar `sticky left-[XX px] z-20 bg-card` (posicion calculada segun el ancho de Ticket)
-- **Red Social**: agregar `sticky left-[YY px] z-20 bg-card` (posicion acumulada de Ticket + Modelo)
+**Headers (lineas 120-122):** Quitar `sticky left-0 z-20 bg-card`, `sticky left-[120px] z-20 bg-card`, `sticky left-[300px] z-20 bg-card` de los tres TableHead. Dejarlos sin className adicional como estaban antes.
 
-**Celdas del body (TableCell) - lineas 134, 137, 145:**
-- Aplicar las mismas clases `sticky left-0 bg-card`, `sticky left-[XX px] bg-card`, `sticky left-[YY px] bg-card` respectivamente para que las celdas de datos se alineen con sus headers.
+**Celdas del body (lineas 134, 137, 145):**
+- Ticket: quitar `sticky left-0 z-10 bg-card`
+- Modelo: quitar `sticky left-[120px] z-10 bg-card`, dejar solo `min-w-[180px]`
+- Red Social: quitar `sticky left-[300px] z-10 bg-card`
 
-Se usaran valores fijos de `left` basados en anchos minimos consistentes:
-- Ticket: `left-0`, ancho aprox ~120px
-- Modelo: `left-[120px]`, ancho aprox ~180px  
-- Red Social: `left-[300px]`
-
-Esto garantiza que al desplazarse horizontalmente, siempre se vean estas 3 columnas identificativas, mientras que Plataforma, Resultado, Agente y Fecha se desplazan normalmente.
+El header sticky vertical (`sticky top-0 z-10 bg-card` en el `TableHeader`) ya esta funcionando correctamente y se mantiene sin cambios.
 
 ### Archivo a modificar
 - `src/pages/promolog/PromologTable.tsx`
+
