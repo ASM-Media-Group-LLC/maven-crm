@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Plus, CalendarIcon } from "lucide-react";
+import { Plus, CalendarIcon, Search, Check } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,9 +25,10 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
   const { user } = useAuth();
   const { subtasks, createSubtask, updateSubtaskStatus, updateSubtaskFields, deleteSubtask, reorderSubtasks } = useSubtasks(taskId, parentSubtaskId);
   const [newTitle, setNewTitle] = useState("");
-  const [newPriority, setNewPriority] = useState("medium");
+  const [newPriority, setNewPriority] = useState("");
   const [newDueDate, setNewDueDate] = useState<Date | undefined>(undefined);
   const [newAssignedTo, setNewAssignedTo] = useState("");
+  const [assignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const dragIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -62,16 +64,18 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
 
   const profiles = externalProfiles || fetchedProfiles;
 
+  const selectedAssignName = profiles.find(p => p.id === newAssignedTo)?.full_name || "";
+
   const handleAdd = () => {
     if (!newTitle.trim()) return;
     createSubtask.mutate({
       title: newTitle.trim(),
-      priority: newPriority,
+      priority: newPriority || "medium",
       due_at: newDueDate ? newDueDate.toISOString() : null,
       assigned_to: newAssignedTo || null,
     });
     setNewTitle("");
-    setNewPriority("medium");
+    setNewPriority("");
     setNewDueDate(undefined);
     setNewAssignedTo("");
   };
@@ -145,9 +149,9 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
           className="h-7 text-xs flex-1 min-w-[120px]"
         />
 
-        <Select value={newPriority} onValueChange={setNewPriority}>
+        <Select value={newPriority || undefined} onValueChange={setNewPriority}>
           <SelectTrigger className="h-7 text-[10px] w-[85px] shrink-0">
-            <SelectValue />
+            <SelectValue placeholder="Prioridad" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="low">Baja</SelectItem>
@@ -170,17 +174,41 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
         </Popover>
 
         {profiles.length > 0 && (
-          <Select value={newAssignedTo || "__none__"} onValueChange={(v) => setNewAssignedTo(v === "__none__" ? "" : v)}>
-            <SelectTrigger className="h-7 text-[10px] w-[100px] shrink-0">
-              <SelectValue placeholder="Asignar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Sin asignar</SelectItem>
-              {profiles.map(p => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={assignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-7 text-[10px] px-2 shrink-0 w-[100px] justify-start", !newAssignedTo && "text-muted-foreground")}>
+                <span className="truncate">{newAssignedTo ? selectedAssignName || "Asignar" : "Asignar"}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
+                <CommandList>
+                  <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="__none__"
+                      onSelect={() => { setNewAssignedTo(""); setAssignPopoverOpen(false); }}
+                      className="text-xs"
+                    >
+                      Sin asignar
+                    </CommandItem>
+                    {profiles.map(p => (
+                      <CommandItem
+                        key={p.id}
+                        value={p.full_name || p.id}
+                        onSelect={() => { setNewAssignedTo(p.id); setAssignPopoverOpen(false); }}
+                        className="text-xs"
+                      >
+                        {p.full_name || "Sin nombre"}
+                        {newAssignedTo === p.id && <Check className="ml-auto h-3 w-3" />}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         )}
 
         <Button

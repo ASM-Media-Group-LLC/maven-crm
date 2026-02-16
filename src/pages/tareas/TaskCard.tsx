@@ -56,7 +56,7 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
 
   return (
     <Card className={`transition-all duration-300 hover:border-primary/30 ${isOverdue && !isCompleted ? "border-destructive/40" : ""}`}>
-      <CardContent className="p-4 flex flex-col gap-3">
+      <CardContent className="p-5 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-0.5">

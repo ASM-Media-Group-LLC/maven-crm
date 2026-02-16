@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useCallback, type ReactNode } from "react";
 import { GripVertical } from "lucide-react";
 
 interface DraggableGridProps<T extends { id: string }> {
@@ -17,10 +17,12 @@ const DraggableGrid = <T extends { id: string }>({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const draggedIndex = useRef<number>(-1);
+  const wasDragged = useRef(false);
 
   const handleDragStart = (id: string, index: number) => {
     setDraggedId(id);
     draggedIndex.current = index;
+    wasDragged.current = true;
   };
 
   const handleDragOver = (e: React.DragEvent, id: string) => {
@@ -53,7 +55,16 @@ const DraggableGrid = <T extends { id: string }>({
     setDraggedId(null);
     setOverId(null);
     draggedIndex.current = -1;
+    // Reset wasDragged after a tick so the click handler can read it
+    setTimeout(() => { wasDragged.current = false; }, 0);
   };
+
+  const handleClickCapture = useCallback((e: React.MouseEvent) => {
+    if (wasDragged.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, []);
 
   return (
     <div className={className}>
@@ -65,6 +76,7 @@ const DraggableGrid = <T extends { id: string }>({
           onDragOver={(e) => handleDragOver(e, item.id)}
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
+          onClickCapture={handleClickCapture}
           className={`relative transition-all duration-150 group/drag ${
             draggedId === item.id ? "opacity-40 scale-95" : ""
           } ${
