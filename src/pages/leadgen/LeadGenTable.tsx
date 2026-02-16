@@ -105,7 +105,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   });
 
   const SortHeader = ({ label, col }: { label: string; col: SortKey }) => (
-    <Button variant="ghost" size="sm" className="-ml-3 h-8" onClick={() => handleSort(col)}>
+    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs" onClick={() => handleSort(col)}>
       {label}
       <ArrowUpDown className="ml-1 h-3 w-3" />
     </Button>
