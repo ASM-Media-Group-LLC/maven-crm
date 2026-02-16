@@ -99,8 +99,9 @@ export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => 
   });
 
   const updateSubtaskFields = useMutation({
-    mutationFn: async (params: { id: string; priority?: string; due_at?: string | null; assigned_to?: string | null }) => {
+    mutationFn: async (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null }) => {
       const updates: any = {};
+      if (params.title !== undefined) updates.title = params.title;
       if (params.priority !== undefined) updates.priority = params.priority;
       if (params.due_at !== undefined) updates.due_at = params.due_at;
       if (params.assigned_to !== undefined) updates.assigned_to = params.assigned_to;
