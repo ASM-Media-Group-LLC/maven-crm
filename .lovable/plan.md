@@ -1,31 +1,93 @@
 
 
-## Corregir defaults de filtros en Tareas y Proyectos
+## Vista Kanban con Drag-and-Drop para Tareas y Proyectos
 
-### Problema
-Los selects de filtro en TareasContent y ProjectsListContent usan `"all"` como valor por defecto, mostrando "Todos" en vez del nombre del filtro (ej: "Estado", "Prioridad"). El usuario quiere que el placeholder descriptivo sea lo que se muestre cuando no hay filtro activo.
+### Resumen
+Transformar la vista Grid del modulo de Tareas en un tablero estilo Kanban (similar a Asana/Jira) donde las tarjetas de proyectos y tareas se puedan arrastrar y reorganizar libremente. La vista Grid pasa a ser la predeterminada.
 
-### Cambios
+---
 
-#### 1. `src/pages/tareas/TareasContent.tsx`
-- Cambiar los estados iniciales de `"all"` a `""`:
-  - `statusFilter`: `""` (placeholder: "Estado")
-  - `assignedFilter`: `""` (placeholder: "Asignado")
-  - `priorityFilter`: `""` (placeholder: "Prioridad")
-- En los `Select`, cambiar `value={statusFilter}` a `value={statusFilter || undefined}` para que cuando sea `""` se muestre el placeholder
-- Cambiar `<SelectItem value="all">` a `<SelectItem value="__all__">` y en `onValueChange` convertir `__all__` a `""`
-- Actualizar la logica de filtrado: cambiar `statusFilter === "all"` a `!statusFilter` (o `statusFilter === ""`)
+### 1. Cambios en Base de Datos
 
-#### 2. `src/pages/tareas/ProjectsListContent.tsx`
-- Mismo patron: cambiar `statusFilter` de `"all"` a `""`
-- Actualizar el Select para usar `__all__` y placeholder
-- Actualizar la logica de filtrado
+Se necesita un campo `position` en ambas tablas para persistir el orden personalizado del usuario.
 
-### Patron aplicado
-Seguir el mismo patron que ya usa `CreadoresFilters.tsx`:
-```
-value={value || undefined}
-onValueChange={(v) => onChange(v === "__all__" ? "" : v)}
+| Tabla | Columna nueva | Tipo | Default |
+|-------|--------------|------|---------|
+| `task_projects` | `position` | integer | 0 |
+| `tasks` | `position` | integer | 0 |
+
+Migracion SQL:
+```text
+ALTER TABLE public.task_projects ADD COLUMN position integer NOT NULL DEFAULT 0;
+ALTER TABLE public.tasks ADD COLUMN position integer NOT NULL DEFAULT 0;
 ```
 
-Esto garantiza consistencia con el resto de modulos del sistema (Contactos, Creadores, Eventos, Tickets, Promolog) que ya siguen este patron.
+---
+
+### 2. Cambios en la Vista de Proyectos (`ProjectsListContent.tsx`)
+
+- Cambiar el default de `viewMode` de `"list"` a `"grid"`
+- Reemplazar el grid estatico de tarjetas de proyectos por un nuevo componente `DraggableProjectsGrid` que implemente drag-and-drop nativo (HTML5) para reordenar las cards
+- Ordenar proyectos por `position` en lugar de `created_at`
+- Al soltar una card, actualizar el campo `position` de los proyectos afectados en Supabase
+
+### 3. Cambios en la Vista de Tareas (`TareasContent.tsx`)
+
+- Cambiar el default de `viewMode` de `"grid"` (ya esta) -- confirmar que ya es grid
+- Reemplazar el grid estatico de TaskCards por un nuevo componente `DraggableTasksGrid` con drag-and-drop nativo
+- Ordenar tareas por `position` como criterio principal (en lugar del ordenamiento por urgencia actual, que se mantendra como fallback cuando `position` sea 0 para todas)
+- Al soltar una card, actualizar el campo `position` de las tareas afectadas en Supabase
+
+### 4. Componente Reutilizable: `DraggableGrid`
+
+Crear un componente generico `DraggableGrid` que encapsule la logica de drag-and-drop para evitar duplicacion entre proyectos y tareas.
+
+**Archivo:** `src/pages/tareas/DraggableGrid.tsx`
+
+Funcionalidad:
+- Acepta una lista de items con `id` y un renderizador de cards
+- Maneja `draggable`, `onDragStart`, `onDragOver`, `onDrop` con estados visuales (indicador de posicion de destino)
+- Feedback visual: borde resaltado en la posicion de destino, opacidad reducida en la card arrastrada
+- Callback `onReorder(reorderedIds: string[])` que el padre usa para persistir el nuevo orden
+
+### 5. Hook de Reordenamiento
+
+**Agregar a `useProjects.ts`:**
+- Mutation `reorderProjects` que recibe un array de IDs ordenados y actualiza el campo `position` de cada proyecto
+
+**Agregar a `useTareas.ts`:**
+- Mutation `reorderTasks` que recibe un array de IDs ordenados y actualiza el campo `position` de cada tarea
+- Modificar la query de tareas para ordenar por `position ASC, due_at ASC`
+
+### 6. Subtareas -- Ya Implementado
+
+El drag-and-drop de subtareas ya existe en `SubtasksPanel.tsx` con el campo `position` en la tabla `subtasks`. No se necesitan cambios adicionales.
+
+---
+
+### Archivos a crear
+
+| Archivo | Descripcion |
+|---------|-------------|
+| `src/pages/tareas/DraggableGrid.tsx` | Componente generico de grid con drag-and-drop |
+
+### Archivos a modificar
+
+| Archivo | Cambios |
+|---------|---------|
+| Migracion SQL | Agregar columna `position` a `task_projects` y `tasks` |
+| `src/pages/tareas/useProjects.ts` | Agregar mutation `reorderProjects`, ordenar por `position` |
+| `src/pages/tareas/useTareas.ts` | Agregar mutation `reorderTasks`, ordenar por `position, due_at` |
+| `src/pages/tareas/ProjectsListContent.tsx` | Default a grid, usar `DraggableGrid` |
+| `src/pages/tareas/TareasContent.tsx` | Usar `DraggableGrid` en vez del grid estatico |
+| `src/integrations/supabase/types.ts` | Agregar `position` a los tipos de tasks y task_projects |
+
+### Flujo de usuario
+
+1. El usuario entra a `/tareas` y ve los proyectos en formato Grid (vista por defecto)
+2. Arrastra una tarjeta de proyecto y la suelta en otra posicion -- el orden se guarda automaticamente
+3. Al entrar a un proyecto, ve las tareas tambien en Grid
+4. Arrastra tarjetas de tareas para reorganizarlas a su gusto
+5. El orden personalizado se persiste y se mantiene entre sesiones
+6. Puede cambiar a vista de Tabla en cualquier momento con el toggle existente
+
