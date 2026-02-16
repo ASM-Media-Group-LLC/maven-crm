@@ -385,7 +385,7 @@ const PromologContent = () => {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* Dashboard tab */}
         {activeTab === "dashboard" && (
-          <div className="flex flex-col flex-1 min-h-0 space-y-6">
+          <div className="space-y-6">
             {/* KPI Cards */}
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
@@ -582,18 +582,16 @@ const PromologContent = () => {
             </div>
 
             {/* Entries */}
-            <div className="flex flex-col flex-1 min-h-0">
-              <div className="flex items-center gap-2 shrink-0 mb-3">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">Entradas Recientes</h2>
                 <span className="text-sm text-muted-foreground">{filteredEntries.length} entradas</span>
               </div>
-              <div className="flex-1 min-h-0">
-                {entryView === "list" ? (
-                  <PromologTable entries={filteredEntries} />
-                ) : (
-                  <PromologGrid entries={filteredEntries} />
-                )}
-              </div>
+              {entryView === "list" ? (
+                <PromologTable entries={filteredEntries} />
+              ) : (
+                <PromologGrid entries={filteredEntries} />
+              )}
             </div>
           </div>
         )}
