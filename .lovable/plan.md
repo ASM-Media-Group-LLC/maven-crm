@@ -1,80 +1,103 @@
 
 
-## Redisenar vista de tareas estilo ClickUp
+## Mejoras avanzadas en subtareas: estados, fechas y asignacion
 
-### Problema actual
+### Resumen
 
-Las cards de tareas son demasiado pequenas para gestionar subtareas comodamente. El formulario de subtareas, los controles de edicion y la informacion se comprimen dentro de una card limitada. La experiencia es muy distinta a lo que se espera de un gestor de tareas profesional como ClickUp.
-
-### Solucion propuesta
-
-Crear una **tercera vista tipo lista ClickUp** (ademas de la grid y la tabla existentes) que se convierta en la vista predeterminada. Esta vista muestra las tareas como filas expandibles agrupadas por estado, con columnas claras y subtareas anidadas directamente debajo de cada tarea.
+Ampliar la gestion de subtareas para incluir: flujo completo de estados (pendiente, en progreso, pausada, completada), fecha de inicio planificada, fecha limite, y asignacion mejorada. Todo visible directamente en cada fila de subtarea sin necesidad de abrir modales.
 
 ---
 
-### Diseno visual (inspirado en el screenshot de ClickUp)
+### Cambios en base de datos
 
-```text
-+-----------------------------------------------------------------------+
-| v PENDIENTE  3  ...  +                                                |
-|-----------------------------------------------------------------------|
-|   Nombre              Persona asignada   Fecha limite   Prioridad   + |
-|-----------------------------------------------------------------------|
-|   v  Tarea ejemplo    [JR avatar]        15/02/26       Media       . |
-|      |-- Subtarea 1   [MA]               16/02/26       Alta          |
-|      |-- Subtarea 2   Sin asignar        --             Baja          |
-|      + Agregar subtarea...                                            |
-|-----------------------------------------------------------------------|
-|   >  Otra tarea       [JR]               20/02/26       Urgente     . |
-|-----------------------------------------------------------------------|
-|   + Agregar Tarea                                                     |
-+-----------------------------------------------------------------------+
-| > EN CURSO  2                                                         |
-+-----------------------------------------------------------------------+
-| > COMPLETADAS  5                                                      |
-+-----------------------------------------------------------------------+
+Se necesita agregar una columna `start_at` a la tabla `subtasks` para la fecha de inicio planificada (distinta de `started_at` que registra cuando realmente se inicio).
+
+| Columna | Tipo | Proposito |
+|---------|------|-----------|
+| `start_at` | timestamp with time zone, nullable | Fecha de inicio planificada por el usuario |
+
+Migracion SQL:
+```sql
+ALTER TABLE subtasks ADD COLUMN start_at timestamp with time zone;
 ```
 
-### Cambios planificados
+---
+
+### Flujo de estados
+
+Los estados disponibles seran:
+
+| Estado | Badge | Transiciones posibles |
+|--------|-------|-----------------------|
+| Pendiente (`pending`) | Gris/secondary | Iniciar, Completar |
+| En progreso (`in_progress`) | Azul/primary | Pausar, Completar |
+| Pausada (`paused`) | Amarillo/warning | Reanudar, Completar |
+| Completada (`completed`) | Verde/emerald | (estado final) |
+
+En lugar de botones individuales por estado, se usara un **dropdown de estado** clickeable directamente en la fila, con iconos y colores para cada opcion. Esto reemplaza los botones Play/CheckCircle actuales.
+
+---
+
+### Cambios por archivo
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/TaskListView.tsx` | **Nuevo**. Vista tipo lista ClickUp con tareas agrupadas por estado (Pendiente, En Curso, Completadas), filas expandibles con subtareas inline, y formulario de creacion rapida integrado en cada grupo. |
-| `src/pages/tareas/TaskListRow.tsx` | **Nuevo**. Fila individual de tarea con columnas: nombre (expandible), persona asignada, fecha limite, prioridad, acciones. Al expandir muestra subtareas anidadas con el mismo patron de columnas. |
-| `src/pages/tareas/TareasContent.tsx` | Agregar la tercera opcion de vista ("list-clickup") y hacerla predeterminada. Mantener grid y tabla como alternativas. |
-| `src/pages/tareas/SubtasksPanel.tsx` | Adaptar para funcionar tanto dentro de cards como dentro de la vista de lista (recibir prop `variant="list"` para layout horizontal con columnas alineadas). |
+| **Nueva migracion** | Agregar columna `start_at` a `subtasks` |
+| `src/integrations/supabase/types.ts` | Actualizar tipo generado si es necesario (el cast `as any` actual lo maneja) |
+| `src/pages/tareas/useSubtasks.ts` | Actualizar interface `Subtask` con `start_at`. Actualizar `createSubtask` para recibir `start_at`. Actualizar `updateSubtaskFields` para recibir `start_at` y `status`. Agregar logica de `paused` en `updateSubtaskStatus`. |
+| `src/pages/tareas/SubtaskItem.tsx` | Redisenar la fila: (1) Reemplazar botones Play/Complete por un dropdown de estado con 4 opciones. (2) Mostrar fecha inicio y fecha fin lado a lado. (3) Mostrar asignado con avatar/nombre. (4) En modo edicion, agregar campo de fecha inicio ademas de fecha fin. |
+| `src/pages/tareas/SubtasksPanel.tsx` | Agregar campo "Fecha inicio" al formulario de creacion (un segundo datepicker junto al de "Fecha fin"). Renombrar el datepicker actual de "Fecha" a "Fin". |
 
 ---
 
 ### Detalle tecnico
 
-#### 1. TaskListView - Vista agrupada por estado
+#### 1. Dropdown de estado en SubtaskItem
 
-- Agrupa las tareas en 3 secciones colapsables: **Pendiente**, **En Curso**, **Completadas**
-- Cada seccion tiene un header con badge de color, contador y boton "+"
-- Las secciones son `Collapsible` (se pueden colapsar/expandir)
-- Header de columnas: Nombre | Persona asignada | Fecha limite | Prioridad | Acciones
+Reemplazar los botones de accion (Play, CheckCircle) por un `DropdownMenu` que muestra el badge de estado actual como trigger:
 
-#### 2. TaskListRow - Fila expandible
+```text
+[v Pendiente]  -->  click  -->  | Iniciar       |
+                                | Completar     |
 
-- Cada tarea ocupa una fila completa del ancho de pantalla (no una card pequena)
-- Click en el chevron expande/colapsa las subtareas debajo
-- Las subtareas se muestran con indentacion y el mismo patron de columnas
-- Formulario "Agregar subtarea" inline al final de las subtareas expandidas
-- Acciones en hover: editar, completar, eliminar (menu contextual)
-- El titulo de la tarea es mas grande y legible (`text-sm font-medium`)
+[v En progreso] --> click -->   | Pausar        |
+                                | Completar     |
 
-#### 3. Formulario de creacion inline
+[v Pausada]    -->  click  -->  | Reanudar      |
+                                | Completar     |
 
-- Al hacer clic en "+ Agregar Tarea" dentro de un grupo de estado, aparece una fila inline con:
-  - Input de titulo (ocupando la columna de nombre)
-  - Selectores de asignacion, fecha y prioridad alineados con las columnas
-  - Botones "Guardar" y "Cancelar"
-- Mismo patron para subtareas dentro de una tarea expandida
+[v Completada] -->  (sin menu, estado final)
+```
 
-#### 4. Integracion en TareasContent
+Cada opcion actualiza el status y los timestamps correspondientes:
+- "Iniciar": status=in_progress, started_at=now()
+- "Pausar": status=paused (no borra started_at)
+- "Reanudar": status=in_progress
+- "Completar": status=completed, completed_at=now()
 
-- Agregar icono de vista lista (tipo `AlignJustify`) junto a los iconos existentes de Grid y Table
-- Hacer esta vista la predeterminada (`useState<"grid" | "list" | "clickup">("clickup")`)
-- Pasar los mismos handlers (onComplete, onEdit, onDelete, onJustify)
+#### 2. Fechas de inicio y fin en la fila
+
+La fila mostrara dos fechas:
+- Icono calendario + "Inicio: dd/MM/yy" (de `start_at`, planificado por el usuario)
+- Icono calendario + "Fin: dd/MM/yy" (de `due_at`, deadline)
+
+Si alguna no esta definida, no se muestra.
+
+#### 3. Formulario de creacion actualizado
+
+El formulario en SubtasksPanel tendra:
+
+```text
+[  Nueva subtarea...  ] [Prioridad v] [Inicio] [Fin] [Asignar] [+]
+```
+
+Dos datepickers: uno para `start_at` (placeholder "Inicio") y otro para `due_at` (placeholder "Fin").
+
+#### 4. Formulario de edicion actualizado
+
+En modo edicion de SubtaskItem, agregar:
+- Campo de estado (Select con las 4 opciones)
+- Datepicker de fecha de inicio
+- Datepicker de fecha fin (ya existente, renombrado)
+- Asignacion con buscador (ya existente)
 
