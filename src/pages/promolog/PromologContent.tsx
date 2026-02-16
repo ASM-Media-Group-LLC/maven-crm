@@ -23,11 +23,10 @@ import {
   Send,
   Eye,
 } from "lucide-react";
-import { es } from "date-fns/locale";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -145,8 +144,8 @@ const PromologContent = () => {
     { value: "C", label: "C - Regular" },
   ];
 
-  const [date, setDate] = useState<Date>(new Date());
-  const [open, setOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
   const [activeTab, setActiveTab] = useState<"dashboard" | "agentes" | "campanas" | "calendario">("dashboard");
 
   const [selectedCreator, setSelectedCreator] = useState("");
@@ -268,8 +267,8 @@ const PromologContent = () => {
     return true;
   });
 
-  const formattedDate = date.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
-  const shortDate = date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
+  const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -282,22 +281,12 @@ const PromologContent = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 h-9">
-                <CalendarDays className="h-4 w-4" />
-                {formattedDate}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={date} onSelect={(d) => { if (d) { setDate(d); setOpen(false); } }} locale={es} weekStartsOn={1} className="p-3 pointer-events-auto" />
-              <Separator />
-              <div className="flex items-center gap-2 p-2">
-                <Button variant="ghost" size="sm" onClick={() => { setDate(new Date()); setOpen(false); }}>Hoy</Button>
-                <Button variant="ghost" size="sm" onClick={() => { const d = new Date(); d.setDate(d.getDate() - 7); setDate(d); setOpen(false); }}>7 días</Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+            className="h-9"
+          />
           <Button variant={activeTab === "agentes" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "agentes" ? "dashboard" : "agentes")}>
             <Eye className="mr-1.5 h-4 w-4" />
             Ver Agentes
