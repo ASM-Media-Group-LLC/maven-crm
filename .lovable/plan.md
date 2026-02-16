@@ -1,32 +1,42 @@
 
 
-## Reemplazar el date picker simple por el DateRangePicker del sistema de diseno
+## Agregar seccion de Filtros colapsable entre las cards de redes/plataformas y Entradas Recientes
 
-Actualmente el Promolog usa un `Calendar` con `mode="single"` dentro de un Popover manual. La imagen y el requerimiento piden poder seleccionar un dia o un rango de dias. El proyecto ya tiene el componente `DateRangePicker` estandarizado que soporta ambos casos (seleccionar un solo dia = from y to iguales, o un rango completo).
+La imagen muestra una seccion "Filtros" con un Collapsible/Accordion que contiene tres selectores en fila: **Creador/a**, **Red Social** y **Estado**, seguida de una barra de tabs con **Tabla**, **Calendario** y **Campanas**.
 
 ### Cambios en `src/pages/promolog/PromologContent.tsx`
 
-1. **Reemplazar el estado `date`** por dos estados `dateFrom` y `dateTo` (ambos `Date | undefined`), inicializados al dia de hoy.
+1. **Agregar import** de `Collapsible, CollapsibleContent, CollapsibleTrigger` desde `@/components/ui/collapsible` y `ChevronUp` desde lucide-react.
 
-2. **Eliminar el Popover + Calendar manual** (lineas 285-299) y reemplazarlo por el componente `DateRangePicker` ya existente:
-   ```text
-   <DateRangePicker
-     from={dateFrom}
-     to={dateTo}
-     onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-   />
-   ```
+2. **Insertar seccion de Filtros** (entre las lineas 452 y 454, despues del cierre de "Social and Platform Section" y antes de "Entries"):
+   - Un `Card` conteniendo un `Collapsible` (abierto por defecto).
+   - El trigger muestra un icono de chevron animado y el titulo "Filtros".
+   - El contenido muestra 3 selectores en una grilla de 3 columnas:
+     - **Creador/a**: Select con "Todos" + lista de creators del query existente.
+     - **Red Social**: Reutiliza el estado `selectedNetwork` con las opciones Instagram, TikTok, X, Telegram.
+     - **Estado**: Reutiliza el estado `selectedStatus` con Todos, Si, No, Parcial, Pendiente.
 
-3. **Eliminar imports innecesarios**: `Calendar`, `Popover`, `PopoverContent`, `PopoverTrigger` (si no se usan en otro lugar del archivo), y `CalendarDays`.
+3. **Agregar barra de tabs debajo de los filtros** con tres opciones: Tabla (icono Table2), Calendario (icono CalendarDays), Campanas (icono Target). Estas tabs controlan la vista de las entradas (reutilizando estados existentes).
 
-4. **Agregar import** de `DateRangePicker` desde `@/components/ui/date-range-picker`.
+4. **Mover los filtros de la barra superior** (searchEntry, selectedStatus, selectedNetwork, selectedCategory, view toggles) que estan en la barra debajo del header: se eliminan los selectores de Estado y Red Social de ahi ya que se mueven a la seccion de Filtros. Se mantiene el buscador y los toggles de vista en la barra superior.
 
-5. **Actualizar la logica de filtrado** de entries para que filtre por rango (`dateFrom` <= fecha entrada <= `dateTo`) en lugar de comparar con un solo dia. Si solo se selecciona un dia (from === to), se comporta igual que antes.
+5. **Agregar estado** `filtersOpen` (boolean, default true) para controlar el collapsible, y `selectedCreatorFilter` (string) para el filtro de creador/a.
 
-6. **Eliminar el estado `open`** ya que el DateRangePicker maneja su propio popover internamente.
+### Estructura visual
 
-### Beneficios
+```text
+[Promociones por Red Social y Plataforma]
+  ... cards existentes ...
 
-- Reutiliza el componente estandarizado del sistema de diseno con presets rapidos (Hoy, Ayer, Esta semana, etc.)
-- Permite seleccionar un solo dia o un rango
-- Mantiene consistencia visual con el resto de la plataforma (Eventos, Sales Overview, Sales Dashboard)
+[Card: Filtros (colapsable)]
+  Creador/a: [Select: Todos]   Red Social: [Select: Todas]   Estado: [Select: Todos]
+
+[Tabs: Tabla | Calendario | Campanas]
+
+[Entradas Recientes]
+  ... tabla/grid existente ...
+```
+
+### Archivo a modificar
+- `src/pages/promolog/PromologContent.tsx`
+
