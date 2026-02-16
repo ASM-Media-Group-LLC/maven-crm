@@ -19,6 +19,7 @@ export interface Subtask {
   assigned_to: string | null;
   priority: string;
   due_at: string | null;
+  start_at: string | null;
 }
 
 export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => {
@@ -56,6 +57,7 @@ export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => 
       priority?: string;
       due_at?: string | null;
       assigned_to?: string | null;
+      start_at?: string | null;
     }) => {
       if (!user) throw new Error("Not authenticated");
       const maxPosition = subtasks.length > 0 ? Math.max(...subtasks.map(s => s.position)) + 1 : 0;
@@ -68,6 +70,7 @@ export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => 
         priority: params.priority || "medium",
         due_at: params.due_at || null,
         assigned_to: params.assigned_to || null,
+        start_at: params.start_at || null,
       } as any);
       if (error) throw error;
     },
@@ -82,8 +85,11 @@ export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => 
   const updateSubtaskStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updates: any = { status };
-      if (status === "in_progress") updates.started_at = new Date().toISOString();
+      if (status === "in_progress" && !subtasks.find(s => s.id === id)?.started_at) {
+        updates.started_at = new Date().toISOString();
+      }
       if (status === "completed") updates.completed_at = new Date().toISOString();
+      // paused: no timestamp changes needed
       const { error } = await supabase
         .from("subtasks" as any)
         .update(updates)
@@ -99,12 +105,14 @@ export const useSubtasks = (taskId: string, parentSubtaskId?: string | null) => 
   });
 
   const updateSubtaskFields = useMutation({
-    mutationFn: async (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null }) => {
+    mutationFn: async (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null; start_at?: string | null; status?: string }) => {
       const updates: any = {};
       if (params.title !== undefined) updates.title = params.title;
       if (params.priority !== undefined) updates.priority = params.priority;
       if (params.due_at !== undefined) updates.due_at = params.due_at;
       if (params.assigned_to !== undefined) updates.assigned_to = params.assigned_to;
+      if (params.start_at !== undefined) updates.start_at = params.start_at;
+      if (params.status !== undefined) updates.status = params.status;
       const { error } = await supabase
         .from("subtasks" as any)
         .update(updates)

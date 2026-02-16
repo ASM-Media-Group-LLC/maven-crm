@@ -1201,6 +1201,7 @@ export type Database = {
           parent_subtask_id: string | null
           position: number
           priority: string
+          start_at: string | null
           started_at: string | null
           status: string
           task_id: string
@@ -1218,6 +1219,7 @@ export type Database = {
           parent_subtask_id?: string | null
           position?: number
           priority?: string
+          start_at?: string | null
           started_at?: string | null
           status?: string
           task_id: string
@@ -1235,6 +1237,7 @@ export type Database = {
           parent_subtask_id?: string | null
           position?: number
           priority?: string
+          start_at?: string | null
           started_at?: string | null
           status?: string
           task_id?: string

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Plus, CalendarIcon, Search, Check } from "lucide-react";
+import { Plus, CalendarIcon, Check } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState("");
   const [newDueDate, setNewDueDate] = useState<Date | undefined>(undefined);
+  const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);
   const [newAssignedTo, setNewAssignedTo] = useState("");
   const [assignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const dragIndex = useRef<number | null>(null);
@@ -72,11 +73,13 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
       title: newTitle.trim(),
       priority: newPriority || "medium",
       due_at: newDueDate ? newDueDate.toISOString() : null,
+      start_at: newStartDate ? newStartDate.toISOString() : null,
       assigned_to: newAssignedTo || null,
     });
     setNewTitle("");
     setNewPriority("");
     setNewDueDate(undefined);
+    setNewStartDate(undefined);
     setNewAssignedTo("");
   };
 
@@ -128,8 +131,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
             profiles={profiles}
             index={i}
             depth={depth}
-            onStart={(id) => updateSubtaskStatus.mutate({ id, status: "in_progress" })}
-            onComplete={(id) => updateSubtaskStatus.mutate({ id, status: "completed" })}
+            onStatusChange={(id, status) => updateSubtaskStatus.mutate({ id, status })}
             onDelete={(id) => deleteSubtask.mutate(id)}
             onUpdate={(params) => updateSubtaskFields.mutate(params)}
             onDragStart={handleDragStart}
@@ -163,9 +165,21 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
 
         <Popover>
           <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", !newStartDate && "text-muted-foreground")}>
+              <CalendarIcon className="h-3 w-3 mr-1" />
+              {newStartDate ? format(newStartDate, "dd/MM/yy") : "Inicio"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={newStartDate} onSelect={setNewStartDate} initialFocus className="p-3 pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", !newDueDate && "text-muted-foreground")}>
               <CalendarIcon className="h-3 w-3 mr-1" />
-              {newDueDate ? format(newDueDate, "dd/MM/yy") : "Fecha"}
+              {newDueDate ? format(newDueDate, "dd/MM/yy") : "Fin"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
