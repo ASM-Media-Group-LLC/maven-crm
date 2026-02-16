@@ -1,37 +1,106 @@
 
 
-## Ajustes al DateRangePicker
+## Corregir recursion infinita en RLS de task_projects y project_members
 
-### Problemas detectados (visible en screenshot)
+### Problema
 
-1. **Overflow horizontal**: El popover con sidebar de presets + 2 meses de calendario es demasiado ancho y se corta en el borde derecho de la pantalla
-2. **Botones Aplicar/Cancelar no visibles**: El footer queda fuera del area visible
-3. **Sin scroll ni ajuste responsive**: No hay mecanismo para manejar viewports mas reducidos
+Las politicas RLS de `task_projects` y `project_members` se referencian mutuamente:
+- `task_projects` SELECT consulta `project_members`
+- `project_members` SELECT/INSERT/UPDATE/DELETE consulta `task_projects`
+
+Esto causa el error `42P17: infinite recursion detected in policy`. Ademas, la politica SELECT de `task_projects` tiene un bug: `pm.project_id = pm.id` deberia ser `pm.project_id = task_projects.id`.
 
 ### Solucion
 
+Crear funciones SECURITY DEFINER que rompan el ciclo de recursion, luego reemplazar las politicas RLS.
+
+### Cambios (una sola migracion SQL)
+
+1. **Crear funcion `is_project_member`** (SECURITY DEFINER) que consulta `project_members` directamente sin pasar por RLS:
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_project_member(_user_id uuid, _project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.project_members
+    WHERE user_id = _user_id AND project_id = _project_id
+  )
+$$;
+```
+
+2. **Crear funcion `is_project_creator`** (SECURITY DEFINER) que consulta `task_projects` directamente:
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_project_creator(_user_id uuid, _project_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.task_projects
+    WHERE id = _project_id AND created_by = _user_id
+  )
+$$;
+```
+
+3. **Reemplazar politica SELECT de `task_projects`** para usar la funcion en vez de subconsulta directa (y corregir el bug `pm.project_id = pm.id`):
+
+```sql
+DROP POLICY IF EXISTS "Users can view relevant projects" ON task_projects;
+CREATE POLICY "Users can view relevant projects"
+ON task_projects FOR SELECT TO authenticated
+USING (
+  created_by = auth.uid()
+  OR user_has_tasks_in_project(auth.uid(), id)
+  OR is_project_member(auth.uid(), id)
+);
+```
+
+4. **Reemplazar politicas de `project_members`** para usar `is_project_creator` en vez de subconsulta a `task_projects`:
+
+```sql
+-- SELECT
+DROP POLICY IF EXISTS "Users can view project members" ON project_members;
+CREATE POLICY "Users can view project members"
+ON project_members FOR SELECT TO authenticated
+USING (
+  user_id = auth.uid()
+  OR is_project_creator(auth.uid(), project_id)
+  OR user_has_tasks_in_project(auth.uid(), project_id)
+);
+
+-- INSERT
+DROP POLICY IF EXISTS "Project creators can add members" ON project_members;
+CREATE POLICY "Project creators can add members"
+ON project_members FOR INSERT TO authenticated
+WITH CHECK (is_project_creator(auth.uid(), project_id));
+
+-- UPDATE
+DROP POLICY IF EXISTS "Project creators can update members" ON project_members;
+CREATE POLICY "Project creators can update members"
+ON project_members FOR UPDATE TO authenticated
+USING (is_project_creator(auth.uid(), project_id));
+
+-- DELETE
+DROP POLICY IF EXISTS "Project creators can delete members" ON project_members;
+CREATE POLICY "Project creators can delete members"
+ON project_members FOR DELETE TO authenticated
+USING (is_project_creator(auth.uid(), project_id));
+```
+
+### Archivos a modificar
+
 | Archivo | Cambios |
 |---------|---------|
-| `src/components/ui/date-range-picker.tsx` | Ajustes de layout, overflow y responsive |
+| Nueva migracion SQL | Crear funciones SECURITY DEFINER y reemplazar politicas RLS |
 
-### Cambios especificos
+### Por que funciona
 
-1. **PopoverContent**: Agregar `sideOffset={4}` y cambiar `align="start"` a `align="center"` para mejor posicionamiento. Agregar clases de max-height y overflow-auto para que el contenido sea scrollable si no cabe.
-
-2. **Layout responsive**: Cambiar el layout interno de `flex` horizontal a un esquema que maneje overflow:
-   - Agregar `max-h-[calc(100vh-100px)] overflow-auto` al contenedor principal dentro del popover
-   - Agregar `max-w-[calc(100vw-32px)]` para evitar que se salga de la pantalla
-
-3. **Calendario responsive**: En pantallas donde no caben 2 meses lado a lado con la sidebar de presets, reducir a 1 mes o hacer la sidebar colapsable. Usar `numberOfMonths={1}` en mobile y `numberOfMonths={2}` en desktop via el hook `use-mobile`.
-
-4. **Footer siempre visible**: Usar `sticky bottom-0 bg-popover` en el footer para que los botones Aplicar/Cancelar siempre sean accesibles.
-
-5. **Inputs de fecha**: Centrar los inputs de fecha manualmente entre ambos calendarios usando `justify-center`.
-
-### Detalles tecnicos
-
-- Importar `useIsMobile` de `@/hooks/use-mobile` para determinar `numberOfMonths`
-- El PopoverContent usara `className="w-auto p-0 max-w-[calc(100vw-32px)]"` y `collisionPadding={16}` para que Radix Popover respete los bordes del viewport
-- El contenedor flex interno tendra `overflow-auto max-h-[80vh]`
-- El footer usara `sticky bottom-0 bg-popover z-10 border-t` para mantenerse siempre visible
-
+Las funciones SECURITY DEFINER se ejecutan con los privilegios del owner (superuser), lo que significa que NO pasan por las politicas RLS de la tabla que consultan. Esto rompe el ciclo de recursion mientras mantiene la seguridad de acceso.
