@@ -43,6 +43,7 @@ import NuevoContacto from "./pages/NuevoContacto";
 import Tareas from "./pages/Tareas";
 import TareaProject from "./pages/TareaProject";
 import TaskSharePage from "./pages/tareas/TaskSharePage";
+import ProjectSharePage from "./pages/tareas/ProjectSharePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
+              <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />
 
               {/* Protected routes */}
               <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />

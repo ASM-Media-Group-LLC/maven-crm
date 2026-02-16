@@ -11,6 +11,7 @@ export interface TaskProject {
   company_id: string | null;
   created_by: string;
   status: string;
+  share_token: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -40,7 +41,6 @@ export const useProjects = () => {
       const { data, error } = await supabase
         .from("task_projects" as any)
         .select("*")
-        .eq("status", "active")
         .order("position", { ascending: true })
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -54,10 +54,10 @@ export const useProjects = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks" as any)
-        .select("id, status, due_at, project_id")
+        .select("id, status, due_at, project_id, priority")
         .order("due_at", { ascending: true });
       if (error) throw error;
-      return (data || []) as unknown as { id: string; status: string; due_at: string; project_id: string | null }[];
+      return (data || []) as unknown as { id: string; status: string; due_at: string; project_id: string | null; priority: string }[];
     },
     enabled: !!user,
   });
@@ -159,6 +159,26 @@ export const useProjects = () => {
     return { pending, in_progress, paused, overdue, completed };
   };
 
+  const archiveProject = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase
+        .from("task_projects" as any)
+        .update({ status } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      toast({
+        title: vars.status === "archived" ? "Proyecto archivado" : "Proyecto reactivado",
+        description: vars.status === "archived" ? "El proyecto fue archivado." : "El proyecto fue reactivado.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el estado.", variant: "destructive" });
+    },
+  });
+
   const reorderProjects = useMutation({
     mutationFn: async (orderedIds: string[]) => {
       const updates = orderedIds.map((id, index) =>
@@ -175,11 +195,13 @@ export const useProjects = () => {
 
   return {
     projects,
+    allTasks,
     isLoading,
     profile,
     createProject,
     updateProject,
     deleteProject,
+    archiveProject,
     getProjectTaskCounts,
     reorderProjects,
   };
