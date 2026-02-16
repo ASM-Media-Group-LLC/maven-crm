@@ -38,7 +38,7 @@ const ComparativaTable = ({ creators }: Props) => {
 
   const header = (label: string, key: SortKey) => (
     <TableHead
-      className="cursor-pointer select-none text-xs hover:text-foreground sticky top-0 z-10 bg-card"
+      className="cursor-pointer select-none text-xs hover:text-foreground"
       onClick={() => handleSort(key)}
     >
       {label} {sortKey === key ? (sortDir === "asc" ? "↑" : "↓") : ""}
@@ -51,9 +51,9 @@ const ComparativaTable = ({ creators }: Props) => {
         <p className="text-sm font-medium text-foreground">Tabla Comparativa</p>
         <div className="overflow-auto max-h-[calc(100vh-24rem)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
-                <TableHead className="w-10 sticky top-0 z-10 bg-card text-xs">#</TableHead>
+                <TableHead className="w-10 text-xs">#</TableHead>
                 {header("Creadora", "artisticName")}
                 {header("Actual", "currentEarnings")}
                 {header("Anterior", "previousEarnings")}

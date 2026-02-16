@@ -60,9 +60,9 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete }
   );
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border max-h-[calc(100vh-24rem)] overflow-auto">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado" col="assigned" /></TableHead>
