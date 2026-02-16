@@ -2,6 +2,9 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 
 interface Props {
   entries: PromologEntry[];
+  onView?: (entry: PromologEntry) => void;
+  onEdit?: (entry: PromologEntry) => void;
+  onDelete?: (entry: PromologEntry) => void;
 }
 
 const PromologGrid = ({ entries }: Props) => {
