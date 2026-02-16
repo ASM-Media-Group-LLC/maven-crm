@@ -259,6 +259,11 @@ const PromologContent = () => {
   const [searchEntry, setSearchEntry] = useState("");
 
   const filteredEntries = mockEntries.filter((entry) => {
+    if (selectedCreatorFilter !== "") {
+      const selectedCreator = creators.find((c) => c.id === selectedCreatorFilter);
+      const creatorName = selectedCreator?.artistic_name || selectedCreator?.name || "";
+      if (!entry.name.toLowerCase().includes(creatorName.toLowerCase())) return false;
+    }
     if (selectedStatus !== "") {
       const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
       if (entry.result !== statusMap[selectedStatus]) return false;
@@ -485,6 +490,23 @@ const PromologContent = () => {
                       </Select>
                     </div>
                   </div>
+                  {(selectedCreatorFilter !== "" || selectedNetwork !== "" || selectedStatus !== "") && (
+                    <div className="flex justify-end px-4 pb-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs text-muted-foreground"
+                        onClick={() => {
+                          setSelectedCreatorFilter("");
+                          setSelectedNetwork("");
+                          setSelectedStatus("");
+                        }}
+                      >
+                        <X className="mr-1 h-3.5 w-3.5" />
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  )}
                 </CollapsibleContent>
               </Collapsible>
             </Card>
