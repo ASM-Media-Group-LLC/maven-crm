@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { buttonVariants } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DateRangePickerProps {
   from: Date | undefined;
@@ -77,6 +78,7 @@ function DateRangePicker({
   placeholder = "Seleccionar fechas",
   className,
 }: DateRangePickerProps) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   const [range, setRange] = React.useState<DateRange | undefined>(
     from || to ? { from, to } : undefined
@@ -153,10 +155,10 @@ function DateRangePicker({
           {triggerLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex">
+      <PopoverContent className="w-auto p-0 max-w-[calc(100vw-32px)]" align="center" sideOffset={4} collisionPadding={16}>
+        <div className="flex max-h-[80vh] overflow-auto">
           {/* Presets sidebar */}
-          <div className="border-r border-border p-3 space-y-1 min-w-[130px]">
+          <div className="border-r border-border p-3 space-y-1 min-w-[130px] hidden sm:block">
             <p className="text-xs font-medium text-muted-foreground mb-2">Acceso rápido</p>
             {presets.map((preset) => (
               <Button
@@ -177,7 +179,7 @@ function DateRangePicker({
               mode="range"
               selected={range}
               onSelect={handleSelect}
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               locale={es}
               showOutsideDays
               className="pointer-events-auto"
@@ -215,7 +217,7 @@ function DateRangePicker({
             />
 
             {/* Manual date inputs */}
-            <div className="flex items-center gap-2 mt-3 px-1">
+            <div className="flex items-center justify-center gap-2 mt-3 px-1">
               <Input
                 placeholder="dd/mm/yyyy"
                 value={inputFrom}
@@ -234,7 +236,7 @@ function DateRangePicker({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border">
+            <div className="sticky bottom-0 bg-popover z-10 flex justify-end gap-2 mt-3 pt-3 border-t border-border">
               <Button variant="ghost" size="sm" onClick={handleCancel}>
                 Cancelar
               </Button>
