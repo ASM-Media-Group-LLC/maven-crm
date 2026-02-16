@@ -15,6 +15,7 @@ export interface Task {
   priority: string;
   duration_hours: number;
   duration_minutes: number;
+  start_at: string | null;
   due_at: string;
   completed_at: string | null;
   overdue_reason: string | null;
@@ -99,6 +100,7 @@ export const useTareas = (projectId?: string) => {
       duration_minutes: number;
       project_id?: string;
       priority?: string;
+      start_at?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
 
@@ -113,6 +115,7 @@ export const useTareas = (projectId?: string) => {
         duration_minutes: task.duration_minutes,
         due_at: task.due_at,
         priority: task.priority || 'medium',
+        start_at: task.start_at || null,
       } as any);
       if (error) throw error;
     },
@@ -144,6 +147,41 @@ export const useTareas = (projectId?: string) => {
     },
   });
 
+  const updateTaskStatus = useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
+      const updates: Record<string, any> = { status };
+      if (status === "in_progress") {
+        // Only set started timestamp if not already started
+        const task = tasks.find(t => t.id === taskId);
+        if (!task?.completed_at) {
+          // We don't have started_at in tasks table, just update status
+        }
+      }
+      if (status === "completed") {
+        updates.completed_at = new Date().toISOString();
+      }
+      const { error } = await supabase
+        .from("tasks" as any)
+        .update(updates as any)
+        .eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { status }) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      const labels: Record<string, string> = {
+        in_progress: "Tarea iniciada",
+        paused: "Tarea pausada",
+        active: "Tarea pendiente",
+        completed: "Tarea completada",
+      };
+      toast({ title: labels[status] || "Estado actualizado", description: "El estado fue actualizado." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el estado.", variant: "destructive" });
+    },
+  });
+
   const submitOverdueReason = useMutation({
     mutationFn: async ({ taskId, reason }: { taskId: string; reason: string }) => {
       const { error } = await supabase
@@ -171,18 +209,28 @@ export const useTareas = (projectId?: string) => {
       duration_hours: number;
       duration_minutes: number;
       priority?: string;
+      start_at?: string;
+      status?: string;
     }) => {
+      const updates: Record<string, any> = {
+        title: task.title,
+        description: task.description || null,
+        assigned_to: task.assigned_to,
+        due_at: task.due_at,
+        duration_hours: task.duration_hours,
+        duration_minutes: task.duration_minutes,
+        priority: task.priority || 'medium',
+        start_at: task.start_at || null,
+      };
+      if (task.status) {
+        updates.status = task.status;
+        if (task.status === "completed") {
+          updates.completed_at = new Date().toISOString();
+        }
+      }
       const { error } = await supabase
         .from("tasks" as any)
-        .update({
-          title: task.title,
-          description: task.description || null,
-          assigned_to: task.assigned_to,
-          due_at: task.due_at,
-          duration_hours: task.duration_hours,
-          duration_minutes: task.duration_minutes,
-          priority: task.priority || 'medium',
-        } as any)
+        .update(updates as any)
         .eq("id", task.id);
       if (error) throw error;
     },
@@ -237,6 +285,7 @@ export const useTareas = (projectId?: string) => {
     companyProfiles,
     createTask,
     completeTask,
+    updateTaskStatus,
     submitOverdueReason,
     updateTask,
     deleteTask,

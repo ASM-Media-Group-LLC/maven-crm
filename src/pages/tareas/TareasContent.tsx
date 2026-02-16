@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { useTareas, type Task } from "./useTareas";
 import TaskCard from "./TaskCard";
 import DraggableGrid from "./DraggableGrid";
@@ -21,7 +22,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason, updateTask, deleteTask, reorderTasks } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -34,8 +35,17 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
 
   const now = Date.now();
 
-  const getTaskStatus = (t: Task) => {
+  const getTaskStatus = (t: Task): string => {
     if (t.status === "completed") return "completed";
+    if (t.status === "in_progress") {
+      if (new Date(t.due_at).getTime() <= now) return "overdue";
+      return "in_progress";
+    }
+    if (t.status === "paused") {
+      if (new Date(t.due_at).getTime() <= now) return "overdue";
+      return "paused";
+    }
+    // active or overdue status
     if (new Date(t.due_at).getTime() <= now) return "overdue";
     return "pending";
   };
@@ -52,42 +62,55 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
 
     return filtered.sort((a, b) => {
       const getOrder = (t: Task) => {
-        if (t.status === "completed") return 4;
-        const due = new Date(t.due_at).getTime();
-        if (due <= now && !t.overdue_reason) return 0;
-        if (due <= now) return 1;
-        if (due - now < 30 * 60 * 1000) return 2;
-        return 3;
+        const s = getTaskStatus(t);
+        if (s === "overdue") return 0;
+        if (s === "in_progress") return 1;
+        if (s === "pending") return 2;
+        if (s === "paused") return 3;
+        return 4; // completed
       };
       return getOrder(a) - getOrder(b) || new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     });
   }, [tasks, now, search, statusFilter, assignedFilter, priorityFilter]);
 
   const counts = useMemo(() => {
-    let active = 0, overdue = 0, completed = 0;
+    let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
     tasks.forEach((t) => {
-      if (t.status === "completed") completed++;
-      else if (new Date(t.due_at).getTime() <= now) overdue++;
-      else active++;
+      const s = getTaskStatus(t);
+      if (s === "completed") completed++;
+      else if (s === "overdue") overdue++;
+      else if (s === "in_progress") in_progress++;
+      else if (s === "paused") paused++;
+      else pending++;
     });
-    return { active, overdue, completed };
+    return { pending, in_progress, paused, overdue, completed };
   }, [tasks, now]);
 
   const handleComplete = (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const isOverdue = new Date(task.due_at).getTime() <= Date.now();
-    if (isOverdue && !task.overdue_reason) {
+    if (isOverdue && task.status !== "completed" && !task.overdue_reason) {
       setJustifyTask(task);
       return;
     }
     completeTask.mutate(id);
   };
 
+  const handleStatusChange = (taskId: string, status: string) => {
+    if (status === "completed") {
+      handleComplete(taskId);
+      return;
+    }
+    updateTaskStatus.mutate({ taskId, status });
+  };
+
   const kpis = [
-    { label: "Activas", value: counts.active, icon: Clock, color: "text-primary" },
-    { label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "text-destructive" },
-    { label: "Completadas", value: counts.completed, icon: CheckSquare, color: "text-emerald-400" },
+    { label: "Pendientes", value: counts.pending, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "En curso", value: counts.in_progress, icon: Play, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "Pausadas", value: counts.paused, icon: Pause, color: "text-yellow-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-yellow-500/15 hover:to-transparent hover:border-yellow-500/40" },
+    { label: "Vencidas", value: counts.overdue, icon: AlertTriangle, color: "text-destructive", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
+    { label: "Completadas", value: counts.completed, icon: CheckSquare, color: "text-emerald-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-emerald-500/15 hover:to-transparent hover:border-emerald-500/40" },
   ];
 
   return (
@@ -110,9 +133,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {kpis.map((kpi) => (
-            <Card key={kpi.label}>
+            <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
               <CardContent className="flex items-center gap-3 p-4">
                 <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
                 <div>
@@ -136,6 +159,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="pending">Pendiente</SelectItem>
+              <SelectItem value="in_progress">En curso</SelectItem>
+              <SelectItem value="paused">Pausada</SelectItem>
               <SelectItem value="overdue">Vencida</SelectItem>
               <SelectItem value="completed">Completada</SelectItem>
             </SelectContent>
@@ -189,6 +214,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onEdit={setEditTarget}
             onDelete={setDeleteTarget}
             onCreateNew={() => setCreateOpen(true)}
+            onStatusChange={handleStatusChange}
           />
         ) : viewMode === "list" ? (
           <TasksTable
@@ -198,6 +224,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onJustify={setJustifyTask}
             onEdit={setEditTarget}
             onDelete={setDeleteTarget}
+            onStatusChange={handleStatusChange}
           />
         ) : (
           <DraggableGrid
@@ -210,6 +237,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
                 onJustify={setJustifyTask}
                 onEdit={setEditTarget}
                 onDelete={setDeleteTarget}
+                onStatusChange={handleStatusChange}
               />
             )}
           />

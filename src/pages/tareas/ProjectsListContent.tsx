@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Users } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,6 @@ const ProjectsListContent = () => {
   const navigate = useNavigate();
   const { projects, isLoading, profile, createProject, updateProject, deleteProject, getProjectTaskCounts, reorderProjects } = useProjects();
 
-  // Fetch company profiles for member selector
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id],
     queryFn: async () => {
@@ -41,7 +40,6 @@ const ProjectsListContent = () => {
     enabled: !!profile,
   });
 
-  // Fetch all project members for display
   const { data: allMembers = [] } = useQuery({
     queryKey: ["all-project-members"],
     queryFn: async () => {
@@ -73,15 +71,25 @@ const ProjectsListContent = () => {
     });
   }, [projects, search, statusFilter]);
 
-  const totalPending = projects.reduce((sum, p) => {
-    const c = getProjectTaskCounts(p.id);
-    return sum + c.active + c.overdue;
-  }, 0);
+  const totalCounts = useMemo(() => {
+    let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
+    projects.forEach((p) => {
+      const c = getProjectTaskCounts(p.id);
+      pending += c.pending;
+      in_progress += c.in_progress;
+      paused += c.paused;
+      overdue += c.overdue;
+      completed += c.completed;
+    });
+    return { pending, in_progress, paused, overdue, completed };
+  }, [projects, getProjectTaskCounts]);
 
   const kpis = [
     { label: "Total Proyectos", value: projects.length, icon: FolderOpen, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Proyectos Activos", value: projects.filter((p) => p.status === "active").length, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-    { label: "Tareas Pendientes", value: totalPending, icon: AlertTriangle, color: "text-warning", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+    { label: "Pendientes", value: totalCounts.pending, icon: Clock, color: "text-primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+    { label: "En curso", value: totalCounts.in_progress, icon: Play, color: "text-blue-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-blue-500/15 hover:to-transparent hover:border-blue-500/40" },
+    { label: "Vencidas", value: totalCounts.overdue, icon: AlertTriangle, color: "text-destructive", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
+    { label: "Completadas", value: totalCounts.completed, icon: CheckSquare, color: "text-emerald-400", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-emerald-500/15 hover:to-transparent hover:border-emerald-500/40" },
   ];
 
   return (
@@ -99,7 +107,7 @@ const ProjectsListContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {kpis.map((kpi) => (
             <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
               <CardContent className="flex items-center gap-3 p-4">
@@ -185,13 +193,27 @@ const ProjectsListContent = () => {
                       </DropdownMenu>
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="flex gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-primary" /> {counts.active} activas
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3 text-destructive" /> {counts.overdue} vencidas
-                        </span>
+                      <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
+                        {counts.pending > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-primary" /> {counts.pending}
+                          </span>
+                        )}
+                        {counts.in_progress > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Play className="h-3 w-3 text-blue-400" /> {counts.in_progress}
+                          </span>
+                        )}
+                        {counts.paused > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Pause className="h-3 w-3 text-yellow-400" /> {counts.paused}
+                          </span>
+                        )}
+                        {counts.overdue > 0 && (
+                          <span className="flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3 text-destructive" /> {counts.overdue}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1 text-emerald-400">
                           ✓ {counts.completed}
                         </span>

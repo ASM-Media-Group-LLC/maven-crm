@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { TaskProject } from "./useProjects";
 
-type SortKey = "name" | "active" | "overdue" | "completed";
+type SortKey = "name" | "pending" | "in_progress" | "overdue" | "completed";
 
 interface ProjectsTableProps {
   projects: TaskProject[];
-  getProjectTaskCounts: (id: string) => { active: number; overdue: number; completed: number };
+  getProjectTaskCounts: (id: string) => { pending: number; in_progress: number; paused: number; overdue: number; completed: number };
   onEdit: (project: TaskProject) => void;
   onDelete: (project: TaskProject) => void;
 }
@@ -30,7 +30,8 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete }: Pro
     const cb = getProjectTaskCounts(b.id);
     let diff = 0;
     if (sortKey === "name") diff = a.name.localeCompare(b.name);
-    else if (sortKey === "active") diff = ca.active - cb.active;
+    else if (sortKey === "pending") diff = ca.pending - cb.pending;
+    else if (sortKey === "in_progress") diff = ca.in_progress - cb.in_progress;
     else if (sortKey === "overdue") diff = ca.overdue - cb.overdue;
     else diff = ca.completed - cb.completed;
     return sortAsc ? diff : -diff;
@@ -49,7 +50,8 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete }: Pro
           <TableRow>
             <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
             <TableHead className="hidden sm:table-cell">Descripción</TableHead>
-            <TableHead className="text-center"><SortHeader label="Activas" col="active" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Pendientes" col="pending" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="En curso" col="in_progress" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Vencidas" col="overdue" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Completadas" col="completed" /></TableHead>
             <TableHead className="w-12" />
@@ -62,7 +64,8 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete }: Pro
               <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/tareas/${project.id}`)}>
                 <TableCell className="font-medium">{project.name}</TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground text-sm truncate max-w-[200px]">{project.description || "—"}</TableCell>
-                <TableCell className="text-center">{counts.active}</TableCell>
+                <TableCell className="text-center">{counts.pending}</TableCell>
+                <TableCell className="text-center">{counts.in_progress}</TableCell>
                 <TableCell className="text-center text-destructive">{counts.overdue}</TableCell>
                 <TableCell className="text-center text-emerald-400">{counts.completed}</TableCell>
                 <TableCell>

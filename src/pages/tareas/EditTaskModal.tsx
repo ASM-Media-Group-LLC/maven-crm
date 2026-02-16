@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
@@ -28,6 +29,8 @@ interface EditTaskModalProps {
     duration_hours: number;
     duration_minutes: number;
     priority?: string;
+    start_at?: string;
+    status?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -39,6 +42,9 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
   const [assignedTo, setAssignedTo] = useState("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [priority, setPriority] = useState("medium");
+  const [status, setStatus] = useState("active");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState("");
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [endTime, setEndTime] = useState("18:00");
 
@@ -48,9 +54,18 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       setDescription(task.description || "");
       setAssignedTo(task.assigned_to);
       setPriority(task.priority || "medium");
+      setStatus(task.status || "active");
       const due = new Date(task.due_at);
       setEndDate(due);
       setEndTime(format(due, "HH:mm"));
+      if (task.start_at) {
+        const start = new Date(task.start_at);
+        setStartDate(start);
+        setStartTime(format(start, "HH:mm"));
+      } else {
+        setStartDate(undefined);
+        setStartTime("");
+      }
     }
   }, [task]);
 
@@ -79,6 +94,18 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       end.setHours(23, 59, 59, 0);
     }
 
+    let startAtIso: string | undefined;
+    if (startDate) {
+      const start = new Date(startDate);
+      if (startTime) {
+        const [sH, sM] = startTime.split(":").map(Number);
+        start.setHours(sH || 0, sM || 0, 0, 0);
+      } else {
+        start.setHours(0, 0, 0, 0);
+      }
+      startAtIso = start.toISOString();
+    }
+
     const diffMs = Math.max(end.getTime() - Date.now(), 0);
     const durationH = Math.floor(diffMs / 3600000);
     const durationM = Math.floor((diffMs % 3600000) / 60000);
@@ -92,6 +119,8 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       duration_hours: durationH,
       duration_minutes: durationM,
       priority,
+      start_at: startAtIso,
+      status,
     });
     onOpenChange(false);
   };
@@ -112,7 +141,23 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
             <Textarea id="edit-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
           </div>
 
-          <PrioritySelect value={priority} onChange={setPriority} />
+          <div className="grid grid-cols-2 gap-3">
+            <PrioritySelect value={priority} onChange={setPriority} />
+            <div>
+              <Label>Estado</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Pendiente</SelectItem>
+                  <SelectItem value="in_progress">En curso</SelectItem>
+                  <SelectItem value="paused">Pausada</SelectItem>
+                  <SelectItem value="completed">Completada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           <div>
             <Label>Asignar a</Label>
@@ -146,6 +191,26 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
             </Popover>
           </div>
 
+          {/* Fecha de inicio */}
+          <div>
+            <Label>Fecha de inicio (opcional)</Label>
+            <div className="flex gap-2 mt-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("flex-1 justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "dd/MM/yyyy") : "Sin fecha inicio"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-28" placeholder="--:--" />
+            </div>
+          </div>
+
+          {/* Fecha de vencimiento */}
           <div>
             <Label>Fecha de vencimiento</Label>
             <div className="flex gap-2 mt-1">
