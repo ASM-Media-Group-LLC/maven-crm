@@ -1092,6 +1092,38 @@ export type Database = {
           },
         ]
       }
+      project_members: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "task_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promolog_entries: {
         Row: {
           action_taken: string | null
@@ -1159,12 +1191,16 @@ export type Database = {
       }
       subtasks: {
         Row: {
+          assigned_to: string | null
           completed_at: string | null
           created_at: string
           created_by: string
           description: string | null
+          due_at: string | null
           id: string
+          parent_subtask_id: string | null
           position: number
+          priority: string
           started_at: string | null
           status: string
           task_id: string
@@ -1172,12 +1208,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           created_by: string
           description?: string | null
+          due_at?: string | null
           id?: string
+          parent_subtask_id?: string | null
           position?: number
+          priority?: string
           started_at?: string | null
           status?: string
           task_id: string
@@ -1185,12 +1225,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
+          due_at?: string | null
           id?: string
+          parent_subtask_id?: string | null
           position?: number
+          priority?: string
           started_at?: string | null
           status?: string
           task_id?: string
@@ -1198,6 +1242,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subtasks_parent_subtask_id_fkey"
+            columns: ["parent_subtask_id"]
+            isOneToOne: false
+            referencedRelation: "subtasks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subtasks_task_id_fkey"
             columns: ["task_id"]
