@@ -477,9 +477,9 @@ const PromologContent = () => {
                         <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__all__">Todos</SelectItem>
-                          <SelectItem value="si_promociono">Sí</SelectItem>
-                          <SelectItem value="no_promociono">No</SelectItem>
-                          <SelectItem value="parcial">Parcial</SelectItem>
+                          <SelectItem value="si_promociono">Promocionó</SelectItem>
+                          <SelectItem value="no_promociono">No promocionó</SelectItem>
+                          <SelectItem value="parcial">Promoción parcial</SelectItem>
                           <SelectItem value="pendiente">Pendiente</SelectItem>
                         </SelectContent>
                       </Select>
