@@ -323,64 +323,67 @@ const PromologContent = () => {
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header sticky */}
-      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center justify-between mb-4">
+       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Promolog</h1>
             <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-            className="h-9"
-          />
-          <Button variant={activeTab === "agentes" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "agentes" ? "dashboard" : "agentes")}>
-            <Eye className="mr-1.5 h-4 w-4" />
-            Ver Agentes
-          </Button>
-          <Button variant={activeTab === "campanas" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "campanas" ? "dashboard" : "campanas")}>
-            <Eye className="mr-1.5 h-4 w-4" />
-            Ver Campañas
-          </Button>
-          <Button variant="outline" size="sm" className="h-9" onClick={() => setCampaignModalOpen(true)}>
-            Agregar Campaña
-          </Button>
-          <Button size="sm" className="h-9" onClick={() => { /* open entry modal */ }}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Agregar Entrada
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-9" onClick={() => setCampaignModalOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Agregar Campaña
+            </Button>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => { /* open entry modal */ }}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Agregar Entrada
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Filters bar - visible on dashboard tab */}
-      {activeTab === "dashboard" && (
-        <div className="px-6 py-3 flex items-center gap-3 shrink-0">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
-          </div>
-          <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {categoryOptions.map((cat) => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="ml-auto flex gap-1">
-            <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Filters bar */}
+      <div className="px-6 py-3 flex items-center gap-3 shrink-0 flex-wrap">
+        <DateRangePicker
+          from={dateFrom}
+          to={dateTo}
+          onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+          className="h-9"
+        />
+        <Button variant={activeTab === "agentes" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "agentes" ? "dashboard" : "agentes")}>
+          <Eye className="mr-1.5 h-4 w-4" />
+          Ver Agentes
+        </Button>
+        <Button variant={activeTab === "campanas" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "campanas" ? "dashboard" : "campanas")}>
+          <Eye className="mr-1.5 h-4 w-4" />
+          Ver Campañas
+        </Button>
+        {activeTab === "dashboard" && (
+          <>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+            </div>
+            <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                {categoryOptions.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="ml-auto flex gap-1">
+              <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
+                <List className="h-4 w-4" />
+              </Button>
+              <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* Dashboard tab */}
