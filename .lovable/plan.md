@@ -1,26 +1,54 @@
 
+## Aplicar Sticky Headers a todas las tablas del sistema
 
-## Fix: Sticky headers siguen sin funcionar
+He verificado todas las tablas principales del sistema. La mayoría ya implementa el patrón de encabezados fijos, pero algunas tablas secundarias o modales aún no lo tienen. Este plan detalla la estandarización de estas tablas restantes.
 
-### Problema
+### Estrategia de estandarización
 
-Aunque cambiamos `overflow-auto` a `overflow-x-auto` en el componente `Table`, esto sigue creando un contenedor de scroll (en el eje X). Los navegadores tratan cualquier elemento con overflow en cualquier eje como "scroll container", lo que atrapa el `sticky top-0` del `TableHeader` dentro de ese div interno en lugar de dejarlo responder al contenedor externo (`max-h-[calc(100vh-20rem)] overflow-auto`).
+Para que el encabezado sea fijo (`sticky top-0`), se requiere:
+1.  **Contenedor con scroll**: El elemento `Table` debe estar envuelto en un `div` con `overflow-auto` y una altura máxima (`max-h`).
+2.  **Clases de TableHeader**: El componente `TableHeader` debe tener las clases `sticky top-0 z-10 bg-card` para que se mantenga visible y opaco sobre el contenido que hace scroll.
 
-### Solucion
+### Tablas a actualizar
 
-Eliminar completamente el `overflow-x-auto` del wrapper interno del componente `Table` en `src/components/ui/table.tsx`. El contenedor externo de cada tabla (que ya usa `overflow-auto`) se encarga de ambos ejes de scroll.
+#### 1. Tabla de Tareas (`src/pages/tareas/TasksTable.tsx`)
+Actualmente tiene un borde simple sin límite de altura.
+- Añadir contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`.
+- Añadir clases sticky al `TableHeader`.
 
-| Archivo | Linea | Antes | Despues |
-|---------|-------|-------|---------|
-| `src/components/ui/table.tsx` | 7 | `relative w-full overflow-x-auto` | `relative w-full` |
+#### 2. Tabla de Proyectos (`src/pages/tareas/ProjectsTable.tsx`)
+Similar a la de tareas.
+- Añadir contenedor con `max-h-[calc(100vh-24rem)] overflow-auto`.
+- Añadir clases sticky al `TableHeader`.
 
-### Por que funciona
+#### 3. Modal de Detalle de Tarjeta (`src/pages/sales-overview/CardDetailModal.tsx`)
+Esta tabla se muestra dentro de un modal y puede ser larga.
+- Añadir contenedor con `max-h-[500px] overflow-auto`.
+- Añadir clases sticky al `TableHeader`.
 
-- El div externo en PromologTable (`max-h-[calc(100vh-20rem)] overflow-auto`) sera el unico scroll container
-- `sticky top-0` en el `TableHeader` se posicionara relativo a ese contenedor externo
-- El scroll horizontal tambien lo maneja el contenedor externo
+#### 4. Tab de Documentos en Perfil de Creador (`src/pages/creadores/DocumentosTabContent.tsx`)
+- Envolver la tabla en un `div` con `max-h-[400px] overflow-auto`.
+- Añadir clases sticky al `TableHeader`.
 
-### Impacto
+#### 5. Tab de Monetización en Perfil de Creador (`src/pages/creadores/MonetizacionTabContent.tsx`)
+- Envolver la tabla en un `div` con `max-h-[400px] overflow-auto`.
+- Añadir clases sticky al `TableHeader`.
 
-Todas las tablas del sistema usan el mismo patron de contenedor externo con `overflow-auto`, por lo que este cambio beneficia a todas por igual.
+#### 6. Tabla Comparativa (`src/pages/sales-overview/comparativas/ComparativaTable.tsx`)
+Ya tiene el contenedor, pero usa clases sticky individuales en cada `TableHead`. 
+- Simplificar aplicando `sticky top-0 z-10 bg-card` directamente al `TableHeader`.
 
+### Resumen de cambios técnicos
+
+````text
+| Archivo | Cambio principal |
+|---------|------------------|
+| TasksTable.tsx | Añadir wrapper overflow-auto y sticky classes al Header |
+| ProjectsTable.tsx | Añadir wrapper overflow-auto y sticky classes al Header |
+| CardDetailModal.tsx | Añadir wrapper max-h y sticky classes al Header |
+| DocumentosTabContent.tsx | Añadir wrapper max-h y sticky classes al Header |
+| MonetizacionTabContent.tsx | Añadir wrapper max-h y sticky classes al Header |
+| ComparativaTable.tsx | Centralizar sticky classes en TableHeader |
+````
+
+Este cambio garantiza que la experiencia de navegación sea consistente en todo el sistema, permitiendo que los títulos de las columnas siempre sean visibles mientras el usuario explora los datos.
