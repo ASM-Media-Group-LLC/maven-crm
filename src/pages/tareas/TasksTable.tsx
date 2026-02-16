@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Check, AlertTriangle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Check, AlertTriangle, Flag } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCountdown } from "./useCountdown";
+import { priorityConfig } from "./PrioritySelect";
 import type { Task } from "./useTareas";
 
-type SortKey = "title" | "assigned" | "due" | "status";
+type SortKey = "title" | "assigned" | "due" | "status" | "priority";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -44,11 +45,14 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete }
     else { setSortKey(key); setSortAsc(true); }
   };
 
+  const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
   const sorted = [...tasks].sort((a, b) => {
     let diff = 0;
     if (sortKey === "title") diff = a.title.localeCompare(b.title);
     else if (sortKey === "assigned") diff = (profileMap.get(a.assigned_to) || "").localeCompare(profileMap.get(b.assigned_to) || "");
     else if (sortKey === "due") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+    else if (sortKey === "priority") diff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
     else diff = a.status.localeCompare(b.status);
     return sortAsc ? diff : -diff;
   });
@@ -66,6 +70,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete }
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
             <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado" col="assigned" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Countdown" col="due" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead className="w-12" />
@@ -85,6 +90,17 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete }
                   {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-sm">{profileMap.get(task.assigned_to) || "—"}</TableCell>
+                <TableCell className="text-center">
+                  {(() => {
+                    const p = priorityConfig[task.priority] || priorityConfig.medium;
+                    return (
+                      <Badge className={`${p.badgeClass} text-[10px]`}>
+                        <Flag className={`h-2.5 w-2.5 mr-1 ${p.color}`} />
+                        {p.label}
+                      </Badge>
+                    );
+                  })()}
+                </TableCell>
                 <TableCell className="text-center"><CountdownCell dueAt={task.due_at} status={task.status} /></TableCell>
                 <TableCell className="text-center"><StatusBadge task={task} /></TableCell>
                 <TableCell>

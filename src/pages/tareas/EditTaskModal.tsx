@@ -11,6 +11,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import PrioritySelect from "./PrioritySelect";
 import type { Task } from "./useTareas";
 
 interface EditTaskModalProps {
@@ -26,6 +27,7 @@ interface EditTaskModalProps {
     due_at: string;
     duration_hours: number;
     duration_minutes: number;
+    priority?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -36,6 +38,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [priority, setPriority] = useState("medium");
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [endTime, setEndTime] = useState("18:00");
 
@@ -44,6 +47,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       setTitle(task.title);
       setDescription(task.description || "");
       setAssignedTo(task.assigned_to);
+      setPriority(task.priority || "medium");
       const due = new Date(task.due_at);
       setEndDate(due);
       setEndTime(format(due, "HH:mm"));
@@ -83,6 +87,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       due_at: end.toISOString(),
       duration_hours: durationH,
       duration_minutes: durationM,
+      priority,
     });
     onOpenChange(false);
   };
@@ -102,6 +107,8 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
             <Label htmlFor="edit-desc">Descripción</Label>
             <Textarea id="edit-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
           </div>
+
+          <PrioritySelect value={priority} onChange={setPriority} />
 
           <div>
             <Label>Asignar a</Label>

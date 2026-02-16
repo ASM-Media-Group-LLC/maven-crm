@@ -1157,6 +1157,56 @@ export type Database = {
           },
         ]
       }
+      subtasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          position: number
+          started_at: string | null
+          status: string
+          task_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          position?: number
+          started_at?: string | null
+          status?: string
+          task_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          position?: number
+          started_at?: string | null
+          status?: string
+          task_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_projects: {
         Row: {
           company_id: string | null
@@ -1203,6 +1253,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          priority: string
           project_id: string | null
           share_token: string | null
           status: string
@@ -1221,6 +1272,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          priority?: string
           project_id?: string | null
           share_token?: string | null
           status?: string
@@ -1239,6 +1291,7 @@ export type Database = {
           duration_minutes?: number
           id?: string
           overdue_reason?: string | null
+          priority?: string
           project_id?: string | null
           share_token?: string | null
           status?: string
@@ -1404,6 +1457,7 @@ export type Database = {
           duration_minutes: number
           id: string
           overdue_reason: string | null
+          priority: string
           project_id: string | null
           share_token: string | null
           status: string

@@ -12,6 +12,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import PrioritySelect from "./PrioritySelect";
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -26,6 +27,7 @@ interface CreateTaskModalProps {
     duration_hours: number;
     duration_minutes: number;
     project_id?: string;
+    priority?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -36,6 +38,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [priority, setPriority] = useState("medium");
 
   // Duration mode
   const [timeMode, setTimeMode] = useState<"duration" | "date">("duration");
@@ -61,6 +64,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     setEndDate(undefined);
     setStartTime("09:00");
     setEndTime("18:00");
+    setPriority("medium");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,6 +117,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       duration_hours: durationH,
       duration_minutes: durationM,
       project_id: projectId,
+      priority,
     });
     resetForm();
     onOpenChange(false);
@@ -133,6 +138,8 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
             <Label htmlFor="description">Descripción</Label>
             <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          <PrioritySelect value={priority} onChange={setPriority} />
 
           {/* Combobox de usuario */}
           <div>

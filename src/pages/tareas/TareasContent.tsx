@@ -28,6 +28,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [assignedFilter, setAssignedFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
   const now = Date.now();
 
@@ -43,7 +44,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       const taskStatus = getTaskStatus(t);
       const matchesStatus = statusFilter === "all" || taskStatus === statusFilter;
       const matchesAssigned = assignedFilter === "all" || t.assigned_to === assignedFilter;
-      return matchesSearch && matchesStatus && matchesAssigned;
+      const matchesPriority = priorityFilter === "all" || t.priority === priorityFilter;
+      return matchesSearch && matchesStatus && matchesAssigned && matchesPriority;
     });
 
     return filtered.sort((a, b) => {
@@ -57,7 +59,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       };
       return getOrder(a) - getOrder(b) || new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     });
-  }, [tasks, now, search, statusFilter, assignedFilter]);
+  }, [tasks, now, search, statusFilter, assignedFilter, priorityFilter]);
 
   const counts = useMemo(() => {
     let active = 0, overdue = 0, completed = 0;
@@ -145,6 +147,18 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               {companyProfiles.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.full_name || p.id}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="low">Baja</SelectItem>
+              <SelectItem value="medium">Media</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="urgent">Urgente</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex items-center gap-1 ml-auto">
