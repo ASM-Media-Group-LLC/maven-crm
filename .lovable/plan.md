@@ -1,47 +1,32 @@
 
 
-## Ajustar visual de /promolog segun la imagen de referencia
+## Reemplazar el date picker simple por el DateRangePicker del sistema de diseno
 
-La imagen muestra un estilo de KPI cards y header con diferencias clave respecto a la implementacion actual. A continuacion los cambios necesarios:
+Actualmente el Promolog usa un `Calendar` con `mode="single"` dentro de un Popover manual. La imagen y el requerimiento piden poder seleccionar un dia o un rango de dias. El proyecto ya tiene el componente `DateRangePicker` estandarizado que soporta ambos casos (seleccionar un solo dia = from y to iguales, o un rango completo).
 
-### 1. Header: Reorganizar botones en una sola fila con el date picker
+### Cambios en `src/pages/promolog/PromologContent.tsx`
 
-Actualmente los botones "Agregar Campana" y "Agregar Entrada" estan en el header, y el date picker esta en la barra de filtros. La imagen muestra todo en una fila debajo del titulo:
+1. **Reemplazar el estado `date`** por dos estados `dateFrom` y `dateTo` (ambos `Date | undefined`), inicializados al dia de hoy.
 
-```text
-[Date Picker]  [Ver Agentes]  [Ver Campanas]  [Agregar Campana]  [+ Agregar Entrada (azul)]
-```
+2. **Eliminar el Popover + Calendar manual** (lineas 285-299) y reemplazarlo por el componente `DateRangePicker` ya existente:
+   ```text
+   <DateRangePicker
+     from={dateFrom}
+     to={dateTo}
+     onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+   />
+   ```
 
-Cambios:
-- Mover el date picker desde la barra de filtros al header
-- Agregar botones "Ver Agentes" y "Ver Campanas" (outline) que cambian la tab activa
-- "Agregar Entrada" pasa a ser el boton primario (azul, no outline) con icono +
-- "Agregar Campana" se mantiene como outline
+3. **Eliminar imports innecesarios**: `Calendar`, `Popover`, `PopoverContent`, `PopoverTrigger` (si no se usan en otro lugar del archivo), y `CalendarDays`.
 
-### 2. KPI Cards: Borde completo de color con fondo oscuro
+4. **Agregar import** de `DateRangePicker` desde `@/components/ui/date-range-picker`.
 
-La imagen muestra cards con borde completo de color (no solo border-top), iconos grandes con fondo circular de color, y fondo mas oscuro que el estandar:
+5. **Actualizar la logica de filtrado** de entries para que filtre por rango (`dateFrom` <= fecha entrada <= `dateTo`) en lugar de comparar con un solo dia. Si solo se selecciona un dia (from === to), se comporta igual que antes.
 
-| Card | Borde | Icono | Color valor |
-|------|-------|-------|-------------|
-| Total Modelos | accent (purple) | Users con bg accent/20 | success (verde) |
-| Tickets ingresados | primary (blue) | CheckCircle con bg primary/20 | primary (azul) |
-| NO Chequeadas | destructive (red) | AlertTriangle con bg destructive/20 | destructive (rojo) |
-| Completadas Hoy | success (green) | TrendingUp con bg success/20 | success (verde) |
+6. **Eliminar el estado `open`** ya que el DateRangePicker maneja su propio popover internamente.
 
-Cambios en cada card:
-- Reemplazar `border-t-[3px] border-t-[color]` por `border border-[color]/40` (borde completo sutil)
-- Agregar `bg-card/80` o `bg-muted/30` para fondo ligeramente mas oscuro
-- Iconos: cambiar de `h-4 w-4 text-muted-foreground` a iconos en un contenedor circular `h-10 w-10 rounded-full bg-[color]/20` con el icono en `h-5 w-5 text-[color]`
-- Agregar hover con escala: `transition-all duration-200 hover:scale-[1.03]`
+### Beneficios
 
-### 3. Eliminar la tab bar separada
-
-La imagen muestra que los botones de navegacion (Ver Agentes, Ver Campanas) estan integrados en el header, no como tabs separadas. Se elimina la barra de tabs y se integran como botones outline en el header.
-
-### Archivo a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/promolog/PromologContent.tsx` | Reorganizar header con botones + date picker en una fila; redisenar KPI cards con borde completo de color, iconos circulares grandes y hover animado; integrar navegacion de tabs en el header |
-
+- Reutiliza el componente estandarizado del sistema de diseno con presets rapidos (Hoy, Ayer, Esta semana, etc.)
+- Permite seleccionar un solo dia o un rango
+- Mantiene consistencia visual con el resto de la plataforma (Eventos, Sales Overview, Sales Dashboard)
