@@ -89,8 +89,9 @@ export default function DocumentosTabContent({ creatorId }: Props) {
         </CardHeader>
         <CardContent>
           {docs && docs.length > 0 ? (
+            <div className="max-h-[400px] overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
@@ -120,6 +121,7 @@ export default function DocumentosTabContent({ creatorId }: Props) {
                 ))}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-12">No hay documentos</p>
           )}

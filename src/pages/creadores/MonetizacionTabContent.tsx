@@ -62,8 +62,9 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
       </CardHeader>
       <CardContent>
         {records && records.length > 0 ? (
+          <div className="max-h-[400px] overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead>Mes</TableHead>
                 <TableHead>Monto</TableHead>
@@ -80,6 +81,7 @@ const MonetizacionTabContent = ({ creatorId }: Props) => {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-12">
             No hay datos de monetización registrados

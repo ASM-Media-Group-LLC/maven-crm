@@ -48,8 +48,9 @@ const CardDetailModal = ({ open, onOpenChange, cardType, creators }: Props) => {
         {creators.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No hay datos para este periodo.</p>
         ) : (
+          <div className="max-h-[500px] overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card">
               <TableRow>
                 <TableHead>Creadora</TableHead>
                 <TableHead className="text-right">Actual</TableHead>
@@ -70,6 +71,7 @@ const CardDetailModal = ({ open, onOpenChange, cardType, creators }: Props) => {
               ))}
             </TableBody>
           </Table>
+          </div>
         )}
       </DialogContent>
     </Dialog>

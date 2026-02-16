@@ -43,9 +43,9 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete }: Pro
   );
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border max-h-[calc(100vh-24rem)] overflow-auto">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
             <TableHead className="hidden sm:table-cell">Descripción</TableHead>
