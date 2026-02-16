@@ -48,6 +48,7 @@ export const useTareas = (projectId?: string) => {
       let query = supabase
         .from("tasks" as any)
         .select("*")
+        .order("position", { ascending: true })
         .order("due_at", { ascending: true });
       if (projectId) {
         query = query.eq("project_id", projectId);
@@ -213,6 +214,21 @@ export const useTareas = (projectId?: string) => {
     },
   });
 
+  const reorderTasks = useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const updates = orderedIds.map((id, index) =>
+        supabase.from("tasks" as any).update({ position: index } as any).eq("id", id)
+      );
+      const results = await Promise.all(updates);
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+    },
+  });
+
   return {
     tasks,
     isLoading,
@@ -224,5 +240,6 @@ export const useTareas = (projectId?: string) => {
     submitOverdueReason,
     updateTask,
     deleteTask,
+    reorderTasks,
   };
 };

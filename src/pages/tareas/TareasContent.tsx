@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTareas, type Task } from "./useTareas";
 import TaskCard from "./TaskCard";
+import DraggableGrid from "./DraggableGrid";
 import CreateTaskModal from "./CreateTaskModal";
 import EditTaskModal from "./EditTaskModal";
 import DeleteTaskDialog from "./DeleteTaskDialog";
@@ -19,7 +20,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason, updateTask, deleteTask } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, submitOverdueReason, updateTask, deleteTask, reorderTasks } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -185,18 +186,19 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onDelete={setDeleteTarget}
           />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAndSortedTasks.map((task) => (
+          <DraggableGrid
+            items={filteredAndSortedTasks}
+            onReorder={(ids) => reorderTasks.mutate(ids)}
+            renderItem={(task) => (
               <TaskCard
-                key={task.id}
                 task={task}
                 onComplete={handleComplete}
                 onJustify={setJustifyTask}
                 onEdit={setEditTarget}
                 onDelete={setDeleteTarget}
               />
-            ))}
-          </div>
+            )}
+          />
         )}
       </div>
 
