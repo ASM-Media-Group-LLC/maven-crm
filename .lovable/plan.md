@@ -1,14 +1,13 @@
 
 
-## Mejorar experiencia de subtareas y confirmar drag-and-drop
+## Mejoras en subtareas, tamano de cards y drag-and-drop de proyectos
 
-### Problemas identificados
+### Problemas detectados
 
-1. **Formulario de creacion de subtareas oculto**: Los campos de prioridad, fecha limite y asignacion estan escondidos detras de un boton chevron (`showOptions`). El usuario debe hacer clic extra para acceder a ellos, lo que hace que no sea obvio que existen.
-
-2. **No se pueden editar subtareas existentes**: Una vez creada, una subtarea solo puede iniciarse, completarse o eliminarse. No hay forma de cambiar su titulo, prioridad, fecha o asignacion.
-
-3. **Drag-and-drop de proyectos y tareas**: Ya esta implementado correctamente usando `DraggableGrid` tanto en `ProjectsListContent` (proyectos) como en `TareasContent` (tareas). Ambos persisten el orden via `reorderProjects` y `reorderTasks`. Si no funciona visualmente, puede ser un problema de feedback visual que mejoraremos.
+1. **Select de prioridad**: No muestra "Prioridad" como placeholder; muestra el valor seleccionado ("Media") desde el inicio porque tiene `value="medium"` por defecto.
+2. **Select de asignacion**: No tiene buscador integrado. Solo es un Select simple sin filtro de texto.
+3. **Cards de tareas pequenas**: El padding `p-4` y el espacio reducido hacen incomodo escribir subtareas dentro de la card.
+4. **Drag-and-drop de proyectos no funciona**: Aunque `DraggableGrid` esta conectado, el `onClick` del Card (`navigate(/tareas/...)`) se dispara al soltar el drag, lo que navega fuera en lugar de reordenar.
 
 ---
 
@@ -16,46 +15,40 @@
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/SubtasksPanel.tsx` | Mostrar campos de prioridad, fecha y asignacion siempre visibles en linea con el input de titulo (eliminar el toggle `showOptions`) |
-| `src/pages/tareas/SubtaskItem.tsx` | Agregar boton de editar y modal/inline editing para modificar titulo, prioridad, fecha y asignacion de subtareas existentes |
-| `src/pages/tareas/DraggableGrid.tsx` | Mejorar feedback visual del drag-and-drop (cursor grab visible, indicador de posicion de drop) |
+| `SubtasksPanel.tsx` | Cambiar select de prioridad para mostrar placeholder "Prioridad". Reemplazar select de asignacion por Popover+Command con buscador (patron de CreateProjectModal). |
+| `SubtaskItem.tsx` | Aplicar los mismos cambios en el modo de edicion: placeholder "Prioridad" y buscador en asignacion. |
+| `TaskCard.tsx` | Aumentar padding de `p-4` a `p-5` y mejorar espaciado interno para mas comodidad al trabajar con subtareas. |
+| `ProjectsListContent.tsx` | Corregir conflicto drag vs click: prevenir la navegacion cuando se esta arrastrando un proyecto. |
+| `DraggableGrid.tsx` | Exponer estado de arrastre para que los hijos puedan saber si hubo drag activo y evitar clicks accidentales. |
 
 ---
 
 ### Detalle tecnico
 
-#### 1. Formulario de subtareas siempre visible
+#### 1. Select de prioridad con placeholder
 
-Eliminar el estado `showOptions` y el boton chevron. Reorganizar el formulario para mostrar todos los campos en una sola fila compacta:
+Cambiar de `value={newPriority}` (siempre tiene valor) a usar un valor vacio como estado inicial y mostrar placeholder "Prioridad":
+- Estado inicial: `""` en lugar de `"medium"`
+- Al agregar, si no se selecciono prioridad, usar `"medium"` como default
+- Placeholder visible: "Prioridad"
 
-```
-[Input titulo] [Select prioridad] [Boton fecha] [Select asignar] [+ Agregar]
-```
+#### 2. Select de asignacion con buscador
 
-- Los selects usan el mismo tamano compacto actual (`h-7 text-xs`)
-- En pantallas pequenas, los campos se envuelven con `flex-wrap`
-- Se mantiene el atajo Enter para crear rapido
+Reemplazar el `<Select>` simple por el patron `Popover + Command` que ya se usa en `CreateProjectModal`:
+- `CommandInput` con placeholder "Buscar usuario..."
+- Lista filtrable de perfiles
+- Placeholder del trigger: "Asignar"
+- Seleccion unica (no multi-select como en miembros)
 
-#### 2. Edicion inline de subtareas
+#### 3. Cards de tareas mas grandes
 
-Agregar un boton de editar (icono Pencil) en `SubtaskItem` que aparece en hover junto al boton de eliminar. Al hacer clic:
+- Aumentar padding de CardContent de `p-4` a `p-5`
+- Aumentar gap interno de `gap-3` a `gap-4`
+- Dar mas espacio al area de subtareas expandida
 
-- El titulo se convierte en un input editable inline
-- Los campos de prioridad, fecha y asignacion se muestran debajo como selects editables
-- Un boton "Guardar" confirma los cambios usando `updateSubtaskFields` (que ya existe en `useSubtasks`)
-- Un boton "Cancelar" o Escape descarta los cambios
-- Se usa el mutation `updateSubtaskFields` existente para prioridad/fecha/asignacion, y se agregara soporte para actualizar el titulo
+#### 4. Corregir drag-and-drop de proyectos
 
-#### 3. Actualizar titulo de subtarea
-
-El hook `useSubtasks` ya tiene `updateSubtaskFields` pero no soporta cambiar el titulo. Se agregara `title` como campo editable en el mutation existente.
-
-#### 4. Mejorar feedback visual de drag-and-drop
-
-En `DraggableGrid`:
-- Agregar icono `GripVertical` visible en hover en cada card de proyecto/tarea
-- Mejorar el indicador visual durante el arrastre (borde mas prominente, sombra sutil)
-
-En `TaskCard` y la card de proyecto en `ProjectsListContent`:
-- Agregar el icono de agarre como primer elemento visual
-
+El problema: al arrastrar y soltar una card de proyecto, el evento `onClick` del Card se dispara y navega a `/tareas/{id}`. La solucion:
+- En `DraggableGrid`, rastrear si ocurrio un drag real (no solo un click)
+- Usar un ref `wasDragged` que se activa en `onDragStart` y se consulta en un `onClickCapture` en el wrapper para cancelar el click si hubo arrastre
+- Esto permite que el click normal siga funcionando pero previene la navegacion accidental al soltar un drag
