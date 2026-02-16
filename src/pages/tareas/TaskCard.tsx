@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Clock, AlertTriangle, Share2, MoreHorizontal, Pencil, Trash2, Flag, ChevronDown, ChevronRight } from "lucide-react";
+import { Clock, AlertTriangle, Share2, MoreHorizontal, Pencil, Trash2, Flag, ChevronDown, ChevronRight, Play, Pause, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,18 +19,60 @@ interface TaskCardProps {
   onJustify: (task: Task) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onStatusChange?: (taskId: string, status: string) => void;
 }
 
-const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardProps) => {
+const statusConfig: Record<string, { label: string; badgeClass: string }> = {
+  active: { label: "Pendiente", badgeClass: "bg-secondary text-secondary-foreground border-border" },
+  in_progress: { label: "En curso", badgeClass: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  paused: { label: "Pausada", badgeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+  overdue: { label: "Vencida", badgeClass: "bg-destructive/20 text-destructive border-destructive/30" },
+  completed: { label: "Completada", badgeClass: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+};
+
+const getStatusTransitions = (status: string, isOverdue: boolean, hasOverdueReason: boolean) => {
+  if (status === "completed") return [];
+  if (isOverdue && !hasOverdueReason) {
+    return [{ status: "justify", label: "Justificar", icon: AlertTriangle }];
+  }
+  switch (status) {
+    case "active":
+      return [
+        { status: "in_progress", label: "Iniciar", icon: Play },
+        { status: "completed", label: "Completar", icon: CheckCircle2 },
+      ];
+    case "in_progress":
+      return [
+        { status: "paused", label: "Pausar", icon: Pause },
+        { status: "completed", label: "Completar", icon: CheckCircle2 },
+      ];
+    case "paused":
+      return [
+        { status: "in_progress", label: "Reanudar", icon: Play },
+        { status: "completed", label: "Completar", icon: CheckCircle2 },
+      ];
+    case "overdue":
+      return [
+        { status: "completed", label: "Completar", icon: CheckCircle2 },
+      ];
+    default:
+      return [
+        { status: "in_progress", label: "Iniciar", icon: Play },
+        { status: "completed", label: "Completar", icon: CheckCircle2 },
+      ];
+  }
+};
+
+const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete, onStatusChange }: TaskCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { display, isOverdue, isWarning } = useCountdown(task.due_at);
   const [subtasksOpen, setSubtasksOpen] = useState(false);
 
-  const isAssigned = user?.id === task.assigned_to;
   const isCompleted = task.status === "completed";
-  const needsJustification = isOverdue && !isCompleted && !task.overdue_reason;
-  const canComplete = isAssigned && !isCompleted && (!isOverdue || !!task.overdue_reason);
+  const effectiveStatus = isCompleted ? "completed" : isOverdue && task.status !== "overdue" ? "overdue" : task.status;
+  const currentStatusConfig = statusConfig[effectiveStatus] || statusConfig.active;
+  const transitions = getStatusTransitions(task.status, isOverdue, !!task.overdue_reason);
 
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
 
@@ -39,11 +82,16 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
     toast({ title: "Link copiado", description: "El enlace fue copiado al portapapeles." });
   };
 
-  const statusBadge = () => {
-    if (isCompleted) return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Completada</Badge>;
-    if (isOverdue) return <Badge variant="destructive">Vencida</Badge>;
-    if (isWarning) return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Próxima</Badge>;
-    return <Badge variant="secondary">Activa</Badge>;
+  const handleTransition = (newStatus: string) => {
+    if (newStatus === "justify") {
+      onJustify(task);
+      return;
+    }
+    if (newStatus === "completed") {
+      onComplete(task.id);
+      return;
+    }
+    onStatusChange?.(task.id, newStatus);
   };
 
   const countdownColor = isCompleted
@@ -69,7 +117,27 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
             )}
           </div>
           <div className="flex items-center gap-1">
-            {statusBadge()}
+            {/* Status dropdown badge */}
+            {transitions.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-auto p-0">
+                    <Badge className={`${currentStatusConfig.badgeClass} cursor-pointer`}>
+                      {currentStatusConfig.label}
+                    </Badge>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {transitions.map((t) => (
+                    <DropdownMenuItem key={t.status} onClick={() => handleTransition(t.status)}>
+                      <t.icon className="mr-2 h-4 w-4" /> {t.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Badge className={currentStatusConfig.badgeClass}>{currentStatusConfig.label}</Badge>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
@@ -95,6 +163,20 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
           </div>
         </div>
 
+        {/* Dates */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {task.start_at && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Inicio: {format(new Date(task.start_at), "dd/MM/yy")}
+            </span>
+          )}
+          <span className={`flex items-center gap-1 ${countdownColor}`}>
+            <Clock className="h-3 w-3" />
+            Fin: {format(new Date(task.due_at), "dd/MM/yy HH:mm")}
+          </span>
+        </div>
+
         <div className={`text-2xl font-mono font-bold text-center ${countdownColor}`}>
           {isCompleted ? "✓" : display}
         </div>
@@ -104,19 +186,6 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
             <span className="font-medium">Justificación:</span> {task.overdue_reason}
           </p>
         )}
-
-        <div className="flex items-center gap-2 mt-auto">
-          {canComplete && (
-            <Button size="sm" className="flex-1" onClick={() => onComplete(task.id)}>
-              <Check className="h-3.5 w-3.5 mr-1" /> Completar
-            </Button>
-          )}
-          {needsJustification && isAssigned && (
-            <Button size="sm" variant="destructive" className="flex-1" onClick={() => onJustify(task)}>
-              <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Justificar
-            </Button>
-          )}
-        </div>
 
         {/* Subtareas expandibles */}
         <Collapsible open={subtasksOpen} onOpenChange={setSubtasksOpen}>

@@ -14,6 +14,7 @@ interface TaskListViewProps {
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   onCreateNew: () => void;
+  onStatusChange?: (taskId: string, status: string) => void;
 }
 
 interface StatusGroup {
@@ -24,11 +25,12 @@ interface StatusGroup {
   tasks: Task[];
 }
 
-const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onCreateNew }: TaskListViewProps) => {
+const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onCreateNew, onStatusChange }: TaskListViewProps) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     overdue: true,
     pending: true,
     in_progress: true,
+    paused: true,
     completed: false,
   });
 
@@ -38,6 +40,7 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
     const overdue: Task[] = [];
     const pending: Task[] = [];
     const inProgress: Task[] = [];
+    const paused: Task[] = [];
     const completed: Task[] = [];
 
     tasks.forEach((t) => {
@@ -47,6 +50,8 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
         overdue.push(t);
       } else if (t.status === "in_progress") {
         inProgress.push(t);
+      } else if (t.status === "paused") {
+        paused.push(t);
       } else {
         pending.push(t);
       }
@@ -70,9 +75,16 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
       {
         key: "in_progress",
         label: "EN CURSO",
+        color: "text-blue-400",
+        badgeClass: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+        tasks: inProgress,
+      },
+      {
+        key: "paused",
+        label: "PAUSADAS",
         color: "text-yellow-400",
         badgeClass: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-        tasks: inProgress,
+        tasks: paused,
       },
       {
         key: "completed",
@@ -143,6 +155,7 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
                 onJustify={onJustify}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onStatusChange={onStatusChange}
               />
             ))}
           </CollapsibleContent>

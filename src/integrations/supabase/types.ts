@@ -1314,6 +1314,7 @@ export type Database = {
           priority: string
           project_id: string | null
           share_token: string | null
+          start_at: string | null
           status: string
           title: string
           updated_at: string | null
@@ -1334,6 +1335,7 @@ export type Database = {
           priority?: string
           project_id?: string | null
           share_token?: string | null
+          start_at?: string | null
           status?: string
           title: string
           updated_at?: string | null
@@ -1354,6 +1356,7 @@ export type Database = {
           priority?: string
           project_id?: string | null
           share_token?: string | null
+          start_at?: string | null
           status?: string
           title?: string
           updated_at?: string | null
@@ -1521,6 +1524,7 @@ export type Database = {
           priority: string
           project_id: string | null
           share_token: string | null
+          start_at: string | null
           status: string
           title: string
           updated_at: string | null

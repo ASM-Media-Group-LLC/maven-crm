@@ -28,6 +28,7 @@ interface CreateTaskModalProps {
     duration_minutes: number;
     project_id?: string;
     priority?: string;
+    start_at?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -81,6 +82,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     let dueAt: string;
     let durationH = 0;
     let durationM = 0;
+    let startAtIso: string | undefined;
 
     if (timeMode === "duration") {
       if (hours === 0 && minutes === 0) {
@@ -104,13 +106,25 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       }
       dueAt = end.toISOString();
 
+      // Build start_at if provided
+      if (startDate) {
+        const start = new Date(startDate);
+        if (startTime) {
+          const [startH, startM] = startTime.split(":").map(Number);
+          start.setHours(startH || 0, startM || 0, 0, 0);
+        } else {
+          start.setHours(0, 0, 0, 0);
+        }
+        startAtIso = start.toISOString();
+      }
+
       // Calculate approximate duration for display
-      const start = startDate ? new Date(startDate) : new Date();
+      const startRef = startDate ? new Date(startDate) : new Date();
       if (startTime) {
         const [startH, startM] = startTime.split(":").map(Number);
-        start.setHours(startH || 0, startM || 0, 0, 0);
+        startRef.setHours(startH || 0, startM || 0, 0, 0);
       }
-      const diffMs = Math.max(end.getTime() - start.getTime(), 0);
+      const diffMs = Math.max(end.getTime() - startRef.getTime(), 0);
       durationH = Math.floor(diffMs / 3600000);
       durationM = Math.floor((diffMs % 3600000) / 60000);
     }
@@ -124,6 +138,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       duration_minutes: durationM,
       project_id: projectId,
       priority,
+      start_at: startAtIso,
     });
     resetForm();
     onOpenChange(false);

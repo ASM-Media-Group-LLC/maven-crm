@@ -73,7 +73,6 @@ export const useProjects = () => {
       } as any).select("id").single();
       if (error) throw error;
       
-      // Add members if provided
       if (project.memberIds && project.memberIds.length > 0 && data) {
         const rows = project.memberIds.map(uid => ({
           project_id: (data as any).id,
@@ -101,7 +100,6 @@ export const useProjects = () => {
         .eq("id", project.id);
       if (error) throw error;
 
-      // Update members if provided
       if (project.memberIds !== undefined) {
         await supabase.from("project_members" as any).delete().eq("project_id", project.id);
         if (project.memberIds.length > 0) {
@@ -143,14 +141,22 @@ export const useProjects = () => {
 
   const getProjectTaskCounts = (projectId: string) => {
     const now = Date.now();
-    let active = 0, overdue = 0, completed = 0;
+    let pending = 0, in_progress = 0, paused = 0, overdue = 0, completed = 0;
     allTasks.forEach((t) => {
       if (t.project_id !== projectId) return;
-      if (t.status === "completed") completed++;
-      else if (new Date(t.due_at).getTime() <= now) overdue++;
-      else active++;
+      if (t.status === "completed") {
+        completed++;
+      } else if (new Date(t.due_at).getTime() <= now) {
+        overdue++;
+      } else if (t.status === "in_progress") {
+        in_progress++;
+      } else if (t.status === "paused") {
+        paused++;
+      } else {
+        pending++;
+      }
     });
-    return { active, overdue, completed };
+    return { pending, in_progress, paused, overdue, completed };
   };
 
   const reorderProjects = useMutation({
