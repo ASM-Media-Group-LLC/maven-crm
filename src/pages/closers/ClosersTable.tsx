@@ -50,7 +50,7 @@ const ClosersTable = ({ deals }: ClosersTableProps) => {
   });
 
   const SortHeader = ({ label, field }: { label: string; field: SortKey }) => (
-    <Button variant="ghost" size="sm" className="-ml-3 h-8" onClick={() => toggleSort(field)}>
+    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs" onClick={() => toggleSort(field)}>
       {label}
       <ArrowUpDown className="h-3 w-3 ml-1" />
     </Button>
