@@ -21,6 +21,7 @@ import {
   List,
   LayoutGrid,
   Send,
+  Eye,
 } from "lucide-react";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -274,52 +275,13 @@ const PromologContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header sticky */}
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">Promolog</h1>
             <p className="text-sm text-muted-foreground">Seguimiento promocional diario</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCampaignModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Campaña
-            </Button>
-            <Button variant="outline" onClick={() => { /* open entry modal */ }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Entrada
-            </Button>
-          </div>
         </div>
-      </header>
-
-      {/* Tab bar */}
-      <div className="px-6 py-2 flex items-center gap-4 shrink-0">
-        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
-          {tabItems.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab(tab.id)}
-                className="text-xs"
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Filters bar - visible on dashboard tab */}
-      {activeTab === "dashboard" && (
-        <div className="px-6 py-3 flex items-center gap-3 shrink-0">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2 h-9">
@@ -336,6 +298,31 @@ const PromologContent = () => {
               </div>
             </PopoverContent>
           </Popover>
+          <Button variant={activeTab === "agentes" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "agentes" ? "dashboard" : "agentes")}>
+            <Eye className="mr-1.5 h-4 w-4" />
+            Ver Agentes
+          </Button>
+          <Button variant={activeTab === "campanas" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "campanas" ? "dashboard" : "campanas")}>
+            <Eye className="mr-1.5 h-4 w-4" />
+            Ver Campañas
+          </Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={() => setCampaignModalOpen(true)}>
+            Agregar Campaña
+          </Button>
+          <Button size="sm" className="h-9" onClick={() => { /* open entry modal */ }}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Agregar Entrada
+          </Button>
+        </div>
+      </header>
+
+      {/* Filters bar - visible on dashboard tab */}
+      {activeTab === "dashboard" && (
+        <div className="px-6 py-3 flex items-center gap-3 shrink-0">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+          </div>
           <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
@@ -381,45 +368,53 @@ const PromologContent = () => {
         {activeTab === "dashboard" && (
           <div className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border-t-[3px] border-t-accent cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setCreatorsModalOpen(true)}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
                     <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
+                      <Users className="h-5 w-5 text-accent" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-success">{creators.length}</p>
-                  <p className="text-xs text-muted-foreground">Registradas en sistema - Filtrando</p>
+                  <p className="text-3xl font-bold text-success">{creators.length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
                 </CardContent>
               </Card>
-              <Card className="border-t-[3px] border-t-primary">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+              <Card className="border border-primary/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
                     <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-primary">6</p>
-                  <p className="text-xs text-muted-foreground">Tickets ingresados hoy</p>
+                  <p className="text-3xl font-bold text-primary">6</p>
+                  <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
                 </CardContent>
               </Card>
-              <Card className="border-t-[3px] border-t-destructive">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+              <Card className="border border-destructive/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
                     <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
-                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-destructive">128</p>
-                  <p className="text-xs text-muted-foreground">Equipo no las revisó</p>
+                  <p className="text-3xl font-bold text-destructive">128</p>
+                  <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
                 </CardContent>
               </Card>
-              <Card className="border-t-[3px] border-t-success">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+              <Card className="border border-success/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
                     <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
+                      <TrendingUp className="h-5 w-5 text-success" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold">6</p>
-                  <p className="text-xs text-muted-foreground">Tickets ingresados hoy</p>
+                  <p className="text-3xl font-bold text-success">6</p>
+                  <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
                 </CardContent>
               </Card>
             </div>
