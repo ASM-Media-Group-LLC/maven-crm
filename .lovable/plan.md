@@ -1,67 +1,88 @@
 
 
-## Vista Kanban con Drag-and-Drop para Tareas y Proyectos
+## Mejoras al Modulo de Tareas: Subtareas Avanzadas, Usuarios en Proyectos y Fechas Opcionales
 
 ### Resumen
-Transformar la vista Grid del modulo de Tareas en un tablero estilo Kanban (similar a Asana/Jira) donde las tarjetas de proyectos y tareas se puedan arrastrar y reorganizar libremente. La vista Grid pasa a ser la predeterminada.
+
+Se realizaran 4 mejoras principales:
+1. Subtareas anidadas (subtarea dentro de subtarea) con soporte recursivo
+2. Subtareas enriquecidas con fecha, prioridad y usuario asignado
+3. Asignacion de multiples usuarios a proyectos
+4. Hora de inicio/entrega opcional (solo la fecha es obligatoria)
 
 ---
 
 ### 1. Cambios en Base de Datos
 
-Se necesita un campo `position` en ambas tablas para persistir el orden personalizado del usuario.
+**Tabla `subtasks` -- agregar columnas:**
 
-| Tabla | Columna nueva | Tipo | Default |
-|-------|--------------|------|---------|
-| `task_projects` | `position` | integer | 0 |
-| `tasks` | `position` | integer | 0 |
+| Columna | Tipo | Default | Descripcion |
+|---------|------|---------|-------------|
+| `parent_subtask_id` | uuid (nullable) | NULL | Referencia a la subtarea padre para anidamiento |
+| `assigned_to` | uuid (nullable) | NULL | Usuario asignado |
+| `priority` | text | 'medium' | Prioridad (low/medium/high/urgent) |
+| `due_at` | timestamptz (nullable) | NULL | Fecha limite |
 
-Migracion SQL:
-```text
-ALTER TABLE public.task_projects ADD COLUMN position integer NOT NULL DEFAULT 0;
-ALTER TABLE public.tasks ADD COLUMN position integer NOT NULL DEFAULT 0;
-```
+**Nueva tabla `project_members`:**
+
+| Columna | Tipo | Default | Descripcion |
+|---------|------|---------|-------------|
+| `id` | uuid | gen_random_uuid() | PK |
+| `project_id` | uuid | NOT NULL | FK a task_projects |
+| `user_id` | uuid | NOT NULL | ID del usuario |
+| `role` | text | 'member' | Rol en el proyecto (owner/member) |
+| `created_at` | timestamptz | now() | Fecha de creacion |
+
+Con constraint UNIQUE en (project_id, user_id) y politicas RLS que permitan a miembros del proyecto ver/gestionar la membresía.
+
+**Tabla `tasks` -- hacer `due_at` mas flexible:**
+- Actualmente `due_at` es NOT NULL. Se mantendra asi pero la hora sera opcional en la UI (se asignara 23:59:59 del dia seleccionado si no se especifica hora).
 
 ---
 
-### 2. Cambios en la Vista de Proyectos (`ProjectsListContent.tsx`)
+### 2. Subtareas Anidadas (Recursivas)
 
-- Cambiar el default de `viewMode` de `"list"` a `"grid"`
-- Reemplazar el grid estatico de tarjetas de proyectos por un nuevo componente `DraggableProjectsGrid` que implemente drag-and-drop nativo (HTML5) para reordenar las cards
-- Ordenar proyectos por `position` en lugar de `created_at`
-- Al soltar una card, actualizar el campo `position` de los proyectos afectados en Supabase
+**`useSubtasks.ts`:**
+- Modificar la query para filtrar por `parent_subtask_id IS NULL` en el nivel raiz
+- Agregar query/mutation para subtareas hijas dado un `parent_subtask_id`
+- Agregar mutations para actualizar `assigned_to`, `priority`, `due_at`
 
-### 3. Cambios en la Vista de Tareas (`TareasContent.tsx`)
+**`SubtaskItem.tsx`:**
+- Agregar boton para expandir/colapsar sub-subtareas
+- Mostrar badges de prioridad y usuario asignado
+- Mostrar fecha limite si existe
+- Incluir un mini-panel colapsable de sub-subtareas (reutilizando SubtasksPanel con `parentSubtaskId`)
 
-- Cambiar el default de `viewMode` de `"grid"` (ya esta) -- confirmar que ya es grid
-- Reemplazar el grid estatico de TaskCards por un nuevo componente `DraggableTasksGrid` con drag-and-drop nativo
-- Ordenar tareas por `position` como criterio principal (en lugar del ordenamiento por urgencia actual, que se mantendra como fallback cuando `position` sea 0 para todas)
-- Al soltar una card, actualizar el campo `position` de las tareas afectadas en Supabase
+**`SubtasksPanel.tsx`:**
+- Aceptar prop opcional `parentSubtaskId` para renderizar subtareas anidadas
+- Al crear una subtarea, incluir campos opcionales: prioridad (select), fecha (date picker), usuario asignado (combobox)
+- Pasar `parentSubtaskId` al crear subtareas hijas
 
-### 4. Componente Reutilizable: `DraggableGrid`
+---
 
-Crear un componente generico `DraggableGrid` que encapsule la logica de drag-and-drop para evitar duplicacion entre proyectos y tareas.
+### 3. Asignacion de Usuarios a Proyectos
 
-**Archivo:** `src/pages/tareas/DraggableGrid.tsx`
+**`CreateProjectModal.tsx` y `EditProjectModal.tsx`:**
+- Agregar un selector multiple de usuarios (combobox multi-select) para asignar miembros al proyecto
+- Al crear el proyecto, insertar registros en `project_members`
 
-Funcionalidad:
-- Acepta una lista de items con `id` y un renderizador de cards
-- Maneja `draggable`, `onDragStart`, `onDragOver`, `onDrop` con estados visuales (indicador de posicion de destino)
-- Feedback visual: borde resaltado en la posicion de destino, opacidad reducida en la card arrastrada
-- Callback `onReorder(reorderedIds: string[])` que el padre usa para persistir el nuevo orden
+**`useProjects.ts`:**
+- Agregar queries para obtener miembros del proyecto
+- Agregar mutations para agregar/remover miembros
+- Al crear un proyecto, el creador se agrega automaticamente como `owner`
 
-### 5. Hook de Reordenamiento
+**`ProjectsListContent.tsx`:**
+- Mostrar avatares/nombres de los miembros en las cards de proyecto
 
-**Agregar a `useProjects.ts`:**
-- Mutation `reorderProjects` que recibe un array de IDs ordenados y actualiza el campo `position` de cada proyecto
+---
 
-**Agregar a `useTareas.ts`:**
-- Mutation `reorderTasks` que recibe un array de IDs ordenados y actualiza el campo `position` de cada tarea
-- Modificar la query de tareas para ordenar por `position ASC, due_at ASC`
+### 4. Hora Opcional en Tareas
 
-### 6. Subtareas -- Ya Implementado
-
-El drag-and-drop de subtareas ya existe en `SubtasksPanel.tsx` con el campo `position` en la tabla `subtasks`. No se necesitan cambios adicionales.
+**`CreateTaskModal.tsx` y `EditTaskModal.tsx`:**
+- En el modo "Fecha", la hora de inicio y la hora de fin pasan a ser opcionales
+- Si no se selecciona hora de fin, se usa 23:59 del dia seleccionado como `due_at`
+- Si no se selecciona hora de inicio, simplemente se omite
+- El modo "Duracion" se mantiene igual
 
 ---
 
@@ -69,25 +90,31 @@ El drag-and-drop de subtareas ya existe en `SubtasksPanel.tsx` con el campo `pos
 
 | Archivo | Descripcion |
 |---------|-------------|
-| `src/pages/tareas/DraggableGrid.tsx` | Componente generico de grid con drag-and-drop |
+| Migracion SQL | Nuevas columnas en subtasks + tabla project_members + RLS |
 
 ### Archivos a modificar
 
 | Archivo | Cambios |
 |---------|---------|
-| Migracion SQL | Agregar columna `position` a `task_projects` y `tasks` |
-| `src/pages/tareas/useProjects.ts` | Agregar mutation `reorderProjects`, ordenar por `position` |
-| `src/pages/tareas/useTareas.ts` | Agregar mutation `reorderTasks`, ordenar por `position, due_at` |
-| `src/pages/tareas/ProjectsListContent.tsx` | Default a grid, usar `DraggableGrid` |
-| `src/pages/tareas/TareasContent.tsx` | Usar `DraggableGrid` en vez del grid estatico |
-| `src/integrations/supabase/types.ts` | Agregar `position` a los tipos de tasks y task_projects |
+| `src/pages/tareas/useSubtasks.ts` | Soporte para parent_subtask_id, assigned_to, priority, due_at |
+| `src/pages/tareas/SubtaskItem.tsx` | UI de prioridad, usuario, fecha, boton de sub-subtareas expandible |
+| `src/pages/tareas/SubtasksPanel.tsx` | Prop parentSubtaskId, campos enriquecidos al crear |
+| `src/pages/tareas/useProjects.ts` | Queries/mutations para project_members |
+| `src/pages/tareas/CreateProjectModal.tsx` | Selector de miembros del proyecto |
+| `src/pages/tareas/EditProjectModal.tsx` | Selector de miembros del proyecto |
+| `src/pages/tareas/ProjectsListContent.tsx` | Mostrar miembros en cards |
+| `src/pages/tareas/CreateTaskModal.tsx` | Hora opcional (default 23:59 si no se especifica) |
+| `src/pages/tareas/EditTaskModal.tsx` | Hora opcional |
+| `src/integrations/supabase/types.ts` | Tipos actualizados automaticamente |
+
+---
 
 ### Flujo de usuario
 
-1. El usuario entra a `/tareas` y ve los proyectos en formato Grid (vista por defecto)
-2. Arrastra una tarjeta de proyecto y la suelta en otra posicion -- el orden se guarda automaticamente
-3. Al entrar a un proyecto, ve las tareas tambien en Grid
-4. Arrastra tarjetas de tareas para reorganizarlas a su gusto
-5. El orden personalizado se persiste y se mantiene entre sesiones
-6. Puede cambiar a vista de Tabla en cualquier momento con el toggle existente
+1. Al crear un proyecto, se pueden agregar miembros del equipo (selector multiple)
+2. Las cards de proyecto muestran los miembros asignados
+3. Al crear una tarea, la hora es opcional -- solo la fecha importa
+4. Al abrir subtareas de una tarea, se puede asignar prioridad, fecha y usuario a cada subtarea
+5. Cada subtarea tiene un boton para agregar sub-subtareas (anidamiento recursivo)
+6. Las sub-subtareas tambien soportan prioridad, fecha y usuario asignado
 
