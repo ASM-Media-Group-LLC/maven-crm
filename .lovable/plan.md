@@ -1,24 +1,24 @@
 
+## Fijar la primera columna (Ticket) en scroll horizontal
 
-## Corregir columnas sticky en PromologTable
+### Cambio en `src/pages/promolog/PromologTable.tsx`
 
-### Problema
-Se aplicaron clases `sticky left-X` a las columnas Ticket, Modelo y Red Social tanto en los headers como en las celdas del body. El usuario solo quiere que los **titulos del header** queden fijos al hacer scroll vertical (que ya funciona con `sticky top-0`), no columnas fijas horizontalmente.
+Se aplicara `sticky left-0` con fondo solido y z-index elevado unicamente a la columna **Ticket** (la primera columna), tanto en el header como en las celdas del body.
 
-### Solucion
-Revertir todas las clases `sticky left-X z-20 bg-card` de los `TableHead` y `sticky left-X z-10 bg-card` de los `TableCell` del body que se agregaron en el ultimo cambio.
+**Header (linea 121):**
+- Agregar `sticky left-0 z-20 bg-card` al `TableHead` de Ticket
+- El z-20 es necesario porque esta celda es sticky tanto en top (por el TableHeader) como en left, y debe quedar por encima del resto
 
-### Cambios en `src/pages/promolog/PromologTable.tsx`
+**Celdas del body (linea 134):**
+- Agregar `sticky left-0 z-10 bg-card` al `TableCell` de Ticket en cada fila
+- El z-10 mantiene la celda sobre las demas columnas al hacer scroll horizontal
+- El `bg-card` garantiza fondo solido para que no se vea contenido debajo
 
-**Headers (lineas 120-122):** Quitar `sticky left-0 z-20 bg-card`, `sticky left-[120px] z-20 bg-card`, `sticky left-[300px] z-20 bg-card` de los tres TableHead. Dejarlos sin className adicional como estaban antes.
+### Resumen de clases
 
-**Celdas del body (lineas 134, 137, 145):**
-- Ticket: quitar `sticky left-0 z-10 bg-card`
-- Modelo: quitar `sticky left-[120px] z-10 bg-card`, dejar solo `min-w-[180px]`
-- Red Social: quitar `sticky left-[300px] z-10 bg-card`
+| Elemento | Clases a agregar |
+|----------|-----------------|
+| TableHead (Ticket) | `sticky left-0 z-20 bg-card` |
+| TableCell (Ticket) | `sticky left-0 z-10 bg-card` |
 
-El header sticky vertical (`sticky top-0 z-10 bg-card` en el `TableHeader`) ya esta funcionando correctamente y se mantiene sin cambios.
-
-### Archivo a modificar
-- `src/pages/promolog/PromologTable.tsx`
-
+El sticky funciona dentro del contenedor `overflow-auto` que ya envuelve la tabla, no del viewport. No afecta la vista grid ni el responsive. La columna Acciones (sticky right) sigue funcionando igual.
