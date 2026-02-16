@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -34,9 +35,11 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
   const [editPriority, setEditPriority] = useState(subtask.priority);
   const [editDueDate, setEditDueDate] = useState<Date | undefined>(subtask.due_at ? new Date(subtask.due_at) : undefined);
   const [editAssignedTo, setEditAssignedTo] = useState(subtask.assigned_to || "");
+  const [editAssignPopoverOpen, setEditAssignPopoverOpen] = useState(false);
 
   const priority = priorityConfig[subtask.priority] || priorityConfig.medium;
   const assignedProfile = profiles.find(p => p.id === subtask.assigned_to);
+  const editAssignedName = profiles.find(p => p.id === editAssignedTo)?.full_name || "";
   const maxDepth = 3;
 
   const handleStartEdit = () => {
@@ -95,9 +98,9 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
           </Button>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <Select value={editPriority} onValueChange={setEditPriority}>
+          <Select value={editPriority || undefined} onValueChange={setEditPriority}>
             <SelectTrigger className="h-6 text-[10px] w-[85px]">
-              <SelectValue />
+              <SelectValue placeholder="Prioridad" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="low">Baja</SelectItem>
@@ -120,17 +123,41 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdat
           </Popover>
 
           {profiles.length > 0 && (
-            <Select value={editAssignedTo || "__none__"} onValueChange={(v) => setEditAssignedTo(v === "__none__" ? "" : v)}>
-              <SelectTrigger className="h-6 text-[10px] w-[100px]">
-                <SelectValue placeholder="Asignar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin asignar</SelectItem>
-                {profiles.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={editAssignPopoverOpen} onOpenChange={setEditAssignPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2 w-[100px] justify-start", !editAssignedTo && "text-muted-foreground")}>
+                  <span className="truncate">{editAssignedTo ? editAssignedName || "Asignar" : "Asignar"}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
+                  <CommandList>
+                    <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="__none__"
+                        onSelect={() => { setEditAssignedTo(""); setEditAssignPopoverOpen(false); }}
+                        className="text-xs"
+                      >
+                        Sin asignar
+                      </CommandItem>
+                      {profiles.map(p => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.full_name || p.id}
+                          onSelect={() => { setEditAssignedTo(p.id); setEditAssignPopoverOpen(false); }}
+                          className="text-xs"
+                        >
+                          {p.full_name || "Sin nombre"}
+                          {editAssignedTo === p.id && <Check className="ml-auto h-3 w-3" />}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       </div>
