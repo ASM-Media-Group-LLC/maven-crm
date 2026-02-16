@@ -66,53 +66,24 @@ const contactTypeOptions = [
   { value: "mensaje_voz", label: "Mensaje de Voz" },
 ] as const;
 
-const socialCards = [
-  { name: "Instagram", value: 3, icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
-  { name: "TikTok", value: 0, icon: <TikTokIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
-  { name: "X", value: 2, icon: <XIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
-  { name: "Telegram", value: 0, icon: <Send className="h-6 w-6" />, bg: "bg-blue-500/10" },
-];
+const promotedToResult = (promoted: string | null): string => {
+  switch (promoted) {
+    case "true": return "Sí";
+    case "false": return "No";
+    case "partial": return "Parcial";
+    case "pending": return "Pendiente";
+    default: return "Pendiente";
+  }
+};
 
-const platformCards = [
-  {
-    name: "OnlyFans",
-    value: 5,
-    bg: "bg-blue-500/10",
-    icon: (
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">
-        OF
-      </span>
-    ),
-  },
-  {
-    name: "Unlok",
-    value: 0,
-    bg: "bg-purple-500/10",
-    icon: (
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">
-        U
-      </span>
-    ),
-  },
-  {
-    name: "Otra",
-    value: 0,
-    bg: "bg-muted/50",
-    icon: (
-      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Info className="h-4 w-4" />
-      </span>
-    ),
-  },
-];
-
-const mockEntries: PromologEntry[] = [
-  { id: "1", ticketNumber: "PL065201", name: "Desieee Daniela Gonzalez angel", handle: "deziig", network: "instagram", platform: "OnlyFans", result: "Sí", date: "13 feb 2026", time: "10:05 AM", agent: "lorena_lozano", notes: "CC promociona en IG, publica foto" },
-  { id: "2", ticketNumber: "PL068144", name: "Veronica Sanchez", network: "x", platform: "OnlyFans", result: "Sí", date: "13 feb 2026", time: "09:57 AM", agent: "lorena_lozano", notes: "CC promociona en reddit, publica foto" },
-  { id: "3", ticketNumber: "PL111676", name: "Valentin Magallanes", handle: "valentin.only", network: "instagram", platform: "OnlyFans", result: "Sí", date: "13 feb 2026", time: "09:53 AM", agent: "lorena_lozano", notes: "CC promociona en IG, publica video" },
-  { id: "4", ticketNumber: "PL641620", name: "Elizabeth Loaiza", handle: "elizabethloaiza", network: "instagram", platform: "OnlyFans", result: "Sí", date: "13 feb 2026", time: "09:48 AM", agent: "lorena_lozano", notes: "CC promociona en IG, publica foto" },
-  { id: "5", ticketNumber: "PL492883", name: "Alejandra Rojas Soto", handle: "alemiarojas", network: "x", platform: "OnlyFans", result: "Sí", date: "13 feb 2026", time: "09:25 AM", agent: "lorena_lozano", notes: "CC promociona en X, publica video" },
-];
+const resultToBadgeClass = (result: string): string => {
+  switch (result) {
+    case "Sí": return "bg-green-500 text-white hover:bg-green-600 border-transparent";
+    case "No": return "bg-destructive text-destructive-foreground hover:bg-destructive/90 border-transparent";
+    case "Parcial": return "bg-yellow-500 text-white hover:bg-yellow-600 border-transparent";
+    default: return "bg-muted text-muted-foreground border-transparent";
+  }
+};
 
 const agentsData = [
   { name: "lorena_lozano", tickets: 5, si: 5, parcial: 0, no: 0, badges: [{ label: "IG", value: 3 }, { label: "X", value: 2 }] },
@@ -138,6 +109,80 @@ const PromologContent = () => {
     },
   });
 
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+
+  // Fetch real promolog entries
+  const { data: promologEntries = [], isLoading: entriesLoading } = useQuery({
+    queryKey: ["promolog-entries", dateFrom?.toISOString(), dateTo?.toISOString()],
+    queryFn: async () => {
+      let query = supabase
+        .from("promolog_entries")
+        .select("*, creators(name, artistic_name, instagram_handle)")
+        .order("date", { ascending: false })
+        .limit(200);
+
+      if (dateFrom) {
+        const fromStr = dateFrom.toISOString().split("T")[0];
+        query = query.gte("date", fromStr);
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setDate(toDate.getDate() + 1);
+        const toStr = toDate.toISOString().split("T")[0];
+        query = query.lt("date", toStr);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Map DB entries to PromologEntry interface
+  const entries: PromologEntry[] = useMemo(() => {
+    return promologEntries.map((pe: any) => {
+      const dateObj = new Date(pe.date);
+      const creator = pe.creators as any;
+      return {
+        id: pe.id,
+        ticketNumber: pe.ticket_number || "",
+        name: creator?.artistic_name || creator?.name || "Sin nombre",
+        handle: creator?.instagram_handle || undefined,
+        network: (pe.network || "").toLowerCase(),
+        platform: pe.platform || "OnlyFans",
+        result: promotedToResult(pe.promoted),
+        date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
+        time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
+        agent: pe.reviewed_by || "—",
+        notes: pe.notes || "",
+        creator_id: pe.creator_id,
+      };
+    });
+  }, [promologEntries]);
+
+  // Dynamic social & platform counts (only "Sí" entries)
+  const socialCards = useMemo(() => {
+    const siEntries = entries.filter(e => e.result === "Sí");
+    const countByNetwork = (net: string) => siEntries.filter(e => e.network === net).length;
+    return [
+      { name: "Instagram", value: countByNetwork("instagram"), icon: <InstagramIcon className="h-6 w-6" />, bg: "bg-pink-500/10" },
+      { name: "TikTok", value: countByNetwork("tiktok"), icon: <TikTokIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
+      { name: "X", value: countByNetwork("x"), icon: <XIcon className="h-6 w-6" />, bg: "bg-slate-500/10" },
+      { name: "Telegram", value: countByNetwork("telegram"), icon: <Send className="h-6 w-6" />, bg: "bg-blue-500/10" },
+    ];
+  }, [entries]);
+
+  const platformCards = useMemo(() => {
+    const siEntries = entries.filter(e => e.result === "Sí");
+    const countByPlatform = (plat: string) => siEntries.filter(e => (e.platform || "").toLowerCase().includes(plat)).length;
+    return [
+      { name: "OnlyFans", value: countByPlatform("onlyfans"), bg: "bg-blue-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white text-[10px] font-bold">OF</span> },
+      { name: "Unlok", value: countByPlatform("unlok"), bg: "bg-purple-500/10", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500 text-white text-[10px] font-bold">U</span> },
+      { name: "Otra", value: siEntries.length - countByPlatform("onlyfans") - countByPlatform("unlok"), bg: "bg-muted/50", icon: <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><Info className="h-4 w-4" /></span> },
+    ];
+  }, [entries]);
+
   const categoryOptions = [
     { value: "A+", label: "A+ - Excelente" },
     { value: "A", label: "A - Muy buena" },
@@ -146,8 +191,6 @@ const PromologContent = () => {
     { value: "C", label: "C - Regular" },
   ];
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
   const [activeTab, setActiveTab] = useState<"dashboard" | "agentes" | "campanas" | "calendario">("dashboard");
 
   const [selectedCreator, setSelectedCreator] = useState("");
@@ -258,23 +301,21 @@ const PromologContent = () => {
 
   const [searchEntry, setSearchEntry] = useState("");
 
-  const filteredEntries = mockEntries.filter((entry) => {
-    if (selectedCreatorFilter !== "") {
-      const selectedCreator = creators.find((c) => c.id === selectedCreatorFilter);
-      const creatorName = selectedCreator?.artistic_name || selectedCreator?.name || "";
-      if (!entry.name.toLowerCase().includes(creatorName.toLowerCase())) return false;
-    }
-    if (selectedStatus !== "") {
-      const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
-      if (entry.result !== statusMap[selectedStatus]) return false;
-    }
-    if (selectedNetwork !== "" && entry.network !== selectedNetwork) return false;
-    if (searchEntry) {
-      const q = searchEntry.toLowerCase();
-      if (!entry.name.toLowerCase().includes(q) && !entry.ticketNumber.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) => {
+      if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
+      if (selectedStatus !== "") {
+        const statusMap: Record<string, string> = { si_promociono: "Sí", no_promociono: "No", parcial: "Parcial", pendiente: "Pendiente" };
+        if (entry.result !== statusMap[selectedStatus]) return false;
+      }
+      if (selectedNetwork !== "" && entry.network !== selectedNetwork) return false;
+      if (searchEntry) {
+        const q = searchEntry.toLowerCase();
+        if (!entry.name.toLowerCase().includes(q) && !entry.ticketNumber.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [entries, selectedCreatorFilter, selectedStatus, selectedNetwork, searchEntry]);
 
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
@@ -367,7 +408,7 @@ const PromologContent = () => {
                       <CheckCircle className="h-5 w-5 text-primary" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-primary">6</p>
+                  <p className="text-3xl font-bold text-primary">{entries.length}</p>
                   <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
                 </CardContent>
               </Card>
@@ -379,7 +420,7 @@ const PromologContent = () => {
                       <AlertTriangle className="h-5 w-5 text-destructive" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-destructive">128</p>
+                  <p className="text-3xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
                   <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
                 </CardContent>
               </Card>
@@ -391,7 +432,7 @@ const PromologContent = () => {
                       <TrendingUp className="h-5 w-5 text-success" />
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-success">6</p>
+                  <p className="text-3xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
                   <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
                 </CardContent>
               </Card>
