@@ -114,7 +114,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
   }
 
   return (
-    <div className="h-full overflow-auto rounded-lg border border-border">
+    <div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
