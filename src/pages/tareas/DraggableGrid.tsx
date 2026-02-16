@@ -1,4 +1,5 @@
 import { useState, useRef, type ReactNode } from "react";
+import { GripVertical } from "lucide-react";
 
 interface DraggableGridProps<T extends { id: string }> {
   items: T[];
@@ -64,12 +65,16 @@ const DraggableGrid = <T extends { id: string }>({
           onDragOver={(e) => handleDragOver(e, item.id)}
           onDrop={(e) => handleDrop(e, index)}
           onDragEnd={handleDragEnd}
-          className={`transition-all duration-150 ${
+          className={`relative transition-all duration-150 group/drag ${
             draggedId === item.id ? "opacity-40 scale-95" : ""
           } ${
             overId === item.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg" : ""
           }`}
         >
+          {/* Grip handle */}
+          <div className="absolute top-2 left-2 z-10 opacity-0 group-hover/drag:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
           {renderItem(item, draggedId === item.id)}
         </div>
       ))}

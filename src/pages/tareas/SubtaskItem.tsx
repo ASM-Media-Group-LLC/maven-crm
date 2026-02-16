@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { Play, CheckCircle2, Trash2, GripVertical, ChevronDown, ChevronRight, Flag, CalendarIcon, User } from "lucide-react";
+import { Play, CheckCircle2, Trash2, GripVertical, ChevronDown, ChevronRight, Flag, CalendarIcon, User, Pencil, X, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { priorityConfig } from "./PrioritySelect";
 import SubtasksPanel from "./SubtasksPanel";
@@ -14,6 +19,7 @@ interface SubtaskItemProps {
   onStart: (id: string) => void;
   onComplete: (id: string) => void;
   onDelete: (id: string) => void;
+  onUpdate: (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null }) => void;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -21,17 +27,115 @@ interface SubtaskItemProps {
   depth?: number;
 }
 
-const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onDragStart, onDragOver, onDrop, index, depth = 0 }: SubtaskItemProps) => {
+const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onUpdate, onDragStart, onDragOver, onDrop, index, depth = 0 }: SubtaskItemProps) => {
   const [childrenOpen, setChildrenOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(subtask.title);
+  const [editPriority, setEditPriority] = useState(subtask.priority);
+  const [editDueDate, setEditDueDate] = useState<Date | undefined>(subtask.due_at ? new Date(subtask.due_at) : undefined);
+  const [editAssignedTo, setEditAssignedTo] = useState(subtask.assigned_to || "");
+
   const priority = priorityConfig[subtask.priority] || priorityConfig.medium;
   const assignedProfile = profiles.find(p => p.id === subtask.assigned_to);
   const maxDepth = 3;
+
+  const handleStartEdit = () => {
+    setEditTitle(subtask.title);
+    setEditPriority(subtask.priority);
+    setEditDueDate(subtask.due_at ? new Date(subtask.due_at) : undefined);
+    setEditAssignedTo(subtask.assigned_to || "");
+    setEditing(true);
+  };
+
+  const handleSaveEdit = () => {
+    onUpdate({
+      id: subtask.id,
+      title: editTitle.trim() || subtask.title,
+      priority: editPriority,
+      due_at: editDueDate ? editDueDate.toISOString() : null,
+      assigned_to: editAssignedTo || null,
+    });
+    setEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditing(false);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSaveEdit();
+    if (e.key === "Escape") handleCancelEdit();
+  };
 
   const statusBadge = () => {
     if (subtask.status === "completed") return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">Completada</Badge>;
     if (subtask.status === "in_progress") return <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">En progreso</Badge>;
     return <Badge variant="secondary" className="text-[10px]">Pendiente</Badge>;
   };
+
+  if (editing) {
+    return (
+      <div
+        className="space-y-1.5 p-2 rounded-md border border-primary/30 bg-card"
+        style={{ marginLeft: depth > 0 ? `${depth * 16}px` : undefined }}
+      >
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            className="h-7 text-xs flex-1"
+            autoFocus
+          />
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSaveEdit} title="Guardar">
+            <Check className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancelEdit} title="Cancelar">
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Select value={editPriority} onValueChange={setEditPriority}>
+            <SelectTrigger className="h-6 text-[10px] w-[85px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Baja</SelectItem>
+              <SelectItem value="medium">Media</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="urgent">Urgente</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2", !editDueDate && "text-muted-foreground")}>
+                <CalendarIcon className="h-2.5 w-2.5 mr-1" />
+                {editDueDate ? format(editDueDate, "dd/MM/yy") : "Fecha"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={editDueDate} onSelect={setEditDueDate} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+
+          {profiles.length > 0 && (
+            <Select value={editAssignedTo || "__none__"} onValueChange={(v) => setEditAssignedTo(v === "__none__" ? "" : v)}>
+              <SelectTrigger className="h-6 text-[10px] w-[100px]">
+                <SelectValue placeholder="Asignar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin asignar</SelectItem>
+                {profiles.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1">
@@ -91,6 +195,9 @@ const SubtaskItem = ({ subtask, profiles, onStart, onComplete, onDelete, onDragS
               <CheckCircle2 className="h-3 w-3" />
             </Button>
           )}
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={handleStartEdit} title="Editar">
+            <Pencil className="h-3 w-3" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => onDelete(subtask.id)}>
             <Trash2 className="h-3 w-3" />
           </Button>
