@@ -12,6 +12,7 @@ export interface Task {
   company_id: string | null;
   project_id: string | null;
   status: string;
+  priority: string;
   duration_hours: number;
   duration_minutes: number;
   due_at: string;
@@ -96,6 +97,7 @@ export const useTareas = (projectId?: string) => {
       duration_hours: number;
       duration_minutes: number;
       project_id?: string;
+      priority?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
 
@@ -109,6 +111,7 @@ export const useTareas = (projectId?: string) => {
         duration_hours: task.duration_hours,
         duration_minutes: task.duration_minutes,
         due_at: task.due_at,
+        priority: task.priority || 'medium',
       } as any);
       if (error) throw error;
     },
@@ -166,6 +169,7 @@ export const useTareas = (projectId?: string) => {
       due_at: string;
       duration_hours: number;
       duration_minutes: number;
+      priority?: string;
     }) => {
       const { error } = await supabase
         .from("tasks" as any)
@@ -176,6 +180,7 @@ export const useTareas = (projectId?: string) => {
           due_at: task.due_at,
           duration_hours: task.duration_hours,
           duration_minutes: task.duration_minutes,
+          priority: task.priority || 'medium',
         } as any)
         .eq("id", task.id);
       if (error) throw error;

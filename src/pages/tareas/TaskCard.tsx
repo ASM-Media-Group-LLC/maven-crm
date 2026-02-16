@@ -1,11 +1,15 @@
-import { Check, Clock, AlertTriangle, Share2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Check, Clock, AlertTriangle, Share2, MoreHorizontal, Pencil, Trash2, Flag, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCountdown } from "./useCountdown";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { priorityConfig } from "./PrioritySelect";
+import SubtasksPanel from "./SubtasksPanel";
 import type { Task } from "./useTareas";
 
 interface TaskCardProps {
@@ -20,11 +24,14 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
   const { user } = useAuth();
   const { toast } = useToast();
   const { display, isOverdue, isWarning } = useCountdown(task.due_at);
+  const [subtasksOpen, setSubtasksOpen] = useState(false);
 
   const isAssigned = user?.id === task.assigned_to;
   const isCompleted = task.status === "completed";
   const needsJustification = isOverdue && !isCompleted && !task.overdue_reason;
   const canComplete = isAssigned && !isCompleted && (!isOverdue || !!task.overdue_reason);
+
+  const priority = priorityConfig[task.priority] || priorityConfig.medium;
 
   const handleShare = () => {
     const url = `${window.location.origin}/tareas/share/${task.share_token}`;
@@ -52,6 +59,10 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
       <CardContent className="p-4 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Flag className={`h-3 w-3 ${priority.color} shrink-0`} />
+              <Badge className={`${priority.badgeClass} text-[10px] px-1.5 py-0`}>{priority.label}</Badge>
+            </div>
             <h3 className="font-semibold text-sm truncate">{task.title}</h3>
             {task.description && (
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
@@ -106,6 +117,19 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete }: TaskCardPro
             </Button>
           )}
         </div>
+
+        {/* Subtareas expandibles */}
+        <Collapsible open={subtasksOpen} onOpenChange={setSubtasksOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-start text-xs text-muted-foreground h-7 -mx-1">
+              {subtasksOpen ? <ChevronDown className="h-3 w-3 mr-1" /> : <ChevronRight className="h-3 w-3 mr-1" />}
+              Subtareas
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-1">
+            <SubtasksPanel taskId={task.id} />
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
