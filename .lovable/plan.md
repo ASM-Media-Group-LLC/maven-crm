@@ -1,54 +1,61 @@
 
 
-## Conectar acciones de la tabla PromologTable
+## Mejorar experiencia de subtareas y confirmar drag-and-drop
 
-### Situacion actual
+### Problemas identificados
 
-El componente `PromologTable` ya esta renderizado correctamente cuando se hace clic en el boton "Tabla". Sin embargo, las acciones de la tabla (Ver detalle, Editar, Eliminar) no estan conectadas: el componente recibe `onView`, `onEdit` y `onDelete` como props opcionales, pero `PromologContent` no pasa ninguno de estos handlers (linea 594).
+1. **Formulario de creacion de subtareas oculto**: Los campos de prioridad, fecha limite y asignacion estan escondidos detras de un boton chevron (`showOptions`). El usuario debe hacer clic extra para acceder a ellos, lo que hace que no sea obvio que existen.
 
-### Cambios necesarios
+2. **No se pueden editar subtareas existentes**: Una vez creada, una subtarea solo puede iniciarse, completarse o eliminarse. No hay forma de cambiar su titulo, prioridad, fecha o asignacion.
+
+3. **Drag-and-drop de proyectos y tareas**: Ya esta implementado correctamente usando `DraggableGrid` tanto en `ProjectsListContent` (proyectos) como en `TareasContent` (tareas). Ambos persisten el orden via `reorderProjects` y `reorderTasks`. Si no funciona visualmente, puede ser un problema de feedback visual que mejoraremos.
+
+---
+
+### Cambios planificados
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/promolog/PromologContent.tsx` | Conectar handlers `onView`, `onEdit`, `onDelete` al `PromologTable` |
+| `src/pages/tareas/SubtasksPanel.tsx` | Mostrar campos de prioridad, fecha y asignacion siempre visibles en linea con el input de titulo (eliminar el toggle `showOptions`) |
+| `src/pages/tareas/SubtaskItem.tsx` | Agregar boton de editar y modal/inline editing para modificar titulo, prioridad, fecha y asignacion de subtareas existentes |
+| `src/pages/tareas/DraggableGrid.tsx` | Mejorar feedback visual del drag-and-drop (cursor grab visible, indicador de posicion de drop) |
+
+---
 
 ### Detalle tecnico
 
-1. **Agregar estado para la entrada seleccionada y modales de accion**:
-   - `selectedEntry: PromologEntry | null`
-   - `viewEntryOpen: boolean`
-   - `editEntryOpen: boolean`
-   - `deleteEntryOpen: boolean`
+#### 1. Formulario de subtareas siempre visible
 
-2. **Crear funciones handler** siguiendo el patron de `TicketsContent`:
-   - `handleViewEntry(entry)` — selecciona la entrada y abre modal de vista
-   - `handleEditEntry(entry)` — selecciona la entrada y abre modal de edicion (reutilizando el modal de edicion existente)
-   - `handleDeleteEntry(entry)` — selecciona la entrada y abre dialogo de confirmacion de eliminacion
+Eliminar el estado `showOptions` y el boton chevron. Reorganizar el formulario para mostrar todos los campos en una sola fila compacta:
 
-3. **Pasar los handlers al componente `PromologTable`**:
-   ```
-   <PromologTable
-     entries={filteredEntries}
-     onView={handleViewEntry}
-     onEdit={handleEditEntry}
-     onDelete={handleDeleteEntry}
-   />
-   ```
+```
+[Input titulo] [Select prioridad] [Boton fecha] [Select asignar] [+ Agregar]
+```
 
-4. **Tambien pasar los mismos handlers a `PromologGrid`** para mantener consistencia entre vistas:
-   ```
-   <PromologGrid
-     entries={filteredEntries}
-     onView={handleViewEntry}
-     onEdit={handleEditEntry}
-     onDelete={handleDeleteEntry}
-   />
-   ```
+- Los selects usan el mismo tamano compacto actual (`h-7 text-xs`)
+- En pantallas pequenas, los campos se envuelven con `flex-wrap`
+- Se mantiene el atajo Enter para crear rapido
 
-### Lo que NO se cambia
+#### 2. Edicion inline de subtareas
 
-- Diseno visual de la tabla (columnas, badges, iconos, ordenacion)
-- Funcionalidades existentes de la tabla (sort, dropdown menu, sticky headers)
-- Layout general de la pagina Promolog
-- Ningun otro componente fuera de `PromologContent.tsx`
+Agregar un boton de editar (icono Pencil) en `SubtaskItem` que aparece en hover junto al boton de eliminar. Al hacer clic:
+
+- El titulo se convierte en un input editable inline
+- Los campos de prioridad, fecha y asignacion se muestran debajo como selects editables
+- Un boton "Guardar" confirma los cambios usando `updateSubtaskFields` (que ya existe en `useSubtasks`)
+- Un boton "Cancelar" o Escape descarta los cambios
+- Se usa el mutation `updateSubtaskFields` existente para prioridad/fecha/asignacion, y se agregara soporte para actualizar el titulo
+
+#### 3. Actualizar titulo de subtarea
+
+El hook `useSubtasks` ya tiene `updateSubtaskFields` pero no soporta cambiar el titulo. Se agregara `title` como campo editable en el mutation existente.
+
+#### 4. Mejorar feedback visual de drag-and-drop
+
+En `DraggableGrid`:
+- Agregar icono `GripVertical` visible en hover en cada card de proyecto/tarea
+- Mejorar el indicador visual durante el arrastre (borde mas prominente, sombra sutil)
+
+En `TaskCard` y la card de proyecto en `ProjectsListContent`:
+- Agregar el icono de agarre como primer elemento visual
 
