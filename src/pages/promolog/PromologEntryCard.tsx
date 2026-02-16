@@ -24,25 +24,43 @@ export interface PromologEntry {
   ticketNumber: string;
   name: string;
   handle?: string;
-  network: "instagram" | "x";
+  network: string;
   platform: string;
   result: string;
   date: string;
   time: string;
   agent: string;
   notes: string;
+  creator_id?: string;
 }
 
 interface PromologEntryCardProps {
   entry: PromologEntry;
 }
 
-const NetworkBadge = ({ network }: { network: "instagram" | "x" }) => {
-  if (network === "instagram") {
+const NetworkBadge = ({ network }: { network: string }) => {
+  const normalized = network.toLowerCase();
+  if (normalized === "instagram") {
     return (
       <Badge variant="outline" className="gap-1 text-xs">
         <InstagramIcon className="h-3 w-3" />
         Instagram
+      </Badge>
+    );
+  }
+  if (normalized === "tiktok") {
+    return (
+      <Badge variant="outline" className="gap-1 text-xs">
+        <TikTokIcon className="h-3 w-3" />
+        TikTok
+      </Badge>
+    );
+  }
+  if (normalized === "telegram") {
+    return (
+      <Badge variant="outline" className="gap-1 text-xs">
+        <TelegramIcon className="h-3 w-3" />
+        Telegram
       </Badge>
     );
   }
