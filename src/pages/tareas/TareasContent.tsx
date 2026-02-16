@@ -26,9 +26,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [assignedFilter, setAssignedFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [assignedFilter, setAssignedFilter] = useState<string>("");
+  const [priorityFilter, setPriorityFilter] = useState<string>("");
 
   const now = Date.now();
 
@@ -42,9 +42,9 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
     const filtered = tasks.filter((t) => {
       const matchesSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
       const taskStatus = getTaskStatus(t);
-      const matchesStatus = statusFilter === "all" || taskStatus === statusFilter;
-      const matchesAssigned = assignedFilter === "all" || t.assigned_to === assignedFilter;
-      const matchesPriority = priorityFilter === "all" || t.priority === priorityFilter;
+      const matchesStatus = !statusFilter || taskStatus === statusFilter;
+      const matchesAssigned = !assignedFilter || t.assigned_to === assignedFilter;
+      const matchesPriority = !priorityFilter || t.priority === priorityFilter;
       return matchesSearch && matchesStatus && matchesAssigned && matchesPriority;
     });
 
@@ -127,34 +127,34 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar tarea..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="pending">Pendiente</SelectItem>
               <SelectItem value="overdue">Vencida</SelectItem>
               <SelectItem value="completed">Completada</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+          <Select value={assignedFilter || undefined} onValueChange={(v) => setAssignedFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Asignado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               {companyProfiles.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.full_name || p.id}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <Select value={priorityFilter || undefined} onValueChange={(v) => setPriorityFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Prioridad" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="__all__">Todas</SelectItem>
               <SelectItem value="low">Baja</SelectItem>
               <SelectItem value="medium">Media</SelectItem>
               <SelectItem value="high">Alta</SelectItem>

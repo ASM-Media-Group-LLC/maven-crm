@@ -21,12 +21,12 @@ const ProjectsListContent = () => {
   const [editProject, setEditProject] = useState<TaskProject | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TaskProject | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("");
 
   const filteredProjects = useMemo(() => {
     return projects.filter((p) => {
       const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+      const matchesStatus = !statusFilter || p.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [projects, search, statusFilter]);
@@ -76,12 +76,12 @@ const ProjectsListContent = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar proyecto..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="active">Activo</SelectItem>
               <SelectItem value="archived">Archivado</SelectItem>
             </SelectContent>
