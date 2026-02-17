@@ -547,71 +547,100 @@ const PromologContent = () => {
 
         {/* Agentes tab */}
         {activeTab === "agentes" && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Desempeño por Agente</h2>
-                <p className="text-sm text-muted-foreground">
-                  Mostrando {agentsData.length} agente con actividad entre {shortDate} - {shortDate}
-                </p>
-              </div>
-              <div className="flex gap-1">
-                <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
+          <div className="space-y-6">
+            {/* Banner gradient al estilo LeadGen */}
+            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+              <div className="p-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
+                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
-              {agentsData.map((agent) => (
-                <Card key={agent.name}>
-                  <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-muted">
-                        <Users className="h-5 w-5 text-muted-foreground" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
-                      <p className="text-sm font-semibold">{agent.name}</p>
-                      <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
+
+            {/* Agent cards o estado vacío */}
+            {agentsData.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                      <Users className="h-8 w-8 text-muted-foreground/50" />
                     </div>
-                    <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15">
-                          <Check className="h-3 w-3 text-green-600" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.si}</span>
-                        <span className="text-xs text-muted-foreground">Sí</span>
+                    <p className="text-muted-foreground text-sm">
+                      No hay datos para esta fecha
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
+                {agentsData.map((agent) => (
+                  <Card key={agent.name}>
+                    <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-muted">
+                          <Users className="h-5 w-5 text-muted-foreground" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
+                        <p className="text-sm font-semibold">{agent.name}</p>
+                        <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15">
-                          <Minus className="h-3 w-3 text-yellow-600" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.parcial}</span>
-                        <span className="text-xs text-muted-foreground">Parcial</span>
+                      <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15">
+                            <Check className="h-3 w-3 text-green-600" />
+                          </span>
+                          <span className="text-sm font-medium">{agent.si}</span>
+                          <span className="text-xs text-muted-foreground">Sí</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15">
+                            <Minus className="h-3 w-3 text-yellow-600" />
+                          </span>
+                          <span className="text-sm font-medium">{agent.parcial}</span>
+                          <span className="text-xs text-muted-foreground">Parcial</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15">
+                            <X className="h-3 w-3 text-red-600" />
+                          </span>
+                          <span className="text-sm font-medium">{agent.no}</span>
+                          <span className="text-xs text-muted-foreground">No</span>
+                        </div>
+                        <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
+                        <div className="flex items-center gap-1.5">
+                          {agent.badges.map((b) => (
+                            <Badge key={b.label} variant="outline" className="text-xs">
+                              {b.label} {b.value}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15">
-                          <X className="h-3 w-3 text-red-600" />
-                        </span>
-                        <span className="text-sm font-medium">{agent.no}</span>
-                        <span className="text-xs text-muted-foreground">No</span>
-                      </div>
-                      <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
-                      <div className="flex items-center gap-1.5">
-                        {agent.badges.map((b) => (
-                          <Badge key={b.label} variant="outline" className="text-xs">
-                            {b.label} {b.value}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
