@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, List, LayoutGrid, X } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format } from "date-fns";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -114,6 +116,15 @@ const TicketsFilters = ({
           </SelectContent>
         </Select>
 
+        <DateRangePicker
+          from={dateFrom ? new Date(dateFrom) : undefined}
+          to={dateTo ? new Date(dateTo) : undefined}
+          onApply={(from, to) => {
+            onDateFromChange(from ? format(from, "yyyy-MM-dd") : "");
+            onDateToChange(to ? format(to, "yyyy-MM-dd") : "");
+          }}
+        />
+
         {hasActiveFilters && onClear && (
           <Button variant="ghost" size="sm" onClick={onClear}>
             <X className="mr-1.5 h-4 w-4" />
@@ -138,27 +149,6 @@ const TicketsFilters = ({
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Desde</span>
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => onDateFromChange(e.target.value)}
-            className="w-[160px]"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Hasta</span>
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => onDateToChange(e.target.value)}
-            className="w-[160px]"
-          />
         </div>
       </div>
     </div>
