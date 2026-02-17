@@ -1,23 +1,29 @@
 
 
-## Reemplazar "Desde/Hasta" por DateRangePicker en Customer Service
+## Conectar boton "Agregar Entrada" al flujo existente
 
-### Cambio
+### Situacion actual
 
-Reemplazar los dos inputs de fecha separados ("Desde" y "Hasta") en la segunda fila de filtros por el componente `DateRangePicker` que ya se usa en Eventos y Sales Overview, manteniendo consistencia visual en toda la app.
+El flujo completo ya existe en `PromologContent.tsx`:
+- **Modal de seleccion de creadora** (linea 612-688): busqueda, filtros, grid de creadoras
+- **Modal de registro de promocion** (linea 691-800): card de creadora, botones Si/No, campos condicionales
 
-### Archivos a modificar
+Sin embargo, el boton **"Agregar Entrada"** en el header (linea 354) tiene un `onClick` vacio (`() => { /* open entry modal */ }`).
 
-**`src/pages/tickets/TicketsFilters.tsx`**
-- Eliminar la segunda fila completa (lineas 144-163) con los inputs "Desde" y "Hasta"
-- Importar `DateRangePicker` de `@/components/ui/date-range-picker` y `format` de `date-fns`
-- Colocar el `DateRangePicker` en la primera fila de filtros, entre el select de "Asignado" y el boton "Limpiar filtros"
-- Adaptar las props: convertir los strings `dateFrom`/`dateTo` a `Date` para el componente, y en `onApply` formatear de vuelta a string `yyyy-MM-dd`
+### Cambios necesarios
 
-**`src/pages/tickets/TicketsContent.tsx`**
-- Sin cambios necesarios: las props `dateFrom`, `dateTo` y sus setters ya existen y seguiran funcionando igual
+**Archivo: `src/pages/promolog/PromologContent.tsx`**
+
+1. **Conectar el boton**: Cambiar el onClick del boton "Agregar Entrada" de `() => {}` a `() => setCreatorsModalOpen(true)` para que abra el modal de seleccion de creadora (que ya existe y funciona cuando se hace clic en el KPI "Total Modelos").
+
+2. **Ajustar texto del boton de guardar**: En el modal de registro (linea 795), cambiar el texto "Guardar Entrada" por "Guardar Promocion" para que coincida con la imagen de referencia.
 
 ### Resultado
 
-Los filtros de Tickets pasaran de tener dos filas (selectores + inputs de fecha) a una sola fila con el `DateRangePicker` integrado, igual que en Eventos.
+Al hacer clic en "Agregar Entrada":
+1. Se abre el modal "Selecciona una Creadora" con busqueda y filtros
+2. Al seleccionar una creadora, se cierra ese modal y se abre "Registrar Promocion"
+3. El usuario elige Si/No Promociono, llena los campos y guarda con "Guardar Promocion"
+
+Es un cambio minimo (2 lineas) porque todo el flujo ya esta construido.
 
