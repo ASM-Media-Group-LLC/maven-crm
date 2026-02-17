@@ -1,46 +1,65 @@
 
 
-## Ajustes en Promolog: Tab bar, Limpiar filtros y Grid cards
+## Agregar "Limpiar filtros" condicional en todas las tablas principales
 
-### 1. Eliminar "Dashboard" del tab bar
+### Situacion actual
 
-Quitar la opcion "Dashboard" del array `tabItems`. Las dos tabs restantes seran **Agentes** y **Campanas**. El contenido que actualmente se muestra en "Dashboard" (Entradas Recientes con tabla/grid) pasara a mostrarse siempre, fuera de cualquier condicional de tab activo.
+Solo **Promolog** tiene un boton "Limpiar filtros", pero siempre esta visible (incluso sin filtros aplicados). Las demas paginas principales no tienen esta funcionalidad:
 
-### 2. Corregir "Limpiar filtros"
+| Pagina | Tiene filtros | Tiene "Limpiar filtros" |
+|--------|:---:|:---:|
+| Promolog | Si | Si (siempre visible) |
+| Eventos | Si | No |
+| Contactos | Si | No |
+| Creadores | Si | No |
+| Tickets | Si | No |
+| Closers | Si | No |
+| LeadGen | Si | No |
 
-El boton actualmente resetea search, status, network, category y creator filter, pero **no resetea las fechas** (`dateFrom` y `dateTo`). Se agregara el reset de ambas fechas a `undefined` en el handler del boton.
+### Cambios
 
-### 3. Redisenar las cards del Grid
+En cada pagina, agregar un boton "Limpiar filtros" (icono X + texto) que **solo aparece cuando al menos un filtro esta activo** (distinto de su valor por defecto). Al hacer clic, resetea todos los filtros a sus valores vacios.
 
-Actualmente `PromologEntryCard` muestra toda la informacion en formato horizontal (notas completas visibles). Segun la imagen de referencia, las cards deben tener un diseno vertical compacto:
+#### Archivos a modificar
 
-```text
-┌──────────────────────────────┐
-│ PL652558              [Sí]  │  <- ticket + badge resultado
-│ ✅ Isabella Gomez Jaramillo │  <- icono resultado + nombre
-│ 📸 @isabellasantos1273      │  <- icono red + handle
-│                              │
-│ [Instagram] [OnlyFans]       │  <- badges red + plataforma
-│ 🕐 04:46 PM · 👤 Fabiana    │  <- hora + agente
-│                              │
-│ (notas ocultas o truncadas)  │
-│                              │
-│ [────── ✏️ Editar ──────]    │  <- boton editar full width
-└──────────────────────────────┘
+| Archivo | Detalle |
+|---------|---------|
+| `src/pages/promolog/PromologContent.tsx` | Hacer que el boton existente solo sea visible cuando hay filtros activos |
+| `src/pages/eventos/EventosFilters.tsx` | Agregar boton "Limpiar filtros" condicional + recibir prop `onClear` |
+| `src/pages/eventos/EventosContent.tsx` | Pasar `onClear` y logica de `hasActiveFilters` al componente de filtros |
+| `src/pages/contactos/ContactosFilters.tsx` | Agregar boton condicional + recibir props `onClear` y `hasActiveFilters` |
+| `src/pages/contactos/ContactosContent.tsx` | Calcular `hasActiveFilters` y pasar `onClear` |
+| `src/pages/creadores/CreadoresFilters.tsx` | Agregar boton condicional + recibir props |
+| `src/pages/creadores/CreadoresContent.tsx` | Calcular `hasActiveFilters` y pasar `onClear` |
+| `src/pages/tickets/TicketsFilters.tsx` | Agregar boton condicional |
+| `src/pages/tickets/TicketsContent.tsx` | Pasar `onClear` y `hasActiveFilters` |
+| `src/pages/closers/ClosersContent.tsx` | Agregar boton inline (filtros estan en el mismo componente) |
+| `src/pages/leadgen/LeadGenContent.tsx` | Agregar boton inline (filtros estan en el mismo componente) |
+
+### Detalle tecnico
+
+**Patron comun para cada pagina:**
+
+1. Calcular si hay filtros activos comparando el estado actual contra los valores vacios:
+```tsx
+const hasActiveFilters = filters.search !== "" || filters.status !== "" || /* etc */;
 ```
 
-Cambios clave vs el diseno actual:
-- El badge de resultado (Si/No/Parcial/Pendiente) va en la esquina superior derecha, con color (verde=Si, rojo=No, amarillo=Parcial, gris=Pendiente)
-- El icono de resultado (check verde, X rojo) va junto al nombre
-- Las notas se ocultan (no se muestran en la card del grid)
-- El boton "Editar" ocupa todo el ancho de la card
-- Layout vertical en vez de horizontal
+2. Mostrar el boton condicionalmente junto a los demas filtros:
+```tsx
+{hasActiveFilters && (
+  <Button variant="ghost" size="sm" onClick={onClear}>
+    <X className="mr-1.5 h-4 w-4" />
+    Limpiar filtros
+  </Button>
+)}
+```
 
-### Archivos a modificar
+3. El handler `onClear` resetea todos los valores a su estado inicial (cadena vacia, undefined para fechas, etc.)
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/promolog/PromologContent.tsx` | (1) Quitar "dashboard" de `tabItems`, tab por defecto pasa a "agentes". (2) Mover el contenido de Entradas Recientes fuera del condicional de tab. (3) Agregar reset de fechas en "Limpiar filtros". |
-| `src/pages/promolog/PromologEntryCard.tsx` | Redisenar la card para que tenga layout vertical compacto segun la imagen de referencia, sin mostrar las notas. |
-| `src/pages/promolog/PromologGrid.tsx` | Ajustar grid a `lg:grid-cols-3` (sin xl:grid-cols-4) para dar mas espacio a las cards. |
+**Para Promolog** solo se envuelve el boton existente en la condicion `hasActiveFilters`.
+
+**Para paginas con filtros inline** (Closers, LeadGen) se agrega directamente en el componente Content.
+
+**Para paginas con componente Filters separado** (Eventos, Contactos, Creadores, Tickets) se pasan las props `hasActiveFilters` y `onClear` al componente de filtros.
 
