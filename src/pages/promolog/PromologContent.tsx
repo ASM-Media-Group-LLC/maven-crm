@@ -351,7 +351,7 @@ const PromologContent = () => {
               <Plus className="mr-1.5 h-4 w-4" />
               Agregar Campaña
             </Button>
-            <Button variant="outline" size="sm" className="h-9" onClick={() => { /* open entry modal */ }}>
+            <Button variant="outline" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
               Agregar Entrada
             </Button>
@@ -792,7 +792,7 @@ const PromologContent = () => {
 
                 <DialogFooter>
                   <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                  <Button onClick={() => { setEntryModalOpen(false); toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` }); }}>Guardar Entrada</Button>
+                  <Button onClick={() => { setEntryModalOpen(false); toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` }); }}>Guardar Promoción</Button>
                 </DialogFooter>
               </>
             )}
