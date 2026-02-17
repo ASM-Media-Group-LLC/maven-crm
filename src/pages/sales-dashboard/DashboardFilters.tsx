@@ -1,5 +1,4 @@
 import { Calendar, GitCompareArrows, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
 
@@ -53,39 +52,31 @@ const DashboardFilters = ({
   return (
     <div className="space-y-4">
       {/* View tabs */}
-      <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+      <div className="inline-flex rounded-lg bg-muted/50 p-1">
         {viewTabs.map((tab) => (
-          <button
+          <Button
             key={tab}
+            variant={activeView === tab ? "secondary" : "ghost"}
+            size="sm"
             onClick={() => handleViewChange(tab)}
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              activeView === tab
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
           >
             {tab}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Time filters + date range + compare */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+        <div className="inline-flex rounded-lg bg-muted/50 p-1">
           {timePeriods.map((period) => (
-            <button
+            <Button
               key={period}
+              variant={activePeriod === period ? "secondary" : "ghost"}
+              size="sm"
               onClick={() => onPeriodChange(period)}
-              className={cn(
-                "px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
-                activePeriod === period
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
             >
               {period}
-            </button>
+            </Button>
           ))}
         </div>
 
