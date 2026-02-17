@@ -90,6 +90,7 @@ const agentsData = [
 ];
 
 const tabItems = [
+  { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
 ];
@@ -189,7 +190,9 @@ const PromologContent = () => {
     { value: "C", label: "C - Regular" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"agentes" | "campanas">("agentes");
+  const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas">("promos");
+  const [agentesView, setAgentesView] = useState<"list" | "grid">("list");
+  const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
 
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -470,97 +473,111 @@ const PromologContent = () => {
           ))}
         </div>
 
-        {/* Unified filters row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
-          </div>
-          <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="si_promociono">Sí</SelectItem>
-              <SelectItem value="no_promociono">No</SelectItem>
-              <SelectItem value="parcial">Parcial</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {networkOptions.map((n) => (
-                <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {categoryOptions.map((cat) => (
-                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-            placeholder="Selecciona fechas"
-            className="h-9"
-          />
-          {(searchEntry || selectedStatus || selectedNetwork || selectedCategory || selectedCreatorFilter || dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              <X className="mr-1.5 h-4 w-4" />
-              Limpiar filtros
-            </Button>
-          )}
-          <div className="ml-auto flex gap-1">
-            <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        {/* Promos tab */}
+        {activeTab === "promos" && (
+          <>
+            {/* Unified filters row */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+              </div>
+              <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="si_promociono">Sí</SelectItem>
+                  <SelectItem value="no_promociono">No</SelectItem>
+                  <SelectItem value="parcial">Parcial</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {networkOptions.map((n) => (
+                    <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  {categoryOptions.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+                placeholder="Selecciona fechas"
+                className="h-9"
+              />
+              {(searchEntry || selectedStatus || selectedNetwork || selectedCategory || selectedCreatorFilter || dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+                  <X className="mr-1.5 h-4 w-4" />
+                  Limpiar filtros
+                </Button>
+              )}
+              <div className="ml-auto flex gap-1">
+                <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-        <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
+            <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
 
-        {/* Entradas Recientes - always visible */}
-        <div className="space-y-3">
-          {entryView === "list" ? (
-            <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-          ) : (
-            <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-          )}
-        </div>
+            <div className="space-y-3">
+              {entryView === "list" ? (
+                <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+              ) : (
+                <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+              )}
+            </div>
+          </>
+        )}
 
         {/* Agentes tab */}
         {activeTab === "agentes" && (
           <div className="space-y-3">
-            <div>
-              <h2 className="text-lg font-semibold">Desempeño por Agente</h2>
-              <p className="text-sm text-muted-foreground">
-                Mostrando {agentsData.length} agente con actividad entre {shortDate} - {shortDate}
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Desempeño por Agente</h2>
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {agentsData.length} agente con actividad entre {shortDate} - {shortDate}
+                </p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="space-y-3">
+            <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
               {agentsData.map((agent) => (
                 <Card key={agent.name}>
-                  <CardContent className="flex items-center gap-4 p-4">
+                  <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-muted">
                         <Users className="h-5 w-5 text-muted-foreground" />
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
+                    <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
                       <p className="text-sm font-semibold">{agent.name}</p>
                       <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
                       <div className="flex items-center gap-1.5">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15">
                           <Check className="h-3 w-3 text-green-600" />
@@ -582,7 +599,7 @@ const PromologContent = () => {
                         <span className="text-sm font-medium">{agent.no}</span>
                         <span className="text-xs text-muted-foreground">No</span>
                       </div>
-                      <Separator orientation="vertical" className="h-8" />
+                      <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
                       <div className="flex items-center gap-1.5">
                         {agent.badges.map((b) => (
                           <Badge key={b.label} variant="outline" className="text-xs">
@@ -600,11 +617,27 @@ const PromologContent = () => {
 
         {/* Campañas tab */}
         {activeTab === "campanas" && (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground text-center">
-              Vista de campañas próximamente...
-            </CardContent>
-          </Card>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Campañas</h2>
+                <p className="text-sm text-muted-foreground">Gestión de campañas promocionales</p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant={campanasView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("list")}>
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button variant={campanasView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("grid")}>
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <Card>
+              <CardContent className="p-6 text-sm text-muted-foreground text-center">
+                {campanasView === "list" ? "Vista de lista de campañas próximamente..." : "Vista de grid de campañas próximamente..."}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
 
