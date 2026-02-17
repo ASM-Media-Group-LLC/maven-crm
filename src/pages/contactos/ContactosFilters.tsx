@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid, CalendarDays } from "lucide-react";
+import { Search, List, LayoutGrid, CalendarDays, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,9 +22,11 @@ interface Props {
   onChange: (patch: Partial<ContactoFilters>) => void;
   view: "table" | "grid";
   onViewChange: (v: "table" | "grid") => void;
+  hasActiveFilters?: boolean;
+  onClear?: () => void;
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear }: Props) => (
   <div className="flex items-center gap-3">
     <div className="relative w-64">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -69,6 +71,13 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
         </SelectContent>
       </Select>
     </div>
+
+    {hasActiveFilters && onClear && (
+      <Button variant="ghost" size="sm" onClick={onClear}>
+        <X className="mr-1.5 h-4 w-4" />
+        Limpiar filtros
+      </Button>
+    )}
 
     <div className="ml-auto flex gap-1">
       <Button

@@ -88,6 +88,8 @@ const CreadoresContent = () => {
             managers={managers}
             view={view}
             onViewChange={setView}
+            hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager)}
+            onClear={() => setFilters(emptyFilters)}
           />
 
           {view === "table" ? (

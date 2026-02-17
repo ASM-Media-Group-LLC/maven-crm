@@ -105,6 +105,8 @@ const TicketsContent = () => {
             dateFrom={dateFrom} onDateFromChange={setDateFrom}
             dateTo={dateTo} onDateToChange={setDateTo}
             view={view} onViewChange={setView}
+            hasActiveFilters={!!(search || priority || ticketType || status || company || assignedTo || dateFrom || dateTo)}
+            onClear={() => { setSearch(""); setPriority(""); setTicketType(""); setStatus(""); setCompany(""); setAssignedTo(""); setDateFrom(""); setDateTo(""); }}
           />
 
           <p className="text-xs text-muted-foreground">{filtered.length} tickets</p>

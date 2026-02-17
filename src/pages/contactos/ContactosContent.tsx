@@ -135,6 +135,8 @@ const ContactosContent = () => {
           onChange={updateFilters}
           view={view}
           onViewChange={setView}
+          hasActiveFilters={!!(filters.search || filters.estado || filters.pais || filters.categoria || filters.fechaCreacion)}
+          onClear={() => setFilters(emptyFilters)}
         />
 
         {view === "table" ? (

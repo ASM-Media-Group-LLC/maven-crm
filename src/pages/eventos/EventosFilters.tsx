@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid } from "lucide-react";
+import { Search, List, LayoutGrid, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,6 +17,8 @@ interface Props {
   onChange: (patch: Partial<EventoFilters>) => void;
   view: "table" | "grid";
   onViewChange: (v: "table" | "grid") => void;
+  hasActiveFilters?: boolean;
+  onClear?: () => void;
 }
 
 const EVENT_TYPES = ["Shooting", "Podcast", "Casting", "Reunion", "Otro"];
@@ -26,7 +28,7 @@ const TIME_OPTIONS = [
   { value: "night", label: "Noche" },
 ];
 
-const EventosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
+const EventosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear }: Props) => (
   <div className="flex items-center gap-3">
     <div className="relative flex-1">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -72,6 +74,13 @@ const EventosFilters = ({ filters, onChange, view, onViewChange }: Props) => (
         })
       }
     />
+
+    {hasActiveFilters && onClear && (
+      <Button variant="ghost" size="sm" onClick={onClear}>
+        <X className="mr-1.5 h-4 w-4" />
+        Limpiar filtros
+      </Button>
+    )}
 
     <div className="ml-auto flex gap-1">
       <Button variant={view === "table" ? "secondary" : "ghost"} size="icon" onClick={() => onViewChange("table")}>
