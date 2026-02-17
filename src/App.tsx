@@ -44,6 +44,8 @@ import Tareas from "./pages/Tareas";
 import TareaProject from "./pages/TareaProject";
 import TaskSharePage from "./pages/tareas/TaskSharePage";
 import ProjectSharePage from "./pages/tareas/ProjectSharePage";
+import AdminUsuarios from "./pages/admin/AdminUsuarios";
+import AdminRoute from "./components/AdminRoute";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -98,6 +100,8 @@ const App = () => (
               <Route path="/eventos/nuevo" element={<ProtectedRoute><NuevoEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
+              {/* Admin routes */}
+              <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
