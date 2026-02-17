@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  CalendarDays,
+  
   Users,
   Search,
   Target,
@@ -93,7 +93,6 @@ const tabItems = [
   { id: "dashboard" as const, label: "Dashboard", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
-  { id: "calendario" as const, label: "Calendario", icon: CalendarDays },
 ];
 
 const PromologContent = () => {
@@ -191,7 +190,7 @@ const PromologContent = () => {
     { value: "C", label: "C - Regular" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "agentes" | "campanas" | "calendario">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "agentes" | "campanas">("dashboard");
 
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -361,50 +360,78 @@ const PromologContent = () => {
         </div>
       </header>
 
-      {/* Filters bar */}
-      <div className="px-6 py-3 flex items-center gap-3 shrink-0 flex-wrap">
-        <DateRangePicker
-          from={dateFrom}
-          to={dateTo}
-          onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-          className="h-9"
-        />
-        <Button variant={activeTab === "agentes" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "agentes" ? "dashboard" : "agentes")}>
-          <Eye className="mr-1.5 h-4 w-4" />
-          Ver Agentes
-        </Button>
-        <Button variant={activeTab === "campanas" ? "secondary" : "outline"} size="sm" className="h-9" onClick={() => setActiveTab(activeTab === "campanas" ? "dashboard" : "campanas")}>
-          <Eye className="mr-1.5 h-4 w-4" />
-          Ver Campañas
-        </Button>
-        {activeTab === "dashboard" && (
-          <>
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
-            </div>
-            <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todas</SelectItem>
-                {categoryOptions.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="ml-auto flex gap-1">
-              <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Tab bar */}
+        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+          {tabItems.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <tab.icon className="mr-1.5 h-4 w-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Unified filters row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar entrada..." className="pl-9 h-9" value={searchEntry} onChange={(e) => setSearchEntry(e.target.value)} />
+          </div>
+          <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="si_promociono">Sí</SelectItem>
+              <SelectItem value="no_promociono">No</SelectItem>
+              <SelectItem value="parcial">Parcial</SelectItem>
+              <SelectItem value="pendiente">Pendiente</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Red Social" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              {networkOptions.map((n) => (
+                <SelectItem key={n.value} value={n.value}>{n.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              {categoryOptions.map((cat) => (
+                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+            className="h-9"
+          />
+          <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); }}>
+            <X className="mr-1.5 h-4 w-4" />
+            Limpiar filtros
+          </Button>
+          <div className="ml-auto flex gap-1">
+            <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
+              <List className="h-4 w-4" />
+            </Button>
+            <Button variant={entryView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("grid")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
+
         {/* Dashboard tab */}
         {activeTab === "dashboard" && (
           <div className="space-y-6">
@@ -572,36 +599,6 @@ const PromologContent = () => {
               </Collapsible>
             </Card>
 
-            {/* View Tabs */}
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
-              <Button
-                variant={entryView === "list" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 gap-1.5"
-                onClick={() => setEntryView("list")}
-              >
-                <Table2 className="h-4 w-4" />
-                Tabla
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1.5"
-                onClick={() => setActiveTab("calendario")}
-              >
-                <CalendarDays className="h-4 w-4" />
-                Calendario
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1.5"
-                onClick={() => setActiveTab("campanas")}
-              >
-                <Target className="h-4 w-4" />
-                Campañas
-              </Button>
-            </div>
 
             {/* Entries */}
             <div className="space-y-3">
@@ -687,14 +684,6 @@ const PromologContent = () => {
           </Card>
         )}
 
-        {/* Calendario tab */}
-        {activeTab === "calendario" && (
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground text-center">
-              Vista de calendario próximamente...
-            </CardContent>
-          </Card>
-        )}
 
         {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
