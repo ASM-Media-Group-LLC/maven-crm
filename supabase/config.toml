@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.event-external-action]
 verify_jwt = false
+
+[functions.manage-user-roles]
+verify_jwt = false

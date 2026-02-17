@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
-  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText,
+  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -15,6 +15,7 @@ import {
   SidebarMenuSubItem, SidebarMenuSubButton, SidebarFooter, SidebarSeparator, useSidebar,
 } from "@/components/ui/sidebar";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
@@ -25,6 +26,7 @@ const DashboardSidebar = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { isAdmin } = useUserRole();
 
   const mainMenu = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
@@ -141,6 +143,24 @@ const DashboardSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administración</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Usuarios">
+                    <NavLink to="/admin/usuarios" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <Shield className="h-4 w-4 shrink-0" />
+                      <span>Usuarios</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>{t("sidebar.resources")}</SidebarGroupLabel>
