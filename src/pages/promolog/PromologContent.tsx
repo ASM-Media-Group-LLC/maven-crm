@@ -361,6 +361,101 @@ const PromologContent = () => {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* KPI Cards - always visible */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
+                  <Users className="h-5 w-5 text-accent" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-success">{creators.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-primary/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+                  <CheckCircle className="h-5 w-5 text-primary" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-primary">{entries.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-destructive/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
+            </CardContent>
+          </Card>
+          <Card className="border border-success/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
+                  <TrendingUp className="h-5 w-5 text-success" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Social & Platform Section - always visible */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">
+            Promociones por Red Social y Plataforma{" "}
+            <span className="text-sm font-normal text-muted-foreground">(solo tickets &apos;Sí&apos;)</span>
+          </h2>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Red Social</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {socialCards.map((s) => (
+                <Card key={s.name} className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
+                  <CardContent className="flex items-center gap-3 p-4">
+                    {s.icon}
+                    <div>
+                      <p className="text-xs text-muted-foreground">{s.name}</p>
+                      <p className="text-xl font-bold">{s.value}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Plataforma</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {platformCards.map((p) => (
+                <Card key={p.name} className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
+                  <CardContent className="flex items-center gap-3 p-4">
+                    {p.icon}
+                    <div>
+                      <p className="text-xs text-muted-foreground">{p.name}</p>
+                      <p className="text-xl font-bold">{p.value}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-center text-muted-foreground">
+            Mostrando datos del {shortDate} al {shortDate}
+          </p>
+        </div>
+
         {/* Tab bar */}
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           {tabItems.map((tab) => (
@@ -435,116 +530,16 @@ const PromologContent = () => {
 
         {/* Dashboard tab */}
         {activeTab === "dashboard" && (
-          <div className="space-y-6">
-            {/* KPI Cards */}
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
-                      <Users className="h-5 w-5 text-accent" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-success">{creators.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
-                </CardContent>
-              </Card>
-              <Card className="border border-primary/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                      <CheckCircle className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-primary">{entries.length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
-                </CardContent>
-              </Card>
-              <Card className="border border-destructive/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
-                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
-                </CardContent>
-              </Card>
-              <Card className="border border-success/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-                      <TrendingUp className="h-5 w-5 text-success" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
-                </CardContent>
-              </Card>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Entradas Recientes</h2>
+              <span className="text-sm text-muted-foreground">{filteredEntries.length} entradas</span>
             </div>
-
-            {/* Social & Platform Section */}
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">
-                Promociones por Red Social y Plataforma{" "}
-                <span className="text-sm font-normal text-muted-foreground">(solo tickets &apos;Sí&apos;)</span>
-              </h2>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Red Social</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {socialCards.map((s) => (
-                    <Card key={s.name} className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
-                      <CardContent className="flex items-center gap-3 p-4">
-                        {s.icon}
-                        <div>
-                          <p className="text-xs text-muted-foreground">{s.name}</p>
-                          <p className="text-xl font-bold">{s.value}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Plataforma</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {platformCards.map((p) => (
-                    <Card key={p.name} className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
-                      <CardContent className="flex items-center gap-3 p-4">
-                        {p.icon}
-                        <div>
-                          <p className="text-xs text-muted-foreground">{p.name}</p>
-                          <p className="text-xl font-bold">{p.value}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-center text-muted-foreground">
-                Mostrando datos del {shortDate} al {shortDate}
-              </p>
-            </div>
-
-
-
-            {/* Entries */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">Entradas Recientes</h2>
-                <span className="text-sm text-muted-foreground">{filteredEntries.length} entradas</span>
-              </div>
-              {entryView === "list" ? (
-                <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              ) : (
-                <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              )}
-            </div>
+            {entryView === "list" ? (
+              <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+            ) : (
+              <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+            )}
           </div>
         )}
 
