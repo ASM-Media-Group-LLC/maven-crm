@@ -22,7 +22,7 @@ import {
   LayoutGrid,
   Send,
   Eye,
-  ChevronUp,
+  
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -196,7 +196,7 @@ const PromologContent = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  
   const [selectedCreatorFilter, setSelectedCreatorFilter] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
   const [searchCreator, setSearchCreator] = useState("");
@@ -414,6 +414,7 @@ const PromologContent = () => {
             from={dateFrom}
             to={dateTo}
             onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+            placeholder="Selecciona fechas"
             className="h-9"
           />
           <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); }}>
@@ -530,74 +531,6 @@ const PromologContent = () => {
               </p>
             </div>
 
-            {/* Collapsible Filters Section */}
-            <Card>
-              <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-                <CollapsibleTrigger asChild>
-                  <button className="flex w-full items-center justify-between p-4 text-sm font-semibold hover:bg-muted/50 transition-colors rounded-t-lg">
-                    <span>Filtros</span>
-                    <ChevronUp className={cn("h-4 w-4 transition-transform duration-200", !filtersOpen && "rotate-180")} />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-4 pb-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Creador/a</Label>
-                      <Select value={selectedCreatorFilter || undefined} onValueChange={(v) => setSelectedCreatorFilter(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          {creators.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Red Social</Label>
-                      <Select value={selectedNetwork || undefined} onValueChange={(v) => setSelectedNetwork(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="Todas" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todas</SelectItem>
-                          <SelectItem value="instagram">Instagram</SelectItem>
-                          <SelectItem value="tiktok">TikTok</SelectItem>
-                          <SelectItem value="x">X</SelectItem>
-                          <SelectItem value="telegram">Telegram</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Estado</Label>
-                      <Select value={selectedStatus || undefined} onValueChange={(v) => setSelectedStatus(v === "__all__" ? "" : v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos</SelectItem>
-                          <SelectItem value="si_promociono">Promocionó</SelectItem>
-                          <SelectItem value="no_promociono">No promocionó</SelectItem>
-                          <SelectItem value="parcial">Promoción parcial</SelectItem>
-                          <SelectItem value="pendiente">Pendiente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end px-4 pb-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs text-muted-foreground"
-                      onClick={() => {
-                        setSelectedCreatorFilter("");
-                        setSelectedNetwork("");
-                        setSelectedStatus("");
-                      }}
-                    >
-                      <X className="mr-1 h-3.5 w-3.5" />
-                      Limpiar filtros
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
 
 
             {/* Entries */}
