@@ -90,7 +90,6 @@ const agentsData = [
 ];
 
 const tabItems = [
-  { id: "dashboard" as const, label: "Dashboard", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
 ];
@@ -190,7 +189,7 @@ const PromologContent = () => {
     { value: "C", label: "C - Regular" },
   ];
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "agentes" | "campanas">("dashboard");
+  const [activeTab, setActiveTab] = useState<"agentes" | "campanas">("agentes");
 
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
@@ -512,7 +511,7 @@ const PromologContent = () => {
             placeholder="Selecciona fechas"
             className="h-9"
           />
-          <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); }}>
+          <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
             <X className="mr-1.5 h-4 w-4" />
             Limpiar filtros
           </Button>
@@ -528,20 +527,14 @@ const PromologContent = () => {
 
         <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
 
-        {/* Dashboard tab */}
-        {activeTab === "dashboard" && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Entradas Recientes</h2>
-              <span className="text-sm text-muted-foreground">{filteredEntries.length} entradas</span>
-            </div>
-            {entryView === "list" ? (
-              <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-            ) : (
-              <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-            )}
-          </div>
-        )}
+        {/* Entradas Recientes - always visible */}
+        <div className="space-y-3">
+          {entryView === "list" ? (
+            <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+          ) : (
+            <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+          )}
+        </div>
 
         {/* Agentes tab */}
         {activeTab === "agentes" && (
