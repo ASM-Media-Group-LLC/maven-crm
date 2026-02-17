@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { CalendarDays, Clock, User, CheckCircle, Pencil, Check, X as XMark, ExternalLink, Upload } from "lucide-react";
+import { Clock, User, Pencil, Check, X as XMark, ExternalLink, Upload } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,38 +38,36 @@ interface PromologEntryCardProps {
   entry: PromologEntry;
 }
 
-const NetworkBadge = ({ network }: { network: string }) => {
-  const normalized = network.toLowerCase();
-  if (normalized === "instagram") {
-    return (
-      <Badge variant="outline" className="gap-1 text-xs">
-        <InstagramIcon className="h-3 w-3" />
-        Instagram
-      </Badge>
-    );
+const NetworkIcon = ({ network }: { network: string }) => {
+  const n = network.toLowerCase();
+  if (n === "instagram") return <InstagramIcon className="h-3.5 w-3.5" />;
+  if (n === "tiktok") return <TikTokIcon className="h-3.5 w-3.5" />;
+  if (n === "telegram") return <TelegramIcon className="h-3.5 w-3.5" />;
+  return <XIcon className="h-3.5 w-3.5" />;
+};
+
+const networkLabel = (network: string) => {
+  const n = network.toLowerCase();
+  if (n === "instagram") return "Instagram";
+  if (n === "tiktok") return "TikTok";
+  if (n === "telegram") return "Telegram";
+  return "X";
+};
+
+const resultBadgeVariant = (result: string): "success" | "destructive" | "warning" | "secondary" => {
+  switch (result) {
+    case "Sí": return "success";
+    case "No": return "destructive";
+    case "Parcial": return "warning";
+    default: return "secondary";
   }
-  if (normalized === "tiktok") {
-    return (
-      <Badge variant="outline" className="gap-1 text-xs">
-        <TikTokIcon className="h-3 w-3" />
-        TikTok
-      </Badge>
-    );
-  }
-  if (normalized === "telegram") {
-    return (
-      <Badge variant="outline" className="gap-1 text-xs">
-        <TelegramIcon className="h-3 w-3" />
-        Telegram
-      </Badge>
-    );
-  }
-  return (
-    <Badge className="gap-1 text-xs bg-foreground text-background hover:bg-foreground/90">
-      <XIcon className="h-3 w-3" />
-      X / Twitter
-    </Badge>
-  );
+};
+
+const ResultIcon = ({ result }: { result: string }) => {
+  if (result === "Sí") return <Check className="h-3.5 w-3.5 text-green-500" />;
+  if (result === "No") return <XMark className="h-3.5 w-3.5 text-destructive" />;
+  if (result === "Parcial") return <Check className="h-3.5 w-3.5 text-yellow-500" />;
+  return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
 };
 
 const getInitials = (name: string) => {
@@ -133,61 +131,68 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
 
   return (
     <>
-      <Card className="transition-colors hover:bg-muted/50">
-        <CardContent className="p-4 space-y-2">
-          {/* Line 1: ID, check, name, handle, badges */}
-          <div className="flex items-center flex-wrap gap-2">
+      <Card className="transition-colors hover:bg-muted/50 flex flex-col">
+        <CardContent className="p-4 flex flex-col gap-3 flex-1">
+          {/* Row 1: Ticket + Result badge */}
+          <div className="flex items-center justify-between">
             <Badge variant="outline" className="text-xs font-mono">
               {entry.ticketNumber}
             </Badge>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span className="text-sm font-semibold">{entry.name}</span>
-            {entry.handle && (
-              <span className="text-sm text-muted-foreground">@{entry.handle}</span>
-            )}
-            <div className="flex items-center gap-1.5 ml-auto">
-              <NetworkBadge network={entry.network} />
-              <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
-                {entry.platform}
-              </Badge>
-              <Badge className="text-xs bg-green-500 text-white hover:bg-green-600 border-transparent">
-                {entry.result}
-              </Badge>
-            </div>
+            <Badge variant={resultBadgeVariant(entry.result)} className="text-xs">
+              {entry.result}
+            </Badge>
           </div>
 
-          {/* Line 2: date, time, agent */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {/* Row 2: Result icon + Name */}
+          <div className="flex items-center gap-2">
+            <ResultIcon result={entry.result} />
+            <span className="text-sm font-semibold truncate">{entry.name}</span>
+          </div>
+
+          {/* Row 3: Network icon + Handle */}
+          {entry.handle && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <NetworkIcon network={entry.network} />
+              <span className="truncate">@{entry.handle}</span>
+            </div>
+          )}
+
+          {/* Row 4: Network + Platform badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className="gap-1 text-xs">
+              <NetworkIcon network={entry.network} />
+              {networkLabel(entry.network)}
+            </Badge>
+            <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
+              {entry.platform}
+            </Badge>
+          </div>
+
+          {/* Row 5: Time + Agent */}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {entry.date}
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
+              <Clock className="h-3 w-3" />
               {entry.time}
             </span>
             <span className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5" />
+              <User className="h-3 w-3" />
               {entry.agent}
             </span>
           </div>
 
-          {/* Line 3-4: notes + edit button */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="text-sm">
-              <span className="font-semibold">Notas: </span>
-              <span className="text-muted-foreground">{entry.notes}</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5"
-              onClick={handleOpenEdit}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Editar
-            </Button>
-          </div>
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Edit button full width */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5"
+            onClick={handleOpenEdit}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </Button>
         </CardContent>
       </Card>
 
@@ -201,7 +206,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Creator card */}
           <Card className="bg-muted">
             <CardContent className="p-3 flex items-center gap-3">
               <Avatar className="h-10 w-10">
@@ -225,7 +229,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             </CardContent>
           </Card>
 
-          {/* Promotion status */}
           <div className="space-y-2">
             <span className="text-sm font-medium">¿Promocionó Hoy?</span>
             <div className="grid grid-cols-2 gap-3">
@@ -256,10 +259,8 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
             </div>
           </div>
 
-          {/* Conditional fields when "Sí Promocionó" */}
           {editResult === "si" && (
             <>
-              {/* Network selection */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">
                   Red Social <span className="text-destructive">*</span>
@@ -287,7 +288,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 </div>
               </div>
 
-              {/* Platform selection */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">
                   Plataforma <span className="text-destructive">*</span>
@@ -313,7 +313,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 </div>
               </div>
 
-              {/* Contact type selection */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">
                   Tipo de Contacto <span className="text-destructive">*</span>
@@ -339,7 +338,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 </div>
               </div>
 
-              {/* Notes */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">Notas</span>
                 <Textarea
@@ -350,7 +348,6 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
                 />
               </div>
 
-              {/* Evidence upload */}
               <div className="space-y-2">
                 <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
                 <div
