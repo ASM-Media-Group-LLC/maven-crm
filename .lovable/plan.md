@@ -1,39 +1,30 @@
 
 
-## Agregar pestaña "Promos" y reorganizar el Tab Bar de Promolog
+## Rediseñar la vista de Agentes en Promolog al estilo de LeadGen
 
-### Situacion actual
+### Referencia
 
-El tab bar tiene 2 pestañas: **Agentes** y **Campanas**. La tabla principal de entradas (con filtros y toggle list/grid) esta **fuera** del tab bar, siempre visible. El usuario quiere reorganizar esto para que las entradas vivan dentro de una nueva pestaña "Promos".
+La vista de Agentes en LeadGen tiene:
+1. Un **banner gradient** con borde izquierdo de color primario, titulo "Rendimiento de Agentes", fecha actual, y un contador de agentes activos con icono circular
+2. Una **card con estado vacio** debajo cuando no hay datos
 
-### Nuevo orden del Tab Bar
+### Cambio en `src/pages/promolog/PromologContent.tsx`
 
-| Pestaña | Contenido | Vista list/grid |
-|---------|-----------|:---:|
-| **Promos** (nueva, default) | Tabla/grid de entradas con filtros actuales | Si (ya existe) |
-| **Agentes** | Rendimiento por agente (cards actuales) | Si (agregar toggle) |
-| **Campanas** | Vista de campanas (placeholder mejorado) | Si (agregar toggle) |
+Reemplazar el contenido actual del tab "Agentes" (titulo simple + cards de agentes) por:
 
-### Cambios en `src/pages/promolog/PromologContent.tsx`
+1. **Banner gradient** identico al de LeadGen:
+   - Fondo `bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5`
+   - Borde izquierdo `border-l-[3px] border-l-primary`
+   - Titulo "Rendimiento de Agentes" con fecha actual formateada
+   - Contador de agentes activos con icono circular a la derecha
 
-1. **Actualizar `tabItems`**: Agregar "Promos" como primera pestaña con icono `Table2` y cambiar el estado default de `activeTab` a `"promos"`
+2. **Mantener el toggle list/grid** existente pero reubicarlo dentro del banner o justo debajo
 
-2. **Mover contenido al tab "Promos"**: Envolver la fila de filtros, el contador de entradas y la seccion de tabla/grid dentro de `{activeTab === "promos" && (...)}` -- actualmente estan fuera de cualquier tab (lineas 473-539)
+3. **Cards de agentes** debajo del banner (las que ya existen con avatar, nombre, tickets, si/parcial/no/badges) se mantienen con su toggle list/grid actual
 
-3. **Agregar toggle list/grid a "Agentes"**: Dentro del tab de agentes (lineas 542-598), agregar un estado `agentesView` con botones list/grid. En vista "list" se muestra el listado actual de cards; en vista "grid" se muestran las mismas cards en un grid de 2-3 columnas
+4. **Estado vacio** cuando no hay datos: icono grande centrado con mensaje "No hay datos para esta fecha", igual que en LeadGen
 
-4. **Agregar toggle list/grid a "Campanas"**: Dentro del tab de campanas (lineas 601-608), agregar un estado `campanasView` con botones list/grid y placeholder mejorado para ambas vistas
+### Resultado
 
-5. **Actualizar tipo de `activeTab`**: Cambiar de `"agentes" | "campanas"` a `"promos" | "agentes" | "campanas"`
-
-### Resultado visual
-
-```text
-[KPIs]
-[Social / Platform cards]
-[ Promos | Agentes | Campanas ]
-  -- En Promos: [Filtros] [List|Grid] + Tabla/Grid de entradas
-  -- En Agentes: [List|Grid] + Cards de rendimiento por agente
-  -- En Campanas: [List|Grid] + Vista de campanas (placeholder)
-```
+La pestaña de Agentes en Promolog tendra la misma jerarquia visual que en LeadGen: banner informativo arriba y contenido debajo, en lugar del titulo plano actual.
 
