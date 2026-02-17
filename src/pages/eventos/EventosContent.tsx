@@ -75,6 +75,8 @@ const EventosContent = () => {
             onChange={updateFilters}
             view={view}
             onViewChange={setView}
+            hasActiveFilters={!!(filters.search || filters.type || filters.timeOfDay || filters.dateFrom || filters.dateTo)}
+            onClear={() => setFilters(emptyFilters)}
           />
 
           <p className="text-sm text-muted-foreground">{events.length} eventos</p>

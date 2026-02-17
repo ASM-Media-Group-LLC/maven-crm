@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, List, LayoutGrid } from "lucide-react";
+import { Plus, Search, List, LayoutGrid, X } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -95,6 +95,13 @@ const ClosersContent = () => {
               ))}
             </SelectContent>
           </Select>
+
+          {(search || selectedStage || selectedSource) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setSelectedStage(""); setSelectedSource(""); }}>
+              <X className="mr-1.5 h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          )}
 
           <div className="ml-auto flex gap-1">
             <Button

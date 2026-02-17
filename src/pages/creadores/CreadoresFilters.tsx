@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid } from "lucide-react";
+import { Search, List, LayoutGrid, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,6 +19,8 @@ interface Props {
   managers: string[];
   view: "table" | "grid";
   onViewChange: (v: "table" | "grid") => void;
+  hasActiveFilters?: boolean;
+  onClear?: () => void;
 }
 
 const CreadoresFilters = ({
@@ -30,6 +32,8 @@ const CreadoresFilters = ({
   managers,
   view,
   onViewChange,
+  hasActiveFilters,
+  onClear,
 }: Props) => (
   <div className="flex items-center gap-3">
     <div className="relative w-48">
@@ -72,6 +76,13 @@ const CreadoresFilters = ({
       options={managers}
       onChange={(v) => onChange({ manager: v })}
     />
+
+    {hasActiveFilters && onClear && (
+      <Button variant="ghost" size="sm" onClick={onClear}>
+        <X className="mr-1.5 h-4 w-4" />
+        Limpiar filtros
+      </Button>
+    )}
 
     <div className="ml-auto flex gap-1">
       <Button

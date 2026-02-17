@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, List, LayoutGrid } from "lucide-react";
+import { Search, List, LayoutGrid, X } from "lucide-react";
 import {
   PRIORITY_LABELS,
   STATUS_LABELS,
@@ -35,6 +35,8 @@ interface Props {
   onDateToChange: (v: string) => void;
   view: "list" | "grid";
   onViewChange: (v: "list" | "grid") => void;
+  hasActiveFilters?: boolean;
+  onClear?: () => void;
 }
 
 const TicketsFilters = ({
@@ -47,6 +49,7 @@ const TicketsFilters = ({
   dateFrom, onDateFromChange,
   dateTo, onDateToChange,
   view, onViewChange,
+  hasActiveFilters, onClear,
 }: Props) => {
   return (
     <div className="space-y-3">
@@ -110,6 +113,13 @@ const TicketsFilters = ({
             ))}
           </SelectContent>
         </Select>
+
+        {hasActiveFilters && onClear && (
+          <Button variant="ghost" size="sm" onClick={onClear}>
+            <X className="mr-1.5 h-4 w-4" />
+            Limpiar filtros
+          </Button>
+        )}
 
         <div className="flex items-center gap-1 ml-auto">
           <Button

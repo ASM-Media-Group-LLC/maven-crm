@@ -511,10 +511,12 @@ const PromologContent = () => {
             placeholder="Selecciona fechas"
             className="h-9"
           />
-          <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-            <X className="mr-1.5 h-4 w-4" />
-            Limpiar filtros
-          </Button>
+          {(searchEntry || selectedStatus || selectedNetwork || selectedCategory || selectedCreatorFilter || dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+              <X className="mr-1.5 h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          )}
           <div className="ml-auto flex gap-1">
             <Button variant={entryView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setEntryView("list")}>
               <List className="h-4 w-4" />
