@@ -1,112 +1,114 @@
 
-## Base de Datos en LeadGen: Tabs Leads/Analisis con datos reales
+
+## Detalle de Agente en LeadGen
 
 ### Descripcion
 
-Crear una nueva pagina "Base de Datos" accesible desde el boton existente en LeadGen. Esta pagina muestra todos los leads del sistema con dos pestanas: "Leads" (tabla con filtros completos) y "Analisis" (charts de distribucion temporal).
+Agregar una vista de detalle cuando se hace click en un agente desde la pestana "Agentes". La vista muestra el perfil completo del agente con KPIs, desglose de calidad, y sus leads filtrados -- replicando la interfaz de la imagen de referencia.
 
 ---
 
-### 1. Nueva pagina `src/pages/leadgen/LeadGenBaseDatos.tsx`
+### Implementacion
 
-Pagina completa con layout estandarizado (h-screen, overflow-hidden, sidebar + topbar):
+Se creara un nuevo componente `AgentDetailView` que se renderiza condicionalmente dentro de `LeadGenContent.tsx` cuando se selecciona un agente, reemplazando el contenido principal (sin navegar a otra ruta).
+
+### 1. Estado nuevo en `LeadGenContent.tsx`
+
+- `selectedAgent`: agente seleccionado (objeto del mockSupervisores o null)
+- Cuando `selectedAgent` no es null, se renderiza `AgentDetailView` en lugar del contenido normal
+
+### 2. Nuevo componente `src/pages/leadgen/AgentDetailView.tsx`
 
 **Header:**
-- Breadcrumb: "LeadGen > Base de Datos"
-- Titulo "Base de Datos", subtitulo "Todos los leads registrados en el sistema"
-- Contador grande a la derecha: "{total} leads"
+- Breadcrumb: "LeadGen > Detalle Agente"
+- Boton de regreso (flecha izquierda) que limpia `selectedAgent`
+- Nombre completo del agente (ej: "Daniel Felipe Duque Cortes") y handle (@Daniel.Duque)
+- Indicadores: "Tiempo Activo" con formato 07h 52min 28s, "Ultima Hora" con conteo y badge
+- Botones: "+ Lead" y "Contacto" a la derecha
 
-**KPI Cards (4 columnas):**
-- GENERAL: Total Leads, Con Contacto (leads con status "contactado" o "cerrado")
-- CALIDAD ALTA: A+ y A (conteo por categoria)
-- CALIDAD MEDIA: B+ y B
-- CALIDAD BAJA: C
+**KPI Cards (3 columnas):**
+- Ultima Hora: conteo de leads en la ultima hora, subtitulo "Modelos contactados"
+- Total Hoy: conteo total del dia, subtitulo "Modelos contactados"
+- Promedio por Hora: calculo de leads/horas trabajadas, con objetivo y esperados. Incluye boton "Ver QA (0)"
 
-Estos datos se calculan en tiempo real desde la query de leads.
+Los datos se calculan filtrando los leads de la tabla `leads` donde `compania` coincide con el nombre/email del agente.
 
-**Tab bar:** Leads | Analisis (usando patron inline-flex rounded-lg bg-muted/50)
+**Calidad Cards (5 columnas, con colores de la imagen):**
+- A+: fondo gradiente verde esmeralda, label "Top Quality"
+- A: fondo gradiente azul/primary, label "Excelente"
+- B+: fondo gradiente cyan/teal, label "Buena"
+- B: fondo gradiente violeta/purple, label "Regular"
+- C: fondo gradiente gris con borde, label "Basica"
 
-### 2. Pestana "Leads"
+Cada card muestra el conteo grande y el label debajo.
 
-**Filtros:**
-- Buscador "Buscar lead..."
-- Select con buscador interno (Popover+Command) para Agente (usando compania del lead)
-- Select Calidad (Todos, A+, A, B+, B, C)
-- Select Estado (Todos, No_response, Contactado, etc.)
-- Select QA (placeholder)
-- DateRangePicker "Filtrar por fecha"
-- Toggle List/Grid
+**Tab bar interno:**
+- Leads | Rendimiento | QA / Retroalimentacion (usando mismo patron inline-flex rounded-lg)
 
-**Tabla:**
-- Columnas: #, Handle, Agente, Calidad, Estado, Pais, Fecha, QA, Acciones (Eye)
-- Datos reales de la tabla `leads` de Supabase
-- Encabezado "Leads Encontrados: {count}"
+**Pestana Leads (default):**
+- Fila de filtros: Buscador, Select fecha (Hoy/Ayer/Semana), Calidad, Estado, Contacto, toggle List/Grid
+- Tabla con columnas: Ticket, Handle, Calidad (badge con color), Estado, Pais (bandera + codigo), Fecha, Acciones (Eye + Select calidad)
+- Los leads se filtran por `compania` del agente
 
-### 3. Pestana "Analisis"
+**Pestana Rendimiento:**
+- Placeholder con estado vacio (igual que el actual)
 
-**Total de Leads Filtrados:**
-- Card con gradiente (from-primary/15) mostrando el total grande en color primary
+**Pestana QA / Retroalimentacion:**
+- Placeholder con estado vacio
 
-**Leads por Hora del Dia:**
-- BarChart (recharts) agrupando leads por hora de `created_at` del dia actual
-- Barras color primary (azul/lila)
+### 3. Conexion desde la tabla/grid de Agentes
 
-**Leads por Dia (Ultima Semana):**
-- BarChart con datos de los ultimos 7 dias, barras color success/emerald
-- Eje X con formato "lun 16", "mar 17", etc.
+- En la tabla de agentes, el boton Eye y el click en la fila activan `setSelectedAgent(agente)`
+- En la vista grid, el click en la card activa lo mismo
 
-**Leads por Dia (Ultimos 30 dias):**
-- LineChart (recharts) con linea color violet/purple, puntos en cada dia
-- Eje X con formato "19 ene", "20 ene", etc.
+### 4. Navegacion de retorno
 
-### 4. Navegacion
+- El boton de flecha en el header del detalle ejecuta `onBack()` que limpia `selectedAgent` y vuelve a la lista
 
-**En `LeadGenContent.tsx`:**
-- El boton "Base de Datos" navega a `/leadgen/base-datos` usando `useNavigate`
-
-**En `App.tsx`:**
-- Agregar ruta protegida `/leadgen/base-datos` apuntando a un wrapper page
-
-**Nueva pagina wrapper `src/pages/LeadGenBaseDatos.tsx`:**
-- Mismo layout que LeadGen.tsx (SidebarProvider + DashboardSidebar + DashboardTopbar + contenido)
+---
 
 ### Seccion tecnica
 
-**Archivos nuevos:**
-- `src/pages/leadgen/LeadGenBaseDatosContent.tsx` - componente principal con toda la logica
-- `src/pages/LeadGenBaseDatos.tsx` - wrapper con sidebar/topbar
+**Archivo nuevo:**
+- `src/pages/leadgen/AgentDetailView.tsx`
 
-**Archivos a modificar:**
-- `src/pages/leadgen/LeadGenContent.tsx` - agregar navigate al boton "Base de Datos"
-- `src/App.tsx` - agregar ruta `/leadgen/base-datos`
+**Archivo a modificar:**
+- `src/pages/leadgen/LeadGenContent.tsx` - agregar estado `selectedAgent`, renderizar condicionalmente `AgentDetailView`, conectar clicks en agentes
 
-**Query de datos:**
+**Props de AgentDetailView:**
 ```typescript
-const { data: leads = [] } = useQuery({
-  queryKey: ["leads-base-datos"],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("leads")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data;
-  },
-});
+interface AgentDetailViewProps {
+  agent: { name: string; email: string; /* ... */ };
+  leads: Lead[]; // todos los leads, se filtran internamente por compania
+  onBack: () => void;
+}
 ```
 
-**Calculo de KPIs (derivados de la query):**
+**Filtrado de leads por agente:**
 ```typescript
-const totalLeads = leads.length;
-const conContacto = leads.filter(l => ["contactado","cerrado"].includes(l.status)).length;
-const aPlus = leads.filter(l => l.categoria === "a+").length;
-// ... etc para cada calidad
+const agentLeads = leads.filter(l => 
+  l.compania?.toLowerCase() === agent.name.toLowerCase() ||
+  l.compania?.toLowerCase() === agent.email.toLowerCase()
+);
 ```
 
-**Charts de Analisis:**
-- Leads por hora: agrupar por `new Date(l.created_at).getHours()` para leads de hoy
-- Leads por dia (semana): agrupar por fecha para ultimos 7 dias, usar BarChart con fill success
-- Leads por dia (30 dias): agrupar por fecha, usar LineChart con stroke purple
+**Calculo de KPIs:**
+```typescript
+const now = new Date();
+const todayLeads = agentLeads.filter(l => isSameDay(new Date(l.created_at), now));
+const lastHourLeads = todayLeads.filter(l => differenceInHours(now, new Date(l.created_at)) < 1);
+const hoursWorked = Math.max(1, differenceInHours(now, startOfDay(now)));
+const avgPerHour = (todayLeads.length / hoursWorked).toFixed(1);
+```
 
-**Filtros locales** (estado en useState, filtrado client-side sobre el array de leads):
-- `searchTerm`, `filterAgente`, `filterCalidad`, `filterEstado`, `filterQA`
+**Calidad cards con colores de la imagen (usando gradientes):**
+```typescript
+const qualityCards = [
+  { key: "a+", label: "Top Quality", bg: "from-emerald-600 to-emerald-900", text: "text-emerald-100" },
+  { key: "a", label: "Excelente", bg: "from-blue-600 to-blue-900", text: "text-blue-100" },
+  { key: "b+", label: "Buena", bg: "from-cyan-600 to-cyan-900", text: "text-cyan-100" },
+  { key: "b", label: "Regular", bg: "from-violet-600 to-violet-900", text: "text-violet-100" },
+  { key: "c", label: "Basica", bg: "border bg-card", text: "text-foreground" },
+];
+```
+
