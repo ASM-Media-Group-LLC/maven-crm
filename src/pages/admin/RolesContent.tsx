@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { useRoles, type RoleConfig } from "./useRoles";
 import RolesTable from "./RolesTable";
+import RolesGrid from "./RolesGrid";
 import CreateRoleModal from "./CreateRoleModal";
 import EditRoleModal from "./EditRoleModal";
 import DeleteRoleDialog from "./DeleteRoleDialog";
@@ -10,11 +11,12 @@ import SetPermissionsModal from "./SetPermissionsModal";
 
 interface RolesContentProps {
   search?: string;
+  view: "list" | "grid";
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
 }
 
-const RolesContent = ({ search = "", createOpen, onCreateOpenChange }: RolesContentProps) => {
+const RolesContent = ({ search = "", view, createOpen, onCreateOpenChange }: RolesContentProps) => {
   const { roles, isLoading, createRole, updateRole, deleteRole, toggleActive, isCreating, isUpdating, isDeleting } = useRoles();
   const [editRole, setEditRole] = useState<RoleConfig | null>(null);
   const [deleteRoleState, setDeleteRoleState] = useState<RoleConfig | null>(null);
@@ -34,13 +36,23 @@ const RolesContent = ({ search = "", createOpen, onCreateOpenChange }: RolesCont
 
   return (
     <div className="space-y-4">
-      <RolesTable
-        roles={filteredRoles}
-        onEdit={setEditRole}
-        onDelete={setDeleteRoleState}
-        onSetPermissions={setPermRole}
-        onToggleActive={(role) => toggleActive({ id: role.id, is_active: !role.is_active })}
-      />
+      {view === "list" ? (
+        <RolesTable
+          roles={filteredRoles}
+          onEdit={setEditRole}
+          onDelete={setDeleteRoleState}
+          onSetPermissions={setPermRole}
+          onToggleActive={(role) => toggleActive({ id: role.id, is_active: !role.is_active })}
+        />
+      ) : (
+        <RolesGrid
+          roles={filteredRoles}
+          onEdit={setEditRole}
+          onDelete={setDeleteRoleState}
+          onSetPermissions={setPermRole}
+          onToggleActive={(role) => toggleActive({ id: role.id, is_active: !role.is_active })}
+        />
+      )}
 
       <CreateRoleModal
         open={createOpen}

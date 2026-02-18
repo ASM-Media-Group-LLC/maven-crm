@@ -153,16 +153,14 @@ const AdminUsuarios = () => {
                     className="pl-9"
                   />
                 </div>
-                {activeTab === "usuarios" && (
-                  <div className="flex gap-1 border rounded-md p-0.5">
-                    <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
-                      <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex gap-1 border rounded-md p-0.5">
+                  <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {activeTab === "usuarios" ? (
@@ -234,7 +232,7 @@ const AdminUsuarios = () => {
                   />
                 </>
               ) : (
-                <RolesContent search={search} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen} />
+                <RolesContent search={search} view={view} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen} />
               )}
 
               <AddUserModal
