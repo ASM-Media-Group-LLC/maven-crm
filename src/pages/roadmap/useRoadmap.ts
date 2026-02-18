@@ -17,6 +17,7 @@ export interface RoadmapItem {
   description: string | null;
   status: string;
   delivery_date: string | null;
+  completed_at: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -57,9 +58,27 @@ export const useRoadmap = () => {
 
   const updateItemStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const updateData: any = { status };
+      if (status === "done") {
+        updateData.completed_at = new Date().toISOString();
+      } else {
+        updateData.completed_at = null;
+      }
       const { error } = await supabase
         .from("roadmap_items" as any)
-        .update({ status } as any)
+        .update(updateData)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateDeliveryDate = useMutation({
+    mutationFn: async ({ id, delivery_date }: { id: string; delivery_date: string | null }) => {
+      const { error } = await supabase
+        .from("roadmap_items" as any)
+        .update({ delivery_date } as any)
         .eq("id", id);
       if (error) throw error;
     },
@@ -116,6 +135,7 @@ export const useRoadmap = () => {
     items: itemsQuery.data || [],
     isLoading: categoriesQuery.isLoading || itemsQuery.isLoading,
     updateItemStatus,
+    updateDeliveryDate,
     addItem,
     deleteItem,
     addCategory,

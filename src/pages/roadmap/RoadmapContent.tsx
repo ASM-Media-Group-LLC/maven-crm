@@ -1,13 +1,18 @@
 import { useState, useMemo } from "react";
-import { useRoadmap, RoadmapCategory, RoadmapItem } from "./useRoadmap";
+import { useRoadmap, RoadmapItem } from "./useRoadmap";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { ChevronRight, Plus, Trash2, Loader2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChevronRight, Plus, Trash2, CalendarIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format, startOfWeek, addWeeks, isWithinInterval, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const STATUS_CYCLE = ["todo", "in_progress", "done", "blocked"] as const;
 
@@ -19,7 +24,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 const RoadmapContent = () => {
-  const { categories, items, isLoading, updateItemStatus, addItem, deleteItem, addCategory, deleteCategory } = useRoadmap();
+  const { categories, items, isLoading, updateItemStatus, updateDeliveryDate, addItem, deleteItem, addCategory, deleteCategory } = useRoadmap();
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({});
 
@@ -32,6 +37,43 @@ const RoadmapContent = () => {
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
     return { total, done, inProgress, todo, blocked, percent };
   }, [items]);
+
+  // Calculate 8 weeks for timeline
+  const weeks = useMemo(() => {
+    const dates = items.map((i) => new Date(i.created_at)).filter((d) => !isNaN(d.getTime()));
+    const earliest = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date();
+    const weekStart = startOfWeek(earliest, { weekStartsOn: 1 });
+    return Array.from({ length: 8 }, (_, i) => {
+      const start = addWeeks(weekStart, i);
+      const end = addWeeks(start, 1);
+      return { start, end, label: `W${i + 1}`, sub: format(start, "MMM d") };
+    });
+  }, [items]);
+
+  const isWeekActive = (item: RoadmapItem, weekStart: Date, weekEnd: Date) => {
+    if (item.status === "done" && item.completed_at) {
+      const start = parseISO(item.created_at);
+      const end = parseISO(item.completed_at);
+      return weekStart < end && weekEnd > start;
+    }
+    if (item.status === "in_progress") {
+      const start = parseISO(item.created_at);
+      const now = new Date();
+      return weekStart < now && weekEnd > start;
+    }
+    if (item.status === "todo" && item.delivery_date) {
+      const delivery = parseISO(item.delivery_date);
+      return isWithinInterval(delivery, { start: weekStart, end: weekEnd });
+    }
+    return false;
+  };
+
+  const getWeekBarColor = (item: RoadmapItem) => {
+    if (item.status === "done") return "bg-emerald-500";
+    if (item.status === "in_progress") return "bg-amber-500";
+    if (item.status === "blocked") return "bg-destructive";
+    return "bg-muted-foreground/40";
+  };
 
   const handleToggleCheck = (item: RoadmapItem) => {
     const newStatus = item.status === "done" ? "todo" : "done";
@@ -56,6 +98,13 @@ const RoadmapContent = () => {
     if (!name) return;
     addCategory.mutate(name);
     setNewCategoryName("");
+  };
+
+  const handleDeliveryDateChange = (itemId: string, date: Date | undefined) => {
+    updateDeliveryDate.mutate({
+      id: itemId,
+      delivery_date: date ? format(date, "yyyy-MM-dd") : null,
+    });
   };
 
   if (isLoading) {
@@ -117,7 +166,7 @@ const RoadmapContent = () => {
           </div>
         </div>
 
-        {/* Categories */}
+        {/* Categories with table layout */}
         {categories.map((cat) => {
           const catItems = getCategoryItems(cat.id);
           const catDone = catItems.filter((i) => i.status === "done").length;
@@ -140,40 +189,106 @@ const RoadmapContent = () => {
                 </CollapsibleTrigger>
 
                 <CollapsibleContent>
-                  <div className="border-t border-border">
-                    {catItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors group/row"
-                      >
-                        <Checkbox
-                          checked={item.status === "done"}
-                          onCheckedChange={() => handleToggleCheck(item)}
-                          className="shrink-0"
-                        />
-                        {item.submodule && (
-                          <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded shrink-0">
-                            {item.submodule}
-                          </span>
-                        )}
-                        <span className={`flex-1 text-sm ${item.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                          {item.task}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={`cursor-pointer text-[10px] px-2 py-0.5 ${statusConfig[item.status]?.color || statusConfig.todo.color}`}
-                          onClick={() => handleCycleStatus(item)}
-                        >
-                          {statusConfig[item.status]?.label || "To Do"}
-                        </Badge>
-                        <button
-                          onClick={() => deleteItem.mutate(item.id)}
-                          className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="border-t border-border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-10" />
+                          <TableHead className="min-w-[100px]">Submodule</TableHead>
+                          <TableHead className="min-w-[200px]">Task</TableHead>
+                          <TableHead className="min-w-[100px]">Status</TableHead>
+                          <TableHead className="min-w-[100px]">Delivery</TableHead>
+                          {weeks.map((w) => (
+                            <TableHead key={w.label} className="w-14 text-center px-1">
+                              <div className="text-[10px] font-semibold">{w.label}</div>
+                              <div className="text-[9px] text-muted-foreground font-normal">{w.sub}</div>
+                            </TableHead>
+                          ))}
+                          <TableHead className="w-8" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {catItems.map((item) => (
+                          <TableRow key={item.id} className="group/row">
+                            <TableCell className="py-2 px-3">
+                              <Checkbox
+                                checked={item.status === "done"}
+                                onCheckedChange={() => handleToggleCheck(item)}
+                              />
+                            </TableCell>
+                            <TableCell className="py-2">
+                              {item.submodule ? (
+                                <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                  {item.submodule}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <span className={`text-sm ${item.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {item.task}
+                              </span>
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <Badge
+                                variant="outline"
+                                className={`cursor-pointer text-[10px] px-2 py-0.5 ${statusConfig[item.status]?.color || statusConfig.todo.color}`}
+                                onClick={() => handleCycleStatus(item)}
+                              >
+                                {statusConfig[item.status]?.label || "To Do"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-2">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={cn(
+                                      "h-7 text-xs px-2 justify-start font-normal",
+                                      !item.delivery_date && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="h-3 w-3 mr-1" />
+                                    {item.delivery_date ? format(parseISO(item.delivery_date), "MMM d") : "—"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={item.delivery_date ? parseISO(item.delivery_date) : undefined}
+                                    onSelect={(date) => handleDeliveryDateChange(item.id, date)}
+                                    initialFocus
+                                    className={cn("p-3 pointer-events-auto")}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </TableCell>
+                            {weeks.map((w) => {
+                              const active = isWeekActive(item, w.start, w.end);
+                              return (
+                                <TableCell key={w.label} className="py-2 px-1">
+                                  <div className="h-5 flex items-center justify-center">
+                                    {active && (
+                                      <div className={`w-full h-1.5 rounded-full ${getWeekBarColor(item)}`} />
+                                    )}
+                                  </div>
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="py-2 px-2">
+                              <button
+                                onClick={() => deleteItem.mutate(item.id)}
+                                className="opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
 
                     {/* Add item inline */}
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20">

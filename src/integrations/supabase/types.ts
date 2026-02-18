@@ -1302,6 +1302,7 @@ export type Database = {
       roadmap_items: {
         Row: {
           category_id: string
+          completed_at: string | null
           created_at: string
           delivery_date: string | null
           description: string | null
@@ -1314,6 +1315,7 @@ export type Database = {
         }
         Insert: {
           category_id: string
+          completed_at?: string | null
           created_at?: string
           delivery_date?: string | null
           description?: string | null
@@ -1326,6 +1328,7 @@ export type Database = {
         }
         Update: {
           category_id?: string
+          completed_at?: string | null
           created_at?: string
           delivery_date?: string | null
           description?: string | null
