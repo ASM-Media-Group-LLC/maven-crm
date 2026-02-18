@@ -1,60 +1,66 @@
 
 
-## Rediseno del Modal de Seleccion de Creadora
+## Modales de detalle para las cards de KPI (Tickets ingresados, NO Chequeadas, Completadas Hoy)
 
-### Problema actual
-El modal muestra las creadoras en un grid de 6 columnas con tarjetas pequenas tipo avatar, lo cual dificulta encontrar rapidamente a una creadora y ver su informacion de redes sociales.
+### Descripcion
 
-### Solucion propuesta
-Reemplazar el grid de cards por una **lista vertical con filas compactas** que muestren toda la informacion relevante en una sola linea, similar a una tabla simplificada. Esto permite escanear rapidamente nombres, handles y estado.
+Al hacer clic en cualquiera de las 3 cards KPI (Tickets ingresados, NO Chequeadas, Completadas Hoy), se abrira un modal con una tabla que muestra las entradas correspondientes filtradas. El modal seguira el patron visual existente del proyecto (Dialog con tabla interna).
 
-### Nuevo layout de cada fila
+### Comportamiento
 
-```text
-[Avatar] Nombre Artistico | @instagram @tiktok @twitter | Categoria | Pais | Estado
-```
+| Card | Datos mostrados |
+|------|----------------|
+| Tickets ingresados | Todas las entradas del periodo seleccionado |
+| NO Chequeadas | Solo entradas con resultado "Pendiente" |
+| Completadas Hoy | Solo entradas con resultado "Si" |
 
-Cada fila sera un elemento clickeable con hover, mostrando:
-- Avatar pequeno (h-8 w-8) a la izquierda
-- Nombre artistico en negrita
-- Iconos de redes sociales con sus handles visibles (no solo iconos)
-- Badge de categoria
-- Bandera de pais
-- Indicador de estado (punto verde/rojo)
+Cada modal mostrara una tabla con columnas: Ticket, Creadora, Red Social, Plataforma, Resultado y Fecha/Hora.
 
-### Cambios especificos
+### Cambios
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx` (lineas 731-765)
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-1. Reemplazar el grid `grid-cols-2 sm:grid-cols-4 lg:grid-cols-6` por un contenedor `flex flex-col divide-y`
-2. Cada creadora sera una fila horizontal (`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md`)
-3. Layout de la fila:
-   - **Izquierda**: Avatar compacto (h-8 w-8) + punto de estado superpuesto
-   - **Centro**: Nombre (texto principal) + handles de redes con iconos inline (texto secundario en una segunda linea)
-   - **Derecha**: Badge de categoria + bandera de pais
-4. Reducir el modal a `max-w-2xl` ya que la lista vertical no necesita tanto ancho
-5. Mantener los 3 mini-KPIs, el buscador y el selector de orden sin cambios
+1. Agregar estado `kpiModalType` (`"ingresados" | "no_chequeadas" | "completadas" | null`) para controlar cual modal esta abierto.
+
+2. Agregar `useMemo` que filtre las entradas segun el tipo de modal:
+   - `ingresados`: todas las `entries`
+   - `no_chequeadas`: `entries.filter(e => e.result === "Pendiente")`
+   - `completadas`: `entries.filter(e => e.result === "Si")`
+
+3. Agregar `onClick` y `cursor-pointer` a las 3 cards KPI (lineas 382-417).
+
+4. Agregar un `Dialog` con una tabla interna que muestre las entradas filtradas. Incluye:
+   - Titulo dinamico segun el tipo
+   - Tabla con scroll interno (`max-h-[500px] overflow-auto`)
+   - Columnas: Ticket, Creadora, Red, Plataforma, Resultado (badge con color), Fecha
+   - Mensaje vacio si no hay datos
 
 ### Seccion tecnica
 
-**Estructura HTML de cada fila:**
+**Nuevo estado:**
 ```text
-<div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md">
-  <Avatar h-8 w-8 + status dot>
-  <div class="flex-1 min-w-0">
-    <p class="text-sm font-medium truncate">Nombre Artistico</p>
-    <div class="flex items-center gap-2 text-xs text-muted-foreground">
-      <InstagramIcon/> @handle  <XIcon/> @handle  <TikTokIcon/> @handle
-    </div>
-  </div>
-  <Badge>categoria</Badge>
-  <span>bandera</span>
-</div>
+const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
 ```
 
-**Ventajas:**
-- Mas rapido de escanear visualmente (lectura de izquierda a derecha)
-- Handles de redes visibles sin hover ni clic adicional
-- Mayor densidad de informacion: se ven mas creadoras sin scroll
-- Busqueda mas intuitiva al ver nombres y handles juntos
+**Datos del modal:**
+```text
+const kpiModalEntries = useMemo(() => {
+  if (!kpiModalType) return [];
+  if (kpiModalType === "no_chequeadas") return entries.filter(e => e.result === "Pendiente");
+  if (kpiModalType === "completadas") return entries.filter(e => e.result === "Si");
+  return entries; // ingresados = todos
+}, [entries, kpiModalType]);
+```
+
+**Titulos:**
+```text
+ingresados -> "Tickets Ingresados"
+no_chequeadas -> "Tickets NO Chequeadas"
+completadas -> "Tickets Completadas Hoy"
+```
+
+**onClick en cada card:**
+- Card "Tickets ingresados" (linea 382): `onClick={() => setKpiModalType("ingresados")}`
+- Card "NO Chequeadas" (linea 394): `onClick={() => setKpiModalType("no_chequeadas")}`
+- Card "Completadas Hoy" (linea 406): `onClick={() => setKpiModalType("completadas")}`
 
