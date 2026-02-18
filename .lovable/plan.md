@@ -1,75 +1,119 @@
 
 
-## Agregar seccion de Agencias al Directorio de Contactos
+## Reestructurar Gestion de Usuarios con Tabs: Usuarios y Roles
 
 ### Resumen
 
-Se agregara una barra de pestanas (tab bar) en la parte superior de la pagina de Contactos para separar dos secciones: **Contactos** (la vista actual) y **Agencias**. La seccion de Agencias permitira registrar agencias con un estado de gestion (Discovery, Contactada, En Proceso, Completada).
+Se dividira la pagina `/admin/usuarios` en dos pestanas: **Usuarios** (gestion individual) y **Roles** (configuracion de roles y permisos). La pestana de Usuarios se enriquecera con acciones adicionales (editar, cambiar contrasena, eliminar, asignar rol). La pestana de Roles mostrara una tabla de roles con descripcion, usuarios asignados, estado y configuracion de permisos granulares por modulo/submodulo.
 
-### Cambios en la base de datos
+---
 
-Se creara una nueva tabla `agencias` con las siguientes columnas:
+### Base de datos
 
+Se creara una nueva tabla `roles_config` para almacenar roles personalizados y una tabla `role_permissions` para los permisos granulares:
+
+**Tabla `roles_config`:**
 | Columna | Tipo | Descripcion |
 |---------|------|-------------|
-| id | uuid (PK) | Identificador unico |
-| nombre | text (NOT NULL) | Nombre de la agencia |
-| estado | text (NOT NULL, default 'Discovery') | Estado: Discovery, Contactada, En Proceso, Completada |
-| pais | text | Pais de la agencia |
-| contacto_nombre | text | Nombre del contacto principal |
-| contacto_email | text | Email del contacto |
-| contacto_telefono | text | Telefono del contacto |
-| instagram | text | Perfil de Instagram |
-| website | text | Sitio web |
-| notas | text | Notas adicionales |
+| id | uuid (PK) | Identificador |
+| name | text (NOT NULL, UNIQUE) | Nombre del rol (Admin, Manager, etc.) |
+| description | text | Descripcion del rol |
+| is_active | boolean (default true) | Si el rol esta activo |
+| is_system | boolean (default false) | Si es un rol del sistema (no se puede eliminar) |
 | created_at | timestamptz | Fecha de creacion |
 | updated_at | timestamptz | Fecha de actualizacion |
 
-Se incluira una politica RLS permisiva similar a la tabla `contactos`.
+**Tabla `role_permissions`:**
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | uuid (PK) | Identificador |
+| role_id | uuid (FK -> roles_config) | Rol asociado |
+| module | text (NOT NULL) | Modulo (Dashboard, Creadores, etc.) |
+| submodule | text | Submodulo o funcion especifica |
+| can_access | boolean (default true) | Si tiene acceso al modulo |
+| data_scope | text (default 'all') | Alcance de datos: all, subordinates, self |
+| created_at | timestamptz | Fecha de creacion |
+
+Se insertaran los 3 roles del sistema como datos iniciales (admin, manager, employee) con `is_system = true`.
+
+RLS: politicas que permitan lectura a usuarios autenticados y escritura solo a admins (via `has_role`).
+
+---
 
 ### Cambios en el frontend
 
-#### 1. ContactosContent.tsx - Agregar tab bar
+#### 1. AdminUsuarios.tsx - Agregar tab bar
 
-Se agregara la barra de pestanas con el patron existente del proyecto (`inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1`) en el header, justo debajo del titulo. Las pestanas seran:
-- **Contactos** (vista actual, por defecto)
-- **Agencias** (nueva seccion)
+Se agregara una barra de pestanas con el patron estandar del proyecto debajo del titulo:
+- **Usuarios** (pestana por defecto) - vista actual mejorada
+- **Roles** (nueva pestana) - gestion de roles y permisos
 
-El boton "Agregar" cambiara su texto y destino segun la pestana activa.
+#### 2. Pestana de Usuarios - Acciones mejoradas
 
-#### 2. Nuevos archivos para la seccion de Agencias
+Se actualizara `UsersTable.tsx` para incluir las siguientes acciones por usuario (iconos como en la imagen de referencia):
+- **Editar** (icono lapiz): Abrir modal para editar nombre del usuario
+- **Asignar rol** (icono engranaje/llave): Abrir el ChangeRoleModal existente
+- **Cambiar contrasena** (icono llave): Enviar email de reset de contrasena via Supabase admin API (edge function)
+- **Eliminar** (icono basura): Dialogo de confirmacion para eliminar usuario
 
-Se crearan los siguientes componentes dentro de `src/pages/contactos/`:
+Se actualizara tambien `UsersGrid.tsx` con las mismas acciones.
 
-- **AgenciasContent.tsx** - Contenido principal con KPIs, filtros, tabla/grid
-- **AgenciasKPICards.tsx** - 4 tarjetas: Total, Discovery, En Proceso, Completadas
-- **AgenciasTable.tsx** - Tabla con columnas: nombre, estado (badge con color), pais, contacto, instagram, fecha
-- **AgenciasGrid.tsx** - Vista en tarjetas
-- **AddAgenciaModal.tsx** - Modal para agregar nueva agencia con campos: nombre, estado (selector con Discovery/Contactada/En Proceso/Completada), pais, datos de contacto, notas
-- **ViewAgenciaModal.tsx** - Modal para ver detalle de una agencia
-- **EditAgenciaModal.tsx** - Modal para editar agencia
-- **DeleteAgenciaDialog.tsx** - Dialogo de confirmacion para eliminar
+Se creara una edge function `admin-user-actions` para operaciones privilegiadas:
+- `reset_password`: Envia email de reset via `auth.admin.generateLink`
+- `delete_user`: Elimina usuario via `auth.admin.deleteUser`
 
-#### 3. Flujo de usuario
+#### 3. Pestana de Roles - Nuevos componentes
 
-1. El usuario entra a `/contactos` y ve la tab bar con "Contactos" activo
-2. Al hacer clic en "Agencias", se muestra la seccion de agencias con sus KPIs y tabla
-3. El boton "Agregar Agencia" abre un modal (no una pagina separada) para crear una nueva agencia
-4. Al crear la agencia, el usuario selecciona el estado entre: Discovery, Contactada, En Proceso, Completada
-5. En la tabla, el estado se muestra como un badge con colores diferenciados
+Se crearan dentro de `src/pages/admin/`:
 
-#### 4. Colores de estado para agencias
+- **RolesContent.tsx** - Contenido principal con tabla de roles y boton "Crear rol"
+- **RolesTable.tsx** - Tabla con columnas: Rol, Descripcion, Usuarios (muestra nombres con "+N"), Status (switch), Acciones (Set permissions, Editar, Eliminar)
+- **CreateRoleModal.tsx** - Modal para crear nuevo rol con campos: nombre (max 50 chars), descripcion (max 300 chars)
+- **EditRoleModal.tsx** - Modal para editar nombre y descripcion del rol
+- **DeleteRoleDialog.tsx** - Confirmacion para eliminar rol (solo si no es de sistema)
+- **SetPermissionsModal.tsx** - Modal completo para configurar permisos granulares
 
-- **Discovery**: badge azul (bg-blue-500/20, text-blue-400)
-- **Contactada**: badge amarillo (bg-warning/20, text-warning)
-- **En Proceso**: badge naranja (bg-orange-500/20, text-orange-400)
-- **Completada**: badge verde (bg-success/20, text-success)
+#### 4. SetPermissionsModal - Configuracion de permisos
+
+El modal mostrara todos los modulos y submodulos de la plataforma organizados en secciones expandibles:
+
+| Modulo | Submodulos |
+|--------|------------|
+| Dashboard | (sin submodulos) |
+| Creator Sales | Dashboard, Sales Report, Sales Report V1, AI Sales, AI Config |
+| Contactos | Contactos, Agencias |
+| Creadores | Lista, Perfil, Nuevo |
+| Eventos | Lista, Detalle, Nuevo, Editar |
+| Promolog | (sin submodulos) |
+| LeadGen | (sin submodulos) |
+| Closers | (sin submodulos) |
+| Tickets | (sin submodulos) |
+| Tareas | Proyectos, Tareas |
+| Administracion | Usuarios, Roles |
+
+Para cada modulo se podra configurar:
+- **Menu access** (checkbox): Si el modulo aparece en el sidebar
+- **Function permissions** (conteo de funciones habilitadas, expandible)
+- **Data permissions** (radio): All data / Self and subordinates / Data about self
+
+Habra checkboxes "All" globales para menus y funciones.
+
+#### 5. Hook useRoles.ts
+
+Nuevo hook para gestionar roles:
+- Query para obtener roles con conteo de usuarios
+- Mutaciones para crear, editar, eliminar roles
+- Query para permisos por rol
+- Mutacion para guardar permisos
+
+---
 
 ### Seccion tecnica
 
-- La tab bar se implementa como un estado local (`activeTab: "contactos" | "agencias"`) en `ContactosContent.tsx`, renderizando condicionalmente el contenido
-- Los datos de agencias se obtienen con `useQuery` apuntando a la tabla `agencias` de Supabase
-- Las mutaciones (crear, editar, eliminar) usan `useMutation` con invalidacion del query `["agencias"]`
-- No se requiere nueva ruta en el router; todo se maneja dentro de `/contactos`
-- Se reutiliza el mismo layout (sidebar + topbar) existente
+- La tab bar usa estado local `activeTab: "usuarios" | "roles"` en `AdminUsuarios.tsx`
+- Los roles del sistema (admin, manager, employee) no pueden eliminarse (`is_system = true`)
+- La edge function `admin-user-actions` utiliza `SUPABASE_SERVICE_ROLE_KEY` para operaciones admin
+- Los permisos se guardan como filas en `role_permissions`, una por modulo/submodulo por rol
+- El `SetPermissionsModal` carga los permisos existentes al abrirse y los guarda en batch con upsert
+- La configuracion de modulos/submodulos se define como constante en el frontend (no en DB) para mantener sincronizacion con el sidebar
 
