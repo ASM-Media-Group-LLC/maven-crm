@@ -1,84 +1,68 @@
 
 
-## Project Roadmap - Tracker de Progreso de la Plataforma
+## Agregar Fechas y Timeline Semanal al Roadmap
 
 ### Descripcion
 
-Nueva pagina `/roadmap` en la seccion de Recursos del sidebar que permite visualizar y gestionar el progreso de construccion de toda la plataforma MAVEN. Inspirado en la imagen de referencia, mostrara categorias colapsables con tareas individuales que se pueden marcar como completadas, junto con una barra de progreso general.
+Transformar cada seccion colapsable del roadmap en una tabla con columnas adicionales: **Submodule**, **Task**, **Status**, **Delivery** (fecha estimada de entrega), y un **timeline semanal** (W1-W8) que muestra barras de progreso visuales indicando cuando se completo cada tarea o cuando esta programada.
 
 ---
 
-### Estructura Visual
+### Cambios necesarios
 
-**Header:**
-- Titulo "Project Roadmap" con descripcion
-- Tarjeta de progreso general con barra de progreso y contadores por estado (Done, In Progress, To Do, Blocked)
-- Porcentaje total calculado automaticamente
+### 1. Nueva columna en base de datos
 
-**Tabla por categorias:**
-- Secciones colapsables (ej: "Core Platform and Auth", "Gestion de Creadoras", "Recursos Humanos", "Contabilidad")
-- Cada seccion muestra contador de tareas completadas y mini barra de progreso
-- Filas con: checkbox, submodulo, tarea (con descripcion opcional), estado (Done/In Progress/To Do/Blocked), fecha estimada
+Agregar un campo `completed_at` a la tabla `roadmap_items` para registrar automaticamente cuando un item se marca como "done". Esto permite saber la fecha real de completado, no solo `updated_at` que cambia con cualquier edicion.
 
-**Formulario inline:**
-- Boton para agregar nueva categoria
-- Boton para agregar nueva tarea dentro de cada categoria
-- Estados editables con click (ciclo entre To Do, In Progress, Done, Blocked)
+### 2. Mutation `updateItemStatus` actualizada
 
----
+Cuando el status cambia a "done", se envia `completed_at: new Date().toISOString()`. Si cambia de "done" a otro estado, se envia `completed_at: null`.
 
-### Persistencia en Supabase
+### 3. Mutation `updateDeliveryDate` nueva
 
-**Tabla `roadmap_categories`:**
-- `id` (uuid, PK)
-- `name` (text, NOT NULL) - Nombre de la categoria
-- `position` (integer) - Orden
-- `created_at` (timestamptz)
+Nuevo mutation en `useRoadmap.ts` que permite actualizar la `delivery_date` de un item haciendo click en la celda de Delivery y seleccionando una fecha con un popover de calendario.
 
-**Tabla `roadmap_items`:**
-- `id` (uuid, PK)
-- `category_id` (uuid, FK a roadmap_categories)
-- `submodule` (text) - Nombre del submodulo
-- `task` (text, NOT NULL) - Descripcion de la tarea
-- `description` (text, nullable) - Nota adicional
-- `status` (text) - "done", "in_progress", "todo", "blocked"
-- `delivery_date` (date, nullable) - Fecha estimada
-- `position` (integer) - Orden dentro de la categoria
-- `created_at` (timestamptz)
-- `updated_at` (timestamptz)
+### 4. Rediseno visual de las secciones colapsables
 
-RLS: Politica permisiva (ALL con true) igual que otras tablas operativas del proyecto.
+Cada seccion colapsable pasa de ser una lista simple a una **tabla** con las siguientes columnas:
 
----
+| Check | Submodule | Task | Status | Delivery | W1 (Feb 17) | W2 (Feb 24) | ... | W8 (Abr 7) |
+|-------|-----------|------|--------|----------|-------------|-------------|-----|------------|
 
-### Archivos a crear/modificar
+- **Check**: Checkbox existente
+- **Submodule**: Badge gris con el nombre del submodulo (ya existe)
+- **Task**: Texto de la tarea con line-through si esta done
+- **Status**: Badge clickable con ciclo de estados (ya existe)
+- **Delivery**: Fecha de entrega, clickable para editar con popover de calendario. Formato `MMM d` (ej: "Feb 24")
+- **W1-W8**: Columnas semanales que muestran barras de color verde (done) o ambar (in_progress) en las semanas correspondientes, calculadas a partir de `created_at`, `delivery_date` y `completed_at`
 
-1. **Migracion SQL** - Crear tablas `roadmap_categories` y `roadmap_items` con RLS
-2. **`src/pages/Roadmap.tsx`** - Pagina wrapper con sidebar y topbar
-3. **`src/pages/roadmap/RoadmapContent.tsx`** - Componente principal con:
-   - Header y tarjeta de progreso general
-   - Secciones colapsables por categoria
-   - Filas de items con checkbox, estado, fecha
-   - Formularios inline para agregar categorias e items
-4. **`src/pages/roadmap/useRoadmap.ts`** - Hook con queries y mutations para CRUD de categorias e items
-5. **`src/App.tsx`** - Agregar ruta `/roadmap` protegida
-6. **`src/components/dashboard/DashboardSidebar.tsx`** - Agregar enlace "Roadmap" en la seccion Recursos
+### 5. Logica del timeline semanal
+
+- Se calculan 8 semanas desde la fecha mas temprana encontrada en los items (o fecha actual si no hay datos)
+- Cada semana se muestra como columna con header "W1", "W2", etc. y subfecha "Feb 17", "Feb 24"
+- Para items "done": barra verde desde la semana de `created_at` hasta la semana de `completed_at`
+- Para items "in_progress": barra ambar desde la semana de inicio hasta la semana actual
+- Para items "todo" con `delivery_date`: indicador gris en la semana de delivery
+- Scroll horizontal si las columnas exceden el ancho disponible
 
 ---
 
 ### Seccion tecnica
 
-**Progreso general:** Calculado como `(items con status "done") / (total items) * 100`. Los contadores Done, In Progress, To Do y Blocked se derivan filtrando `roadmap_items` por status.
+**Archivo:** Migracion SQL nueva
+- `ALTER TABLE roadmap_items ADD COLUMN completed_at timestamptz;`
+- Update items existentes con status "done": `SET completed_at = updated_at WHERE status = 'done'`
 
-**Checkbox:** Al hacer click en el checkbox de una fila, se alterna entre "done" y "todo". El estado se persiste con un `update` a Supabase y se invalida la query.
+**Archivo:** `src/pages/roadmap/useRoadmap.ts`
+- Agregar `completed_at` al tipo `RoadmapItem`
+- Modificar `updateItemStatus` para enviar `completed_at` segun el nuevo status
+- Agregar mutation `updateDeliveryDate({ id, delivery_date })`
 
-**Agregar items:** Input inline dentro de cada categoria colapsable. Al presionar Enter o el boton, se inserta en `roadmap_items` con `category_id` correspondiente y status "todo".
-
-**Agregar categorias:** Input + boton en la parte inferior. Inserta en `roadmap_categories`.
-
-**Cambio de estado:** Click en el badge de estado cicla entre todo, in_progress, done, blocked. Cada cambio se persiste inmediatamente.
-
-**Patron visual:** Secciones colapsables usando `Collapsible` de Radix. Cada seccion muestra `X/Y tasks` y una mini barra `Progress`. Colores semanticos: verde para Done, amarillo para In Progress, gris para To Do, rojo para Blocked.
-
-**Pre-poblado:** La migracion incluira datos iniciales con los modulos ya construidos (Dashboard, Contactos, Creadores, Eventos, LeadGen, Closers, Tickets, Promolog, Tareas, Sales, Design System, Docs, Auth, Admin) marcados como "done", y los pendientes (RRHH, Contabilidad, Onboarding de Modelos, Contenido Personalizado) como "todo".
+**Archivo:** `src/pages/roadmap/RoadmapContent.tsx`
+- Reemplazar las filas simples (div flex) por una estructura tipo tabla con header fijo
+- Header de tabla: Check, Submodule, Task, Status, Delivery, W1..W8
+- Agregar logica `useMemo` para calcular las 8 semanas y mapear cada item a las celdas correspondientes
+- Agregar componente Popover + Calendar para editar `delivery_date` inline
+- Contenedor con `overflow-x-auto` para scroll horizontal en el timeline
+- Las columnas de semana tendran ancho fijo (`w-12`) con barras de 4px de alto coloreadas segun status
 
