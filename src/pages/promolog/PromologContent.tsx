@@ -45,7 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-import { Calendar } from "@/components/ui/calendar";
+// Calendar removed - month/year selector uses Select components
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -212,6 +212,14 @@ const PromologContent = () => {
   const [searchCreator, setSearchCreator] = useState("");
   const [sortOrder, setSortOrder] = useState("pendientes");
   const [entryView, setEntryView] = useState<"list" | "grid">("list");
+
+  const [searchAgent, setSearchAgent] = useState("");
+  const [searchCampaign, setSearchCampaign] = useState("");
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
+  const [agentDateFrom, setAgentDateFrom] = useState<Date | undefined>(undefined);
+  const [agentDateTo, setAgentDateTo] = useState<Date | undefined>(undefined);
+  const [campDateFrom, setCampDateFrom] = useState<Date | undefined>(undefined);
+  const [campDateTo, setCampDateTo] = useState<Date | undefined>(undefined);
 
   const { toast } = useToast();
   const [selectedCreatorForEntry, setSelectedCreatorForEntry] = useState<typeof creators[0] | null>(null);
@@ -595,14 +603,6 @@ const PromologContent = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex gap-1">
-                    <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
-                      <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                  </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
                     <p className="text-xs text-muted-foreground">Agentes Activos</p>
@@ -614,8 +614,37 @@ const PromologContent = () => {
               </div>
             </div>
 
+            {/* Filters row */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar agente..." className="pl-9 h-9" value={searchAgent} onChange={(e) => setSearchAgent(e.target.value)} />
+              </div>
+              <DateRangePicker
+                from={agentDateFrom}
+                to={agentDateTo}
+                onApply={(from, to) => { setAgentDateFrom(from); setAgentDateTo(to); }}
+                placeholder="Selecciona fechas"
+                className="h-9"
+              />
+              {(searchAgent || agentDateFrom || agentDateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchAgent(""); setAgentDateFrom(undefined); setAgentDateTo(undefined); }}>
+                  <X className="mr-1.5 h-4 w-4" />
+                  Limpiar filtros
+                </Button>
+              )}
+              <div className="ml-auto flex gap-1">
+                <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             {/* Agent cards o estado vacío */}
-            {agentsData.length === 0 ? (
+            {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center justify-center py-16">
@@ -630,7 +659,7 @@ const PromologContent = () => {
               </Card>
             ) : (
               <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
-                {agentsData.map((agent) => (
+                {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
                   <Card key={agent.name}>
                     <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
                       <Avatar className="h-10 w-10">
@@ -684,12 +713,35 @@ const PromologContent = () => {
         {/* Campañas tab */}
         {activeTab === "campanas" && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Campañas</h2>
-                <p className="text-sm text-muted-foreground">Gestión de campañas promocionales</p>
+            {/* Filters row */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar campaña..." className="pl-9 h-9" value={searchCampaign} onChange={(e) => setSearchCampaign(e.target.value)} />
               </div>
-              <div className="flex gap-1">
+              <Select value={campaignStatusFilter || undefined} onValueChange={(v) => setCampaignStatusFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="activa">Activa</SelectItem>
+                  <SelectItem value="finalizada">Finalizada</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+              <DateRangePicker
+                from={campDateFrom}
+                to={campDateTo}
+                onApply={(from, to) => { setCampDateFrom(from); setCampDateTo(to); }}
+                placeholder="Selecciona fechas"
+                className="h-9"
+              />
+              {(searchCampaign || campaignStatusFilter || campDateFrom || campDateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchCampaign(""); setCampaignStatusFilter(""); setCampDateFrom(undefined); setCampDateTo(undefined); }}>
+                  <X className="mr-1.5 h-4 w-4" />
+                  Limpiar filtros
+                </Button>
+              )}
+              <div className="ml-auto flex gap-1">
                 <Button variant={campanasView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("list")}>
                   <List className="h-4 w-4" />
                 </Button>
@@ -1085,14 +1137,41 @@ const PromologContent = () => {
                       {campaignMonth ? format(campaignMonth, "MMMM yyyy") : "Seleccionar mes"}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={campaignMonth}
-                      onSelect={(d) => { setCampaignMonth(d); setCampaignMonthOpen(false); }}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
+                  <PopoverContent className="w-auto p-4" align="start">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={campaignMonth ? String(campaignMonth.getMonth()) : undefined}
+                        onValueChange={(m) => {
+                          const year = campaignMonth ? campaignMonth.getFullYear() : new Date().getFullYear();
+                          const d = new Date(year, Number(m), 1);
+                          setCampaignMonth(d);
+                          if (campaignMonth && campaignMonth.getFullYear()) setCampaignMonthOpen(false);
+                        }}
+                      >
+                        <SelectTrigger className="w-[130px]"><SelectValue placeholder="Mes" /></SelectTrigger>
+                        <SelectContent>
+                          {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                            <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={campaignMonth ? String(campaignMonth.getFullYear()) : undefined}
+                        onValueChange={(y) => {
+                          const month = campaignMonth ? campaignMonth.getMonth() : new Date().getMonth();
+                          const d = new Date(Number(y), month, 1);
+                          setCampaignMonth(d);
+                          if (campaignMonth && campaignMonth.getMonth() !== undefined) setCampaignMonthOpen(false);
+                        }}
+                      >
+                        <SelectTrigger className="w-[100px]"><SelectValue placeholder="Año" /></SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i).map((y) => (
+                            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
