@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye, ChevronsUpDown, Check } from "lucide-react";
+import AgentDetailView from "./AgentDetailView";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
@@ -58,6 +59,7 @@ const LeadGenContent = () => {
   const [addContactoOpen, setAddContactoOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<(typeof leads)[number] | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<(typeof mockSupervisores)[number] | null>(null);
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ["leads"],
@@ -70,6 +72,10 @@ const LeadGenContent = () => {
       return data;
     },
   });
+
+  if (selectedAgent) {
+    return <AgentDetailView agent={selectedAgent} leads={leads} onBack={() => setSelectedAgent(null)} />;
+  }
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
@@ -262,7 +268,7 @@ const LeadGenContent = () => {
                   </div>
                   <div className="flex items-center gap-3 text-right">
                     <div>
-                      <p className="text-3xl font-bold text-primary">0</p>
+                      <p className="text-3xl font-bold text-primary">{mockSupervisores.length}</p>
                       <p className="text-xs text-muted-foreground">Agentes Activos</p>
                     </div>
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -272,18 +278,91 @@ const LeadGenContent = () => {
                 </div>
               </div>
 
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                      <Users className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      No hay datos para esta fecha
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              {viewMode === "list" ? (
+                <Card>
+                  <CardContent className="pt-6 px-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Agente</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="text-center">Leads Hoy</TableHead>
+                          <TableHead className="text-center">A+</TableHead>
+                          <TableHead className="text-center">A</TableHead>
+                          <TableHead className="text-center">B+</TableHead>
+                          <TableHead className="text-center">B</TableHead>
+                          <TableHead className="text-center">C</TableHead>
+                          <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mockSupervisores.map((ag) => {
+                          const initials = ag.name.slice(0, 2).toUpperCase();
+                          return (
+                            <TableRow key={ag.email} className="cursor-pointer" onClick={() => setSelectedAgent(ag)}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="bg-primary text-primary-foreground text-xs">{initials}</AvatarFallback>
+                                  </Avatar>
+                                  <span className="font-medium text-sm">{ag.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{ag.email}</TableCell>
+                              <TableCell className="text-center"><Badge className="justify-center">0</Badge></TableCell>
+                              <TableCell className="text-center font-medium text-primary">0</TableCell>
+                              <TableCell className="text-center font-medium">0</TableCell>
+                              <TableCell className="text-center font-medium">0</TableCell>
+                              <TableCell className="text-center font-medium">0</TableCell>
+                              <TableCell className="text-center font-medium">0</TableCell>
+                              <TableCell className="text-center sticky right-0 bg-card">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); setSelectedAgent(ag); }}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mockSupervisores.map((ag) => {
+                    const initials = ag.name.slice(0, 2).toUpperCase();
+                    return (
+                      <Card key={ag.email} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedAgent(ag)}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3 mb-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-semibold text-sm">{ag.name}</p>
+                              <p className="text-xs text-muted-foreground">{ag.email}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border">
+                            {[
+                              { label: "A+", value: 0, color: "text-primary" },
+                              { label: "A", value: 0, color: "text-primary" },
+                              { label: "B+", value: 0, color: "text-muted-foreground" },
+                              { label: "B", value: 0, color: "text-muted-foreground" },
+                              { label: "C", value: 0, color: "text-muted-foreground" },
+                            ].map((item) => (
+                              <div key={item.label} className="bg-muted/30 p-2 text-center">
+                                <p className="text-xs text-muted-foreground">{item.label}</p>
+                                <p className={`text-sm font-bold ${item.color}`}>{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
