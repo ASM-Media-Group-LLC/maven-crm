@@ -1,56 +1,48 @@
 
 
-## Rediseno del Modal de Permisos
+## Cambios en Gestion de Usuarios
 
-### Cambios visuales (basado en la imagen de referencia)
+### 1. Quitar rol desde la columna de rol en la tabla
 
-#### 1. Layout de 3 columnas con encabezados
+En la columna "Rol" de `UsersTable.tsx`, cada badge de rol mostrara un icono "X" al lado. Al hacer clic en la X, se eliminara el rol del usuario (se borrara su entrada en `user_roles`). Los usuarios "Sin rol" no mostraran la X.
 
-Se agregaran encabezados de columna: **Menus**, **Function permissions**, **Data permissions**. La fila global tendra:
-- Checkbox "All" para menus (toggle todos los modulos)
-- Checkbox "All" para funciones (toggle todos los submodulos)
-- RadioGroup global para data permissions (All data / Self and subordinates / Data about self)
+Se necesita:
+- Agregar un callback `onRemoveRole` al componente `UsersTable`
+- Mostrar el badge con un boton X integrado (similar a la imagen de referencia)
+- Agregar la accion `remove_role` en la edge function `admin-user-actions` que haga `DELETE FROM user_roles WHERE user_id = ...`
+- Conectar todo desde `AdminUsuarios.tsx`
 
-#### 2. Cada modulo como card con borde
+### 2. Mover toggle lista/grid a la esquina derecha
 
-Cada modulo se mostrara como una tarjeta con borde (`border rounded-lg p-4`), conteniendo:
-- **Fila principal**: Checkbox + nombre del modulo + conteo de funciones ("X funciones") + etiqueta del data scope actual ("All data")
-- **"Ver detalles"** como trigger expandible con chevron a la derecha
-- **Contenido expandido**: A la izquierda los submodulos (o "No functions available" si no tiene), a la derecha el RadioGroup con las 3 opciones de data scope
-
-#### 3. Titulo y subtitulo actualizados
-
-- Titulo: "Set permissions for **[RoleName]**"
-- Subtitulo (DialogDescription): "Configure granular permissions for this role"
-
-#### 4. Modal mas ancho
-
-Se aumentara el ancho maximo a `sm:max-w-3xl` para acomodar las 3 columnas.
+Actualmente el toggle esta pegado al buscador. Se movera a la derecha usando `justify-between` o `ml-auto` en el contenedor de filtros, separando el buscador (izquierda) del toggle (derecha).
 
 ---
 
 ### Seccion tecnica
 
-**Archivo a modificar:**
-- `src/pages/admin/SetPermissionsModal.tsx` - Reescritura completa del layout interno
+**Archivos a modificar:**
 
-**Estructura de cada card de modulo:**
+- `src/pages/admin/UsersTable.tsx`
+  - Agregar prop `onRemoveRole: (user: AdminUser) => void`
+  - En la celda de Rol, mostrar badge con boton X al lado (solo si tiene rol)
+
+- `src/pages/admin/UsersGrid.tsx`
+  - Agregar la misma prop `onRemoveRole` para consistencia
+
+- `src/pages/admin/AdminUsuarios.tsx`
+  - Lineas 147-165: Cambiar el contenedor de filtros para separar buscador (izquierda) y toggle (derecha) con `justify-between`
+  - Agregar handler `handleRemoveRole` que llame a la edge function con `action: "remove_role"`
+  - Pasar `onRemoveRole` a `UsersTable` y `UsersGrid`
+
+- `supabase/functions/admin-user-actions/index.ts`
+  - Agregar accion `remove_role`: ejecuta `DELETE FROM user_roles WHERE user_id = $user_id`
+  - Proteger contra auto-eliminacion de rol del admin que ejecuta la accion
+
+**Estilo del badge con X (referencia de la imagen):**
 
 ```text
-+------------------------------------------------------+
-| [x] Dashboard    0 funciones              All data   |
-| Ver detalles                                    v    |
-|------------------------------------------------------|
-|          No functions available    o All data         |
-|                                   o Self and subord. |
-|                                   o Data about self  |
-+------------------------------------------------------+
+[Admin x]   -- badge con X clickeable
+[Agent x]   -- badge con X clickeable
+Sin posicion -- texto sin X
 ```
-
-**Logica de "All" para funciones:**
-- El checkbox "All" de funciones iterara sobre todos los submodulos de todos los modulos y los marcara/desmarcara
-- El conteo "X funciones" por modulo mostrara cuantos submodulos estan habilitados vs total
-
-**Labels de data scope en la fila resumida:**
-- Se mostrara el data_scope actual del modulo como texto ("All data", "Self and subordinates", "Data about self") junto al nombre
 
