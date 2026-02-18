@@ -1,66 +1,79 @@
 
 
-## Modales de detalle para las cards de KPI (Tickets ingresados, NO Chequeadas, Completadas Hoy)
+## Mejoras al Modal de Nueva Campana Mensual
 
-### Descripcion
+### Cambios propuestos
 
-Al hacer clic en cualquiera de las 3 cards KPI (Tickets ingresados, NO Chequeadas, Completadas Hoy), se abrira un modal con una tabla que muestra las entradas correspondientes filtradas. El modal seguira el patron visual existente del proyecto (Dialog con tabla interna).
+**1. Selector de Creador/a con buscador interno**
 
-### Comportamiento
+Reemplazar el `Select` actual por un Combobox basado en `Popover` + `Command` (cmdk, ya instalado). El usuario podra escribir para filtrar creadoras por nombre, y seleccionar con un clic. Se mostrara un input con icono de busqueda dentro del dropdown.
 
-| Card | Datos mostrados |
-|------|----------------|
-| Tickets ingresados | Todas las entradas del periodo seleccionado |
-| NO Chequeadas | Solo entradas con resultado "Pendiente" |
-| Completadas Hoy | Solo entradas con resultado "Si" |
+**2. Selector de Mes/Ano con estilo del sistema de diseno**
 
-Cada modal mostrara una tabla con columnas: Ticket, Creadora, Red Social, Plataforma, Resultado y Fecha/Hora.
+Reemplazar el `<Input type="month">` nativo por un `Popover` con `Calendar` en modo single, configurado para seleccionar solo mes y ano. Se usara un boton estilizado como trigger (mismo patron que el DateRangePicker existente) mostrando el mes/ano seleccionado con formato legible (ej. "Febrero 2026").
 
-### Cambios
-
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
-
-1. Agregar estado `kpiModalType` (`"ingresados" | "no_chequeadas" | "completadas" | null`) para controlar cual modal esta abierto.
-
-2. Agregar `useMemo` que filtre las entradas segun el tipo de modal:
-   - `ingresados`: todas las `entries`
-   - `no_chequeadas`: `entries.filter(e => e.result === "Pendiente")`
-   - `completadas`: `entries.filter(e => e.result === "Si")`
-
-3. Agregar `onClick` y `cursor-pointer` a las 3 cards KPI (lineas 382-417).
-
-4. Agregar un `Dialog` con una tabla interna que muestre las entradas filtradas. Incluye:
-   - Titulo dinamico segun el tipo
-   - Tabla con scroll interno (`max-h-[500px] overflow-auto`)
-   - Columnas: Ticket, Creadora, Red, Plataforma, Resultado (badge con color), Fecha
-   - Mensaje vacio si no hay datos
+---
 
 ### Seccion tecnica
 
-**Nuevo estado:**
-```text
-const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
+
+**Imports nuevos:**
+- `Popover, PopoverContent, PopoverTrigger` desde `@/components/ui/popover`
+- `Command, CommandInput, CommandList, CommandEmpty, CommandItem` desde `@/components/ui/command`
+- `CalendarIcon, ChevronsUpDown` desde `lucide-react`
+- `format` desde `date-fns`
+- `Calendar` desde `@/components/ui/calendar`
+
+**Cambios en estado:**
+- `campaignMonth` pasa de `string` a `Date | undefined` para integrarse con Calendar
+- Agregar `campaignCreatorOpen: boolean` para controlar el Popover del Combobox
+- Agregar `campaignMonthOpen: boolean` para controlar el Popover del calendario
+- Agregar `campaignCreatorSearch: string` para el filtro de busqueda interno
+
+**Selector de Creador/a (lineas 1044-1051):**
+Reemplazar el `<Select>` por:
+```
+<Popover open={campaignCreatorOpen} onOpenChange={setCampaignCreatorOpen}>
+  <PopoverTrigger asChild>
+    <Button variant="outline" role="combobox" className="w-full justify-between">
+      {nombre seleccionado || "Seleccionar creador/a"}
+      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent className="w-full p-0">
+    <Command>
+      <CommandInput placeholder="Buscar creador/a..." />
+      <CommandList>
+        <CommandEmpty>No se encontro.</CommandEmpty>
+        {creators.map(c => (
+          <CommandItem onSelect={() => { setCampaignCreator(c.id); setCampaignCreatorOpen(false); }}>
+            <Check className={cn("mr-2 h-4 w-4", campaignCreator === c.id ? "opacity-100" : "opacity-0")} />
+            {c.artistic_name || c.name}
+          </CommandItem>
+        ))}
+      </CommandList>
+    </Command>
+  </PopoverContent>
+</Popover>
 ```
 
-**Datos del modal:**
-```text
-const kpiModalEntries = useMemo(() => {
-  if (!kpiModalType) return [];
-  if (kpiModalType === "no_chequeadas") return entries.filter(e => e.result === "Pendiente");
-  if (kpiModalType === "completadas") return entries.filter(e => e.result === "Si");
-  return entries; // ingresados = todos
-}, [entries, kpiModalType]);
+**Selector de Mes/Ano (lineas 1053-1056):**
+Reemplazar el `<Input type="month">` por un Popover con Calendar en modo single, configurado con `captionLayout="dropdown-buttons"` y navegacion por mes:
+```
+<Popover open={campaignMonthOpen} onOpenChange={setCampaignMonthOpen}>
+  <PopoverTrigger asChild>
+    <Button variant="outline" className="w-full justify-start text-left font-normal">
+      <CalendarIcon className="mr-2 h-4 w-4" />
+      {campaignMonth ? format(campaignMonth, "MMMM yyyy") : "Seleccionar mes"}
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent className="w-auto p-0">
+    <Calendar mode="single" selected={campaignMonth}
+      onSelect={(d) => { setCampaignMonth(d); setCampaignMonthOpen(false); }}
+      className="p-3 pointer-events-auto" />
+  </PopoverContent>
+</Popover>
 ```
 
-**Titulos:**
-```text
-ingresados -> "Tickets Ingresados"
-no_chequeadas -> "Tickets NO Chequeadas"
-completadas -> "Tickets Completadas Hoy"
-```
-
-**onClick en cada card:**
-- Card "Tickets ingresados" (linea 382): `onClick={() => setKpiModalType("ingresados")}`
-- Card "NO Chequeadas" (linea 394): `onClick={() => setKpiModalType("no_chequeadas")}`
-- Card "Completadas Hoy" (linea 406): `onClick={() => setKpiModalType("completadas")}`
-
+**Ajuste en `handleCreateCampaign`:** Actualizar el reset para usar `undefined` en vez de `""` para `campaignMonth`.
