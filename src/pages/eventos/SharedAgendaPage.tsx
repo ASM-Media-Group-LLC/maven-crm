@@ -56,11 +56,11 @@ interface AgendaEvent {
   guests: AgendaGuest[];
 }
 
-const PROJECT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  Ora: { bg: "bg-blue-500/15", text: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
-  Kash: { bg: "bg-purple-500/15", text: "text-purple-600 dark:text-purple-400", dot: "bg-purple-500" },
-  Trafix: { bg: "bg-amber-500/15", text: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
-  Unlok: { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+const PROJECT_COLORS: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
+  Ora: { bg: "bg-blue-500/10", bgActive: "bg-blue-500/20", text: "text-blue-600/70 dark:text-blue-400/70", textActive: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500", border: "border-blue-500" },
+  Kash: { bg: "bg-purple-500/10", bgActive: "bg-purple-500/20", text: "text-purple-600/70 dark:text-purple-400/70", textActive: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500", border: "border-purple-500" },
+  Trafix: { bg: "bg-amber-500/10", bgActive: "bg-amber-500/20", text: "text-amber-600/70 dark:text-amber-400/70", textActive: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", border: "border-amber-500" },
+  Unlok: { bg: "bg-emerald-500/10", bgActive: "bg-emerald-500/20", text: "text-emerald-600/70 dark:text-emerald-400/70", textActive: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", border: "border-emerald-500" },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -198,23 +198,26 @@ const SharedAgendaPage = () => {
 
       {/* ─── Project filter tabs ─── */}
       <div className="max-w-6xl mx-auto w-full px-4 md:px-6 pt-5">
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 p-1">
           {PROJECT_TABS.map((tab) => {
             const isActive = projectFilter === tab;
             const colors = PROJECT_COLORS[tab];
             return (
-              <Button
+              <button
                 key={tab}
-                variant={isActive ? "secondary" : "ghost"}
-                size="sm"
                 onClick={() => setProjectFilter(tab)}
-                className={`text-xs gap-1.5 ${isActive && colors ? `${colors.bg} ${colors.text} hover:${colors.bg}` : ""}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                  isActive
+                    ? colors
+                      ? `${colors.bgActive} ${colors.textActive} shadow-sm`
+                      : "bg-background text-foreground shadow-sm"
+                    : colors
+                    ? `${colors.text} hover:${colors.bg}`
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
               >
-                {colors && (
-                  <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
-                )}
                 {tab}
-              </Button>
+              </button>
             );
           })}
         </div>
@@ -302,18 +305,28 @@ const SharedAgendaPage = () => {
           </CardContent>
         </Card>
 
-        {/* ─── Upcoming Events (horizontal scroll) ─── */}
+        {/* ─── All Events (grouped by date) ─── */}
         {!selectedDate && upcomingEvents.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-5">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <CalendarDays className="h-4 w-4 text-primary" />
               Próximos Eventos
             </h3>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-              {upcomingEvents.map((ev) => (
-                <UpcomingEventCard key={ev.id} event={ev} onSelect={() => setSelectedDate(new Date(ev.date))} />
-              ))}
-            </div>
+            {(() => {
+              const grouped = new Map<string, AgendaEvent[]>();
+              upcomingEvents.forEach((ev) => {
+                if (!grouped.has(ev.date)) grouped.set(ev.date, []);
+                grouped.get(ev.date)!.push(ev);
+              });
+              return Array.from(grouped.entries()).map(([date, evs]) => (
+                <div key={date} className="space-y-3">
+                  <DayHeader date={new Date(date)} count={evs.length} />
+                  {evs.map((ev) => (
+                    <EventDetailCard key={ev.id} event={ev} />
+                  ))}
+                </div>
+              ));
+            })()}
           </div>
         )}
 
@@ -342,44 +355,7 @@ const SharedAgendaPage = () => {
 
 /* ─── Sub-components ─── */
 
-const UpcomingEventCard = ({ event, onSelect }: { event: AgendaEvent; onSelect: () => void }) => {
-  const colors = PROJECT_COLORS[event.project_type ?? ""];
-  const borderColor = colors ? colors.dot.replace("bg-", "border-") : "border-border";
-  return (
-    <Card
-      className={`shrink-0 w-64 cursor-pointer border-l-[3px] ${borderColor} transition-all duration-200 hover:scale-[1.02] hover:border-l-[3px]`}
-      onClick={onSelect}
-    >
-      <CardContent className="p-4 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {event.project_type && colors && (
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${colors.bg} ${colors.text}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${colors.dot} mr-1.5`} />
-              {event.project_type}
-            </span>
-          )}
-          <span className="text-[10px] text-muted-foreground">{event.event_type}</span>
-        </div>
-        <h4 className="font-semibold text-sm truncate">{event.name}</h4>
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>
-              {format(new Date(event.date), "EEE d MMM", { locale: es })}
-              {event.start_time ? ` — ${event.start_time.slice(0, 5)}` : ""}
-            </span>
-          </div>
-          {event.location && (
-            <div className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              <span className="truncate">{event.location}</span>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
+
 
 const DayHeader = ({ date, count }: { date: Date; count: number }) => (
   <div className="flex items-end gap-3">
@@ -409,7 +385,7 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
       </div>
 
       {/* Card */}
-      <Card className={`flex-1 overflow-hidden border-t-[3px] ${colors ? colors.dot.replace("bg-", "border-") : "border-border"}`}>
+      <Card className={`flex-1 overflow-hidden border-t-[3px] ${colors ? colors.border : "border-border"} transition-all duration-200 hover:shadow-lg hover:scale-[1.01]`}>
         <CardContent className="p-4 space-y-3">
           {/* Badges row */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -489,10 +465,16 @@ const GuestChip = ({ guest }: { guest: AgendaGuest }) => (
     <div className="min-w-0 flex-1">
       <p className="text-xs font-medium truncate">{guest.guest_name}</p>
       {guest.instagram_handle && (
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <a
+          href={`https://instagram.com/${guest.instagram_handle}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-pink-500 transition-colors cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
           <InstagramIcon className="h-3 w-3" />
-          <span className="truncate">@{guest.instagram_handle}</span>
-        </div>
+          <span className="truncate hover:underline">@{guest.instagram_handle}</span>
+        </a>
       )}
     </div>
     <span className={`h-2 w-2 rounded-full shrink-0 ${
