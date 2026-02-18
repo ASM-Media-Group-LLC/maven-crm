@@ -1,77 +1,56 @@
 
 
-## Cambios en Gestion de Usuarios
+## Rediseno del Modal de Permisos
 
-### 1. Nuevo flujo de "Restablecer Contrasena" (modal de 2 pasos)
+### Cambios visuales (basado en la imagen de referencia)
 
-Actualmente, al hacer clic en "Reset contrasena" se envia un email directamente sin confirmacion. Se reemplazara por un modal con dos estados:
+#### 1. Layout de 3 columnas con encabezados
 
-**Paso 1 - Confirmacion:** Dialogo con icono de llave, titulo "Restablecer Contrasena", mensaje "Estas seguro de restablecer la contrasena de [Nombre]?", y dos botones: "Cancelar" y "Restablecer Contrasena" (boton primario naranja/amber).
+Se agregaran encabezados de columna: **Menus**, **Function permissions**, **Data permissions**. La fila global tendra:
+- Checkbox "All" para menus (toggle todos los modulos)
+- Checkbox "All" para funciones (toggle todos los submodulos)
+- RadioGroup global para data permissions (All data / Self and subordinates / Data about self)
 
-**Paso 2 - Resultado:** Al confirmar, el backend genera una contrasena temporal aleatoria, la establece como nueva contrasena del usuario, y la retorna. El modal muestra:
-- Titulo "Restablecer Contrasena" con icono de llave
-- Mensaje de exito: "La contrasena ha sido restablecida exitosamente."
-- Alerta verde: "Se envio un email al usuario con la contrasena temporal."
-- Campo de solo lectura con la contrasena temporal y boton de copiar al portapapeles
-- Texto de ayuda: "El usuario debera cambiar esta contrasena al iniciar sesion."
-- Boton "Cerrar"
+#### 2. Cada modulo como card con borde
 
-**Nuevo componente:** `src/pages/admin/ResetPasswordModal.tsx`
+Cada modulo se mostrara como una tarjeta con borde (`border rounded-lg p-4`), conteniendo:
+- **Fila principal**: Checkbox + nombre del modulo + conteo de funciones ("X funciones") + etiqueta del data scope actual ("All data")
+- **"Ver detalles"** como trigger expandible con chevron a la derecha
+- **Contenido expandido**: A la izquierda los submodulos (o "No functions available" si no tiene), a la derecha el RadioGroup con las 3 opciones de data scope
 
-### 2. Actualizacion de la Edge Function
+#### 3. Titulo y subtitulo actualizados
 
-La edge function `admin-user-actions` se modificara para que la accion `reset_password`:
-- Genere una contrasena temporal aleatoria (8 caracteres, alfanumerica con simbolos)
-- Use `adminClient.auth.admin.updateUserById(user_id, { password: tempPassword })` para establecerla
-- Retorne `{ success: true, temp_password: "..." }` en la respuesta
+- Titulo: "Set permissions for **[RoleName]**"
+- Subtitulo (DialogDescription): "Configure granular permissions for this role"
 
-### 3. Boton principal: "Agregar Usuario" en lugar de "Agregar Empleado"
+#### 4. Modal mas ancho
 
-En `AdminUsuarios.tsx` (linea 103) cambiar el texto de "Agregar Empleado" a "Agregar Usuario". Tambien en el titulo del modal `AddUserModal.tsx` (linea 57) cambiar "Agregar Empleado" a "Agregar Usuario".
-
-### 4. EditUserModal ampliado
-
-El modal de edicion actual solo permite cambiar el nombre completo. Se ampliara para incluir todos los campos del formulario de agregar usuario:
-- Nombre (first_name)
-- Apellido (last_name)
-- Rol (select con roles de roles_config)
-
-El email no sera editable (se mostrara como campo deshabilitado o no se incluira, ya que no esta disponible desde el cliente).
-
-La edge function `admin-user-actions` tambien se actualizara para que `update_profile` acepte `first_name`, `last_name` y `role` (actualizando tanto profiles como user_roles).
+Se aumentara el ancho maximo a `sm:max-w-3xl` para acomodar las 3 columnas.
 
 ---
 
 ### Seccion tecnica
 
-**Archivos a crear:**
-- `src/pages/admin/ResetPasswordModal.tsx` - Modal de 2 pasos (confirmacion + resultado con contrasena temporal y boton copiar)
+**Archivo a modificar:**
+- `src/pages/admin/SetPermissionsModal.tsx` - Reescritura completa del layout interno
 
-**Archivos a modificar:**
-- `supabase/functions/admin-user-actions/index.ts`
-  - Accion `reset_password`: generar contrasena temporal, aplicarla con `updateUserById`, retornar `temp_password`
-  - Accion `update_profile`: aceptar `first_name`, `last_name`, `role` ademas de `full_name`
-- `src/pages/admin/AdminUsuarios.tsx`
-  - Linea 103: "Agregar Empleado" a "Agregar Usuario"
-  - Reemplazar `handleResetPassword` para abrir el nuevo `ResetPasswordModal` en lugar de ejecutar directamente
-  - Integrar `ResetPasswordModal`
-- `src/pages/admin/AddUserModal.tsx`
-  - Linea 57: "Agregar Empleado" a "Agregar Usuario"
-- `src/pages/admin/EditUserModal.tsx`
-  - Ampliar interfaz para recibir el usuario completo (AdminUser)
-  - Agregar campos: nombre, apellido, rol (con Select de roles_config)
-  - Actualizar `onConfirm` para enviar todos los campos editables
-
-**Logica de contrasena temporal en la Edge Function:**
+**Estructura de cada card de modulo:**
 
 ```text
-function generateTempPassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-  let result = "";
-  for (let i = 0; i < 10; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
++------------------------------------------------------+
+| [x] Dashboard    0 funciones              All data   |
+| Ver detalles                                    v    |
+|------------------------------------------------------|
+|          No functions available    o All data         |
+|                                   o Self and subord. |
+|                                   o Data about self  |
++------------------------------------------------------+
 ```
+
+**Logica de "All" para funciones:**
+- El checkbox "All" de funciones iterara sobre todos los submodulos de todos los modulos y los marcara/desmarcara
+- El conteo "X funciones" por modulo mostrara cuantos submodulos estan habilitados vs total
+
+**Labels de data scope en la fila resumida:**
+- Se mostrara el data_scope actual del modulo como texto ("All data", "Self and subordinates", "Data about self") junto al nombre
 
