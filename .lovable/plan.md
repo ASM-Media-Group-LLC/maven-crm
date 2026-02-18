@@ -1,26 +1,49 @@
 
 
-## Cambios: Renombrar "Posicion" a "Rol" y agregar boton "Nuevo Rol"
+## Toggle de vista en ambos tabs + Roles actualizados
 
-### 1. AddUserModal.tsx - Renombrar "Posicion" a "Rol"
+### Cambios
 
-Cambiar la etiqueta del campo `Label` de "Posicion" a "Rol" (linea con `htmlFor="role"`). El placeholder del Select tambien se actualizara a "Seleccionar rol".
+#### 1. Toggle lista/grid visible en ambos tabs (`AdminUsuarios.tsx`)
 
-### 2. AdminUsuarios.tsx - Agregar boton "Nuevo Rol" en el header
+Actualmente el toggle de vista (List/Grid) solo aparece cuando `activeTab === "usuarios"`. Se removera esa condicion para que aparezca siempre, y se usara el estado `view` tambien para el tab de roles.
 
-Cuando el tab activo sea "roles", mostrar un boton "Nuevo Rol" en el header (misma posicion que "Agregar Empleado" para usuarios). Este boton necesita comunicarse con `RolesContent` para abrir el `CreateRoleModal`.
+En el tab de roles, se pasara la prop `view` a `RolesContent` para que alterne entre tabla y grid.
 
-Para esto se elevara el estado `createRoleOpen` a `AdminUsuarios.tsx` y se pasara como prop a `RolesContent`.
+#### 2. Grid de roles (`RolesGrid.tsx` - nuevo archivo)
 
-### 3. RolesContent.tsx - Recibir prop para controlar modal de creacion
+Se creara un componente `RolesGrid` que muestra cada rol como una card, similar al patron de `UsersGrid`. Cada card mostrara: nombre del rol, descripcion, cantidad de usuarios, badge de sistema, switch de activo/inactivo, y botones de acciones.
 
-Se agregaran props `createOpen` y `onCreateOpenChange` para que el modal de creacion sea controlado desde el padre (`AdminUsuarios`).
+#### 3. RolesContent recibe prop `view`
+
+`RolesContent` recibira una prop `view: "list" | "grid"` y renderizara `RolesTable` o `RolesGrid` segun corresponda.
+
+#### 4. Roles en la base de datos
+
+Se insertaran los roles faltantes en `roles_config`: **Supervisor**, **Agente** y **Closer**. El rol "employee" existente se mantiene ya que es de sistema, pero se agregaran los nuevos roles solicitados.
+
+Se creara una migracion SQL para insertar los roles faltantes:
+
+```
+INSERT INTO roles_config (name, description, is_active, is_system)
+VALUES
+  ('supervisor', 'Supervision de equipos y revision de operaciones', true, false),
+  ('agente', 'Gestion operativa de creadores y tareas asignadas', true, false),
+  ('closer', 'Cierre de ventas y seguimiento de prospectos', true, false)
+ON CONFLICT (name) DO NOTHING;
+```
+
+---
 
 ### Seccion tecnica
 
-**Archivos a modificar:**
+**Archivos a crear:**
+- `src/pages/admin/RolesGrid.tsx` - Vista grid para roles (cards)
 
-- `src/pages/admin/AddUserModal.tsx` - Cambiar label "Posicion" por "Rol" (linea 101)
-- `src/pages/admin/AdminUsuarios.tsx` - Agregar estado `createRoleOpen`, mostrar boton "Nuevo Rol" cuando `activeTab === "roles"`, pasar props a `RolesContent`
-- `src/pages/admin/RolesContent.tsx` - Aceptar props `createOpen` y `onCreateOpenChange` en lugar de estado local para el modal de creacion
+**Archivos a modificar:**
+- `src/pages/admin/AdminUsuarios.tsx` - Remover condicion `activeTab === "usuarios"` del toggle de vista, pasar `view` a `RolesContent`
+- `src/pages/admin/RolesContent.tsx` - Aceptar prop `view`, alternar entre `RolesTable` y `RolesGrid`
+
+**Migracion SQL:**
+- Insertar roles: supervisor, agente, closer en `roles_config`
 
