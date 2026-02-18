@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      agencias: {
+        Row: {
+          contacto_email: string | null
+          contacto_nombre: string | null
+          contacto_telefono: string | null
+          created_at: string
+          estado: string
+          id: string
+          instagram: string | null
+          nombre: string
+          notas: string | null
+          pais: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          contacto_email?: string | null
+          contacto_nombre?: string | null
+          contacto_telefono?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          instagram?: string | null
+          nombre: string
+          notas?: string | null
+          pais?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          contacto_email?: string | null
+          contacto_nombre?: string | null
+          contacto_telefono?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          instagram?: string | null
+          nombre?: string
+          notas?: string | null
+          pais?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string | null
