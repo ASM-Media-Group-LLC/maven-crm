@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -20,47 +20,80 @@ type PermState = Record<string, { can_access: boolean; data_scope: string }>;
 
 const getKey = (mod: string, sub: string | null) => sub ? `${mod}::${sub}` : mod;
 
+const DATA_SCOPE_LABELS: Record<string, string> = {
+  all: "All data",
+  subordinates: "Self and subordinates",
+  self: "Data about self",
+};
+
+const DATA_SCOPE_OPTIONS = [
+  { value: "all", label: "All data" },
+  { value: "subordinates", label: "Self and subordinates" },
+  { value: "self", label: "Data about self" },
+];
+
 const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermissionsModalProps) => {
   const { permissions, isLoading, savePermissions, isSaving } = useRolePermissions(roleId);
   const [state, setState] = useState<PermState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  // Build initial state from permissions
   useEffect(() => {
     if (!open) return;
     const s: PermState = {};
-    // Initialize all modules/submodules as unchecked
     MODULES_CONFIG.forEach((m) => {
-      if (m.submodules.length === 0) {
-        s[getKey(m.module, null)] = { can_access: false, data_scope: "all" };
-      } else {
-        m.submodules.forEach((sub) => {
-          s[getKey(m.module, sub)] = { can_access: false, data_scope: "all" };
-        });
-      }
+      s[getKey(m.module, null)] = { can_access: false, data_scope: "all" };
+      m.submodules.forEach((sub) => {
+        s[getKey(m.module, sub)] = { can_access: false, data_scope: "all" };
+      });
     });
-    // Override with existing permissions
     permissions.forEach((p) => {
       const key = getKey(p.module, p.submodule);
-      s[key] = { can_access: p.can_access, data_scope: p.data_scope };
+      if (s[key] !== undefined) {
+        s[key] = { can_access: p.can_access, data_scope: p.data_scope };
+      }
     });
     setState(s);
   }, [permissions, open]);
 
-  const allMenuChecked = useMemo(() => {
-    const keys = Object.keys(state);
-    return keys.length > 0 && keys.every((k) => state[k].can_access);
-  }, [state]);
+  // Compute helpers
+  const allModuleKeys = useMemo(() => MODULES_CONFIG.map((m) => getKey(m.module, null)), []);
+  const allSubKeys = useMemo(() => MODULES_CONFIG.flatMap((m) => m.submodules.map((s) => getKey(m.module, s))), []);
 
-  const toggleAll = (checked: boolean) => {
+  const allMenusChecked = useMemo(() => allModuleKeys.every((k) => state[k]?.can_access), [state, allModuleKeys]);
+  const allFunctionsChecked = useMemo(() => allSubKeys.length > 0 && allSubKeys.every((k) => state[k]?.can_access), [state, allSubKeys]);
+
+  const toggleAllMenus = (checked: boolean) => {
     setState((prev) => {
       const next = { ...prev };
-      Object.keys(next).forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
+      allModuleKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
       return next;
     });
   };
 
-  const toggle = (key: string) => {
+  const toggleAllFunctions = (checked: boolean) => {
+    setState((prev) => {
+      const next = { ...prev };
+      allSubKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
+      return next;
+    });
+  };
+
+  const setGlobalDataScope = (scope: string) => {
+    setState((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => { next[k] = { ...next[k], data_scope: scope }; });
+      return next;
+    });
+  };
+
+  const toggleModule = (key: string) => {
+    setState((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], can_access: !prev[key]?.can_access },
+    }));
+  };
+
+  const toggleSub = (key: string) => {
     setState((prev) => ({
       ...prev,
       [key]: { ...prev[key], can_access: !prev[key]?.can_access },
@@ -72,6 +105,30 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
       ...prev,
       [key]: { ...prev[key], data_scope: scope },
     }));
+  };
+
+  const setModuleDataScope = (mod: string, scope: string) => {
+    setState((prev) => {
+      const next = { ...prev };
+      const moduleKey = getKey(mod, null);
+      next[moduleKey] = { ...next[moduleKey], data_scope: scope };
+      const cfg = MODULES_CONFIG.find((m) => m.module === mod);
+      cfg?.submodules.forEach((sub) => {
+        const k = getKey(mod, sub);
+        next[k] = { ...next[k], data_scope: scope };
+      });
+      return next;
+    });
+  };
+
+  const getModuleDataScope = (mod: string): string => {
+    return state[getKey(mod, null)]?.data_scope ?? "all";
+  };
+
+  const getEnabledSubCount = (mod: string): number => {
+    const cfg = MODULES_CONFIG.find((m) => m.module === mod);
+    if (!cfg || cfg.submodules.length === 0) return 0;
+    return cfg.submodules.filter((sub) => state[getKey(mod, sub)]?.can_access).length;
   };
 
   const handleSave = () => {
@@ -92,114 +149,124 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh]">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>Configurar Permisos — <span className="capitalize">{roleName}</span></DialogTitle>
+          <DialogTitle>
+            Set permissions for <span className="font-bold capitalize">{roleName}</span>
+          </DialogTitle>
+          <DialogDescription>Configure granular permissions for this role</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="h-[55vh] pr-4">
-          {/* Global toggles */}
-          <div className="flex items-center gap-6 pb-4 border-b mb-4">
+        <ScrollArea className="h-[58vh] pr-2">
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 pb-3 border-b mb-4 px-1">
             <div className="flex items-center gap-2">
-              <Checkbox
-                checked={allMenuChecked}
-                onCheckedChange={(c) => toggleAll(!!c)}
-              />
-              <Label className="text-sm font-medium">Todos los módulos</Label>
+              <Checkbox checked={allMenusChecked} onCheckedChange={(c) => toggleAllMenus(!!c)} />
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Menus</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox checked={allFunctionsChecked} onCheckedChange={(c) => toggleAllFunctions(!!c)} />
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Function permissions</Label>
+            </div>
+            <div>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data permissions</Label>
+              <RadioGroup
+                value=""
+                onValueChange={(v) => setGlobalDataScope(v)}
+                className="flex gap-3 mt-1"
+              >
+                {DATA_SCOPE_OPTIONS.map((o) => (
+                  <div key={o.value} className="flex items-center gap-1">
+                    <RadioGroupItem value={o.value} id={`global-${o.value}`} className="h-3 w-3" />
+                    <Label htmlFor={`global-${o.value}`} className="text-[11px] text-muted-foreground">{o.label}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
             </div>
           </div>
 
-          <div className="space-y-1">
+          {/* Module cards */}
+          <div className="space-y-3 px-1">
             {MODULES_CONFIG.map((mod) => {
-              const hasSubmodules = mod.submodules.length > 0;
+              const moduleKey = getKey(mod.module, null);
               const isExpanded = expanded[mod.module] ?? false;
-
-              if (!hasSubmodules) {
-                const key = getKey(mod.module, null);
-                return (
-                  <div key={mod.module} className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={state[key]?.can_access ?? false}
-                        onCheckedChange={() => toggle(key)}
-                      />
-                      <span className="text-sm font-medium">{mod.module}</span>
-                    </div>
-                    <RadioGroup
-                      value={state[key]?.data_scope ?? "all"}
-                      onValueChange={(v) => setDataScope(key, v)}
-                      className="flex gap-3"
-                    >
-                      {[{ value: "all", label: "Todos" }, { value: "subordinates", label: "Subordinados" }, { value: "self", label: "Propios" }].map((o) => (
-                        <div key={o.value} className="flex items-center gap-1">
-                          <RadioGroupItem value={o.value} id={`${key}-${o.value}`} className="h-3 w-3" />
-                          <Label htmlFor={`${key}-${o.value}`} className="text-xs text-muted-foreground">{o.label}</Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                );
-              }
-
-              const subKeys = mod.submodules.map((s) => getKey(mod.module, s));
-              const allSubChecked = subKeys.every((k) => state[k]?.can_access);
-              const someSubChecked = subKeys.some((k) => state[k]?.can_access);
+              const hasSubmodules = mod.submodules.length > 0;
+              const enabledCount = getEnabledSubCount(mod.module);
+              const totalSubs = mod.submodules.length;
+              const dataScope = getModuleDataScope(mod.module);
 
               return (
-                <Collapsible key={mod.module} open={isExpanded} onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}>
-                  <div className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={allSubChecked}
-                        // @ts-ignore
-                        indeterminate={someSubChecked && !allSubChecked}
-                        onCheckedChange={(c) => {
-                          setState((prev) => {
-                            const next = { ...prev };
-                            subKeys.forEach((k) => { next[k] = { ...next[k], can_access: !!c }; });
-                            return next;
-                          });
-                        }}
-                      />
-                      <CollapsibleTrigger className="flex items-center gap-1">
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        <span className="text-sm font-medium">{mod.module}</span>
+                <Collapsible
+                  key={mod.module}
+                  open={isExpanded}
+                  onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
+                >
+                  <div className="border rounded-lg">
+                    {/* Summary row */}
+                    <div className="p-4 space-y-1">
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={state[moduleKey]?.can_access ?? false}
+                            onCheckedChange={() => toggleModule(moduleKey)}
+                          />
+                          <span className="text-sm font-medium">{mod.module}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {hasSubmodules ? `${enabledCount} funciones` : "0 funciones"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {DATA_SCOPE_LABELS[dataScope] || "All data"}
+                        </span>
+                      </div>
+                      <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer w-full">
+                        <span>Ver detalles</span>
+                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                       </CollapsibleTrigger>
-                      <span className="text-xs text-muted-foreground">
-                        ({subKeys.filter((k) => state[k]?.can_access).length}/{subKeys.length})
-                      </span>
                     </div>
-                  </div>
-                  <CollapsibleContent>
-                    <div className="ml-10 space-y-1 pb-2">
-                      {mod.submodules.map((sub) => {
-                        const key = getKey(mod.module, sub);
-                        return (
-                          <div key={key} className="flex items-center justify-between py-1.5 px-3 rounded-md hover:bg-muted/30">
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                checked={state[key]?.can_access ?? false}
-                                onCheckedChange={() => toggle(key)}
-                              />
-                              <span className="text-sm">{sub}</span>
-                            </div>
+
+                    {/* Expanded details */}
+                    <CollapsibleContent>
+                      <div className="border-t px-4 py-3">
+                        <div className="grid grid-cols-[1fr_1fr] gap-4">
+                          {/* Left: submodules */}
+                          <div className="space-y-2">
+                            {hasSubmodules ? (
+                              mod.submodules.map((sub) => {
+                                const key = getKey(mod.module, sub);
+                                return (
+                                  <div key={key} className="flex items-center gap-2">
+                                    <Checkbox
+                                      checked={state[key]?.can_access ?? false}
+                                      onCheckedChange={() => toggleSub(key)}
+                                    />
+                                    <span className="text-sm">{sub}</span>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">No functions available</p>
+                            )}
+                          </div>
+                          {/* Right: data scope radio */}
+                          <div>
                             <RadioGroup
-                              value={state[key]?.data_scope ?? "all"}
-                              onValueChange={(v) => setDataScope(key, v)}
-                              className="flex gap-3"
+                              value={dataScope}
+                              onValueChange={(v) => setModuleDataScope(mod.module, v)}
+                              className="space-y-2"
                             >
-                              {[{ value: "all", label: "Todos" }, { value: "subordinates", label: "Subordinados" }, { value: "self", label: "Propios" }].map((o) => (
-                                <div key={o.value} className="flex items-center gap-1">
-                                  <RadioGroupItem value={o.value} id={`${key}-${o.value}`} className="h-3 w-3" />
-                                  <Label htmlFor={`${key}-${o.value}`} className="text-xs text-muted-foreground">{o.label}</Label>
+                              {DATA_SCOPE_OPTIONS.map((o) => (
+                                <div key={o.value} className="flex items-center gap-2">
+                                  <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
+                                  <Label htmlFor={`${mod.module}-${o.value}`} className="text-sm">{o.label}</Label>
                                 </div>
                               ))}
                             </RadioGroup>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CollapsibleContent>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </div>
                 </Collapsible>
               );
             })}
