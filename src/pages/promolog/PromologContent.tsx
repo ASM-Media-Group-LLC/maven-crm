@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -322,6 +323,16 @@ const PromologContent = () => {
 
   const [searchEntry, setSearchEntry] = useState("");
 
+  // KPI modal state
+  const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
+  const kpiModalEntries = useMemo(() => {
+    if (!kpiModalType) return [];
+    if (kpiModalType === "no_chequeadas") return entries.filter(e => e.result === "Pendiente");
+    if (kpiModalType === "completadas") return entries.filter(e => e.result === "Sí");
+    return entries;
+  }, [entries, kpiModalType]);
+  const kpiModalTitle = kpiModalType === "ingresados" ? "Tickets Ingresados" : kpiModalType === "no_chequeadas" ? "Tickets NO Chequeadas" : "Tickets Completadas Hoy";
+
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       if (selectedCreatorFilter !== "" && entry.creator_id !== selectedCreatorFilter) return false;
@@ -379,7 +390,7 @@ const PromologContent = () => {
               <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
             </CardContent>
           </Card>
-          <Card className="border border-primary/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+          <Card className="border border-primary/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("ingresados")}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
@@ -391,7 +402,7 @@ const PromologContent = () => {
               <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
             </CardContent>
           </Card>
-          <Card className="border border-destructive/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+          <Card className="border border-destructive/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("no_chequeadas")}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
@@ -403,7 +414,7 @@ const PromologContent = () => {
               <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
             </CardContent>
           </Card>
-          <Card className="border border-success/40 bg-card/80 transition-all duration-200 hover:scale-[1.03]">
+          <Card className="border border-success/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("completadas")}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
@@ -1061,6 +1072,53 @@ const PromologContent = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* KPI Detail Modal */}
+      <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{kpiModalTitle}</DialogTitle>
+            <DialogDescription>
+              {kpiModalEntries.length} {kpiModalEntries.length === 1 ? "entrada" : "entradas"} encontradas
+            </DialogDescription>
+          </DialogHeader>
+          {kpiModalEntries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Info className="h-10 w-10 mb-2 opacity-40" />
+              <p className="text-sm">No hay entradas para mostrar</p>
+            </div>
+          ) : (
+            <div className="max-h-[500px] overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ticket</TableHead>
+                    <TableHead>Creadora</TableHead>
+                    <TableHead>Red</TableHead>
+                    <TableHead>Plataforma</TableHead>
+                    <TableHead>Resultado</TableHead>
+                    <TableHead>Fecha / Hora</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {kpiModalEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-mono text-xs">{entry.ticketNumber || "—"}</TableCell>
+                      <TableCell className="font-medium text-sm">{entry.name}</TableCell>
+                      <TableCell className="capitalize text-sm">{entry.network}</TableCell>
+                      <TableCell className="text-sm">{entry.platform}</TableCell>
+                      <TableCell>
+                        <Badge className={cn("text-xs", resultToBadgeClass(entry.result))}>{entry.result}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{entry.date} {entry.time}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
