@@ -1,86 +1,84 @@
 
 
-## Correcciones al Modal de Promolog y Validacion de Filtros
+## Project Roadmap - Tracker de Progreso de la Plataforma
 
-### Problemas encontrados
+### Descripcion
 
-1. **Scroll no funciona**: El `DialogContent` base tiene `grid` y `gap-4` en su clase CSS (dialog.tsx linea 39). Aunque el modal pasa `flex flex-col p-0`, la clase `grid` del base tiene la misma especificidad y prevalece. Esto impide que `flex-1 min-h-0 overflow-y-auto` funcione en el area de scroll.
-
-2. **El boton "Guardar Promocion" no persiste datos**: El handler del boton (linea 1068) solo muestra un toast y cierra el modal, pero NO inserta el registro en la tabla `promolog_entries` de Supabase.
-
-3. **Filtros**: Los filtros de la pestana Promos (busqueda, estado, red social, fechas) estan correctamente implementados y conectados al memo `filteredEntries`. Los cards de Red Social y Plataforma tambien filtran via `selectedNetwork` y `selectedCardPlatform`. Todo funciona correctamente.
+Nueva pagina `/roadmap` en la seccion de Recursos del sidebar que permite visualizar y gestionar el progreso de construccion de toda la plataforma MAVEN. Inspirado en la imagen de referencia, mostrara categorias colapsables con tareas individuales que se pueden marcar como completadas, junto con una barra de progreso general.
 
 ---
 
-### Cambios a realizar
+### Estructura Visual
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
+**Header:**
+- Titulo "Project Roadmap" con descripcion
+- Tarjeta de progreso general con barra de progreso y contadores por estado (Done, In Progress, To Do, Blocked)
+- Porcentaje total calculado automaticamente
 
-**1. Fix scroll en ambos modales (lineas 954 y 1113):**
+**Tabla por categorias:**
+- Secciones colapsables (ej: "Core Platform and Auth", "Gestion de Creadoras", "Recursos Humanos", "Contabilidad")
+- Cada seccion muestra contador de tareas completadas y mini barra de progreso
+- Filas con: checkbox, submodulo, tarea (con descripcion opcional), estado (Done/In Progress/To Do/Blocked), fecha estimada
 
-Cambiar la clase del `DialogContent` para forzar flex con `!important`:
+**Formulario inline:**
+- Boton para agregar nueva categoria
+- Boton para agregar nueva tarea dentro de cada categoria
+- Estados editables con click (ciclo entre To Do, In Progress, Done, Blocked)
 
-Antes:
-```text
-className="max-w-lg max-h-[80vh] flex flex-col p-0"
-```
+---
 
-Despues:
-```text
-className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden"
-```
+### Persistencia en Supabase
 
-El `!flex` y `!flex-col` fuerzan el layout flex sobre el `grid` base. El `gap-0` anula el `gap-4` base. El `overflow-hidden` asegura que el contenedor no se desborde.
+**Tabla `roadmap_categories`:**
+- `id` (uuid, PK)
+- `name` (text, NOT NULL) - Nombre de la categoria
+- `position` (integer) - Orden
+- `created_at` (timestamptz)
 
-**2. Guardar entrada en Supabase (linea 1068):**
+**Tabla `roadmap_items`:**
+- `id` (uuid, PK)
+- `category_id` (uuid, FK a roadmap_categories)
+- `submodule` (text) - Nombre del submodulo
+- `task` (text, NOT NULL) - Descripcion de la tarea
+- `description` (text, nullable) - Nota adicional
+- `status` (text) - "done", "in_progress", "todo", "blocked"
+- `delivery_date` (date, nullable) - Fecha estimada
+- `position` (integer) - Orden dentro de la categoria
+- `created_at` (timestamptz)
+- `updated_at` (timestamptz)
 
-Reemplazar el handler inline del boton "Guardar Promocion" por una funcion `handleSaveEntry` que:
-- Valide campos obligatorios (red social, plataforma, tipo de contacto cuando `entryResult === "si"`)
-- Inserte en `promolog_entries` con los campos: `creator_id`, `date`, `promoted`, `network`, `platform`, `contact_type`, `notes`, `action_taken` (estrategia), `evidence_url`
-- Invalide la query `promolog-entries` para refrescar la tabla
-- Muestre toast de exito o error
-- Llame a `resetEntryModal()` y cierre el modal
+RLS: Politica permisiva (ALL con true) igual que otras tablas operativas del proyecto.
 
-```text
-const handleSaveEntry = async () => {
-  if (!selectedCreatorForEntry) return;
-  
-  if (entryResult === "si") {
-    if (!entryNetwork || !entryPlatform || !entryContactType) {
-      toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
-      return;
-    }
-  }
+---
 
-  const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
+### Archivos a crear/modificar
 
-  const { error } = await supabase.from("promolog_entries").insert({
-    creator_id: selectedCreatorForEntry.id,
-    date: new Date().toISOString(),
-    promoted: entryResult === "si" ? "true" : "false",
-    network: entryResult === "si" ? entryNetwork : "n/a",
-    platform: entryResult === "si" ? platformValue : null,
-    contact_type: entryResult === "si" ? entryContactType : null,
-    notes: entryNotes || null,
-    action_taken: entryResult === "si" ? entryStrategy || null : null,
-    evidence_url: entryEvidencePreview || null,
-  });
+1. **Migracion SQL** - Crear tablas `roadmap_categories` y `roadmap_items` con RLS
+2. **`src/pages/Roadmap.tsx`** - Pagina wrapper con sidebar y topbar
+3. **`src/pages/roadmap/RoadmapContent.tsx`** - Componente principal con:
+   - Header y tarjeta de progreso general
+   - Secciones colapsables por categoria
+   - Filas de items con checkbox, estado, fecha
+   - Formularios inline para agregar categorias e items
+4. **`src/pages/roadmap/useRoadmap.ts`** - Hook con queries y mutations para CRUD de categorias e items
+5. **`src/App.tsx`** - Agregar ruta `/roadmap` protegida
+6. **`src/components/dashboard/DashboardSidebar.tsx`** - Agregar enlace "Roadmap" en la seccion Recursos
 
-  if (error) {
-    toast({ title: "Error", description: error.message, variant: "destructive" });
-    return;
-  }
+---
 
-  queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
-  toast({ title: "Promocion registrada", description: "..." });
-  resetEntryModal();
-  setEntryModalOpen(false);
-};
-```
+### Seccion tecnica
 
-Reemplazar el `onClick` del boton "Guardar Promocion" (linea 1068) por `onClick={handleSaveEntry}`.
+**Progreso general:** Calculado como `(items con status "done") / (total items) * 100`. Los contadores Done, In Progress, To Do y Blocked se derivan filtrando `roadmap_items` por status.
 
-**3. Actualizar el boton del footer del modal de Edicion (linea 1236):**
+**Checkbox:** Al hacer click en el checkbox de una fila, se alterna entre "done" y "todo". El estado se persiste con un `update` a Supabase y se invalida la query.
 
-Similarmente, el boton "Guardar Cambios" del modal de edicion no persiste los cambios. Se creara un handler `handleUpdateEntry` que haga un `update` en `promolog_entries` usando `selectedEntry.id`.
+**Agregar items:** Input inline dentro de cada categoria colapsable. Al presionar Enter o el boton, se inserta en `roadmap_items` con `category_id` correspondiente y status "todo".
+
+**Agregar categorias:** Input + boton en la parte inferior. Inserta en `roadmap_categories`.
+
+**Cambio de estado:** Click en el badge de estado cicla entre todo, in_progress, done, blocked. Cada cambio se persiste inmediatamente.
+
+**Patron visual:** Secciones colapsables usando `Collapsible` de Radix. Cada seccion muestra `X/Y tasks` y una mini barra `Progress`. Colores semanticos: verde para Done, amarillo para In Progress, gris para To Do, rojo para Blocked.
+
+**Pre-poblado:** La migracion incluira datos iniciales con los modulos ya construidos (Dashboard, Contactos, Creadores, Eventos, LeadGen, Closers, Tickets, Promolog, Tareas, Sales, Design System, Docs, Auth, Admin) marcados como "done", y los pendientes (RRHH, Contabilidad, Onboarding de Modelos, Contenido Personalizado) como "todo".
 
