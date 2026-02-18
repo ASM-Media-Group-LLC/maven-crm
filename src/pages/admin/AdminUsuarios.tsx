@@ -29,6 +29,7 @@ const AdminUsuarios = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -96,10 +97,15 @@ const AdminUsuarios = () => {
                   <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
                   <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
                 </div>
-                {activeTab === "usuarios" && (
+                {activeTab === "usuarios" ? (
                   <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Agregar Empleado
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuevo Rol
                   </Button>
                 )}
               </div>
@@ -228,7 +234,7 @@ const AdminUsuarios = () => {
                   />
                 </>
               ) : (
-                <RolesContent search={search} />
+                <RolesContent search={search} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen} />
               )}
 
               <AddUserModal
