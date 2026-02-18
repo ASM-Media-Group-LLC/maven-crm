@@ -1,51 +1,69 @@
 
 
-## Reorganizar layout de Gestion de Usuarios
+## Agregar funcionalidad "Crear Usuario" y buscador en tab Roles
 
-### Problema actual
+### Resumen
 
-En `AdminUsuarios.tsx`, la estructura es: Header > Tab bar > KPIs > Buscador > Contenido. El usuario solicita que las KPI cards esten **antes** del tab bar, y que se siga el patron estandarizado de la plataforma (visible en `ContactosContent.tsx`):
+Se agregaran dos funcionalidades: (1) un modal "Agregar Empleado" para crear usuarios desde el panel admin, y (2) un buscador en la pestana de Roles que actualmente no tiene. Ambos cambios siguen los patrones existentes de la plataforma.
 
-1. Header fijo con titulo + boton principal
-2. KPI cards de resumen
-3. Tab bar (Usuarios / Roles)
-4. Buscador + filtros con toggle de vista a la derecha
-5. Contenido (tabla o grid)
+---
 
-### Cambios en un solo archivo
+### 1. Modal "Agregar Empleado" (AddUserModal)
 
-**`src/pages/admin/AdminUsuarios.tsx`**
+Se creara `src/pages/admin/AddUserModal.tsx` con los campos mostrados en la imagen de referencia:
 
-Se reestructurara el layout adoptando el patron `h-screen overflow-hidden` con header fijo y scroll en el contenido:
+- **Correo Electronico** (requerido, icono de email)
+- **Nombre** (requerido, icono de usuario)
+- **Apellido** (requerido, icono de usuario)
+- **Posicion** (select con roles existentes de `roles_config`)
 
+El modal usara Dialog de Radix con botones "Cancelar" y "Agregar".
+
+### 2. Edge Function: accion `create_user`
+
+Se agregara una nueva accion `create_user` en `supabase/functions/admin-user-actions/index.ts` que:
+
+1. Recibe `email`, `first_name`, `last_name`, y opcionalmente `role`
+2. Usa `adminClient.auth.admin.createUser()` con `email_confirm: true` para crear el usuario sin necesidad de verificacion
+3. El trigger `handle_new_user` existente crea automaticamente el perfil y asigna rol `employee`
+4. Si se especifica un rol diferente, actualiza `user_roles` y el `full_name` en profiles con nombre + apellido
+
+### 3. Buscador en tab Roles
+
+Se modificara `RolesContent.tsx` para recibir una prop `search` y filtrar roles por nombre. El buscador se colocara en `AdminUsuarios.tsx` dentro del bloque del tab "roles", siguiendo el mismo patron del tab "usuarios" (buscador a la izquierda, toggle de vista a la derecha si aplica).
+
+### 4. Cambios en AdminUsuarios.tsx
+
+- Agregar estado `addUserOpen` para controlar el modal
+- Agregar boton "Agregar Empleado" en el header (visible cuando tab es "usuarios")
+- Mostrar buscador tambien cuando `activeTab === "roles"` (sin toggle de vista, solo el input de busqueda)
+- El search se reutiliza para ambos tabs, reseteandolo al cambiar de tab
+
+---
+
+### Seccion tecnica
+
+**Archivos a crear:**
+- `src/pages/admin/AddUserModal.tsx` - Modal con formulario (email, nombre, apellido, posicion/rol)
+
+**Archivos a modificar:**
+- `supabase/functions/admin-user-actions/index.ts` - Agregar accion `create_user` usando `auth.admin.createUser`
+- `src/pages/admin/AdminUsuarios.tsx` - Agregar boton "Agregar Empleado" en header, estado del modal, buscador en tab roles
+- `src/pages/admin/RolesContent.tsx` - Aceptar prop `search` y filtrar roles por nombre
+
+**Logica de creacion de usuario:**
 ```
-<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-  <!-- HEADER FIJO (shrink-0, border-b) -->
-  <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
-    - Titulo "Gestion de Usuarios" + subtitulo
-    - Boton principal a la derecha (cambia segun tab activo)
-  </header>
+action: "create_user"
+params: { email, first_name, last_name, role? }
 
-  <!-- AREA SCROLLABLE -->
-  <div className="flex-1 overflow-auto p-6 space-y-6">
-    - KPI cards (Total, Admins, Managers, Employees) -- ANTES del tab bar
-    - Tab bar (Usuarios | Roles)
-    - Si tab "usuarios":
-        - Buscador + toggle vista (lista/grid) alineado a la derecha
-        - Tabla o Grid de usuarios
-    - Si tab "roles":
-        - RolesContent
-  </div>
-</main>
+1. auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name } })
+2. El trigger handle_new_user inserta perfil + rol employee automaticamente
+3. Si role !== "employee", actualizar user_roles con el rol especificado
 ```
 
-### Detalle de los cambios
-
-1. Envolver en el patron de layout estandar con `header` fijo (`shrink-0`, `border-b`) y area scrollable (`flex-1 overflow-auto`)
-2. Mover las KPI cards fuera del bloque condicional del tab, colocandolas justo despues del header scrollable, antes del tab bar
-3. El tab bar queda debajo de las KPIs
-4. El buscador + toggle de vista se mantiene solo dentro del tab "usuarios", justo debajo del tab bar
-5. Eliminar el `<main className="flex-1 p-6 space-y-6">` actual y reemplazar con la estructura fija + scroll
-
-No se crean ni eliminan archivos. Solo se modifica `AdminUsuarios.tsx`.
+**Validacion del formulario:**
+- Email: requerido, formato valido
+- Nombre: requerido, max 50 chars
+- Apellido: requerido, max 50 chars
+- Posicion: opcional (default employee)
 
