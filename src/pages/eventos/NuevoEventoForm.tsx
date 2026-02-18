@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Clock, X, Check, ChevronsUpDown, UserPlus,
 } from "lucide-react";
+import { format, parse } from "date-fns";
+import { es } from "date-fns/locale/es";
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,8 +65,12 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const [eventType, setEventType] = useState(event?.event_type ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [multiDay, setMultiDay] = useState(!!event?.end_date);
-  const [date, setDate] = useState(event?.date ?? "");
-  const [endDate, setEndDate] = useState(event?.end_date ?? "");
+  const [date, setDate] = useState<Date | undefined>(
+    event?.date ? parse(event.date, "yyyy-MM-dd", new Date()) : undefined
+  );
+  const [endDate, setEndDate] = useState<Date | undefined>(
+    event?.end_date ? parse(event.end_date, "yyyy-MM-dd", new Date()) : undefined
+  );
   const [startH, setStartH] = useState(event?.start_time?.slice(0, 2) ?? "");
   const [startM, setStartM] = useState(event?.start_time?.slice(3, 5) ?? "00");
   const [endH, setEndH] = useState(event?.end_time?.slice(0, 2) ?? "");
@@ -100,8 +107,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
       event_type: eventType,
       project_type: projectType,
       description: description || null,
-      date,
-      end_date: multiDay && endDate ? endDate : null,
+      date: format(date, "yyyy-MM-dd"),
+      end_date: multiDay && endDate ? format(endDate, "yyyy-MM-dd") : null,
       start_time: startH ? `${startH}:${startM}:00` : null,
       end_time: endH ? `${endH}:${endM}:00` : null,
       location: location || null,
@@ -226,12 +233,52 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Fecha {multiDay ? "inicio" : ""} *</Label>
-                      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                          >
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            locale={es}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     {multiDay && (
                       <div className="space-y-2">
                         <Label>Fecha fin</Label>
-                        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}
+                            >
+                              <CalendarDays className="mr-2 h-4 w-4" />
+                              {endDate ? format(endDate, "PPP", { locale: es }) : "Seleccionar fecha"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={endDate}
+                              onSelect={setEndDate}
+                              locale={es}
+                              initialFocus
+                              className="pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     )}
                   </div>
