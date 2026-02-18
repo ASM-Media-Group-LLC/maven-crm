@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye, ChevronsUpDown, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -50,6 +52,7 @@ const LeadGenContent = () => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [selectedAgente, setSelectedAgente] = useState("todos");
+  const [agentSelectOpen, setAgentSelectOpen] = useState(false);
   const [addContactoOpen, setAddContactoOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<(typeof leads)[number] | null>(null);
@@ -290,17 +293,32 @@ const LeadGenContent = () => {
                     <Users className="h-5 w-5" />
                     Rendimiento por Agente
                   </div>
-                  <Select value={selectedAgente} onValueChange={setSelectedAgente}>
-                    <SelectTrigger className="w-[200px] h-9">
-                      <SelectValue placeholder="Todos los agentes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos los agentes</SelectItem>
-                      {mockSupervisores.map((s) => (
-                        <SelectItem key={s.email} value={s.name}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={agentSelectOpen} onOpenChange={setAgentSelectOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-[200px] h-9 justify-between font-normal">
+                        {selectedAgente === "todos" ? "Todos los agentes" : selectedAgente}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar agente..." />
+                        <CommandList>
+                          <CommandEmpty>No encontrado</CommandEmpty>
+                          <CommandItem onSelect={() => { setSelectedAgente("todos"); setAgentSelectOpen(false); }}>
+                            Todos los agentes
+                            {selectedAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
+                          </CommandItem>
+                          {mockSupervisores.map((s) => (
+                            <CommandItem key={s.email} onSelect={() => { setSelectedAgente(s.name); setAgentSelectOpen(false); }}>
+                              {s.name}
+                              {selectedAgente === s.name && <Check className="ml-auto h-4 w-4" />}
+                            </CommandItem>
+                          ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="flex flex-col items-center justify-center py-20">
                   <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
