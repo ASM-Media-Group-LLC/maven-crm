@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, Eye, ChevronsUpDown, Check } from "lucide-react";
 import AgentDetailView from "./AgentDetailView";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
@@ -22,6 +22,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { supabase } from "@/integrations/supabase/client";
 
 const mockSupervisores = [
@@ -60,6 +61,8 @@ const LeadGenContent = () => {
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<(typeof leads)[number] | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<(typeof mockSupervisores)[number] | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ["leads"],
@@ -142,20 +145,13 @@ const LeadGenContent = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" || activeTab === "leads-hora" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />
           </div>
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <Select defaultValue="hoy">
-              <SelectTrigger className="w-[120px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hoy">Hoy</SelectItem>
-                <SelectItem value="ayer">Ayer</SelectItem>
-                <SelectItem value="semana">Esta semana</SelectItem>
-                <SelectItem value="mes">Este mes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+            placeholder="Selecciona fechas"
+            className="h-9"
+          />
           {activeTab === "supervisores" || activeTab === "rendimiento" || activeTab === "leads-hora" ? null : activeTab === "agentes" ? (
             <Select>
               <SelectTrigger className="w-[140px] h-9">
