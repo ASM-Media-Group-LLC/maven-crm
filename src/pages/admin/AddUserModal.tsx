@@ -54,7 +54,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading }: AddUserModal
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Agregar Empleado</DialogTitle>
+          <DialogTitle>Agregar Usuario</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
