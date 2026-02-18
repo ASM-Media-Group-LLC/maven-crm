@@ -86,129 +86,136 @@ const AdminUsuarios = () => {
         <DashboardSidebar />
         <div className="flex-1 flex flex-col">
           <DashboardTopbar />
-          <main className="flex-1 p-6 space-y-6">
-            {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
-              <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
-            </div>
+          <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+            {/* Fixed Header */}
+            <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
+                  <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
+                </div>
+              </div>
+            </header>
 
-            {/* Tab bar */}
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {tabs.map((tab) => (
-                <Button
-                  key={tab.key}
-                  variant={activeTab === tab.key ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setActiveTab(tab.key)}
-                >
-                  {tab.label}
-                </Button>
-              ))}
-            </div>
-
-            {activeTab === "usuarios" ? (
-              <>
-                {/* KPIs */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {kpis.map((kpi) => (
-                    <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
-                        <kpi.icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{kpi.value}</p>
-                        <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                      </div>
+            {/* Scrollable Area */}
+            <div className="flex-1 overflow-auto p-6 space-y-6">
+              {/* KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {kpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
+                      <kpi.icon className="h-5 w-5" />
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <p className="text-2xl font-bold">{kpi.value}</p>
+                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                {/* Search + View Toggle */}
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-                  </div>
-                  <div className="flex gap-1 border rounded-md p-0.5">
-                    <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
-                      <List className="h-4 w-4" />
-                    </Button>
-                    <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
-                      <LayoutGrid className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+              {/* Tab bar */}
+              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                {tabs.map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === tab.key ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setActiveTab(tab.key)}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-                {/* Content */}
-                {isLoading ? (
-                  <div className="flex justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              {activeTab === "usuarios" ? (
+                <>
+                  {/* Search + View Toggle */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-sm">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                    </div>
+                    <div className="flex gap-1 border rounded-md p-0.5">
+                      <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                        <List className="h-4 w-4" />
+                      </Button>
+                      <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                        <LayoutGrid className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                ) : filtered.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <Users className="h-12 w-12 mb-3 opacity-40" />
-                    <p>No se encontraron usuarios</p>
-                  </div>
-                ) : view === "list" ? (
-                  <UsersTable
-                    users={filtered}
-                    onEditRole={handleEditRole}
-                    onEdit={handleEdit}
-                    onResetPassword={handleResetPassword}
-                    onDelete={handleDelete}
+
+                  {/* Content */}
+                  {isLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                      <Users className="h-12 w-12 mb-3 opacity-40" />
+                      <p>No se encontraron usuarios</p>
+                    </div>
+                  ) : view === "list" ? (
+                    <UsersTable
+                      users={filtered}
+                      onEditRole={handleEditRole}
+                      onEdit={handleEdit}
+                      onResetPassword={handleResetPassword}
+                      onDelete={handleDelete}
+                    />
+                  ) : (
+                    <UsersGrid
+                      users={filtered}
+                      onEditRole={handleEditRole}
+                      onEdit={handleEdit}
+                      onResetPassword={handleResetPassword}
+                      onDelete={handleDelete}
+                    />
+                  )}
+
+                  <ChangeRoleModal
+                    user={selectedUser}
+                    open={modalOpen}
+                    onOpenChange={setModalOpen}
+                    onConfirm={handleConfirmRole}
+                    isLoading={isChangingRole}
                   />
-                ) : (
-                  <UsersGrid
-                    users={filtered}
-                    onEditRole={handleEditRole}
-                    onEdit={handleEdit}
-                    onResetPassword={handleResetPassword}
-                    onDelete={handleDelete}
+
+                  <EditUserModal
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    userName={selectedUser?.full_name || ""}
+                    onConfirm={(name) => {
+                      if (selectedUser) {
+                        adminAction.mutate(
+                          { action: "update_profile", user_id: selectedUser.id, full_name: name },
+                          { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
+                        );
+                      }
+                    }}
+                    isLoading={adminAction.isPending}
                   />
-                )}
 
-                <ChangeRoleModal
-                  user={selectedUser}
-                  open={modalOpen}
-                  onOpenChange={setModalOpen}
-                  onConfirm={handleConfirmRole}
-                  isLoading={isChangingRole}
-                />
-
-                <EditUserModal
-                  open={editOpen}
-                  onOpenChange={setEditOpen}
-                  userName={selectedUser?.full_name || ""}
-                  onConfirm={(name) => {
-                    if (selectedUser) {
-                      adminAction.mutate(
-                        { action: "update_profile", user_id: selectedUser.id, full_name: name },
-                        { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
-                      );
-                    }
-                  }}
-                  isLoading={adminAction.isPending}
-                />
-
-                <DeleteUserDialog
-                  open={deleteOpen}
-                  onOpenChange={setDeleteOpen}
-                  userName={selectedUser?.full_name || "Sin nombre"}
-                  onConfirm={() => {
-                    if (selectedUser) {
-                      adminAction.mutate(
-                        { action: "delete_user", user_id: selectedUser.id },
-                        { onSuccess: () => { setDeleteOpen(false); toast({ title: "Usuario eliminado" }); } }
-                      );
-                    }
-                  }}
-                  isLoading={adminAction.isPending}
-                />
-              </>
-            ) : (
-              <RolesContent />
-            )}
+                  <DeleteUserDialog
+                    open={deleteOpen}
+                    onOpenChange={setDeleteOpen}
+                    userName={selectedUser?.full_name || "Sin nombre"}
+                    onConfirm={() => {
+                      if (selectedUser) {
+                        adminAction.mutate(
+                          { action: "delete_user", user_id: selectedUser.id },
+                          { onSuccess: () => { setDeleteOpen(false); toast({ title: "Usuario eliminado" }); } }
+                        );
+                      }
+                    }}
+                    isLoading={adminAction.isPending}
+                  />
+                </>
+              ) : (
+                <RolesContent />
+              )}
+            </div>
           </main>
         </div>
       </div>
