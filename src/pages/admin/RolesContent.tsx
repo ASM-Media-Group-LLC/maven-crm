@@ -8,12 +8,20 @@ import EditRoleModal from "./EditRoleModal";
 import DeleteRoleDialog from "./DeleteRoleDialog";
 import SetPermissionsModal from "./SetPermissionsModal";
 
-const RolesContent = () => {
+interface RolesContentProps {
+  search?: string;
+}
+
+const RolesContent = ({ search = "" }: RolesContentProps) => {
   const { roles, isLoading, createRole, updateRole, deleteRole, toggleActive, isCreating, isUpdating, isDeleting } = useRoles();
   const [createOpen, setCreateOpen] = useState(false);
   const [editRole, setEditRole] = useState<RoleConfig | null>(null);
   const [deleteRoleState, setDeleteRoleState] = useState<RoleConfig | null>(null);
   const [permRole, setPermRole] = useState<RoleConfig | null>(null);
+
+  const filteredRoles = search.trim()
+    ? roles.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
+    : roles;
 
   if (isLoading) {
     return (
@@ -25,14 +33,8 @@ const RolesContent = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button onClick={() => setCreateOpen(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" /> Crear Rol
-        </Button>
-      </div>
-
       <RolesTable
-        roles={roles}
+        roles={filteredRoles}
         onEdit={setEditRole}
         onDelete={setDeleteRoleState}
         onSetPermissions={setPermRole}

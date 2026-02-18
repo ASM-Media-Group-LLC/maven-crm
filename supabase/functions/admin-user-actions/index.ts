@@ -57,11 +57,58 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action, user_id, full_name } = await req.json();
+    const body = await req.json();
+    const { action, user_id, full_name, email, first_name, last_name, role } = body;
 
-    if (!user_id || !action) {
+    // create_user doesn't need user_id
+    if (action !== "create_user" && (!user_id || !action)) {
       return new Response(JSON.stringify({ error: "user_id and action are required" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!action) {
+      return new Response(JSON.stringify({ error: "action is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === CREATE USER ===
+    if (action === "create_user") {
+      if (!email || !first_name || !last_name) {
+        return new Response(JSON.stringify({ error: "email, first_name, and last_name are required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const fullName = `${first_name} ${last_name}`;
+
+      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      });
+
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // The handle_new_user trigger creates profile + employee role automatically.
+      // If a different role is specified, update it.
+      if (role && role !== "employee" && newUser?.user?.id) {
+        await adminClient
+          .from("user_roles")
+          .update({ role })
+          .eq("user_id", newUser.user.id);
+      }
+
+      return new Response(JSON.stringify({ success: true, user_id: newUser?.user?.id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
