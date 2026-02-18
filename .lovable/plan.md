@@ -1,119 +1,51 @@
 
 
-## Reestructurar Gestion de Usuarios con Tabs: Usuarios y Roles
+## Reorganizar layout de Gestion de Usuarios
 
-### Resumen
+### Problema actual
 
-Se dividira la pagina `/admin/usuarios` en dos pestanas: **Usuarios** (gestion individual) y **Roles** (configuracion de roles y permisos). La pestana de Usuarios se enriquecera con acciones adicionales (editar, cambiar contrasena, eliminar, asignar rol). La pestana de Roles mostrara una tabla de roles con descripcion, usuarios asignados, estado y configuracion de permisos granulares por modulo/submodulo.
+En `AdminUsuarios.tsx`, la estructura es: Header > Tab bar > KPIs > Buscador > Contenido. El usuario solicita que las KPI cards esten **antes** del tab bar, y que se siga el patron estandarizado de la plataforma (visible en `ContactosContent.tsx`):
 
----
+1. Header fijo con titulo + boton principal
+2. KPI cards de resumen
+3. Tab bar (Usuarios / Roles)
+4. Buscador + filtros con toggle de vista a la derecha
+5. Contenido (tabla o grid)
 
-### Base de datos
+### Cambios en un solo archivo
 
-Se creara una nueva tabla `roles_config` para almacenar roles personalizados y una tabla `role_permissions` para los permisos granulares:
+**`src/pages/admin/AdminUsuarios.tsx`**
 
-**Tabla `roles_config`:**
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | uuid (PK) | Identificador |
-| name | text (NOT NULL, UNIQUE) | Nombre del rol (Admin, Manager, etc.) |
-| description | text | Descripcion del rol |
-| is_active | boolean (default true) | Si el rol esta activo |
-| is_system | boolean (default false) | Si es un rol del sistema (no se puede eliminar) |
-| created_at | timestamptz | Fecha de creacion |
-| updated_at | timestamptz | Fecha de actualizacion |
+Se reestructurara el layout adoptando el patron `h-screen overflow-hidden` con header fijo y scroll en el contenido:
 
-**Tabla `role_permissions`:**
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | uuid (PK) | Identificador |
-| role_id | uuid (FK -> roles_config) | Rol asociado |
-| module | text (NOT NULL) | Modulo (Dashboard, Creadores, etc.) |
-| submodule | text | Submodulo o funcion especifica |
-| can_access | boolean (default true) | Si tiene acceso al modulo |
-| data_scope | text (default 'all') | Alcance de datos: all, subordinates, self |
-| created_at | timestamptz | Fecha de creacion |
+```
+<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+  <!-- HEADER FIJO (shrink-0, border-b) -->
+  <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
+    - Titulo "Gestion de Usuarios" + subtitulo
+    - Boton principal a la derecha (cambia segun tab activo)
+  </header>
 
-Se insertaran los 3 roles del sistema como datos iniciales (admin, manager, employee) con `is_system = true`.
+  <!-- AREA SCROLLABLE -->
+  <div className="flex-1 overflow-auto p-6 space-y-6">
+    - KPI cards (Total, Admins, Managers, Employees) -- ANTES del tab bar
+    - Tab bar (Usuarios | Roles)
+    - Si tab "usuarios":
+        - Buscador + toggle vista (lista/grid) alineado a la derecha
+        - Tabla o Grid de usuarios
+    - Si tab "roles":
+        - RolesContent
+  </div>
+</main>
+```
 
-RLS: politicas que permitan lectura a usuarios autenticados y escritura solo a admins (via `has_role`).
+### Detalle de los cambios
 
----
+1. Envolver en el patron de layout estandar con `header` fijo (`shrink-0`, `border-b`) y area scrollable (`flex-1 overflow-auto`)
+2. Mover las KPI cards fuera del bloque condicional del tab, colocandolas justo despues del header scrollable, antes del tab bar
+3. El tab bar queda debajo de las KPIs
+4. El buscador + toggle de vista se mantiene solo dentro del tab "usuarios", justo debajo del tab bar
+5. Eliminar el `<main className="flex-1 p-6 space-y-6">` actual y reemplazar con la estructura fija + scroll
 
-### Cambios en el frontend
-
-#### 1. AdminUsuarios.tsx - Agregar tab bar
-
-Se agregara una barra de pestanas con el patron estandar del proyecto debajo del titulo:
-- **Usuarios** (pestana por defecto) - vista actual mejorada
-- **Roles** (nueva pestana) - gestion de roles y permisos
-
-#### 2. Pestana de Usuarios - Acciones mejoradas
-
-Se actualizara `UsersTable.tsx` para incluir las siguientes acciones por usuario (iconos como en la imagen de referencia):
-- **Editar** (icono lapiz): Abrir modal para editar nombre del usuario
-- **Asignar rol** (icono engranaje/llave): Abrir el ChangeRoleModal existente
-- **Cambiar contrasena** (icono llave): Enviar email de reset de contrasena via Supabase admin API (edge function)
-- **Eliminar** (icono basura): Dialogo de confirmacion para eliminar usuario
-
-Se actualizara tambien `UsersGrid.tsx` con las mismas acciones.
-
-Se creara una edge function `admin-user-actions` para operaciones privilegiadas:
-- `reset_password`: Envia email de reset via `auth.admin.generateLink`
-- `delete_user`: Elimina usuario via `auth.admin.deleteUser`
-
-#### 3. Pestana de Roles - Nuevos componentes
-
-Se crearan dentro de `src/pages/admin/`:
-
-- **RolesContent.tsx** - Contenido principal con tabla de roles y boton "Crear rol"
-- **RolesTable.tsx** - Tabla con columnas: Rol, Descripcion, Usuarios (muestra nombres con "+N"), Status (switch), Acciones (Set permissions, Editar, Eliminar)
-- **CreateRoleModal.tsx** - Modal para crear nuevo rol con campos: nombre (max 50 chars), descripcion (max 300 chars)
-- **EditRoleModal.tsx** - Modal para editar nombre y descripcion del rol
-- **DeleteRoleDialog.tsx** - Confirmacion para eliminar rol (solo si no es de sistema)
-- **SetPermissionsModal.tsx** - Modal completo para configurar permisos granulares
-
-#### 4. SetPermissionsModal - Configuracion de permisos
-
-El modal mostrara todos los modulos y submodulos de la plataforma organizados en secciones expandibles:
-
-| Modulo | Submodulos |
-|--------|------------|
-| Dashboard | (sin submodulos) |
-| Creator Sales | Dashboard, Sales Report, Sales Report V1, AI Sales, AI Config |
-| Contactos | Contactos, Agencias |
-| Creadores | Lista, Perfil, Nuevo |
-| Eventos | Lista, Detalle, Nuevo, Editar |
-| Promolog | (sin submodulos) |
-| LeadGen | (sin submodulos) |
-| Closers | (sin submodulos) |
-| Tickets | (sin submodulos) |
-| Tareas | Proyectos, Tareas |
-| Administracion | Usuarios, Roles |
-
-Para cada modulo se podra configurar:
-- **Menu access** (checkbox): Si el modulo aparece en el sidebar
-- **Function permissions** (conteo de funciones habilitadas, expandible)
-- **Data permissions** (radio): All data / Self and subordinates / Data about self
-
-Habra checkboxes "All" globales para menus y funciones.
-
-#### 5. Hook useRoles.ts
-
-Nuevo hook para gestionar roles:
-- Query para obtener roles con conteo de usuarios
-- Mutaciones para crear, editar, eliminar roles
-- Query para permisos por rol
-- Mutacion para guardar permisos
-
----
-
-### Seccion tecnica
-
-- La tab bar usa estado local `activeTab: "usuarios" | "roles"` en `AdminUsuarios.tsx`
-- Los roles del sistema (admin, manager, employee) no pueden eliminarse (`is_system = true`)
-- La edge function `admin-user-actions` utiliza `SUPABASE_SERVICE_ROLE_KEY` para operaciones admin
-- Los permisos se guardan como filas en `role_permissions`, una por modulo/submodulo por rol
-- El `SetPermissionsModal` carga los permisos existentes al abrirse y los guarda en batch con upsert
-- La configuracion de modulos/submodulos se define como constante en el frontend (no en DB) para mantener sincronizacion con el sidebar
+No se crean ni eliminan archivos. Solo se modifica `AdminUsuarios.tsx`.
 
