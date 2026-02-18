@@ -1,16 +1,54 @@
 
 
-## Mejoras al Modal de Nueva Campana Mensual
+## Mejoras en Promolog: Selector de Mes, Filtros en Agentes y Campanas
 
-### Cambios propuestos
+### 1. Selector de Mes/Ano en Nueva Campana
 
-**1. Selector de Creador/a con buscador interno**
+**Problema:** El calendario actual permite seleccionar un dia individual, pero la campana es mensual y solo necesita mes y ano.
 
-Reemplazar el `Select` actual por un Combobox basado en `Popover` + `Command` (cmdk, ya instalado). El usuario podra escribir para filtrar creadoras por nombre, y seleccionar con un clic. Se mostrara un input con icono de busqueda dentro del dropdown.
+**Solucion:** Reemplazar el `Calendar` por un selector manual con dos `Select` (uno para mes, otro para ano). Al seleccionar ambos, se construye la fecha internamente. El trigger sigue siendo un `Button` con `CalendarIcon` mostrando "Febrero 2026".
 
-**2. Selector de Mes/Ano con estilo del sistema de diseno**
+**Implementacion:**
+- Dentro del `PopoverContent` del mes/ano (lineas 1088-1097), reemplazar `Calendar` por dos selects en fila:
+  - Select de mes: Enero a Diciembre
+  - Select de ano: rango dinamico (ano actual - 1 hasta ano actual + 2)
+- Al seleccionar ambos, se construye `new Date(year, monthIndex, 1)` y se cierra el popover
 
-Reemplazar el `<Input type="month">` nativo por un `Popover` con `Calendar` en modo single, configurado para seleccionar solo mes y ano. Se usara un boton estilizado como trigger (mismo patron que el DateRangePicker existente) mostrando el mes/ano seleccionado con formato legible (ej. "Febrero 2026").
+---
+
+### 2. Agentes: Mover toggle de vista y agregar filtros
+
+**Problema:** El toggle List/Grid esta dentro del banner gradient (lineas 598-605), lo cual es inconsistente con el patron de Promos donde esta en la fila de filtros.
+
+**Solucion:** Eliminar el toggle del banner y agregar una fila de filtros debajo del banner con:
+- Buscador (`max-w-xs`, busca por nombre de agente)
+- DateRangePicker (reutiliza `dateFrom`/`dateTo` globales)
+- Boton "Limpiar filtros" condicional
+- Toggle List/Grid alineado a la derecha (`ml-auto`)
+
+**Cambios en lineas 586-681:**
+- Eliminar el bloque de botones List/Grid del banner (lineas 597-605)
+- Agregar estado `searchAgent` para el buscador
+- Insertar fila de filtros despues del banner con el mismo patron visual que Promos (linea 517)
+- Filtrar `agentsData` por nombre segun `searchAgent`
+
+---
+
+### 3. Campanas: Agregar filtros completos
+
+**Problema:** La pestana Campanas solo tiene un titulo y el toggle de vista, sin buscador ni filtros.
+
+**Solucion:** Reemplazar la estructura actual (lineas 685-706) por una fila de filtros unificada con:
+- Buscador (`max-w-xs`, busca por nombre de creadora de la campana)
+- Select de estado (Activa, Finalizada, Pendiente)
+- DateRangePicker
+- Boton "Limpiar filtros" condicional
+- Toggle List/Grid alineado a la derecha (`ml-auto`)
+- Eliminar el encabezado h2 redundante (ya esta en las tabs)
+
+**Cambios en lineas 684-706:**
+- Agregar estados `searchCampaign` y `campaignStatusFilter`
+- Reemplazar el layout actual por la fila de filtros estandar
 
 ---
 
@@ -18,62 +56,63 @@ Reemplazar el `<Input type="month">` nativo por un `Popover` con `Calendar` en m
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Imports nuevos:**
-- `Popover, PopoverContent, PopoverTrigger` desde `@/components/ui/popover`
-- `Command, CommandInput, CommandList, CommandEmpty, CommandItem` desde `@/components/ui/command`
-- `CalendarIcon, ChevronsUpDown` desde `lucide-react`
-- `format` desde `date-fns`
-- `Calendar` desde `@/components/ui/calendar`
-
-**Cambios en estado:**
-- `campaignMonth` pasa de `string` a `Date | undefined` para integrarse con Calendar
-- Agregar `campaignCreatorOpen: boolean` para controlar el Popover del Combobox
-- Agregar `campaignMonthOpen: boolean` para controlar el Popover del calendario
-- Agregar `campaignCreatorSearch: string` para el filtro de busqueda interno
-
-**Selector de Creador/a (lineas 1044-1051):**
-Reemplazar el `<Select>` por:
-```
-<Popover open={campaignCreatorOpen} onOpenChange={setCampaignCreatorOpen}>
-  <PopoverTrigger asChild>
-    <Button variant="outline" role="combobox" className="w-full justify-between">
-      {nombre seleccionado || "Seleccionar creador/a"}
-      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-    </Button>
-  </PopoverTrigger>
-  <PopoverContent className="w-full p-0">
-    <Command>
-      <CommandInput placeholder="Buscar creador/a..." />
-      <CommandList>
-        <CommandEmpty>No se encontro.</CommandEmpty>
-        {creators.map(c => (
-          <CommandItem onSelect={() => { setCampaignCreator(c.id); setCampaignCreatorOpen(false); }}>
-            <Check className={cn("mr-2 h-4 w-4", campaignCreator === c.id ? "opacity-100" : "opacity-0")} />
-            {c.artistic_name || c.name}
-          </CommandItem>
-        ))}
-      </CommandList>
-    </Command>
-  </PopoverContent>
-</Popover>
+**Nuevos estados:**
+```text
+const [searchAgent, setSearchAgent] = useState("");
+const [searchCampaign, setSearchCampaign] = useState("");
+const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
 ```
 
-**Selector de Mes/Ano (lineas 1053-1056):**
-Reemplazar el `<Input type="month">` por un Popover con Calendar en modo single, configurado con `captionLayout="dropdown-buttons"` y navegacion por mes:
-```
-<Popover open={campaignMonthOpen} onOpenChange={setCampaignMonthOpen}>
-  <PopoverTrigger asChild>
-    <Button variant="outline" className="w-full justify-start text-left font-normal">
-      <CalendarIcon className="mr-2 h-4 w-4" />
-      {campaignMonth ? format(campaignMonth, "MMMM yyyy") : "Seleccionar mes"}
-    </Button>
-  </PopoverTrigger>
-  <PopoverContent className="w-auto p-0">
-    <Calendar mode="single" selected={campaignMonth}
-      onSelect={(d) => { setCampaignMonth(d); setCampaignMonthOpen(false); }}
-      className="p-3 pointer-events-auto" />
-  </PopoverContent>
-</Popover>
+**Selector de Mes/Ano (reemplaza Calendar en lineas 1088-1097):**
+```text
+<PopoverContent className="w-auto p-4" align="start">
+  <div className="flex items-center gap-2">
+    <Select value={mes} onValueChange={setMes}>
+      <SelectTrigger className="w-[130px]">
+        <SelectValue placeholder="Mes" />
+      </SelectTrigger>
+      <SelectContent>
+        {meses.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}
+      </SelectContent>
+    </Select>
+    <Select value={ano} onValueChange={setAno}>
+      <SelectTrigger className="w-[100px]">
+        <SelectValue placeholder="Ano" />
+      </SelectTrigger>
+      <SelectContent>
+        {anos.map(a => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  </div>
+</PopoverContent>
 ```
 
-**Ajuste en `handleCreateCampaign`:** Actualizar el reset para usar `undefined` en vez de `""` para `campaignMonth`.
+**Fila de filtros para Agentes (despues del banner, linea 616):**
+```text
+<div className="flex items-center gap-3 flex-wrap">
+  <div className="relative flex-1 max-w-xs">
+    <Search .../> <Input placeholder="Buscar agente..." />
+  </div>
+  <DateRangePicker from={dateFrom} to={dateTo} onApply={...} />
+  {hasFilters && <Button>Limpiar filtros</Button>}
+  <div className="ml-auto flex gap-1">
+    <Button List/> <Button Grid/>
+  </div>
+</div>
+```
+
+**Fila de filtros para Campanas (reemplaza lineas 687-699):**
+```text
+<div className="flex items-center gap-3 flex-wrap">
+  <div className="relative flex-1 max-w-xs">
+    <Search .../> <Input placeholder="Buscar campana..." />
+  </div>
+  <Select estado />
+  <DateRangePicker />
+  {hasFilters && <Button>Limpiar filtros</Button>}
+  <div className="ml-auto flex gap-1">
+    <Button List/> <Button Grid/>
+  </div>
+</div>
+```
+
