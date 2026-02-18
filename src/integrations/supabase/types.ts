@@ -59,6 +59,30 @@ export type Database = {
         }
         Relationships: []
       }
+      agenda_share_tokens: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          token?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string | null
@@ -883,6 +907,7 @@ export type Database = {
           max_capacity: number | null
           name: string
           notes: string | null
+          project_type: string | null
           start_time: string | null
           status: string
           updated_at: string
@@ -903,6 +928,7 @@ export type Database = {
           max_capacity?: number | null
           name: string
           notes?: string | null
+          project_type?: string | null
           start_time?: string | null
           status?: string
           updated_at?: string
@@ -923,6 +949,7 @@ export type Database = {
           max_capacity?: number | null
           name?: string
           notes?: string | null
+          project_type?: string | null
           start_time?: string | null
           status?: string
           updated_at?: string
@@ -1737,6 +1764,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_agenda_by_share_token: {
+        Args: { p_token: string }
+        Returns: {
+          date: string
+          description: string
+          end_time: string
+          event_type: string
+          guests: Json
+          id: string
+          location: string
+          name: string
+          project_type: string
+          start_time: string
+          status: string
+        }[]
+      }
       get_project_by_share_token: {
         Args: { _token: string }
         Returns: {

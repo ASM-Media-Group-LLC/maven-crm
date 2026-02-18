@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import EventosCalendar from "./EventosCalendar";
 import EventosFilters from "./EventosFilters";
 import EventosTable from "./EventosTable";
 import EventosGrid from "./EventosGrid";
-import { useEventos, statusLabel, emptyFilters, type EventoFilters } from "./useEventos";
+import { useEventos, statusLabel, emptyFilters, PROJECT_TYPES, type EventoFilters } from "./useEventos";
+import { supabase } from "@/integrations/supabase/client";
 
 const statusTabs = [
   { value: "", label: "Todos" },
@@ -18,12 +22,65 @@ const statusTabs = [
   { value: "rescheduled", label: "Reagendados" },
 ];
 
+const projectTabs = [
+  { value: "", label: "Todos" },
+  ...PROJECT_TYPES.map((p) => ({ value: p, label: p })),
+];
+
 const EventosContent = () => {
   const [filters, setFilters] = useState<EventoFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const { events, allEvents, isLoading } = useEventos(filters);
+
+  // Agenda share
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [shareLoading, setShareLoading] = useState(false);
+
+  const handleShareAgenda = async () => {
+    setShareLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      // Check existing token
+      const { data: existing } = await supabase
+        .from("agenda_share_tokens" as any)
+        .select("token")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      let token: string;
+      if (existing && existing.length > 0) {
+        token = (existing[0] as any).token;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("agenda_share_tokens" as any)
+          .insert({ created_by: user.id } as any)
+          .select("token")
+          .single();
+        if (error) throw error;
+        token = (inserted as any).token;
+      }
+
+      const link = `${window.location.origin}/shared/agenda/${token}`;
+      setShareLink(link);
+      setShareOpen(true);
+    } catch (err: any) {
+      toast({ title: "Error generando enlace", description: err.message, variant: "destructive" });
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    toast({ title: "Enlace copiado al portapapeles" });
+  };
 
   const updateFilters = (patch: Partial<EventoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -38,10 +95,16 @@ const EventosContent = () => {
               Gestiona tus eventos y sesiones de contenido
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Crear Evento
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleShareAgenda} disabled={shareLoading}>
+              <Share2 className="mr-2 h-4 w-4" />
+              Compartir Agenda
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Evento
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -55,6 +118,20 @@ const EventosContent = () => {
       ) : (
         <div className="flex-1 overflow-auto p-6 space-y-6">
           <EventosCalendar events={allEvents} />
+
+          {/* Project type tabs */}
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {projectTabs.map((tab) => (
+              <Button
+                key={tab.value}
+                variant={filters.projectType === tab.value ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => updateFilters({ projectType: tab.value })}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
 
           {/* Status tabs */}
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
@@ -88,6 +165,22 @@ const EventosContent = () => {
           )}
         </div>
       )}
+
+      {/* Share Agenda Modal */}
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Compartir Agenda</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Comparte este enlace para dar acceso de solo lectura a la agenda de eventos próximos.
+          </p>
+          <div className="flex gap-2">
+            <Input value={shareLink} readOnly className="flex-1" />
+            <Button onClick={copyShareLink}>Copiar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

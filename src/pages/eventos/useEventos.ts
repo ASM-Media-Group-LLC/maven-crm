@@ -5,6 +5,7 @@ export interface EventRow {
   id: string;
   name: string;
   event_type: string;
+  project_type: string | null;
   description: string | null;
   date: string;
   end_date: string | null;
@@ -28,6 +29,7 @@ export interface EventoFilters {
   timeOfDay: string;
   dateFrom: string;
   dateTo: string;
+  projectType: string;
 }
 
 export const emptyFilters: EventoFilters = {
@@ -37,6 +39,7 @@ export const emptyFilters: EventoFilters = {
   timeOfDay: "",
   dateFrom: "",
   dateTo: "",
+  projectType: "",
 };
 
 const EVENT_STATUSES = ["upcoming", "in_progress", "completed", "cancelled", "rescheduled"] as const;
@@ -56,6 +59,16 @@ export const statusVariant: Record<string, "primary-soft" | "warning-soft" | "su
   completed: "success-soft",
   cancelled: "destructive-soft",
   rescheduled: "secondary-soft",
+};
+
+export const PROJECT_TYPES = ["Ora", "Kash", "Trafix", "Unlok"] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
+export const projectTypeColor: Record<string, { bg: string; text: string }> = {
+  Ora: { bg: "bg-blue-500/15", text: "text-blue-600" },
+  Kash: { bg: "bg-purple-500/15", text: "text-purple-600" },
+  Trafix: { bg: "bg-amber-500/15", text: "text-amber-600" },
+  Unlok: { bg: "bg-emerald-500/15", text: "text-emerald-600" },
 };
 
 export const eventTypeIcon: Record<string, string> = {
@@ -87,6 +100,9 @@ function getHour(time: string | null): number | null {
 function applyFilters(events: EventRow[], filters: EventoFilters): EventRow[] {
   let result = events;
 
+  if (filters.projectType) {
+    result = result.filter((e) => e.project_type === filters.projectType);
+  }
   if (filters.status) {
     result = result.filter((e) => e.status === filters.status);
   }

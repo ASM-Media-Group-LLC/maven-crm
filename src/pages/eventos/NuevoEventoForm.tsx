@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useAddEvento, useUpdateEvento, useEventLocations, useAddEventGuests, type EventRow } from "./useEventos";
+import { useAddEvento, useUpdateEvento, useEventLocations, useAddEventGuests, PROJECT_TYPES, type EventRow } from "./useEventos";
 import AddGuestsModal, { type LocalGuest } from "./AddGuestsModal";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +58,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const isEditMode = !!event;
 
   const [name, setName] = useState(event?.name ?? "");
+  const [projectType, setProjectType] = useState(event?.project_type ?? "");
   const [eventType, setEventType] = useState(event?.event_type ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [multiDay, setMultiDay] = useState(!!event?.end_date);
@@ -89,14 +90,15 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !eventType || !date) {
-      toast({ title: "Completa los campos obligatorios", variant: "destructive" });
+    if (!name.trim() || !eventType || !date || !projectType) {
+      toast({ title: "Completa los campos obligatorios (nombre, tipo, proyecto, fecha)", variant: "destructive" });
       return;
     }
 
     const formData = {
       name: name.trim(),
       event_type: eventType,
+      project_type: projectType,
       description: description || null,
       date,
       end_date: multiDay && endDate ? endDate : null,
@@ -194,6 +196,18 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
                               {t.label}
                             </span>
                           </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Proyecto *</Label>
+                    <Select value={projectType} onValueChange={setProjectType}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
+                      <SelectContent>
+                        {PROJECT_TYPES.map((p) => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
