@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, CalendarDays, Eye, ChevronsUpDown, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
@@ -48,6 +49,7 @@ const hourlyData = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 const LeadGenContent = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [addLeadOpen, setAddLeadOpen] = useState(false);
@@ -122,7 +124,7 @@ const LeadGenContent = () => {
               );
             })}
           </div>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => navigate("/leadgen/base-datos")}>
             <Database className="h-4 w-4" />
             Base de Datos
           </Button>
