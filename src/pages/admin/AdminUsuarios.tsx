@@ -9,15 +9,26 @@ import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
 import UsersGrid from "./UsersGrid";
 import ChangeRoleModal from "./ChangeRoleModal";
+import EditUserModal from "./EditUserModal";
+import DeleteUserDialog from "./DeleteUserDialog";
+import RolesContent from "./RolesContent";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const AdminUsuarios = () => {
   const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "grid">("list");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return users;
@@ -34,11 +45,39 @@ const AdminUsuarios = () => {
     changeRole({ userId, role }, { onSuccess: () => setModalOpen(false) });
   };
 
+  const adminAction = useMutation({
+    mutationFn: async (body: Record<string, string>) => {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (user: AdminUser) => { setSelectedUser(user); setEditOpen(true); };
+  const handleDelete = (user: AdminUser) => { setSelectedUser(user); setDeleteOpen(true); };
+  const handleResetPassword = (user: AdminUser) => {
+    adminAction.mutate({ action: "reset_password", user_id: user.id }, {
+      onSuccess: () => toast({ title: "Email de recuperación enviado" }),
+    });
+  };
+
   const kpis = [
     { label: "Total", value: stats.total, icon: Users, color: "text-primary" },
     { label: "Admins", value: stats.admins, icon: Shield, color: "text-red-500" },
     { label: "Managers", value: stats.managers, icon: UserCog, color: "text-amber-500" },
     { label: "Employees", value: stats.employees, icon: User, color: "text-blue-500" },
+  ];
+
+  const tabs = [
+    { key: "usuarios" as const, label: "Usuarios" },
+    { key: "roles" as const, label: "Roles" },
   ];
 
   return (
@@ -54,60 +93,122 @@ const AdminUsuarios = () => {
               <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
             </div>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {kpis.map((kpi) => (
-                <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
-                    <kpi.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{kpi.value}</p>
-                    <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                  </div>
-                </div>
+            {/* Tab bar */}
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.key}
+                  variant={activeTab === tab.key ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {tab.label}
+                </Button>
               ))}
             </div>
 
-            {/* Search + View Toggle */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-              </div>
-              <div className="flex gap-1 border rounded-md p-0.5">
-                <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            {activeTab === "usuarios" ? (
+              <>
+                {/* KPIs */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {kpis.map((kpi) => (
+                    <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
+                        <kpi.icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{kpi.value}</p>
+                        <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-            {/* Content */}
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Users className="h-12 w-12 mb-3 opacity-40" />
-                <p>No se encontraron usuarios</p>
-              </div>
-            ) : view === "list" ? (
-              <UsersTable users={filtered} onEditRole={handleEditRole} />
+                {/* Search + View Toggle */}
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <div className="flex gap-1 border rounded-md p-0.5">
+                    <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                {isLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Users className="h-12 w-12 mb-3 opacity-40" />
+                    <p>No se encontraron usuarios</p>
+                  </div>
+                ) : view === "list" ? (
+                  <UsersTable
+                    users={filtered}
+                    onEditRole={handleEditRole}
+                    onEdit={handleEdit}
+                    onResetPassword={handleResetPassword}
+                    onDelete={handleDelete}
+                  />
+                ) : (
+                  <UsersGrid
+                    users={filtered}
+                    onEditRole={handleEditRole}
+                    onEdit={handleEdit}
+                    onResetPassword={handleResetPassword}
+                    onDelete={handleDelete}
+                  />
+                )}
+
+                <ChangeRoleModal
+                  user={selectedUser}
+                  open={modalOpen}
+                  onOpenChange={setModalOpen}
+                  onConfirm={handleConfirmRole}
+                  isLoading={isChangingRole}
+                />
+
+                <EditUserModal
+                  open={editOpen}
+                  onOpenChange={setEditOpen}
+                  userName={selectedUser?.full_name || ""}
+                  onConfirm={(name) => {
+                    if (selectedUser) {
+                      adminAction.mutate(
+                        { action: "update_profile", user_id: selectedUser.id, full_name: name },
+                        { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
+                      );
+                    }
+                  }}
+                  isLoading={adminAction.isPending}
+                />
+
+                <DeleteUserDialog
+                  open={deleteOpen}
+                  onOpenChange={setDeleteOpen}
+                  userName={selectedUser?.full_name || "Sin nombre"}
+                  onConfirm={() => {
+                    if (selectedUser) {
+                      adminAction.mutate(
+                        { action: "delete_user", user_id: selectedUser.id },
+                        { onSuccess: () => { setDeleteOpen(false); toast({ title: "Usuario eliminado" }); } }
+                      );
+                    }
+                  }}
+                  isLoading={adminAction.isPending}
+                />
+              </>
             ) : (
-              <UsersGrid users={filtered} onEditRole={handleEditRole} />
+              <RolesContent />
             )}
-
-            <ChangeRoleModal
-              user={selectedUser}
-              open={modalOpen}
-              onOpenChange={setModalOpen}
-              onConfirm={handleConfirmRole}
-              isLoading={isChangingRole}
-            />
           </main>
         </div>
       </div>

@@ -2,7 +2,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Shield, UserCog, User } from "lucide-react";
+import { Pencil, Trash2, KeyRound, UserCog, Shield, User } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,15 +18,41 @@ const roleConfig: Record<string, { icon: React.ReactNode; variant: "default" | "
 interface UsersGridProps {
   users: AdminUser[];
   onEditRole: (user: AdminUser) => void;
+  onEdit: (user: AdminUser) => void;
+  onResetPassword: (user: AdminUser) => void;
+  onDelete: (user: AdminUser) => void;
 }
 
-const UsersGrid = ({ users, onEditRole }: UsersGridProps) => (
+const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete }: UsersGridProps) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     {users.map((user) => {
       const config = roleConfig[user.role ?? ""] ?? { icon: null, variant: "outline" as const };
       return (
-        <Card key={user.id} className="group hover:shadow-md transition-shadow">
+        <Card key={user.id} className="group hover:shadow-md transition-shadow relative">
           <CardContent className="p-5">
+            <div className="absolute top-3 right-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(user)}>
+                    <Pencil className="h-4 w-4 mr-2" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEditRole(user)}>
+                    <UserCog className="h-4 w-4 mr-2" /> Asignar rol
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onResetPassword(user)}>
+                    <KeyRound className="h-4 w-4 mr-2" /> Reset contraseña
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <div className="flex flex-col items-center text-center gap-3">
               <Avatar className="h-16 w-16">
                 <AvatarImage src={user.avatar_url ?? ""} />
@@ -40,9 +68,6 @@ const UsersGrid = ({ users, onEditRole }: UsersGridProps) => (
                 {config.icon}
                 {user.role ?? "Sin rol"}
               </Badge>
-              <Button variant="outline" size="sm" className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => onEditRole(user)}>
-                <Pencil className="h-3 w-3 mr-1" /> Cambiar rol
-              </Button>
             </div>
           </CardContent>
         </Card>
