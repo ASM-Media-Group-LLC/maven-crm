@@ -199,17 +199,24 @@ const SharedAgendaPage = () => {
       {/* ─── Project filter tabs ─── */}
       <div className="max-w-6xl mx-auto w-full px-4 md:px-6 pt-5">
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-          {PROJECT_TABS.map((tab) => (
-            <Button
-              key={tab}
-              variant={projectFilter === tab ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setProjectFilter(tab)}
-              className="text-xs"
-            >
-              {tab}
-            </Button>
-          ))}
+          {PROJECT_TABS.map((tab) => {
+            const isActive = projectFilter === tab;
+            const colors = PROJECT_COLORS[tab];
+            return (
+              <Button
+                key={tab}
+                variant={isActive ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setProjectFilter(tab)}
+                className={`text-xs gap-1.5 ${isActive && colors ? `${colors.bg} ${colors.text} hover:${colors.bg}` : ""}`}
+              >
+                {colors && (
+                  <span className={`h-2 w-2 rounded-full ${colors.dot}`} />
+                )}
+                {tab}
+              </Button>
+            );
+          })}
         </div>
       </div>
 
@@ -258,12 +265,19 @@ const SharedAgendaPage = () => {
                 const hasEvent = !!dayEvents;
                 const isSelected = selectedDate && isSameDay(day, selectedDate);
                 const today = isToday(day);
+                // Get unique project colors for this day's events
+                const dayProjectColors = dayEvents
+                  ? [...new Set(dayEvents.map((e) => e.project_type).filter(Boolean))]
+                      .map((p) => PROJECT_COLORS[p!]?.dot)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                  : [];
 
                 return (
                   <button
                     key={dateStr}
                     onClick={() => setSelectedDate(isSelected ? null : day)}
-                    className={`relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-colors ${
+                    className={`relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all duration-150 ${
                       isSelected
                         ? "bg-primary text-primary-foreground font-semibold"
                         : today
@@ -275,7 +289,11 @@ const SharedAgendaPage = () => {
                   >
                     {format(day, "d")}
                     {hasEvent && !isSelected && (
-                      <span className="absolute bottom-1 h-1 w-1 rounded-full bg-primary" />
+                      <span className="absolute bottom-1 flex gap-0.5">
+                        {dayProjectColors.map((dotColor, i) => (
+                          <span key={i} className={`h-1 w-1 rounded-full ${dotColor}`} />
+                        ))}
+                      </span>
                     )}
                   </button>
                 );
@@ -326,15 +344,17 @@ const SharedAgendaPage = () => {
 
 const UpcomingEventCard = ({ event, onSelect }: { event: AgendaEvent; onSelect: () => void }) => {
   const colors = PROJECT_COLORS[event.project_type ?? ""];
+  const borderColor = colors ? colors.dot.replace("bg-", "border-") : "border-border";
   return (
     <Card
-      className="shrink-0 w-64 cursor-pointer hover:shadow-md transition-shadow"
+      className={`shrink-0 w-64 cursor-pointer border-l-[3px] ${borderColor} transition-all duration-200 hover:scale-[1.02] hover:border-l-[3px]`}
       onClick={onSelect}
     >
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           {event.project_type && colors && (
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg} ${colors.text}`}>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${colors.bg} ${colors.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${colors.dot} mr-1.5`} />
               {event.project_type}
             </span>
           )}
@@ -389,13 +409,14 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
       </div>
 
       {/* Card */}
-      <Card className="flex-1 overflow-hidden">
+      <Card className={`flex-1 overflow-hidden border-t-[3px] ${colors ? colors.dot.replace("bg-", "border-") : "border-border"}`}>
         <CardContent className="p-4 space-y-3">
           {/* Badges row */}
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-[10px]">{event.event_type}</Badge>
             {event.project_type && colors && (
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${colors.bg} ${colors.text}`}>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${colors.bg} ${colors.text}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${colors.dot} mr-1.5`} />
                 {event.project_type}
               </span>
             )}

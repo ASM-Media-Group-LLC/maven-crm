@@ -120,37 +120,31 @@ const EventosContent = () => {
           <EventosCalendar events={allEvents} />
 
           {/* Project type tabs */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Proyecto:</span>
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {projectTabs.map((tab) => (
-                <Button
-                  key={tab.value}
-                  variant={filters.projectType === tab.value ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => updateFilters({ projectType: tab.value })}
-                >
-                  {tab.label}
-                </Button>
-              ))}
-            </div>
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {projectTabs.map((tab) => (
+              <Button
+                key={tab.value}
+                variant={filters.projectType === tab.value ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => updateFilters({ projectType: tab.value })}
+              >
+                {tab.label}
+              </Button>
+            ))}
           </div>
 
           {/* Status tabs */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Estado:</span>
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {statusTabs.map((tab) => (
-                <Button
-                  key={tab.value}
-                  variant={filters.status === tab.value ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => updateFilters({ status: tab.value })}
-                >
-                  {tab.label}
-                </Button>
-              ))}
-            </div>
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {statusTabs.map((tab) => (
+              <Button
+                key={tab.value}
+                variant={filters.status === tab.value ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => updateFilters({ status: tab.value })}
+              >
+                {tab.label}
+              </Button>
+            ))}
           </div>
 
           <EventosFilters
