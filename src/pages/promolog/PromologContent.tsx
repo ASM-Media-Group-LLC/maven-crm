@@ -198,6 +198,7 @@ const PromologContent = () => {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
+  const [selectedCardPlatform, setSelectedCardPlatform] = useState("");
   
   const [selectedCreatorFilter, setSelectedCreatorFilter] = useState("");
   const [creatorsModalOpen, setCreatorsModalOpen] = useState(false);
@@ -329,13 +330,14 @@ const PromologContent = () => {
         if (entry.result !== statusMap[selectedStatus]) return false;
       }
       if (selectedNetwork !== "" && entry.network !== selectedNetwork) return false;
+      if (selectedCardPlatform !== "" && !(entry.platform || "").toLowerCase().includes(selectedCardPlatform)) return false;
       if (searchEntry) {
         const q = searchEntry.toLowerCase();
         if (!entry.name.toLowerCase().includes(q) && !entry.ticketNumber.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [entries, selectedCreatorFilter, selectedStatus, selectedNetwork, searchEntry]);
+  }, [entries, selectedCreatorFilter, selectedStatus, selectedNetwork, selectedCardPlatform, searchEntry]);
 
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
@@ -424,33 +426,49 @@ const PromologContent = () => {
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Red Social</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {socialCards.map((s) => (
-                <Card key={s.name} className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
-                  <CardContent className="flex items-center gap-3 p-4">
-                    {s.icon}
-                    <div>
-                      <p className="text-xs text-muted-foreground">{s.name}</p>
-                      <p className="text-xl font-bold">{s.value}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {socialCards.map((s) => {
+                const netKey = s.name.toLowerCase();
+                const isActive = selectedNetwork === netKey;
+                return (
+                  <Card
+                    key={s.name}
+                    className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
+                    onClick={() => setSelectedNetwork(prev => prev === netKey ? "" : netKey)}
+                  >
+                    <CardContent className="flex items-center gap-3 p-4">
+                      {s.icon}
+                      <div>
+                        <p className="text-xs text-muted-foreground">{s.name}</p>
+                        <p className="text-xl font-bold">{s.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Plataforma</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {platformCards.map((p) => (
-                <Card key={p.name} className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]")}>
-                  <CardContent className="flex items-center gap-3 p-4">
-                    {p.icon}
-                    <div>
-                      <p className="text-xs text-muted-foreground">{p.name}</p>
-                      <p className="text-xl font-bold">{p.value}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {platformCards.map((p) => {
+                const platKey = p.name.toLowerCase();
+                const isActive = selectedCardPlatform === platKey;
+                return (
+                  <Card
+                    key={p.name}
+                    className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
+                    onClick={() => setSelectedCardPlatform(prev => prev === platKey ? "" : platKey)}
+                  >
+                    <CardContent className="flex items-center gap-3 p-4">
+                      {p.icon}
+                      <div>
+                        <p className="text-xs text-muted-foreground">{p.name}</p>
+                        <p className="text-xl font-bold">{p.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
           <p className="text-xs text-center text-muted-foreground">
