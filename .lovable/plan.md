@@ -1,14 +1,14 @@
 
 
-## Correcciones al Modal de Promolog
+## Correcciones al Modal de Promolog y Validacion de Filtros
 
-### Problemas identificados
+### Problemas encontrados
 
-1. **Scroll roto en modal de Registro (linea 993):** Sigue usando `ScrollArea` de Radix en lugar de un `div` nativo con `overflow-y-auto`. El modal de Edicion (linea 1158) ya fue corregido correctamente, pero el de Registro no.
+1. **Scroll no funciona**: El `DialogContent` base tiene `grid` y `gap-4` en su clase CSS (dialog.tsx linea 39). Aunque el modal pasa `flex flex-col p-0`, la clase `grid` del base tiene la misma especificidad y prevalece. Esto impide que `flex-1 min-h-0 overflow-y-auto` funcione en el area de scroll.
 
-2. **"Que se hizo para que promocione?" visible en "No" (lineas 1041-1053 del modal de Registro):** Este campo esta fuera del bloque condicional `entryResult === "si"`, por lo que aparece siempre. Debe moverse dentro del bloque condicional.
+2. **El boton "Guardar Promocion" no persiste datos**: El handler del boton (linea 1068) solo muestra un toast y cierra el modal, pero NO inserta el registro en la tabla `promolog_entries` de Supabase.
 
-3. **Falta Evidencia en modal de Edicion (lineas 1219-1227):** El modal de edicion solo tiene Notas pero no tiene el campo de Evidencia.
+3. **Filtros**: Los filtros de la pestana Promos (busqueda, estado, red social, fechas) estan correctamente implementados y conectados al memo `filteredEntries`. Los cards de Red Social y Plataforma tambien filtran via `selectedNetwork` y `selectedCardPlatform`. Todo funciona correctamente.
 
 ---
 
@@ -16,14 +16,71 @@
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**1. Fix scroll en modal de Registro (linea 993):**
-- Reemplazar `<ScrollArea className="flex-1 min-h-0 px-6">` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`
-- Reemplazar el cierre `</ScrollArea>` (linea 1075) por `</div>`
+**1. Fix scroll en ambos modales (lineas 954 y 1113):**
 
-**2. Mover "Que se hizo" dentro del bloque "si" (lineas 1038-1053):**
-- Mover las lineas 1040-1053 (campo de estrategia) dentro del bloque `{entryResult === "si" && ...}` antes del cierre `</>`, y eliminar el comentario "Always visible"
-- Dejar Notas y Evidencia fuera del bloque condicional (siempre visibles)
+Cambiar la clase del `DialogContent` para forzar flex con `!important`:
 
-**3. Agregar Evidencia al modal de Edicion (despues de linea 1225):**
-- Copiar el bloque de Evidencia (upload + preview) del modal de Registro al modal de Edicion, debajo de Notas
+Antes:
+```text
+className="max-w-lg max-h-[80vh] flex flex-col p-0"
+```
+
+Despues:
+```text
+className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden"
+```
+
+El `!flex` y `!flex-col` fuerzan el layout flex sobre el `grid` base. El `gap-0` anula el `gap-4` base. El `overflow-hidden` asegura que el contenedor no se desborde.
+
+**2. Guardar entrada en Supabase (linea 1068):**
+
+Reemplazar el handler inline del boton "Guardar Promocion" por una funcion `handleSaveEntry` que:
+- Valide campos obligatorios (red social, plataforma, tipo de contacto cuando `entryResult === "si"`)
+- Inserte en `promolog_entries` con los campos: `creator_id`, `date`, `promoted`, `network`, `platform`, `contact_type`, `notes`, `action_taken` (estrategia), `evidence_url`
+- Invalide la query `promolog-entries` para refrescar la tabla
+- Muestre toast de exito o error
+- Llame a `resetEntryModal()` y cierre el modal
+
+```text
+const handleSaveEntry = async () => {
+  if (!selectedCreatorForEntry) return;
+  
+  if (entryResult === "si") {
+    if (!entryNetwork || !entryPlatform || !entryContactType) {
+      toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
+      return;
+    }
+  }
+
+  const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
+
+  const { error } = await supabase.from("promolog_entries").insert({
+    creator_id: selectedCreatorForEntry.id,
+    date: new Date().toISOString(),
+    promoted: entryResult === "si" ? "true" : "false",
+    network: entryResult === "si" ? entryNetwork : "n/a",
+    platform: entryResult === "si" ? platformValue : null,
+    contact_type: entryResult === "si" ? entryContactType : null,
+    notes: entryNotes || null,
+    action_taken: entryResult === "si" ? entryStrategy || null : null,
+    evidence_url: entryEvidencePreview || null,
+  });
+
+  if (error) {
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+    return;
+  }
+
+  queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+  toast({ title: "Promocion registrada", description: "..." });
+  resetEntryModal();
+  setEntryModalOpen(false);
+};
+```
+
+Reemplazar el `onClick` del boton "Guardar Promocion" (linea 1068) por `onClick={handleSaveEntry}`.
+
+**3. Actualizar el boton del footer del modal de Edicion (linea 1236):**
+
+Similarmente, el boton "Guardar Cambios" del modal de edicion no persiste los cambios. Se creara un handler `handleUpdateEntry` que haga un `update` en `promolog_entries` usando `selectedEntry.id`.
 
