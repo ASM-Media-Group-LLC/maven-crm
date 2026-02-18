@@ -1,77 +1,77 @@
 
 
-## Pagina de Auditoria de Roles
+## Cambios en Gestion de Usuarios
 
-### Resumen
+### 1. Nuevo flujo de "Restablecer Contrasena" (modal de 2 pasos)
 
-Se creara una nueva pagina "Auditoria" dentro del grupo de Administracion en el sidebar, accesible en `/admin/auditoria`. Esta pagina mostrara un reporte en tiempo real del estado de roles y permisos del sistema, generado a partir de consultas a la base de datos (no del JSON estatico). El JSON proporcionado sirve como referencia de la estructura y secciones a mostrar.
+Actualmente, al hacer clic en "Reset contrasena" se envia un email directamente sin confirmacion. Se reemplazara por un modal con dos estados:
 
----
+**Paso 1 - Confirmacion:** Dialogo con icono de llave, titulo "Restablecer Contrasena", mensaje "Estas seguro de restablecer la contrasena de [Nombre]?", y dos botones: "Cancelar" y "Restablecer Contrasena" (boton primario naranja/amber).
 
-### Secciones de la pagina
+**Paso 2 - Resultado:** Al confirmar, el backend genera una contrasena temporal aleatoria, la establece como nueva contrasena del usuario, y la retorna. El modal muestra:
+- Titulo "Restablecer Contrasena" con icono de llave
+- Mensaje de exito: "La contrasena ha sido restablecida exitosamente."
+- Alerta verde: "Se envio un email al usuario con la contrasena temporal."
+- Campo de solo lectura con la contrasena temporal y boton de copiar al portapapeles
+- Texto de ayuda: "El usuario debera cambiar esta contrasena al iniciar sesion."
+- Boton "Cerrar"
 
-#### 1. KPIs de resumen (cards superiores)
-Basado en `summary` del JSON:
-- Total de usuarios
-- Usuarios con rol asignado
-- Usuarios sin rol (resaltado en rojo/warning)
-- Total de roles activos
-- Total de permisos configurados
+**Nuevo componente:** `src/pages/admin/ResetPasswordModal.tsx`
 
-#### 2. Health Checks (alertas)
-Basado en `health_checks` del JSON:
-- Cards de alerta con conteo por severidad (critical, high, medium, low)
-- Lista de hallazgos expandible con:
-  - Usuarios sin rol asignado (tipo warning)
-  - Permisos huerfanos - permisos en `role_permissions` cuyo `role_id` no apunta a un rol valido en `roles_config` (tipo error)
-- Cada hallazgo muestra categoria, mensaje, prioridad y usuarios/items afectados
+### 2. Actualizacion de la Edge Function
 
-#### 3. Tabla de usuarios con roles
-Basado en `users` del JSON:
-- Tabla con columnas: nombre, email, rol(es), rol custom (nombre del rol en roles_config)
-- Filtrable y con indicador visual para usuarios sin rol
+La edge function `admin-user-actions` se modificara para que la accion `reset_password`:
+- Genere una contrasena temporal aleatoria (8 caracteres, alfanumerica con simbolos)
+- Use `adminClient.auth.admin.updateUserById(user_id, { password: tempPassword })` para establecerla
+- Retorne `{ success: true, temp_password: "..." }` en la respuesta
 
-#### 4. Matriz de permisos por rol
-Basado en `role_matrix` del JSON:
-- Tabla donde las filas son los modulos (creators, tickets, promolog, etc.) y las columnas son los roles (admin, manager, supervisor, agent)
-- Cada celda muestra iconos de check/x para can_view, can_create, can_edit, can_delete
-- Esto se construira a partir de `role_permissions` + `roles_config`
+### 3. Boton principal: "Agregar Usuario" en lugar de "Agregar Empleado"
+
+En `AdminUsuarios.tsx` (linea 103) cambiar el texto de "Agregar Empleado" a "Agregar Usuario". Tambien en el titulo del modal `AddUserModal.tsx` (linea 57) cambiar "Agregar Empleado" a "Agregar Usuario".
+
+### 4. EditUserModal ampliado
+
+El modal de edicion actual solo permite cambiar el nombre completo. Se ampliara para incluir todos los campos del formulario de agregar usuario:
+- Nombre (first_name)
+- Apellido (last_name)
+- Rol (select con roles de roles_config)
+
+El email no sera editable (se mostrara como campo deshabilitado o no se incluira, ya que no esta disponible desde el cliente).
+
+La edge function `admin-user-actions` tambien se actualizara para que `update_profile` acepte `first_name`, `last_name` y `role` (actualizando tanto profiles como user_roles).
 
 ---
 
 ### Seccion tecnica
 
 **Archivos a crear:**
-- `src/pages/admin/AuditoriaRoles.tsx` - Pagina principal con layout sidebar + topbar
-- `src/pages/admin/auditoria/AuditoriaSummaryCards.tsx` - KPI cards del resumen
-- `src/pages/admin/auditoria/AuditoriaHealthChecks.tsx` - Seccion de alertas/hallazgos
-- `src/pages/admin/auditoria/AuditoriaUsersTable.tsx` - Tabla de usuarios con sus roles
-- `src/pages/admin/auditoria/AuditoriaRoleMatrix.tsx` - Matriz de permisos por rol
-- `src/pages/admin/auditoria/useAuditoriaData.ts` - Hook que consulta profiles, user_roles, roles_config y role_permissions para generar el reporte en tiempo real
+- `src/pages/admin/ResetPasswordModal.tsx` - Modal de 2 pasos (confirmacion + resultado con contrasena temporal y boton copiar)
 
 **Archivos a modificar:**
-- `src/components/dashboard/DashboardSidebar.tsx` - Agregar enlace "Auditoria" debajo de "Usuarios" en el grupo Administracion (con icono `ClipboardCheck` o `FileSearch`)
-- `src/App.tsx` - Agregar ruta `/admin/auditoria` protegida con `AdminRoute`
+- `supabase/functions/admin-user-actions/index.ts`
+  - Accion `reset_password`: generar contrasena temporal, aplicarla con `updateUserById`, retornar `temp_password`
+  - Accion `update_profile`: aceptar `first_name`, `last_name`, `role` ademas de `full_name`
+- `src/pages/admin/AdminUsuarios.tsx`
+  - Linea 103: "Agregar Empleado" a "Agregar Usuario"
+  - Reemplazar `handleResetPassword` para abrir el nuevo `ResetPasswordModal` en lugar de ejecutar directamente
+  - Integrar `ResetPasswordModal`
+- `src/pages/admin/AddUserModal.tsx`
+  - Linea 57: "Agregar Empleado" a "Agregar Usuario"
+- `src/pages/admin/EditUserModal.tsx`
+  - Ampliar interfaz para recibir el usuario completo (AdminUser)
+  - Agregar campos: nombre, apellido, rol (con Select de roles_config)
+  - Actualizar `onConfirm` para enviar todos los campos editables
 
-**Logica del hook `useAuditoriaData`:**
+**Logica de contrasena temporal en la Edge Function:**
 
 ```text
-1. Consultar profiles + user_roles (JOIN) para obtener usuarios con/sin roles
-2. Consultar roles_config para roles activos
-3. Consultar role_permissions + roles_config para construir la matriz
-4. Detectar health checks:
-   - Usuarios sin entrada en user_roles -> warning "Usuarios sin rol"
-   - role_permissions con role_id que no existe en roles_config -> error "Permiso huerfano"
-5. Calcular summary counts
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  let result = "";
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 ```
-
-**Estructura de la ruta en sidebar:**
-
-```text
-Administracion
-  |-- Usuarios (/admin/usuarios)
-  |-- Auditoria (/admin/auditoria)
-```
-
-Ambos enlaces solo visibles para usuarios con rol `admin`.
 
