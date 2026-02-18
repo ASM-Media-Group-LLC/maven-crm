@@ -151,14 +151,14 @@ const SharedAgendaPage = () => {
     );
   }
 
-  if (isError || (events.length === 0 && !isLoading)) {
+  if (isError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-3">
           <CalendarDays className="h-12 w-12 mx-auto text-muted-foreground" />
           <h1 className="text-xl font-bold">Agenda no disponible</h1>
           <p className="text-sm text-muted-foreground">
-            El enlace ha expirado o no hay eventos próximos.
+            El enlace ha expirado o es inválido.
           </p>
         </div>
       </div>
