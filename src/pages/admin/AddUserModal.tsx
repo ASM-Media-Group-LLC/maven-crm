@@ -107,7 +107,7 @@ const AddUserModal = ({ open, onOpenChange, onConfirm, isLoading }: AddUserModal
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Posición</Label>
+            <Label htmlFor="role">Rol</Label>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar rol" />

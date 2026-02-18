@@ -10,11 +10,12 @@ import SetPermissionsModal from "./SetPermissionsModal";
 
 interface RolesContentProps {
   search?: string;
+  createOpen: boolean;
+  onCreateOpenChange: (open: boolean) => void;
 }
 
-const RolesContent = ({ search = "" }: RolesContentProps) => {
+const RolesContent = ({ search = "", createOpen, onCreateOpenChange }: RolesContentProps) => {
   const { roles, isLoading, createRole, updateRole, deleteRole, toggleActive, isCreating, isUpdating, isDeleting } = useRoles();
-  const [createOpen, setCreateOpen] = useState(false);
   const [editRole, setEditRole] = useState<RoleConfig | null>(null);
   const [deleteRoleState, setDeleteRoleState] = useState<RoleConfig | null>(null);
   const [permRole, setPermRole] = useState<RoleConfig | null>(null);
@@ -43,9 +44,9 @@ const RolesContent = ({ search = "" }: RolesContentProps) => {
 
       <CreateRoleModal
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={onCreateOpenChange}
         onConfirm={(name, description) => {
-          createRole({ name, description }, { onSuccess: () => setCreateOpen(false) });
+          createRole({ name, description }, { onSuccess: () => onCreateOpenChange(false) });
         }}
         isLoading={isCreating}
       />
