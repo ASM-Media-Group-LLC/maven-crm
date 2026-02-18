@@ -1,78 +1,65 @@
 
 
-## Revision completa de SharedAgendaPage: Tabs de invitados funcionales
+## Actualización del Roadmap: Estado real + Módulos pendientes
 
-### Problema
+### 1. Marcar como "done" los módulos ya construidos
 
-Los badges "Pendientes (X)" y "Confirmados (X)" en cada tarjeta de evento son elementos estaticos que solo muestran conteos. No funcionan como tabs interactivos para filtrar la lista de invitados.
+Los siguientes 6 items están marcados como "todo" pero ya están completamente funcionales en la plataforma:
 
-### Solucion
+**Eventos (3 items):**
+- CRUD y detalle de eventos
+- Invitados, checklist, métricas
+- Calendario y compartir externo
 
-Convertir esos badges en tabs funcionales dentro de cada `EventDetailCard`, permitiendo filtrar invitados por estado: Todos, Pendientes y Confirmados.
+**Recursos y Admin (3 items):**
+- Gestión de usuarios y roles
+- Auditoría de roles
+- Tracker de progreso de plataforma
 
-### Cambios en `src/pages/eventos/SharedAgendaPage.tsx`
+Se actualizarán a status "done" con `completed_at` = fecha actual.
 
-#### 1. Convertir EventDetailCard de componente funcional simple a componente con estado
+### 2. Agregar 3 items a "Módulos Pendientes"
 
-Agregar un estado local `guestFilter` con valores `"all" | "pending" | "confirmed"` para controlar que invitados se muestran.
+La categoría "Módulos Pendientes" ya existe pero tiene 0 items. Se agregarán:
 
-#### 2. Reemplazar badges estaticos por tabs interactivos
+| Submodule | Task | Status |
+|-----------|------|--------|
+| RRHH | Gestión de Empleados (RRHH) | todo |
+| Finanzas | Contabilidad | todo |
+| Creadoras | Gestión de Creadoras | todo |
 
-En la seccion de invitados (lineas 426-448), reemplazar los badges "Pendientes" y "Confirmados" por botones estilizados como tabs siguiendo el patron del design system:
+### Resultado esperado
 
-- **Todos** (cuenta total) - tab por defecto
-- **Pendientes** (cuenta de pending) - con indicador ambar
-- **Confirmados** (cuenta de confirmed) - con indicador verde
-
-Los tabs usaran el patron `inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1` con botones `ghost`/`secondary`.
-
-#### 3. Filtrar la lista de invitados segun el tab activo
-
-La grilla de `GuestChip` mostrara solo los invitados correspondientes al filtro seleccionado.
+Después de los cambios, el progreso general subirá significativamente ya que 6 items pasarán de "todo" a "done", y se agregarán 3 nuevos items pendientes.
 
 ---
 
-### Seccion tecnica
+### Sección técnica
 
-**Archivo:** `src/pages/eventos/SharedAgendaPage.tsx`
+**Método:** Migraciones SQL directas sobre las tablas `roadmap_items` y `roadmap_categories`.
 
-**EventDetailCard** (lineas 373-455): Agregar estado interno y reemplazar la seccion de guests:
-
-```tsx
-const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
-  const [guestFilter, setGuestFilter] = useState<"all" | "pending" | "confirmed">("all");
-  const colors = PROJECT_COLORS[event.project_type ?? ""];
-  const pendingGuests = event.guests.filter((g) => g.status === "pending");
-  const confirmedGuests = event.guests.filter((g) => g.status === "confirmed");
-  const displayedGuests = guestFilter === "all" 
-    ? event.guests 
-    : guestFilter === "pending" 
-    ? pendingGuests 
-    : confirmedGuests;
-  // ...resto del card igual...
-  // Seccion de guests: reemplazar badges por tabs
+**Migración 1 - Actualizar estados:**
+```sql
+UPDATE roadmap_items 
+SET status = 'done', completed_at = NOW()
+WHERE id IN (
+  '6f20fdd4-3163-4e7f-92bb-1ad46e3755f8',
+  'b4294c98-0782-4a71-af50-e2c8d61a3026',
+  'b2509632-51e9-4a85-ab29-78d8e82f05a3',
+  'ddd7b605-aa3e-4cbd-9e59-d83967f0a06f',
+  'c28a5e2b-c4fd-4ec9-8432-214db771049c',
+  'a726259b-c554-4750-98e4-e205a1947ab8'
+);
 ```
 
-**Tabs de invitados** (reemplaza lineas 427-442):
-```tsx
-<div className="flex items-center justify-between flex-wrap gap-2">
-  <div className="flex items-center gap-2">
-    <Users className="h-4 w-4 text-muted-foreground" />
-    <span className="text-xs font-medium text-muted-foreground">Invitados</span>
-  </div>
-  <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
-    <button onClick={() => setGuestFilter("all")} className={tab activo/inactivo}>
-      Todos ({event.guests.length})
-    </button>
-    <button onClick={() => setGuestFilter("pending")} className={...}>
-      Pendientes ({pendingGuests.length})
-    </button>
-    <button onClick={() => setGuestFilter("confirmed")} className={...}>
-      Confirmados ({confirmedGuests.length})
-    </button>
-  </div>
-</div>
+**Migración 2 - Insertar módulos pendientes:**
+```sql
+INSERT INTO roadmap_items (category_id, submodule, task, status, position)
+VALUES
+  ('a0000001-0000-0000-0000-000000000008', 'RRHH', 'Gestión de Empleados (RRHH)', 'todo', 1),
+  ('a0000001-0000-0000-0000-000000000008', 'Finanzas', 'Contabilidad', 'todo', 2),
+  ('a0000001-0000-0000-0000-000000000008', 'Creadoras', 'Gestión de Creadoras', 'todo', 3);
 ```
 
-**Grilla filtrada** (linea 444-448): Cambiar `event.guests.map` por `displayedGuests.map`, con mensaje vacio si no hay resultados.
+No se requieren cambios de código, solo actualizaciones de datos en la base de datos.
 
