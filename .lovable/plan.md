@@ -1,31 +1,37 @@
 
 
-## Mejoras en Promolog: Filtros, Modal de Registro y Layout
+## Mejoras al Modal de Registro de Promolog
 
-### 1. Eliminar filtro de Categoria en Promos
+### 1. Corregir scroll interno del modal
 
-El `Select` de "Categoria" (lineas 581-589) no se usa en el flujo de Promolog. Se eliminara junto con el estado `selectedCategory` y la constante `categoryOptions`.
-
----
-
-### 2. Modal de Registro: Mostrar Notas y Evidencia tambien cuando "No Promociono"
-
-Actualmente, los campos de Notas y Evidencia solo se muestran cuando `entryResult === "si"` (dentro del bloque condicional lineas 996-1058). Se necesita:
-
-- Mover **Notas** y **Evidencia** fuera del bloque `{entryResult === "si" && ...}`, para que aparezcan siempre (tanto en "Si" como en "No").
-- Agregar el campo **"Que se hizo para que promocione?"** con opciones seleccionables (como se ve en la imagen de referencia): Incentivo economico, Llamada motivacional, Mensaje estrategico, Recordatorio amable, Otro. Este campo aparecera siempre, independientemente de si promociono o no.
+El `ScrollArea` de Radix no esta funcionando correctamente porque necesita una altura explicita. Se cambiara el approach: en lugar de usar `ScrollArea`, se usara un `div` con `overflow-y-auto` y `flex-1 min-h-0` que funciona de forma nativa con el layout flex del modal. Esto es mas confiable y directo.
 
 ---
 
-### 3. Modal de Registro: Header y Footer fijos con scroll en contenido
+### 2. Plataforma: OnlyFans, Unlok o nombre personalizado
 
-El modal actualmente usa `overflow-y-auto` en todo el `DialogContent`. Se cambiara a un layout con:
+Actualmente el selector de plataforma muestra 3 botones (OnlyFans, Unlok, Otra). Se mejorara para que al seleccionar "Otra" aparezca un campo `Input` donde el usuario pueda escribir el nombre de la plataforma personalizada.
 
-- **Header fijo** (card de la creadora + botones Si/No) usando `shrink-0`
-- **Contenido central scrollable** usando `ScrollArea` con `flex-1 overflow-y-auto`
-- **Footer fijo** (botones Cancelar/Guardar) usando `shrink-0`
+Se agregara un nuevo estado `entryCustomPlatform` para almacenar el nombre cuando se selecciona "Otra".
 
-Esto sigue el patron `sticky` ya usado en formularios complejos del proyecto.
+---
+
+### 3. Simplificar vista "No Promociono"
+
+Cuando `entryResult === "no"`, solo se mostraran:
+- **Notas** (para explicar por que no se pudo hacer la promo)
+- **Evidencia** (opcional)
+
+Se eliminara el campo "Que se hizo para que promocione?" de la vista "No". Este campo solo aparecera cuando `entryResult === "si"`, ya que tiene sentido en ese contexto.
+
+---
+
+### 4. Simplificacion general del modal
+
+- Reducir padding y espaciado para que el modal sea mas compacto
+- Los botones Si/No se mantienen en el header fijo
+- Los campos condicionales (Red Social, Plataforma, Tipo de Contacto, Estrategia) solo aparecen con "Si"
+- Notas y Evidencia siempre visibles en ambos casos
 
 ---
 
@@ -33,58 +39,54 @@ Esto sigue el patron `sticky` ya usado en formularios complejos del proyecto.
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Eliminar filtro Categoria (lineas 581-589):**
-- Eliminar el `Select` de categoria de la fila de filtros en Promos
-- Eliminar `selectedCategory` del estado y de la condicion de "Limpiar filtros"
-- Eliminar `categoryOptions`
-
-**Nuevo estado para "Que se hizo":**
+**Nuevo estado:**
 ```text
-const strategyOptions = [
-  { value: "incentivo_economico", label: "Incentivo economico" },
-  { value: "llamada_motivacional", label: "Llamada motivacional" },
-  { value: "mensaje_estrategico", label: "Mensaje estrategico" },
-  { value: "recordatorio_amable", label: "Recordatorio amable" },
-  { value: "otro", label: "Otro" },
-];
-const [entryStrategy, setEntryStrategy] = useState<string>("");
+const [entryCustomPlatform, setEntryCustomPlatform] = useState("");
 ```
 
-**Reestructura del modal de registro (lineas 959-1068):**
+**Reset:** Agregar `setEntryCustomPlatform("")` en `resetEntryModal`.
 
+**Scroll fix (lineas 991, 1073 del modal de registro y lineas 1156, 1222 del modal de edicion):**
+- Reemplazar `<ScrollArea className="flex-1 min-h-0 px-6">` por `<div className="flex-1 min-h-0 overflow-y-auto px-6">`
+- Reemplazar el cierre `</ScrollArea>` por `</div>`
+
+**Plataforma con input personalizado (lineas 1009-1021 y 1174-1186):**
 ```text
-<DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
-  {/* Header fijo */}
-  <div className="shrink-0 p-6 pb-0 space-y-4">
-    <DialogHeader>...</DialogHeader>
-    <Card creadora>...</Card>
-    <Botones Si/No>...</Botones>
+<div className="space-y-2">
+  <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
+  <div className="grid grid-cols-3 gap-2">
+    {platformOptions.map((opt) => (
+      <button ...>{opt.label}</button>
+    ))}
   </div>
-
-  {/* Contenido scrollable */}
-  <ScrollArea className="flex-1 min-h-0 px-6">
-    <div className="space-y-4 py-4">
-      {entryResult === "si" && (
-        Red Social, Plataforma, Tipo de Contacto
-      )}
-      {/* Siempre visibles: */}
-      Que se hizo para que promocione? (grid 2 cols)
-      Notas (Textarea)
-      Evidencia (Upload)
-    </div>
-  </ScrollArea>
-
-  {/* Footer fijo */}
-  <div className="shrink-0 p-6 pt-4 border-t">
-    <DialogFooter>Cancelar | Guardar Promocion</DialogFooter>
-  </div>
-</DialogContent>
+  {entryPlatform === "otra" && (
+    <Input
+      placeholder="Nombre de la plataforma..."
+      value={entryCustomPlatform}
+      onChange={(e) => setEntryCustomPlatform(e.target.value)}
+    />
+  )}
+</div>
 ```
 
-**Aplicar los mismos cambios al modal de Editar (lineas 1106-1188):**
-- Mover Notas fuera del bloque condicional `entryResult === "si"`
-- Agregar campo "Que se hizo"
-- Aplicar layout sticky header/footer
+**Reorganizar campos condicionales (ambos modales):**
+```text
+{/* Solo cuando "Si Promociono" */}
+{entryResult === "si" && (
+  <>
+    Red Social (grid 4 cols)
+    Plataforma (grid 3 cols + input custom)
+    Tipo de Contacto (grid 3 cols)
+    Que se hizo para que promocione? (grid 2 cols)
+  </>
+)}
 
-**Reset:** Agregar `setEntryStrategy("")` en `resetEntryModal`.
+{/* Siempre visibles */}
+Notas (Textarea)
+Evidencia (Upload + preview)
+```
 
+**Aplicar los mismos cambios al modal de Editar (lineas 1121-1232):**
+- Misma correccion de scroll
+- Misma logica de plataforma con input custom
+- Misma reorganizacion de campos condicionales
