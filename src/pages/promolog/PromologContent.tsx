@@ -219,6 +219,7 @@ const PromologContent = () => {
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [entryStrategy, setEntryStrategy] = useState<string>("");
+  const [entryCustomPlatform, setEntryCustomPlatform] = useState("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [selectedCardPlatform, setSelectedCardPlatform] = useState("");
   
@@ -316,6 +317,7 @@ const PromologContent = () => {
     setEntryNotes("");
     setEntryEvidencePreview("");
     setEntryStrategy("");
+    setEntryCustomPlatform("");
   };
 
   const getInitials = (name: string) => name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -1153,7 +1155,7 @@ const PromologContent = () => {
               </div>
 
               {/* Scrollable content */}
-              <ScrollArea className="flex-1 min-h-0 px-6">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6">
                 <div className="space-y-4 py-4">
                   {entryResult === "si" && (
                     <>
@@ -1177,12 +1179,15 @@ const PromologContent = () => {
                           {platformOptions.map((opt) => {
                             const isSelected = entryPlatform === opt.value;
                             return (
-                              <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                              <button key={opt.value} type="button" onClick={() => { setEntryPlatform(opt.value); if (opt.value !== "otra") setEntryCustomPlatform(""); }} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                                 {opt.label}
                               </button>
                             );
                           })}
                         </div>
+                        {entryPlatform === "otra" && (
+                          <Input placeholder="Nombre de la plataforma..." value={entryCustomPlatform} onChange={(e) => setEntryCustomPlatform(e.target.value)} />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
@@ -1197,29 +1202,29 @@ const PromologContent = () => {
                           })}
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {strategyOptions.map((opt) => {
+                            const isSelected = entryStrategy === opt.value;
+                            return (
+                              <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </>
                   )}
 
                   {/* Always visible fields */}
                   <div className="space-y-2">
-                    <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {strategyOptions.map((opt) => {
-                        const isSelected = entryStrategy === opt.value;
-                        return (
-                          <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
                     <span className="text-sm font-medium">Notas</span>
-                    <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[80px]" />
+                    <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder={entryResult === "no" ? "¿Por qué no se pudo hacer la promo?..." : "Agregar notas..."} className="min-h-[80px]" />
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
 
               {/* Fixed footer */}
               <div className="shrink-0 p-6 pt-4 border-t">
