@@ -1,68 +1,59 @@
 
 
-## Agregar Fechas y Timeline Semanal al Roadmap
+## Edicion Inline Completa del Roadmap
 
 ### Descripcion
 
-Transformar cada seccion colapsable del roadmap en una tabla con columnas adicionales: **Submodule**, **Task**, **Status**, **Delivery** (fecha estimada de entrega), y un **timeline semanal** (W1-W8) que muestra barras de progreso visuales indicando cuando se completo cada tarea o cuando esta programada.
+Hacer que todos los campos del roadmap sean editables inline: nombre de tarea, submodulo, nombre de categoria y descripcion. Actualmente solo se pueden editar el estado, checkbox y fecha de delivery.
 
 ---
 
-### Cambios necesarios
+### Cambios en `useRoadmap.ts`
 
-### 1. Nueva columna en base de datos
+Agregar 3 nuevas mutations:
 
-Agregar un campo `completed_at` a la tabla `roadmap_items` para registrar automaticamente cuando un item se marca como "done". Esto permite saber la fecha real de completado, no solo `updated_at` que cambia con cualquier edicion.
+1. **`updateItem`** - Mutation generica para actualizar cualquier campo de un item (`task`, `submodule`, `description`)
+2. **`updateCategory`** - Mutation para renombrar una categoria
 
-### 2. Mutation `updateItemStatus` actualizada
+### Cambios en `RoadmapContent.tsx`
 
-Cuando el status cambia a "done", se envia `completed_at: new Date().toISOString()`. Si cambia de "done" a otro estado, se envia `completed_at: null`.
+**Nombre de categoria editable:**
+- Doble click en el nombre de la categoria abre un Input inline
+- Al presionar Enter o blur, se guarda el nuevo nombre
+- Estado local `editingCategoryId` controla cual esta en edicion
 
-### 3. Mutation `updateDeliveryDate` nueva
+**Nombre de tarea editable:**
+- Doble click en el texto de la tarea lo convierte en un Input
+- Enter o blur guarda el cambio
+- Estado local `editingItemField` con `{ id, field }` controla la edicion
 
-Nuevo mutation en `useRoadmap.ts` que permite actualizar la `delivery_date` de un item haciendo click en la celda de Delivery y seleccionando una fecha con un popover de calendario.
+**Submodule editable:**
+- Click en el badge de submodulo o en el "---" abre un Input inline
+- Enter o blur guarda. Si queda vacio, se envia `null`
 
-### 4. Rediseno visual de las secciones colapsables
+**Descripcion editable:**
+- Agregar una fila expandible o un tooltip editable debajo de cada tarea (icono de nota al lado del nombre de la tarea)
+- Click abre un Popover con un Textarea para editar la descripcion
 
-Cada seccion colapsable pasa de ser una lista simple a una **tabla** con las siguientes columnas:
-
-| Check | Submodule | Task | Status | Delivery | W1 (Feb 17) | W2 (Feb 24) | ... | W8 (Abr 7) |
-|-------|-----------|------|--------|----------|-------------|-------------|-----|------------|
-
-- **Check**: Checkbox existente
-- **Submodule**: Badge gris con el nombre del submodulo (ya existe)
-- **Task**: Texto de la tarea con line-through si esta done
-- **Status**: Badge clickable con ciclo de estados (ya existe)
-- **Delivery**: Fecha de entrega, clickable para editar con popover de calendario. Formato `MMM d` (ej: "Feb 24")
-- **W1-W8**: Columnas semanales que muestran barras de color verde (done) o ambar (in_progress) en las semanas correspondientes, calculadas a partir de `created_at`, `delivery_date` y `completed_at`
-
-### 5. Logica del timeline semanal
-
-- Se calculan 8 semanas desde la fecha mas temprana encontrada en los items (o fecha actual si no hay datos)
-- Cada semana se muestra como columna con header "W1", "W2", etc. y subfecha "Feb 17", "Feb 24"
-- Para items "done": barra verde desde la semana de `created_at` hasta la semana de `completed_at`
-- Para items "in_progress": barra ambar desde la semana de inicio hasta la semana actual
-- Para items "todo" con `delivery_date`: indicador gris en la semana de delivery
-- Scroll horizontal si las columnas exceden el ancho disponible
+**Boton de eliminar categoria:**
+- Agregar un boton de eliminar (Trash2) al lado del nombre de cada categoria en el header del Collapsible, visible en hover
 
 ---
 
 ### Seccion tecnica
 
-**Archivo:** Migracion SQL nueva
-- `ALTER TABLE roadmap_items ADD COLUMN completed_at timestamptz;`
-- Update items existentes con status "done": `SET completed_at = updated_at WHERE status = 'done'`
+**`useRoadmap.ts`** - Agregar:
+```
+updateItem({ id, data: { task?, submodule?, description? } })
+updateCategory({ id, name })
+```
 
-**Archivo:** `src/pages/roadmap/useRoadmap.ts`
-- Agregar `completed_at` al tipo `RoadmapItem`
-- Modificar `updateItemStatus` para enviar `completed_at` segun el nuevo status
-- Agregar mutation `updateDeliveryDate({ id, delivery_date })`
+Ambas mutations hacen `supabase.from("roadmap_items/categories").update(data).eq("id", id)` e invalidan queries.
 
-**Archivo:** `src/pages/roadmap/RoadmapContent.tsx`
-- Reemplazar las filas simples (div flex) por una estructura tipo tabla con header fijo
-- Header de tabla: Check, Submodule, Task, Status, Delivery, W1..W8
-- Agregar logica `useMemo` para calcular las 8 semanas y mapear cada item a las celdas correspondientes
-- Agregar componente Popover + Calendar para editar `delivery_date` inline
-- Contenedor con `overflow-x-auto` para scroll horizontal en el timeline
-- Las columnas de semana tendran ancho fijo (`w-12`) con barras de 4px de alto coloreadas segun status
+**`RoadmapContent.tsx`** - Estado local:
+- `editingCategoryId: string | null` - categoria en edicion
+- `editingField: { id: string; field: "task" | "submodule" | "description" } | null` - item/campo en edicion
+- `editValue: string` - valor temporal del input
+
+Cada celda editable muestra el texto normal por defecto. Al hacer doble click se reemplaza por un Input con el valor actual. Al presionar Enter o onBlur se llama la mutation correspondiente y se limpia el estado de edicion. Escape cancela la edicion.
 
