@@ -45,6 +45,7 @@ import TareaProject from "./pages/TareaProject";
 import TaskSharePage from "./pages/tareas/TaskSharePage";
 import ProjectSharePage from "./pages/tareas/ProjectSharePage";
 import AdminUsuarios from "./pages/admin/AdminUsuarios";
+import AuditoriaRoles from "./pages/admin/AuditoriaRoles";
 import AdminRoute from "./components/AdminRoute";
 import NotFound from "./pages/NotFound";
 
@@ -102,6 +103,7 @@ const App = () => (
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
+              <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
