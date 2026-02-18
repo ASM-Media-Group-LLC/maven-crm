@@ -990,7 +990,7 @@ const PromologContent = () => {
                 </div>
 
                 {/* Scrollable content */}
-                <ScrollArea className="flex-1 min-h-0 px-6">
+                <div className="flex-1 min-h-0 overflow-y-auto px-6">
                   <div className="space-y-4 py-4">
                     {entryResult === "si" && (
                       <>
@@ -1039,19 +1039,6 @@ const PromologContent = () => {
 
                     {/* Always visible fields */}
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {strategyOptions.map((opt) => {
-                          const isSelected = entryStrategy === opt.value;
-                          return (
-                            <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
                       <span className="text-sm font-medium">Notas</span>
                       <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[80px]" />
                     </div>
@@ -1072,7 +1059,7 @@ const PromologContent = () => {
                       )}
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
 
                 {/* Fixed footer */}
                 <div className="shrink-0 p-6 pt-4 border-t">
@@ -1222,6 +1209,22 @@ const PromologContent = () => {
                   <div className="space-y-2">
                     <span className="text-sm font-medium">Notas</span>
                     <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder={entryResult === "no" ? "¿Por qué no se pudo hacer la promo?..." : "Agregar notas..."} className="min-h-[80px]" />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Evidencia (Pantallazo)</span>
+                    <div className="border-2 border-dashed border-input rounded-md p-4 text-center cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => entryFileInputRef.current?.click()}>
+                      <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Subir Evidencia</span>
+                      <input ref={entryFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleEntryFileChange} />
+                    </div>
+                    {entryEvidencePreview && (
+                      <div className="space-y-2">
+                        <img src={entryEvidencePreview} alt="Evidencia" className="w-full rounded-md border border-input max-h-48 object-contain" />
+                        <button type="button" className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={() => window.open(entryEvidencePreview, "_blank")}>
+                          <ExternalLink className="h-3 w-3" />Abrir en nueva pestaña
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
