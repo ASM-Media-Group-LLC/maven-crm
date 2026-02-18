@@ -951,7 +951,7 @@ const PromologContent = () => {
 
         {/* Registration Modal */}
         <Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
-          <DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
+          <DialogContent className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden">
             {selectedCreatorForEntry && (
               <>
                 {/* Fixed header */}
@@ -1065,7 +1065,35 @@ const PromologContent = () => {
                 <div className="shrink-0 p-6 pt-4 border-t">
                   <DialogFooter>
                     <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                    <Button onClick={() => { setEntryModalOpen(false); toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` }); }}>Guardar Promoción</Button>
+                    <Button onClick={async () => {
+                      if (!selectedCreatorForEntry) return;
+                      if (entryResult === "si") {
+                        if (!entryNetwork || !entryPlatform || !entryContactType) {
+                          toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
+                          return;
+                        }
+                      }
+                      const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
+                      const { error } = await supabase.from("promolog_entries").insert({
+                        creator_id: selectedCreatorForEntry.id,
+                        date: new Date().toISOString(),
+                        promoted: entryResult === "si" ? "true" : "false",
+                        network: entryResult === "si" ? entryNetwork : "n/a",
+                        platform: entryResult === "si" ? platformValue : null,
+                        contact_type: entryResult === "si" ? entryContactType : null,
+                        notes: entryNotes || null,
+                        action_taken: entryResult === "si" ? entryStrategy || null : null,
+                        evidence_url: entryEvidencePreview || null,
+                      });
+                      if (error) {
+                        toast({ title: "Error", description: error.message, variant: "destructive" });
+                        return;
+                      }
+                      queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+                      toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` });
+                      resetEntryModal();
+                      setEntryModalOpen(false);
+                    }}>Guardar Promoción</Button>
                   </DialogFooter>
                 </div>
               </>
@@ -1110,7 +1138,7 @@ const PromologContent = () => {
         {/* Edit Entry Modal (from table/grid actions) */}
         {selectedEntry && (
           <Dialog open={editEntryOpen} onOpenChange={setEditEntryOpen}>
-            <DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
+            <DialogContent className="max-w-lg max-h-[80vh] !flex !flex-col gap-0 p-0 overflow-hidden">
               {/* Fixed header */}
               <div className="shrink-0 p-6 pb-4 space-y-4">
                 <DialogHeader className="pr-8">
@@ -1233,7 +1261,33 @@ const PromologContent = () => {
               <div className="shrink-0 p-6 pt-4 border-t">
                 <DialogFooter>
                   <Button variant="outline" onClick={() => { setEditEntryOpen(false); toast({ title: "Edición cancelada" }); }}>Cancelar</Button>
-                  <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => { setEditEntryOpen(false); toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` }); }}>Guardar Cambios</Button>
+                  <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={async () => {
+                    if (!selectedEntry) return;
+                    if (entryResult === "si") {
+                      if (!entryNetwork || !entryPlatform || !entryContactType) {
+                        toast({ title: "Campos requeridos", description: "Completa Red Social, Plataforma y Tipo de Contacto.", variant: "destructive" });
+                        return;
+                      }
+                    }
+                    const platformValue = entryPlatform === "otra" ? entryCustomPlatform : entryPlatform;
+                    const { error } = await supabase.from("promolog_entries").update({
+                      promoted: entryResult === "si" ? "true" : "false",
+                      network: entryResult === "si" ? entryNetwork : "n/a",
+                      platform: entryResult === "si" ? platformValue : null,
+                      contact_type: entryResult === "si" ? entryContactType : null,
+                      notes: entryNotes || null,
+                      action_taken: entryResult === "si" ? entryStrategy || null : null,
+                      evidence_url: entryEvidencePreview || null,
+                    }).eq("id", selectedEntry.id);
+                    if (error) {
+                      toast({ title: "Error", description: error.message, variant: "destructive" });
+                      return;
+                    }
+                    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+                    toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` });
+                    resetEntryModal();
+                    setEditEntryOpen(false);
+                  }}>Guardar Cambios</Button>
                 </DialogFooter>
               </div>
             </DialogContent>
