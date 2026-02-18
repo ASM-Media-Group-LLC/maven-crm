@@ -130,12 +130,38 @@ export const useRoadmap = () => {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const updateItem = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<RoadmapItem, "task" | "submodule" | "description">> }) => {
+      const { error } = await supabase
+        .from("roadmap_items" as any)
+        .update(data as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateCategory = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from("roadmap_categories" as any)
+        .update({ name } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   return {
     categories: categoriesQuery.data || [],
     items: itemsQuery.data || [],
     isLoading: categoriesQuery.isLoading || itemsQuery.isLoading,
     updateItemStatus,
     updateDeliveryDate,
+    updateItem,
+    updateCategory,
     addItem,
     deleteItem,
     addCategory,

@@ -1,15 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRoadmap, RoadmapItem } from "./useRoadmap";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronRight, Plus, Trash2, CalendarIcon } from "lucide-react";
+import { ChevronRight, Plus, Trash2, CalendarIcon, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfWeek, addWeeks, isWithinInterval, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -24,9 +25,24 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 const RoadmapContent = () => {
-  const { categories, items, isLoading, updateItemStatus, updateDeliveryDate, addItem, deleteItem, addCategory, deleteCategory } = useRoadmap();
+  const { categories, items, isLoading, updateItemStatus, updateDeliveryDate, updateItem, updateCategory, addItem, deleteItem, addCategory, deleteCategory } = useRoadmap();
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newItemInputs, setNewItemInputs] = useState<Record<string, string>>({});
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<{ id: string; field: "task" | "submodule" | "description" } | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const catEditRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingCategoryId) catEditRef.current?.focus();
+  }, [editingCategoryId]);
+
+  useEffect(() => {
+    if (editingField?.field === "description") editTextareaRef.current?.focus();
+    else if (editingField) editInputRef.current?.focus();
+  }, [editingField]);
 
   const stats = useMemo(() => {
     const total = items.length;
@@ -99,12 +115,54 @@ const RoadmapContent = () => {
     addCategory.mutate(name);
     setNewCategoryName("");
   };
-
   const handleDeliveryDateChange = (itemId: string, date: Date | undefined) => {
     updateDeliveryDate.mutate({
       id: itemId,
       delivery_date: date ? format(date, "yyyy-MM-dd") : null,
     });
+  };
+
+  const startEditCategory = (catId: string, name: string) => {
+    setEditingCategoryId(catId);
+    setEditValue(name);
+  };
+
+  const commitCategoryEdit = () => {
+    if (editingCategoryId && editValue.trim()) {
+      updateCategory.mutate({ id: editingCategoryId, name: editValue.trim() });
+    }
+    setEditingCategoryId(null);
+  };
+
+  const startEditField = (id: string, field: "task" | "submodule" | "description", value: string) => {
+    setEditingField({ id, field });
+    setEditValue(value);
+  };
+
+  const commitFieldEdit = () => {
+    if (editingField) {
+      const val = editValue.trim();
+      const data: any = {};
+      if (editingField.field === "submodule") {
+        data.submodule = val || null;
+      } else {
+        data[editingField.field] = val;
+      }
+      if (editingField.field !== "task" || val) {
+        updateItem.mutate({ id: editingField.id, data });
+      }
+    }
+    setEditingField(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingField(null);
+    setEditingCategoryId(null);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent, commit: () => void) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
+    if (e.key === "Escape") cancelEdit();
   };
 
   if (isLoading) {
@@ -175,18 +233,42 @@ const RoadmapContent = () => {
           return (
             <Collapsible key={cat.id} defaultOpen>
               <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <CollapsibleTrigger asChild>
-                  <button className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left group">
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
-                    <span className="font-semibold text-foreground flex-1">{cat.name}</span>
-                    <span className="text-xs text-muted-foreground mr-2">
-                      {catDone}/{catItems.length} tasks
+                <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left group">
+                  <CollapsibleTrigger asChild>
+                    <button className="shrink-0">
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                    </button>
+                  </CollapsibleTrigger>
+                  {editingCategoryId === cat.id ? (
+                    <Input
+                      ref={catEditRef}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={commitCategoryEdit}
+                      onKeyDown={(e) => handleEditKeyDown(e, commitCategoryEdit)}
+                      className="h-7 text-sm font-semibold flex-1"
+                    />
+                  ) : (
+                    <span
+                      className="font-semibold text-foreground flex-1 cursor-pointer"
+                      onDoubleClick={() => startEditCategory(cat.id, cat.name)}
+                    >
+                      {cat.name}
                     </span>
-                    <div className="w-20">
-                      <Progress value={catPercent} className="h-1.5" />
-                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground mr-2">
+                    {catDone}/{catItems.length} tasks
+                  </span>
+                  <div className="w-20">
+                    <Progress value={catPercent} className="h-1.5" />
+                  </div>
+                  <button
+                    onClick={() => deleteCategory.mutate(cat.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                </CollapsibleTrigger>
+                </div>
 
                 <CollapsibleContent>
                   <div className="border-t border-border overflow-x-auto">
@@ -217,18 +299,76 @@ const RoadmapContent = () => {
                               />
                             </TableCell>
                             <TableCell className="py-2">
-                              {item.submodule ? (
-                                <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                  {item.submodule}
-                                </span>
+                              {editingField?.id === item.id && editingField.field === "submodule" ? (
+                                <Input
+                                  ref={editInputRef}
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={commitFieldEdit}
+                                  onKeyDown={(e) => handleEditKeyDown(e, commitFieldEdit)}
+                                  className="h-6 text-xs w-24"
+                                  placeholder="Submodule"
+                                />
                               ) : (
-                                <span className="text-xs text-muted-foreground/50">—</span>
+                                <span
+                                  className={cn(
+                                    "text-xs cursor-pointer px-2 py-0.5 rounded",
+                                    item.submodule ? "font-medium text-muted-foreground bg-muted" : "text-muted-foreground/50"
+                                  )}
+                                  onClick={() => startEditField(item.id, "submodule", item.submodule || "")}
+                                >
+                                  {item.submodule || "—"}
+                                </span>
                               )}
                             </TableCell>
                             <TableCell className="py-2">
-                              <span className={`text-sm ${item.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                                {item.task}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                {editingField?.id === item.id && editingField.field === "task" ? (
+                                  <Input
+                                    ref={editInputRef}
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onBlur={commitFieldEdit}
+                                    onKeyDown={(e) => handleEditKeyDown(e, commitFieldEdit)}
+                                    className="h-6 text-sm flex-1"
+                                  />
+                                ) : (
+                                  <span
+                                    className={cn(
+                                      "text-sm cursor-pointer flex-1",
+                                      item.status === "done" ? "line-through text-muted-foreground" : "text-foreground"
+                                    )}
+                                    onDoubleClick={() => startEditField(item.id, "task", item.task)}
+                                  >
+                                    {item.task}
+                                  </span>
+                                )}
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className={cn(
+                                      "shrink-0 transition-opacity",
+                                      item.description ? "text-muted-foreground" : "opacity-0 group-hover/row:opacity-100 text-muted-foreground/50"
+                                    )}>
+                                      <FileText className="h-3.5 w-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 p-3" align="start">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Descripción</p>
+                                    <Textarea
+                                      value={editingField?.id === item.id && editingField.field === "description" ? editValue : (item.description || "")}
+                                      onFocus={() => {
+                                        if (editingField?.id !== item.id || editingField?.field !== "description") {
+                                          startEditField(item.id, "description", item.description || "");
+                                        }
+                                      }}
+                                      onChange={(e) => setEditValue(e.target.value)}
+                                      onBlur={commitFieldEdit}
+                                      placeholder="Agregar descripción..."
+                                      className="min-h-[80px] text-sm"
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             </TableCell>
                             <TableCell className="py-2">
                               <Badge
