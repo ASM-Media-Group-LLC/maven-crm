@@ -34,6 +34,7 @@ import NuevoEvento from "./pages/NuevoEvento";
 import EditEvento from "./pages/EditEvento";
 import EventoDetail from "./pages/EventoDetail";
 import EventoSharePage from "./pages/eventos/EventoSharePage";
+import SharedAgendaPage from "./pages/eventos/SharedAgendaPage";
 import LeadGen from "./pages/LeadGen";
 import LeadGenBaseDatos from "./pages/LeadGenBaseDatos";
 import Closers from "./pages/Closers";
@@ -70,6 +71,7 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/eventos/share/:token" element={<EventoSharePage />} />
+              <Route path="/shared/agenda/:token" element={<SharedAgendaPage />} />
               <Route path="/tareas/share/:token" element={<TaskSharePage />} />
               <Route path="/tareas/project-share/:token" element={<ProjectSharePage />} />
 

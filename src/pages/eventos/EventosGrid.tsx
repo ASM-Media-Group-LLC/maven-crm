@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { statusLabel, statusVariant, type EventRow } from "./useEventos";
+import { statusLabel, statusVariant, projectTypeColor, type EventRow } from "./useEventos";
 import ViewEventoModal from "./ViewEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import DeleteEventoDialog from "./DeleteEventoDialog";
@@ -80,6 +80,11 @@ const EventosGrid = ({ events }: Props) => {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold truncate">{e.name}</p>
                     <p className="text-xs text-muted-foreground">{e.event_type}</p>
+                    {e.project_type && (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${projectTypeColor[e.project_type]?.bg ?? ""} ${projectTypeColor[e.project_type]?.text ?? ""}`}>
+                        {e.project_type}
+                      </span>
+                    )}
                   </div>
                   <div onClick={(ev) => ev.stopPropagation()}>
                     <DropdownMenu>

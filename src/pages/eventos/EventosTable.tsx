@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { statusLabel, statusVariant, type EventRow } from "./useEventos";
+import { statusLabel, statusVariant, projectTypeColor, type EventRow } from "./useEventos";
 import ViewEventoModal from "./ViewEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import DeleteEventoDialog from "./DeleteEventoDialog";
@@ -24,7 +24,7 @@ const typeIcons: Record<string, React.ElementType> = {
   Shooting: Camera, Podcast: Mic, Casting: Users, Reunion: Video, Otro: CalendarDays,
 };
 
-type SortKey = "name" | "event_type" | "date" | "location" | "status" | "guest_count";
+type SortKey = "name" | "event_type" | "project_type" | "date" | "location" | "status" | "guest_count";
 
 interface Props {
   events: EventRow[];
@@ -79,6 +79,7 @@ const EventosTable = ({ events }: Props) => {
     switch (sortKey) {
       case "name": va = a.name; vb = b.name; break;
       case "event_type": va = a.event_type; vb = b.event_type; break;
+      case "project_type": va = a.project_type ?? ""; vb = b.project_type ?? ""; break;
       case "date": va = a.date; vb = b.date; break;
       case "location": va = a.location ?? ""; vb = b.location ?? ""; break;
       case "status": va = a.status; vb = b.status; break;
@@ -102,6 +103,7 @@ const EventosTable = ({ events }: Props) => {
           <TableRow>
             <TableHead><SortHeader label="Evento" col="name" /></TableHead>
             <TableHead><SortHeader label="Tipo" col="event_type" /></TableHead>
+            <TableHead><SortHeader label="Proyecto" col="project_type" /></TableHead>
             <TableHead><SortHeader label="Fecha" col="date" /></TableHead>
             <TableHead><SortHeader label="Ubicación" col="location" /></TableHead>
             <TableHead><SortHeader label="Estado" col="status" /></TableHead>
@@ -122,6 +124,15 @@ const EventosTable = ({ events }: Props) => {
                   </div>
                 </TableCell>
                 <TableCell className="text-sm">{e.event_type}</TableCell>
+                <TableCell>
+                  {e.project_type ? (
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${projectTypeColor[e.project_type]?.bg ?? ""} ${projectTypeColor[e.project_type]?.text ?? ""}`}>
+                      {e.project_type}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(e.date), { addSuffix: true, locale: es })}
                 </TableCell>
@@ -175,7 +186,7 @@ const EventosTable = ({ events }: Props) => {
           })}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                 No se encontraron eventos.
               </TableCell>
             </TableRow>
