@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 import {
   
   Users,
@@ -22,6 +23,8 @@ import {
   LayoutGrid,
   Send,
   Eye,
+  CalendarIcon,
+  ChevronsUpDown,
   
 } from "lucide-react";
 
@@ -40,6 +43,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
+import { Calendar } from "@/components/ui/calendar";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -239,15 +245,17 @@ const PromologContent = () => {
 
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [campaignCreator, setCampaignCreator] = useState("");
-  const [campaignMonth, setCampaignMonth] = useState("");
+  const [campaignMonth, setCampaignMonth] = useState<Date | undefined>(undefined);
   const [campaignGoalMonthly, setCampaignGoalMonthly] = useState("");
   const [campaignGoalWeekly, setCampaignGoalWeekly] = useState("");
+  const [campaignCreatorOpen, setCampaignCreatorOpen] = useState(false);
+  const [campaignMonthOpen, setCampaignMonthOpen] = useState(false);
 
   const handleCreateCampaign = () => {
     toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
     setCampaignModalOpen(false);
     setCampaignCreator("");
-    setCampaignMonth("");
+    setCampaignMonth(undefined);
     setCampaignGoalMonthly("");
     setCampaignGoalWeekly("");
   };
@@ -1043,16 +1051,50 @@ const PromologContent = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Creador/a *</Label>
-                <Select value={campaignCreator} onValueChange={setCampaignCreator}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar creador/a" /></SelectTrigger>
-                  <SelectContent>
-                    {creators.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+                <Popover open={campaignCreatorOpen} onOpenChange={setCampaignCreatorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={campaignCreatorOpen} className="w-full justify-between font-normal">
+                      {campaignCreator
+                        ? (creators.find(c => c.id === campaignCreator)?.artistic_name || creators.find(c => c.id === campaignCreator)?.name || "Seleccionar creador/a")
+                        : "Seleccionar creador/a"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar creador/a..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró.</CommandEmpty>
+                        {creators.map((c) => (
+                          <CommandItem key={c.id} value={c.artistic_name || c.name} onSelect={() => { setCampaignCreator(c.id); setCampaignCreatorOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", campaignCreator === c.id ? "opacity-100" : "opacity-0")} />
+                            {c.artistic_name || c.name}
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Mes/Año *</Label>
-                <Input type="month" value={campaignMonth} onChange={(e) => setCampaignMonth(e.target.value)} />
+                <Popover open={campaignMonthOpen} onOpenChange={setCampaignMonthOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !campaignMonth && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {campaignMonth ? format(campaignMonth, "MMMM yyyy") : "Seleccionar mes"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={campaignMonth}
+                      onSelect={(d) => { setCampaignMonth(d); setCampaignMonthOpen(false); }}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
