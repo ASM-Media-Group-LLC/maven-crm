@@ -1,49 +1,81 @@
 
 
-## Corregir Agenda Compartida y Layout de Tab Bars en Eventos
+## Reemplazar Date Picker nativo por componente del Design System
 
-### Problema 1: "Agenda no disponible" al abrir el enlace compartido
+### Problema
 
-La funcion RPC `get_agenda_by_share_token` solo retorna eventos futuros (`date >= CURRENT_DATE`). El unico evento en la base de datos es del 15 de febrero (ya pasado), por lo que retorna 0 resultados. La pagina `SharedAgendaPage.tsx` interpreta 0 eventos como error y muestra "Agenda no disponible".
+Los campos de fecha en "Crear Evento" y "Editar Evento" usan `<Input type="date" />`, que renderiza el date picker nativo del navegador. Este no corresponde con el sistema de diseno de la plataforma, que usa el patron Shadcn Calendar + Popover.
 
-**Solucion**: Separar el estado de "token invalido" del estado de "no hay eventos proximos":
-- Modificar la RPC para tambien retornar eventos pasados recientes (ultimos 30 dias) para que el calendario tenga contenido
-- O mejor: cambiar la logica del frontend para que muestre la interfaz completa (calendario, buscador, filtros) incluso cuando no hay eventos, y solo mostrar "Agenda no disponible" cuando el token es realmente invalido (error de la RPC)
+### Solucion
 
-**Cambio en `SharedAgendaPage.tsx`**:
-- La condicion `events.length === 0 && !isLoading` ya no mostrara el estado de error
-- Solo se mostrara "Agenda no disponible" si hay un error real de la RPC (`isError === true`)
-- Con 0 eventos, se mostrara el calendario vacio con un mensaje "No hay eventos proximos"
+Reemplazar los dos campos de fecha (fecha inicio y fecha fin) por el componente `Calendar` de Shadcn dentro de un `Popover`, siguiendo el patron documentado en el Design System.
 
-**Cambio en la RPC `get_agenda_by_share_token`**:
-- Modificar para retornar eventos de los ultimos 90 dias Y futuros, no solo futuros
-- Asi el calendario siempre tendra contexto historico
+### Cambios en `src/pages/eventos/NuevoEventoForm.tsx`
 
-### Problema 2: Tab Bars necesitan mejor separacion visual
+1. **Imports**: Agregar `Calendar` de `@/components/ui/calendar`, `format` y `parse` de `date-fns`, y `es` locale de `date-fns/locale/es`.
 
-Los dos tab bars (Proyecto y Estado) estan apilados verticalmente con `space-y-6` pero se ven pegados y confusos sin etiquetas.
+2. **Estado**: Cambiar el tipo de `date` y `endDate` de `string` a `Date | undefined`. Convertir al formato `YYYY-MM-DD` solo al enviar el formulario.
 
-**Cambio en `EventosContent.tsx`**:
-- Agregar etiqueta "Proyecto:" antes del tab bar de proyectos
-- Agregar etiqueta "Estado:" antes del tab bar de estados
-- Agrupar cada etiqueta + tab bar en un `div` con `flex items-center gap-3`
-- Mantenerlos uno debajo del otro con separacion clara
+3. **Campo "Fecha inicio"** (linea 229): Reemplazar `<Input type="date" />` por:
+   - Un `Popover` con un `Button` trigger que muestra la fecha formateada o el placeholder "Seleccionar fecha"
+   - Un `Calendar` con `mode="single"`, locale en espanol, y `className="pointer-events-auto"`
+
+4. **Campo "Fecha fin"** (linea 234): Mismo patron, condicionado a `multiDay === true`
+
+5. **handleSubmit**: Formatear las fechas `Date` a string `YYYY-MM-DD` con `format(date, "yyyy-MM-dd")` antes de enviar.
 
 ---
 
 ### Seccion tecnica
 
-**Archivos a modificar:**
+**Archivo a modificar:** `src/pages/eventos/NuevoEventoForm.tsx`
 
-1. `src/pages/eventos/SharedAgendaPage.tsx` (lineas 154-166):
-   - Cambiar condicion de error: solo mostrar "Agenda no disponible" cuando `isError` es true
-   - Cuando hay 0 eventos y no hay error, mostrar la UI completa con mensaje vacio
+**Imports a agregar:**
+```
+import { Calendar } from "@/components/ui/calendar";
+import { format, parse } from "date-fns";
+import { es } from "date-fns/locale/es";
+```
 
-2. `src/pages/eventos/EventosContent.tsx` (lineas 122-148):
-   - Envolver cada tab bar con una etiqueta descriptiva
-   - Estructura: `<div className="flex items-center gap-3"><span className="text-sm font-medium text-muted-foreground">Proyecto:</span><div>...tabs...</div></div>`
+**Estado actualizado:**
+```
+const [date, setDate] = useState<Date | undefined>(
+  event?.date ? parse(event.date, "yyyy-MM-dd", new Date()) : undefined
+);
+const [endDate, setEndDate] = useState<Date | undefined>(
+  event?.end_date ? parse(event.end_date, "yyyy-MM-dd", new Date()) : undefined
+);
+```
 
-3. Migracion SQL:
-   - Modificar la funcion `get_agenda_by_share_token` para cambiar `WHERE e.date >= CURRENT_DATE` a `WHERE e.date >= CURRENT_DATE - INTERVAL '90 days'`
-   - Esto mostrara eventos pasados recientes y futuros en el calendario
+**Componente de fecha (patron repetido para inicio y fin):**
+```tsx
+<Popover>
+  <PopoverTrigger asChild>
+    <Button
+      variant="outline"
+      className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+    >
+      <CalendarDays className="mr-2 h-4 w-4" />
+      {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
+    </Button>
+  </PopoverTrigger>
+  <PopoverContent className="w-auto p-0" align="start">
+    <Calendar
+      mode="single"
+      selected={date}
+      onSelect={setDate}
+      locale={es}
+      initialFocus
+      className="pointer-events-auto"
+    />
+  </PopoverContent>
+</Popover>
+```
+
+**Validacion y submit actualizado:**
+- Cambiar `!date` a `!date` (sigue siendo falsy check)
+- En formData: `date: format(date, "yyyy-MM-dd")` en lugar de `date` directamente
+- Para endDate: `end_date: multiDay && endDate ? format(endDate, "yyyy-MM-dd") : null`
+
+Como `EditEventoPage.tsx` reutiliza `NuevoEventoForm`, ambas vistas se actualizan automaticamente.
 
