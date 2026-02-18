@@ -1,114 +1,97 @@
 
 
-## Implementacion completa: Categorización por Proyecto y Agenda Compartida en Eventos
+## Corregir visibilidad de controles en Eventos + Redisenar Agenda Compartida
 
-### Alcance
+### Problema 1: Tab Bar de proyectos y boton "Compartir Agenda"
 
-Implementar las dos funcionalidades pendientes solicitadas para el modulo de Eventos:
-1. Categorización por tipo de proyecto (Ora, Kash, Trafix, Unlok)
-2. Agenda compartida publica accesible mediante token
+El codigo ya incluye ambos elementos (lineas 98-134 de EventosContent.tsx). Si no se ven, puede deberse a que la preview no ha recargado los cambios mas recientes. Se verificara que el codigo esta correcto y se asegurara que ambos controles sean visibles.
 
----
+### Problema 2: Redisenar SharedAgendaPage segun la imagen de referencia
 
-### Parte 1: Categorización por Proyecto
-
-#### 1.1 Migracion de base de datos
-- Agregar columna `project_type TEXT` a la tabla `events` con valores permitidos: `'Ora'`, `'Kash'`, `'Trafix'`, `'Unlok'`
-- Columna nullable para no romper eventos existentes
-
-#### 1.2 Tipos de Supabase (`src/integrations/supabase/types.ts`)
-- Agregar `project_type` al tipo `events` en Row, Insert y Update
-
-#### 1.3 Hook `useEventos.ts`
-- Agregar `project_type` a la interfaz `EventRow`
-- Agregar filtro `projectType` a `EventoFilters`
-- Aplicar filtrado client-side por `project_type`
-
-#### 1.4 Tab Bar de proyectos en `EventosContent.tsx`
-- Agregar un segundo Tab Bar (encima del de estados) con las opciones: Todos, Ora, Kash, Trafix, Unlok
-- Mismo estilo que el tab de estados existente (`inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1`)
-- Filtrar eventos por `project_type` seleccionado
-
-#### 1.5 Campo en formulario `NuevoEventoForm.tsx`
-- Agregar un Select "Proyecto *" (obligatorio) debajo del tipo de evento
-- Opciones: Ora, Kash, Trafix, Unlok
-- Incluir en `formData` del submit
-
-#### 1.6 Columna en `EventosTable.tsx`
-- Agregar columna "Proyecto" con Badge coloreado entre "Tipo" y "Fecha"
-- Sortable como las demas columnas
-- Colores diferenciados por proyecto (ej: Ora=blue, Kash=purple, Trafix=amber, Unlok=emerald)
-
-#### 1.7 Badge en `EventosGrid.tsx`
-- Mostrar badge de proyecto en las tarjetas del grid
+La pagina actual es funcional pero muy basica. Se rediseñara completamente para replicar el diseño de alta fidelidad de la imagen de referencia.
 
 ---
 
-### Parte 2: Agenda Compartida Publica
+### Cambios en `src/pages/eventos/EventosContent.tsx`
 
-#### 2.1 Tabla de tokens de agenda
-- Crear tabla `agenda_share_tokens` con columnas: `id`, `token` (uuid, unique), `created_by`, `created_at`, `expires_at`
-- RLS: authenticated puede insertar/seleccionar sus propios tokens; anon no accede directamente
+Verificar que los controles existen y son visibles. El codigo actual ya los tiene:
+- Boton "Compartir Agenda" en el header (linea 99)
+- Tab Bar de proyectos (lineas 122-134)
 
-#### 2.2 Funcion RPC `get_agenda_by_share_token`
-- Funcion con `SECURITY DEFINER` que recibe un token UUID
-- Valida que el token existe y no ha expirado
-- Retorna los eventos futuros (proximos 30 dias) con sus invitados y datos de creadoras (nombre, artistic_name, profile_photo_url, instagram)
-- Accesible por `anon` role
+Si hay algun problema de renderizado, se ajustara.
 
-#### 2.3 Ruta publica `/shared/agenda/:token`
-- Nueva pagina en `src/pages/eventos/SharedAgendaPage.tsx`
-- Sin autenticacion requerida (fuera de ProtectedRoute)
-- Llama a `get_agenda_by_share_token` con el token de la URL
+---
 
-#### 2.4 Interfaz de la agenda publica
-La pagina muestra:
-- **Calendario mensual** con indicadores en dias con eventos
-- **Tarjetas de proximos eventos** con hora, badges de proyecto y tipo
-- **Listado diario** al seleccionar un dia: hora, nombre, badges, lista de invitados con handles de Instagram y fotos de perfil
-- Diseno de alta fidelidad, solo lectura
+### Rediseno completo de `src/pages/eventos/SharedAgendaPage.tsx`
 
-#### 2.5 Boton para generar/compartir enlace de agenda
-- En `EventosContent.tsx`, agregar boton "Compartir Agenda" en el header
-- Al hacer click: genera un token en `agenda_share_tokens`, muestra modal con el enlace copiable
-- Si ya existe un token activo, reutilizarlo
+La pagina se rediseñara desde cero para coincidir con la imagen de referencia:
 
-#### 2.6 Registro de ruta en `App.tsx`
-- Agregar ruta publica `/shared/agenda/:token` apuntando a `SharedAgendaPage`
+#### Header
+- Logo "Maven CRM" a la izquierda
+- Buscador de eventos centrado con icono de busqueda y placeholder "Buscar eventos..."
+- Toggle de tema claro/oscuro (Sun/Moon) a la derecha
+
+#### Barra de filtros por proyecto
+- Tab Bar con: Todos, Ora, Kash, Trafix, Unlok
+- Estilo redondeado con borde, variante secondary/ghost segun seleccion
+- Filtra los eventos mostrados por project_type
+
+#### Calendario mensual completo
+- Card con controles: boton "Hoy", navegacion mes anterior/siguiente, nombre del mes capitalizado
+- Toggle Mes/Semana (solo visual por ahora, funcional en Mes)
+- Grid 7 columnas con dias de la semana (Su, Mo, Tu, We, Th, Fr, Sa)
+- Dia actual resaltado con fondo primary (circulo purpura)
+- Dias con eventos marcados con punto indicador debajo del numero
+- Click en dia filtra los eventos del listado inferior
+
+#### Seccion "Proximos Eventos"
+- Titulo con icono de calendario
+- Tarjetas horizontales scrollables mostrando:
+  - Nombre del evento
+  - Badge de proyecto (coloreado: Kash purpura, Ora azul, etc.)
+  - Fecha y hora formateada (ej: "vie 20 feb - 03:00 PM")
+  - Ubicacion con icono MapPin
+
+#### Listado diario detallado
+- Header con dia de la semana en mayuscula, numero grande + mes, conteo de eventos
+- Hora del evento a la izquierda
+- Tarjeta de evento con:
+  - Badges de tipo (Podcast, Shooting, etc.) y proyecto (Kash, Ora, etc.) y status (Upcoming, etc.)
+  - Nombre del evento en negrita
+  - Ubicacion con icono
+  - Descripcion del evento (si tiene)
+  - Links de Instagram (si los hay en la descripcion)
+  - Seccion de invitados con conteo "Pendientes (N)"
+  - Grid de invitados con Avatar, nombre y handle de Instagram con icono
+
+#### Footer
+- Texto centrado "Maven CRM - Kash Agency"
+- Color muted
+
+#### Funcionalidades
+- Buscador: filtra eventos por nombre o ubicacion
+- Filtro de proyecto: Tab Bar filtra por project_type
+- Calendario interactivo: click en dia muestra eventos de ese dia
+- Tema claro/oscuro: toggle funcional usando next-themes
+- Responsive: funciona en desktop y mobile
 
 ---
 
 ### Seccion tecnica
 
-**Archivos nuevos:**
-- Migracion SQL para `project_type` y `agenda_share_tokens`
-- Migracion SQL para funcion RPC `get_agenda_by_share_token`
-- `src/pages/eventos/SharedAgendaPage.tsx` - pagina publica completa
+**Archivo a modificar:**
+- `src/pages/eventos/SharedAgendaPage.tsx` - rediseno completo
 
-**Archivos a modificar:**
-- `src/integrations/supabase/types.ts` - agregar `project_type` a events
-- `src/pages/eventos/useEventos.ts` - agregar campo y filtro
-- `src/pages/eventos/EventosContent.tsx` - Tab Bar de proyectos + boton compartir agenda
-- `src/pages/eventos/NuevoEventoForm.tsx` - campo Select de proyecto
-- `src/pages/eventos/EventosTable.tsx` - columna Proyecto con badge
-- `src/pages/eventos/EventosGrid.tsx` - badge de proyecto en tarjetas
-- `src/App.tsx` - ruta publica `/shared/agenda/:token`
+**Dependencias existentes utilizadas:**
+- `date-fns` y `date-fns/locale/es` para formateo
+- `next-themes` para toggle de tema
+- `lucide-react` para iconos (Sun, Moon, Search, MapPin, Clock, CalendarDays, ChevronLeft, ChevronRight, Users)
+- Componentes UI: Card, Button, Avatar, Badge, Input
 
-**Colores de proyecto:**
-```text
-Ora     -> blue (bg-blue-500/15, text-blue-600)
-Kash    -> purple (bg-purple-500/15, text-purple-600)
-Trafix  -> amber (bg-amber-500/15, text-amber-600)
-Unlok   -> emerald (bg-emerald-500/15, text-emerald-600)
-```
+**Estado del componente:**
+- `currentMonth` - mes visible en el calendario
+- `selectedDate` - dia seleccionado (null = mostrar proximos)
+- `searchQuery` - texto del buscador
+- `projectFilter` - filtro de proyecto activo ("" = todos)
 
-**Estructura de la funcion RPC:**
-```text
-get_agenda_by_share_token(p_token UUID)
-  RETURNS TABLE(id, name, event_type, project_type, date, start_time, end_time, location, guests JSONB)
-  SECURITY DEFINER
-  - Valida token en agenda_share_tokens (no expirado)
-  - Retorna eventos con date >= CURRENT_DATE ordenados por date, start_time
-  - Guests como JSON array con nombre, artistic_name, profile_photo_url
-```
-
+**No se requieren cambios en backend** - la funcion RPC `get_agenda_by_share_token` ya devuelve todos los datos necesarios (project_type, event_type, status, guests con instagram_handle y profile_photo_url).
