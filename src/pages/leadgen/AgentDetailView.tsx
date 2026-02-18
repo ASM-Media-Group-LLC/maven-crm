@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, CalendarDays, FileText } from "lucide-react";
-import { format, isSameDay, differenceInMinutes, startOfDay } from "date-fns";
+import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, CalendarDays, FileText, BarChart3 } from "lucide-react";
+import { format, isSameDay, differenceInMinutes, startOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -366,14 +367,149 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             </div>
           )}
 
-          {activeTab === "rendimiento" && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground/50" />
+          {activeTab === "rendimiento" && (() => {
+            const dailyData = Array.from({ length: 7 }, (_, i) => {
+              const day = subDays(now, 6 - i);
+              return {
+                label: format(day, "EEE dd", { locale: es }),
+                count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
+              };
+            });
+
+            const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+              hour: `${String(i).padStart(2, "0")}:00`,
+              count: todayLeads.filter(l => new Date(l.created_at).getHours() === i).length,
+            }));
+            const firstHourIdx = hourlyData.findIndex(h => h.count > 0);
+            const lastHourIdx = hourlyData.length - 1 - [...hourlyData].reverse().findIndex(h => h.count > 0);
+            const filteredHourly = firstHourIdx >= 0 ? hourlyData.slice(firstHourIdx, lastHourIdx + 1) : hourlyData;
+
+            const qualityDistData = Object.entries(qualityCounts)
+              .filter(([_, v]) => v > 0)
+              .map(([key, value]) => ({ category: key.toUpperCase(), count: value }));
+
+            const qualityBarColors: Record<string, string> = {
+              "A+": "hsl(160, 60%, 45%)",
+              "A": "hsl(217, 71%, 53%)",
+              "B+": "hsl(187, 72%, 50%)",
+              "B": "hsl(263, 70%, 50%)",
+              "C": "hsl(215, 14%, 50%)",
+            };
+
+            const daysWithActivity = dailyData.filter(d => d.count > 0).length || 1;
+            const avgPerDay = (agentLeads.length / daysWithActivity).toFixed(1);
+
+            return (
+              <div className="space-y-6">
+                {/* KPI Summary */}
+                <Card>
+                  <CardContent className="p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold">Resumen del Rango Seleccionado</h3>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="rounded-lg border bg-muted/30 p-4 text-center">
+                        <p className="text-2xl font-bold text-primary">{agentLeads.length}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Total Leads</p>
+                      </div>
+                      <div className="rounded-lg border bg-muted/30 p-4 text-center">
+                        <p className="text-2xl font-bold text-primary">{avgPerDay}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Promedio/Día</p>
+                      </div>
+                      <div className="rounded-lg border bg-muted/30 p-4 text-center">
+                        <p className="text-2xl font-bold text-primary">{hoursWorked.toFixed(1)}h</p>
+                        <p className="text-xs text-muted-foreground mt-1">Horas Activas</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Leads por Día */}
+                  <Card>
+                    <CardContent className="p-5">
+                      <h3 className="font-semibold mb-4">Leads por Día</h3>
+                      <div className="h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={dailyData}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Bar dataKey="count" name="Leads" fill="hsl(263, 70%, 50%)" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Leads por Hora */}
+                  <Card>
+                    <CardContent className="p-5">
+                      <h3 className="font-semibold mb-4">Leads por Hora (Hoy)</h3>
+                      <div className="h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={filteredHourly}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                            <XAxis dataKey="hour" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="count"
+                              name="Leads"
+                              stroke="hsl(187, 72%, 50%)"
+                              strokeWidth={2}
+                              dot={{ r: 4, fill: "hsl(var(--card))", stroke: "hsl(187, 72%, 50%)", strokeWidth: 2 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Distribución por Calidad */}
+                {qualityDistData.length > 0 && (
+                  <Card>
+                    <CardContent className="p-5">
+                      <h3 className="font-semibold mb-4">Distribución por Calidad</h3>
+                      <div className="h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                            <YAxis type="category" dataKey="category" tick={{ fontSize: 13, fontWeight: 600 }} className="fill-muted-foreground" width={40} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              labelStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Bar
+                              dataKey="count"
+                              name="Leads"
+                              radius={[0, 4, 4, 0]}
+                              shape={(props: any) => {
+                                const color = qualityBarColors[props.category] || "hsl(var(--primary))";
+                                return <rect {...props} fill={color} />;
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-              <p className="text-muted-foreground text-sm">Rendimiento no disponible aún</p>
-            </div>
-          )}
+            );
+          })()}
 
           {activeTab === "qa" && (
             <div className="flex flex-col items-center justify-center py-20">
