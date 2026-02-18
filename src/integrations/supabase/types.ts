@@ -1234,6 +1234,74 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          can_access: boolean
+          created_at: string
+          data_scope: string
+          id: string
+          module: string
+          role_id: string
+          submodule: string | null
+        }
+        Insert: {
+          can_access?: boolean
+          created_at?: string
+          data_scope?: string
+          id?: string
+          module: string
+          role_id: string
+          submodule?: string | null
+        }
+        Update: {
+          can_access?: boolean
+          created_at?: string
+          data_scope?: string
+          id?: string
+          module?: string
+          role_id?: string
+          submodule?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subtasks: {
         Row: {
           assigned_to: string | null
