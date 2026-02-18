@@ -371,9 +371,15 @@ const DayHeader = ({ date, count }: { date: Date; count: number }) => (
 );
 
 const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
+  const [guestFilter, setGuestFilter] = useState<"all" | "pending" | "confirmed">("all");
   const colors = PROJECT_COLORS[event.project_type ?? ""];
   const pendingGuests = event.guests.filter((g) => g.status === "pending");
   const confirmedGuests = event.guests.filter((g) => g.status === "confirmed");
+  const displayedGuests = guestFilter === "all"
+    ? event.guests
+    : guestFilter === "pending"
+    ? pendingGuests
+    : confirmedGuests;
 
   return (
     <div className="flex gap-4">
@@ -424,28 +430,52 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
           {/* Guests */}
           {event.guests.length > 0 && (
             <div className="border-t pt-3 space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {event.guests.length} invitado{event.guests.length !== 1 ? "s" : ""}
-                </span>
-                {pendingGuests.length > 0 && (
-                  <Badge variant="outline" className="text-[10px]">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">Invitados</span>
+                </div>
+                <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5">
+                  <Button
+                    variant={guestFilter === "all" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => setGuestFilter("all")}
+                  >
+                    Todos ({event.guests.length})
+                  </Button>
+                  <Button
+                    variant={guestFilter === "pending" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => setGuestFilter("pending")}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 mr-1" />
                     Pendientes ({pendingGuests.length})
-                  </Badge>
-                )}
-                {confirmedGuests.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px]">
+                  </Button>
+                  <Button
+                    variant={guestFilter === "confirmed" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => setGuestFilter("confirmed")}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1" />
                     Confirmados ({confirmedGuests.length})
-                  </Badge>
-                )}
+                  </Button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {event.guests.map((g, i) => (
-                  <GuestChip key={i} guest={g} />
-                ))}
-              </div>
+              {displayedGuests.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {displayedGuests.map((g, i) => (
+                    <GuestChip key={i} guest={g} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  No hay invitados {guestFilter === "pending" ? "pendientes" : "confirmados"}
+                </p>
+              )}
             </div>
           )}
         </CardContent>
