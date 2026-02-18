@@ -1,114 +1,115 @@
 
 
-## Detalle de Agente en LeadGen
+## Rendimiento por Agente: Graficas interactivas al seleccionar agente
 
 ### Descripcion
 
-Agregar una vista de detalle cuando se hace click en un agente desde la pestana "Agentes". La vista muestra el perfil completo del agente con KPIs, desglose de calidad, y sus leads filtrados -- replicando la interfaz de la imagen de referencia.
+Cuando se selecciona un agente en la pestana "Rendimiento", reemplazar el estado vacio con un dashboard de graficas interactivas filtradas por ese agente, replicando la interfaz de las imagenes de referencia.
 
 ---
 
-### Implementacion
+### Cambios en `src/pages/leadgen/LeadGenContent.tsx`
 
-Se creara un nuevo componente `AgentDetailView` que se renderiza condicionalmente dentro de `LeadGenContent.tsx` cuando se selecciona un agente, reemplazando el contenido principal (sin navegar a otra ruta).
+**Imports nuevos:**
+- `YAxis, CartesianGrid, Tooltip, LineChart, Line` de `recharts`
+- `isSameDay, subDays, startOfDay, differenceInMonths, subMonths, format as fnsFormat` de `date-fns`
 
-### 1. Estado nuevo en `LeadGenContent.tsx`
+**Cuando `selectedAgente !== "todos"`**, reemplazar el empty state (lineas 404-411) con:
 
-- `selectedAgent`: agente seleccionado (objeto del mockSupervisores o null)
-- Cuando `selectedAgent` no es null, se renderiza `AgentDetailView` en lugar del contenido normal
+#### 1. Card header con total del agente
+- Card con gradiente `from-primary/15 to-primary/5` y borde primary/30
+- Titulo: "Total de Leads - {selectedAgente}"
+- Numero grande en color primary con el conteo total de leads del agente
+- Fecha actual formateada (dd/MM/yyyy)
 
-### 2. Nuevo componente `src/pages/leadgen/AgentDetailView.tsx`
+#### 2. Leads por Hora del Dia (BarChart)
+- Card con titulo "Leads por Hora del Dia"
+- BarChart con datos agrupados por hora de `created_at` para leads de hoy del agente seleccionado
+- Eje X: horas 0:00 a 23:00
+- Eje Y: conteo
+- CartesianGrid con stroke dashed
+- Tooltip interactivo mostrando hora y count
+- Barras color primary
 
-**Header:**
-- Breadcrumb: "LeadGen > Detalle Agente"
-- Boton de regreso (flecha izquierda) que limpia `selectedAgent`
-- Nombre completo del agente (ej: "Daniel Felipe Duque Cortes") y handle (@Daniel.Duque)
-- Indicadores: "Tiempo Activo" con formato 07h 52min 28s, "Ultima Hora" con conteo y badge
-- Botones: "+ Lead" y "Contacto" a la derecha
+#### 3. Leads por Dia - Ultima Semana (BarChart)
+- Card con titulo "Leads por Dia (Ultima Semana)"
+- BarChart con ultimos 7 dias
+- Eje X: formato "lun 16", "mar 17" en espanol
+- Tooltip mostrando nombre del dia y conteo con fecha
+- Barras color emerald/success
 
-**KPI Cards (3 columnas):**
-- Ultima Hora: conteo de leads en la ultima hora, subtitulo "Modelos contactados"
-- Total Hoy: conteo total del dia, subtitulo "Modelos contactados"
-- Promedio por Hora: calculo de leads/horas trabajadas, con objetivo y esperados. Incluye boton "Ver QA (0)"
+#### 4. Leads por Dia - Ultimos 30 dias (LineChart)
+- Card con titulo "Leads por Dia (Ultimos 30 dias)"
+- LineChart con linea violeta/purple y puntos en cada dia
+- Eje X: formato "20 ene", "1 feb"
+- Tooltip interactivo
+- Stroke purple, dots visibles
 
-Los datos se calculan filtrando los leads de la tabla `leads` donde `compania` coincide con el nombre/email del agente.
+#### 5. Leads por Mes - Ultimos 12 meses (BarChart)
+- Card con titulo "Leads por Mes (Ultimos 12 meses)"
+- BarChart con barras color naranja/amber
+- Eje X: formato "mar 25", "abr 25"
+- Agrupado por mes
 
-**Calidad Cards (5 columnas, con colores de la imagen):**
-- A+: fondo gradiente verde esmeralda, label "Top Quality"
-- A: fondo gradiente azul/primary, label "Excelente"
-- B+: fondo gradiente cyan/teal, label "Buena"
-- B: fondo gradiente violeta/purple, label "Regular"
-- C: fondo gradiente gris con borde, label "Basica"
+**Cuando `selectedAgente === "todos"`**, mantener el empty state actual pidiendo seleccionar un agente.
 
-Cada card muestra el conteo grande y el label debajo.
+### Logica de filtrado
 
-**Tab bar interno:**
-- Leads | Rendimiento | QA / Retroalimentacion (usando mismo patron inline-flex rounded-lg)
-
-**Pestana Leads (default):**
-- Fila de filtros: Buscador, Select fecha (Hoy/Ayer/Semana), Calidad, Estado, Contacto, toggle List/Grid
-- Tabla con columnas: Ticket, Handle, Calidad (badge con color), Estado, Pais (bandera + codigo), Fecha, Acciones (Eye + Select calidad)
-- Los leads se filtran por `compania` del agente
-
-**Pestana Rendimiento:**
-- Placeholder con estado vacio (igual que el actual)
-
-**Pestana QA / Retroalimentacion:**
-- Placeholder con estado vacio
-
-### 3. Conexion desde la tabla/grid de Agentes
-
-- En la tabla de agentes, el boton Eye y el click en la fila activan `setSelectedAgent(agente)`
-- En la vista grid, el click en la card activa lo mismo
-
-### 4. Navegacion de retorno
-
-- El boton de flecha en el header del detalle ejecuta `onBack()` que limpia `selectedAgent` y vuelve a la lista
-
----
-
-### Seccion tecnica
-
-**Archivo nuevo:**
-- `src/pages/leadgen/AgentDetailView.tsx`
-
-**Archivo a modificar:**
-- `src/pages/leadgen/LeadGenContent.tsx` - agregar estado `selectedAgent`, renderizar condicionalmente `AgentDetailView`, conectar clicks en agentes
-
-**Props de AgentDetailView:**
-```typescript
-interface AgentDetailViewProps {
-  agent: { name: string; email: string; /* ... */ };
-  leads: Lead[]; // todos los leads, se filtran internamente por compania
-  onBack: () => void;
-}
-```
-
-**Filtrado de leads por agente:**
+Los leads del agente se filtran de la query existente de `leads`:
 ```typescript
 const agentLeads = leads.filter(l => 
-  l.compania?.toLowerCase() === agent.name.toLowerCase() ||
-  l.compania?.toLowerCase() === agent.email.toLowerCase()
+  l.compania?.toLowerCase() === selectedAgente.toLowerCase()
 );
 ```
 
-**Calculo de KPIs:**
-```typescript
-const now = new Date();
-const todayLeads = agentLeads.filter(l => isSameDay(new Date(l.created_at), now));
-const lastHourLeads = todayLeads.filter(l => differenceInHours(now, new Date(l.created_at)) < 1);
-const hoursWorked = Math.max(1, differenceInHours(now, startOfDay(now)));
-const avgPerHour = (todayLeads.length / hoursWorked).toFixed(1);
-```
+Los datos de cada chart se calculan client-side agrupando `agentLeads` por hora/dia/mes segun corresponda.
 
-**Calidad cards con colores de la imagen (usando gradientes):**
-```typescript
-const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "from-emerald-600 to-emerald-900", text: "text-emerald-100" },
-  { key: "a", label: "Excelente", bg: "from-blue-600 to-blue-900", text: "text-blue-100" },
-  { key: "b+", label: "Buena", bg: "from-cyan-600 to-cyan-900", text: "text-cyan-100" },
-  { key: "b", label: "Regular", bg: "from-violet-600 to-violet-900", text: "text-violet-100" },
-  { key: "c", label: "Basica", bg: "border bg-card", text: "text-foreground" },
-];
-```
+### Seccion tecnica
 
+**Archivo a modificar:** `src/pages/leadgen/LeadGenContent.tsx`
+
+- Agregar imports de recharts: `YAxis, CartesianGrid, Tooltip, LineChart, Line`
+- Agregar imports de date-fns: `isSameDay, subDays, startOfDay, subMonths`
+- Dentro del bloque `activeTab === "rendimiento"`, reemplazar el div de empty state (lineas 404-411) con la logica condicional:
+  - Si `selectedAgente === "todos"`: mostrar empty state
+  - Si hay agente seleccionado: calcular `agentLeads`, derivar datos por hora/dia/semana/mes, y renderizar las 5 cards con charts
+
+**Calculo de datos para charts:**
+```typescript
+// Hora
+const hourlyAgentData = Array.from({ length: 24 }, (_, i) => ({
+  hour: `${i}:00`,
+  count: agentLeads.filter(l => isSameDay(new Date(l.created_at), now) && new Date(l.created_at).getHours() === i).length,
+}));
+
+// Semana (7 dias)
+const weeklyData = Array.from({ length: 7 }, (_, i) => {
+  const day = subDays(now, 6 - i);
+  return {
+    label: format(day, "EEE dd", { locale: es }),
+    count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
+    fullDate: format(day, "dd/MM/yyyy"),
+  };
+});
+
+// 30 dias
+const monthlyData = Array.from({ length: 30 }, (_, i) => {
+  const day = subDays(now, 29 - i);
+  return {
+    label: format(day, "d MMM", { locale: es }),
+    count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
+  };
+});
+
+// 12 meses
+const yearlyData = Array.from({ length: 12 }, (_, i) => {
+  const month = subMonths(now, 11 - i);
+  return {
+    label: format(month, "MMM yy", { locale: es }),
+    count: agentLeads.filter(l => {
+      const d = new Date(l.created_at);
+      return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
+    }).length,
+  };
+});
+```
