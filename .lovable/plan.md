@@ -1,48 +1,43 @@
 
 
-## Cambios en Gestion de Usuarios
+## Filtrado interactivo desde las cards de Red Social y Plataforma
 
-### 1. Quitar rol desde la columna de rol en la tabla
+### Descripcion
 
-En la columna "Rol" de `UsersTable.tsx`, cada badge de rol mostrara un icono "X" al lado. Al hacer clic en la X, se eliminara el rol del usuario (se borrara su entrada en `user_roles`). Los usuarios "Sin rol" no mostraran la X.
+Al hacer clic en una card de red social (ej. Instagram) o plataforma (ej. OnlyFans), la tabla/grid de promos se filtrara automaticamente para mostrar solo las entradas de esa red o plataforma. Al hacer clic de nuevo en la misma card, se quita el filtro. La card activa tendra un borde resaltado para indicar visualmente que esta filtrando.
 
-Se necesita:
-- Agregar un callback `onRemoveRole` al componente `UsersTable`
-- Mostrar el badge con un boton X integrado (similar a la imagen de referencia)
-- Agregar la accion `remove_role` en la edge function `admin-user-actions` que haga `DELETE FROM user_roles WHERE user_id = ...`
-- Conectar todo desde `AdminUsuarios.tsx`
+### Cambios
 
-### 2. Mover toggle lista/grid a la esquina derecha
+**Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-Actualmente el toggle esta pegado al buscador. Se movera a la derecha usando `justify-between` o `ml-auto` en el contenedor de filtros, separando el buscador (izquierda) del toggle (derecha).
+1. **Nuevo estado:** Agregar `selectedCardNetwork` y `selectedCardPlatform` (strings vacios por defecto).
+
+2. **onClick en cards de red social:** Al hacer clic en una card, si ya esta seleccionada se deselecciona (toggle). Al seleccionar una red social via card, tambien se sincroniza con el filtro `selectedNetwork` del dropdown para mantener consistencia.
+
+3. **onClick en cards de plataforma:** Mismo comportamiento toggle. Se agrega un nuevo filtro de plataforma en `filteredEntries`.
+
+4. **Indicador visual:** La card activa recibira un anillo de borde (`ring-2 ring-primary`) para distinguirla visualmente de las demas.
+
+5. **Logica de filtrado:** En el `useMemo` de `filteredEntries` (linea ~324), agregar condicion para `selectedCardPlatform` que compare contra `entry.platform`.
 
 ---
 
 ### Seccion tecnica
 
-**Archivos a modificar:**
+**Estado nuevo:**
+- `selectedCardNetwork: string` - red social seleccionada via card (se reutiliza `selectedNetwork` existente)
+- `selectedCardPlatform: string` - plataforma seleccionada via card
 
-- `src/pages/admin/UsersTable.tsx`
-  - Agregar prop `onRemoveRole: (user: AdminUser) => void`
-  - En la celda de Rol, mostrar badge con boton X al lado (solo si tiene rol)
+**Cambios en socialCards onClick (~linea 428):**
+- Click: `setSelectedNetwork(prev => prev === net ? "" : net)` (toggle)
+- Clase condicional: `selectedNetwork === net.toLowerCase() ? "ring-2 ring-primary" : ""`
 
-- `src/pages/admin/UsersGrid.tsx`
-  - Agregar la misma prop `onRemoveRole` para consistencia
+**Cambios en platformCards onClick (~linea 444):**
+- Click: `setSelectedCardPlatform(prev => prev === plat ? "" : plat)` (toggle)
+- Clase condicional: `selectedCardPlatform === plat.toLowerCase() ? "ring-2 ring-primary" : ""`
 
-- `src/pages/admin/AdminUsuarios.tsx`
-  - Lineas 147-165: Cambiar el contenedor de filtros para separar buscador (izquierda) y toggle (derecha) con `justify-between`
-  - Agregar handler `handleRemoveRole` que llame a la edge function con `action: "remove_role"`
-  - Pasar `onRemoveRole` a `UsersTable` y `UsersGrid`
+**Cambio en filteredEntries (~linea 324):**
+- Agregar: `if (selectedCardPlatform && !(entry.platform || "").toLowerCase().includes(selectedCardPlatform)) return false;`
 
-- `supabase/functions/admin-user-actions/index.ts`
-  - Agregar accion `remove_role`: ejecuta `DELETE FROM user_roles WHERE user_id = $user_id`
-  - Proteger contra auto-eliminacion de rol del admin que ejecuta la accion
-
-**Estilo del badge con X (referencia de la imagen):**
-
-```text
-[Admin x]   -- badge con X clickeable
-[Agent x]   -- badge con X clickeable
-Sin posicion -- texto sin X
-```
+**Nota:** Para red social, ya existe `selectedNetwork` en los filtros, asi que al hacer clic en la card simplemente se activa/desactiva ese mismo estado, manteniendo sincronizado el dropdown de filtros con la card.
 
