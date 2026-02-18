@@ -149,6 +149,31 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "remove_role") {
+      if (user_id === callerId) {
+        return new Response(JSON.stringify({ error: "No puedes quitarte tu propio rol" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: removeError } = await adminClient
+        .from("user_roles")
+        .delete()
+        .eq("user_id", user_id);
+
+      if (removeError) {
+        return new Response(JSON.stringify({ error: removeError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "delete_user") {
       // Delete from user_roles first
       await adminClient.from("user_roles").delete().eq("user_id", user_id);

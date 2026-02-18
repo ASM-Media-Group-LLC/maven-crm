@@ -144,7 +144,7 @@ const AdminUsuarios = () => {
               </div>
 
               {/* Search bar - visible for both tabs */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -183,6 +183,12 @@ const AdminUsuarios = () => {
                       onEdit={handleEdit}
                       onResetPassword={handleResetPassword}
                       onDelete={handleDelete}
+                      onRemoveRole={(user) => {
+                        adminAction.mutate(
+                          { action: "remove_role", user_id: user.id },
+                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                        );
+                      }}
                     />
                   ) : (
                     <UsersGrid
@@ -191,6 +197,12 @@ const AdminUsuarios = () => {
                       onEdit={handleEdit}
                       onResetPassword={handleResetPassword}
                       onDelete={handleDelete}
+                      onRemoveRole={(user) => {
+                        adminAction.mutate(
+                          { action: "remove_role", user_id: user.id },
+                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                        );
+                      }}
                     />
                   )}
 
