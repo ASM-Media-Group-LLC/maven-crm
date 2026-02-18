@@ -1,86 +1,40 @@
 
 
-## Graficas Interactivas en Rendimiento del Detalle de Agente
+## Reemplazar selector de fecha en LeadGen por DateRangePicker
 
 ### Descripcion
 
-Reemplazar el estado vacio de la pestana "Rendimiento" en `AgentDetailView` con un dashboard de graficas interactivas que repliquen la interfaz de la imagen: resumen con KPIs, leads por dia (BarChart), leads por hora (LineChart con tooltips), y distribucion por calidad (BarChart horizontal).
+Reemplazar el selector simple de fecha (Select con opciones Hoy/Ayer/Semana/Mes) en la barra de filtros de LeadGen por el componente `DateRangePicker` utilizado en Promolog, con el placeholder "Selecciona fechas".
+
+Tambien se verifico que en Promolog todas las instancias del `DateRangePicker` (Promos, Agentes, Campanas) usan correctamente `placeholder="Selecciona fechas"` -- estan bien.
 
 ---
 
-### Cambios en `src/pages/leadgen/AgentDetailView.tsx`
+### Cambios en `src/pages/leadgen/LeadGenContent.tsx`
 
-**Imports nuevos:**
-- `BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer` de `recharts`
-- `subDays` de `date-fns`
+#### 1. Imports
+- Agregar: `import { DateRangePicker } from "@/components/ui/date-range-picker";`
 
-**Reemplazar el bloque vacio de `activeTab === "rendimiento"` (lineas 369-376) con:**
+#### 2. Estado nuevo
+- Agregar dos estados para el rango de fechas:
+  - `dateFrom: Date | undefined`
+  - `dateTo: Date | undefined`
 
-#### 1. Resumen del Rango Seleccionado (3 KPI cards en fila)
-- **Total Leads**: conteo total de `agentLeads` (ya calculado)
-- **Promedio/Dia**: total dividido por dias con actividad (minimo 1)
-- **Horas Activas**: `hoursWorked` formateado con 1 decimal + "h"
-- Estilo: Card con icono de grafico, 3 sub-cards internas con borde y fondo muted/30
-
-#### 2. Leads por Dia (BarChart)
-- Card con titulo "Leads por Dia"
-- BarChart con ultimos 7 dias de actividad del agente
-- Barras color violeta/purple (como en la imagen)
-- Eje X con formato de fecha, Eje Y con conteo
-- Tooltip interactivo
-
-#### 3. Leads por Hora - Hoy (LineChart)
-- Card con titulo "Leads por Hora (Hoy)"
-- LineChart con linea azul/cyan y puntos visibles
-- Solo horas con actividad (desde primera hasta ultima hora del dia)
-- Tooltip mostrando hora y "count: X" (como en la imagen)
-- Dots con radio 4, fill blanco, stroke azul
-
-#### 4. Distribucion por Calidad (BarChart horizontal)
-- Card con titulo "Distribucion por Calidad"
-- BarChart con layout="vertical"
-- Eje Y con categorias (A+, A, B+, B, C)
-- Barras con colores diferenciados por calidad:
-  - A+: azul (blue-500)
-  - B+: violeta/purple
-  - B: cyan/teal
-- Sin eje X numerico complejo, solo valores simples
-
----
-
-### Seccion tecnica
-
-**Archivo a modificar:** `src/pages/leadgen/AgentDetailView.tsx`
-
-**Datos derivados (usando `agentLeads` ya existente):**
-
-```typescript
-// Leads por dia (ultimos 7 dias)
-const dailyData = Array.from({ length: 7 }, (_, i) => {
-  const day = subDays(now, 6 - i);
-  return {
-    label: format(day, "dd/MM"),
-    count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
-  };
-});
-
-// Leads por hora (hoy)
-const hourlyData = Array.from({ length: 24 }, (_, i) => ({
-  hour: `${String(i).padStart(2, "0")}:00`,
-  count: todayLeads.filter(l => new Date(l.created_at).getHours() === i).length,
-})).filter((_, i, arr) => {
-  // Mostrar desde primera hasta ultima hora con datos
-  const firstIdx = arr.findIndex(h => h.count > 0);
-  const lastIdx = arr.length - 1 - [...arr].reverse().findIndex(h => h.count > 0);
-  return i >= firstIdx && i <= lastIdx;
-});
-
-// Distribucion por calidad (reutiliza qualityCounts existente)
-const qualityDistData = Object.entries(qualityCounts)
-  .filter(([_, v]) => v > 0)
-  .map(([key, value]) => ({ category: key.toUpperCase(), count: value }));
+#### 3. Reemplazo del selector de fecha (lineas 145-157)
+- Eliminar el bloque del icono `CalendarDays` + `Select` con opciones Hoy/Ayer/Semana/Mes
+- Reemplazar por:
+```tsx
+<DateRangePicker
+  from={dateFrom}
+  to={dateTo}
+  onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
+  placeholder="Selecciona fechas"
+  className="h-9"
+/>
 ```
 
-**Colores de las barras de calidad (por categoria):**
-- Cada barra usa un color fijo mapeado a la categoria, consistente con los qualityCards ya definidos
+Esto replica exactamente el comportamiento de Promolog: un boton que dice "Selecciona fechas" y al hacer click abre el modal con presets rapidos (Hoy, Ayer, Esta semana, etc.), calendario dual y entrada manual.
 
+### Resultado de la verificacion de Promolog
+
+Las tres pestanas de Promolog (Promos, Agentes, Campanas) usan `placeholder="Selecciona fechas"` correctamente. No se requiere ningun cambio en Promolog.
