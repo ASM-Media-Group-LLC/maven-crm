@@ -1169,6 +1169,50 @@ export type Database = {
           },
         ]
       }
+      promolog_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          creator_id: string
+          goal_monthly: number
+          goal_weekly: number
+          id: string
+          month_year: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          creator_id: string
+          goal_monthly?: number
+          goal_weekly?: number
+          id?: string
+          month_year: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          creator_id?: string
+          goal_monthly?: number
+          goal_weekly?: number
+          id?: string
+          month_year?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promolog_campaigns_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promolog_entries: {
         Row: {
           action_taken: string | null

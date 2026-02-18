@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
@@ -114,6 +114,21 @@ const PromologContent = () => {
       return data;
     },
   });
+
+  // Fetch campaigns
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["promolog-campaigns"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("promolog_campaigns")
+        .select("*, creators(name, artistic_name)")
+        .order("month_year", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const queryClient = useQueryClient();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
@@ -259,7 +274,24 @@ const PromologContent = () => {
   const [campaignCreatorOpen, setCampaignCreatorOpen] = useState(false);
   const [campaignMonthOpen, setCampaignMonthOpen] = useState(false);
 
-  const handleCreateCampaign = () => {
+  const handleCreateCampaign = async () => {
+    if (!campaignCreator || !campaignMonth || !campaignGoalMonthly) {
+      toast({ title: "Campos requeridos", description: "Completa todos los campos obligatorios.", variant: "destructive" });
+      return;
+    }
+    const monthDate = new Date(campaignMonth.getFullYear(), campaignMonth.getMonth(), 1);
+    const { error } = await supabase.from("promolog_campaigns").insert({
+      creator_id: campaignCreator,
+      month_year: monthDate.toISOString().split("T")[0],
+      goal_monthly: parseInt(campaignGoalMonthly) || 0,
+      goal_weekly: parseInt(campaignGoalWeekly) || 0,
+      status: "activa",
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
     toast({ title: "Campaña creada", description: "La campaña mensual se ha creado correctamente." });
     setCampaignModalOpen(false);
     setCampaignCreator("");
@@ -593,27 +625,6 @@ const PromologContent = () => {
         {/* Agentes tab */}
         {activeTab === "agentes" && (
           <div className="space-y-6">
-            {/* Banner gradient al estilo LeadGen */}
-            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-              <div className="p-6 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
-                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Filters row */}
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 max-w-xs">
@@ -640,6 +651,27 @@ const PromologContent = () => {
                 <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
+              </div>
+            </div>
+
+            {/* Banner gradient al estilo LeadGen */}
+            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+              <div className="p-6 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
+                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -750,11 +782,88 @@ const PromologContent = () => {
                 </Button>
               </div>
             </div>
-            <Card>
-              <CardContent className="p-6 text-sm text-muted-foreground text-center">
-                {campanasView === "list" ? "Vista de lista de campañas próximamente..." : "Vista de grid de campañas próximamente..."}
-              </CardContent>
-            </Card>
+            {(() => {
+              const filtered = campaigns.filter((c: any) => {
+                const creator = c.creators as any;
+                const name = (creator?.artistic_name || creator?.name || "").toLowerCase();
+                if (searchCampaign && !name.includes(searchCampaign.toLowerCase())) return false;
+                if (campaignStatusFilter && c.status !== campaignStatusFilter) return false;
+                return true;
+              });
+              if (filtered.length === 0) {
+                return (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center justify-center py-16">
+                        <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                          <Target className="h-8 w-8 text-muted-foreground/50" />
+                        </div>
+                        <p className="text-muted-foreground text-sm">No hay campañas</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+              if (campanasView === "list") {
+                return (
+                  <div className="rounded-md border overflow-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Creadora</TableHead>
+                          <TableHead>Mes</TableHead>
+                          <TableHead className="text-right">Obj. Mensual</TableHead>
+                          <TableHead className="text-right">Obj. Semanal</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead>Creada</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filtered.map((c: any) => {
+                          const creator = c.creators as any;
+                          const monthDate = new Date(c.month_year + "T00:00:00");
+                          return (
+                            <TableRow key={c.id}>
+                              <TableCell className="font-medium">{creator?.artistic_name || creator?.name || "—"}</TableCell>
+                              <TableCell className="capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</TableCell>
+                              <TableCell className="text-right">{c.goal_monthly}</TableCell>
+                              <TableCell className="text-right">{c.goal_weekly}</TableCell>
+                              <TableCell>
+                                <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filtered.map((c: any) => {
+                    const creator = c.creators as any;
+                    const monthDate = new Date(c.month_year + "T00:00:00");
+                    return (
+                      <Card key={c.id}>
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-sm">{creator?.artistic_name || creator?.name || "—"}</p>
+                            <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize text-xs">{c.status}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                          <div className="flex gap-4 text-xs">
+                            <span><strong>{c.goal_monthly}</strong> mensual</span>
+                            <span><strong>{c.goal_weekly}</strong> semanal</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
