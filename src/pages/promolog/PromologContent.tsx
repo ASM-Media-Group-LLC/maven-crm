@@ -204,12 +204,12 @@ const PromologContent = () => {
     ];
   }, [entries]);
 
-  const categoryOptions = [
-    { value: "A+", label: "A+ - Excelente" },
-    { value: "A", label: "A - Muy buena" },
-    { value: "B+", label: "B+ - Buena plus" },
-    { value: "B", label: "B - Buena" },
-    { value: "C", label: "C - Regular" },
+  const strategyOptions = [
+    { value: "incentivo_economico", label: "Incentivo económico" },
+    { value: "llamada_motivacional", label: "Llamada motivacional" },
+    { value: "mensaje_estrategico", label: "Mensaje estratégico" },
+    { value: "recordatorio_amable", label: "Recordatorio amable" },
+    { value: "otro", label: "Otro" },
   ];
 
   const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas">("promos");
@@ -218,7 +218,7 @@ const PromologContent = () => {
 
   const [selectedCreator, setSelectedCreator] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [entryStrategy, setEntryStrategy] = useState<string>("");
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [selectedCardPlatform, setSelectedCardPlatform] = useState("");
   
@@ -315,6 +315,7 @@ const PromologContent = () => {
     setEntryContactType("");
     setEntryNotes("");
     setEntryEvidencePreview("");
+    setEntryStrategy("");
   };
 
   const getInitials = (name: string) => name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
@@ -578,15 +579,6 @@ const PromologContent = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={selectedCategory || undefined} onValueChange={(v) => setSelectedCategory(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas</SelectItem>
-                  {categoryOptions.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <DateRangePicker
                 from={dateFrom}
                 to={dateTo}
@@ -594,8 +586,8 @@ const PromologContent = () => {
                 placeholder="Selecciona fechas"
                 className="h-9"
               />
-              {(searchEntry || selectedStatus || selectedNetwork || selectedCategory || selectedCreatorFilter || dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCategory(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+              {(searchEntry || selectedStatus || selectedNetwork || selectedCreatorFilter || dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
                   <X className="mr-1.5 h-4 w-4" />
                   Limpiar filtros
                 </Button>
@@ -957,78 +949,100 @@ const PromologContent = () => {
 
         {/* Registration Modal */}
         <Dialog open={entryModalOpen} onOpenChange={setEntryModalOpen}>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-            <DialogHeader className="pr-8">
-              <DialogTitle>Registrar Promoción</DialogTitle>
-              <DialogDescription className="sr-only">Registrar una nueva entrada de promoción para esta creadora</DialogDescription>
-            </DialogHeader>
+          <DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
             {selectedCreatorForEntry && (
               <>
-                <Card className="bg-muted">
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      {selectedCreatorForEntry.profile_photo_url ? <AvatarImage src={selectedCreatorForEntry.profile_photo_url} alt={selectedCreatorForEntry.name} /> : null}
-                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedCreatorForEntry.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold">{selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}</span>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        {selectedCreatorForEntry.instagram_handle && <span className="flex items-center gap-0.5"><InstagramIcon className="h-3 w-3" />@{selectedCreatorForEntry.instagram_handle}</span>}
-                        {selectedCreatorForEntry.twitter_handle && <span className="flex items-center gap-0.5"><XIcon className="h-3 w-3" />@{selectedCreatorForEntry.twitter_handle}</span>}
-                        {selectedCreatorForEntry.tiktok_handle && <span className="flex items-center gap-0.5"><TikTokIcon className="h-3 w-3" />@{selectedCreatorForEntry.tiktok_handle}</span>}
+                {/* Fixed header */}
+                <div className="shrink-0 p-6 pb-4 space-y-4">
+                  <DialogHeader className="pr-8">
+                    <DialogTitle>Registrar Promoción</DialogTitle>
+                    <DialogDescription className="sr-only">Registrar una nueva entrada de promoción para esta creadora</DialogDescription>
+                  </DialogHeader>
+                  <Card className="bg-muted">
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        {selectedCreatorForEntry.profile_photo_url ? <AvatarImage src={selectedCreatorForEntry.profile_photo_url} alt={selectedCreatorForEntry.name} /> : null}
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedCreatorForEntry.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold">{selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {selectedCreatorForEntry.instagram_handle && <span className="flex items-center gap-0.5"><InstagramIcon className="h-3 w-3" />@{selectedCreatorForEntry.instagram_handle}</span>}
+                          {selectedCreatorForEntry.twitter_handle && <span className="flex items-center gap-0.5"><XIcon className="h-3 w-3" />@{selectedCreatorForEntry.twitter_handle}</span>}
+                          {selectedCreatorForEntry.tiktok_handle && <span className="flex items-center gap-0.5"><TikTokIcon className="h-3 w-3" />@{selectedCreatorForEntry.tiktok_handle}</span>}
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">¿Promocionó Hoy?</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-primary text-primary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                        <Check className="h-4 w-4" />Sí Promocionó
+                      </button>
+                      <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-secondary text-secondary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                        <X className="h-4 w-4" />No Promocionó
+                      </button>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-2">
-                  <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-primary text-primary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                      <Check className="h-4 w-4" />Sí Promocionó
-                    </button>
-                    <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-secondary text-secondary-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                      <X className="h-4 w-4" />No Promocionó
-                    </button>
                   </div>
                 </div>
 
-                {entryResult === "si" && (
-                  <>
+                {/* Scrollable content */}
+                <ScrollArea className="flex-1 min-h-0 px-6">
+                  <div className="space-y-4 py-4">
+                    {entryResult === "si" && (
+                      <>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
+                          <div className="grid grid-cols-4 gap-2">
+                            {networkOptions.map((opt) => {
+                              const Icon = opt.icon;
+                              const isSelected = entryNetwork === opt.value;
+                              return (
+                                <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                  <Icon className="h-5 w-5" />{opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {platformOptions.map((opt) => {
+                              const isSelected = entryPlatform === opt.value;
+                              return (
+                                <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {contactTypeOptions.map((opt) => {
+                              const isSelected = entryContactType === opt.value;
+                              return (
+                                <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Always visible fields */}
                     <div className="space-y-2">
-                      <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
-                      <div className="grid grid-cols-4 gap-2">
-                        {networkOptions.map((opt) => {
-                          const Icon = opt.icon;
-                          const isSelected = entryNetwork === opt.value;
+                      <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {strategyOptions.map((opt) => {
+                          const isSelected = entryStrategy === opt.value;
                           return (
-                            <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                              <Icon className="h-5 w-5" />{opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {platformOptions.map((opt) => {
-                          const isSelected = entryPlatform === opt.value;
-                          return (
-                            <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {contactTypeOptions.map((opt) => {
-                          const isSelected = entryContactType === opt.value;
-                          return (
-                            <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                            <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                               {opt.label}
                             </button>
                           );
@@ -1055,13 +1069,16 @@ const PromologContent = () => {
                         </div>
                       )}
                     </div>
-                  </>
-                )}
+                  </div>
+                </ScrollArea>
 
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
-                  <Button onClick={() => { setEntryModalOpen(false); toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` }); }}>Guardar Promoción</Button>
-                </DialogFooter>
+                {/* Fixed footer */}
+                <div className="shrink-0 p-6 pt-4 border-t">
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => { setEntryModalOpen(false); toast({ title: "Registro cancelado" }); }}>Cancelar</Button>
+                    <Button onClick={() => { setEntryModalOpen(false); toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` }); }}>Guardar Promoción</Button>
+                  </DialogFooter>
+                </div>
               </>
             )}
           </DialogContent>
@@ -1104,69 +1121,93 @@ const PromologContent = () => {
         {/* Edit Entry Modal (from table/grid actions) */}
         {selectedEntry && (
           <Dialog open={editEntryOpen} onOpenChange={setEditEntryOpen}>
-            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-              <DialogHeader className="pr-8">
-                <DialogTitle>Editar Promoción</DialogTitle>
-                <DialogDescription className="sr-only">Editar los detalles de promoción</DialogDescription>
-              </DialogHeader>
-              <Card className="bg-muted">
-                <CardContent className="p-3 flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedEntry.name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold">{selectedEntry.name}</span>
-                    {selectedEntry.handle && <span className="text-xs text-muted-foreground">@{selectedEntry.handle}</span>}
+            <DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
+              {/* Fixed header */}
+              <div className="shrink-0 p-6 pb-4 space-y-4">
+                <DialogHeader className="pr-8">
+                  <DialogTitle>Editar Promoción</DialogTitle>
+                  <DialogDescription className="sr-only">Editar los detalles de promoción</DialogDescription>
+                </DialogHeader>
+                <Card className="bg-muted">
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(selectedEntry.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold">{selectedEntry.name}</span>
+                      {selectedEntry.handle && <span className="text-xs text-muted-foreground">@{selectedEntry.handle}</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <div className="space-y-2">
+                  <span className="text-sm font-medium">¿Promocionó Hoy?</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-cyan-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                      <Check className="h-4 w-4" />Sí Promocionó
+                    </button>
+                    <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-blue-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                      <X className="h-4 w-4" />No Promocionó
+                    </button>
                   </div>
-                </CardContent>
-              </Card>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">¿Promocionó Hoy?</span>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setEntryResult("si")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "si" ? "bg-cyan-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                    <Check className="h-4 w-4" />Sí Promocionó
-                  </button>
-                  <button type="button" onClick={() => setEntryResult("no")} className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-medium transition-colors ${entryResult === "no" ? "bg-blue-500 text-white" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                    <X className="h-4 w-4" />No Promocionó
-                  </button>
                 </div>
               </div>
-              {entryResult === "si" && (
-                <>
+
+              {/* Scrollable content */}
+              <ScrollArea className="flex-1 min-h-0 px-6">
+                <div className="space-y-4 py-4">
+                  {entryResult === "si" && (
+                    <>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
+                        <div className="grid grid-cols-4 gap-2">
+                          {networkOptions.map((opt) => {
+                            const Icon = opt.icon;
+                            const isSelected = entryNetwork === opt.value;
+                            return (
+                              <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                <Icon className="h-5 w-5" />{opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {platformOptions.map((opt) => {
+                            const isSelected = entryPlatform === opt.value;
+                            return (
+                              <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
+                        <div className="grid grid-cols-3 gap-2">
+                          {contactTypeOptions.map((opt) => {
+                            const isSelected = entryContactType === opt.value;
+                            return (
+                              <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Always visible fields */}
                   <div className="space-y-2">
-                    <span className="text-sm font-medium">Red Social <span className="text-destructive">*</span></span>
-                    <div className="grid grid-cols-4 gap-2">
-                      {networkOptions.map((opt) => {
-                        const Icon = opt.icon;
-                        const isSelected = entryNetwork === opt.value;
+                    <span className="text-sm font-medium">¿Qué se hizo para que promocione?</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {strategyOptions.map((opt) => {
+                        const isSelected = entryStrategy === opt.value;
                         return (
-                          <button key={opt.value} type="button" onClick={() => setEntryNetwork(opt.value)} className={`flex flex-col items-center justify-center gap-1.5 rounded-md px-2 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            <Icon className="h-5 w-5" />{opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Plataforma <span className="text-destructive">*</span></span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {platformOptions.map((opt) => {
-                        const isSelected = entryPlatform === opt.value;
-                        return (
-                          <button key={opt.value} type="button" onClick={() => setEntryPlatform(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-sm font-medium">Tipo de Contacto <span className="text-destructive">*</span></span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {contactTypeOptions.map((opt) => {
-                        const isSelected = entryContactType === opt.value;
-                        return (
-                          <button key={opt.value} type="button" onClick={() => setEntryContactType(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-3 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
+                          <button key={opt.value} type="button" onClick={() => setEntryStrategy(opt.value)} className={`flex items-center justify-center rounded-md px-3 py-2.5 text-xs font-medium transition-colors ${isSelected ? "border-2 border-primary bg-accent text-accent-foreground" : "border border-input bg-background text-muted-foreground hover:bg-accent"}`}>
                             {opt.label}
                           </button>
                         );
@@ -1177,12 +1218,16 @@ const PromologContent = () => {
                     <span className="text-sm font-medium">Notas</span>
                     <Textarea value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} placeholder="Agregar notas..." className="min-h-[80px]" />
                   </div>
-                </>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => { setEditEntryOpen(false); toast({ title: "Edición cancelada" }); }}>Cancelar</Button>
-                <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => { setEditEntryOpen(false); toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` }); }}>Guardar Cambios</Button>
-              </DialogFooter>
+                </div>
+              </ScrollArea>
+
+              {/* Fixed footer */}
+              <div className="shrink-0 p-6 pt-4 border-t">
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setEditEntryOpen(false); toast({ title: "Edición cancelada" }); }}>Cancelar</Button>
+                  <Button className="bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => { setEditEntryOpen(false); toast({ title: "Promoción actualizada", description: `Los cambios para ${selectedEntry.name} han sido guardados.` }); }}>Guardar Cambios</Button>
+                </DialogFooter>
+              </div>
             </DialogContent>
           </Dialog>
         )}
