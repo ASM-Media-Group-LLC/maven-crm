@@ -690,7 +690,7 @@ const PromologContent = () => {
 
         {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="pr-8">
               <DialogTitle>Todas - Selecciona una Creadora</DialogTitle>
             </DialogHeader>
@@ -729,11 +729,11 @@ const PromologContent = () => {
               </Select>
             </div>
             <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-1">
+              <div className="flex flex-col divide-y divide-border">
                 {filteredCreators.map((creator) => (
-                  <Card
+                  <div
                     key={creator.id}
-                    className="relative cursor-pointer transition-colors hover:bg-muted/50"
+                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md transition-colors"
                     onClick={() => {
                       setSelectedCreatorForEntry(creator);
                       resetEntryModal();
@@ -741,26 +741,34 @@ const PromologContent = () => {
                       setCreatorsModalOpen(false);
                     }}
                   >
-                    <CardContent className="flex flex-col items-center p-3 gap-2">
-                      {creator.status !== "active" && (
-                        <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-destructive" />
-                      )}
-                      <Avatar className="h-12 w-12 border-2 border-muted-foreground/50">
+                    <div className="relative shrink-0">
+                      <Avatar className="h-8 w-8 border border-muted-foreground/30">
                         {creator.profile_photo_url ? <AvatarImage src={creator.profile_photo_url} alt={creator.name} /> : null}
-                        <AvatarFallback className="bg-muted text-sm font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="bg-muted text-xs font-medium">{creator.name.charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      <p className="text-xs font-medium text-center truncate w-full">{creator.artistic_name || creator.name}</p>
-                      <span className="text-sm">{getCountryFlag(creator.country)}</span>
-                      <div className="flex items-center gap-1.5">
-                        {creator.instagram_handle && <InstagramIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                        {creator.twitter_handle && <XIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                        {creator.tiktok_handle && <TikTokIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </div>
-                      {creator.category && (
-                        <Badge variant={getCategoryBadgeVariant(creator.category)} className="text-[10px] px-1.5 py-0">{creator.category}</Badge>
+                      {creator.status !== "active" && (
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive border-2 border-background" />
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{creator.artistic_name || creator.name}</p>
+                      <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                        {creator.instagram_handle && (
+                          <span className="flex items-center gap-0.5 truncate"><InstagramIcon className="h-3 w-3 shrink-0" />@{creator.instagram_handle}</span>
+                        )}
+                        {creator.tiktok_handle && (
+                          <span className="flex items-center gap-0.5 truncate"><TikTokIcon className="h-3 w-3 shrink-0" />@{creator.tiktok_handle}</span>
+                        )}
+                        {creator.twitter_handle && (
+                          <span className="flex items-center gap-0.5 truncate"><XIcon className="h-3 w-3 shrink-0" />@{creator.twitter_handle}</span>
+                        )}
+                      </div>
+                    </div>
+                    {creator.category && (
+                      <Badge variant={getCategoryBadgeVariant(creator.category)} className="text-[10px] px-1.5 py-0 shrink-0">{creator.category}</Badge>
+                    )}
+                    <span className="text-sm shrink-0">{getCountryFlag(creator.country)}</span>
+                  </div>
                 ))}
               </div>
             </ScrollArea>
