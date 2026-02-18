@@ -4,7 +4,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, LayoutGrid, List, Shield, UserCog, Users, User } from "lucide-react";
+import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus } from "lucide-react";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
 import UsersGrid from "./UsersGrid";
@@ -12,6 +12,7 @@ import ChangeRoleModal from "./ChangeRoleModal";
 import EditUserModal from "./EditUserModal";
 import DeleteUserDialog from "./DeleteUserDialog";
 import RolesContent from "./RolesContent";
+import AddUserModal from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,7 @@ const AdminUsuarios = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -94,6 +96,12 @@ const AdminUsuarios = () => {
                   <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
                   <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
                 </div>
+                {activeTab === "usuarios" && (
+                  <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar Empleado
+                  </Button>
+                )}
               </div>
             </header>
 
@@ -121,31 +129,38 @@ const AdminUsuarios = () => {
                     key={tab.key}
                     variant={activeTab === tab.key ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => { setActiveTab(tab.key); setSearch(""); }}
                   >
                     {tab.label}
                   </Button>
                 ))}
               </div>
 
+              {/* Search bar - visible for both tabs */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={activeTab === "usuarios" ? "Buscar por nombre..." : "Buscar rol..."}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                {activeTab === "usuarios" && (
+                  <div className="flex gap-1 border rounded-md p-0.5">
+                    <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {activeTab === "usuarios" ? (
                 <>
-                  {/* Search + View Toggle */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1 max-w-sm">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Buscar por nombre..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-                    </div>
-                    <div className="flex gap-1 border rounded-md p-0.5">
-                      <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
-                        <List className="h-4 w-4" />
-                      </Button>
-                      <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
-                        <LayoutGrid className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
                   {/* Content */}
                   {isLoading ? (
                     <div className="flex justify-center py-12">
@@ -213,8 +228,25 @@ const AdminUsuarios = () => {
                   />
                 </>
               ) : (
-                <RolesContent />
+                <RolesContent search={search} />
               )}
+
+              <AddUserModal
+                open={addUserOpen}
+                onOpenChange={setAddUserOpen}
+                onConfirm={(data) => {
+                  adminAction.mutate(
+                    { action: "create_user", ...data },
+                    {
+                      onSuccess: () => {
+                        setAddUserOpen(false);
+                        toast({ title: "Usuario creado exitosamente" });
+                      },
+                    }
+                  );
+                }}
+                isLoading={adminAction.isPending}
+              />
             </div>
           </main>
         </div>
