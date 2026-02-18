@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, KeyRound, UserCog } from "lucide-react";
+import { Pencil, Trash2, KeyRound, UserCog, X } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,9 +20,10 @@ interface UsersTableProps {
   onEdit: (user: AdminUser) => void;
   onResetPassword: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
+  onRemoveRole: (user: AdminUser) => void;
 }
 
-const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete }: UsersTableProps) => (
+const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRemoveRole }: UsersTableProps) => (
   <div className="rounded-md border">
     <Table>
       <TableHeader>
@@ -46,9 +47,19 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete }: Us
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant={roleBadgeVariant[user.role ?? ""] ?? "outline"}>
-                {user.role ?? "Sin rol"}
-              </Badge>
+              {user.role ? (
+                <Badge variant={roleBadgeVariant[user.role] ?? "outline"} className="inline-flex items-center gap-1 pr-1">
+                  {user.role}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground text-sm">Sin rol</span>
+              )}
             </TableCell>
             <TableCell className="text-muted-foreground">
               {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}

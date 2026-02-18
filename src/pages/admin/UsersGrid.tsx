@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Trash2, KeyRound, UserCog, Shield, User } from "lucide-react";
+import { Pencil, Trash2, KeyRound, UserCog, Shield, User, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
@@ -21,9 +21,10 @@ interface UsersGridProps {
   onEdit: (user: AdminUser) => void;
   onResetPassword: (user: AdminUser) => void;
   onDelete: (user: AdminUser) => void;
+  onRemoveRole: (user: AdminUser) => void;
 }
 
-const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete }: UsersGridProps) => (
+const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRemoveRole }: UsersGridProps) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
     {users.map((user) => {
       const config = roleConfig[user.role ?? ""] ?? { icon: null, variant: "outline" as const };
@@ -64,10 +65,20 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete }: Use
                   {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
                 </p>
               </div>
-              <Badge variant={config.variant} className="flex items-center gap-1">
-                {config.icon}
-                {user.role ?? "Sin rol"}
-              </Badge>
+              {user.role ? (
+                <Badge variant={config.variant} className="flex items-center gap-1 pr-1">
+                  {config.icon}
+                  {user.role}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemoveRole(user); }}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground text-sm">Sin rol</span>
+              )}
             </div>
           </CardContent>
         </Card>
