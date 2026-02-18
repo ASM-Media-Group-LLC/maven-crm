@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Users, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,8 @@ import ContactosGrid from "./ContactosGrid";
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
+import AgenciasContent from "./AgenciasContent";
+import AddAgenciaModal from "./AddAgenciaModal";
 
 export interface Contacto {
   id: string;
@@ -36,12 +38,14 @@ const emptyFilters: ContactoFilters = {
 };
 
 const ContactosContent = () => {
+  const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -57,7 +61,6 @@ const ContactosContent = () => {
     },
   });
 
-  // Map DB rows to Contacto interface
   const allContactos: Contacto[] = useMemo(() =>
     dbContactos.map((c, i) => ({
       id: c.id,
@@ -115,34 +118,66 @@ const ContactosContent = () => {
               Total: {totalContactos} contactos
             </p>
           </div>
-          <Button onClick={() => navigate("/contactos/nuevo")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Contacto
+          {activeTab === "contactos" ? (
+            <Button onClick={() => navigate("/contactos/nuevo")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Contacto
+            </Button>
+          ) : (
+            <Button onClick={() => setAddAgenciaOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar Agencia
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-4 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <Button
+            variant={activeTab === "contactos" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("contactos")}
+          >
+            <Users className="mr-1.5 h-4 w-4" />
+            Contactos
+          </Button>
+          <Button
+            variant={activeTab === "agencias" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setActiveTab("agencias")}
+          >
+            <Building2 className="mr-1.5 h-4 w-4" />
+            Agencias
           </Button>
         </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <ContactosKPICards
-          total={totalContactos}
-          nuevos={nuevos}
-          convertidos={convertidos}
-          esteMes={esteMes}
-        />
+        {activeTab === "contactos" ? (
+          <>
+            <ContactosKPICards
+              total={totalContactos}
+              nuevos={nuevos}
+              convertidos={convertidos}
+              esteMes={esteMes}
+            />
 
-        <ContactosFilters
-          filters={filters}
-          onChange={updateFilters}
-          view={view}
-          onViewChange={setView}
-          hasActiveFilters={!!(filters.search || filters.estado || filters.pais || filters.categoria || filters.fechaCreacion)}
-          onClear={() => setFilters(emptyFilters)}
-        />
+            <ContactosFilters
+              filters={filters}
+              onChange={updateFilters}
+              view={view}
+              onViewChange={setView}
+              hasActiveFilters={!!(filters.search || filters.estado || filters.pais || filters.categoria || filters.fechaCreacion)}
+              onClear={() => setFilters(emptyFilters)}
+            />
 
-        {view === "table" ? (
-          <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+            {view === "table" ? (
+              <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+            ) : (
+              <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+            )}
+          </>
         ) : (
-          <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+          <AgenciasContent />
         )}
       </div>
 
@@ -155,6 +190,7 @@ const ContactosContent = () => {
       />
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
       <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />
+      <AddAgenciaModal open={addAgenciaOpen} onOpenChange={setAddAgenciaOpen} />
     </main>
   );
 };
