@@ -1,97 +1,49 @@
 
 
-## Corregir visibilidad de controles en Eventos + Redisenar Agenda Compartida
+## Corregir Agenda Compartida y Layout de Tab Bars en Eventos
 
-### Problema 1: Tab Bar de proyectos y boton "Compartir Agenda"
+### Problema 1: "Agenda no disponible" al abrir el enlace compartido
 
-El codigo ya incluye ambos elementos (lineas 98-134 de EventosContent.tsx). Si no se ven, puede deberse a que la preview no ha recargado los cambios mas recientes. Se verificara que el codigo esta correcto y se asegurara que ambos controles sean visibles.
+La funcion RPC `get_agenda_by_share_token` solo retorna eventos futuros (`date >= CURRENT_DATE`). El unico evento en la base de datos es del 15 de febrero (ya pasado), por lo que retorna 0 resultados. La pagina `SharedAgendaPage.tsx` interpreta 0 eventos como error y muestra "Agenda no disponible".
 
-### Problema 2: Redisenar SharedAgendaPage segun la imagen de referencia
+**Solucion**: Separar el estado de "token invalido" del estado de "no hay eventos proximos":
+- Modificar la RPC para tambien retornar eventos pasados recientes (ultimos 30 dias) para que el calendario tenga contenido
+- O mejor: cambiar la logica del frontend para que muestre la interfaz completa (calendario, buscador, filtros) incluso cuando no hay eventos, y solo mostrar "Agenda no disponible" cuando el token es realmente invalido (error de la RPC)
 
-La pagina actual es funcional pero muy basica. Se rediseñara completamente para replicar el diseño de alta fidelidad de la imagen de referencia.
+**Cambio en `SharedAgendaPage.tsx`**:
+- La condicion `events.length === 0 && !isLoading` ya no mostrara el estado de error
+- Solo se mostrara "Agenda no disponible" si hay un error real de la RPC (`isError === true`)
+- Con 0 eventos, se mostrara el calendario vacio con un mensaje "No hay eventos proximos"
 
----
+**Cambio en la RPC `get_agenda_by_share_token`**:
+- Modificar para retornar eventos de los ultimos 90 dias Y futuros, no solo futuros
+- Asi el calendario siempre tendra contexto historico
 
-### Cambios en `src/pages/eventos/EventosContent.tsx`
+### Problema 2: Tab Bars necesitan mejor separacion visual
 
-Verificar que los controles existen y son visibles. El codigo actual ya los tiene:
-- Boton "Compartir Agenda" en el header (linea 99)
-- Tab Bar de proyectos (lineas 122-134)
+Los dos tab bars (Proyecto y Estado) estan apilados verticalmente con `space-y-6` pero se ven pegados y confusos sin etiquetas.
 
-Si hay algun problema de renderizado, se ajustara.
-
----
-
-### Rediseno completo de `src/pages/eventos/SharedAgendaPage.tsx`
-
-La pagina se rediseñara desde cero para coincidir con la imagen de referencia:
-
-#### Header
-- Logo "Maven CRM" a la izquierda
-- Buscador de eventos centrado con icono de busqueda y placeholder "Buscar eventos..."
-- Toggle de tema claro/oscuro (Sun/Moon) a la derecha
-
-#### Barra de filtros por proyecto
-- Tab Bar con: Todos, Ora, Kash, Trafix, Unlok
-- Estilo redondeado con borde, variante secondary/ghost segun seleccion
-- Filtra los eventos mostrados por project_type
-
-#### Calendario mensual completo
-- Card con controles: boton "Hoy", navegacion mes anterior/siguiente, nombre del mes capitalizado
-- Toggle Mes/Semana (solo visual por ahora, funcional en Mes)
-- Grid 7 columnas con dias de la semana (Su, Mo, Tu, We, Th, Fr, Sa)
-- Dia actual resaltado con fondo primary (circulo purpura)
-- Dias con eventos marcados con punto indicador debajo del numero
-- Click en dia filtra los eventos del listado inferior
-
-#### Seccion "Proximos Eventos"
-- Titulo con icono de calendario
-- Tarjetas horizontales scrollables mostrando:
-  - Nombre del evento
-  - Badge de proyecto (coloreado: Kash purpura, Ora azul, etc.)
-  - Fecha y hora formateada (ej: "vie 20 feb - 03:00 PM")
-  - Ubicacion con icono MapPin
-
-#### Listado diario detallado
-- Header con dia de la semana en mayuscula, numero grande + mes, conteo de eventos
-- Hora del evento a la izquierda
-- Tarjeta de evento con:
-  - Badges de tipo (Podcast, Shooting, etc.) y proyecto (Kash, Ora, etc.) y status (Upcoming, etc.)
-  - Nombre del evento en negrita
-  - Ubicacion con icono
-  - Descripcion del evento (si tiene)
-  - Links de Instagram (si los hay en la descripcion)
-  - Seccion de invitados con conteo "Pendientes (N)"
-  - Grid de invitados con Avatar, nombre y handle de Instagram con icono
-
-#### Footer
-- Texto centrado "Maven CRM - Kash Agency"
-- Color muted
-
-#### Funcionalidades
-- Buscador: filtra eventos por nombre o ubicacion
-- Filtro de proyecto: Tab Bar filtra por project_type
-- Calendario interactivo: click en dia muestra eventos de ese dia
-- Tema claro/oscuro: toggle funcional usando next-themes
-- Responsive: funciona en desktop y mobile
+**Cambio en `EventosContent.tsx`**:
+- Agregar etiqueta "Proyecto:" antes del tab bar de proyectos
+- Agregar etiqueta "Estado:" antes del tab bar de estados
+- Agrupar cada etiqueta + tab bar en un `div` con `flex items-center gap-3`
+- Mantenerlos uno debajo del otro con separacion clara
 
 ---
 
 ### Seccion tecnica
 
-**Archivo a modificar:**
-- `src/pages/eventos/SharedAgendaPage.tsx` - rediseno completo
+**Archivos a modificar:**
 
-**Dependencias existentes utilizadas:**
-- `date-fns` y `date-fns/locale/es` para formateo
-- `next-themes` para toggle de tema
-- `lucide-react` para iconos (Sun, Moon, Search, MapPin, Clock, CalendarDays, ChevronLeft, ChevronRight, Users)
-- Componentes UI: Card, Button, Avatar, Badge, Input
+1. `src/pages/eventos/SharedAgendaPage.tsx` (lineas 154-166):
+   - Cambiar condicion de error: solo mostrar "Agenda no disponible" cuando `isError` es true
+   - Cuando hay 0 eventos y no hay error, mostrar la UI completa con mensaje vacio
 
-**Estado del componente:**
-- `currentMonth` - mes visible en el calendario
-- `selectedDate` - dia seleccionado (null = mostrar proximos)
-- `searchQuery` - texto del buscador
-- `projectFilter` - filtro de proyecto activo ("" = todos)
+2. `src/pages/eventos/EventosContent.tsx` (lineas 122-148):
+   - Envolver cada tab bar con una etiqueta descriptiva
+   - Estructura: `<div className="flex items-center gap-3"><span className="text-sm font-medium text-muted-foreground">Proyecto:</span><div>...tabs...</div></div>`
 
-**No se requieren cambios en backend** - la funcion RPC `get_agenda_by_share_token` ya devuelve todos los datos necesarios (project_type, event_type, status, guests con instagram_handle y profile_photo_url).
+3. Migracion SQL:
+   - Modificar la funcion `get_agenda_by_share_token` para cambiar `WHERE e.date >= CURRENT_DATE` a `WHERE e.date >= CURRENT_DATE - INTERVAL '90 days'`
+   - Esto mostrara eventos pasados recientes y futuros en el calendario
+
