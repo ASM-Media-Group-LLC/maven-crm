@@ -4,8 +4,8 @@ import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search,
 import AgentDetailView from "./AgentDetailView";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
-import { BarChart, Bar, XAxis, ResponsiveContainer } from "recharts";
-import { format } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
+import { format, isSameDay, subDays, startOfDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -401,14 +401,151 @@ const LeadGenContent = () => {
                     </PopoverContent>
                   </Popover>
                 </div>
-                <div className="flex flex-col items-center justify-center py-20">
-                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                    <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
+                {selectedAgente === "todos" ? (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                      <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Selecciona un agente para ver su rendimiento
+                    </p>
                   </div>
-                  <p className="text-muted-foreground text-sm">
-                    Selecciona un agente para ver su rendimiento
-                  </p>
-                </div>
+                ) : (() => {
+                  const now = new Date();
+                  const agentLeads = leads.filter(l => l.compania?.toLowerCase() === selectedAgente.toLowerCase());
+                  
+                  const hourlyAgentData = Array.from({ length: 24 }, (_, i) => ({
+                    hour: `${i}:00`,
+                    count: agentLeads.filter(l => isSameDay(new Date(l.created_at), now) && new Date(l.created_at).getHours() === i).length,
+                  }));
+
+                  const weeklyData = Array.from({ length: 7 }, (_, i) => {
+                    const day = subDays(now, 6 - i);
+                    return {
+                      label: format(day, "EEE dd", { locale: es }),
+                      count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
+                      fullDate: format(day, "dd/MM/yyyy"),
+                    };
+                  });
+
+                  const last30Data = Array.from({ length: 30 }, (_, i) => {
+                    const day = subDays(now, 29 - i);
+                    return {
+                      label: format(day, "d MMM", { locale: es }),
+                      count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
+                    };
+                  });
+
+                  const yearlyData = Array.from({ length: 12 }, (_, i) => {
+                    const month = subMonths(now, 11 - i);
+                    return {
+                      label: format(month, "MMM yy", { locale: es }),
+                      count: agentLeads.filter(l => {
+                        const d = new Date(l.created_at);
+                        return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear();
+                      }).length,
+                    };
+                  });
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Total card */}
+                      <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Total de Leads — {selectedAgente}</p>
+                            <p className="text-4xl font-bold text-primary mt-1">{agentLeads.length}</p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{format(now, "dd/MM/yyyy")}</p>
+                        </div>
+                      </div>
+
+                      {/* Hourly chart */}
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-primary" />
+                            Leads por Hora del Día
+                          </h4>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={hourlyAgentData}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                <Bar dataKey="count" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Weekly chart */}
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-emerald-500" />
+                            Leads por Día (Última Semana)
+                          </h4>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={weeklyData}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                <Bar dataKey="count" name="Leads" fill="#10b981" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* 30 days line chart */}
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-violet-500" />
+                            Leads por Día (Últimos 30 días)
+                          </h4>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={last30Data}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                <Line type="monotone" dataKey="count" name="Leads" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 3 }} activeDot={{ r: 5 }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* 12 months chart */}
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-amber-500" />
+                            Leads por Mes (Últimos 12 meses)
+                          </h4>
+                          <div className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={yearlyData}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                                <Bar dataKey="count" name="Leads" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}
