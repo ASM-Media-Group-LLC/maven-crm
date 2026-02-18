@@ -1278,6 +1278,74 @@ export type Database = {
           },
         ]
       }
+      roadmap_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
+      roadmap_items: {
+        Row: {
+          category_id: string
+          created_at: string
+          delivery_date: string | null
+          description: string | null
+          id: string
+          position: number
+          status: string
+          submodule: string | null
+          task: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          id?: string
+          position?: number
+          status?: string
+          submodule?: string | null
+          task: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          id?: string
+          position?: number
+          status?: string
+          submodule?: string | null
+          task?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           can_access: boolean
