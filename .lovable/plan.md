@@ -1,54 +1,31 @@
 
 
-## Mejoras en Promolog: Selector de Mes, Filtros en Agentes y Campanas
+## Mejoras en Promolog: Filtros, Modal de Registro y Layout
 
-### 1. Selector de Mes/Ano en Nueva Campana
+### 1. Eliminar filtro de Categoria en Promos
 
-**Problema:** El calendario actual permite seleccionar un dia individual, pero la campana es mensual y solo necesita mes y ano.
-
-**Solucion:** Reemplazar el `Calendar` por un selector manual con dos `Select` (uno para mes, otro para ano). Al seleccionar ambos, se construye la fecha internamente. El trigger sigue siendo un `Button` con `CalendarIcon` mostrando "Febrero 2026".
-
-**Implementacion:**
-- Dentro del `PopoverContent` del mes/ano (lineas 1088-1097), reemplazar `Calendar` por dos selects en fila:
-  - Select de mes: Enero a Diciembre
-  - Select de ano: rango dinamico (ano actual - 1 hasta ano actual + 2)
-- Al seleccionar ambos, se construye `new Date(year, monthIndex, 1)` y se cierra el popover
+El `Select` de "Categoria" (lineas 581-589) no se usa en el flujo de Promolog. Se eliminara junto con el estado `selectedCategory` y la constante `categoryOptions`.
 
 ---
 
-### 2. Agentes: Mover toggle de vista y agregar filtros
+### 2. Modal de Registro: Mostrar Notas y Evidencia tambien cuando "No Promociono"
 
-**Problema:** El toggle List/Grid esta dentro del banner gradient (lineas 598-605), lo cual es inconsistente con el patron de Promos donde esta en la fila de filtros.
+Actualmente, los campos de Notas y Evidencia solo se muestran cuando `entryResult === "si"` (dentro del bloque condicional lineas 996-1058). Se necesita:
 
-**Solucion:** Eliminar el toggle del banner y agregar una fila de filtros debajo del banner con:
-- Buscador (`max-w-xs`, busca por nombre de agente)
-- DateRangePicker (reutiliza `dateFrom`/`dateTo` globales)
-- Boton "Limpiar filtros" condicional
-- Toggle List/Grid alineado a la derecha (`ml-auto`)
-
-**Cambios en lineas 586-681:**
-- Eliminar el bloque de botones List/Grid del banner (lineas 597-605)
-- Agregar estado `searchAgent` para el buscador
-- Insertar fila de filtros despues del banner con el mismo patron visual que Promos (linea 517)
-- Filtrar `agentsData` por nombre segun `searchAgent`
+- Mover **Notas** y **Evidencia** fuera del bloque `{entryResult === "si" && ...}`, para que aparezcan siempre (tanto en "Si" como en "No").
+- Agregar el campo **"Que se hizo para que promocione?"** con opciones seleccionables (como se ve en la imagen de referencia): Incentivo economico, Llamada motivacional, Mensaje estrategico, Recordatorio amable, Otro. Este campo aparecera siempre, independientemente de si promociono o no.
 
 ---
 
-### 3. Campanas: Agregar filtros completos
+### 3. Modal de Registro: Header y Footer fijos con scroll en contenido
 
-**Problema:** La pestana Campanas solo tiene un titulo y el toggle de vista, sin buscador ni filtros.
+El modal actualmente usa `overflow-y-auto` en todo el `DialogContent`. Se cambiara a un layout con:
 
-**Solucion:** Reemplazar la estructura actual (lineas 685-706) por una fila de filtros unificada con:
-- Buscador (`max-w-xs`, busca por nombre de creadora de la campana)
-- Select de estado (Activa, Finalizada, Pendiente)
-- DateRangePicker
-- Boton "Limpiar filtros" condicional
-- Toggle List/Grid alineado a la derecha (`ml-auto`)
-- Eliminar el encabezado h2 redundante (ya esta en las tabs)
+- **Header fijo** (card de la creadora + botones Si/No) usando `shrink-0`
+- **Contenido central scrollable** usando `ScrollArea` con `flex-1 overflow-y-auto`
+- **Footer fijo** (botones Cancelar/Guardar) usando `shrink-0`
 
-**Cambios en lineas 684-706:**
-- Agregar estados `searchCampaign` y `campaignStatusFilter`
-- Reemplazar el layout actual por la fila de filtros estandar
+Esto sigue el patron `sticky` ya usado en formularios complejos del proyecto.
 
 ---
 
@@ -56,63 +33,58 @@
 
 **Archivo:** `src/pages/promolog/PromologContent.tsx`
 
-**Nuevos estados:**
+**Eliminar filtro Categoria (lineas 581-589):**
+- Eliminar el `Select` de categoria de la fila de filtros en Promos
+- Eliminar `selectedCategory` del estado y de la condicion de "Limpiar filtros"
+- Eliminar `categoryOptions`
+
+**Nuevo estado para "Que se hizo":**
 ```text
-const [searchAgent, setSearchAgent] = useState("");
-const [searchCampaign, setSearchCampaign] = useState("");
-const [campaignStatusFilter, setCampaignStatusFilter] = useState("");
+const strategyOptions = [
+  { value: "incentivo_economico", label: "Incentivo economico" },
+  { value: "llamada_motivacional", label: "Llamada motivacional" },
+  { value: "mensaje_estrategico", label: "Mensaje estrategico" },
+  { value: "recordatorio_amable", label: "Recordatorio amable" },
+  { value: "otro", label: "Otro" },
+];
+const [entryStrategy, setEntryStrategy] = useState<string>("");
 ```
 
-**Selector de Mes/Ano (reemplaza Calendar en lineas 1088-1097):**
+**Reestructura del modal de registro (lineas 959-1068):**
+
 ```text
-<PopoverContent className="w-auto p-4" align="start">
-  <div className="flex items-center gap-2">
-    <Select value={mes} onValueChange={setMes}>
-      <SelectTrigger className="w-[130px]">
-        <SelectValue placeholder="Mes" />
-      </SelectTrigger>
-      <SelectContent>
-        {meses.map((m, i) => <SelectItem key={i} value={String(i)}>{m}</SelectItem>)}
-      </SelectContent>
-    </Select>
-    <Select value={ano} onValueChange={setAno}>
-      <SelectTrigger className="w-[100px]">
-        <SelectValue placeholder="Ano" />
-      </SelectTrigger>
-      <SelectContent>
-        {anos.map(a => <SelectItem key={a} value={String(a)}>{a}</SelectItem>)}
-      </SelectContent>
-    </Select>
+<DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0">
+  {/* Header fijo */}
+  <div className="shrink-0 p-6 pb-0 space-y-4">
+    <DialogHeader>...</DialogHeader>
+    <Card creadora>...</Card>
+    <Botones Si/No>...</Botones>
   </div>
-</PopoverContent>
+
+  {/* Contenido scrollable */}
+  <ScrollArea className="flex-1 min-h-0 px-6">
+    <div className="space-y-4 py-4">
+      {entryResult === "si" && (
+        Red Social, Plataforma, Tipo de Contacto
+      )}
+      {/* Siempre visibles: */}
+      Que se hizo para que promocione? (grid 2 cols)
+      Notas (Textarea)
+      Evidencia (Upload)
+    </div>
+  </ScrollArea>
+
+  {/* Footer fijo */}
+  <div className="shrink-0 p-6 pt-4 border-t">
+    <DialogFooter>Cancelar | Guardar Promocion</DialogFooter>
+  </div>
+</DialogContent>
 ```
 
-**Fila de filtros para Agentes (despues del banner, linea 616):**
-```text
-<div className="flex items-center gap-3 flex-wrap">
-  <div className="relative flex-1 max-w-xs">
-    <Search .../> <Input placeholder="Buscar agente..." />
-  </div>
-  <DateRangePicker from={dateFrom} to={dateTo} onApply={...} />
-  {hasFilters && <Button>Limpiar filtros</Button>}
-  <div className="ml-auto flex gap-1">
-    <Button List/> <Button Grid/>
-  </div>
-</div>
-```
+**Aplicar los mismos cambios al modal de Editar (lineas 1106-1188):**
+- Mover Notas fuera del bloque condicional `entryResult === "si"`
+- Agregar campo "Que se hizo"
+- Aplicar layout sticky header/footer
 
-**Fila de filtros para Campanas (reemplaza lineas 687-699):**
-```text
-<div className="flex items-center gap-3 flex-wrap">
-  <div className="relative flex-1 max-w-xs">
-    <Search .../> <Input placeholder="Buscar campana..." />
-  </div>
-  <Select estado />
-  <DateRangePicker />
-  {hasFilters && <Button>Limpiar filtros</Button>}
-  <div className="ml-auto flex gap-1">
-    <Button List/> <Button Grid/>
-  </div>
-</div>
-```
+**Reset:** Agregar `setEntryStrategy("")` en `resetEntryModal`.
 
