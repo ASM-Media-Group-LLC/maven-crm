@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
-  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield,
+  Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -154,6 +154,14 @@ const DashboardSidebar = () => {
                     <NavLink to="/admin/usuarios" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                       <Shield className="h-4 w-4 shrink-0" />
                       <span>Usuarios</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Auditoría">
+                    <NavLink to="/admin/auditoria" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <ClipboardCheck className="h-4 w-4 shrink-0" />
+                      <span>Auditoría</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
