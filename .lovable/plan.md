@@ -1,43 +1,60 @@
 
 
-## Filtrado interactivo desde las cards de Red Social y Plataforma
+## Rediseno del Modal de Seleccion de Creadora
 
-### Descripcion
+### Problema actual
+El modal muestra las creadoras en un grid de 6 columnas con tarjetas pequenas tipo avatar, lo cual dificulta encontrar rapidamente a una creadora y ver su informacion de redes sociales.
 
-Al hacer clic en una card de red social (ej. Instagram) o plataforma (ej. OnlyFans), la tabla/grid de promos se filtrara automaticamente para mostrar solo las entradas de esa red o plataforma. Al hacer clic de nuevo en la misma card, se quita el filtro. La card activa tendra un borde resaltado para indicar visualmente que esta filtrando.
+### Solucion propuesta
+Reemplazar el grid de cards por una **lista vertical con filas compactas** que muestren toda la informacion relevante en una sola linea, similar a una tabla simplificada. Esto permite escanear rapidamente nombres, handles y estado.
 
-### Cambios
+### Nuevo layout de cada fila
 
-**Archivo:** `src/pages/promolog/PromologContent.tsx`
+```text
+[Avatar] Nombre Artistico | @instagram @tiktok @twitter | Categoria | Pais | Estado
+```
 
-1. **Nuevo estado:** Agregar `selectedCardNetwork` y `selectedCardPlatform` (strings vacios por defecto).
+Cada fila sera un elemento clickeable con hover, mostrando:
+- Avatar pequeno (h-8 w-8) a la izquierda
+- Nombre artistico en negrita
+- Iconos de redes sociales con sus handles visibles (no solo iconos)
+- Badge de categoria
+- Bandera de pais
+- Indicador de estado (punto verde/rojo)
 
-2. **onClick en cards de red social:** Al hacer clic en una card, si ya esta seleccionada se deselecciona (toggle). Al seleccionar una red social via card, tambien se sincroniza con el filtro `selectedNetwork` del dropdown para mantener consistencia.
+### Cambios especificos
 
-3. **onClick en cards de plataforma:** Mismo comportamiento toggle. Se agrega un nuevo filtro de plataforma en `filteredEntries`.
+**Archivo:** `src/pages/promolog/PromologContent.tsx` (lineas 731-765)
 
-4. **Indicador visual:** La card activa recibira un anillo de borde (`ring-2 ring-primary`) para distinguirla visualmente de las demas.
-
-5. **Logica de filtrado:** En el `useMemo` de `filteredEntries` (linea ~324), agregar condicion para `selectedCardPlatform` que compare contra `entry.platform`.
-
----
+1. Reemplazar el grid `grid-cols-2 sm:grid-cols-4 lg:grid-cols-6` por un contenedor `flex flex-col divide-y`
+2. Cada creadora sera una fila horizontal (`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md`)
+3. Layout de la fila:
+   - **Izquierda**: Avatar compacto (h-8 w-8) + punto de estado superpuesto
+   - **Centro**: Nombre (texto principal) + handles de redes con iconos inline (texto secundario en una segunda linea)
+   - **Derecha**: Badge de categoria + bandera de pais
+4. Reducir el modal a `max-w-2xl` ya que la lista vertical no necesita tanto ancho
+5. Mantener los 3 mini-KPIs, el buscador y el selector de orden sin cambios
 
 ### Seccion tecnica
 
-**Estado nuevo:**
-- `selectedCardNetwork: string` - red social seleccionada via card (se reutiliza `selectedNetwork` existente)
-- `selectedCardPlatform: string` - plataforma seleccionada via card
+**Estructura HTML de cada fila:**
+```text
+<div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 rounded-md">
+  <Avatar h-8 w-8 + status dot>
+  <div class="flex-1 min-w-0">
+    <p class="text-sm font-medium truncate">Nombre Artistico</p>
+    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+      <InstagramIcon/> @handle  <XIcon/> @handle  <TikTokIcon/> @handle
+    </div>
+  </div>
+  <Badge>categoria</Badge>
+  <span>bandera</span>
+</div>
+```
 
-**Cambios en socialCards onClick (~linea 428):**
-- Click: `setSelectedNetwork(prev => prev === net ? "" : net)` (toggle)
-- Clase condicional: `selectedNetwork === net.toLowerCase() ? "ring-2 ring-primary" : ""`
-
-**Cambios en platformCards onClick (~linea 444):**
-- Click: `setSelectedCardPlatform(prev => prev === plat ? "" : plat)` (toggle)
-- Clase condicional: `selectedCardPlatform === plat.toLowerCase() ? "ring-2 ring-primary" : ""`
-
-**Cambio en filteredEntries (~linea 324):**
-- Agregar: `if (selectedCardPlatform && !(entry.platform || "").toLowerCase().includes(selectedCardPlatform)) return false;`
-
-**Nota:** Para red social, ya existe `selectedNetwork` en los filtros, asi que al hacer clic en la card simplemente se activa/desactiva ese mismo estado, manteniendo sincronizado el dropdown de filtros con la card.
+**Ventajas:**
+- Mas rapido de escanear visualmente (lectura de izquierda a derecha)
+- Handles de redes visibles sin hover ni clic adicional
+- Mayor densidad de informacion: se ven mas creadoras sin scroll
+- Busqueda mas intuitiva al ver nombres y handles juntos
 
