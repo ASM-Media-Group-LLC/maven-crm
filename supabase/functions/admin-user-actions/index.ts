@@ -6,6 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  let result = "";
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -122,18 +131,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === "reset_password") {
-      // Get user email
-      const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(user_id);
-      if (userError || !userData?.user?.email) {
-        return new Response(JSON.stringify({ error: "No se encontró el email del usuario" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const tempPassword = generateTempPassword();
 
-      const { error: resetError } = await adminClient.auth.admin.generateLink({
-        type: "recovery",
-        email: userData.user.email,
+      const { error: resetError } = await adminClient.auth.admin.updateUserById(user_id, {
+        password: tempPassword,
       });
 
       if (resetError) {
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ success: true, message: "Email de recuperación enviado" }), {
+      return new Response(JSON.stringify({ success: true, temp_password: tempPassword }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -169,8 +170,13 @@ Deno.serve(async (req) => {
     }
 
     if (action === "update_profile") {
-      if (!full_name) {
-        return new Response(JSON.stringify({ error: "full_name is required" }), {
+      // Support both legacy full_name and new first_name/last_name
+      const newFullName = first_name && last_name
+        ? `${first_name} ${last_name}`
+        : full_name;
+
+      if (!newFullName) {
+        return new Response(JSON.stringify({ error: "full_name or first_name+last_name is required" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -178,7 +184,7 @@ Deno.serve(async (req) => {
 
       const { error: updateError } = await adminClient
         .from("profiles")
-        .update({ full_name })
+        .update({ full_name: newFullName })
         .eq("id", user_id);
 
       if (updateError) {
@@ -186,6 +192,21 @@ Deno.serve(async (req) => {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // Update role if provided
+      if (role) {
+        const { error: roleError } = await adminClient
+          .from("user_roles")
+          .update({ role })
+          .eq("user_id", user_id);
+
+        if (roleError) {
+          return new Response(JSON.stringify({ error: roleError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       return new Response(JSON.stringify({ success: true }), {

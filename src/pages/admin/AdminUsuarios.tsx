@@ -12,6 +12,7 @@ import ChangeRoleModal from "./ChangeRoleModal";
 import EditUserModal from "./EditUserModal";
 import DeleteUserDialog from "./DeleteUserDialog";
 import RolesContent from "./RolesContent";
+import ResetPasswordModal from "./ResetPasswordModal";
 import AddUserModal from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
@@ -29,6 +30,7 @@ const AdminUsuarios = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
+  const [resetPwOpen, setResetPwOpen] = useState(false);
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -66,9 +68,8 @@ const AdminUsuarios = () => {
   const handleEdit = (user: AdminUser) => { setSelectedUser(user); setEditOpen(true); };
   const handleDelete = (user: AdminUser) => { setSelectedUser(user); setDeleteOpen(true); };
   const handleResetPassword = (user: AdminUser) => {
-    adminAction.mutate({ action: "reset_password", user_id: user.id }, {
-      onSuccess: () => toast({ title: "Email de recuperación enviado" }),
-    });
+    setSelectedUser(user);
+    setResetPwOpen(true);
   };
 
   const kpis = [
@@ -100,7 +101,7 @@ const AdminUsuarios = () => {
                 {activeTab === "usuarios" ? (
                   <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
                     <Plus className="h-4 w-4 mr-1" />
-                    Agregar Empleado
+                    Agregar Usuario
                   </Button>
                 ) : (
                   <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
@@ -204,16 +205,23 @@ const AdminUsuarios = () => {
                   <EditUserModal
                     open={editOpen}
                     onOpenChange={setEditOpen}
-                    userName={selectedUser?.full_name || ""}
-                    onConfirm={(name) => {
+                    user={selectedUser}
+                    onConfirm={(data) => {
                       if (selectedUser) {
                         adminAction.mutate(
-                          { action: "update_profile", user_id: selectedUser.id, full_name: name },
+                          { action: "update_profile", user_id: selectedUser.id, first_name: data.first_name, last_name: data.last_name, role: data.role },
                           { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
                         );
                       }
                     }}
                     isLoading={adminAction.isPending}
+                  />
+
+                  <ResetPasswordModal
+                    open={resetPwOpen}
+                    onOpenChange={setResetPwOpen}
+                    userName={selectedUser?.full_name || ""}
+                    userId={selectedUser?.id || ""}
                   />
 
                   <DeleteUserDialog
