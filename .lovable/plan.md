@@ -1,56 +1,65 @@
 
-## Agregar efecto hover premium a las cards de Cantidad y Estados
+## Renombrar "Dashboard" a "Listado" y crear un nuevo Dashboard de Creadoras
 
-### Qué se va a hacer
-Aplicar el mismo efecto de hover que usan las KPI cards del Sales Overview a las cards de **Cantidad** y **Estados** del módulo LeadGen, y también a cada chip/fila individualmente.
+### Contexto actual
+En el sidebar, el submenú de **Creadores** tiene dos ítems:
+- `Dashboard` → `/creadores` (es el listado filtrable con tabla/grid)
+- `Onboarding` → `/creadores/onboarding`
 
-### Efecto de hover actual (referencia de SalesKPICards)
+El ítem "Dashboard" es en realidad un **listado**, no un dashboard. Se propone:
+1. Renombrarlo a "Listado" en el sidebar.
+2. Actualizar el título `h1` de la página de `"Creadores"` a `"Listado de Creadoras"`.
+3. Crear una nueva ruta `/creadores/dashboard` con una página de dashboard real.
+4. Añadir ese nuevo ítem al submenú del sidebar.
+
+---
+
+### Estructura del nuevo Dashboard de Creadoras
+
+La nueva página `/creadores/dashboard` mostrará una visión ejecutiva del sistema de gestión, con datos obtenidos de las tablas `creators` y `creator_business` que ya existen.
+
+**Sección 1 — KPIs de Estado (fila superior)**
+Cards con el mismo efecto hover premium del sistema, una por estado:
+
+| Card | Dato | Color |
+|---|---|---|
+| Activas | `status = 'active'` | success |
+| Onboarding | `status = 'onboarding'` | primary |
+| Pausadas | `status = 'paused'` | warning |
+| En retiro | `status = 'leaving'` | destructive |
+| Terminadas | `status = 'terminated'` | muted |
+
+**Sección 2 — Métricas de distribución (fila media)**
+- **Por Agencia**: mini barras horizontales (KASH, alvaroletshoot, etc.) con conteo y % del total.
+- **Por País**: top 5 países con más creadoras.
+- **Por Categoría**: distribución de categorías (A+, A, B, etc.).
+
+**Sección 3 — Actividad reciente (fila inferior)**
+- **Últimas incorporaciones**: las 5 creadoras más recientemente registradas (`created_at` DESC), con nombre, agencia y estado.
+- **Onboarding en curso**: creadoras con `status = 'onboarding'` más su fecha de inicio (`start_date` de `creator_business`).
+
+---
+
+### Archivos a crear / modificar
+
+| Archivo | Acción | Descripción |
+|---|---|---|
+| `src/pages/creadores/CreadorasDashboardPage.tsx` | Crear | Página envolvente con Sidebar + Topbar |
+| `src/pages/creadores/CreadorasDashboardContent.tsx` | Crear | Contenido real del dashboard con KPIs, distribución y actividad |
+| `src/components/dashboard/DashboardSidebar.tsx` | Modificar | Renombrar `"Dashboard"` → `"Listado"` en `creadoresSubItems` y añadir `{ title: "Dashboard", url: "/creadores/dashboard" }` |
+| `src/pages/creadores/CreadoresContent.tsx` | Modificar | Cambiar el `h1` de `"Creadores"` a `"Listado de Creadoras"` |
+| `src/App.tsx` | Modificar | Añadir ruta `<Route path="/creadores/dashboard" element={<ProtectedRoute><CreadorasDashboardPage /></ProtectedRoute>} />` |
+
+---
+
+### Detalle técnico
+
+El `CreadorasDashboardContent.tsx` reutilizará el hook `useCreadores` ya existente (sin filtros) para obtener todos los datos sin llamadas extra a Supabase. Los cálculos de distribución por agencia, país y categoría se hacen en el cliente con los datos del array.
+
+El orden del submenú de Creadores quedará:
 ```
-hover:scale-[1.03]
-hover:bg-gradient-to-br hover:from-{color}/15 hover:to-transparent
-hover:border-{color}/40
-hover:shadow-lg
-transition-all duration-200
+Creadores ▾
+  ├─ Dashboard   → /creadores/dashboard   (NUEVA)
+  ├─ Listado     → /creadores             (renombrada)
+  └─ Onboarding  → /creadores/onboarding
 ```
-
-### Cambios propuestos
-
-**`LeadGenCantidadCard.tsx`**
-
-1. La `<Card>` envolvente recibe hover general con gradiente azul/primary:
-   ```tsx
-   <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30 hover:bg-gradient-to-br hover:from-primary/5 hover:to-transparent">
-   ```
-
-2. Cada chip de categoría (A+, A, B+, B, C) recibe hover con el color de su categoría + escala:
-   ```tsx
-   "hover:scale-[1.02] hover:shadow-sm hover:from-primary/10 ..."  // por cat
-   ```
-   Específicamente, añadir `hover:scale-[1.05] transition-all duration-150` a cada botón, y cuando está inactivo mostrar un hover tintado según la categoría:
-   - A+: `hover:bg-primary/10 hover:border-primary/40`
-   - A: `hover:bg-success/10 hover:border-success/40`
-   - B+: `hover:bg-warning/10 hover:border-warning/40`
-   - B: `hover:bg-warning/8 hover:border-warning/30`
-   - C: `hover:bg-muted-foreground/10 hover:border-muted-foreground/40`
-
-**`LeadGenEstadosCard.tsx`**
-
-1. La `<Card>` envolvente recibe el mismo hover suave.
-
-2. Cada fila de estado recibe un hover con el color del dot correspondiente y transición:
-   - Respondieron: `hover:bg-primary/8 hover:border-l-primary/60`
-   - Interesadas: `hover:bg-success/8 hover:border-l-success/60`
-   - No interesadas: `hover:bg-destructive/8 hover:border-l-destructive/60`
-   - Otros: `hover:bg-muted hover:border-l-muted-foreground/40`
-   - Con Teléfono: `hover:bg-warning/8 hover:border-l-warning/60`
-   
-   Además agregar una flecha o indicador visual (`→`) que aparezca en hover para sugerir interactividad.
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---|---|
-| `src/pages/leadgen/LeadGenCantidadCard.tsx` | Hover en `<Card>` + hover por color en cada chip de categoría |
-| `src/pages/leadgen/LeadGenEstadosCard.tsx` | Hover en `<Card>` + hover por color en cada fila de estado |
-
-Sin cambios en lógica, solo clases CSS de Tailwind.
