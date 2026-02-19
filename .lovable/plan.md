@@ -1,35 +1,82 @@
 
-## Cambios en el sidebar: etiqueta "Ventas" y acceso a Config IA desde IA Ventas
+## Tres cambios en IA Ventas
 
-### Cambios a realizar
+### 1. Sidebar — quitar el engranaje de "IA Ventas"
 
-**1. Renombrar el menú padre de "Ventas de Creadores" → "Ventas"**
+`src/components/dashboard/DashboardSidebar.tsx`:
+- Quitar el renderizado especial de "IA Ventas" con el botón de Settings.
+- Devolver "IA Ventas" a un `SidebarMenuSubItem` estándar (como Dashboard y Reportes).
+- Quitar "Config IA" del dropdown del estado colapsado.
 
-El texto del `SidebarMenuButton` padre actualmente usa `t("nav.creatorSales")` que devuelve `"Ventas de Creadores"`. Se cambiará a texto directo `"Ventas"` en los tres lugares donde aparece (botón colapsable, tooltip del collapsed y span de texto).
-
-**2. Eliminar "Config IA" como ítem separado y añadir icono de engranaje junto a "IA Ventas"**
-
-Actualmente `creatorSalesSubItems` tiene 4 ítems incluyendo `"Config IA"` como una fila aparte. El plan es:
-- Quitar `{ title: "Config IA", url: "/ai-sales-config" }` del array
-- Renderizar "IA Ventas" de forma especial: el texto navega a `/aisales` y a su derecha aparece un pequeño icono `Settings` (engranaje) que navega a `/ai-sales-config`
-
-El resultado visual en el submenú de Ventas quedaría:
-
+Resultado del submenú Ventas:
 ```text
 Ventas ▾
-  ├─ Dashboard          → /sales-overview
-  ├─ Reportes           → /salesdashboard
-  └─ IA Ventas  ⚙       → /aisales  (⚙ → /ai-sales-config)
+  ├─ Dashboard   → /sales-overview
+  ├─ Reportes    → /salesdashboard
+  └─ IA Ventas   → /aisales
 ```
 
-### Detalles técnicos
+---
 
-- En la versión expandida (no collapsed), el ítem "IA Ventas" se renderizará manualmente fuera del `.map()` del array, con un layout flex que incluya:
-  - `NavLink` a `/aisales` con el texto "IA Ventas" (ocupa el espacio disponible)
-  - Un botón con icono `Settings` (h-3 w-3) que navega a `/ai-sales-config` con `e.preventDefault()` para no interferir con el link padre
-- En la versión collapsed (DropdownMenu), "Config IA" se eliminará del dropdown y en su lugar se añadirá un `DropdownMenuItem` "Config IA" justo debajo de "IA Ventas" para mantener el acceso.
-- Se importa `Settings2` o el icono `Settings` ya importado desde lucide-react — `Settings` ya está importado, se reutiliza.
+### 2. Página IA Ventas — header con acciones
 
-### Solo 1 archivo a modificar
+`src/pages/AiSales.tsx`: añadir un header sticky con tres acciones a la derecha:
 
-- `src/components/dashboard/DashboardSidebar.tsx`
+| Botón | Ícono | Acción |
+|---|---|---|
+| Configuración | `Settings` | Navega a `/ai-sales-config` |
+| Archivar chat | `Archive` | Limpia el historial de mensajes |
+
+Para archivar: se usa un `resetKey` (estado numérico) como `key` del componente `ClariAiChat`. Al incrementarlo, React desmonta y vuelve a montar el componente, restableciendo todo el estado de mensajes de forma limpia sin necesidad de pasar props extra.
+
+---
+
+### 3. Componente ClariAiChat — botón de voz (micrófono)
+
+`src/components/ClariAiChat.tsx`:
+
+**Tecnología**: Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`), nativa en el navegador, sin costo ni API key adicional. Compatible con Chrome, Edge y Safari.
+
+**Comportamiento**:
+- Nuevo botón de micrófono (`Mic` / `MicOff`) junto al botón de enviar.
+- Al hacer clic: inicia grabación y muestra el ícono en rojo con una animación de pulso (`animate-pulse`).
+- Mientras graba: el texto reconocido aparece en tiempo real en el textarea (resultados interinos).
+- Al terminar de hablar: el texto final queda en el input listo para enviar (o se puede enviar automáticamente).
+- Si el browser no soporta la API: el botón se oculta.
+
+**Implementación**:
+```tsx
+const recognition = useRef<SpeechRecognition | null>(null);
+const [isRecording, setIsRecording] = useState(false);
+
+const toggleRecording = () => {
+  if (isRecording) {
+    recognition.current?.stop();
+    return;
+  }
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) return;
+  const rec = new SpeechRec();
+  rec.lang = "es-ES";
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join("");
+    setInput(transcript);
+  };
+  rec.onend = () => setIsRecording(false);
+  rec.start();
+  setIsRecording(true);
+  recognition.current = rec;
+};
+```
+
+---
+
+### Archivos a modificar
+
+| Archivo | Cambios |
+|---|---|
+| `src/components/dashboard/DashboardSidebar.tsx` | Quitar gear icon y volver IA Ventas a link estándar |
+| `src/pages/AiSales.tsx` | Añadir header con Settings + Archive |
+| `src/components/ClariAiChat.tsx` | Añadir botón de micrófono con Web Speech API |
