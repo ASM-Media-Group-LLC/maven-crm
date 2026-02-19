@@ -1,98 +1,74 @@
 
-## Prevención de duplicados por Instagram handle
+## Añadir banner de resumen y vista de calendario semanal a Agentes y Supervisores
 
-### Contexto
+### Contexto actual
 
-Actualmente no existe ninguna validación de duplicados. El mismo handle de Instagram puede registrarse múltiples veces en cuatro módulos distintos:
+| Módulo | Pestaña | Banner | Vista Calendario |
+|---|---|---|---|
+| LeadGen | Agentes | ✅ Ya existe | ❌ Falta |
+| LeadGen | Supervisores | ❌ No tiene | ❌ Falta |
+| Promolog | Agentes | ✅ Ya existe | ❌ Falta |
 
-- **Creadores** (onboarding wizard y modal rápido `AddCreadorModal`): campo `instagram_handle` en tabla `creators`
-- **Contactos** (`AddContactoModal`): campo `instagram` en tabla `contactos`
-- **LeadGen** (`AddLeadModal`): campo `url_perfil` en tabla `leads` (contiene la URL del perfil, ej. `https://instagram.com/usuario`)
-- **Closers** (`NewDealModal`): campo `prospect_handle` en tabla `deals`
+### Qué se va a construir
 
-### Estrategia
+Siguiendo exactamente la imagen de referencia, se añade:
 
-La validación se hará en el **frontend**, consultando Supabase justo antes del insert. No se añaden constraints de base de datos por ahora para no afectar datos existentes ni el esquema de producción. La experiencia es:
+1. **Banner de resumen** (donde falta, en LeadGen > Supervisores) con el mismo estilo que ya existe en Agentes: gradiente `primary`, recuento de activos a la derecha, fecha de la semana seleccionada.
 
-1. El usuario ingresa el handle/URL.
-2. Al hacer clic en Guardar, antes del insert, se busca si ya existe ese valor (normalizado, sin `@`, en minúsculas).
-3. Si hay coincidencia → se bloquea el insert y se muestra un **toast de advertencia** con el nombre del registro duplicado encontrado.
-4. Si no hay coincidencia → se procede con el insert normal.
+2. **Vista de calendario semanal** en las tres pestañas afectadas, activada mediante un tercer botón de vista (icono de calendario) junto a los botones Lista/Grid existentes. La vista muestra:
+   - Navegación de semana: botones "Semana anterior" / "Semana siguiente"
+   - Encabezado con el rango de fechas de la semana actual
+   - Tabla con columnas: Agente | LUN | MAR | MIÉ | JUE | VIE | SÁB | DOM | Total
+   - La columna del día actual resaltada en azul (igual que en la imagen)
+   - Celdas vacías mostradas como `—`
+   - Fila de **Total** al final con el gran número acumulado
+   - El total general en badge de color primario
 
-### Normalización del handle
+### Datos mostrados por módulo
 
-Para que `@KashCreator`, `kashcreator` y `https://instagram.com/KashCreator` sean tratados como el mismo, se aplicará esta función utilitaria:
-
-```text
-"@KashCreator"               → "kashcreator"
-"https://instagram.com/KashCreator/" → "kashcreator"
-"KashCreator"                → "kashcreator"
-```
-
-Se creará `src/lib/handle-utils.ts` con la función `normalizeHandle(input: string): string`.
-
----
+- **LeadGen > Agentes**: número de leads por día filtrados por `compania` del agente (datos reales de Supabase)
+- **LeadGen > Supervisores**: número de QA reviews por día (datos del mock `mockSupervisores`, que actualmente todos son 0)
+- **Promolog > Agentes**: número de promociones (entries) "Sí" registradas por agente por día (datos reales de `promolog_entries`, campo `reviewed_by`)
 
 ### Archivos a modificar
 
-**1. Nuevo archivo: `src/lib/handle-utils.ts`**
-Función `normalizeHandle` que limpia URLs, `@`, espacios y pasa a minúsculas.
+**1. `src/pages/leadgen/LeadGenContent.tsx`**
 
-**2. `src/pages/creadores/AddCreadorModal.tsx`**
-En `onSubmit`, antes del insert:
-- Normalizar `instagram_handle`
-- Consultar `creators` donde `instagram_handle ILIKE` el valor normalizado
-- Si hay resultado → toast destructive de advertencia + return
+- Añadir estado `weekOffset` (número entero, 0 = semana actual, -1 = semana anterior, etc.)
+- Crear función `getWeekDays(offset)` que devuelve los 7 días de la semana seleccionada (lunes a domingo) usando `date-fns`
+- Añadir icono `Calendar` a los imports de `lucide-react` y agregar el tercer botón de vista `calendar` en la barra de controles de ambas pestañas (Agentes y Supervisores)
+- **Agentes tab**: añadir el bloque de calendario que calcula `leadsInDay(agente, day)` consultando el array `leads` ya disponible, filtrando por `compania` y la fecha
+- **Supervisores tab**: añadir banner de resumen (igual al de Agentes) + bloque de calendario (con datos del mock)
+- Añadir el tipo `"calendar"` al estado `viewMode`
 
-**3. `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
-El onboarding no pide el handle de Instagram directamente en los pasos visibles (Step1 captura nombre, email, teléfono). Sin embargo, existe el campo `instagram_handle` en la tabla `creators`. La validación aquí se hará en `handleSubmit` antes de llamar a `addCreador.mutateAsync`, buscando por `email` para evitar duplicado de creador completo. Dado que el onboarding no tiene campo Instagram en Step1, se validará **email** como identificador único del creador en este flujo.
+**2. `src/pages/promolog/PromologContent.tsx`**
 
-**4. `src/pages/contactos/AddContactoModal.tsx` (ya en la vista actual)**
-En `onSubmit`, antes del insert:
-- Normalizar `instagram`
-- Consultar `contactos` donde `instagram ILIKE` el valor normalizado
-- Si hay resultado → toast warning + return
+- Añadir estado `agentWeekOffset` separado del estado de fecha principal
+- Crear función `getWeekDays(offset)` local
+- Añadir el botón de vista `calendar` (con icono `Calendar` ya importado como `CalendarIcon`) en la fila de filtros de la pestaña Agentes
+- Crear el bloque de calendario semanal en la pestaña Agentes: filtra `promologEntries` donde `reviewed_by === agente.name` y la fecha caiga en el día correspondiente, mostrando solo entradas con `promoted = 'true'` (Sí)
+- Añadir el tipo `"calendar"` al `agentesView`
 
-**5. `src/pages/leadgen/AddLeadModal.tsx`**
-En `onSubmit`, antes del insert:
-- Normalizar `url_perfil`
-- Consultar `leads` donde `url_perfil ILIKE` el valor normalizado
-- Si hay resultado → toast warning + return (incluyendo en qué compañía está registrado)
-
-**6. `src/pages/closers/NewDealModal.tsx`**
-En `handleSubmit`, antes de llamar a `onSubmit`:
-- Normalizar `prospectHandle`
-- Consultar `deals` donde `prospect_handle ILIKE` el valor normalizado
-- Si hay resultado → toast warning (mostrado aquí con `useToast`) + return
-
----
-
-### Detalle técnico
-
-La consulta de deduplicación usará `.ilike()` de Supabase para comparación case-insensitive, lo cual es suficiente sin cambiar el esquema:
+### Comportamiento del calendario
 
 ```text
-supabase
-  .from("creators")
-  .select("id, name, instagram_handle")
-  .ilike("instagram_handle", normalizeHandle(value))
-  .maybeSingle()
+[ < Semana anterior ]    16 De Febrero – 22 De Febrero, 2026    [ Semana siguiente > ]
+
+Agente         LUN 16  MAR 17  MIÉ 18  JUE 19  VIE 20  SÁB 21  DOM 22   Total
+yeison.bello     167     126     154      64       —       —       —       511
+julieth.rojano    17      79      72      79       —       —       —       247
+─────────────────────────────────────────────────────────────────────────────────
+Total            364     267     226     143       —       —       —      1000
 ```
 
-El toast de advertencia incluirá:
-- Título: "Duplicado detectado"
-- Descripción: "Ya existe un registro con este handle: [nombre del registro]"
-- Variante: `destructive`
-
----
+- La columna del día actual se resalta con `bg-primary/10 text-primary font-bold`
+- Días futuros o sin datos muestran `—` en `text-muted-foreground`
+- El total general (esquina inferior derecha) usa un `Badge` con variante `default`
+- La navegación de semanas no hace llamadas adicionales a Supabase; filtra los datos ya cargados en memoria (los últimos 200 registros de leads o promolog_entries)
 
 ### Resumen de cambios
 
-| Archivo | Tipo de cambio |
+| Archivo | Cambio |
 |---|---|
-| `src/lib/handle-utils.ts` | Nuevo archivo |
-| `src/pages/creadores/AddCreadorModal.tsx` | Validación pre-insert por `instagram_handle` |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Validación pre-insert por `email` |
-| `src/pages/contactos/AddContactoModal.tsx` | Validación pre-insert por `instagram` |
-| `src/pages/leadgen/AddLeadModal.tsx` | Validación pre-insert por `url_perfil` |
-| `src/pages/closers/NewDealModal.tsx` | Validación pre-insert por `prospect_handle` + agregar `useToast` |
+| `src/pages/leadgen/LeadGenContent.tsx` | Nuevo viewMode `calendar`, navegación de semana, tabla semanal en Agentes y Supervisores; banner en Supervisores |
+| `src/pages/promolog/PromologContent.tsx` | Nuevo agentesView `calendar`, navegación de semana, tabla semanal en Agentes |
