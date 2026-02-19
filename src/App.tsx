@@ -27,6 +27,7 @@ import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
+import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
 import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
 import Eventos from "./pages/Eventos";
@@ -93,6 +94,7 @@ const App = () => (
               <Route path="/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
               <Route path="/contactos/nuevo" element={<ProtectedRoute><NuevoContacto /></ProtectedRoute>} />
               <Route path="/creadores" element={<ProtectedRoute><Creadores /></ProtectedRoute>} />
+              <Route path="/creadores/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/creadores/nuevo" element={<ProtectedRoute><NuevoCreador /></ProtectedRoute>} />
               <Route path="/creadores/:id" element={<ProtectedRoute><CreadorProfile /></ProtectedRoute>} />
               <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
