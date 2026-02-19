@@ -1,65 +1,43 @@
 
-## Renombrar "Dashboard" a "Listado" y crear un nuevo Dashboard de Creadoras
+## Corrección de textos en español del Sidebar y páginas
 
-### Contexto actual
-En el sidebar, el submenú de **Creadores** tiene dos ítems:
-- `Dashboard` → `/creadores` (es el listado filtrable con tabla/grid)
-- `Onboarding` → `/creadores/onboarding`
+### Problema identificado
 
-El ítem "Dashboard" es en realidad un **listado**, no un dashboard. Se propone:
-1. Renombrarlo a "Listado" en el sidebar.
-2. Actualizar el título `h1` de la página de `"Creadores"` a `"Listado de Creadoras"`.
-3. Crear una nueva ruta `/creadores/dashboard` con una página de dashboard real.
-4. Añadir ese nuevo ítem al submenú del sidebar.
+Varios textos del sidebar y páginas usan inglés o género incorrecto cuando el idioma es español. Estos son los cambios necesarios:
 
----
-
-### Estructura del nuevo Dashboard de Creadoras
-
-La nueva página `/creadores/dashboard` mostrará una visión ejecutiva del sistema de gestión, con datos obtenidos de las tablas `creators` y `creator_business` que ya existen.
-
-**Sección 1 — KPIs de Estado (fila superior)**
-Cards con el mismo efecto hover premium del sistema, una por estado:
-
-| Card | Dato | Color |
+| Clave / Lugar | Texto actual (ES) | Texto correcto (ES) |
 |---|---|---|
-| Activas | `status = 'active'` | success |
-| Onboarding | `status = 'onboarding'` | primary |
-| Pausadas | `status = 'paused'` | warning |
-| En retiro | `status = 'leaving'` | destructive |
-| Terminadas | `status = 'terminated'` | muted |
+| `nav.creatorSales` en `i18n.ts` | `"Creator Sales"` | `"Ventas de Creadores"` |
+| `nav.salesReport` en `i18n.ts` | `"Sales Report"` | `"Reporte de Ventas"` |
+| `nav.aiSales` en `i18n.ts` | `"AI Sales"` | `"IA Ventas"` |
+| `nav.aiConfig` en `i18n.ts` | `"AI Config"` | `"Configuración IA"` |
+| Sidebar: subitem hardcodeado `"Dashboard"` (Creadores) | `"Dashboard"` | `"Dashboard de Creadores"` |
+| Sidebar: subitem hardcodeado `"Listado"` (Creadores) | `"Listado"` | `"Listado"` (ya está bien) |
+| `CreadoresContent.tsx` heading `h1` | `"Listado de Creadoras"` | `"Listado de Creadores"` |
+| `CreadorasDashboardContent.tsx` heading | `"Dashboard de Creadoras"` | `"Dashboard de Creadores"` |
 
-**Sección 2 — Métricas de distribución (fila media)**
-- **Por Agencia**: mini barras horizontales (KASH, alvaroletshoot, etc.) con conteo y % del total.
-- **Por País**: top 5 países con más creadoras.
-- **Por Categoría**: distribución de categorías (A+, A, B, etc.).
+> Nota: los sub-ítems del menú de Creadores (`"Dashboard"`, `"Listado"`, `"Onboarding"`) están hardcodeados directamente en `DashboardSidebar.tsx`, no pasan por `i18n.ts`. Se corregirá el género ahí mismo.
 
-**Sección 3 — Actividad reciente (fila inferior)**
-- **Últimas incorporaciones**: las 5 creadoras más recientemente registradas (`created_at` DESC), con nombre, agencia y estado.
-- **Onboarding en curso**: creadoras con `status = 'onboarding'` más su fecha de inicio (`start_date` de `creator_business`).
+### Archivos a modificar
 
----
+| Archivo | Cambio |
+|---|---|
+| `src/lib/i18n.ts` | Actualizar 4 claves ES: `creatorSales`, `salesReport`, `aiSales`, `aiConfig` |
+| `src/components/dashboard/DashboardSidebar.tsx` | Corregir el subitem `"Dashboard"` del grupo Creadores (no el de Creator Sales) — ahí no hay t() |
+| `src/pages/creadores/CreadoresContent.tsx` | `h1` de `"Listado de Creadoras"` → `"Listado de Creadores"` |
+| `src/pages/creadores/CreadorasDashboardContent.tsx` | Heading de `"Dashboard de Creadoras"` → `"Dashboard de Creadores"` |
 
-### Archivos a crear / modificar
+### Resultado esperado en sidebar (modo ES)
 
-| Archivo | Acción | Descripción |
-|---|---|---|
-| `src/pages/creadores/CreadorasDashboardPage.tsx` | Crear | Página envolvente con Sidebar + Topbar |
-| `src/pages/creadores/CreadorasDashboardContent.tsx` | Crear | Contenido real del dashboard con KPIs, distribución y actividad |
-| `src/components/dashboard/DashboardSidebar.tsx` | Modificar | Renombrar `"Dashboard"` → `"Listado"` en `creadoresSubItems` y añadir `{ title: "Dashboard", url: "/creadores/dashboard" }` |
-| `src/pages/creadores/CreadoresContent.tsx` | Modificar | Cambiar el `h1` de `"Creadores"` a `"Listado de Creadoras"` |
-| `src/App.tsx` | Modificar | Añadir ruta `<Route path="/creadores/dashboard" element={<ProtectedRoute><CreadorasDashboardPage /></ProtectedRoute>} />` |
-
----
-
-### Detalle técnico
-
-El `CreadorasDashboardContent.tsx` reutilizará el hook `useCreadores` ya existente (sin filtros) para obtener todos los datos sin llamadas extra a Supabase. Los cálculos de distribución por agencia, país y categoría se hacen en el cliente con los datos del array.
-
-El orden del submenú de Creadores quedará:
 ```
 Creadores ▾
-  ├─ Dashboard   → /creadores/dashboard   (NUEVA)
-  ├─ Listado     → /creadores             (renombrada)
-  └─ Onboarding  → /creadores/onboarding
+  ├─ Dashboard de Creadores   → /creadores/dashboard
+  ├─ Listado                  → /creadores
+  └─ Onboarding               → /creadores/onboarding
+
+Ventas de Creadores ▾
+  ├─ Dashboard               → /sales-overview
+  ├─ Reporte de Ventas       → /salesdashboard
+  ├─ IA Ventas               → /aisales
+  └─ Configuración IA        → /ai-sales-config
 ```
