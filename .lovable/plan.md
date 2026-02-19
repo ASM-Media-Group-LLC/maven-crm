@@ -1,30 +1,54 @@
 
-## Acortar textos del sidebar en Creadores y Ventas de Creadores
+## Estandarización de botones principales en headers de sección
 
-### Problema
-Como se ve en la imagen, los textos largos en los sub-ítems del sidebar se parten en dos líneas, amontonando el menú.
+### Regla establecida en el Design System
 
-### Cambios únicamente en `src/components/dashboard/DashboardSidebar.tsx`
+Según la memoria del proyecto (`style/contextual-button-usage`):
+> **Acciones principales en el header de página** (ej. "Agregar Creador", "Nuevo Ticket"): variante **`outline`**
 
-**Submenú de Creadores:**
+### Discrepancias encontradas
 
-| Antes | Después |
+Al revisar todos los archivos `*Content.tsx` de la app:
+
+| Archivo | Botón | Variante actual | Variante correcta |
+|---|---|---|---|
+| `ContactosContent.tsx` | "Agregar Contacto" | `default` (sin variant) | `outline` |
+| `ContactosContent.tsx` | "Agregar Agencia" | `default` (sin variant) | `outline` |
+| `OnboardingContent.tsx` | "Iniciar Onboarding" | `default` (sin variant) | `outline` |
+| `LeadGenContent.tsx` | "Lead" | `outline` ✅ | ya correcto |
+| `LeadGenContent.tsx` | "Contacto" | `outline` ✅ | ya correcto |
+| `CreadoresContent.tsx` | "Agregar Creador" | `outline` ✅ | ya correcto |
+| `TicketsContent.tsx` | "Nuevo Ticket" | `outline` ✅ | ya correcto |
+| `EventosContent.tsx` | "Crear Evento" | `outline` ✅ | ya correcto |
+| `TareasContent.tsx` | "Nueva Tarea" | `outline` ✅ | ya correcto |
+| `ProjectsListContent.tsx` | "Nuevo Proyecto" | `outline` ✅ | ya correcto |
+| `ClosersContent.tsx` | "Nuevo Deal" | `outline` ✅ | ya correcto |
+
+### Cambios a realizar (solo 2 archivos)
+
+**`src/pages/contactos/ContactosContent.tsx`** — líneas 122 y 127:
+```tsx
+// Antes
+<Button onClick={() => navigate("/contactos/nuevo")}>
+<Button onClick={() => setAddAgenciaOpen(true)}>
+
+// Después
+<Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
+<Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
+```
+
+**`src/pages/creadores/onboarding/OnboardingContent.tsx`** — línea 62:
+```tsx
+// Antes
+<Button onClick={() => setShowWizard(true)}>
+
+// Después
+<Button variant="outline" onClick={() => setShowWizard(true)}>
+```
+
+### Archivos a modificar
+
+| Archivo | Cantidad de cambios |
 |---|---|
-| `"Dashboard de Creadores"` | `"Dashboard"` |
-| `"Listado"` | `"Listado"` (sin cambio) |
-| `"Onboarding"` | `"Onboarding"` (sin cambio) |
-
-**Submenú de Ventas de Creadores** (sub-ítems en `creatorSalesSubItems`):
-
-| Antes | Después |
-|---|---|
-| `"Dashboard"` | `"Dashboard"` (sin cambio) |
-| `t("nav.salesReport")` → `"Reporte de Ventas"` | `"Reportes"` (hardcodeado corto) |
-| `t("nav.aiSales")` → `"IA Ventas"` | `"IA Ventas"` (sin cambio, cabe en una línea) |
-| `t("nav.aiConfig")` → `"Configuración IA"` | `"Config IA"` (acortado) |
-
-> Las páginas internas mantienen sus títulos completos (`"Dashboard de Creadores"`, `"Reporte de Ventas"`, etc.) — solo cambia lo que se muestra en el sidebar.
-
-### Solo 1 archivo a modificar
-
-- `src/components/dashboard/DashboardSidebar.tsx`
+| `src/pages/contactos/ContactosContent.tsx` | 2 botones |
+| `src/pages/creadores/onboarding/OnboardingContent.tsx` | 1 botón |
