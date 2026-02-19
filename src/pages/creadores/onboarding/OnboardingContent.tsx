@@ -9,18 +9,18 @@ import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding } from "./useOnboarding";
 
-const areaTabs = ["Todos", "Ventas", "LeadGen", "Contenido", "Marketing", "Tecnología"];
+const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Unlok Platform"];
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("Todos");
+  const [activeTab, setActiveTab] = useState("Todas");
   const [view, setView] = useState<"table" | "grid">("table");
 
   const filtered = useMemo(() => {
     let list = creators;
-    if (activeTab !== "Todos") {
-      list = list.filter((c) => c.area.toLowerCase() === activeTab.toLowerCase());
+    if (activeTab !== "Todas") {
+      list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
     }
     if (search) {
       const q = search.toLowerCase();
