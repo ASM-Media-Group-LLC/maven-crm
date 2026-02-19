@@ -1,67 +1,66 @@
 
 
-## Conectar formulario de Onboarding con tabla `creators` y nuevos estados
+## Convertir el modal de Onboarding en formulario inline
 
 ### Resumen
 
-El formulario ya guarda datos en la tabla `creators` con `status = "onboarding"`. Los cambios necesarios son:
+Reemplazar el Dialog/modal actual por un formulario que se renderiza directamente en la pagina, debajo de las KPIs. Al hacer clic en "Iniciar Onboarding", se oculta la tabla y se muestra el wizard en su lugar dentro de un Card. Un boton "Cancelar" permite volver a la vista de tabla.
 
-1. Usar los nuevos estados del ciclo de onboarding en lugar del generico "onboarding"
-2. Actualizar el hook `useOnboarding` para filtrar por estos estados
-3. Actualizar los contadores KPI del dashboard
-
-### Seccion tecnica
-
-**No se requieren migraciones de esquema.** La columna `status` en `creators` es de tipo `text` y ya acepta cualquier valor.
-
----
+### Cambios
 
 **Archivo 1: `src/pages/creadores/onboarding/StartOnboardingModal.tsx`**
 
-- Linea 111: Cambiar `status: "onboarding"` a `status: "borrador"` cuando se guarda como borrador y `status: "pendiente_verificacion"` cuando se finaliza el formulario completo.
-- En `buildPayload`: el parametro `isDraft` determinara el status:
-  - `isDraft = true` -> `status: "borrador"`
-  - `isDraft = false` -> `status: "pendiente_verificacion"`
+Refactorizar para eliminar el Dialog wrapper y convertirlo en un componente inline:
 
----
+- Eliminar imports de Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+- Cambiar la prop `onClose` por `onCancel` (misma funcion)
+- Eliminar la prop `open` (ya no es necesaria, el padre controla la visibilidad)
+- Envolver todo el contenido en un `Card` con bordes suaves
+- Mover el header (titulo + descripcion) a un `CardHeader`
+- El stepper y contenido van en `CardContent`
+- Los botones van en `CardFooter` con un boton "Cancelar" adicional (icono ArrowLeft + texto "Volver a la lista")
+- El footer incluye: a la izquierda "Volver a la lista" y "Guardar Borrador", a la derecha "Anterior"/"Siguiente"/"Finalizar"
+- Renombrar el archivo/componente a `OnboardingWizard` para reflejar que ya no es un modal
 
-**Archivo 2: `src/pages/creadores/onboarding/useOnboarding.ts`**
+**Archivo 2: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
 
-- Linea 40: Cambiar `.eq("status", "onboarding")` por `.in("status", ["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"])` para traer todos los registros del ciclo de onboarding.
-- Linea 14: Actualizar el tipo de `status` a los nuevos valores: `"Pendiente" | "En Progreso" | "Completado"` (se mantienen como labels de UI).
-- Actualizar `deriveStatus` para mapear los nuevos estados de DB a los labels de UI:
-  - `pendiente_verificacion` -> "Pendiente"
-  - `borrador` o `verificado` -> "En Progreso"
-  - `asignado` o `activo` -> "Completado"
+- Cambiar el estado `showModal` a `showWizard`
+- Cuando `showWizard` es true: ocultar tabs, filtros y tabla/grid; mostrar el componente wizard inline
+- Cuando `showWizard` es false: mostrar la vista normal (tabs, filtros, tabla)
+- Las KPIs se mantienen siempre visibles
+- Al completar o cancelar el wizard, se vuelve a `showWizard = false`
+- Actualizar imports (reemplazar StartOnboardingModal por OnboardingWizard)
 
----
+### Seccion tecnica
 
-**Archivo 3: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
-
-- Los contadores en lineas 34-37 ya usan los labels de UI ("Pendiente", "En Progreso", "Completado"), por lo que se actualizaran automaticamente con el cambio en `useOnboarding`.
-- Actualizar las labels de los KPI cards para mayor claridad:
-  - "Total Onboarding" = Todos los registros (sin cambio)
-  - "Pendientes" = Registros en `pendiente_verificacion` (sin cambio, ya filtra por "Pendiente")
-  - "En Progreso" = Registros en `borrador` o `verificado` (sin cambio, ya filtra por "En Progreso")
-  - "Completados" = Registros en `asignado` o `activo` (sin cambio)
-
----
-
-### Flujo resultante
+**`StartOnboardingModal.tsx` -> renombrar logicamente a OnboardingWizard:**
 
 ```text
-Guardar Borrador  -->  status = "borrador"       -->  KPI: "En Progreso"
-Finalizar         -->  status = "pendiente_verificacion"  -->  KPI: "Pendientes"
-(manual/futuro)   -->  status = "verificado"      -->  KPI: "En Progreso"
-(manual/futuro)   -->  status = "asignado"        -->  KPI: "Completados"
-(manual/futuro)   -->  status = "activo"          -->  KPI: "Completados"
+Antes:
+  <Dialog> -> <DialogContent> -> <DialogHeader> -> stepper -> content -> footer
+
+Despues:
+  <Card> -> <CardHeader> -> stepper (dentro de CardContent) -> content -> <CardFooter>
 ```
 
-### Archivos afectados
+Estructura del Card:
+- `Card` con clase `rounded-lg border`
+- `CardHeader`: titulo "Iniciar Onboarding" + descripcion + boton "Volver a la lista" alineado a la derecha
+- `CardContent`: stepper + progress bar + contenido del paso actual
+- `CardFooter`: botones de navegacion con `border-t`
 
-| Archivo | Cambio |
-|---------|--------|
-| `StartOnboardingModal.tsx` | Status dinamico segun borrador/finalizar |
-| `useOnboarding.ts` | Query con `.in()` y mapeo de estados |
-| `OnboardingContent.tsx` | Sin cambios funcionales (labels ya coinciden) |
+**`OnboardingContent.tsx` - logica condicional:**
 
+```text
+{showWizard ? (
+  <OnboardingWizard onCancel={() => setShowWizard(false)} />
+) : (
+  <>
+    {/* Area Tabs */}
+    {/* Filters */}
+    {/* Table/Grid */}
+  </>
+)}
+```
+
+La funcion `resetAndClose` del wizard llamara a `onCancel()` que pone `showWizard = false`.
