@@ -12,11 +12,11 @@ const translations = {
   "nav.tasks": { es: "Tareas", en: "Tasks" },
   "nav.creators": { es: "Creadores", en: "Creators" },
   "nav.events": { es: "Eventos", en: "Events" },
-  "nav.creatorSales": { es: "Creator Sales", en: "Creator Sales" },
-  "nav.salesReport": { es: "Sales Report", en: "Sales Report" },
+  "nav.creatorSales": { es: "Ventas de Creadores", en: "Creator Sales" },
+  "nav.salesReport": { es: "Reporte de Ventas", en: "Sales Report" },
   "nav.salesReportV1": { es: "Sale Report v.1", en: "Sale Report v.1" },
-  "nav.aiSales": { es: "AI Sales", en: "AI Sales" },
-  "nav.aiConfig": { es: "AI Config", en: "AI Config" },
+  "nav.aiSales": { es: "IA Ventas", en: "AI Sales" },
+  "nav.aiConfig": { es: "Configuración IA", en: "AI Config" },
 
   // Sidebar items - Operations
   "nav.promolog": { es: "Promolog", en: "Promolog" },
