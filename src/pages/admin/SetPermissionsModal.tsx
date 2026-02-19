@@ -37,13 +37,17 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
   const [state, setState] = useState<PermState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
+  const isAdminRole = roleName.toLowerCase() === "admin";
+
   useEffect(() => {
     if (!open) return;
     const s: PermState = {};
+    // If admin and no saved permissions, default everything to enabled
+    const defaultOn = isAdminRole && permissions.length === 0;
     MODULES_CONFIG.forEach((m) => {
-      s[getKey(m.module, null)] = { can_access: false, data_scope: "all" };
+      s[getKey(m.module, null)] = { can_access: defaultOn, data_scope: "all" };
       m.submodules.forEach((sub) => {
-        s[getKey(m.module, sub)] = { can_access: false, data_scope: "all" };
+        s[getKey(m.module, sub)] = { can_access: defaultOn, data_scope: "all" };
       });
     });
     permissions.forEach((p) => {
@@ -53,19 +57,20 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
       }
     });
     setState(s);
-  }, [permissions, open]);
+  }, [permissions, open, isAdminRole]);
 
-  // Compute helpers
   const allModuleKeys = useMemo(() => MODULES_CONFIG.map((m) => getKey(m.module, null)), []);
   const allSubKeys = useMemo(() => MODULES_CONFIG.flatMap((m) => m.submodules.map((s) => getKey(m.module, s))), []);
+  const allKeys = useMemo(() => [...allModuleKeys, ...allSubKeys], [allModuleKeys, allSubKeys]);
 
   const allMenusChecked = useMemo(() => allModuleKeys.every((k) => state[k]?.can_access), [state, allModuleKeys]);
   const allFunctionsChecked = useMemo(() => allSubKeys.length > 0 && allSubKeys.every((k) => state[k]?.can_access), [state, allSubKeys]);
 
+  // Toggle all menus AND all functions together
   const toggleAllMenus = (checked: boolean) => {
     setState((prev) => {
       const next = { ...prev };
-      allModuleKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
+      allKeys.forEach((k) => { next[k] = { ...next[k], can_access: checked }; });
       return next;
     });
   };
@@ -86,24 +91,26 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
     });
   };
 
-  const toggleModule = (key: string) => {
-    setState((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], can_access: !prev[key]?.can_access },
-    }));
+  // Toggle module + cascade to all its submodules
+  const toggleModule = (mod: string) => {
+    setState((prev) => {
+      const next = { ...prev };
+      const moduleKey = getKey(mod, null);
+      const newVal = !next[moduleKey]?.can_access;
+      next[moduleKey] = { ...next[moduleKey], can_access: newVal };
+      const cfg = MODULES_CONFIG.find((m) => m.module === mod);
+      cfg?.submodules.forEach((sub) => {
+        const k = getKey(mod, sub);
+        next[k] = { ...next[k], can_access: newVal };
+      });
+      return next;
+    });
   };
 
   const toggleSub = (key: string) => {
     setState((prev) => ({
       ...prev,
       [key]: { ...prev[key], can_access: !prev[key]?.can_access },
-    }));
-  };
-
-  const setDataScope = (key: string, scope: string) => {
-    setState((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], data_scope: scope },
     }));
   };
 
@@ -159,7 +166,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
 
         <ScrollArea className="h-[58vh] pr-2">
           {/* Column headers */}
-          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 pb-3 border-b mb-4 px-1">
+          <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 pb-3 border-b border-border mb-4 px-1">
             <div className="flex items-center gap-2">
               <Checkbox checked={allMenusChecked} onCheckedChange={(c) => toggleAllMenus(!!c)} />
               <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Menus</Label>
@@ -201,33 +208,34 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                   open={isExpanded}
                   onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
                 >
-                  <div className="border rounded-lg">
+                  <div className="border border-border rounded-lg border-l-[3px] border-l-primary bg-card">
                     {/* Summary row */}
-                    <div className="p-4 space-y-1">
+                    <div className="px-4 py-3">
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
                         <div className="flex items-center gap-2">
                           <Checkbox
                             checked={state[moduleKey]?.can_access ?? false}
-                            onCheckedChange={() => toggleModule(moduleKey)}
+                            onCheckedChange={() => toggleModule(mod.module)}
                           />
-                          <span className="text-sm font-medium">{mod.module}</span>
+                          <span className="text-sm font-semibold">{mod.module}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {hasSubmodules ? `${enabledCount} funciones` : "0 funciones"}
+                          {hasSubmodules ? `${enabledCount}/${totalSubs} funciones` : "—"}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {DATA_SCOPE_LABELS[dataScope] || "All data"}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {DATA_SCOPE_LABELS[dataScope] || "All data"}
+                          </span>
+                          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </CollapsibleTrigger>
+                        </div>
                       </div>
-                      <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer w-full">
-                        <span>Ver detalles</span>
-                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                      </CollapsibleTrigger>
                     </div>
 
                     {/* Expanded details */}
                     <CollapsibleContent>
-                      <div className="border-t px-4 py-3">
+                      <div className="border-t border-border px-4 py-3">
                         <div className="grid grid-cols-[1fr_1fr] gap-4">
                           {/* Left: submodules */}
                           <div className="space-y-2">
