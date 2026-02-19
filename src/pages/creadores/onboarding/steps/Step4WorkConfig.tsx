@@ -8,7 +8,7 @@ const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "
 const SHIFTS = ["Mañana", "Tarde", "Noche"];
 
 const SERVICES = [
-  { key: "cat_1", label: "Categoría 1" },
+  { key: "cat_1", label: "Contenido X" },
   { key: "cat_2", label: "Categoría 2" },
   { key: "cat_3", label: "Categoría 3" },
   { key: "cat_4", label: "Categoría 4" },
