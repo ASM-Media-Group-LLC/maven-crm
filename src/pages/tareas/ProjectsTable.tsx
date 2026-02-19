@@ -1,0 +1,116 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Share2, Archive, RotateCcw } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { TaskProject } from "./useProjects";
+
+type SortKey = "name" | "status" | "pending" | "in_progress" | "overdue" | "completed";
+
+interface ProjectsTableProps {
+  projects: TaskProject[];
+  getProjectTaskCounts: (id: string) => { pending: number; in_progress: number; paused: number; overdue: number; completed: number };
+  onEdit: (project: TaskProject) => void;
+  onDelete: (project: TaskProject) => void;
+  onShare: (project: TaskProject) => void;
+  onArchive: (project: TaskProject) => void;
+}
+
+const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete, onShare, onArchive }: ProjectsTableProps) => {
+  const navigate = useNavigate();
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+
+  const sorted = [...projects].sort((a, b) => {
+    const ca = getProjectTaskCounts(a.id);
+    const cb = getProjectTaskCounts(b.id);
+    let diff = 0;
+    if (sortKey === "name") diff = a.name.localeCompare(b.name);
+    else if (sortKey === "status") diff = a.status.localeCompare(b.status);
+    else if (sortKey === "pending") diff = ca.pending - cb.pending;
+    else if (sortKey === "in_progress") diff = ca.in_progress - cb.in_progress;
+    else if (sortKey === "overdue") diff = ca.overdue - cb.overdue;
+    else diff = ca.completed - cb.completed;
+    return sortAsc ? diff : -diff;
+  });
+
+  const SortHeader = ({ label, col }: { label: string; col: SortKey }) => (
+    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs" onClick={() => handleSort(col)}>
+      {label} <ArrowUpDown className="ml-1 h-3 w-3" />
+    </Button>
+  );
+
+  return (
+    <div className="rounded-md border max-h-[calc(100vh-24rem)] overflow-auto">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-card">
+          <TableRow>
+            <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
+            <TableHead className="hidden sm:table-cell">Descripción</TableHead>
+            <TableHead><SortHeader label="Estado" col="status" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Pendientes" col="pending" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="En curso" col="in_progress" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Vencidas" col="overdue" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Completadas" col="completed" /></TableHead>
+            <TableHead className="w-12" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((project) => {
+            const counts = getProjectTaskCounts(project.id);
+            return (
+              <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/tareas/${project.id}`)}>
+                <TableCell className="font-medium">{project.name}</TableCell>
+                <TableCell className="hidden sm:table-cell text-muted-foreground text-sm truncate max-w-[200px]">{project.description || "—"}</TableCell>
+                <TableCell>
+                  <span className={`text-xs px-2 py-0.5 rounded ${project.status === "archived" ? "bg-muted text-muted-foreground" : "bg-primary/20 text-primary"}`}>
+                    {project.status === "archived" ? "Archivado" : "Activo"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center">{counts.pending}</TableCell>
+                <TableCell className="text-center">{counts.in_progress}</TableCell>
+                <TableCell className="text-center text-destructive">{counts.overdue}</TableCell>
+                <TableCell className="text-center text-emerald-400">{counts.completed}</TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem onClick={() => onEdit(project)}>
+                        <Pencil className="mr-2 h-4 w-4" /> Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onShare(project)}>
+                        <Share2 className="mr-2 h-4 w-4" /> Compartir
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onArchive(project)}>
+                        {project.status === "archived" ? (
+                          <><RotateCcw className="mr-2 h-4 w-4" /> Reactivar</>
+                        ) : (
+                          <><Archive className="mr-2 h-4 w-4" /> Archivar</>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete(project)}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
+export default ProjectsTable;

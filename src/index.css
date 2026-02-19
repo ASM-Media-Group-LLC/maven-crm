@@ -3,94 +3,108 @@
 @tailwind utilities;
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 240 10% 4%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 4%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 240 10% 4%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 271 91% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 145 63% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 40 96% 40%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 211 100% 50%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 10% 4%;
+    --sidebar-primary: 211 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-ring: 211 100% 50%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --instagram-pink: 340 82% 59%;
+    --instagram-purple: 271 91% 50%;
+    --instagram-orange: 25 95% 53%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 8% 10%;
+    --foreground: 240 5% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 6% 13%;
+    --card-foreground: 240 5% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 6% 13%;
+    --popover-foreground: 240 5% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 6% 15%;
+    --secondary-foreground: 240 5% 96%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 240 6% 15%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 271 91% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --success: 145 63% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 40 96% 40%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 240 6% 18%;
+    --input: 240 6% 18%;
+    --ring: 211 100% 50%;
+
+    --sidebar-background: 240 8% 10%;
+    --sidebar-foreground: 240 5% 96%;
+    --sidebar-primary: 211 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 240 6% 15%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 240 6% 12%;
+    --sidebar-ring: 211 100% 50%;
+
+    --instagram-pink: 340 82% 59%;
+    --instagram-purple: 271 91% 50%;
+    --instagram-orange: 25 95% 53%;
   }
 }
 
@@ -103,3 +117,110 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Hero gradient background */
+.hero-gradient {
+  background: radial-gradient(ellipse at center top, hsl(var(--accent) / 0.08) 0%, transparent 60%);
+}
+
+/* Calendar event dot indicator */
+.calendar-day-has-event {
+  position: relative;
+}
+.calendar-day-has-event::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+}
+
+/* Glass card utilities */
+.glass-card {
+  @apply backdrop-blur-2xl border rounded-2xl;
+  background: hsl(0 0% 100% / 0.03);
+  border-color: hsl(0 0% 100% / 0.08);
+  box-shadow: 0 0 80px -20px hsl(var(--accent) / 0.3);
+}
+
+.glass-card-subtle {
+  @apply backdrop-blur-md border rounded-2xl;
+  background: hsl(0 0% 100% / 0.02);
+  border-color: hsl(0 0% 100% / 0.06);
+}
+
+/* Sidebar glass hover effect */
+.sidebar-glass-hover {
+  @apply transition-all duration-200 border border-transparent;
+}
+.sidebar-glass-hover:hover {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.08), hsl(var(--accent) / 0.08));
+  backdrop-filter: blur(12px);
+  border-color: hsl(0 0% 100% / 0.06);
+}
+
+.sidebar-glass-active {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--accent) / 0.12)) !important;
+  border-left: 2px solid hsl(var(--accent));
+  color: hsl(var(--accent));
+}
+
+/* Auth animated gradient blobs */
+@keyframes blob-move-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30%, 20%) scale(1.2); }
+  66% { transform: translate(10%, 40%) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes blob-move-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-30%, 15%) scale(1.15); }
+  66% { transform: translate(-15%, -25%) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes blob-move-3 {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20%, -30%) scale(1.25); }
+  66% { transform: translate(-20%, 15%) scale(0.95); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes blob-move-4 {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(35%, -10%) scale(1.1); }
+  66% { transform: translate(-25%, 20%) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes blob-move-5 {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-20%, 30%) scale(1.2); }
+  66% { transform: translate(25%, -15%) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Auth animated waves */
+@keyframes wave-drift-1 {
+  0% { transform: translate(-5%, 0%) rotate(0deg); }
+  25% { transform: translate(2%, -2%) rotate(0.5deg); }
+  50% { transform: translate(5%, 1%) rotate(-0.3deg); }
+  75% { transform: translate(1%, 3%) rotate(0.2deg); }
+  100% { transform: translate(-5%, 0%) rotate(0deg); }
+}
+@keyframes wave-drift-2 {
+  0% { transform: translate(5%, 2%) rotate(0deg); }
+  25% { transform: translate(-1%, -1%) rotate(-0.4deg); }
+  50% { transform: translate(-5%, 0%) rotate(0.3deg); }
+  75% { transform: translate(2%, 2%) rotate(-0.2deg); }
+  100% { transform: translate(5%, 2%) rotate(0deg); }
+}
+@keyframes wave-drift-3 {
+  0% { transform: translate(0%, -3%) scale(1); }
+  25% { transform: translate(-3%, 1%) scale(1.02); }
+  50% { transform: translate(1%, 3%) scale(0.98); }
+  75% { transform: translate(3%, -1%) scale(1.01); }
+  100% { transform: translate(0%, -3%) scale(1); }
+}
+

@@ -1,1 +1,13 @@
-project_id = "svkvbnangrnkqynnmxjc"
+project_id = "lsagslbkliprespbyhts"
+
+[functions.ai-sales-chat]
+verify_jwt = false
+
+[functions.event-external-action]
+verify_jwt = false
+
+[functions.manage-user-roles]
+verify_jwt = false
+
+[functions.admin-user-actions]
+verify_jwt = false

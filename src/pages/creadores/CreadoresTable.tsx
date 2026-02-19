@@ -1,0 +1,353 @@
+import { useState } from "react";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import type { CreatorWithBusiness } from "./useCreadores";
+import { useUpdateCreador } from "./useCreadores";
+import { buildSocialUrl } from "@/lib/utils";
+import EditCreadorModal from "./EditCreadorModal";
+import ViewCreadorModal from "./ViewCreadorModal";
+import ChangeStatusModal from "./ChangeStatusModal";
+
+const statusLabel: Record<string, string> = {
+  active: "Activa",
+  onboarding: "Onboarding",
+  leaving: "Retiro",
+  terminated: "Terminada",
+  paused: "Pausada",
+};
+
+const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
+  active: "success-soft",
+  onboarding: "primary-soft",
+  leaving: "warning-soft",
+  terminated: "destructive-soft",
+  paused: "secondary-soft",
+};
+
+const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "A+": "success-soft",
+  A: "primary-soft",
+  "B+": "warning-soft",
+  B: "secondary-soft",
+  C: "destructive-soft",
+};
+
+const getFlagEmoji = (countryCode: string | null) => {
+  if (!countryCode) return "";
+  return countryCode
+    .toUpperCase()
+    .split("")
+    .map((c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
+    .join("");
+};
+
+type SortKey = "name" | "category" | "status" | "country" | "agency";
+
+interface Props {
+  creators: CreatorWithBusiness[];
+}
+
+const CreadoresTable = ({ creators }: Props) => {
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+  const [editingCreator, setEditingCreator] = useState<CreatorWithBusiness | null>(null);
+  const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
+  const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
+  const updateCreador = useUpdateCreador();
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  };
+
+  const sorted = [...creators].sort((a, b) => {
+    let va = "";
+    let vb = "";
+    switch (sortKey) {
+      case "name":
+        va = a.name;
+        vb = b.name;
+        break;
+      case "category":
+        va = a.category ?? "";
+        vb = b.category ?? "";
+        break;
+      case "status":
+        va = a.status ?? "";
+        vb = b.status ?? "";
+        break;
+      case "country":
+        va = `${a.country ?? ""} ${a.city ?? ""}`;
+        vb = `${b.country ?? ""} ${b.city ?? ""}`;
+        break;
+      case "agency":
+        va = a.creator_business?.assigned_agency ?? "";
+        vb = b.creator_business?.assigned_agency ?? "";
+        break;
+    }
+    return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+
+  const SortHeader = ({ label, col }: { label: string; col: SortKey }) => (
+    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs" onClick={() => handleSort(col)}>
+      {label}
+      <ArrowUpDown className="ml-1 h-3 w-3" />
+    </Button>
+  );
+
+  return (
+    <>
+    <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
+    <Table>
+      <TableHeader className="sticky top-0 z-10 bg-card">
+        <TableRow>
+          <TableHead><SortHeader label="Creador" col="name" /></TableHead>
+          <TableHead><SortHeader label="Categoría" col="category" /></TableHead>
+          <TableHead><SortHeader label="Estado" col="status" /></TableHead>
+          <TableHead><SortHeader label="Ubicación" col="country" /></TableHead>
+          <TableHead><SortHeader label="Agencia" col="agency" /></TableHead>
+          <TableHead>Redes</TableHead>
+          <TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((c) => {
+          const initials = c.name
+            .split(" ")
+            .slice(0, 2)
+            .map((w) => w[0])
+            .join("")
+            .toUpperCase();
+
+          const flag = getFlagEmoji(c.country_code);
+          const agency = c.creator_business?.assigned_agency;
+          const kashType = c.creator_business?.kash_type;
+          const agencyLabel = [agency, kashType].filter(Boolean).join(" · ");
+
+          return (
+            <TableRow key={c.id}>
+              <TableCell className="cursor-pointer" onClick={() => setViewingCreator(c)}>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    {c.profile_photo_url && <AvatarImage src={c.profile_photo_url} />}
+                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium leading-none">{c.artistic_name || c.name}</p>
+                    {c.artistic_name && (
+                      <p className="text-xs text-muted-foreground">{c.name}</p>
+                    )}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>
+                {c.category && (
+                  <Badge variant={categoryVariant[c.category] ?? "secondary-soft"} className="font-normal">
+                    {c.category}
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                <button
+                  onClick={() => setStatusChangeCreator(c)}
+                  className="flex items-center gap-1 focus:outline-none cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
+                    {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
+                  </Badge>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {flag && <span className="mr-1">{flag}</span>}
+                {c.city || c.country || "—"}
+              </TableCell>
+              <TableCell className="text-sm">
+                {agencyLabel ? (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate max-w-[140px]">{agencyLabel}</span>
+                  </span>
+                ) : "—"}
+              </TableCell>
+              <TableCell>
+                <TooltipProvider>
+                <div className="flex gap-2">
+                  {c.instagram_handle && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={buildSocialUrl("instagram", c.instagram_handle)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <InstagramIcon className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Instagram</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {c.tiktok_handle && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={buildSocialUrl("tiktok", c.tiktok_handle)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground hover:text-muted-foreground"
+                        >
+                          <TikTokIcon className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>TikTok</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {c.twitter_handle && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={buildSocialUrl("twitter", c.twitter_handle)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-foreground hover:text-muted-foreground"
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>X</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {(() => {
+                    const externalLinks = [
+                      c.onlyfans_url && { label: "OnlyFans", url: c.onlyfans_url },
+                      c.piclink_url && { label: "Piclink", url: c.piclink_url },
+                      c.linkedin_handle && { label: "LinkedIn", url: buildSocialUrl("linkedin", c.linkedin_handle) },
+                      c.youtube_handle && { label: "YouTube", url: buildSocialUrl("youtube", c.youtube_handle) },
+                      c.chat_url && { label: "Chat", url: c.chat_url },
+                    ].filter(Boolean) as { label: string; url: string }[];
+                    if (externalLinks.length === 0) return null;
+                    if (externalLinks.length === 1) {
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={externalLinks[0].url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent>{externalLinks[0].label}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+                    return (
+                      <DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer">
+                                <Globe className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver plataformas</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent align="start">
+                          {externalLinks.map((link) => (
+                            <DropdownMenuItem key={link.label} asChild>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                {link.label}
+                              </a>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  })()}
+                </div>
+                </TooltipProvider>
+              </TableCell>
+              <TableCell className="sticky right-0 bg-card">
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCreator(c)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+        {sorted.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+              No se encontraron creadores.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+    </div>
+
+    {editingCreator && (
+      <EditCreadorModal
+        open={!!editingCreator}
+        onOpenChange={(open) => { if (!open) setEditingCreator(null); }}
+        creator={editingCreator}
+      />
+    )}
+
+    {viewingCreator && (
+      <ViewCreadorModal
+        open={!!viewingCreator}
+        onOpenChange={(open) => { if (!open) setViewingCreator(null); }}
+        creator={viewingCreator}
+      />
+    )}
+
+    {statusChangeCreator && (
+      <ChangeStatusModal
+        creatorId={statusChangeCreator.id}
+        creatorName={statusChangeCreator.name}
+        currentStatus={statusChangeCreator.status ?? ""}
+        open={!!statusChangeCreator}
+        onOpenChange={(open) => {
+          if (!open) setStatusChangeCreator(null);
+        }}
+      />
+    )}
+  </>
+  );
+};
+
+export default CreadoresTable;

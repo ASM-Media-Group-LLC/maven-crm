@@ -1,0 +1,282 @@
+import { useState, useMemo } from "react";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus } from "lucide-react";
+import { useAdminUsers, type AdminUser } from "./useAdminUsers";
+import UsersTable from "./UsersTable";
+import UsersGrid from "./UsersGrid";
+import ChangeRoleModal from "./ChangeRoleModal";
+import EditUserModal from "./EditUserModal";
+import DeleteUserDialog from "./DeleteUserDialog";
+import RolesContent from "./RolesContent";
+import ResetPasswordModal from "./ResetPasswordModal";
+import AddUserModal from "./AddUserModal";
+import type { AppRole } from "@/hooks/useUserRole";
+import { Loader2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+const AdminUsuarios = () => {
+  const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
+  const [search, setSearch] = useState("");
+  const [view, setView] = useState<"list" | "grid">("list");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [resetPwOpen, setResetPwOpen] = useState(false);
+  const [createRoleOpen, setCreateRoleOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return users;
+    const q = search.toLowerCase();
+    return users.filter((u) => (u.full_name ?? "").toLowerCase().includes(q));
+  }, [users, search]);
+
+  const handleEditRole = (user: AdminUser) => {
+    setSelectedUser(user);
+    setModalOpen(true);
+  };
+
+  const handleConfirmRole = (userId: string, role: AppRole) => {
+    changeRole({ userId, role }, { onSuccess: () => setModalOpen(false) });
+  };
+
+  const adminAction = useMutation({
+    mutationFn: async (body: Record<string, string>) => {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (user: AdminUser) => { setSelectedUser(user); setEditOpen(true); };
+  const handleDelete = (user: AdminUser) => { setSelectedUser(user); setDeleteOpen(true); };
+  const handleResetPassword = (user: AdminUser) => {
+    setSelectedUser(user);
+    setResetPwOpen(true);
+  };
+
+  const kpis = [
+    { label: "Total", value: stats.total, icon: Users, color: "text-primary" },
+    { label: "Admins", value: stats.admins, icon: Shield, color: "text-red-500" },
+    { label: "Managers", value: stats.managers, icon: UserCog, color: "text-amber-500" },
+    { label: "Employees", value: stats.employees, icon: User, color: "text-blue-500" },
+  ];
+
+  const tabs = [
+    { key: "usuarios" as const, label: "Usuarios" },
+    { key: "roles" as const, label: "Roles" },
+  ];
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <DashboardSidebar />
+        <div className="flex-1 flex flex-col">
+          <DashboardTopbar />
+          <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+            {/* Fixed Header */}
+            <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
+                  <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
+                </div>
+                {activeTab === "usuarios" ? (
+                  <Button variant="outline" size="sm" onClick={() => setAddUserOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar Usuario
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setCreateRoleOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuevo Rol
+                  </Button>
+                )}
+              </div>
+            </header>
+
+            {/* Scrollable Area */}
+            <div className="flex-1 overflow-auto p-6 space-y-6">
+              {/* KPIs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {kpis.map((kpi) => (
+                  <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
+                      <kpi.icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{kpi.value}</p>
+                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tab bar */}
+              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                {tabs.map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === tab.key ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => { setActiveTab(tab.key); setSearch(""); }}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Search bar - visible for both tabs */}
+              <div className="flex items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={activeTab === "usuarios" ? "Buscar por nombre..." : "Buscar rol..."}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <div className="flex gap-1 border rounded-md p-0.5">
+                  <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("list")}>
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setView("grid")}>
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {activeTab === "usuarios" ? (
+                <>
+                  {/* Content */}
+                  {isLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                      <Users className="h-12 w-12 mb-3 opacity-40" />
+                      <p>No se encontraron usuarios</p>
+                    </div>
+                  ) : view === "list" ? (
+                    <UsersTable
+                      users={filtered}
+                      onEditRole={handleEditRole}
+                      onEdit={handleEdit}
+                      onResetPassword={handleResetPassword}
+                      onDelete={handleDelete}
+                      onRemoveRole={(user) => {
+                        adminAction.mutate(
+                          { action: "remove_role", user_id: user.id },
+                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                        );
+                      }}
+                    />
+                  ) : (
+                    <UsersGrid
+                      users={filtered}
+                      onEditRole={handleEditRole}
+                      onEdit={handleEdit}
+                      onResetPassword={handleResetPassword}
+                      onDelete={handleDelete}
+                      onRemoveRole={(user) => {
+                        adminAction.mutate(
+                          { action: "remove_role", user_id: user.id },
+                          { onSuccess: () => toast({ title: "Rol eliminado" }) }
+                        );
+                      }}
+                    />
+                  )}
+
+                  <ChangeRoleModal
+                    user={selectedUser}
+                    open={modalOpen}
+                    onOpenChange={setModalOpen}
+                    onConfirm={handleConfirmRole}
+                    isLoading={isChangingRole}
+                  />
+
+                  <EditUserModal
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    user={selectedUser}
+                    onConfirm={(data) => {
+                      if (selectedUser) {
+                        adminAction.mutate(
+                          { action: "update_profile", user_id: selectedUser.id, first_name: data.first_name, last_name: data.last_name, role: data.role },
+                          { onSuccess: () => { setEditOpen(false); toast({ title: "Usuario actualizado" }); } }
+                        );
+                      }
+                    }}
+                    isLoading={adminAction.isPending}
+                  />
+
+                  <ResetPasswordModal
+                    open={resetPwOpen}
+                    onOpenChange={setResetPwOpen}
+                    userName={selectedUser?.full_name || ""}
+                    userId={selectedUser?.id || ""}
+                  />
+
+                  <DeleteUserDialog
+                    open={deleteOpen}
+                    onOpenChange={setDeleteOpen}
+                    userName={selectedUser?.full_name || "Sin nombre"}
+                    onConfirm={() => {
+                      if (selectedUser) {
+                        adminAction.mutate(
+                          { action: "delete_user", user_id: selectedUser.id },
+                          { onSuccess: () => { setDeleteOpen(false); toast({ title: "Usuario eliminado" }); } }
+                        );
+                      }
+                    }}
+                    isLoading={adminAction.isPending}
+                  />
+                </>
+              ) : (
+                <RolesContent search={search} view={view} createOpen={createRoleOpen} onCreateOpenChange={setCreateRoleOpen} />
+              )}
+
+              <AddUserModal
+                open={addUserOpen}
+                onOpenChange={setAddUserOpen}
+                onConfirm={(data) => {
+                  adminAction.mutate(
+                    { action: "create_user", ...data },
+                    {
+                      onSuccess: () => {
+                        setAddUserOpen(false);
+                        toast({ title: "Usuario creado exitosamente" });
+                      },
+                    }
+                  );
+                }}
+                isLoading={adminAction.isPending}
+              />
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+};
+
+export default AdminUsuarios;
