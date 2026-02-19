@@ -48,6 +48,7 @@ const DashboardSidebar = () => {
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
     { title: "Reportes", url: "/salesdashboard" },
+    { title: "IA Ventas", url: "/aisales" },
   ];
 
   const operationsMenu = [
@@ -141,12 +142,6 @@ const DashboardSidebar = () => {
                           {item.title}
                         </DropdownMenuItem>
                       ))}
-                      <DropdownMenuItem onClick={() => navigate("/aisales")} className={pathname === "/aisales" ? "bg-accent text-accent-foreground font-medium" : ""}>
-                        IA Ventas
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate("/ai-sales-config")} className={pathname === "/ai-sales-config" ? "bg-accent text-accent-foreground font-medium" : ""}>
-                        Config IA
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
@@ -169,21 +164,6 @@ const DashboardSidebar = () => {
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
-                        {/* IA Ventas with settings gear */}
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={pathname === "/aisales"} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                            <div className="flex items-center w-full">
-                              <NavLink to="/aisales" className="flex-1">IA Ventas</NavLink>
-                              <button
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate("/ai-sales-config"); }}
-                                className={`ml-1 p-0.5 rounded hover:bg-accent/50 transition-colors ${pathname === "/ai-sales-config" ? "text-primary" : "text-muted-foreground"}`}
-                                title="Configuración IA"
-                              >
-                                <Settings className="h-3 w-3" />
-                              </button>
-                            </div>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Loader2 } from "lucide-react";
+import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { getAiConfig } from "@/lib/ai-config";
@@ -82,6 +82,12 @@ async function streamChat({
   onDone();
 }
 
+// Detect Speech API support (cast to any for cross-browser compatibility)
+const SpeechRecAPI: any =
+  typeof window !== "undefined"
+    ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null)
+    : null;
+
 interface ClariAiChatProps {
   mode?: "full" | "panel";
 }
@@ -90,15 +96,63 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
   const [messages, setMessages] = useState<Msg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  // Stop recording on unmount
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    if (!SpeechRecAPI) return;
+
+    const rec = new SpeechRecAPI();
+    rec.lang = "es-ES";
+    rec.continuous = false;
+    rec.interimResults = true;
+
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results as SpeechRecognitionResultList)
+        .map((r: SpeechRecognitionResult) => r[0].transcript)
+        .join("");
+      setInput(transcript);
+    };
+
+    rec.onerror = (e: any) => {
+      if (e.error !== "aborted") {
+        toast.error("Error de micrófono: " + e.error);
+      }
+      setIsRecording(false);
+    };
+
+    rec.onend = () => setIsRecording(false);
+
+    rec.start();
+    setIsRecording(true);
+    recognitionRef.current = rec;
+  }, [isRecording]);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || isLoading) return;
+
+    // Stop recording if active
+    if (isRecording) {
+      recognitionRef.current?.stop();
+    }
+
     setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
@@ -138,7 +192,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
       toast.error("Error de conexión");
       setIsLoading(false);
     }
-  }, [input, isLoading, messages]);
+  }, [input, isLoading, isRecording, messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -206,10 +260,27 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pregunta sobre creadoras y ganancias…"
+            placeholder={isRecording ? "Escuchando…" : "Pregunta sobre creadoras y ganancias…"}
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={`flex-1 resize-none rounded-xl border bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
+              isRecording ? "border-destructive" : "border-input"
+            }`}
           />
+          {SpeechRecAPI && (
+            <Button
+              onClick={toggleRecording}
+              variant="outline"
+              size="icon"
+              className={`h-10 w-10 shrink-0 rounded-xl transition-colors ${
+                isRecording
+                  ? "border-destructive text-destructive animate-pulse hover:bg-destructive/10"
+                  : ""
+              }`}
+              title={isRecording ? "Detener grabación" : "Hablar"}
+            >
+              {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+          )}
           <Button
             onClick={send}
             disabled={!input.trim() || isLoading}
