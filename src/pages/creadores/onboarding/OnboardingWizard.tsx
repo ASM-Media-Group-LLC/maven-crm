@@ -20,7 +20,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
-const initialStep4: Step4Data = { schedule: {}, hourlyRate: "", monthlyGoal: "", notes: "" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "" };
 
 interface Props {
   onCancel: () => void;
@@ -79,9 +79,17 @@ export default function OnboardingWizard({ onCancel }: Props) {
   const handlePrev = () => setStep((s) => Math.max(s - 1, 1));
 
   const buildPayload = (isDraft: boolean) => {
+    // Build precios_contenido from pricing entries with price > 0
+    const preciosContenido: Record<string, { price: number; notes: string }> = {};
+    Object.entries(step4.pricing).forEach(([key, val]) => {
+      const price = Number(val.price);
+      if (price > 0) {
+        preciosContenido[key] = { price, notes: val.notes || "" };
+      }
+    });
+
     const extraData = JSON.stringify({
       schedule: step4.schedule,
-      hourlyRate: step4.hourlyRate,
       monthlyGoal: step4.monthlyGoal,
       timezone: step1.timezone,
     });
@@ -117,6 +125,7 @@ export default function OnboardingWizard({ onCancel }: Props) {
         contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
         status: isDraft ? "borrador" : "pendiente_verificacion",
         profile_photo_url: profilePhotoUrl,
+        precios_contenido: Object.keys(preciosContenido).length > 0 ? preciosContenido : null,
         internal_notes: extraData,
         notes: step4.notes || null,
       },
