@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, Eye, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, Eye, ChevronsUpDown, Check, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import AgentDetailView from "./AgentDetailView";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
-import { format, isSameDay, subDays, startOfDay, subMonths } from "date-fns";
+import { format, isSameDay, subDays, startOfDay, subMonths, addDays, startOfWeek, endOfWeek, isToday, isFuture } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -50,10 +50,19 @@ const hourlyData = Array.from({ length: 24 }, (_, i) => ({
   leads: 0,
 }));
 
+const getWeekDays = (offset: number): Date[] => {
+  const now = new Date();
+  const monday = startOfWeek(addDays(now, offset * 7), { weekStartsOn: 1 });
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+};
+
+const DAY_LABELS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+
 const LeadGenContent = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("leads");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "grid" | "calendar">("list");
+  const [weekOffset, setWeekOffset] = useState(0);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [selectedAgente, setSelectedAgente] = useState("todos");
   const [agentSelectOpen, setAgentSelectOpen] = useState(false);
@@ -218,6 +227,16 @@ const LeadGenContent = () => {
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
+            {(activeTab === "agentes" || activeTab === "supervisores") && (
+              <Button
+                variant={viewMode === "calendar" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setViewMode("calendar")}
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -259,7 +278,9 @@ const LeadGenContent = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
+                      {viewMode === "calendar"
+                        ? (() => { const days = getWeekDays(weekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
+                        : format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-right">
@@ -274,7 +295,76 @@ const LeadGenContent = () => {
                 </div>
               </div>
 
-              {viewMode === "list" ? (
+              {viewMode === "calendar" ? (() => {
+                const weekDays = getWeekDays(weekOffset);
+                const leadsInDay = (agente: typeof mockSupervisores[0], day: Date) =>
+                  leads.filter(l => l.compania?.toLowerCase() === agente.name.toLowerCase() && isSameDay(new Date(l.created_at), day)).length;
+                const colTotals = weekDays.map(day => mockSupervisores.reduce((sum, ag) => sum + leadsInDay(ag, day), 0));
+                const grandTotal = colTotals.reduce((a, b) => a + b, 0);
+                return (
+                  <Card>
+                    <CardContent className="pt-4 px-4 pb-4">
+                      {/* Week navigation */}
+                      <div className="flex items-center justify-between mb-4">
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)}>
+                          <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
+                        </Button>
+                        <span className="text-sm font-medium text-muted-foreground">
+                          {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 0}>
+                          Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="min-w-[140px]">Agente</TableHead>
+                              {weekDays.map((day, i) => (
+                                <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
+                                  {DAY_LABELS[i]} {format(day, "d")}
+                                </TableHead>
+                              ))}
+                              <TableHead className="text-center font-semibold">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {mockSupervisores.map((ag) => {
+                              const dayCounts = weekDays.map(day => leadsInDay(ag, day));
+                              const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
+                              return (
+                                <TableRow key={ag.email}>
+                                  <TableCell className="font-medium text-sm">{ag.name}</TableCell>
+                                  {dayCounts.map((cnt, i) => (
+                                    <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                                      {isFuture(startOfDay(weekDays[i])) || cnt === 0 ? "—" : cnt}
+                                    </TableCell>
+                                  ))}
+                                  <TableCell className="text-center font-semibold">{rowTotal > 0 ? rowTotal : "—"}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                          <tfoot>
+                            <TableRow className="border-t-2 bg-muted/30">
+                              <TableCell className="font-bold text-sm">Total</TableCell>
+                              {colTotals.map((t, i) => (
+                                <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${(t === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                                  {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-center">
+                                <Badge variant="default">{grandTotal}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          </tfoot>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })() : viewMode === "list" ? (
                 <Card>
                   <CardContent className="pt-6 px-0">
                     <Table>
@@ -566,131 +656,208 @@ const LeadGenContent = () => {
           )}
 
           {activeTab === "supervisores" && (
-            viewMode === "list" ? (
-            <Card>
-              <CardContent className="pt-6 px-0">
-                <div className="max-h-[calc(100vh-24rem)] overflow-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-card">
-                    <TableRow>
-                      <TableHead>Supervisor</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead className="text-center">Total QA</TableHead>
-                      <TableHead className="text-center">A+</TableHead>
-                      <TableHead className="text-center">A</TableHead>
-                      <TableHead className="text-center">B+</TableHead>
-                      <TableHead className="text-center">B</TableHead>
-                      <TableHead className="text-center">C</TableHead>
-                      <TableHead className="text-center">Aprobados</TableHead>
-                      <TableHead className="text-center">Rechazados</TableHead>
-                      <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mockSupervisores.map((sup) => {
-                      const initials = sup.name.slice(0, 2).toUpperCase();
-                      return (
-                        <TableRow key={sup.email}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                  {initials}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium text-sm">{sup.name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge className="justify-center">{sup.totalQA}</Badge>
-                          </TableCell>
-                          <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
-                          <TableCell className="text-center font-medium text-green-500">{sup.a}</TableCell>
-                          <TableCell className="text-center font-medium text-yellow-500">{sup.bPlus}</TableCell>
-                          <TableCell className="text-center font-medium text-yellow-500">{sup.b}</TableCell>
-                          <TableCell className="text-center font-medium">{sup.c}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="success" className="justify-center">{sup.aprobados}</Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
-                          </TableCell>
-                          <TableCell className="text-center sticky right-0 bg-card">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+            <div className="space-y-6">
+              {/* Banner */}
+              <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+                <div className="p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-primary">Rendimiento de Supervisores</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {viewMode === "calendar"
+                        ? (() => { const days = getWeekDays(weekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
+                        : format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 text-right">
+                    <div>
+                      <p className="text-3xl font-bold text-primary">{mockSupervisores.length}</p>
+                      <p className="text-xs text-muted-foreground">Supervisores Activos</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-            ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {mockSupervisores.map((sup) => {
-                const initials = sup.name.slice(0, 2).toUpperCase();
+              </div>
+
+              {viewMode === "calendar" ? (() => {
+                const weekDays = getWeekDays(weekOffset);
+                const colTotals = weekDays.map(() => 0);
                 return (
-                  <Card key={sup.email}>
-                    <CardContent className="p-4">
-                      {/* Header */}
+                  <Card>
+                    <CardContent className="pt-4 px-4 pb-4">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-sm">{sup.name}</p>
-                            <p className="text-xs text-muted-foreground">{sup.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <CheckSquare className="h-4 w-4" />
-                          <span className="text-sm font-medium">{sup.totalQA}</span>
-                          <span className="text-xs">QA reviews</span>
-                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)}>
+                          <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
+                        </Button>
+                        <span className="text-sm font-medium text-muted-foreground">
+                          {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w + 1)} disabled={weekOffset >= 0}>
+                          Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
                       </div>
-
-                      {/* Calificaciones */}
-                      <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border mb-3">
-                        {[
-                          { label: "A+", value: sup.aPlus, color: "text-primary" },
-                          { label: "A", value: sup.a, color: "text-green-500" },
-                          { label: "B+", value: sup.bPlus, color: "text-yellow-500" },
-                          { label: "B", value: sup.b, color: "text-muted-foreground" },
-                          { label: "C", value: sup.c, color: "text-muted-foreground" },
-                        ].map((item) => (
-                          <div key={item.label} className="bg-muted/30 p-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                            <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Estados */}
-                      <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden border">
-                        <div className="bg-green-500/5 p-3 text-center">
-                          <p className="text-xs text-muted-foreground mb-1">Aprobados</p>
-                          <p className="text-lg font-bold text-green-500">{sup.aprobados}</p>
-                        </div>
-                        <div className="bg-yellow-500/5 p-3 text-center">
-                          <p className="text-xs text-muted-foreground mb-1">Mejorar</p>
-                          <p className="text-lg font-bold text-yellow-500">{sup.mejorar}</p>
-                        </div>
-                        <div className="bg-destructive/5 p-3 text-center">
-                          <p className="text-xs text-muted-foreground mb-1">Rechazados</p>
-                          <p className="text-lg font-bold text-destructive">{sup.rechazados}</p>
-                        </div>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="min-w-[140px]">Supervisor</TableHead>
+                              {weekDays.map((day, i) => (
+                                <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
+                                  {DAY_LABELS[i]} {format(day, "d")}
+                                </TableHead>
+                              ))}
+                              <TableHead className="text-center font-semibold">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {mockSupervisores.map((sup) => (
+                              <TableRow key={sup.email}>
+                                <TableCell className="font-medium text-sm">{sup.name}</TableCell>
+                                {weekDays.map((day, i) => (
+                                  <TableCell key={i} className={`text-center text-sm text-muted-foreground ${isToday(day) ? "bg-primary/10" : ""}`}>—</TableCell>
+                                ))}
+                                <TableCell className="text-center text-muted-foreground">—</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                          <tfoot>
+                            <TableRow className="border-t-2 bg-muted/30">
+                              <TableCell className="font-bold text-sm">Total</TableCell>
+                              {weekDays.map((day, i) => (
+                                <TableCell key={i} className={`text-center text-sm text-muted-foreground ${isToday(day) ? "bg-primary/10" : ""}`}>—</TableCell>
+                              ))}
+                              <TableCell className="text-center">
+                                <Badge variant="default">0</Badge>
+                              </TableCell>
+                            </TableRow>
+                          </tfoot>
+                        </Table>
                       </div>
                     </CardContent>
                   </Card>
                 );
-              })}
+              })() : viewMode === "list" ? (
+              <Card>
+                <CardContent className="pt-6 px-0">
+                  <div className="max-h-[calc(100vh-24rem)] overflow-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-10 bg-card">
+                      <TableRow>
+                        <TableHead>Supervisor</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead className="text-center">Total QA</TableHead>
+                        <TableHead className="text-center">A+</TableHead>
+                        <TableHead className="text-center">A</TableHead>
+                        <TableHead className="text-center">B+</TableHead>
+                        <TableHead className="text-center">B</TableHead>
+                        <TableHead className="text-center">C</TableHead>
+                        <TableHead className="text-center">Aprobados</TableHead>
+                        <TableHead className="text-center">Rechazados</TableHead>
+                        <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mockSupervisores.map((sup) => {
+                        const initials = sup.name.slice(0, 2).toUpperCase();
+                        return (
+                          <TableRow key={sup.email}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium text-sm">{sup.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge className="justify-center">{sup.totalQA}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
+                            <TableCell className="text-center font-medium">{sup.a}</TableCell>
+                            <TableCell className="text-center font-medium">{sup.bPlus}</TableCell>
+                            <TableCell className="text-center font-medium">{sup.b}</TableCell>
+                            <TableCell className="text-center font-medium">{sup.c}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="success" className="justify-center">{sup.aprobados}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center sticky right-0 bg-card">
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                  </div>
+                </CardContent>
+              </Card>
+              ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {mockSupervisores.map((sup) => {
+                  const initials = sup.name.slice(0, 2).toUpperCase();
+                  return (
+                    <Card key={sup.email}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm">{sup.name}</p>
+                              <p className="text-xs text-muted-foreground">{sup.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <CheckSquare className="h-4 w-4" />
+                            <span className="text-sm font-medium">{sup.totalQA}</span>
+                            <span className="text-xs">QA reviews</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border mb-3">
+                          {[
+                            { label: "A+", value: sup.aPlus, color: "text-primary" },
+                            { label: "A", value: sup.a, color: "text-success" },
+                            { label: "B+", value: sup.bPlus, color: "text-warning" },
+                            { label: "B", value: sup.b, color: "text-muted-foreground" },
+                            { label: "C", value: sup.c, color: "text-muted-foreground" },
+                          ].map((item) => (
+                            <div key={item.label} className="bg-muted/30 p-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                              <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden border">
+                          <div className="bg-success/5 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Aprobados</p>
+                            <p className="text-lg font-bold text-success">{sup.aprobados}</p>
+                          </div>
+                          <div className="bg-warning/5 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Mejorar</p>
+                            <p className="text-lg font-bold text-warning">{sup.mejorar}</p>
+                          </div>
+                          <div className="bg-destructive/5 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Rechazados</p>
+                            <p className="text-lg font-bold text-destructive">{sup.rechazados}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              )}
             </div>
-            )
           )}
         </div>
       </div>

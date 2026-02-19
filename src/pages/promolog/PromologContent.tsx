@@ -2,9 +2,9 @@ import { useState, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, isSameDay, addDays, startOfWeek, isToday, isFuture, startOfDay } from "date-fns";
+import { es } from "date-fns/locale";
 import {
-  
   Users,
   Search,
   Target,
@@ -25,7 +25,8 @@ import {
   Eye,
   CalendarIcon,
   ChevronsUpDown,
-  
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,14 @@ const tabItems = [
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
 ];
+
+const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
+
+const getAgentWeekDays = (offset: number): Date[] => {
+  const now = new Date();
+  const monday = startOfWeek(addDays(now, offset * 7), { weekStartsOn: 1 });
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+};
 
 const PromologContent = () => {
   const { data: creators = [] } = useQuery({
@@ -213,7 +222,8 @@ const PromologContent = () => {
   ];
 
   const [activeTab, setActiveTab] = useState<"promos" | "agentes" | "campanas">("promos");
-  const [agentesView, setAgentesView] = useState<"list" | "grid">("list");
+  const [agentesView, setAgentesView] = useState<"list" | "grid" | "calendar">("list");
+  const [agentWeekOffset, setAgentWeekOffset] = useState(0);
   const [campanasView, setCampanasView] = useState<"list" | "grid">("list");
 
   const [selectedCreator, setSelectedCreator] = useState("");
@@ -645,6 +655,9 @@ const PromologContent = () => {
                 <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
+                <Button variant={agentesView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("calendar")}>
+                  <CalendarIcon className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
@@ -654,7 +667,9 @@ const PromologContent = () => {
                 <div>
                   <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha"}
+                    {agentesView === "calendar"
+                      ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
+                      : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -669,17 +684,90 @@ const PromologContent = () => {
               </div>
             </div>
 
-            {/* Agent cards o estado vacío */}
-            {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
+            {/* Calendar view or agent cards */}
+            {agentesView === "calendar" ? (() => {
+              const weekDays = getAgentWeekDays(agentWeekOffset);
+              const entriesInDay = (agentName: string, day: Date) =>
+                promologEntries.filter(pe =>
+                  pe.reviewed_by === agentName &&
+                  pe.promoted === "true" &&
+                  isSameDay(new Date(pe.date), day)
+                ).length;
+              const colTotals = weekDays.map(day =>
+                agentsData.reduce((sum, ag) => sum + entriesInDay(ag.name, day), 0)
+              );
+              const grandTotal = colTotals.reduce((a, b) => a + b, 0);
+              return (
+                <Card>
+                  <CardContent className="pt-4 px-4 pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w - 1)}>
+                        <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
+                      </Button>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
+                      </span>
+                      <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w + 1)} disabled={agentWeekOffset >= 0}>
+                        Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[140px]">Agente</TableHead>
+                            {weekDays.map((day, i) => (
+                              <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
+                                {DAY_LABELS_ES[i]} {format(day, "d")}
+                              </TableHead>
+                            ))}
+                            <TableHead className="text-center font-semibold">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {agentsData.map((agent) => {
+                            const dayCounts = weekDays.map(day => entriesInDay(agent.name, day));
+                            const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
+                            return (
+                              <TableRow key={agent.name}>
+                                <TableCell className="font-medium text-sm">{agent.name}</TableCell>
+                                {dayCounts.map((cnt, i) => (
+                                  <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                                    {isFuture(startOfDay(weekDays[i])) || cnt === 0 ? "—" : cnt}
+                                  </TableCell>
+                                ))}
+                                <TableCell className="text-center font-semibold">{rowTotal > 0 ? rowTotal : "—"}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                        <tfoot>
+                          <TableRow className="border-t-2 bg-muted/30">
+                            <TableCell className="font-bold text-sm">Total</TableCell>
+                            {colTotals.map((t, i) => (
+                              <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${(t === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                                {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
+                              </TableCell>
+                            ))}
+                            <TableCell className="text-center">
+                              <Badge variant="default">{grandTotal}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        </tfoot>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })() : (
+            agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center justify-center py-16">
                     <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                       <Users className="h-8 w-8 text-muted-foreground/50" />
                     </div>
-                    <p className="text-muted-foreground text-sm">
-                      No hay datos para esta fecha
-                    </p>
+                    <p className="text-muted-foreground text-sm">No hay datos para esta fecha</p>
                   </div>
                 </CardContent>
               </Card>
@@ -699,22 +787,22 @@ const PromologContent = () => {
                       </div>
                       <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
                         <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15">
-                            <Check className="h-3 w-3 text-green-600" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15">
+                            <Check className="h-3 w-3 text-success" />
                           </span>
                           <span className="text-sm font-medium">{agent.si}</span>
                           <span className="text-xs text-muted-foreground">Sí</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-500/15">
-                            <Minus className="h-3 w-3 text-yellow-600" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning/15">
+                            <Minus className="h-3 w-3 text-warning" />
                           </span>
                           <span className="text-sm font-medium">{agent.parcial}</span>
                           <span className="text-xs text-muted-foreground">Parcial</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/15">
-                            <X className="h-3 w-3 text-red-600" />
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/15">
+                            <X className="h-3 w-3 text-destructive" />
                           </span>
                           <span className="text-sm font-medium">{agent.no}</span>
                           <span className="text-xs text-muted-foreground">No</span>
@@ -732,7 +820,7 @@ const PromologContent = () => {
                   </Card>
                 ))}
               </div>
-            )}
+            ))}
           </div>
         )}
 
