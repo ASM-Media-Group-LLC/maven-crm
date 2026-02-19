@@ -32,9 +32,15 @@ const DashboardSidebar = () => {
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare },
-    { title: t("nav.creators"), url: "/creadores", icon: Users },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays },
   ];
+
+  const creadoresSubItems = [
+    { title: "Lista", url: "/creadores" },
+    { title: "Onboarding", url: "/creadores/onboarding" },
+  ];
+
+  const isCreadoresActive = creadoresSubItems.some((item) => pathname.startsWith(item.url));
 
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
@@ -75,6 +81,51 @@ const DashboardSidebar = () => {
                 </SidebarMenuItem>
               ))}
 
+              {/* Creadores submenu */}
+              {collapsed ? (
+                <SidebarMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton tooltip={t("nav.creators")} className={`sidebar-glass-hover ${isCreadoresActive ? "sidebar-glass-active font-medium" : ""}`}>
+                        <Users className="h-4 w-4 shrink-0" />
+                        <span>{t("nav.creators")}</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                      {creadoresSubItems.map((item) => (
+                        <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
+                          {item.title}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItem>
+              ) : (
+                <Collapsible defaultOpen={isCreadoresActive} className="group/creadoresCollapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton tooltip={t("nav.creators")} className="sidebar-glass-hover">
+                        <Users className="h-4 w-4 shrink-0" />
+                        <span>{t("nav.creators")}</span>
+                        <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/creadoresCollapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {creadoresSubItems.map((item) => (
+                          <SidebarMenuSubItem key={item.url}>
+                            <SidebarMenuSubButton asChild isActive={pathname === item.url} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                              <NavLink to={item.url}>{item.title}</NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {/* Creator Sales submenu */}
               {collapsed ? (
                 <SidebarMenuItem>
                   <DropdownMenu>
