@@ -9,6 +9,7 @@ import Step1PersonalInfo, { type Step1Data, type Step1Errors, validateStep1 } fr
 import Step2PsychologyLimits, { type Step2PsyData } from "./steps/Step2PsychologyLimits";
 import Step2Documentation, { type Step2Data, type Step2Errors, validateStep2 } from "./steps/Step2Documentation";
 import Step4WorkConfig, { type Step4Data } from "./steps/Step4WorkConfig";
+import { supabase } from "@/integrations/supabase/client";
 
 const STEPS = [
   { label: "Información Personal" },
@@ -150,6 +151,24 @@ export default function OnboardingWizard({ onCancel }: Props) {
     } else {
       if (!step1.name.trim()) {
         setStep1Errors({ name: "Nombre es requerido para guardar borrador" });
+        setStep(1);
+        return;
+      }
+    }
+
+    // Duplicate check by email
+    if (step1.email) {
+      const { data: existingByEmail } = await supabase
+        .from("creators")
+        .select("id, name, email")
+        .ilike("email", step1.email.trim())
+        .maybeSingle();
+      if (existingByEmail) {
+        toast({
+          title: "Duplicado detectado",
+          description: `Ya existe un creador con este email: ${existingByEmail.name}`,
+          variant: "destructive",
+        });
         setStep(1);
         return;
       }
