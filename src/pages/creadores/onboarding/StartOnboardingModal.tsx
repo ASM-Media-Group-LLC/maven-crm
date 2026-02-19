@@ -108,7 +108,7 @@ export default function StartOnboardingModal({ open, onClose }: Props) {
         age: step1.age ? Number(step1.age) : null,
         country: step1.country || null,
         city: step1.city || null,
-        status: "onboarding",
+        status: isDraft ? "borrador" : "pendiente_verificacion",
         profile_photo_url: profilePhotoUrl,
         internal_notes: extraData,
         notes: step4.notes || null,

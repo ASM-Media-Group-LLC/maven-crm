@@ -24,9 +24,9 @@ function calculateProgress(training: any): number {
   return Math.round((count / 4) * 100);
 }
 
-function deriveStatus(progress: number): "Pendiente" | "En Progreso" | "Completado" {
-  if (progress === 0) return "Pendiente";
-  if (progress >= 100) return "Completado";
+function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "Completado" {
+  if (dbStatus === "pendiente_verificacion") return "Pendiente";
+  if (dbStatus === "asignado" || dbStatus === "activo") return "Completado";
   return "En Progreso";
 }
 
@@ -37,7 +37,7 @@ export function useOnboarding() {
       const { data, error } = await supabase
         .from("creators")
         .select("*, creator_business(*), creator_training(*)")
-        .eq("status", "onboarding");
+        .in("status", ["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"]);
 
       if (error) throw error;
 
@@ -56,7 +56,7 @@ export function useOnboarding() {
           startDate: biz?.start_date || null,
           manager: "Sin asignar",
           progress,
-          status: deriveStatus(progress),
+          status: deriveStatus(c.status),
         };
       });
     },
