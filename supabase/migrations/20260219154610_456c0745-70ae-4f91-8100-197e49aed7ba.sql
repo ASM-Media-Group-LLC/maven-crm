@@ -1,0 +1,18 @@
+ALTER TABLE creators
+  ADD COLUMN IF NOT EXISTS signo_zodiacal text,
+  ADD COLUMN IF NOT EXISTS wishlist_url text,
+  ADD COLUMN IF NOT EXISTS estatura text,
+  ADD COLUMN IF NOT EXISTS medidas_cm text,
+  ADD COLUMN IF NOT EXISTS talla_brasier text,
+  ADD COLUMN IF NOT EXISTS tatuajes_piercings_detalle text,
+  ADD COLUMN IF NOT EXISTS rutina_diaria text,
+  ADD COLUMN IF NOT EXISTS hobbies text,
+  ADD COLUMN IF NOT EXISTS mascotas_nombres text,
+  ADD COLUMN IF NOT EXISTS comida_favorita text,
+  ADD COLUMN IF NOT EXISTS nivel_estudios text,
+  ADD COLUMN IF NOT EXISTS apodos_permitidos text,
+  ADD COLUMN IF NOT EXISTS palabras_prohibidas text,
+  ADD COLUMN IF NOT EXISTS emoji_frecuente text,
+  ADD COLUMN IF NOT EXISTS tono_voz text,
+  ADD COLUMN IF NOT EXISTS contenido_jamas_haria text,
+  ADD COLUMN IF NOT EXISTS precios_contenido jsonb DEFAULT '{}';
