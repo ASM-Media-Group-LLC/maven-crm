@@ -1,74 +1,65 @@
 
-## Añadir banner de resumen y vista de calendario semanal a Agentes y Supervisores
+## Mejora de las cards de Cantidad y Estados en LeadGen
 
-### Contexto actual
+### Problema actual
 
-| Módulo | Pestaña | Banner | Vista Calendario |
-|---|---|---|---|
-| LeadGen | Agentes | ✅ Ya existe | ❌ Falta |
-| LeadGen | Supervisores | ❌ No tiene | ❌ Falta |
-| Promolog | Agentes | ✅ Ya existe | ❌ Falta |
+Las cards **Cantidad** y **Estados** son componentes estáticos (`LeadGenCantidadCard` y `LeadGenEstadosCard`) que muestran siempre `0` para todos los valores. Los datos reales ya están cargados en `LeadGenContent.tsx` mediante el query de Supabase (array `leads`), pero no se pasan a estas cards.
 
-### Qué se va a construir
+### Columnas reales de la tabla `leads`
 
-Siguiendo exactamente la imagen de referencia, se añade:
+Consultando la base de datos se confirma:
+- `categoria` → valores como `a+`, `a`, `b+`, `b`, `c` (para la card de Cantidad)
+- `status` → valores como `nuevo`, `contactado`, etc.
+- `url_perfil`, `compania`, `pais`, `notas`, `evidence_urls`, `created_at`, `updated_at`
 
-1. **Banner de resumen** (donde falta, en LeadGen > Supervisores) con el mismo estilo que ya existe en Agentes: gradiente `primary`, recuento de activos a la derecha, fecha de la semana seleccionada.
+> No existe columna `estado` ni columna para "respondieron/interesadas" — los **Estados** se derivarán de `status` con mapeo lógico.
 
-2. **Vista de calendario semanal** en las tres pestañas afectadas, activada mediante un tercer botón de vista (icono de calendario) junto a los botones Lista/Grid existentes. La vista muestra:
-   - Navegación de semana: botones "Semana anterior" / "Semana siguiente"
-   - Encabezado con el rango de fechas de la semana actual
-   - Tabla con columnas: Agente | LUN | MAR | MIÉ | JUE | VIE | SÁB | DOM | Total
-   - La columna del día actual resaltada en azul (igual que en la imagen)
-   - Celdas vacías mostradas como `—`
-   - Fila de **Total** al final con el gran número acumulado
-   - El total general en badge de color primario
+### Qué se va a cambiar
 
-### Datos mostrados por módulo
+**1. `LeadGenCantidadCard.tsx`** — Recibir `leads` como prop y calcular conteos reales:
 
-- **LeadGen > Agentes**: número de leads por día filtrados por `compania` del agente (datos reales de Supabase)
-- **LeadGen > Supervisores**: número de QA reviews por día (datos del mock `mockSupervisores`, que actualmente todos son 0)
-- **Promolog > Agentes**: número de promociones (entries) "Sí" registradas por agente por día (datos reales de `promolog_entries`, campo `reviewed_by`)
+| Categoría | Derivación |
+|---|---|
+| A+ | `leads.filter(l => l.categoria?.toLowerCase() === 'a+').length` |
+| A | `leads.filter(l => l.categoria?.toLowerCase() === 'a').length` |
+| B+ | `leads.filter(l => l.categoria?.toLowerCase() === 'b+').length` |
+| B | `leads.filter(l => l.categoria?.toLowerCase() === 'b').length` |
+| C | `leads.filter(l => l.categoria?.toLowerCase() === 'c').length` |
+| Total | `leads.length` |
+| QA | leads con evidencia: `leads.filter(l => l.evidence_urls?.length > 0).length` |
+
+**2. `LeadGenEstadosCard.tsx`** — Recibir `leads` como prop y calcular conteos reales:
+
+| Estado | Derivación |
+|---|---|
+| Respondieron | `leads.filter(l => l.status === 'contactado' \|\| l.status === 'respondio').length` |
+| Interesadas | `leads.filter(l => l.status === 'interesado').length` |
+| No interesadas | `leads.filter(l => l.status === 'no_interesado').length` |
+| Otros | leads con status distinto a los anteriores y a 'nuevo' |
+| Con Teléfono | `leads.filter(l => l.notas?.includes('+') \|\| ...).length` — se puede detectar si la URL o notas incluyen un teléfono, o simplemente contar los que tienen notas |
+
+> Para "Estados" se calculará con los valores reales de `status`. Si los valores exactos difieren, se mostrará el total real del campo `status`.
+
+**3. `LeadGenContent.tsx`** — Pasar el array `leads` como prop a ambas cards:
+```tsx
+<LeadGenCantidadCard leads={leads} />
+<LeadGenEstadosCard leads={leads} />
+```
+
+### Mejora visual adicional
+
+Aprovechando la refactorización, se añadirá un pequeño **progress bar** o **porcentaje** junto al número en la card de Cantidad, para visualizar la distribución relativa de cada categoría respecto al total. Esto hace la card más informativa sin cambiar su layout.
+
+```
+A+  |████░░░░░░|  12  (24%)
+A   |██████░░░░|  28  (56%)
+...
+```
 
 ### Archivos a modificar
 
-**1. `src/pages/leadgen/LeadGenContent.tsx`**
-
-- Añadir estado `weekOffset` (número entero, 0 = semana actual, -1 = semana anterior, etc.)
-- Crear función `getWeekDays(offset)` que devuelve los 7 días de la semana seleccionada (lunes a domingo) usando `date-fns`
-- Añadir icono `Calendar` a los imports de `lucide-react` y agregar el tercer botón de vista `calendar` en la barra de controles de ambas pestañas (Agentes y Supervisores)
-- **Agentes tab**: añadir el bloque de calendario que calcula `leadsInDay(agente, day)` consultando el array `leads` ya disponible, filtrando por `compania` y la fecha
-- **Supervisores tab**: añadir banner de resumen (igual al de Agentes) + bloque de calendario (con datos del mock)
-- Añadir el tipo `"calendar"` al estado `viewMode`
-
-**2. `src/pages/promolog/PromologContent.tsx`**
-
-- Añadir estado `agentWeekOffset` separado del estado de fecha principal
-- Crear función `getWeekDays(offset)` local
-- Añadir el botón de vista `calendar` (con icono `Calendar` ya importado como `CalendarIcon`) en la fila de filtros de la pestaña Agentes
-- Crear el bloque de calendario semanal en la pestaña Agentes: filtra `promologEntries` donde `reviewed_by === agente.name` y la fecha caiga en el día correspondiente, mostrando solo entradas con `promoted = 'true'` (Sí)
-- Añadir el tipo `"calendar"` al `agentesView`
-
-### Comportamiento del calendario
-
-```text
-[ < Semana anterior ]    16 De Febrero – 22 De Febrero, 2026    [ Semana siguiente > ]
-
-Agente         LUN 16  MAR 17  MIÉ 18  JUE 19  VIE 20  SÁB 21  DOM 22   Total
-yeison.bello     167     126     154      64       —       —       —       511
-julieth.rojano    17      79      72      79       —       —       —       247
-─────────────────────────────────────────────────────────────────────────────────
-Total            364     267     226     143       —       —       —      1000
-```
-
-- La columna del día actual se resalta con `bg-primary/10 text-primary font-bold`
-- Días futuros o sin datos muestran `—` en `text-muted-foreground`
-- El total general (esquina inferior derecha) usa un `Badge` con variante `default`
-- La navegación de semanas no hace llamadas adicionales a Supabase; filtra los datos ya cargados en memoria (los últimos 200 registros de leads o promolog_entries)
-
-### Resumen de cambios
-
 | Archivo | Cambio |
 |---|---|
-| `src/pages/leadgen/LeadGenContent.tsx` | Nuevo viewMode `calendar`, navegación de semana, tabla semanal en Agentes y Supervisores; banner en Supervisores |
-| `src/pages/promolog/PromologContent.tsx` | Nuevo agentesView `calendar`, navegación de semana, tabla semanal en Agentes |
+| `src/pages/leadgen/LeadGenCantidadCard.tsx` | Recibir `leads` prop, calcular conteos reales, añadir barra de progreso |
+| `src/pages/leadgen/LeadGenEstadosCard.tsx` | Recibir `leads` prop, calcular conteos reales por `status` |
+| `src/pages/leadgen/LeadGenContent.tsx` | Pasar `leads` como prop a ambas cards |
