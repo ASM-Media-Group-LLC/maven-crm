@@ -8,7 +8,7 @@ interface Props {
   leads: Lead[];
 }
 
-const LeadGenCantidadCard = ({ leads }: Props) => {
+const LeadGenCantidadCard = ({ leads = [] }: Props) => {
   const total = leads.length;
 
   const counts = {

@@ -7,7 +7,7 @@ interface Props {
   leads: Lead[];
 }
 
-const LeadGenEstadosCard = ({ leads }: Props) => {
+const LeadGenEstadosCard = ({ leads = [] }: Props) => {
   const respondieron = leads.filter(
     (l) => l.status === "contactado" || l.status === "respondio"
   ).length;
