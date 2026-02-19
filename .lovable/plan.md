@@ -1,150 +1,116 @@
 
 
-## Actualizar formulario de Onboarding con campos KASH
+## Transformar Paso 4 en Tabla de Precios de Servicios
 
 ### Resumen
 
-Ampliar el Paso 1 con campos de identidad y fisico (nombre artistico, cumpleanos, medidas, talla brasier), y convertir el Paso 2 de "Documentacion" a "Psicologia y Limites" con campos KASH (rutina, mascotas, contenido prohibido, etc.). Todo en layout de dos columnas. La documentacion actual del Paso 2 se mueve al Paso 3 o se fusiona.
+Reemplazar los inputs sueltos de tarifa/objetivo en Step4WorkConfig por una tabla de precios profesional donde cada fila es un servicio y las columnas son "Precio sugerido ($)" y "Notas del servicio". Los valores se guardan en el campo JSONB `precios_contenido` de la tabla `creators`. Se mantiene la grilla de horarios y las notas adicionales.
 
-### Cambios detallados
+### Cambios en Step4WorkConfig.tsx
 
-**Archivo 1: `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx`**
-
-Ampliar `Step1Data` con 4 campos nuevos:
-- `artisticName` (string) - Nombre artistico
-- `birthDate` (string) - Fecha de nacimiento (input type="date")
-- `medidas` (string) - Medidas en cm (ej: "90-60-90")
-- `tallaBrasier` (string) - Talla de brasier
-
-Agregar los 4 inputs al grid de dos columnas, despues de los campos actuales y antes de la zona horaria:
-- Nombre artistico (Input text)
-- Fecha de nacimiento (Input date)
-- Medidas (Input text, placeholder "90-60-90")
-- Talla de brasier (Input text, placeholder "34B")
-
-El layout ya usa `grid grid-cols-1 md:grid-cols-2 gap-4`, asi que solo se anaden filas al grid existente.
-
-**Archivo 2: Nuevo `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx`**
-
-Reemplaza el paso 2 actual. Interface `Step2PsyData`:
-- `rutinaDiaria` (string)
-- `hobbies` (string)
-- `mascotasNombres` (string)
-- `comidaFavorita` (string)
-- `nivelEstudios` (string)
-- `apodosPermitidos` (string)
-- `palabrasProhibidas` (string)
-- `emojiFrecuente` (string)
-- `tonoVoz` (string)
-- `contenidoJamasHaria` (string)
-
-Layout con secciones claras separadas por subtitulos (h4 + separador):
-
-1. **Seccion "Personalidad y Dia a Dia"** (grid 2 columnas)
-   - Rutina diaria (Textarea, col-span-2)
-   - Hobbies (Input)
-   - Comida favorita (Input)
-   - Mascotas y nombres (Input)
-   - Nivel de estudios (Select: Bachillerato, Tecnico, Universitario, Postgrado, Otro)
-
-2. **Seccion "Interaccion con Fans"** (grid 2 columnas)
-   - Apodos permitidos (Input)
-   - Palabras prohibidas (Input)
-   - Emoji frecuente (Input)
-   - Tono de voz (Select: Dulce, Picante, Dominante, Tierna, Directa, Juguetona)
-
-3. **Seccion "Limites" con enfasis visual** (borde rojo/destructive sutil)
-   - Contenido que JAMAS haria (Textarea, col-span-2, con icono de advertencia)
-
-**Archivo 3: `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
-
-- Actualizar STEPS labels: Paso 2 pasa de "Documentacion" a "Psicologia y Limites"
-- Actualizar `initialStep1` con los 4 campos nuevos (strings vacios)
-- Agregar `initialStep2Psy` para el nuevo Step2PsyData (strings vacios)
-- Mover la documentacion (Step2Documentation) al Paso 3, desplazando Step3 a Paso 3 tambien (fusionar) o mover a Paso 4
-- Reordenar steps: 1-Personal, 2-Psicologia, 3-Documentacion+Perfil, 4-Configuracion
-- Actualizar `buildPayload` para incluir los nuevos campos directamente en el objeto `creator` (ya existen las columnas en DB):
-  - `artistic_name: step1.artisticName`
-  - `birth_date: step1.birthDate`
-  - `medidas_cm: step1.medidas`
-  - `talla_brasier: step1.tallaBrasier`
-  - `rutina_diaria`, `hobbies`, `mascotas_nombres`, etc. desde step2Psy
-  - `contenido_jamas_haria` desde step2Psy
-- Agregar state y callbacks para el nuevo step2Psy
-
-### Reordenamiento de pasos
+Actualizar la interface `Step4Data` para incluir un campo `pricing` que almacene los precios y notas por servicio:
 
 ```text
-Antes:                          Despues:
-1. Informacion Personal         1. Informacion Personal (+ artistico, cumple, medidas)
-2. Documentacion                2. Psicologia y Limites (NUEVO)
-3. Perfil Profesional           3. Documentacion y Perfil (fusionados)
-4. Configuracion                4. Configuracion (sin cambios)
+interface ServicePricing {
+  price: string;
+  notes: string;
+}
+
+interface Step4Data {
+  schedule: ScheduleGrid;
+  pricing: Record<string, ServicePricing>;
+  monthlyGoal: string;
+  notes: string;
+}
 ```
 
-Para no complicar la fusion de pasos 2+3, la documentacion se mantiene como Step 3 sin cambios y el perfil profesional pasa a compartir el Step 3 (se renderizan ambos secuencialmente dentro del mismo paso) o se deja la documentacion como sub-seccion del paso 3.
+Se elimina `hourlyRate` (se reemplaza por la tabla de precios por servicio).
 
-Alternativa mas simple: mantener 4 pasos exactos, solo reemplazar el contenido del paso 2:
+**Servicios (filas de la tabla):**
+1. Categoria 1
+2. Categoria 2
+3. Categoria 3
+4. Categoria 4
+5. Contenido Personalizado
+6. Valoracion de Medios
+7. Sesiones de Video en Vivo
+8. Envio de Articulos Fisicos
+
+**Columnas:**
+- Servicio (nombre fijo, no editable)
+- Precio sugerido ($) (Input number con prefijo $)
+- Notas del servicio (Input text)
+
+La tabla usa los componentes `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell` del design system existente, con borde redondeado y estilo consistente con la tabla de horarios que ya existe en el mismo paso.
+
+### Cambios en OnboardingWizard.tsx
+
+**initialStep4 actualizado:**
+```text
+{ schedule: {}, pricing: {}, monthlyGoal: "", notes: "" }
+```
+
+**buildPayload - mapeo de pricing a precios_contenido:**
+
+Transformar `step4.pricing` en el objeto JSONB que espera la columna `precios_contenido`:
 
 ```text
-1. Informacion Personal (ampliado)
-2. Psicologia y Limites (nuevo contenido)
-3. Documentacion (sin cambios)
-4. Configuracion (sin cambios)
+precios_contenido: {
+  cat_1: { price: 15, notes: "..." },
+  cat_2: { price: 25, notes: "..." },
+  cat_3: { price: 40, notes: "..." },
+  cat_4: { price: 50, notes: "..." },
+  contenido_personalizado: { price: 10, notes: "..." },
+  valoracion_medios: { price: 20, notes: "..." },
+  sesiones_video: { price: 30, notes: "..." },
+  envio_articulos: { price: 15, notes: "..." },
+}
 ```
 
-El Step3 (Perfil Profesional) se elimina y sus datos (experience, workAreas, services, traits) se mueven al `internal_notes` JSON que ya se usa en buildPayload, o se integran en otro paso. Para mantener simple: Step3 queda como "Documentacion" (el actual Step2Documentation) y Step4 queda como "Configuracion" (el actual Step4WorkConfig que ya incluye horarios y notas).
+Solo se incluyen servicios donde el usuario ingreso un precio > 0. El campo `hourlyRate` se elimina del payload (ya no existe en `extraData` de `internal_notes`).
 
 ### Archivos afectados
 
 | Archivo | Cambio |
 |---|---|
-| `steps/Step1PersonalInfo.tsx` | Agregar 4 campos KASH al grid |
-| `steps/Step2PsychologyLimits.tsx` | Nuevo archivo, reemplaza Step2Documentation en posicion |
-| `OnboardingWizard.tsx` | Reordenar steps, nuevo state, actualizar buildPayload |
+| `steps/Step4WorkConfig.tsx` | Reemplazar inputs de tarifa por tabla de precios con 8 servicios |
+| `OnboardingWizard.tsx` | Actualizar initialStep4, buildPayload para mapear pricing a precios_contenido |
 
 ### Seccion tecnica
 
-**Step1Data ampliado:**
+**Claves de servicio (keys internos):**
+
+| Servicio | Key |
+|---|---|
+| Categoria 1 | `cat_1` |
+| Categoria 2 | `cat_2` |
+| Categoria 3 | `cat_3` |
+| Categoria 4 | `cat_4` |
+| Contenido Personalizado | `contenido_personalizado` |
+| Valoracion de Medios | `valoracion_medios` |
+| Sesiones de Video en Vivo | `sesiones_video` |
+| Envio de Articulos Fisicos | `envio_articulos` |
+
+**Estructura visual de la tabla:**
+
 ```text
-{ name, email, phone, age, country, city, timezone,
-  artisticName, birthDate, medidas, tallaBrasier }
++-----------------------------------+--------------------+------------------------+
+| Servicio                          | Precio sugerido ($)| Notas del servicio     |
++-----------------------------------+--------------------+------------------------+
+| Categoria 1                       | $ [___]            | [________________]     |
+| Categoria 2                       | $ [___]            | [________________]     |
+| Categoria 3                       | $ [___]            | [________________]     |
+| Categoria 4                       | $ [___]            | [________________]     |
+| Contenido Personalizado           | $ [___]            | [________________]     |
+| Valoracion de Medios              | $ [___]            | [________________]     |
+| Sesiones de Video en Vivo         | $ [___]            | [________________]     |
+| Envio de Articulos Fisicos        | $ [___]            | [________________]     |
++-----------------------------------+--------------------+------------------------+
 ```
 
-**Step2PsyData nuevo:**
-```text
-{ rutinaDiaria, hobbies, mascotasNombres, comidaFavorita,
-  nivelEstudios, apodosPermitidos, palabrasProhibidas,
-  emojiFrecuente, tonoVoz, contenidoJamasHaria }
-```
-
-**STEPS actualizado:**
-```text
-[
-  { label: "Informacion Personal" },
-  { label: "Psicologia y Limites" },
-  { label: "Documentacion" },
-  { label: "Configuracion" },
-]
-```
-
-**buildPayload - campos nuevos en creator:**
-```text
-artistic_name: step1.artisticName || null,
-birth_date: step1.birthDate || null,
-medidas_cm: step1.medidas || null,
-talla_brasier: step1.tallaBrasier || null,
-rutina_diaria: step2Psy.rutinaDiaria || null,
-hobbies: step2Psy.hobbies || null,
-mascotas_nombres: step2Psy.mascotasNombres || null,
-comida_favorita: step2Psy.comidaFavorita || null,
-nivel_estudios: step2Psy.nivelEstudios || null,
-apodos_permitidos: step2Psy.apodosPermitidos || null,
-palabras_prohibidas: step2Psy.palabrasProhibidas || null,
-emoji_frecuente: step2Psy.emojiFrecuente || null,
-tono_voz: step2Psy.tonoVoz || null,
-contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
-```
-
-El Step3ProfessionalProfile se elimina del flujo (sus datos ya se guardan en internal_notes). Los pasos quedan: Step1 -> Step2Psy -> Step2Documentation (ahora en posicion 3) -> Step4WorkConfig.
+**Layout final del Paso 4:**
+1. Tabla de precios de servicios (nuevo)
+2. Objetivo mensual de ingresos (se mantiene, input unico)
+3. Grilla de horarios semanales (se mantiene sin cambios)
+4. Notas adicionales (se mantiene sin cambios)
 
