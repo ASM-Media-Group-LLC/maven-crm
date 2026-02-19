@@ -36,11 +36,14 @@ const DashboardSidebar = () => {
   ];
 
   const creadoresSubItems = [
-    { title: "Dashboard", url: "/creadores" },
+    { title: "Dashboard", url: "/creadores/dashboard" },
+    { title: "Listado", url: "/creadores" },
     { title: "Onboarding", url: "/creadores/onboarding" },
   ];
 
-  const isCreadoresActive = creadoresSubItems.some((item) => pathname.startsWith(item.url));
+  const isCreadoresActive = creadoresSubItems.some((item) =>
+    item.url === "/creadores" ? pathname === "/creadores" : pathname.startsWith(item.url)
+  );
 
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
