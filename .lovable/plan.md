@@ -1,54 +1,35 @@
 
-## Estandarización de botones principales en headers de sección
+## Cambios en el sidebar: etiqueta "Ventas" y acceso a Config IA desde IA Ventas
 
-### Regla establecida en el Design System
+### Cambios a realizar
 
-Según la memoria del proyecto (`style/contextual-button-usage`):
-> **Acciones principales en el header de página** (ej. "Agregar Creador", "Nuevo Ticket"): variante **`outline`**
+**1. Renombrar el menú padre de "Ventas de Creadores" → "Ventas"**
 
-### Discrepancias encontradas
+El texto del `SidebarMenuButton` padre actualmente usa `t("nav.creatorSales")` que devuelve `"Ventas de Creadores"`. Se cambiará a texto directo `"Ventas"` en los tres lugares donde aparece (botón colapsable, tooltip del collapsed y span de texto).
 
-Al revisar todos los archivos `*Content.tsx` de la app:
+**2. Eliminar "Config IA" como ítem separado y añadir icono de engranaje junto a "IA Ventas"**
 
-| Archivo | Botón | Variante actual | Variante correcta |
-|---|---|---|---|
-| `ContactosContent.tsx` | "Agregar Contacto" | `default` (sin variant) | `outline` |
-| `ContactosContent.tsx` | "Agregar Agencia" | `default` (sin variant) | `outline` |
-| `OnboardingContent.tsx` | "Iniciar Onboarding" | `default` (sin variant) | `outline` |
-| `LeadGenContent.tsx` | "Lead" | `outline` ✅ | ya correcto |
-| `LeadGenContent.tsx` | "Contacto" | `outline` ✅ | ya correcto |
-| `CreadoresContent.tsx` | "Agregar Creador" | `outline` ✅ | ya correcto |
-| `TicketsContent.tsx` | "Nuevo Ticket" | `outline` ✅ | ya correcto |
-| `EventosContent.tsx` | "Crear Evento" | `outline` ✅ | ya correcto |
-| `TareasContent.tsx` | "Nueva Tarea" | `outline` ✅ | ya correcto |
-| `ProjectsListContent.tsx` | "Nuevo Proyecto" | `outline` ✅ | ya correcto |
-| `ClosersContent.tsx` | "Nuevo Deal" | `outline` ✅ | ya correcto |
+Actualmente `creatorSalesSubItems` tiene 4 ítems incluyendo `"Config IA"` como una fila aparte. El plan es:
+- Quitar `{ title: "Config IA", url: "/ai-sales-config" }` del array
+- Renderizar "IA Ventas" de forma especial: el texto navega a `/aisales` y a su derecha aparece un pequeño icono `Settings` (engranaje) que navega a `/ai-sales-config`
 
-### Cambios a realizar (solo 2 archivos)
+El resultado visual en el submenú de Ventas quedaría:
 
-**`src/pages/contactos/ContactosContent.tsx`** — líneas 122 y 127:
-```tsx
-// Antes
-<Button onClick={() => navigate("/contactos/nuevo")}>
-<Button onClick={() => setAddAgenciaOpen(true)}>
-
-// Después
-<Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
-<Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
+```text
+Ventas ▾
+  ├─ Dashboard          → /sales-overview
+  ├─ Reportes           → /salesdashboard
+  └─ IA Ventas  ⚙       → /aisales  (⚙ → /ai-sales-config)
 ```
 
-**`src/pages/creadores/onboarding/OnboardingContent.tsx`** — línea 62:
-```tsx
-// Antes
-<Button onClick={() => setShowWizard(true)}>
+### Detalles técnicos
 
-// Después
-<Button variant="outline" onClick={() => setShowWizard(true)}>
-```
+- En la versión expandida (no collapsed), el ítem "IA Ventas" se renderizará manualmente fuera del `.map()` del array, con un layout flex que incluya:
+  - `NavLink` a `/aisales` con el texto "IA Ventas" (ocupa el espacio disponible)
+  - Un botón con icono `Settings` (h-3 w-3) que navega a `/ai-sales-config` con `e.preventDefault()` para no interferir con el link padre
+- En la versión collapsed (DropdownMenu), "Config IA" se eliminará del dropdown y en su lugar se añadirá un `DropdownMenuItem` "Config IA" justo debajo de "IA Ventas" para mantener el acceso.
+- Se importa `Settings2` o el icono `Settings` ya importado desde lucide-react — `Settings` ya está importado, se reutiliza.
 
-### Archivos a modificar
+### Solo 1 archivo a modificar
 
-| Archivo | Cantidad de cambios |
-|---|---|
-| `src/pages/contactos/ContactosContent.tsx` | 2 botones |
-| `src/pages/creadores/onboarding/OnboardingContent.tsx` | 1 botón |
+- `src/components/dashboard/DashboardSidebar.tsx`
