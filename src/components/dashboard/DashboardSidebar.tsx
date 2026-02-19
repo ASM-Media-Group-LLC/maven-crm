@@ -48,8 +48,6 @@ const DashboardSidebar = () => {
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
     { title: "Reportes", url: "/salesdashboard" },
-    { title: "IA Ventas", url: "/aisales" },
-    { title: "Config IA", url: "/ai-sales-config" },
   ];
 
   const operationsMenu = [
@@ -59,7 +57,7 @@ const DashboardSidebar = () => {
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket },
   ];
 
-  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url);
+  const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
 
   return (
     <Sidebar collapsible="icon">
@@ -132,9 +130,9 @@ const DashboardSidebar = () => {
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton tooltip={t("nav.creatorSales")} className={`sidebar-glass-hover ${isCreatorSalesActive ? "sidebar-glass-active font-medium" : ""}`}>
+                      <SidebarMenuButton tooltip="Ventas" className={`sidebar-glass-hover ${isCreatorSalesActive ? "sidebar-glass-active font-medium" : ""}`}>
                         <TrendingUp className="h-4 w-4 shrink-0" />
-                        <span>{t("nav.creatorSales")}</span>
+                        <span>Ventas</span>
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
@@ -143,6 +141,12 @@ const DashboardSidebar = () => {
                           {item.title}
                         </DropdownMenuItem>
                       ))}
+                      <DropdownMenuItem onClick={() => navigate("/aisales")} className={pathname === "/aisales" ? "bg-accent text-accent-foreground font-medium" : ""}>
+                        IA Ventas
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate("/ai-sales-config")} className={pathname === "/ai-sales-config" ? "bg-accent text-accent-foreground font-medium" : ""}>
+                        Config IA
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
@@ -150,9 +154,9 @@ const DashboardSidebar = () => {
                 <Collapsible defaultOpen={isCreatorSalesActive} className="group/collapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip={t("nav.creatorSales")} className="sidebar-glass-hover">
+                      <SidebarMenuButton tooltip="Ventas" className="sidebar-glass-hover">
                         <TrendingUp className="h-4 w-4 shrink-0" />
-                        <span>{t("nav.creatorSales")}</span>
+                        <span>Ventas</span>
                         <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
@@ -165,6 +169,21 @@ const DashboardSidebar = () => {
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
+                        {/* IA Ventas with settings gear */}
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === "/aisales"} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                            <div className="flex items-center w-full">
+                              <NavLink to="/aisales" className="flex-1">IA Ventas</NavLink>
+                              <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate("/ai-sales-config"); }}
+                                className={`ml-1 p-0.5 rounded hover:bg-accent/50 transition-colors ${pathname === "/ai-sales-config" ? "text-primary" : "text-muted-foreground"}`}
+                                title="Configuración IA"
+                              >
+                                <Settings className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
