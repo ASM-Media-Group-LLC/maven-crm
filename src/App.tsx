@@ -22,7 +22,7 @@ import SubiendoPage from "./pages/sales-overview/SubiendoPage";
 import BajandoPage from "./pages/sales-overview/BajandoPage";
 import AltoPotencialPage from "./pages/sales-overview/AltoPotencialPage";
 import EnRiesgoPage from "./pages/sales-overview/EnRiesgoPage";
-import SalesPerformanceCreator from "./pages/SalesPerformanceCreator";
+
 import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
@@ -88,7 +88,7 @@ const App = () => (
               <Route path="/sales-overview/alto-potencial" element={<ProtectedRoute><AltoPotencialPage /></ProtectedRoute>} />
               <Route path="/sales-overview/en-riesgo" element={<ProtectedRoute><EnRiesgoPage /></ProtectedRoute>} />
               <Route path="/salesdashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
-              <Route path="/salesperformancecreator" element={<ProtectedRoute><SalesPerformanceCreator /></ProtectedRoute>} />
+              
               <Route path="/aisales" element={<ProtectedRoute><AiSales /></ProtectedRoute>} />
               <Route path="/ai-sales-config" element={<ProtectedRoute><AiSalesConfig /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
