@@ -22,7 +22,7 @@ const CATEGORIES = [
 ];
 
 const COMPANIES = [
-  "KASH Agency", "alvaroletshoot", "Blue app", "Piclink.me", "Pagomundo", "Exchange", "Unlok",
+  "KASH Agency", "alvaroletshoot", "Blue app", "Piclink.me", "Pagomundo", "Exchange", "Unlok", "Trafix",
 ];
 
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
