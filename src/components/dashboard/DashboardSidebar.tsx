@@ -36,7 +36,7 @@ const DashboardSidebar = () => {
   ];
 
   const creadoresSubItems = [
-    { title: "Dashboard de Creadores", url: "/creadores/dashboard" },
+    { title: "Dashboard", url: "/creadores/dashboard" },
     { title: "Listado", url: "/creadores" },
     { title: "Onboarding", url: "/creadores/onboarding" },
   ];
@@ -47,9 +47,9 @@ const DashboardSidebar = () => {
 
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
-    { title: t("nav.salesReport"), url: "/salesdashboard" },
-    { title: t("nav.aiSales"), url: "/aisales", icon: Bot },
-    { title: t("nav.aiConfig"), url: "/ai-sales-config" },
+    { title: "Reportes", url: "/salesdashboard" },
+    { title: "IA Ventas", url: "/aisales" },
+    { title: "Config IA", url: "/ai-sales-config" },
   ];
 
   const operationsMenu = [
