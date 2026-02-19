@@ -571,6 +571,7 @@ export type Database = {
       creators: {
         Row: {
           age: number | null
+          apodos_permitidos: string | null
           artistic_name: string | null
           assigned_manager_id: string | null
           assigned_manager_profile_id: string | null
@@ -583,35 +584,52 @@ export type Database = {
           city: string | null
           closer_responsible_id: string | null
           closer_responsible_profile_id: string | null
+          comida_favorita: string | null
+          contenido_jamas_haria: string | null
           country: string | null
           country_code: string | null
           created_at: string | null
           email: string | null
+          emoji_frecuente: string | null
+          estatura: string | null
           external_transfer: number | null
+          hobbies: string | null
           id: string
           instagram_followers: number | null
           instagram_handle: string | null
           internal_notes: string | null
           languages: string[] | null
           linkedin_handle: string | null
+          mascotas_nombres: string | null
+          medidas_cm: string | null
           name: string
+          nivel_estudios: string | null
           notes: string | null
           onlyfans_url: string | null
+          palabras_prohibidas: string | null
           phone: string | null
           phone_e164: string | null
           piclink_url: string | null
+          precios_contenido: Json | null
           profile_photo_url: string | null
           registration_date: string | null
+          rutina_diaria: string | null
+          signo_zodiacal: string | null
           source: string | null
           status: string | null
+          talla_brasier: string | null
+          tatuajes_piercings_detalle: string | null
           tiktok_handle: string | null
+          tono_voz: string | null
           twitter_handle: string | null
           updated_at: string | null
           whatsapp_number: string | null
+          wishlist_url: string | null
           youtube_handle: string | null
         }
         Insert: {
           age?: number | null
+          apodos_permitidos?: string | null
           artistic_name?: string | null
           assigned_manager_id?: string | null
           assigned_manager_profile_id?: string | null
@@ -624,35 +642,52 @@ export type Database = {
           city?: string | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          comida_favorita?: string | null
+          contenido_jamas_haria?: string | null
           country?: string | null
           country_code?: string | null
           created_at?: string | null
           email?: string | null
+          emoji_frecuente?: string | null
+          estatura?: string | null
           external_transfer?: number | null
+          hobbies?: string | null
           id?: string
           instagram_followers?: number | null
           instagram_handle?: string | null
           internal_notes?: string | null
           languages?: string[] | null
           linkedin_handle?: string | null
+          mascotas_nombres?: string | null
+          medidas_cm?: string | null
           name: string
+          nivel_estudios?: string | null
           notes?: string | null
           onlyfans_url?: string | null
+          palabras_prohibidas?: string | null
           phone?: string | null
           phone_e164?: string | null
           piclink_url?: string | null
+          precios_contenido?: Json | null
           profile_photo_url?: string | null
           registration_date?: string | null
+          rutina_diaria?: string | null
+          signo_zodiacal?: string | null
           source?: string | null
           status?: string | null
+          talla_brasier?: string | null
+          tatuajes_piercings_detalle?: string | null
           tiktok_handle?: string | null
+          tono_voz?: string | null
           twitter_handle?: string | null
           updated_at?: string | null
           whatsapp_number?: string | null
+          wishlist_url?: string | null
           youtube_handle?: string | null
         }
         Update: {
           age?: number | null
+          apodos_permitidos?: string | null
           artistic_name?: string | null
           assigned_manager_id?: string | null
           assigned_manager_profile_id?: string | null
@@ -665,31 +700,47 @@ export type Database = {
           city?: string | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          comida_favorita?: string | null
+          contenido_jamas_haria?: string | null
           country?: string | null
           country_code?: string | null
           created_at?: string | null
           email?: string | null
+          emoji_frecuente?: string | null
+          estatura?: string | null
           external_transfer?: number | null
+          hobbies?: string | null
           id?: string
           instagram_followers?: number | null
           instagram_handle?: string | null
           internal_notes?: string | null
           languages?: string[] | null
           linkedin_handle?: string | null
+          mascotas_nombres?: string | null
+          medidas_cm?: string | null
           name?: string
+          nivel_estudios?: string | null
           notes?: string | null
           onlyfans_url?: string | null
+          palabras_prohibidas?: string | null
           phone?: string | null
           phone_e164?: string | null
           piclink_url?: string | null
+          precios_contenido?: Json | null
           profile_photo_url?: string | null
           registration_date?: string | null
+          rutina_diaria?: string | null
+          signo_zodiacal?: string | null
           source?: string | null
           status?: string | null
+          talla_brasier?: string | null
+          tatuajes_piercings_detalle?: string | null
           tiktok_handle?: string | null
+          tono_voz?: string | null
           twitter_handle?: string | null
           updated_at?: string | null
           whatsapp_number?: string | null
+          wishlist_url?: string | null
           youtube_handle?: string | null
         }
         Relationships: []
