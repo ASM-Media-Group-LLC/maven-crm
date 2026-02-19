@@ -1,42 +1,23 @@
 
 
-## Agregar submenu "Onboarding" dentro de Creadores
+## Renombrar "Lista" a "Dashboard" en el submenu de Creadores
 
 ### Cambio
 
-Convertir el item "Creadores" de un enlace simple a un Collapsible con submenu, siguiendo el mismo patron que ya existe para "Creator Sales". Tendra dos sub-items:
-
-- **Lista** (ruta actual `/creadores`)
-- **Onboarding** (ruta `/creadores/onboarding`)
-
-Cuando el sidebar esta colapsado, se usara un DropdownMenu (igual que Creator Sales).
+En `src/components/dashboard/DashboardSidebar.tsx`, linea 38, cambiar el titulo del primer sub-item de Creadores de "Lista" a "Dashboard".
 
 ### Seccion tecnica
 
-**Archivo:** `src/components/dashboard/DashboardSidebar.tsx`
+**Archivo:** `src/components/dashboard/DashboardSidebar.tsx` (linea 38)
 
-**1. Agregar sub-items de Creadores (despues de linea 36):**
-
-Definir un array `creadoresSubItems`:
+Cambiar:
 ```ts
-const creadoresSubItems = [
-  { title: "Lista", url: "/creadores" },
-  { title: "Onboarding", url: "/creadores/onboarding" },
-];
+{ title: "Lista", url: "/creadores" },
+```
+Por:
+```ts
+{ title: "Dashboard", url: "/creadores" },
 ```
 
-Y una variable de estado activo:
-```ts
-const isCreadoresActive = creadoresSubItems.some((item) => pathname.startsWith(item.url));
-```
+Un solo cambio de string sin impacto en rutas ni logica.
 
-**2. Reemplazar el item de Creadores en mainMenu (lineas 31-37):**
-
-Quitar `{ title: t("nav.creators"), url: "/creadores", icon: Users }` del array `mainMenu` y renderizarlo aparte como un Collapsible/DropdownMenu (misma logica que Creator Sales en lineas 78-119), usando el icono `Users` y el titulo `t("nav.creators")`.
-
-**3. Renderizado (insertar despues del map de mainMenu, antes del bloque de Creator Sales):**
-
-- **Collapsed**: DropdownMenu con los 2 sub-items
-- **Expanded**: Collapsible con SidebarMenuSub conteniendo "Lista" y "Onboarding"
-
-No se requiere crear la pagina de Onboarding en este cambio, solo el enlace en el sidebar.
