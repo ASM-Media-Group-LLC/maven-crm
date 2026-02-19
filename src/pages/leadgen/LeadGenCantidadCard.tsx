@@ -15,11 +15,11 @@ interface Props {
 }
 
 const categoryConfig = [
-  { key: "a+", label: "A+", activeClass: "bg-primary/15 border-primary text-primary", dotClass: "bg-primary" },
-  { key: "a",  label: "A",  activeClass: "bg-success/15 border-success text-success", dotClass: "bg-success" },
-  { key: "b+", label: "B+", activeClass: "bg-warning/15 border-warning text-warning", dotClass: "bg-warning" },
-  { key: "b",  label: "B",  activeClass: "bg-warning/10 border-warning/50 text-warning/80", dotClass: "bg-warning/60" },
-  { key: "c",  label: "C",  activeClass: "bg-muted border-muted-foreground/50 text-muted-foreground", dotClass: "bg-muted-foreground" },
+  { key: "a+", label: "A+", activeClass: "bg-primary/15 border-primary text-primary", hoverClass: "hover:bg-primary/10 hover:border-primary/40 hover:scale-[1.05] hover:shadow-sm" },
+  { key: "a",  label: "A",  activeClass: "bg-success/15 border-success text-success",   hoverClass: "hover:bg-success/10 hover:border-success/40 hover:scale-[1.05] hover:shadow-sm" },
+  { key: "b+", label: "B+", activeClass: "bg-warning/15 border-warning text-warning",   hoverClass: "hover:bg-warning/10 hover:border-warning/40 hover:scale-[1.05] hover:shadow-sm" },
+  { key: "b",  label: "B",  activeClass: "bg-warning/10 border-warning/50 text-warning/80", hoverClass: "hover:bg-warning/8 hover:border-warning/30 hover:scale-[1.05] hover:shadow-sm" },
+  { key: "c",  label: "C",  activeClass: "bg-muted border-muted-foreground/50 text-muted-foreground", hoverClass: "hover:bg-muted-foreground/10 hover:border-muted-foreground/40 hover:scale-[1.05] hover:shadow-sm" },
 ];
 
 const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props) => {
@@ -47,7 +47,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
     activeFilter?.type === "categoria" && activeFilter.value === key;
 
   return (
-    <Card>
+      <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
@@ -65,11 +65,10 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 key={cat.key}
                 onClick={() => handleClick(cat.key)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all",
-                  "hover:bg-muted/60 cursor-pointer",
+                  "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all duration-200 cursor-pointer",
                   active
                     ? cat.activeClass
-                    : "border-border bg-card text-foreground"
+                    : cn("border-border bg-card text-foreground", cat.hoverClass)
                 )}
               >
                 <span className={cn("text-[10px] font-bold uppercase tracking-wide", active ? "" : "text-muted-foreground")}>

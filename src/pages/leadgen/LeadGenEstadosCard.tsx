@@ -23,6 +23,7 @@ const estadoConfig = [
     label: "Respondieron",
     dotClass: "bg-primary",
     activeClass: "bg-primary/10 border-l-primary",
+    hoverClass: "hover:bg-primary/8 hover:border-l-primary/60",
     count: (leads: Lead[]) =>
       leads.filter((l) => l.status === "contactado" || l.status === "respondio").length,
   },
@@ -31,6 +32,7 @@ const estadoConfig = [
     label: "Interesadas",
     dotClass: "bg-success",
     activeClass: "bg-success/10 border-l-success",
+    hoverClass: "hover:bg-success/8 hover:border-l-success/60",
     count: (leads: Lead[]) => leads.filter((l) => l.status === "interesado").length,
   },
   {
@@ -38,6 +40,7 @@ const estadoConfig = [
     label: "No interesadas",
     dotClass: "bg-destructive",
     activeClass: "bg-destructive/10 border-l-destructive",
+    hoverClass: "hover:bg-destructive/8 hover:border-l-destructive/60",
     count: (leads: Lead[]) => leads.filter((l) => l.status === "no_interesado").length,
   },
   {
@@ -45,6 +48,7 @@ const estadoConfig = [
     label: "Otros",
     dotClass: "bg-muted-foreground/50",
     activeClass: "bg-muted border-l-muted-foreground",
+    hoverClass: "hover:bg-muted hover:border-l-muted-foreground/40",
     count: (leads: Lead[]) => leads.filter((l) => !knownStatuses.has(l.status)).length,
   },
   {
@@ -52,6 +56,7 @@ const estadoConfig = [
     label: "Con Teléfono",
     dotClass: "bg-warning",
     activeClass: "bg-warning/10 border-l-warning",
+    hoverClass: "hover:bg-warning/8 hover:border-l-warning/60",
     isPhone: true,
     count: (leads: Lead[]) =>
       leads.filter((l) => l.notas && /\+?\d[\d\s\-().]{7,}/.test(l.notas)).length,
@@ -72,7 +77,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
     activeFilter?.type === "status" && activeFilter.value === key;
 
   return (
-    <Card>
+    <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Estados
@@ -87,15 +92,14 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
               key={estado.key}
               onClick={() => handleClick(estado.key)}
               className={cn(
-                "w-full flex items-center gap-3 rounded-md px-3 py-2.5 border-l-[3px] transition-all",
-                "hover:bg-muted/60 cursor-pointer text-left",
+                "group w-full flex items-center gap-3 rounded-md px-3 py-2.5 border-l-[3px] transition-all duration-200 cursor-pointer text-left",
                 active
                   ? estado.activeClass
-                  : "border-l-transparent"
+                  : cn("border-l-transparent", estado.hoverClass)
               )}
             >
               {estado.isPhone ? (
-                <Phone className={cn("h-3.5 w-3.5 shrink-0", active ? "text-warning" : "text-muted-foreground")} />
+                <Phone className={cn("h-3.5 w-3.5 shrink-0 transition-colors", active ? "text-warning" : "text-muted-foreground")} />
               ) : (
                 <span className={cn("h-2.5 w-2.5 rounded-full shrink-0 transition-transform", estado.dotClass, active && "scale-125")} />
               )}
@@ -105,6 +109,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
               <span className={cn("text-base font-bold tabular-nums", active ? "text-foreground" : "text-foreground/70")}>
                 {count}
               </span>
+              <span className="opacity-0 group-hover:opacity-60 transition-opacity text-xs text-muted-foreground">→</span>
             </button>
           );
         })}
