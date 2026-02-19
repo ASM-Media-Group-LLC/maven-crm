@@ -1,25 +1,42 @@
 
 
-## Mejora visual del modal de permisos
+## Agregar submenu "Onboarding" dentro de Creadores
 
-### Cambios
+### Cambio
 
-**1. Header "Data permissions" - espaciado y layout**
+Convertir el item "Creadores" de un enlace simple a un Collapsible con submenu, siguiendo el mismo patron que ya existe para "Creator Sales". Tendra dos sub-items:
 
-El area de "Data permissions" en el header esta amontonada porque los 3 radio buttons estan en una sola fila (`flex gap-3`) dentro de una columna estrecha. Se cambiara a layout vertical (`flex-col`) con mejor espaciado, y se usara un `Select` dropdown o simplemente se apilaran verticalmente para que sean legibles.
+- **Lista** (ruta actual `/creadores`)
+- **Onboarding** (ruta `/creadores/onboarding`)
 
-**2. Cards del acordeon - quitar borde azul lateral**
-
-Eliminar `border-l-[3px] border-l-primary` de las tarjetas de modulo. Se mantendra un borde sutil uniforme (`border border-border`) con fondo `bg-muted/30` para diferenciarlas sin el acento lateral.
+Cuando el sidebar esta colapsado, se usara un DropdownMenu (igual que Creator Sales).
 
 ### Seccion tecnica
 
-**Archivo:** `src/pages/admin/SetPermissionsModal.tsx`
+**Archivo:** `src/components/dashboard/DashboardSidebar.tsx`
 
-**Cambio 1 - Header Data permissions (lineas 178-192):**
-- Cambiar el `RadioGroup` de `flex gap-3` a `flex flex-col gap-1.5 mt-1.5` para apilar los radio buttons verticalmente
-- Aumentar ligeramente el tamano del texto de las labels de `text-[11px]` a `text-xs`
+**1. Agregar sub-items de Creadores (despues de linea 36):**
 
-**Cambio 2 - Cards del acordeon (linea 211):**
-- Reemplazar `border border-border rounded-lg border-l-[3px] border-l-primary bg-card` por `border border-border rounded-lg bg-muted/30` eliminando el borde azul lateral y usando un fondo sutil
+Definir un array `creadoresSubItems`:
+```ts
+const creadoresSubItems = [
+  { title: "Lista", url: "/creadores" },
+  { title: "Onboarding", url: "/creadores/onboarding" },
+];
+```
 
+Y una variable de estado activo:
+```ts
+const isCreadoresActive = creadoresSubItems.some((item) => pathname.startsWith(item.url));
+```
+
+**2. Reemplazar el item de Creadores en mainMenu (lineas 31-37):**
+
+Quitar `{ title: t("nav.creators"), url: "/creadores", icon: Users }` del array `mainMenu` y renderizarlo aparte como un Collapsible/DropdownMenu (misma logica que Creator Sales en lineas 78-119), usando el icono `Users` y el titulo `t("nav.creators")`.
+
+**3. Renderizado (insertar despues del map de mainMenu, antes del bloque de Creator Sales):**
+
+- **Collapsed**: DropdownMenu con los 2 sub-items
+- **Expanded**: Collapsible con SidebarMenuSub conteniendo "Lista" y "Onboarding"
+
+No se requiere crear la pagina de Onboarding en este cambio, solo el enlace en el sidebar.
