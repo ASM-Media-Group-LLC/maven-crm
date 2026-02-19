@@ -180,12 +180,12 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
               <RadioGroup
                 value=""
                 onValueChange={(v) => setGlobalDataScope(v)}
-                className="flex gap-3 mt-1"
+                className="flex flex-col gap-1.5 mt-1.5"
               >
                 {DATA_SCOPE_OPTIONS.map((o) => (
                   <div key={o.value} className="flex items-center gap-1">
                     <RadioGroupItem value={o.value} id={`global-${o.value}`} className="h-3 w-3" />
-                    <Label htmlFor={`global-${o.value}`} className="text-[11px] text-muted-foreground">{o.label}</Label>
+                    <Label htmlFor={`global-${o.value}`} className="text-xs text-muted-foreground">{o.label}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -208,7 +208,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                   open={isExpanded}
                   onOpenChange={(o) => setExpanded((p) => ({ ...p, [mod.module]: o }))}
                 >
-                  <div className="border border-border rounded-lg border-l-[3px] border-l-primary bg-card">
+                  <div className="border border-border rounded-lg bg-muted/30">
                     {/* Summary row */}
                     <div className="px-4 py-3">
                       <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 items-center">
