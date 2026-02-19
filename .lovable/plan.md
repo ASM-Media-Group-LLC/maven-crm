@@ -1,38 +1,29 @@
 
 
-## Ajustar tabs de area al estilo de la imagen de referencia
+## Ajustar nombres de las tabs de area
 
-### Cambios visuales
+### Cambio
 
-La imagen muestra un contenedor con borde visible y fondo semi-transparente, con la tab activa en un color purpura vibrante (coincide con el gradiente del boton `default`) y las inactivas como texto plano.
+En `src/pages/creadores/onboarding/OnboardingContent.tsx`, linea 14, actualizar el array `areaTabs` con los nombres que aparecen en la imagen de referencia.
 
 ### Seccion tecnica
 
-**Archivo:** `src/pages/creadores/onboarding/OnboardingContent.tsx` (lineas 76-88)
+**Archivo:** `src/pages/creadores/onboarding/OnboardingContent.tsx` (linea 14)
 
-Cambios:
+Cambiar:
+```ts
+const areaTabs = ["Todos", "Ventas", "LeadGen", "Contenido", "Marketing", "Tecnología"];
+```
+Por:
+```ts
+const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Unlok Platform"];
+```
 
-1. **Contenedor** (linea 76): Cambiar `bg-muted p-1` por `border border-border bg-muted/50 p-1` para agregar el borde visible y fondo semi-transparente.
+Tambien actualizar la logica de filtrado (linea 25) para que compare contra el campo correcto. Dado que ahora las tabs representan agencias (no areas), el filtro debe comparar contra `c.company` en lugar de `c.area`:
 
-2. **Tab activa** (linea 81): Cambiar variante de `secondary` a `default` para obtener el gradiente purpura.
-
-3. **Tab inactiva** (linea 81): Mantener `ghost`.
-
-4. **Tamano de texto** (linea 83): Quitar `text-xs` para usar el tamano por defecto (`text-sm`), que es mas grande y coincide con la imagen.
-
-Resultado:
-```tsx
-<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-  {areaTabs.map((tab) => (
-    <Button
-      key={tab}
-      size="sm"
-      variant={activeTab === tab ? "default" : "ghost"}
-      onClick={() => setActiveTab(tab)}
-    >
-      {tab}
-    </Button>
-  ))}
-</div>
+```ts
+if (activeTab !== "Todas") {
+  list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
+}
 ```
 
