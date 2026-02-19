@@ -72,6 +72,7 @@ const LeadGenContent = () => {
   const [selectedAgent, setSelectedAgent] = useState<(typeof mockSupervisores)[number] | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [activeFilter, setActiveFilter] = useState<{ type: "categoria" | "status" | null; value: string | null }>({ type: null, value: null });
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ["leads"],
@@ -83,6 +84,22 @@ const LeadGenContent = () => {
       if (error) throw error;
       return data;
     },
+  });
+
+  const knownStatuses = new Set(["nuevo", "contactado", "respondio", "interesado", "no_interesado"]);
+
+  const filteredLeads = leads.filter((lead) => {
+    if (activeFilter.type === "categoria") {
+      return lead.categoria?.toLowerCase() === activeFilter.value;
+    }
+    if (activeFilter.type === "status") {
+      if (activeFilter.value === "respondieron") return lead.status === "contactado" || lead.status === "respondio";
+      if (activeFilter.value === "interesadas") return lead.status === "interesado";
+      if (activeFilter.value === "no_interesadas") return lead.status === "no_interesado";
+      if (activeFilter.value === "otros") return !knownStatuses.has(lead.status);
+      if (activeFilter.value === "con_telefono") return !!(lead.notas && /\+?\d[\d\s\-().]{7,}/.test(lead.notas));
+    }
+    return true;
   });
 
   if (selectedAgent) {
@@ -118,8 +135,8 @@ const LeadGenContent = () => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-2 gap-6">
-            <LeadGenCantidadCard leads={leads} />
-            <LeadGenEstadosCard leads={leads} />
+            <LeadGenCantidadCard leads={leads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+            <LeadGenEstadosCard leads={leads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
           </div>
         </div>
 
@@ -250,11 +267,11 @@ const LeadGenContent = () => {
                 </div>
               ) : viewMode === "grid" ? (
                 <LeadGenGrid
-                  leads={leads}
+                  leads={filteredLeads}
                   onView={(lead) => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
               ) : (
-                leads.length === 0 ? (
+                filteredLeads.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
                     <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground text-sm">
@@ -263,7 +280,7 @@ const LeadGenContent = () => {
                   </div>
                 ) : (
                   <LeadGenTable
-                    leads={leads}
+                    leads={filteredLeads}
                     onView={(lead) => { setSelectedLead(lead); setViewLeadOpen(true); }}
                   />
                 )

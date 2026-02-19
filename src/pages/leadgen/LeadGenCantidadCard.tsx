@@ -1,69 +1,100 @@
-import { Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
 type Lead = { categoria: string; evidence_urls?: string[] | null };
 
-interface Props {
-  leads: Lead[];
+interface ActiveFilter {
+  type: "categoria" | "status" | null;
+  value: string | null;
 }
 
-const LeadGenCantidadCard = ({ leads = [] }: Props) => {
+interface Props {
+  leads: Lead[];
+  activeFilter?: ActiveFilter;
+  onFilterChange?: (filter: ActiveFilter) => void;
+}
+
+const categoryConfig = [
+  { key: "a+", label: "A+", activeClass: "bg-primary/15 border-primary text-primary", dotClass: "bg-primary" },
+  { key: "a",  label: "A",  activeClass: "bg-success/15 border-success text-success", dotClass: "bg-success" },
+  { key: "b+", label: "B+", activeClass: "bg-warning/15 border-warning text-warning", dotClass: "bg-warning" },
+  { key: "b",  label: "B",  activeClass: "bg-warning/10 border-warning/50 text-warning/80", dotClass: "bg-warning/60" },
+  { key: "c",  label: "C",  activeClass: "bg-muted border-muted-foreground/50 text-muted-foreground", dotClass: "bg-muted-foreground" },
+];
+
+const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props) => {
   const total = leads.length;
 
-  const counts = {
-    "A+": leads.filter((l) => l.categoria?.toLowerCase() === "a+").length,
-    A: leads.filter((l) => l.categoria?.toLowerCase() === "a").length,
-    "B+": leads.filter((l) => l.categoria?.toLowerCase() === "b+").length,
-    B: leads.filter((l) => l.categoria?.toLowerCase() === "b").length,
-    C: leads.filter((l) => l.categoria?.toLowerCase() === "c").length,
+  const counts: Record<string, number> = {
+    "a+": leads.filter((l) => l.categoria?.toLowerCase() === "a+").length,
+    a:   leads.filter((l) => l.categoria?.toLowerCase() === "a").length,
+    "b+": leads.filter((l) => l.categoria?.toLowerCase() === "b+").length,
+    b:   leads.filter((l) => l.categoria?.toLowerCase() === "b").length,
+    c:   leads.filter((l) => l.categoria?.toLowerCase() === "c").length,
   };
-
   const qa = leads.filter((l) => (l.evidence_urls?.length ?? 0) > 0).length;
 
-  const categories = [
-    { name: "A+", borderColor: "border-primary", valueColor: "text-primary", count: counts["A+"] },
-    { name: "A", borderColor: "border-success", valueColor: "text-success", count: counts["A"] },
-    { name: "B+", borderColor: "border-warning", valueColor: "text-warning", count: counts["B+"] },
-    { name: "B", borderColor: "border-warning/60", valueColor: "text-warning/60", count: counts["B"] },
-    { name: "C", borderColor: "border-muted-foreground", valueColor: "text-muted-foreground", count: counts["C"] },
-    { name: "Total", borderColor: "border-destructive", valueColor: "text-destructive", count: total },
-    { name: "QA", borderColor: "border-destructive/70", valueColor: "text-destructive/70", count: qa },
-  ];
+  const handleClick = (key: string) => {
+    if (!onFilterChange) return;
+    if (activeFilter?.type === "categoria" && activeFilter.value === key) {
+      onFilterChange({ type: null, value: null });
+    } else {
+      onFilterChange({ type: "categoria", value: key });
+    }
+  };
+
+  const isActive = (key: string) =>
+    activeFilter?.type === "categoria" && activeFilter.value === key;
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 pt-0">
-        {categories.map((cat) => {
-          const pct = total > 0 && cat.name !== "Total" && cat.name !== "QA"
-            ? Math.round((cat.count / total) * 100)
-            : null;
-          return (
-            <div key={cat.name} className={`rounded-md px-3 py-2 border-l-[3px] ${cat.borderColor}`}>
-              <div className="flex items-center gap-3 mb-1">
-                <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-sm font-medium flex-1">{cat.name}</span>
-                <span className={`text-sm font-semibold tabular-nums ${cat.valueColor}`}>
-                  {cat.count}
-                </span>
-                {pct !== null && (
-                  <span className="text-xs text-muted-foreground w-9 text-right">{pct}%</span>
+      <CardContent className="pt-0">
+        {/* Category chips grid */}
+        <div className="grid grid-cols-5 gap-1.5 mb-3">
+          {categoryConfig.map((cat) => {
+            const count = counts[cat.key] ?? 0;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            const active = isActive(cat.key);
+            return (
+              <button
+                key={cat.key}
+                onClick={() => handleClick(cat.key)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all",
+                  "hover:bg-muted/60 cursor-pointer",
+                  active
+                    ? cat.activeClass
+                    : "border-border bg-card text-foreground"
                 )}
-              </div>
-              {pct !== null && (
-                <Progress
-                  value={pct}
-                  className="h-1"
-                />
-              )}
-            </div>
-          );
-        })}
+              >
+                <span className={cn("text-[10px] font-bold uppercase tracking-wide", active ? "" : "text-muted-foreground")}>
+                  {cat.label}
+                </span>
+                <span className="text-xl font-bold tabular-nums leading-none">{count}</span>
+                <span className={cn("text-[10px] tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>
+                  {pct}%
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Total & QA row */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">Total</span>
+            <span className="text-lg font-bold tabular-nums">{total}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">QA</span>
+            <span className="text-lg font-bold tabular-nums text-primary">{qa}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
