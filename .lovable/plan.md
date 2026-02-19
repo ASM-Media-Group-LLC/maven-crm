@@ -1,57 +1,61 @@
 
 
-## Sincronizar roles con la estructura de la imagen
+## Permisos de Roles: Funcionalidad completa + Mejora visual
 
-### Situacion actual
+### Problemas actuales
 
-La tabla `roles_config` tiene 3 roles:
-- **Admin** (sistema) - "Acceso completo..."
-- **Employee** (sistema) - "Acceso basico..."
-- **Manager** (sistema) - "Gestion de equipos..."
+1. **Admin sin permisos pre-cargados**: Al abrir "Set permissions" para Admin, todo aparece desmarcado. No hay logica para inicializar permisos por defecto segun el tipo de rol.
+2. **"All" de Menus no incluye funciones**: El checkbox "All" de Menus solo marca los modulos principales, no activa las funciones (submodulos) automaticamente.
+3. **Visual diferente a la referencia**: Las tarjetas de modulos no tienen el estilo oscuro con borde izquierdo de acento que muestra la imagen.
 
-### Roles objetivo (segun la imagen, sin Owner)
+### Cambios planificados
 
-| Rol | Descripcion |
-|-----|-------------|
-| Admin | Full administrative access |
-| Agent | Standard agent access |
-| Closer | Sales closing and deal management |
-| Manager | MG |
-| Supervisor | Team supervision and QA access |
+**1. Logica de inicializacion inteligente para Admin**
 
-### Cambios a realizar
+Cuando se abra el modal para el rol "admin" y no tenga permisos guardados en la base de datos (perm_count = 0), se pre-seleccionaran automaticamente:
+- Todos los menus activados
+- Todas las funciones activadas
+- Data scope = "all" para todos
 
-1. **Insertar 3 nuevos roles** en `roles_config`:
-   - **Agent** - "Standard agent access" (is_system: true)
-   - **Closer** - "Sales closing and deal management" (is_system: true)
-   - **Supervisor** - "Team supervision and QA access" (is_system: true)
+Esto garantiza que Admin tenga acceso completo por defecto.
 
-2. **Eliminar el rol Employee** ya que no aparece en la imagen y sera reemplazado por Agent como el rol de acceso basico. Si hay usuarios asignados con rol "employee" en `user_roles`, se debera considerar migrarlos.
+**2. Mejorar el toggle "All" de Menus**
 
-3. **Actualizar descripciones** de Admin y Manager para que coincidan con la imagen.
+Actualmente el checkbox "All" de Menus solo marca `can_access` en los modulos principales. Se modificara para que al marcar "All" en Menus, tambien se activen automaticamente todas las funciones (submodulos). Esto simula el comportamiento de "seleccionar todo" como se espera.
+
+**3. Toggle individual de modulo activa sus submodulos**
+
+Al marcar/desmarcar un modulo, se marcaran/desmarcaran automaticamente todos sus submodulos.
+
+**4. Mejora visual de las tarjetas de modulos**
+
+Ajustar el estilo de las tarjetas para que se parezcan mas a la referencia:
+- Borde izquierdo de color acento (primary) de 3px
+- Fondo ligeramente diferenciado (card/muted)
+- Checkbox con color de acento mas visible
+- "Ver detalles" con chevron alineado a la derecha de la tarjeta
+- Layout: checkbox + nombre en bold a la izquierda, "X funciones" al centro, "All data" a la derecha
+- Chevron de expansion alineado al extremo derecho
 
 ### Seccion tecnica
 
-**Archivo:** No se requieren cambios de codigo, solo migracion SQL.
+**Archivo a modificar:** `src/pages/admin/SetPermissionsModal.tsx`
 
-**Migracion SQL:**
-```sql
--- Insertar nuevos roles
-INSERT INTO roles_config (name, description, is_system, is_active)
-VALUES
-  ('agent', 'Standard agent access', true, true),
-  ('closer', 'Sales closing and deal management', true, true),
-  ('supervisor', 'Team supervision and QA access', true, true);
+**Cambios especificos:**
 
--- Actualizar descripcion de admin
-UPDATE roles_config SET description = 'Full administrative access' WHERE name = 'admin';
+1. **useEffect de inicializacion** (lineas 40-56): Agregar condicion para detectar si el rol es "admin" y no tiene permisos guardados, en cuyo caso inicializar todo como `can_access: true, data_scope: "all"`.
 
--- Actualizar descripcion de manager  
-UPDATE roles_config SET description = 'MG' WHERE name = 'manager';
+2. **toggleAllMenus** (lineas 65-71): Extender para que al activar todos los menus, tambien active todas las funciones (submodulos).
 
--- Eliminar rol employee (reemplazado por agent)
-DELETE FROM roles_config WHERE name = 'employee' AND id = '34a9686c-a4b7-4aff-8973-465a618dd77e';
-```
+3. **toggleModule** (lineas 89-94): Extender para que al marcar un modulo, tambien marque todos sus submodulos.
 
-**Nota sobre el enum `app_role`:** El enum en `user_roles` solo tiene `admin`, `manager`, `employee`. Los nuevos roles (agent, closer, supervisor) existen en `roles_config` para el sistema de permisos granulares pero no necesariamente requieren cambiar el enum base, ya que el sistema de permisos usa `roles_config` + `role_permissions`. Si se necesita asignar estos roles a usuarios via `user_roles`, se debera ampliar el enum en una futura iteracion.
+4. **JSX de tarjetas de modulo** (lineas 198-271): Redisenar el layout de cada tarjeta para:
+   - Agregar `border-l-3 border-l-primary` al contenedor
+   - Usar `bg-card` como fondo
+   - Mover el chevron de expansion al extremo derecho de la fila principal
+   - Mantener grid de 3 columnas: (checkbox + nombre), (count funciones), (data scope label + chevron)
+
+5. **Encabezado global** (lineas 162-186): Asegurar que los radio buttons globales de "Data permissions" funcionen correctamente y que las etiquetas sean legibles.
+
+No se requieren cambios de base de datos ni nuevas tablas.
 
