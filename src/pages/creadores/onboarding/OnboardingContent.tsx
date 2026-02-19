@@ -59,7 +59,7 @@ const OnboardingContent = () => {
             <p className="text-sm text-muted-foreground">Gestiona el proceso de onboarding de nuevos creadores</p>
           </div>
           {!showWizard && (
-            <Button onClick={() => setShowWizard(true)}>
+            <Button variant="outline" onClick={() => setShowWizard(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Iniciar Onboarding
             </Button>
