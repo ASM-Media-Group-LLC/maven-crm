@@ -106,8 +106,8 @@ const CreadorasDashboardContent = () => {
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard de Creadoras</h1>
-          <p className="text-sm text-muted-foreground">Visión ejecutiva · {total} creadoras en total</p>
+          <h1 className="text-2xl font-bold">Dashboard de Creadores</h1>
+          <p className="text-sm text-muted-foreground">Visión ejecutiva · {total} creadores en total</p>
         </div>
       </header>
 

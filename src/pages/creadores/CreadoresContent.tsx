@@ -35,7 +35,7 @@ const CreadoresContent = () => {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Listado de Creadoras</h1>
+            <h1 className="text-2xl font-bold">Listado de Creadores</h1>
             <p className="text-sm text-muted-foreground">
               Total: {isLoading ? "…" : allCreators.length} creadores
             </p>
