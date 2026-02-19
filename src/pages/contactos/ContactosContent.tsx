@@ -119,12 +119,12 @@ const ContactosContent = () => {
             </p>
           </div>
           {activeTab === "contactos" ? (
-            <Button onClick={() => navigate("/contactos/nuevo")}>
+            <Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
               <Plus className="mr-2 h-4 w-4" />
               Agregar Contacto
             </Button>
           ) : (
-            <Button onClick={() => setAddAgenciaOpen(true)}>
+            <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Agregar Agencia
             </Button>
