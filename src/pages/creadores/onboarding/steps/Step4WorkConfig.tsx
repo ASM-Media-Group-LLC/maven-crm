@@ -10,7 +10,7 @@ const SHIFTS = ["Mañana", "Tarde", "Noche"];
 const SERVICES = [
   { key: "cat_1", label: "Contenido X" },
   { key: "cat_2", label: "Contenido XX" },
-  { key: "cat_3", label: "Categoría 3" },
+  { key: "cat_3", label: "Contenido XXX" },
   { key: "cat_4", label: "Categoría 4" },
   { key: "contenido_personalizado", label: "Contenido Personalizado" },
   { key: "valoracion_medios", label: "Valoración de Medios" },
