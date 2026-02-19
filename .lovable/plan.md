@@ -1,19 +1,13 @@
 
 
-## Cambiar etiqueta "Categoría 1" a "Contenido X"
+## Cambiar etiqueta "Categoría 2" a "Contenido XX"
 
 ### Cambio
 
-En el archivo `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`, actualizar el array `SERVICES` cambiando el label del primer elemento:
+En `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`, línea 12, cambiar el label del segundo servicio:
 
-- **Antes:** `{ key: "cat_1", label: "Categoría 1" }`
-- **Después:** `{ key: "cat_1", label: "Contenido X" }`
+- **Antes:** `{ key: "cat_2", label: "Categoría 2" }`
+- **Después:** `{ key: "cat_2", label: "Contenido XX" }`
 
-Solo se modifica el texto visible (label). La key interna `cat_1` no cambia, por lo que no afecta la base de datos ni el payload.
-
-### Archivo afectado
-
-| Archivo | Cambio |
-|---|---|
-| `steps/Step4WorkConfig.tsx` | Cambiar label de "Categoría 1" a "Contenido X" en linea 11 |
+La key interna no cambia, solo el texto visible.
 
