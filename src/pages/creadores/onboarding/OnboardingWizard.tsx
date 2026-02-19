@@ -1,8 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
-import { Check, Loader2 } from "lucide-react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
+import { Check, Loader2, ArrowLeft } from "lucide-react";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -25,11 +23,10 @@ const initialStep3: Step3Data = { experience: 0, workAreas: [], services: [], tr
 const initialStep4: Step4Data = { schedule: {}, hourlyRate: "", monthlyGoal: "", notes: "" };
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
+  onCancel: () => void;
 }
 
-export default function StartOnboardingModal({ open, onClose }: Props) {
+export default function OnboardingWizard({ onCancel }: Props) {
   const [step, setStep] = useState(1);
   const [step1, setStep1] = useState<Step1Data>(initialStep1);
   const [step2, setStep2] = useState<Step2Data>(initialStep2);
@@ -125,7 +122,6 @@ export default function StartOnboardingModal({ open, onClose }: Props) {
     if (!isDraft && !validateCurrentStep()) return;
     if (!isDraft && step < 4) return;
     if (!isDraft) {
-      // Validate step 1 regardless
       const s1Errors = validateStep1(step1);
       if (Object.keys(s1Errors).length > 0) {
         setStep1Errors(s1Errors);
@@ -157,21 +153,27 @@ export default function StartOnboardingModal({ open, onClose }: Props) {
     setStep4(initialStep4);
     setStep1Errors({});
     setStep2Errors({});
-    onClose();
+    onCancel();
   };
 
   const isSubmitting = addCreador.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && !isSubmitting && resetAndClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle>Iniciar Onboarding</DialogTitle>
-          <DialogDescription>Completa la información del nuevo creador en 4 pasos</DialogDescription>
-        </DialogHeader>
+    <Card className="rounded-lg">
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold leading-none tracking-tight">Iniciar Onboarding</h2>
+          <p className="text-sm text-muted-foreground mt-1.5">Completa la información del nuevo creador en 4 pasos</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={resetAndClose} disabled={isSubmitting}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver a la lista
+        </Button>
+      </CardHeader>
 
+      <CardContent className="space-y-4">
         {/* Stepper */}
-        <div className="px-6 pb-4">
+        <div>
           <div className="flex items-center justify-between mb-2">
             {STEPS.map((s, i) => {
               const num = i + 1;
@@ -202,33 +204,34 @@ export default function StartOnboardingModal({ open, onClose }: Props) {
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-auto px-6 pb-4">
+        <div>
           {step === 1 && <Step1PersonalInfo data={step1} errors={step1Errors} onChange={updateStep1} />}
           {step === 2 && <Step2Documentation data={step2} errors={step2Errors} tempId={tempId} onChange={updateStep2} />}
           {step === 3 && <Step3ProfessionalProfile data={step3} onChange={updateStep3} />}
           {step === 4 && <Step4WorkConfig data={step4} onChange={updateStep4} />}
         </div>
+      </CardContent>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t px-6 py-4">
+      <CardFooter className="flex items-center justify-between border-t pt-4">
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => handleSubmit(true)} disabled={isSubmitting}>
             Guardar Borrador
           </Button>
-          <div className="flex items-center gap-2">
-            {step > 1 && (
-              <Button variant="outline" onClick={handlePrev} disabled={isSubmitting}>Anterior</Button>
-            )}
-            {step < 4 ? (
-              <Button onClick={handleNext}>Siguiente</Button>
-            ) : (
-              <Button onClick={() => handleSubmit(false)} disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Finalizar
-              </Button>
-            )}
-          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        <div className="flex items-center gap-2">
+          {step > 1 && (
+            <Button variant="outline" onClick={handlePrev} disabled={isSubmitting}>Anterior</Button>
+          )}
+          {step < 4 ? (
+            <Button onClick={handleNext}>Siguiente</Button>
+          ) : (
+            <Button onClick={() => handleSubmit(false)} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Finalizar
+            </Button>
+          )}
+        </div>
+      </CardFooter>
+    </Card>
   );
 }
