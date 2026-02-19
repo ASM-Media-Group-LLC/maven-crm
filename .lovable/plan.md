@@ -1,65 +1,57 @@
 
 
-## Actualización del Roadmap: Estado real + Módulos pendientes
+## Sincronizar roles con la estructura de la imagen
 
-### 1. Marcar como "done" los módulos ya construidos
+### Situacion actual
 
-Los siguientes 6 items están marcados como "todo" pero ya están completamente funcionales en la plataforma:
+La tabla `roles_config` tiene 3 roles:
+- **Admin** (sistema) - "Acceso completo..."
+- **Employee** (sistema) - "Acceso basico..."
+- **Manager** (sistema) - "Gestion de equipos..."
 
-**Eventos (3 items):**
-- CRUD y detalle de eventos
-- Invitados, checklist, métricas
-- Calendario y compartir externo
+### Roles objetivo (segun la imagen, sin Owner)
 
-**Recursos y Admin (3 items):**
-- Gestión de usuarios y roles
-- Auditoría de roles
-- Tracker de progreso de plataforma
+| Rol | Descripcion |
+|-----|-------------|
+| Admin | Full administrative access |
+| Agent | Standard agent access |
+| Closer | Sales closing and deal management |
+| Manager | MG |
+| Supervisor | Team supervision and QA access |
 
-Se actualizarán a status "done" con `completed_at` = fecha actual.
+### Cambios a realizar
 
-### 2. Agregar 3 items a "Módulos Pendientes"
+1. **Insertar 3 nuevos roles** en `roles_config`:
+   - **Agent** - "Standard agent access" (is_system: true)
+   - **Closer** - "Sales closing and deal management" (is_system: true)
+   - **Supervisor** - "Team supervision and QA access" (is_system: true)
 
-La categoría "Módulos Pendientes" ya existe pero tiene 0 items. Se agregarán:
+2. **Eliminar el rol Employee** ya que no aparece en la imagen y sera reemplazado por Agent como el rol de acceso basico. Si hay usuarios asignados con rol "employee" en `user_roles`, se debera considerar migrarlos.
 
-| Submodule | Task | Status |
-|-----------|------|--------|
-| RRHH | Gestión de Empleados (RRHH) | todo |
-| Finanzas | Contabilidad | todo |
-| Creadoras | Gestión de Creadoras | todo |
+3. **Actualizar descripciones** de Admin y Manager para que coincidan con la imagen.
 
-### Resultado esperado
+### Seccion tecnica
 
-Después de los cambios, el progreso general subirá significativamente ya que 6 items pasarán de "todo" a "done", y se agregarán 3 nuevos items pendientes.
+**Archivo:** No se requieren cambios de codigo, solo migracion SQL.
 
----
-
-### Sección técnica
-
-**Método:** Migraciones SQL directas sobre las tablas `roadmap_items` y `roadmap_categories`.
-
-**Migración 1 - Actualizar estados:**
+**Migracion SQL:**
 ```sql
-UPDATE roadmap_items 
-SET status = 'done', completed_at = NOW()
-WHERE id IN (
-  '6f20fdd4-3163-4e7f-92bb-1ad46e3755f8',
-  'b4294c98-0782-4a71-af50-e2c8d61a3026',
-  'b2509632-51e9-4a85-ab29-78d8e82f05a3',
-  'ddd7b605-aa3e-4cbd-9e59-d83967f0a06f',
-  'c28a5e2b-c4fd-4ec9-8432-214db771049c',
-  'a726259b-c554-4750-98e4-e205a1947ab8'
-);
-```
-
-**Migración 2 - Insertar módulos pendientes:**
-```sql
-INSERT INTO roadmap_items (category_id, submodule, task, status, position)
+-- Insertar nuevos roles
+INSERT INTO roles_config (name, description, is_system, is_active)
 VALUES
-  ('a0000001-0000-0000-0000-000000000008', 'RRHH', 'Gestión de Empleados (RRHH)', 'todo', 1),
-  ('a0000001-0000-0000-0000-000000000008', 'Finanzas', 'Contabilidad', 'todo', 2),
-  ('a0000001-0000-0000-0000-000000000008', 'Creadoras', 'Gestión de Creadoras', 'todo', 3);
+  ('agent', 'Standard agent access', true, true),
+  ('closer', 'Sales closing and deal management', true, true),
+  ('supervisor', 'Team supervision and QA access', true, true);
+
+-- Actualizar descripcion de admin
+UPDATE roles_config SET description = 'Full administrative access' WHERE name = 'admin';
+
+-- Actualizar descripcion de manager  
+UPDATE roles_config SET description = 'MG' WHERE name = 'manager';
+
+-- Eliminar rol employee (reemplazado por agent)
+DELETE FROM roles_config WHERE name = 'employee' AND id = '34a9686c-a4b7-4aff-8973-465a618dd77e';
 ```
 
-No se requieren cambios de código, solo actualizaciones de datos en la base de datos.
+**Nota sobre el enum `app_role`:** El enum en `user_roles` solo tiene `admin`, `manager`, `employee`. Los nuevos roles (agent, closer, supervisor) existen en `roles_config` para el sistema de permisos granulares pero no necesariamente requieren cambiar el enum base, ya que el sistema de permisos usa `roles_config` + `role_permissions`. Si se necesita asignar estos roles a usuarios via `user_roles`, se debera ampliar el enum en una futura iteracion.
 
