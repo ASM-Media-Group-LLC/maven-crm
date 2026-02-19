@@ -73,14 +73,13 @@ const OnboardingContent = () => {
         </div>
 
         {/* Area Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           {areaTabs.map((tab) => (
             <Button
               key={tab}
               size="sm"
-              variant={activeTab === tab ? "secondary" : "ghost"}
+              variant={activeTab === tab ? "default" : "ghost"}
               onClick={() => setActiveTab(tab)}
-              className="text-xs"
             >
               {tab}
             </Button>
