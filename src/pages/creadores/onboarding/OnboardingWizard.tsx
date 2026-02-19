@@ -6,20 +6,20 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "../useCreadores";
 import Step1PersonalInfo, { type Step1Data, type Step1Errors, validateStep1 } from "./steps/Step1PersonalInfo";
+import Step2PsychologyLimits, { type Step2PsyData } from "./steps/Step2PsychologyLimits";
 import Step2Documentation, { type Step2Data, type Step2Errors, validateStep2 } from "./steps/Step2Documentation";
-import Step3ProfessionalProfile, { type Step3Data } from "./steps/Step3ProfessionalProfile";
 import Step4WorkConfig, { type Step4Data } from "./steps/Step4WorkConfig";
 
 const STEPS = [
   { label: "Información Personal" },
+  { label: "Psicología y Límites" },
   { label: "Documentación" },
-  { label: "Perfil Profesional" },
   { label: "Configuración" },
 ];
 
-const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "" };
-const initialStep2: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
-const initialStep3: Step3Data = { experience: 0, workAreas: [], services: [], traits: [] };
+const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "" };
+const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
+const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
 const initialStep4: Step4Data = { schedule: {}, hourlyRate: "", monthlyGoal: "", notes: "" };
 
 interface Props {
@@ -29,11 +29,11 @@ interface Props {
 export default function OnboardingWizard({ onCancel }: Props) {
   const [step, setStep] = useState(1);
   const [step1, setStep1] = useState<Step1Data>(initialStep1);
-  const [step2, setStep2] = useState<Step2Data>(initialStep2);
-  const [step3, setStep3] = useState<Step3Data>(initialStep3);
+  const [step2Psy, setStep2Psy] = useState<Step2PsyData>(initialStep2Psy);
+  const [step3Doc, setStep3Doc] = useState<Step2Data>(initialStep3Doc);
   const [step4, setStep4] = useState<Step4Data>(initialStep4);
   const [step1Errors, setStep1Errors] = useState<Step1Errors>({});
-  const [step2Errors, setStep2Errors] = useState<Step2Errors>({});
+  const [step3DocErrors, setStep3DocErrors] = useState<Step2Errors>({});
 
   const { toast } = useToast();
   const addCreador = useAddCreadorWithBusiness();
@@ -44,13 +44,13 @@ export default function OnboardingWizard({ onCancel }: Props) {
     setStep1Errors((prev) => ({ ...prev, [field]: undefined }));
   }, []);
 
-  const updateStep2 = useCallback(<K extends keyof Step2Data>(field: K, value: Step2Data[K]) => {
-    setStep2((prev) => ({ ...prev, [field]: value }));
-    if (field === "dataConfirmed") setStep2Errors({});
+  const updateStep2Psy = useCallback(<K extends keyof Step2PsyData>(field: K, value: Step2PsyData[K]) => {
+    setStep2Psy((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  const updateStep3 = useCallback(<K extends keyof Step3Data>(field: K, value: Step3Data[K]) => {
-    setStep3((prev) => ({ ...prev, [field]: value }));
+  const updateStep3Doc = useCallback(<K extends keyof Step2Data>(field: K, value: Step2Data[K]) => {
+    setStep3Doc((prev) => ({ ...prev, [field]: value }));
+    if (field === "dataConfirmed") setStep3DocErrors({});
   }, []);
 
   const updateStep4 = useCallback(<K extends keyof Step4Data>(field: K, value: Step4Data[K]) => {
@@ -63,9 +63,9 @@ export default function OnboardingWizard({ onCancel }: Props) {
       setStep1Errors(errors);
       return Object.keys(errors).length === 0;
     }
-    if (step === 2) {
-      const errors = validateStep2(step2);
-      setStep2Errors(errors);
+    if (step === 3) {
+      const errors = validateStep2(step3Doc);
+      setStep3DocErrors(errors);
       return Object.keys(errors).length === 0;
     }
     return true;
@@ -80,21 +80,17 @@ export default function OnboardingWizard({ onCancel }: Props) {
 
   const buildPayload = (isDraft: boolean) => {
     const extraData = JSON.stringify({
-      experience: step3.experience,
-      workAreas: step3.workAreas,
-      services: step3.services,
-      traits: step3.traits,
       schedule: step4.schedule,
       hourlyRate: step4.hourlyRate,
       monthlyGoal: step4.monthlyGoal,
       timezone: step1.timezone,
     });
 
-    const profilePhotoUrl = step2.profilePhotos.length > 0 ? step2.profilePhotos[0].url : null;
+    const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
 
     const documents = [
-      ...step2.idDocuments.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad" })),
-      ...step2.profilePhotos.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Foto de perfil" })),
+      ...step3Doc.idDocuments.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad" })),
+      ...step3Doc.profilePhotos.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Foto de perfil" })),
     ];
 
     return {
@@ -105,6 +101,20 @@ export default function OnboardingWizard({ onCancel }: Props) {
         age: step1.age ? Number(step1.age) : null,
         country: step1.country || null,
         city: step1.city || null,
+        artistic_name: step1.artisticName || null,
+        birth_date: step1.birthDate || null,
+        medidas_cm: step1.medidas || null,
+        talla_brasier: step1.tallaBrasier || null,
+        rutina_diaria: step2Psy.rutinaDiaria || null,
+        hobbies: step2Psy.hobbies || null,
+        mascotas_nombres: step2Psy.mascotasNombres || null,
+        comida_favorita: step2Psy.comidaFavorita || null,
+        nivel_estudios: step2Psy.nivelEstudios || null,
+        apodos_permitidos: step2Psy.apodosPermitidos || null,
+        palabras_prohibidas: step2Psy.palabrasProhibidas || null,
+        emoji_frecuente: step2Psy.emojiFrecuente || null,
+        tono_voz: step2Psy.tonoVoz || null,
+        contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
         status: isDraft ? "borrador" : "pendiente_verificacion",
         profile_photo_url: profilePhotoUrl,
         internal_notes: extraData,
@@ -148,11 +158,11 @@ export default function OnboardingWizard({ onCancel }: Props) {
   const resetAndClose = () => {
     setStep(1);
     setStep1(initialStep1);
-    setStep2(initialStep2);
-    setStep3(initialStep3);
+    setStep2Psy(initialStep2Psy);
+    setStep3Doc(initialStep3Doc);
     setStep4(initialStep4);
     setStep1Errors({});
-    setStep2Errors({});
+    setStep3DocErrors({});
     onCancel();
   };
 
@@ -206,8 +216,8 @@ export default function OnboardingWizard({ onCancel }: Props) {
         {/* Step Content */}
         <div>
           {step === 1 && <Step1PersonalInfo data={step1} errors={step1Errors} onChange={updateStep1} />}
-          {step === 2 && <Step2Documentation data={step2} errors={step2Errors} tempId={tempId} onChange={updateStep2} />}
-          {step === 3 && <Step3ProfessionalProfile data={step3} onChange={updateStep3} />}
+          {step === 2 && <Step2PsychologyLimits data={step2Psy} onChange={updateStep2Psy} />}
+          {step === 3 && <Step2Documentation data={step3Doc} errors={step3DocErrors} tempId={tempId} onChange={updateStep3Doc} />}
           {step === 4 && <Step4WorkConfig data={step4} onChange={updateStep4} />}
         </div>
       </CardContent>

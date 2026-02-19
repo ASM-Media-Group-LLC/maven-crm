@@ -37,6 +37,10 @@ export interface Step1Data {
   country: string;
   city: string;
   timezone: string;
+  artisticName: string;
+  birthDate: string;
+  medidas: string;
+  tallaBrasier: string;
 }
 
 export interface Step1Errors {
@@ -71,6 +75,10 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
       </div>
       <div className="space-y-1.5">
+        <Label>Nombre artístico</Label>
+        <Input value={data.artisticName} onChange={(e) => onChange("artisticName", e.target.value)} placeholder="Nombre artístico" />
+      </div>
+      <div className="space-y-1.5">
         <Label>Email *</Label>
         <Input type="email" value={data.email} onChange={(e) => onChange("email", e.target.value)} placeholder="correo@ejemplo.com" />
         {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
@@ -86,6 +94,10 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         {errors.age && <p className="text-xs text-destructive">{errors.age}</p>}
       </div>
       <div className="space-y-1.5">
+        <Label>Fecha de nacimiento</Label>
+        <Input type="date" value={data.birthDate} onChange={(e) => onChange("birthDate", e.target.value)} />
+      </div>
+      <div className="space-y-1.5">
         <Label>País</Label>
         <Select value={data.country} onValueChange={(v) => onChange("country", v)}>
           <SelectTrigger><SelectValue placeholder="Seleccionar país" /></SelectTrigger>
@@ -97,6 +109,14 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>Ciudad</Label>
         <Input value={data.city} onChange={(e) => onChange("city", e.target.value)} placeholder="Ciudad" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Medidas (cm)</Label>
+        <Input value={data.medidas} onChange={(e) => onChange("medidas", e.target.value)} placeholder="90-60-90" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Talla de brasier</Label>
+        <Input value={data.tallaBrasier} onChange={(e) => onChange("tallaBrasier", e.target.value)} placeholder="34B" />
       </div>
       <div className="md:col-span-2 space-y-1.5">
         <Label>Zona horaria</Label>
