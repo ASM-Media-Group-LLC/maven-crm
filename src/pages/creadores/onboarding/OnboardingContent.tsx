@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus } from "lucide-react";
+import StartOnboardingModal from "./StartOnboardingModal";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ const OnboardingContent = () => {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Todas");
   const [view, setView] = useState<"table" | "grid">("table");
+  const [showModal, setShowModal] = useState(false);
 
   const filtered = useMemo(() => {
     let list = creators;
@@ -56,7 +58,7 @@ const OnboardingContent = () => {
             <h1 className="text-2xl font-bold tracking-tight">Onboarding</h1>
             <p className="text-sm text-muted-foreground">Gestiona el proceso de onboarding de nuevos creadores</p>
           </div>
-          <Button>
+          <Button onClick={() => setShowModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Iniciar Onboarding
           </Button>
@@ -118,6 +120,8 @@ const OnboardingContent = () => {
           <OnboardingGrid data={filtered} />
         )}
       </div>
+
+      <StartOnboardingModal open={showModal} onClose={() => setShowModal(false)} />
     </div>
   );
 };
