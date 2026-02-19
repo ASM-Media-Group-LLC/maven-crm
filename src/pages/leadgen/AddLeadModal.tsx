@@ -69,6 +69,26 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const onSubmit = async (data: LeadFormValues) => {
     setIsSubmitting(true);
     try {
+      // Duplicate check by url_perfil
+      const { normalizeHandle } = await import("@/lib/handle-utils");
+      const normalizedUrl = normalizeHandle(data.url_perfil);
+      if (normalizedUrl) {
+        const { data: existing } = await supabase
+          .from("leads")
+          .select("id, url_perfil, compania")
+          .ilike("url_perfil", `%${normalizedUrl}%`)
+          .maybeSingle();
+        if (existing) {
+          toast({
+            title: "Duplicado detectado",
+            description: `Ya existe un lead con este perfil en ${existing.compania}: ${existing.url_perfil}`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Upload evidence files if any
       let evidenceUrls: string[] = [];
       if (files.length > 0) {

@@ -17,6 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { STAGES, SOURCES } from "./useDeals";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle } from "@/lib/handle-utils";
 
 interface NewDealModalProps {
   open: boolean;
@@ -26,12 +29,30 @@ interface NewDealModalProps {
 }
 
 const NewDealModal = ({ open, onOpenChange, onSubmit, isLoading }: NewDealModalProps) => {
+  const { toast } = useToast();
   const [prospectHandle, setProspectHandle] = useState("");
   const [source, setSource] = useState("LeadGen");
   const [stage, setStage] = useState("Nuevo");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!prospectHandle.trim()) return;
+    // Duplicate check by prospect_handle
+    const normalized = normalizeHandle(prospectHandle);
+    if (normalized) {
+      const { data: existing } = await supabase
+        .from("deals")
+        .select("id, prospect_handle")
+        .ilike("prospect_handle", normalized)
+        .maybeSingle();
+      if (existing) {
+        toast({
+          title: "Duplicado detectado",
+          description: `Ya existe un deal con este handle: ${existing.prospect_handle}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     onSubmit({ prospect_handle: prospectHandle.trim(), source, stage });
     setProspectHandle("");
     setSource("LeadGen");

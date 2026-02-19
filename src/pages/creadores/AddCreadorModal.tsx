@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { useAddCreador } from "./useCreadores";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle } from "@/lib/handle-utils";
 
 const schema = z.object({
   name: z.string().min(1, "Nombre requerido"),
@@ -58,6 +60,26 @@ const AddCreadorModal = ({ open, onOpenChange }: Props) => {
 
   const onSubmit = async (data: FormData) => {
     try {
+      // Duplicate check by instagram_handle
+      if (data.instagram_handle) {
+        const normalized = normalizeHandle(data.instagram_handle);
+        if (normalized) {
+          const { data: existing } = await supabase
+            .from("creators")
+            .select("id, name, instagram_handle")
+            .ilike("instagram_handle", normalized)
+            .maybeSingle();
+          if (existing) {
+            toast({
+              title: "Duplicado detectado",
+              description: `Ya existe un creador con este handle: ${existing.name}`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
       await mutateAsync({
         name: data.name,
         artistic_name: data.artistic_name || null,
