@@ -1,43 +1,30 @@
 
-## Corrección de textos en español del Sidebar y páginas
+## Acortar textos del sidebar en Creadores y Ventas de Creadores
 
-### Problema identificado
+### Problema
+Como se ve en la imagen, los textos largos en los sub-ítems del sidebar se parten en dos líneas, amontonando el menú.
 
-Varios textos del sidebar y páginas usan inglés o género incorrecto cuando el idioma es español. Estos son los cambios necesarios:
+### Cambios únicamente en `src/components/dashboard/DashboardSidebar.tsx`
 
-| Clave / Lugar | Texto actual (ES) | Texto correcto (ES) |
-|---|---|---|
-| `nav.creatorSales` en `i18n.ts` | `"Creator Sales"` | `"Ventas de Creadores"` |
-| `nav.salesReport` en `i18n.ts` | `"Sales Report"` | `"Reporte de Ventas"` |
-| `nav.aiSales` en `i18n.ts` | `"AI Sales"` | `"IA Ventas"` |
-| `nav.aiConfig` en `i18n.ts` | `"AI Config"` | `"Configuración IA"` |
-| Sidebar: subitem hardcodeado `"Dashboard"` (Creadores) | `"Dashboard"` | `"Dashboard de Creadores"` |
-| Sidebar: subitem hardcodeado `"Listado"` (Creadores) | `"Listado"` | `"Listado"` (ya está bien) |
-| `CreadoresContent.tsx` heading `h1` | `"Listado de Creadoras"` | `"Listado de Creadores"` |
-| `CreadorasDashboardContent.tsx` heading | `"Dashboard de Creadoras"` | `"Dashboard de Creadores"` |
+**Submenú de Creadores:**
 
-> Nota: los sub-ítems del menú de Creadores (`"Dashboard"`, `"Listado"`, `"Onboarding"`) están hardcodeados directamente en `DashboardSidebar.tsx`, no pasan por `i18n.ts`. Se corregirá el género ahí mismo.
-
-### Archivos a modificar
-
-| Archivo | Cambio |
+| Antes | Después |
 |---|---|
-| `src/lib/i18n.ts` | Actualizar 4 claves ES: `creatorSales`, `salesReport`, `aiSales`, `aiConfig` |
-| `src/components/dashboard/DashboardSidebar.tsx` | Corregir el subitem `"Dashboard"` del grupo Creadores (no el de Creator Sales) — ahí no hay t() |
-| `src/pages/creadores/CreadoresContent.tsx` | `h1` de `"Listado de Creadoras"` → `"Listado de Creadores"` |
-| `src/pages/creadores/CreadorasDashboardContent.tsx` | Heading de `"Dashboard de Creadoras"` → `"Dashboard de Creadores"` |
+| `"Dashboard de Creadores"` | `"Dashboard"` |
+| `"Listado"` | `"Listado"` (sin cambio) |
+| `"Onboarding"` | `"Onboarding"` (sin cambio) |
 
-### Resultado esperado en sidebar (modo ES)
+**Submenú de Ventas de Creadores** (sub-ítems en `creatorSalesSubItems`):
 
-```
-Creadores ▾
-  ├─ Dashboard de Creadores   → /creadores/dashboard
-  ├─ Listado                  → /creadores
-  └─ Onboarding               → /creadores/onboarding
+| Antes | Después |
+|---|---|
+| `"Dashboard"` | `"Dashboard"` (sin cambio) |
+| `t("nav.salesReport")` → `"Reporte de Ventas"` | `"Reportes"` (hardcodeado corto) |
+| `t("nav.aiSales")` → `"IA Ventas"` | `"IA Ventas"` (sin cambio, cabe en una línea) |
+| `t("nav.aiConfig")` → `"Configuración IA"` | `"Config IA"` (acortado) |
 
-Ventas de Creadores ▾
-  ├─ Dashboard               → /sales-overview
-  ├─ Reporte de Ventas       → /salesdashboard
-  ├─ IA Ventas               → /aisales
-  └─ Configuración IA        → /ai-sales-config
-```
+> Las páginas internas mantienen sus títulos completos (`"Dashboard de Creadores"`, `"Reporte de Ventas"`, etc.) — solo cambia lo que se muestra en el sidebar.
+
+### Solo 1 archivo a modificar
+
+- `src/components/dashboard/DashboardSidebar.tsx`
