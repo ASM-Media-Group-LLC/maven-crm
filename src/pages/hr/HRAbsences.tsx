@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, Clock, CalendarDays, Search, ListIcon, LayoutGrid,
-  Check, X, Eye, Plus, CalendarIcon,
+  Check, X, Eye, Plus, CalendarIcon, Pencil, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -178,19 +182,15 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
-          {/* Empleado */}
           <div className="space-y-1.5">
             <Label>Empleado <span className="text-destructive">*</span></Label>
             <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
           </div>
 
-          {/* Tipo de Falta */}
           <div className="space-y-1.5">
             <Label>Tipo de Falta <span className="text-destructive">*</span></Label>
             <Select value={absenceType} onValueChange={setAbsenceType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo..." />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Seleccionar tipo..." /></SelectTrigger>
               <SelectContent>
                 {ABSENCE_TYPES.map((t) => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -199,81 +199,148 @@ function RegisterAbsenceModal({ open, onOpenChange }: RegisterModalProps) {
             </Select>
           </div>
 
-          {/* Fechas */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Fecha Inicio <span className="text-destructive">*</span></Label>
               <Popover open={startOpen} onOpenChange={setStartOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start font-normal", !startDate && "text-muted-foreground")}
-                  >
+                  <Button variant="outline" className={cn("w-full justify-start font-normal", !startDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {startDate ? format(startDate, "dd/MM/yyyy") : "Fecha inicio"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(d) => { setStartDate(d); setStartOpen(false); }}
-                    locale={es}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
-
             <div className="space-y-1.5">
               <Label>Fecha Fin <span className="text-destructive">*</span></Label>
               <Popover open={endOpen} onOpenChange={setEndOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start font-normal", !endDate && "text-muted-foreground")}
-                  >
+                  <Button variant="outline" className={cn("w-full justify-start font-normal", !endDate && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {endDate ? format(endDate, "dd/MM/yyyy") : "Fecha fin"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(d) => { setEndDate(d); setEndOpen(false); }}
-                    locale={es}
-                    disabled={(d) => startDate ? d < startDate : false}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
           </div>
 
-          {/* Observaciones */}
           <div className="space-y-1.5">
             <Label>Observaciones</Label>
-            <Textarea
-              placeholder="Descripción o contexto de la falta..."
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            <Textarea placeholder="Descripción o contexto de la falta..." rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-            Cancelar
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => mutation.mutate()}
-            disabled={!isValid || mutation.isPending}
-            className="flex-1"
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancelar</Button>
+          <Button variant="destructive" onClick={() => mutation.mutate()} disabled={!isValid || mutation.isPending} className="flex-1">
             {mutation.isPending ? "Guardando..." : "+ Registrar Falta"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit Modal ─────────────────────────────────────────────────────────────────
+function EditAbsenceModal({ absence, onClose }: { absence: AbsenceRecord | null; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [absenceType, setAbsenceType] = useState(absence?.absence_type ?? "");
+  const [startDate, setStartDate] = useState<Date | undefined>(absence ? new Date(absence.start_date) : undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(absence ? new Date(absence.end_date) : undefined);
+  const [notes, setNotes] = useState(absence?.notes ?? "");
+  const [startOpen, setStartOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const days = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1) : null;
+      const { error } = await supabase.from("absences").update({
+        absence_type: absenceType,
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : absence!.start_date,
+        end_date: endDate ? format(endDate, "yyyy-MM-dd") : absence!.end_date,
+        total_days: days,
+        notes: notes || null,
+      }).eq("id", absence!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absences"] });
+      toast({ title: "Falta actualizada" });
+      onClose();
+    },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  if (!absence) return null;
+  const emp = absence.employees;
+  const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+
+  return (
+    <Dialog open={!!absence} onOpenChange={onClose}>
+      <DialogContent className="!flex !flex-col gap-0 max-w-md p-0 overflow-hidden">
+        <DialogHeader className="shrink-0 px-6 py-5 border-b">
+          <DialogTitle>Editar Falta</DialogTitle>
+          <DialogDescription>{empName}</DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <Label>Tipo de Falta</Label>
+            <Select value={absenceType} onValueChange={setAbsenceType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ABSENCE_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Fecha Inicio</Label>
+              <Popover open={startOpen} onOpenChange={setStartOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, "dd/MM/yyyy") : "—"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartOpen(false); }} locale={es} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fecha Fin</Label>
+              <Popover open={endOpen} onOpenChange={setEndOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? format(endDate, "dd/MM/yyyy") : "—"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndOpen(false); }} locale={es} disabled={(d) => startDate ? d < startDate : false} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Observaciones</Label>
+            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
+          <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} className="flex-1">
+            {mutation.isPending ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -342,6 +409,8 @@ export default function HRAbsences() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [viewAbsence, setViewAbsence] = useState<AbsenceRecord | null>(null);
+  const [editAbsence, setEditAbsence] = useState<AbsenceRecord | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -362,6 +431,19 @@ export default function HRAbsences() {
       toast({ title: "Estado actualizado" });
     },
     onError: () => toast({ title: "Error al actualizar el estado", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("absences").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absences"] });
+      toast({ title: "Falta eliminada" });
+      setDeleteId(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
   // KPIs
@@ -410,45 +492,17 @@ export default function HRAbsences() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <DashboardMetricCard
-            label="Total Faltas"
-            value={String(totalFaltas)}
-            icon={AlertTriangle}
-          />
-          <DashboardMetricCard
-            label="Pendientes"
-            value={String(pendientes)}
-            icon={Clock}
-            valueColor="text-yellow-600"
-          />
-          <DashboardMetricCard
-            label="Este Mes"
-            value={String(esteMes)}
-            icon={CalendarDays}
-          />
+          <DashboardMetricCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} />
+          <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} valueColor="text-yellow-600" />
+          <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} />
         </div>
 
         {/* Department Tabs */}
         {departments.length > 0 && (
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-            <Button
-              size="sm"
-              variant={!deptFilter ? "secondary" : "ghost"}
-              className="text-sm"
-              onClick={() => setDeptFilter("")}
-            >
-              Todos
-            </Button>
+            <Button size="sm" variant={!deptFilter ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
             {departments.map((d) => (
-              <Button
-                key={d.id}
-                size="sm"
-                variant={deptFilter === d.id ? "secondary" : "ghost"}
-                className="text-sm"
-                onClick={() => setDeptFilter(d.id)}
-              >
-                {d.name}
-              </Button>
+              <Button key={d.id} size="sm" variant={deptFilter === d.id ? "secondary" : "ghost"} className="text-sm" onClick={() => setDeptFilter(d.id)}>{d.name}</Button>
             ))}
           </div>
         )}
@@ -457,18 +511,10 @@ export default function HRAbsences() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar empleado u observaciones..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9"
-            />
+            <Input placeholder="Buscar empleado u observaciones..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
           </div>
-
           <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-44 h-9">
-              <SelectValue placeholder="Tipo de Falta" />
-            </SelectTrigger>
+            <SelectTrigger className="w-44 h-9"><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos los tipos</SelectItem>
               {ABSENCE_TYPES.map((t) => (
@@ -476,11 +522,8 @@ export default function HRAbsences() {
               ))}
             </SelectContent>
           </Select>
-
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36 h-9">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
+            <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
               {ABSENCE_STATUSES.map((s) => (
@@ -488,30 +531,13 @@ export default function HRAbsences() {
               ))}
             </SelectContent>
           </Select>
-
           <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-            <Button
-              size="sm"
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              className="h-7 w-7 p-0"
-              onClick={() => setViewMode("list")}
-            >
-              <ListIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              className="h-7 w-7 p-0"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+            <Button size="sm" variant={viewMode === "list" ? "secondary" : "ghost"} className="h-7 w-7 p-0" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
+            <Button size="sm" variant={viewMode === "grid" ? "secondary" : "ghost"} className="h-7 w-7 p-0" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Mostrando {filtered.length} de {absences.length} registros
-        </p>
+        <p className="text-xs text-muted-foreground">Mostrando {filtered.length} de {absences.length} registros</p>
 
         {/* ── List View ─────────────────────────────────────────────────────── */}
         {viewMode === "list" && (
@@ -532,11 +558,7 @@ export default function HRAbsences() {
                 <TableBody>
                   {isLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <TableCell key={j}><Skeleton className="h-5" /></TableCell>
-                        ))}
-                      </TableRow>
+                      <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
                     ))
                   ) : filtered.length === 0 ? (
                     <TableRow>
@@ -552,87 +574,37 @@ export default function HRAbsences() {
                       const initials = emp ? getInitials(emp.first_name, emp.last_name) : "—";
                       return (
                         <TableRow key={a.id} className="group">
-                          {/* Empleado */}
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                                {initials}
-                              </div>
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{initials}</div>
                               <div>
                                 <p className="text-sm font-semibold leading-tight">{empName}</p>
                                 <p className="text-xs text-muted-foreground">{emp?.departments?.name ?? "—"}</p>
                               </div>
                             </div>
                           </TableCell>
-                          {/* Tipo */}
+                          <TableCell><Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type)}</Badge></TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDateRange(a.start_date, a.end_date)}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {getAbsenceTypeLabel(a.absence_type)}
-                            </Badge>
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                           </TableCell>
-                          {/* Fechas */}
-                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {formatDateRange(a.start_date, a.end_date)}
-                          </TableCell>
-                          {/* Días */}
+                          <TableCell className="max-w-[180px]"><p className="text-xs text-muted-foreground truncate">{a.notes ?? "—"}</p></TableCell>
                           <TableCell>
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                              {a.total_days ?? "—"}
-                            </span>
-                          </TableCell>
-                          {/* Observaciones */}
-                          <TableCell className="max-w-[180px]">
-                            <p className="text-xs text-muted-foreground truncate">
-                              {a.notes ?? "—"}
-                            </p>
-                          </TableCell>
-                          {/* Estado */}
-                          <TableCell>
-                            <Badge
-                              variant={getStatusVariant(a.status)}
-                              className={cn(
-                                 "text-xs",
-                                 a.status === "pending" && "border-warning/50 bg-warning/10 text-warning",
-                                 a.status === "approved" && "border-primary/50 bg-primary/10 text-primary",
-                               )}
-                            >
+                            <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
                               {getStatusLabel(a.status)}
                             </Badge>
                           </TableCell>
-                          {/* Acciones */}
                           <TableCell className="sticky right-0 bg-card">
                             <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setViewAbsence(a)} title="Ver detalle"><Eye className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditAbsence(a)} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
                               {a.status === "pending" && (
                                 <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
-                                    onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })}
-                                    title="Aprobar"
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })}
-                                    title="Rechazar"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10" onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })} title="Aprobar"><Check className="h-3.5 w-3.5" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })} title="Rechazar"><X className="h-3.5 w-3.5" /></Button>
                                 </>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-muted-foreground"
-                                onClick={() => setViewAbsence(a)}
-                                title="Ver detalle"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(a.id)} title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -649,9 +621,7 @@ export default function HRAbsences() {
         {viewMode === "grid" && (
           isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-lg" />
-              ))}
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -666,79 +636,38 @@ export default function HRAbsences() {
                 const initials = emp ? getInitials(emp.first_name, emp.last_name) : "—";
                 return (
                   <div key={a.id} className="rounded-lg border bg-card p-4 flex flex-col gap-3">
-                    {/* Header */}
                     <div className="flex items-center gap-2">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                        {initials}
-                      </div>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">{initials}</div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold leading-tight truncate">{empName}</p>
                         <p className="text-xs text-muted-foreground truncate">{emp?.departments?.name ?? "Sin departamento"}</p>
                       </div>
                     </div>
-
-                    {/* Badges */}
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">
-                        {getAbsenceTypeLabel(a.absence_type)}
-                      </Badge>
-                      <Badge
-                        variant={getStatusVariant(a.status)}
-                        className={cn(
-                           "text-xs",
-                           a.status === "pending" && "border-warning/50 bg-warning/10 text-warning",
-                           a.status === "approved" && "border-primary/50 bg-primary/10 text-primary",
-                         )}
-                      >
+                      <Badge variant="outline" className="text-xs">{getAbsenceTypeLabel(a.absence_type)}</Badge>
+                      <Badge variant={getStatusVariant(a.status)} className={cn("text-xs", a.status === "pending" && "border-warning/50 bg-warning/10 text-warning", a.status === "approved" && "border-primary/50 bg-primary/10 text-primary")}>
                         {getStatusLabel(a.status)}
                       </Badge>
                     </div>
-
-                    {/* Dates */}
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">{formatDateRange(a.start_date, a.end_date)}</span>
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                        {a.total_days ?? "—"}
-                      </span>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-semibold">{a.total_days ?? "—"}</span>
                     </div>
-
-                    {/* Observaciones */}
-                    {a.notes && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{a.notes}</p>
-                    )}
-
-                    {/* Footer actions */}
+                    {a.notes && <p className="text-xs text-muted-foreground line-clamp-2">{a.notes}</p>}
                     <div className="flex items-center gap-1 pt-1 border-t">
                       {a.status === "pending" && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 flex-1 text-xs text-primary hover:text-primary hover:bg-primary/10"
-                            onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })}
-                          >
-                            <Check className="h-3.5 w-3.5 mr-1" />
-                            Aprobar
+                          <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs text-primary hover:text-primary hover:bg-primary/10" onClick={() => updateStatus.mutate({ id: a.id, status: "approved" })}>
+                            <Check className="h-3.5 w-3.5 mr-1" /> Aprobar
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 flex-1 text-xs text-destructive hover:bg-destructive/10"
-                            onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })}
-                          >
-                            <X className="h-3.5 w-3.5 mr-1" />
-                            Rechazar
+                          <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs text-destructive hover:bg-destructive/10" onClick={() => updateStatus.mutate({ id: a.id, status: "rejected" })}>
+                            <X className="h-3.5 w-3.5 mr-1" /> Rechazar
                           </Button>
                         </>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-muted-foreground ml-auto"
-                        onClick={() => setViewAbsence(a)}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground ml-auto" onClick={() => setViewAbsence(a)}><Eye className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditAbsence(a)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                 );
@@ -751,6 +680,20 @@ export default function HRAbsences() {
       {/* Modals */}
       <RegisterAbsenceModal open={modalOpen} onOpenChange={setModalOpen} />
       <ViewAbsenceModal absence={viewAbsence} onClose={() => setViewAbsence(null)} />
+      <EditAbsenceModal absence={editAbsence} onClose={() => setEditAbsence(null)} />
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar falta?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. El registro será eliminado permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

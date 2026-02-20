@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sun, CalendarDays, Plus, Check, X, Eye, Search,
   List, LayoutGrid, Clock, CheckCircle2, XCircle, CalendarClock,
-  ChevronLeft, ChevronRight, Users,
+  ChevronLeft, ChevronRight, Users, Pencil, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,6 +64,68 @@ function useVacationAbsences() {
   });
 }
 
+// ─── Edit Form ─────────────────────────────────────────────────────
+function EditVacationForm({ data, onSave, onCancel, isPending }: { data: any; onSave: (d: any) => void; onCancel: () => void; isPending: boolean }) {
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date(data.start_date));
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date(data.end_date));
+  const [reason, setReason] = useState(data.reason ?? "");
+
+  const handleSave = () => {
+    const days = startDate && endDate ? Math.max(1, differenceInCalendarDays(endDate, startDate) + 1) : data.total_days;
+    onSave({
+      start_date: startDate ? format(startDate, "yyyy-MM-dd") : data.start_date,
+      end_date: endDate ? format(endDate, "yyyy-MM-dd") : data.end_date,
+      total_days: days,
+      reason: reason || null,
+    });
+  };
+
+  return (
+    <>
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label>Fecha Inicio</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start font-normal")}>
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "dd/MM/yyyy") : "—"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={es} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Fecha Fin</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start font-normal")}>
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "dd/MM/yyyy") : "—"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={es} disabled={(d) => startDate ? d < startDate : false} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Motivo</Label>
+          <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+      </div>
+      <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
+        <Button variant="outline" onClick={onCancel} className="flex-1">Cancelar</Button>
+        <Button onClick={handleSave} disabled={isPending} className="flex-1">{isPending ? "Guardando..." : "Guardar Cambios"}</Button>
+      </DialogFooter>
+    </>
+  );
+}
+
 // ─── Component ─────────────────────────────────────────────────────
 export default function HRVacations() {
   const { data: absences = [], isLoading } = useVacationAbsences();
@@ -75,6 +141,8 @@ export default function HRVacations() {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalData, setViewModalData] = useState<any>(null);
+  const [editData, setEditData] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   // Form
@@ -159,6 +227,32 @@ export default function HRVacations() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("absences").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
+      toast({ title: "Solicitud eliminada" });
+      setDeleteId(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const { error } = await supabase.from("absences").update(data).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vacation-absences"] });
+      toast({ title: "Solicitud actualizada" });
+      setEditData(null);
+    },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
   // ─── Helper renders ────────────────────────────────────────────
   const typeConfig = VACATION_TYPES.find((t) => t.value === activeType)!;
 
@@ -172,6 +266,9 @@ export default function HRVacations() {
       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewModalData(item)}>
         <Eye className="h-3.5 w-3.5" />
       </Button>
+      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditData(item)}>
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
       {item.status === "pending" && (
         <>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success" onClick={() => updateStatus.mutate({ id: item.id, status: "approved" })}>
@@ -182,6 +279,9 @@ export default function HRVacations() {
           </Button>
         </>
       )}
+      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(item.id)}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 
@@ -695,6 +795,31 @@ export default function HRVacations() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={!!editData} onOpenChange={(o) => !o && setEditData(null)}>
+        <DialogContent className="!flex !flex-col gap-0 max-w-md p-0 overflow-hidden">
+          <DialogHeader className="shrink-0 px-6 py-5 border-b">
+            <DialogTitle>Editar Solicitud</DialogTitle>
+            <DialogDescription>{editData ? getEmpName(editData) : ""}</DialogDescription>
+          </DialogHeader>
+          {editData && <EditVacationForm data={editData} onSave={(d) => editMutation.mutate({ id: editData.id, data: d })} onCancel={() => setEditData(null)} isPending={editMutation.isPending} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar solicitud?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
