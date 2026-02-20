@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, UserCheck, UserMinus, Clock, Search, Plus, LayoutGrid, LayoutList, Trash2, Eye } from "lucide-react";
+import { Users, UserCheck, UserMinus, Clock, Search, Plus, LayoutGrid, LayoutList, Trash2, Eye, Pencil } from "lucide-react";
 import { useEmployees, useDeleteEmployee, useDepartments } from "@/hooks/useEmployees";
 import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { EmployeeAreaBadge } from "@/components/hr/EmployeeAreaBadge";
@@ -13,22 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
-/* ── KPI Card ── */
-function KPICard({ label, value, icon: Icon, colorClass }: { label: string; value: number; icon: React.ElementType; colorClass: string }) {
-  return (
-    <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:shadow-lg">
-      <CardContent className="p-4 flex items-center gap-4">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colorClass}`}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+/* ── KPI Cards (same pattern as ContactosKPICards) ── */
+const kpiCards = [
+  { label: "Total Empleados", subtitle: "Registrados", icon: Users, key: "total" as const, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
+  { label: "Activos", subtitle: "En nómina", icon: UserCheck, key: "active" as const, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+  { label: "En Licencia", subtitle: "Vacaciones / Licencia", icon: Clock, key: "leave" as const, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+  { label: "Inactivos", subtitle: "Suspendidos / Inactivos", icon: UserMinus, key: "inactive" as const, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
+];
 
 /* ── Directory Table ── */
 function DirectoryTable({ employees, isLoading, navigate, onDelete }: { employees: any[]; isLoading: boolean; navigate: any; onDelete: (id: string) => void }) {
@@ -89,6 +80,9 @@ function DirectoryTable({ employees, isLoading, navigate, onDelete }: { employee
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(emp.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -136,9 +130,14 @@ function DirectoryGrid({ employees, isLoading, navigate, onDelete }: { employees
             </div>
             <div className="flex items-center justify-between">
               <EmployeeStatusBadge status={emp.status} />
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(emp.id); }}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); navigate(`/hr/empleado/${emp.id}`); }}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(emp.id); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -195,11 +194,24 @@ export default function EmployeeDirectory() {
       {/* ── Scrollable content ── */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard label="Total Empleados" value={employees.length} icon={Users} colorClass="bg-muted text-muted-foreground" />
-          <KPICard label="Activos" value={totalActive} icon={UserCheck} colorClass="bg-emerald-500/10 text-emerald-600" />
-          <KPICard label="En Licencia / Vacaciones" value={totalLeave} icon={Clock} colorClass="bg-amber-500/10 text-amber-600" />
-          <KPICard label="Inactivos / Suspendidos" value={totalInactive} icon={UserMinus} colorClass="bg-destructive/10 text-destructive" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {kpiCards.map((card) => {
+            const val = card.key === "total" ? employees.length : card.key === "active" ? totalActive : card.key === "leave" ? totalLeave : totalInactive;
+            return (
+              <Card key={card.key} className={`transition-all duration-200 ${card.hoverClass}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm text-muted-foreground">{card.label}</p>
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
+                      <card.icon className={`h-4 w-4 ${card.colorClass}`} />
+                    </div>
+                  </div>
+                  <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{val}</p>
+                  <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Department tab bar */}
