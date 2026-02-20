@@ -1,131 +1,137 @@
 
-## Estandarización: botón `default` (primary) para la acción principal de cada sección
+## IA Ventas: Rediseño tipo ChatGPT con historial persistente
 
-### La regla corregida
+### Arquitectura general
 
-El botón `default` (gradiente azul-morado) es el CTA principal de la plataforma. Debe usarse para **la acción de creación primaria en cada header de sección**. Las acciones secundarias (compartir, exportar, acción adicional) van en `outline`.
+La página `/aisales` pasará de ser un chat único a una interfaz de múltiples conversaciones, exactamente como ChatGPT. Se crean dos nuevas tablas en Supabase y se refactorizan los componentes relevantes.
 
 ---
 
-### Mapa completo de cambios por sección
+### 1. Base de datos — 2 tablas nuevas
 
-| Sección | Botón principal → `default` | Botón secundario → `outline` (ya correcto o ajustar) |
+**`ai_conversations`** — Una fila por conversación:
+| columna | tipo | notas |
 |---|---|---|
-| **Creadores** | "Agregar Creador" | — |
-| **Contactos** | "Agregar Contacto" | "Agregar Agencia" (secundario, queda `outline`) |
-| **Eventos** | "Crear Evento" | "Compartir Agenda" (secundario, queda `outline`) |
-| **Tickets** | "Nuevo Ticket" | — |
-| **Tareas (Proyectos)** | "Nuevo Proyecto" | — |
-| **Tareas (dentro de proyecto)** | "Nueva Tarea" | — |
-| **Onboarding** | "Iniciar Onboarding" | — |
-| **LeadGen** | "Agregar Lead" (texto completo) | "Agregar Contacto" (queda `outline`) |
-| **Closers** | "Nuevo Deal" | — |
+| id | uuid PK | gen_random_uuid() |
+| user_id | uuid | auth.uid() |
+| title | text | "Nueva conversación" por defecto |
+| created_at | timestamptz | now() |
+| updated_at | timestamptz | now() |
 
-### Detalles técnicos por archivo
+**`ai_messages`** — Mensajes de cada conversación:
+| columna | tipo | notas |
+|---|---|---|
+| id | uuid PK | gen_random_uuid() |
+| conversation_id | uuid FK → ai_conversations.id | ON DELETE CASCADE |
+| role | text | 'user' o 'assistant' |
+| content | text | texto del mensaje |
+| created_at | timestamptz | now() |
 
-**`src/pages/creadores/CreadoresContent.tsx`** (línea 43):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => navigate("/creadores/nuevo")}>
-// Después
-<Button onClick={() => navigate("/creadores/nuevo")}>
+**RLS**: Cada usuario solo ve y gestiona sus propias conversaciones y mensajes (políticas por `user_id` y FK cascade).
+
+---
+
+### 2. Nuevo layout de la página `/aisales`
+
+El `DashboardTopbar` y `DashboardSidebar` se conservan. La nueva estructura del `<main>` queda así:
+
+```text
+┌──────────────────────────────────────────────┐
+│  DashboardSidebar  │  DashboardTopbar         │
+├────────────────────┼─────────────────────────┤
+│                    │  Header: título +        │
+│  Chat Sidebar      │  botón Configuración     │
+│  ─────────────     ├─────────────────────────┤
+│  [+ Nuevo chat]    │                          │
+│                    │  Área de mensajes        │
+│  Hoy               │  (scroll)                │
+│  ▶ Análisis top 5  │                          │
+│  ▶ Tips de ayer    │                          │
+│                    │                          │
+│  Ayer              ├─────────────────────────┤
+│  ▶ Comparativa     │  Input + Mic + Send      │
+└────────────────────┴─────────────────────────┘
 ```
 
-**`src/pages/contactos/ContactosContent.tsx`** (línea 122):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
-// Después
-<Button onClick={() => navigate("/contactos/nuevo")}>
-// "Agregar Agencia" permanece outline (acción secundaria)
+El **Chat Sidebar** (izquierdo, dentro del área de contenido) tiene ancho fijo `w-64`, con:
+- Botón **"+ Nuevo chat"** (primary gradient, ancho completo)
+- Lista agrupada por fecha (Hoy / Ayer / Esta semana / Anteriores)
+- Conversación activa resaltada con `bg-muted`
+- Al hacer hover aparece un icono de editar (lápiz) y uno de eliminar (papelera)
+- Doble clic en el título o clic en el lápiz activa renombrado inline con un `<input>`
+
+---
+
+### 3. Nuevo hook `useAiConversations`
+
+`src/hooks/useAiConversations.ts` — gestiona toda la lógica:
+
+```typescript
+// Funciones expuestas:
+createConversation()       → crea en DB, setea como activa
+deleteConversation(id)     → elimina en DB
+renameConversation(id, title) → actualiza title en DB
+loadMessages(conversationId)  → fetch de ai_messages
+saveMessage(conversationId, role, content) → INSERT en ai_messages
 ```
 
-**`src/pages/eventos/EventosContent.tsx`** (línea 103):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
-// Después
-<Button onClick={() => navigate("/eventos/nuevo")}>
-// "Compartir Agenda" permanece outline
+Usa `@tanstack/react-query` para caché y revalidación.
+
+---
+
+### 4. Nuevo componente `AiChatSidebar`
+
+`src/components/AiChatSidebar.tsx`:
+- Recibe: lista de conversaciones, conversación activa, callbacks de crear/eliminar/renombrar/seleccionar
+- Agrupa las conversaciones por fecha relativa usando `date-fns`
+- Estado local para `editingId` (renombrado inline)
+- Al eliminar: `AlertDialog` de confirmación antes de borrar
+
+---
+
+### 5. Refactor de `ClariAiChat`
+
+El componente recibirá nuevas props:
+```typescript
+interface ClariAiChatProps {
+  mode?: "full" | "panel";
+  conversationId?: string;        // NUEVO
+  initialMessages?: Msg[];        // NUEVO
+  onMessageSaved?: () => void;    // NUEVO (para refrescar sidebar)
+}
 ```
 
-**`src/pages/tickets/TicketsContent.tsx`** (línea 83):
+Cambios internos:
+- Al cargar: muestra `initialMessages` en vez de solo `WELCOME`
+- Después de cada respuesta completa de la IA: llama `saveMessage()` tanto para el mensaje del usuario como el de la IA
+- El título de la conversación se genera automáticamente desde el primer mensaje del usuario (truncado a 40 chars)
+
+---
+
+### 6. Refactor de `AiSales.tsx`
+
+La página reemplaza el header fijo + `<ClariAiChat key={resetKey}>` por el nuevo layout de dos paneles:
+
 ```tsx
-// Antes
-<Button variant="outline" onClick={() => setModalOpen(true)}>
-// Después
-<Button onClick={() => setModalOpen(true)}>
+<main className="flex flex-1 overflow-hidden">
+  <AiChatSidebar ... />
+  <div className="flex flex-1 flex-col min-w-0">
+    {/* Header: título conversación + botón Configuración */}
+    <ClariAiChat conversationId={activeId} initialMessages={messages} ... />
+  </div>
+</main>
 ```
 
-**`src/pages/tareas/ProjectsListContent.tsx`** (línea 152):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => setCreateOpen(true)}>
-// Después
-<Button onClick={() => setCreateOpen(true)}>
-```
+El botón "Archivar chat" se elimina (reemplazado por "Eliminar" en el sidebar). El botón "Configuración" se mantiene en el header del área principal.
 
-**`src/pages/tareas/TareasContent.tsx`** (línea 129):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => setCreateOpen(true)}>
-// Después
-<Button onClick={() => setCreateOpen(true)}>
-```
+---
 
-**`src/pages/creadores/onboarding/OnboardingContent.tsx`** (línea 62):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => setShowWizard(true)}>
-// Después
-<Button onClick={() => setShowWizard(true)}>
-```
+### Archivos a crear/modificar
 
-**`src/pages/leadgen/LeadGenContent.tsx`** (líneas 121-128):
-```tsx
-// Antes - texto corto "Lead" en outline
-<Button variant="outline" size="sm" onClick={() => setAddLeadOpen(true)}>
-  <Plus className="h-4 w-4" />
-  Lead
-</Button>
-<Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
-  <UserPlus className="h-4 w-4" />
-  Contacto
-</Button>
-
-// Después - "Agregar Lead" como default (primary), "Agregar Contacto" outline
-<Button size="sm" onClick={() => setAddLeadOpen(true)}>
-  <Plus className="h-4 w-4" />
-  Agregar Lead
-</Button>
-<Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
-  <UserPlus className="h-4 w-4" />
-  Agregar Contacto
-</Button>
-```
-
-**`src/pages/closers/ClosersContent.tsx`** (línea 43):
-```tsx
-// Antes
-<Button variant="outline" onClick={() => setShowNewDeal(true)}>
-// Después
-<Button onClick={() => setShowNewDeal(true)}>
-```
-
-### Archivos a modificar (9 archivos)
-
-1. `src/pages/creadores/CreadoresContent.tsx`
-2. `src/pages/contactos/ContactosContent.tsx`
-3. `src/pages/eventos/EventosContent.tsx`
-4. `src/pages/tickets/TicketsContent.tsx`
-5. `src/pages/tareas/ProjectsListContent.tsx`
-6. `src/pages/tareas/TareasContent.tsx`
-7. `src/pages/creadores/onboarding/OnboardingContent.tsx`
-8. `src/pages/leadgen/LeadGenContent.tsx`
-9. `src/pages/closers/ClosersContent.tsx`
-
-### Actualización de la regla en el design system
-
-Se actualizará la memoria `style/contextual-button-usage-v2` para reflejar:
-- Acción **principal** de header de sección → variante `default` (gradiente primary)
-- Acciones **secundarias** de header → variante `outline`
+| Archivo | Operación |
+|---|---|
+| Migración SQL | CREAR 2 tablas + RLS + índices |
+| `src/hooks/useAiConversations.ts` | CREAR — lógica DB completa |
+| `src/components/AiChatSidebar.tsx` | CREAR — sidebar de chats |
+| `src/pages/AiSales.tsx` | MODIFICAR — nuevo layout 2 paneles |
+| `src/components/ClariAiChat.tsx` | MODIFICAR — persistencia + props nuevas |
