@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { User, ArrowLeft, FileText, AlertTriangle, GraduationCap, TrendingUp, Calendar, Building2, Phone, Mail, CreditCard, Link2, Link2Off, CheckCircle2, XCircle, Search } from "lucide-react";
 import { useEmployee, useEmployeeAbsences, useEmployeeIncidents, useEmployeeDocuments, useEmployeeTraining, useEmployeePerformance } from "@/hooks/useEmployee";
 import { useAllProfiles, useLinkedProfile, useLinkEmployeeProfile, useUnlinkEmployeeProfile } from "@/hooks/useEmployees";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
+
 import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { EmployeeAreaBadge } from "@/components/hr/EmployeeAreaBadge";
 import { Button } from "@/components/ui/button";
@@ -48,39 +48,53 @@ export default function EmployeeProfile() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-16 rounded-lg" />
-        <Skeleton className="h-48 rounded-lg" />
-      </div>
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-16 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
+        </div>
+      </main>
     );
   }
 
   if (!employee) {
     return (
-      <div className="p-6 text-center">
-        <p className="text-muted-foreground">Empleado no encontrado.</p>
-        <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate("/hr/directorio")}>
-          Volver al directorio
-        </Button>
-      </div>
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <p className="text-muted-foreground">Empleado no encontrado.</p>
+          <Button variant="ghost" size="sm" className="mt-4" onClick={() => navigate("/hr/directorio")}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Volver al directorio
+          </Button>
+        </div>
+      </main>
     );
   }
 
   const fullName = `${employee.first_name} ${employee.last_name}`;
 
   return (
-    <div className="p-6 space-y-6">
-      <HRPageHeader
-        title={fullName}
-        subtitle={`${employee.employee_code ?? ""} · ${employee.positions?.name ?? "Sin cargo"}`}
-        icon={User}
-        actions={
-          <Button variant="outline" size="sm" onClick={() => navigate("/hr/directorio")}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Volver
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="shrink-0 border-b bg-background px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/directorio")}>
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-        }
-      />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-xl font-semibold text-foreground">{fullName}</h1>
+              <EmployeeStatusBadge status={employee.status} />
+              {employee.positions?.name && (
+                <Badge variant="outline">{employee.positions.name}</Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {[employee.employee_code, employee.departments?.name, employee.hire_date ? `Ingreso: ${format(new Date(employee.hire_date), "dd/MM/yyyy")}` : null].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+        </div>
+      </header>
 
+      <div className="flex-1 overflow-auto p-6 space-y-6">
       {/* Summary card */}
       <Card>
         <CardContent className="p-5">
@@ -423,7 +437,8 @@ export default function EmployeeProfile() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </main>
   );
 }
 
