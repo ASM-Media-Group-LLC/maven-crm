@@ -2,6 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+export type ProfileOption = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
 export type EmployeeWithRelations = {
   id: string;
   employee_code: string | null;
@@ -44,6 +50,7 @@ export type EmployeeWithRelations = {
   updated_at: string;
   departments: { id: string; name: string; code: string } | null;
   positions: { id: string; name: string; code: string } | null;
+  profile_id: string | null;
 };
 
 export function useEmployees() {
@@ -107,6 +114,91 @@ export function usePositions(departmentId?: string) {
       const { data, error } = await q;
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+// --- Profile linking hooks ---
+
+export function useAllProfiles() {
+  return useQuery({
+    queryKey: ["all-profiles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .order("full_name");
+      if (error) throw error;
+      return (data ?? []) as ProfileOption[];
+    },
+  });
+}
+
+export function useLinkedProfile(profileId: string | null) {
+  return useQuery({
+    queryKey: ["linked-profile", profileId],
+    enabled: !!profileId,
+    queryFn: async () => {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .eq("id", profileId!)
+        .single();
+      if (profileError) throw profileError;
+
+      const { data: roleRow } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", profileId!)
+        .single();
+
+      return { ...profile, role: roleRow?.role ?? null } as ProfileOption & { role: string | null };
+    },
+  });
+}
+
+export function useLinkEmployeeProfile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ employeeId, profileId }: { employeeId: string; profileId: string }) => {
+      const { error } = await supabase
+        .from("employees")
+        .update({ profile_id: profileId })
+        .eq("id", employeeId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, { employeeId }) => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast({ title: "Usuario vinculado correctamente" });
+    },
+    onError: () => {
+      toast({ title: "Error al vincular el usuario", variant: "destructive" });
+    },
+  });
+}
+
+export function useUnlinkEmployeeProfile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { error } = await supabase
+        .from("employees")
+        .update({ profile_id: null })
+        .eq("id", employeeId);
+      if (error) throw error;
+    },
+    onSuccess: (_data, employeeId) => {
+      queryClient.invalidateQueries({ queryKey: ["employee", employeeId] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast({ title: "Vínculo de usuario eliminado" });
+    },
+    onError: () => {
+      toast({ title: "Error al desvincular el usuario", variant: "destructive" });
     },
   });
 }
