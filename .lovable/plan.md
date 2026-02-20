@@ -1,77 +1,73 @@
 
 
-## Rediseno del DateInput + Documentacion en Design System
+## Estandarizar el Directorio de Empleados
 
-### Problema actual
+### Problemas actuales
 
-El `DateInput` actual es un layout de dos piezas separadas: un `Input` de texto y un `Button` con icono de calendario al lado. Esto se ve desconectado y no coincide con el estilo del `DateRangePicker`, que usa un solo boton-trigger elegante con el icono integrado y abre un popover completo.
+1. **Header diferente**: Usa `HRPageHeader` con caja de icono (`bg-primary/10`), prohibida por el sistema de diseno. Otros directorios (Contactos, Creadores) usan `header` con `text-2xl font-bold`, subtitulo, y boton CTA directo.
+2. **Sin layout estandar**: Usa `div className="p-6 space-y-5"` en vez del patron `main > header fijo (border-b) + div scroll (flex-1 overflow-auto)`.
+3. **Sin KPI cards**: Contactos y Creadores muestran tarjetas de resumen (Total, Activos, Inactivos, Nuevos). El directorio de empleados no tiene ninguna.
+4. **Sin tab bar de departamentos**: Creadores usa un tab bar (`inline-flex rounded-lg border bg-muted/50 p-1`) para filtrar por agencia. El directorio deberia tener lo mismo para departamentos.
 
-### Solucion: DateInput unificado estilo Material Design
+### Solucion
 
-Redisenar el `DateInput` para que sea un **trigger unico** (como el DateRangePicker) que al hacer clic abre un popover con:
-
-1. **Calendario con dropdowns de mes/ano** para navegar facilmente (captionLayout dropdown-buttons)
-2. **Input manual** debajo del calendario para escribir la fecha en formato dd/mm/aaaa
-3. **Footer con botones** Cancelar / Aplicar (mismo patron que el DateRangePicker)
-
-El trigger mostrara la fecha formateada (ej: "15 feb 2024") o el placeholder "Seleccionar fecha" con el icono de calendario a la izquierda, exactamente como el DateRangePicker muestra su rango.
-
-### Estructura visual del nuevo componente
+Reescribir `EmployeeDirectory.tsx` para que siga exactamente el mismo patron que `ContactosContent` y `CreadoresContent`:
 
 ```text
-Trigger (cerrado):
-[ icono-calendario  15 feb 2024 ]
+<main flex-1 flex-col h-full overflow-hidden>
+  <header shrink-0 bg-background px-6 border-b>
+    Titulo "Directorio de Empleados" (text-2xl font-bold)
+    Subtitulo "Total: N empleados"
+    Boton "Nuevo Empleado" (default variant)
+  </header>
 
-Popover (abierto):
-+----------------------------------+
-|  < febrero 2024 [v mes] [v ano] >|
-|  Lu Ma Mi Ju Vi Sa Do            |
-|  ...calendario...                |
-|                                  |
-|  [ dd/mm/aaaa ]                  |
-|  ─────────────────────────────   |
-|              Cancelar  [Aplicar] |
-+----------------------------------+
+  <div flex-1 overflow-auto p-6 space-y-6>
+    1. KPI Cards (4 tarjetas: Total, Activos, En Licencia, Inactivos)
+    2. Tab bar de departamentos (Todos + cada departamento dinamico)
+    3. Filtros (search + status + toggle list/grid)
+    4. Tabla o Grid
+  </div>
+</main>
 ```
 
-### Cambios
+### Cambios detallados
 
-#### 1. `src/components/ui/date-input.tsx` — Reescribir
+#### Archivo: `src/pages/hr/EmployeeDirectory.tsx` — Reescribir
 
-- Trigger: `Button variant="outline"` con `CalendarIcon` + fecha formateada (o placeholder)
-- Popover con `DayPicker` usando `captionLayout="dropdown-buttons"`, `fromYear`, `toYear`
-- Input manual debajo del calendario con auto-formateo dd/mm/aaaa
-- Footer con Cancelar y Aplicar
-- Locale `es` para los nombres de meses
-- El estado interno (fecha seleccionada) solo se aplica al hacer clic en "Aplicar", como el DateRangePicker
-- `pointer-events-auto` en el DayPicker
-- Mismos classNames del calendario que usa el DateRangePicker para consistencia visual
+**Header**:
+- Eliminar import y uso de `HRPageHeader`
+- Usar `<main>` con `flex-1 flex-col h-full overflow-hidden min-w-0`
+- Header: `<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">`
+- Titulo: `<h1 className="text-2xl font-bold">Directorio de Empleados</h1>`
+- Subtitulo: `<p className="text-sm text-muted-foreground">Total: {employees.length} empleados</p>`
+- CTA: `<Button>` (variant default, no size="sm") con icono Plus
 
-#### 2. `src/pages/design-system/sections/InputsSection.tsx` — Agregar documentacion
+**KPI Cards** (nuevas, debajo del header en la zona scroll):
+- 4 tarjetas usando el mismo patron de `ContactosKPICards`:
+  - Total Empleados (icon Users, color muted)
+  - Activos (icon UserCheck, color success)
+  - En Licencia/Vacaciones (icon Clock, color warning)
+  - Inactivos (icon UserMinus, color destructive)
+- Cada card con hover animado (`hover:scale-[1.03]`) igual que Contactos
 
-Agregar una seccion "Date Input" debajo de "Date Range Picker" con:
-- Ejemplo interactivo del DateInput
-- Tabla de props documentada (value, onChange, placeholder, fromYear, toYear, disabled)
-- Notas de uso: cuando usar DateInput vs DateRangePicker
+**Tab bar de departamentos** (nuevo):
+- Contenedor `inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1`
+- Boton "Todos" + un boton por cada departamento (obtenido de `useDepartments()`)
+- Filtra `deptFilter` al hacer clic (mismo patron que agencias en Creadores)
+- Variantes: `secondary` (activo) y `ghost` (inactivo)
+- Esto reemplaza el `Select` de departamento actual
 
-### Props (sin cambios en la interfaz publica)
+**Filtros**:
+- Mantener: buscador con icono Search, Select de estado, toggle list/grid
+- Eliminar: el Select de departamento (reemplazado por tab bar)
 
-```text
-- value: string (yyyy-MM-dd)
-- onChange: (value: string) => void
-- placeholder?: string (default: "Seleccionar fecha")
-- disabled?: boolean
-- className?: string
-- fromYear?: number (default: 1940)
-- toYear?: number (default: ano actual + 5)
-```
+**Contenido scroll**:
+- Envolver todo en `<div className="flex-1 overflow-auto p-6 space-y-6">`
+- Orden: KPIs, tab bar departamentos, filtros, tabla/grid
 
-La interfaz publica se mantiene identica, asi que todos los formularios que ya usan `DateInput` funcionaran sin cambios.
-
-### Archivos a modificar
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/components/ui/date-input.tsx` | Reescribir: trigger unificado tipo boton + popover con calendario (dropdown mes/ano), input manual y footer Cancelar/Aplicar |
-| `src/pages/design-system/sections/InputsSection.tsx` | Agregar seccion "Date Input" con ejemplo interactivo y documentacion de props |
+| `src/pages/hr/EmployeeDirectory.tsx` | Reescribir layout completo: header estandar (sin HRPageHeader), KPI cards, tab bar de departamentos, filtros simplificados, todo dentro del patron main/header/scroll |
 
