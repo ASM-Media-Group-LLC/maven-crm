@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Shield, UserCog, User } from "lucide-react";
+import { Shield, UserCog, User, Headphones, DollarSign, Eye } from "lucide-react";
 import type { AdminUser } from "./useAdminUsers";
 import type { AppRole } from "@/hooks/useUserRole";
 
@@ -19,6 +19,9 @@ const roleConfig: Record<AppRole, { label: string; icon: React.ReactNode; color:
   admin: { label: "Admin", icon: <Shield className="h-4 w-4" />, color: "text-red-500" },
   manager: { label: "Manager", icon: <UserCog className="h-4 w-4" />, color: "text-amber-500" },
   employee: { label: "Employee", icon: <User className="h-4 w-4" />, color: "text-blue-500" },
+  agent: { label: "Agent", icon: <Headphones className="h-4 w-4" />, color: "text-green-500" },
+  closer: { label: "Closer", icon: <DollarSign className="h-4 w-4" />, color: "text-purple-500" },
+  supervisor: { label: "Supervisor", icon: <Eye className="h-4 w-4" />, color: "text-cyan-500" },
 };
 
 const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: ChangeRoleModalProps) => {

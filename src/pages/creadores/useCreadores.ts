@@ -196,7 +196,7 @@ export function useCreadorById(id: string) {
 export function useAddCreadorWithBusiness() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ creator, business, documents }: AddCreadorFullInput) => {
+    mutationFn: async ({ creator, business, documents }: AddCreadorFullInput): Promise<string> => {
       const { data, error } = await supabase.from("creators").insert(creator).select("id").single();
       if (error) throw error;
       const creatorId = data.id;
@@ -216,6 +216,7 @@ export function useAddCreadorWithBusiness() {
         const { error: docError } = await supabase.from("creator_documents").insert(docs);
         if (docError) throw docError;
       }
+      return creatorId;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["creators"] }),
   });
