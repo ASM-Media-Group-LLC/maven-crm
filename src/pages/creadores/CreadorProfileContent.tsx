@@ -18,6 +18,7 @@ import NotasTabContent from "./NotasTabContent";
 import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
+import OperacionesTabContent from "./OperacionesTabContent";
 import ChangeStatusModal from "./ChangeStatusModal";
 
 const statusLabel: Record<string, string> = {
@@ -166,8 +167,9 @@ const CreadorProfileContent = () => {
       </div>
 
       <div className="px-6 mt-4 pb-6">
-        <Tabs defaultValue="info">
+        <Tabs defaultValue="operaciones">
           <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
             <TabsTrigger value="info">Información</TabsTrigger>
             <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
             <TabsTrigger value="redes">Redes</TabsTrigger>
@@ -177,6 +179,10 @@ const CreadorProfileContent = () => {
             <TabsTrigger value="tickets">Tickets</TabsTrigger>
             <TabsTrigger value="historial">Historial</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="operaciones">
+            <OperacionesTabContent creator={c} />
+          </TabsContent>
 
           <TabsContent value="info">
             <InfoTabContent creator={c} creatorId={id!} />
