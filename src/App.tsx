@@ -63,6 +63,7 @@ import HRApplicants from "./pages/hr/HRApplicants";
 import HRTraining from "./pages/hr/HRTraining";
 import HRPerformance from "./pages/hr/HRPerformance";
 import HRLayout from "./pages/hr/HRLayout";
+import HRAttendance from "./pages/hr/HRAttendance";
 
 const queryClient = new QueryClient();
 
@@ -131,6 +132,7 @@ const App = () => (
               <Route path="/hr/candidatos" element={<ProtectedRoute><HRLayout><HRApplicants /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion" element={<ProtectedRoute><HRLayout><HRTraining /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/desempeno" element={<ProtectedRoute><HRLayout><HRPerformance /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/asistencia" element={<ProtectedRoute><HRLayout><HRAttendance /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
