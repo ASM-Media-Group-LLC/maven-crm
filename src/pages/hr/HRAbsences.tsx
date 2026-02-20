@@ -470,24 +470,24 @@ export default function HRAbsences() {
             />
           </div>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-44 h-9">
               <SelectValue placeholder="Tipo de Falta" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los tipos</SelectItem>
+              <SelectItem value="__all__">Todos los tipos</SelectItem>
               {ABSENCE_TYPES.map((t) => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36 h-9">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               {ABSENCE_STATUSES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}

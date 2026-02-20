@@ -316,10 +316,10 @@ export default function HRVacations() {
                 <Input placeholder="Buscar por nombre o motivo..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               {activeView === "solicitudes" && (
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
                   <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="pending">Pendientes</SelectItem>
                     <SelectItem value="approved">Aprobadas</SelectItem>
                     <SelectItem value="rejected">Rechazadas</SelectItem>

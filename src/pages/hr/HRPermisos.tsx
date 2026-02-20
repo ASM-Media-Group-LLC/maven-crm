@@ -447,24 +447,24 @@ export default function HRPermisos() {
             />
           </div>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-44">
               <SelectValue placeholder="Tipo de Permiso" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los tipos</SelectItem>
+              <SelectItem value="__all__">Todos los tipos</SelectItem>
               {PERMISSION_TYPES.map((t) => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="pending">Pendiente</SelectItem>
               <SelectItem value="approved">Aprobado</SelectItem>
               <SelectItem value="rejected">Rechazado</SelectItem>
