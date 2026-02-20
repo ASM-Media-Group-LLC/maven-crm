@@ -1,106 +1,67 @@
 
-## Unificacion de Experiencia de Usuario: Transiciones, Feedback y Limpieza
+## Dos mejoras: Sidebar HR compacto + Dashboard de Recursos Humanos rediseñado
 
-### Resumen
-Conectar toda la experiencia del modulo de Onboarding y Creadores para que se sienta como un flujo continuo: animaciones de transicion, feedback visual con toasts, sidebar siempre sincronizado, y limpieza de la interfaz usando acordeones y tabs para reducir la sobrecarga visual.
+### Problema 1: Submenú HR con títulos en dos líneas
 
----
+Los labels de los grupos anidados en el sidebar de RRHH son demasiado largos para caber en una línea en el espacio disponible:
+- "Seguimiento y Control" → **"Seguimiento"**
+- "Finanzas Operativas" → **"Finanzas"**
+- "Operación Diaria" → **"Operaciones"**
+- "Reclutamiento" → queda bien
+- "Desarrollo" → queda bien
+- "Información" → queda bien
 
-### 1. Transiciones animadas entre tabla y wizard
-
-**Archivo:** `src/pages/creadores/onboarding/OnboardingContent.tsx`
-
-- Envolver la zona de contenido condicional (wizard vs tabla) con clases de animacion `animate-fade-in`
-- Cuando `showWizard` cambia, el nuevo contenido aparece con un fade suave en lugar de un salto brusco
-- Aplicar la misma animacion al cambiar entre vista tabla y grid
-
-```text
-{showWizard ? (
-  <div className="animate-fade-in">
-    <OnboardingWizard ... />
-  </div>
-) : (
-  <div className="animate-fade-in">
-    {/* tabs, filters, table/grid */}
-  </div>
-)}
-```
-
-### 2. Transiciones entre pasos del wizard
-
-**Archivo:** `src/pages/creadores/onboarding/OnboardingWizard.tsx`
-
-- Envolver el contenido de cada paso con `animate-fade-in` usando una `key={step}` para que React re-monte el div al cambiar de paso, activando la animacion
-
-```text
-<div key={step} className="animate-fade-in">
-  {step === 1 && <Step1PersonalInfo ... />}
-  {step === 2 && ...}
-  ...
-</div>
-```
-
-### 3. Feedback visual con Toasts (verificacion y completitud)
-
-Los toasts ya estan implementados para "Borrador guardado" y "Onboarding completado" en `OnboardingWizard.tsx`. Se agregaran toasts adicionales:
-
-**Archivo:** `src/pages/creadores/onboarding/OnboardingWizard.tsx`
-- Al avanzar de paso: toast sutil confirmando el paso completado (solo en pasos con validacion exitosa)
-- Al cancelar/volver a la lista: toast "Edicion cancelada" (siguiendo el patron estandar)
-
-**Archivo:** `src/pages/creadores/VerificationSection.tsx`
-- Verificar que los toasts de "Verificacion aprobada" y "Verificacion rechazada" ya estan presentes (ya lo estan)
-
-### 4. Sidebar siempre sincronizado
+Además, añadir un enlace directo al Dashboard de HR (`/hr`) como primer sub-item de la sección, antes de los grupos colapsables, para que el usuario pueda navegar directamente al dashboard.
 
 **Archivo:** `src/components/dashboard/DashboardSidebar.tsx`
 
-El sidebar ya maneja correctamente el resaltado:
-- `isCreadoresActive` detecta `/creadores`, `/creadores/dashboard` y `/creadores/onboarding`
-- El `Collapsible` se abre con `defaultOpen={isCreadoresActive}`
-- Los sub-items usan `isActive={pathname === item.url}`
+Cambios en el array `hrGroups`:
+```
+"Operación Diaria"      → "Operaciones"
+"Seguimiento y Control" → "Seguimiento"
+"Finanzas Operativas"   → "Finanzas"
+```
 
-**Mejora necesaria:** Cuando el usuario esta en `/creadores/onboarding` y navega hacia el wizard (misma URL), el sub-item "Onboarding" ya se resalta. Sin embargo, para la ruta `/creadores/nuevo`, hay que verificar que tambien se resalte el grupo "Creadores".
+También añadir un item directo "Dashboard" (con `LayoutDashboard` icon) apuntando a `/hr` antes de los grupos expandibles.
 
-- Agregar `/creadores/nuevo` a la deteccion de `isCreadoresActive` (ya deberia funcionar con `pathname.startsWith(item.url)` pero verificar)
+---
 
-### 5. Limpieza de interfaz: Acordeones en Step 4 (Configuracion)
+### Problema 2: Rediseño del HR Dashboard
 
-**Archivo:** `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`
+El `HRDashboard.tsx` actual solo tiene 4 KPI cards básicas + distribución por departamento + contrataciones recientes.
 
-El paso 4 tiene demasiada informacion visible simultaneamente (tabla de precios, config de interaccion, horarios, notas). Reorganizar usando acordeones:
+La referencia visual muestra:
 
-- **Acordeon 1: "Precios por Servicio"** - Tabla de precios (abierto por defecto)
-- **Acordeon 2: "Configuracion de Interaccion"** - Permiso identidad, orientacion, terminos de afecto, restricciones
-- **Acordeon 3: "Horarios y Disponibilidad"** - Grid de horarios + objetivo mensual
-- **Acordeon 4: "Notas Adicionales"** - Textarea de notas
+**Sección 1 - KPI Cards superiores** (4 tarjetas):
+- Total Empleados, Check-ins Hoy (= 0 placeholder), Ausencias Pendientes (pendientes de revisión), En Onboarding (nuevos en 30d)
 
-Cada acordeon tendra un icono descriptivo (DollarSign, MessageCircle, Calendar, StickyNote) para facilitar la lectura rapida.
+**Sección 2 - Rotación y Retención** (card contenedor con 5 mini-cards):
+- Rotación 30d (%), Retiros 30d (#), % Ingresos 30d, Antigüedad Promedio, Rotación 12m
+- Cada mini-card tiene fondo de color sutil (rojo oscuro, naranja oscuro, verde oscuro, azul oscuro, púrpura oscuro)
 
-### 6. Limpieza de interfaz: Acordeones en Step 2 (Psicologia)
+**Sección 3 - Acciones Rápidas** (4 botones horizontales):
+- Registrar Ausencia → `/hr/ausencias`
+- Ver Asistencia → (placeholder)
+- Ver Directorio → `/hr/directorio`
+- Agregar Empleado → `/hr/empleado/nuevo`
 
-**Archivo:** `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx`
+**Sección 4 - Dos columnas**:
+- **Solicitudes Pendientes** (lado izquierdo): Lista de ausencias con estado `pendiente`, usando datos de la tabla `absences`. Botón "Ver todas →"
+- **Módulos HR** (lado derecho): Grid 2x3 de tarjetas de navegación (Asistencia, Vacaciones, Horarios, Capacitación, Incidentes, Candidatos) + botón "Exportar Arquitectura"
 
-Actualmente usa `Separator` y secciones planas. Convertir a acordeones colapsables:
+**Sección 5 - Resumen del Equipo** (4 mini-cards con fondo de color):
+- Activos, En Licencia, Nuevos (30d), Total
 
-- **Acordeon 1: "Personalidad y Dia a Dia"** (abierto por defecto) - Rutina, hobbies, comida, mascotas, estudios
-- **Acordeon 2: "Interaccion con Fans"** - Apodos, palabras prohibidas, emoji, tono
-- **Acordeon 3: "Limites"** - Contenido que jamas haria
+---
 
-### 7. Reduccion de texto y consistencia visual
+### Datos requeridos
 
-**Archivo:** `src/pages/creadores/onboarding/OnboardingContent.tsx`
-- Reducir el subtitulo del header: "Gestiona el onboarding de nuevos creadores" (mas corto)
-- Reducir labels de KPI cards: "Total" en lugar de "Total Onboarding"
+Para las métricas de rotación se calculan desde los datos ya disponibles:
+- `employees` (hook `useEmployees`)
+- `absences` (query directa a Supabase para las pendientes)
+- Métricas calculadas en el componente (no requieren tablas nuevas)
 
-**Archivo:** `src/pages/creadores/onboarding/OnboardingWizard.tsx`
-- Reducir el subtitulo del card: "4 pasos para completar el registro" (mas conciso)
-
-### 8. Fecha de nacimiento con Calendar Popover
-
-**Archivo:** `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx`
-
-Reemplazar el `<Input type="date">` por el patron estandar de Popover + Calendar de Shadcn con locale en espanol (`es` de `date-fns`), segun la restriccion del sistema de diseno.
+Para "Ausencias pendientes" se necesita una query a la tabla `absences` con `status = 'pending'`. Se puede hacer con un hook inline en el mismo componente.
 
 ---
 
@@ -108,12 +69,5 @@ Reemplazar el `<Input type="date">` por el patron estandar de Popover + Calendar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Animaciones fade-in en transiciones, textos mas concisos |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Animacion fade-in entre pasos, toast al cancelar, texto reducido |
-| `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx` | Reorganizar con Accordion (3 secciones colapsables) |
-| `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx` | Reorganizar con Accordion (4 secciones colapsables con iconos) |
-| `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` | Reemplazar input date nativo por Popover + Calendar |
-
-### Sin archivos nuevos
-
-Todas las mejoras son refinamientos sobre componentes existentes usando utilidades CSS y componentes Shadcn ya disponibles en el proyecto (Accordion, Calendar, Popover).
+| `src/components/dashboard/DashboardSidebar.tsx` | Acortar labels HR, añadir link directo a Dashboard HR |
+| `src/pages/hr/HRDashboard.tsx` | Rediseño completo siguiendo la referencia visual |
