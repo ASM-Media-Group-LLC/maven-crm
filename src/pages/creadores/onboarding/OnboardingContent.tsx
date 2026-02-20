@@ -1,14 +1,17 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus } from "lucide-react";
+import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, RefreshCw } from "lucide-react";
 import OnboardingWizard from "./OnboardingWizard";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
-import { useOnboarding } from "./useOnboarding";
+import { useOnboarding, calculateCurrentStep, getStepLabel, type OnboardingCreator } from "./useOnboarding";
 
 const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
 
@@ -18,6 +21,7 @@ const OnboardingContent = () => {
   const [activeTab, setActiveTab] = useState("Todas");
   const [view, setView] = useState<"table" | "grid">("table");
   const [showWizard, setShowWizard] = useState(false);
+  const [editingCreator, setEditingCreator] = useState<{ id: string; initialStep: number } | null>(null);
 
   const filtered = useMemo(() => {
     let list = creators;
@@ -31,10 +35,25 @@ const OnboardingContent = () => {
     return list;
   }, [creators, activeTab, search]);
 
+  const inProgressCreators = useMemo(() => {
+    return creators.filter((c) => c.dbStatus === "borrador" || c.dbStatus === "pendiente_verificacion");
+  }, [creators]);
+
   const total = creators.length;
   const pending = creators.filter((c) => c.status === "Pendiente").length;
   const inProgress = creators.filter((c) => c.status === "En Progreso").length;
   const completed = creators.filter((c) => c.status === "Completado").length;
+
+  const handleCardClick = (creator: OnboardingCreator) => {
+    const step = calculateCurrentStep(creator);
+    setEditingCreator({ id: creator.id, initialStep: step });
+    setShowWizard(true);
+  };
+
+  const handleCloseWizard = () => {
+    setShowWizard(false);
+    setEditingCreator(null);
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -59,7 +78,7 @@ const OnboardingContent = () => {
             <p className="text-sm text-muted-foreground">Gestiona el onboarding de nuevos creadores</p>
           </div>
           {!showWizard && (
-            <Button onClick={() => setShowWizard(true)}>
+            <Button onClick={() => { setEditingCreator(null); setShowWizard(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Iniciar Onboarding
             </Button>
@@ -76,9 +95,53 @@ const OnboardingContent = () => {
           <DashboardMetricCard label="Completados" value={String(completed)} icon={CheckCircle2} valueColor="text-emerald-500" />
         </div>
 
+        {/* Procesos en Curso */}
+        {!showWizard && inProgressCreators.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between py-4">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base">Procesos en Curso</CardTitle>
+                <Badge variant="secondary-soft" className="text-xs">{inProgressCreators.length}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {inProgressCreators.map((creator) => {
+                  const currentStep = calculateCurrentStep(creator);
+                  const label = getStepLabel(currentStep, creator.dbStatus);
+                  const progressValue = ((currentStep - 1) / 4) * 100;
+                  const isPending = creator.dbStatus === "pendiente_verificacion";
+
+                  return (
+                    <div
+                      key={creator.id}
+                      onClick={() => handleCardClick(creator)}
+                      className="min-w-[200px] max-w-[240px] rounded-lg border bg-card p-3 space-y-2 cursor-pointer transition-all hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px]"
+                    >
+                      <p className="font-medium text-sm truncate">{creator.name}</p>
+                      <Progress value={isPending ? 100 : progressValue} className="h-1.5" />
+                      <p className="text-xs text-muted-foreground">
+                        {isPending ? "Completado" : `Paso ${currentStep} de 4`}
+                      </p>
+                      <Badge variant={isPending ? "warning-soft" : "primary-soft"} className="text-[10px]">
+                        {label}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {showWizard ? (
           <div key="wizard" className="animate-fade-in">
-            <OnboardingWizard onCancel={() => setShowWizard(false)} />
+            <OnboardingWizard
+              onCancel={handleCloseWizard}
+              initialStep={editingCreator?.initialStep}
+              editCreatorId={editingCreator?.id}
+            />
           </div>
         ) : (
           <div key="list" className="animate-fade-in">

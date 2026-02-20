@@ -1,10 +1,11 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Check, Loader2, ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "../useCreadores";
+import { useQueryClient } from "@tanstack/react-query";
 import Step1PersonalInfo, { type Step1Data, type Step1Errors, validateStep1 } from "./steps/Step1PersonalInfo";
 import Step2PsychologyLimits, { type Step2PsyData } from "./steps/Step2PsychologyLimits";
 import Step2Documentation, { type Step2Data, type Step2Errors, validateStep2 } from "./steps/Step2Documentation";
@@ -25,20 +26,66 @@ const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", no
 
 interface Props {
   onCancel: () => void;
+  initialStep?: number;
+  editCreatorId?: string;
 }
 
-export default function OnboardingWizard({ onCancel }: Props) {
-  const [step, setStep] = useState(1);
+export default function OnboardingWizard({ onCancel, initialStep, editCreatorId }: Props) {
+  const [step, setStep] = useState(initialStep || 1);
   const [step1, setStep1] = useState<Step1Data>(initialStep1);
   const [step2Psy, setStep2Psy] = useState<Step2PsyData>(initialStep2Psy);
   const [step3Doc, setStep3Doc] = useState<Step2Data>(initialStep3Doc);
   const [step4, setStep4] = useState<Step4Data>(initialStep4);
   const [step1Errors, setStep1Errors] = useState<Step1Errors>({});
   const [step3DocErrors, setStep3DocErrors] = useState<Step2Errors>({});
+  const [loadingCreator, setLoadingCreator] = useState(!!editCreatorId);
 
   const { toast } = useToast();
   const addCreador = useAddCreadorWithBusiness();
+  const queryClient = useQueryClient();
   const tempId = useMemo(() => `onboarding-${Date.now()}`, []);
+
+  // Load existing creator data when editing
+  useEffect(() => {
+    if (!editCreatorId) return;
+    (async () => {
+      setLoadingCreator(true);
+      const { data: c } = await supabase
+        .from("creators")
+        .select("*, creator_business(*)")
+        .eq("id", editCreatorId)
+        .maybeSingle();
+      if (c) {
+        let extraData: any = {};
+        try { extraData = c.internal_notes ? JSON.parse(c.internal_notes) : {}; } catch {}
+        const biz = Array.isArray(c.creator_business) ? c.creator_business[0] : c.creator_business;
+
+        setStep1({
+          name: c.name || "", email: c.email || "", phone: c.phone || "",
+          age: c.age ? String(c.age) : "", country: c.country || "", city: c.city || "",
+          timezone: extraData.timezone || "", artisticName: c.artistic_name || "",
+          birthDate: c.birth_date || "", medidas: c.medidas_cm || "", tallaBrasier: c.talla_brasier || "",
+        });
+        setStep2Psy({
+          rutinaDiaria: c.rutina_diaria || "", hobbies: c.hobbies || "",
+          mascotasNombres: c.mascotas_nombres || "", comidaFavorita: c.comida_favorita || "",
+          nivelEstudios: c.nivel_estudios || "", apodosPermitidos: c.apodos_permitidos || "",
+          palabrasProhibidas: c.palabras_prohibidas || "", emojiFrecuente: c.emoji_frecuente || "",
+          tonoVoz: c.tono_voz || "", contenidoJamasHaria: c.contenido_jamas_haria || "",
+        });
+        setStep4({
+          schedule: extraData.schedule || {}, pricing: {},
+          monthlyGoal: biz?.monthly_sales_target ? String(biz.monthly_sales_target) : "",
+          notes: c.notes || "",
+          permisoIdentidadReal: extraData.permisoIdentidadReal || "",
+          terminosAfecto: extraData.terminosAfecto || "",
+          restriccionesSeguridad: extraData.restriccionesSeguridad || "",
+          orientacionPerfil: extraData.orientacionPerfil || "",
+        });
+      }
+      setLoadingCreator(false);
+    })();
+  }, [editCreatorId]);
 
   const updateStep1 = useCallback((field: keyof Step1Data, value: string) => {
     setStep1((prev) => ({ ...prev, [field]: value }));
@@ -81,7 +128,6 @@ export default function OnboardingWizard({ onCancel }: Props) {
   const handlePrev = () => setStep((s) => Math.max(s - 1, 1));
 
   const buildPayload = (isDraft: boolean) => {
-    // Build precios_contenido from pricing entries with price > 0
     const preciosContenido: Record<string, { price: number; notes: string }> = {};
     Object.entries(step4.pricing).forEach(([key, val]) => {
       const price = Number(val.price);
@@ -161,7 +207,36 @@ export default function OnboardingWizard({ onCancel }: Props) {
       }
     }
 
-    // Duplicate check by email
+    // If editing, update instead of insert
+    if (editCreatorId) {
+      try {
+        const payload = buildPayload(isDraft);
+        const { error } = await supabase
+          .from("creators")
+          .update(payload.creator as any)
+          .eq("id", editCreatorId);
+        if (error) throw error;
+
+        // Update business record if exists
+        const { data: existingBiz } = await supabase
+          .from("creator_business")
+          .select("id")
+          .eq("creator_id", editCreatorId)
+          .maybeSingle();
+        if (existingBiz) {
+          await supabase.from("creator_business").update(payload.business as any).eq("creator_id", editCreatorId);
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
+        toast({ title: isDraft ? "Borrador actualizado" : "Onboarding actualizado exitosamente" });
+        resetAndClose();
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+      }
+      return;
+    }
+
+    // Duplicate check by email (only for new creators)
     if (step1.email) {
       const { data: existingByEmail } = await supabase
         .from("creators")
@@ -181,7 +256,6 @@ export default function OnboardingWizard({ onCancel }: Props) {
 
     try {
       const createdId = await addCreador.mutateAsync(buildPayload(isDraft));
-      // Create notification when onboarding is completed (not draft)
       if (!isDraft && createdId) {
         await supabase.from("notifications").insert({
           type: "onboarding_complete",
@@ -206,17 +280,29 @@ export default function OnboardingWizard({ onCancel }: Props) {
     setStep4(initialStep4);
     setStep1Errors({});
     setStep3DocErrors({});
-    toast({ title: "Edición cancelada" });
     onCancel();
   };
 
   const isSubmitting = addCreador.isPending;
 
+  if (loadingCreator) {
+    return (
+      <Card className="rounded-lg">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Cargando datos...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="rounded-lg">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold leading-none tracking-tight">Iniciar Onboarding</h2>
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
+            {editCreatorId ? "Continuar Onboarding" : "Iniciar Onboarding"}
+          </h2>
           <p className="text-sm text-muted-foreground mt-1.5">4 pasos para completar el registro</p>
         </div>
         <Button variant="ghost" size="sm" onClick={resetAndClose} disabled={isSubmitting}>
