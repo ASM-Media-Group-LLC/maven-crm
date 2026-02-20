@@ -1,73 +1,48 @@
 
 
-## Estandarizar el Directorio de Empleados
+## Corregir KPI Cards y agregar boton Editar en el Directorio de Empleados
 
-### Problemas actuales
+### Problema 1: KPI Cards con layout diferente
 
-1. **Header diferente**: Usa `HRPageHeader` con caja de icono (`bg-primary/10`), prohibida por el sistema de diseno. Otros directorios (Contactos, Creadores) usan `header` con `text-2xl font-bold`, subtitulo, y boton CTA directo.
-2. **Sin layout estandar**: Usa `div className="p-6 space-y-5"` en vez del patron `main > header fijo (border-b) + div scroll (flex-1 overflow-auto)`.
-3. **Sin KPI cards**: Contactos y Creadores muestran tarjetas de resumen (Total, Activos, Inactivos, Nuevos). El directorio de empleados no tiene ninguna.
-4. **Sin tab bar de departamentos**: Creadores usa un tab bar (`inline-flex rounded-lg border bg-muted/50 p-1`) para filtrar por agencia. El directorio deberia tener lo mismo para departamentos.
+Las KPI cards actuales del directorio usan un layout **horizontal** (icono a la izquierda, texto a la derecha) con un hover basico (`hover:scale hover:shadow-lg`). El estandar de la plataforma (`ContactosKPICards`) usa:
 
-### Solucion
+- Layout **vertical**: label arriba-izquierda, icono arriba-derecha, valor grande debajo, subtitulo al final
+- Hover con **gradiente semantico** (`hover:bg-gradient-to-br hover:from-{color}/15 hover:to-transparent hover:border-{color}/40`)
+- Colores del sistema: `text-muted-foreground`, `text-success`, `text-warning`, `text-destructive` (no `emerald-600` ni `amber-600` hardcoded)
 
-Reescribir `EmployeeDirectory.tsx` para que siga exactamente el mismo patron que `ContactosContent` y `CreadoresContent`:
+### Problema 2: Sin opcion de editar
+
+Actualmente solo hay botones de Ver (Eye) y Eliminar (Trash2). Falta un boton de Editar (Pencil) que lleve al perfil del empleado en modo edicion (o directamente al perfil donde se puede editar).
+
+### Cambios en `src/pages/hr/EmployeeDirectory.tsx`
+
+**KPI Cards** — Reescribir el componente `KPICard` para que siga exactamente el patron de `ContactosKPICards`:
 
 ```text
-<main flex-1 flex-col h-full overflow-hidden>
-  <header shrink-0 bg-background px-6 border-b>
-    Titulo "Directorio de Empleados" (text-2xl font-bold)
-    Subtitulo "Total: N empleados"
-    Boton "Nuevo Empleado" (default variant)
-  </header>
+Antes (horizontal):
+[ [icono] Valor  ]
+[         Label  ]
 
-  <div flex-1 overflow-auto p-6 space-y-6>
-    1. KPI Cards (4 tarjetas: Total, Activos, En Licencia, Inactivos)
-    2. Tab bar de departamentos (Todos + cada departamento dinamico)
-    3. Filtros (search + status + toggle list/grid)
-    4. Tabla o Grid
-  </div>
-</main>
+Despues (vertical, como ContactosKPICards):
+[ Label          [icono] ]
+[ Valor (grande)         ]
+[ Subtitulo              ]
 ```
 
-### Cambios detallados
+- Cada card tendra: `label`, `value`, `subtitle`, `icon`, `colorClass`, `bgClass`, `hoverClass`
+- Hover con gradiente semantico y transicion `transition-all duration-200`
+- Tokens semanticos en vez de colores hardcoded:
+  - Total: `text-muted-foreground` / `bg-muted`
+  - Activos: `text-success` / `bg-success/20`
+  - En Licencia: `text-warning` / `bg-warning/20`
+  - Inactivos: `text-destructive` / `bg-destructive/20`
 
-#### Archivo: `src/pages/hr/EmployeeDirectory.tsx` — Reescribir
-
-**Header**:
-- Eliminar import y uso de `HRPageHeader`
-- Usar `<main>` con `flex-1 flex-col h-full overflow-hidden min-w-0`
-- Header: `<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">`
-- Titulo: `<h1 className="text-2xl font-bold">Directorio de Empleados</h1>`
-- Subtitulo: `<p className="text-sm text-muted-foreground">Total: {employees.length} empleados</p>`
-- CTA: `<Button>` (variant default, no size="sm") con icono Plus
-
-**KPI Cards** (nuevas, debajo del header en la zona scroll):
-- 4 tarjetas usando el mismo patron de `ContactosKPICards`:
-  - Total Empleados (icon Users, color muted)
-  - Activos (icon UserCheck, color success)
-  - En Licencia/Vacaciones (icon Clock, color warning)
-  - Inactivos (icon UserMinus, color destructive)
-- Cada card con hover animado (`hover:scale-[1.03]`) igual que Contactos
-
-**Tab bar de departamentos** (nuevo):
-- Contenedor `inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1`
-- Boton "Todos" + un boton por cada departamento (obtenido de `useDepartments()`)
-- Filtra `deptFilter` al hacer clic (mismo patron que agencias en Creadores)
-- Variantes: `secondary` (activo) y `ghost` (inactivo)
-- Esto reemplaza el `Select` de departamento actual
-
-**Filtros**:
-- Mantener: buscador con icono Search, Select de estado, toggle list/grid
-- Eliminar: el Select de departamento (reemplazado por tab bar)
-
-**Contenido scroll**:
-- Envolver todo en `<div className="flex-1 overflow-auto p-6 space-y-6">`
-- Orden: KPIs, tab bar departamentos, filtros, tabla/grid
+**Boton Editar** — Agregar un boton con icono `Pencil` en:
+- **Tabla**: nueva columna de accion entre Ver y Eliminar, que navega a `/hr/empleado/{id}` (el perfil ya soporta edicion)
+- **Grid**: nuevo boton Pencil en el footer de cada card junto al boton de eliminar
 
 ### Archivo a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/EmployeeDirectory.tsx` | Reescribir layout completo: header estandar (sin HRPageHeader), KPI cards, tab bar de departamentos, filtros simplificados, todo dentro del patron main/header/scroll |
-
+| `src/pages/hr/EmployeeDirectory.tsx` | Reescribir KPICard con layout vertical y hover gradiente (patron ContactosKPICards). Agregar boton Pencil de edicion en tabla y grid. Usar tokens semanticos. |
