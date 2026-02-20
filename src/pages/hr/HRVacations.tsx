@@ -71,7 +71,7 @@ export default function HRVacations() {
   const [activeType, setActiveType] = useState<VacationType>("vacaciones");
   const [activeView, setActiveView] = useState<"solicitudes" | "balances" | "historial" | "calendario">("solicitudes");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalData, setViewModalData] = useState<any>(null);
@@ -88,7 +88,7 @@ export default function HRVacations() {
 
   const filtered = useMemo(() => {
     let items = activeView === "historial" ? typeAbsences : typeAbsences;
-    if (activeView === "solicitudes" && statusFilter !== "all") {
+    if (activeView === "solicitudes" && statusFilter) {
       items = items.filter((a) => a.status === statusFilter);
     }
     if (search) {
@@ -319,7 +319,7 @@ export default function HRVacations() {
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="">Todos</SelectItem>
                     <SelectItem value="pending">Pendientes</SelectItem>
                     <SelectItem value="approved">Aprobadas</SelectItem>
                     <SelectItem value="rejected">Rechazadas</SelectItem>
