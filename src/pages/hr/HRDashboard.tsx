@@ -42,7 +42,7 @@ const ALL_ACTIONS: QuickAction[] = [
   { id: "incidentes",    label: "Ver Incidentes",     icon: ShieldAlert,    url: "/hr/incidentes" },
   { id: "capacitacion",  label: "Ver Capacitación",   icon: BookOpen,       url: "/hr/capacitacion" },
   { id: "desempeno",     label: "Ver Desempeño",      icon: TrendingUp,     url: "/hr/desempeno" },
-  { id: "asistencia",    label: "Ver Asistencia",     icon: ClipboardCheck, url: null, soon: true },
+  { id: "asistencia",    label: "Control Asistencia", icon: ClipboardCheck, url: "/hr/asistencia" },
   { id: "vacaciones",    label: "Vacaciones",          icon: CalendarDays,   url: null, soon: true },
   { id: "horarios",      label: "Horarios",            icon: Clock,          url: null, soon: true },
 ];
@@ -168,7 +168,7 @@ export default function HRDashboard() {
   ];
 
   const hrModules = [
-    { label: "Asistencia",  icon: Activity,     url: null },
+    { label: "Asistencia",  icon: Activity,     url: "/hr/asistencia" },
     { label: "Vacaciones",  icon: CalendarDays, url: null },
     { label: "Horarios",    icon: Clock,        url: null },
     { label: "Capacitación",icon: BookOpen,     url: "/hr/capacitacion" },

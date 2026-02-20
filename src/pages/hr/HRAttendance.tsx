@@ -1,0 +1,666 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ClipboardCheck, Search, Users, UserCheck, Clock, UserX, ListIcon, LayoutGrid } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useEmployees } from "@/hooks/useEmployees";
+import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, differenceInMinutes } from "date-fns";
+import { es } from "date-fns/locale";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface AttendanceRecord {
+  id: string;
+  employee_id: string;
+  shift: string;
+  shift_start: string | null;
+  shift_end: string | null;
+  check_in: string | null;
+  check_out: string | null;
+  date: string;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  employees: {
+    first_name: string;
+    last_name: string;
+    employee_code: string | null;
+    department_id: string | null;
+    departments?: { id: string; name: string } | null;
+  } | null;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const SHIFTS = [
+  { value: "turno_manana",  label: "Turno Mañana",  start: "08:00", end: "16:00" },
+  { value: "turno_tarde",   label: "Turno Tarde",   start: "14:00", end: "22:00" },
+  { value: "turno_noche",   label: "Turno Noche",   start: "22:00", end: "06:00" },
+];
+
+const STATUSES = [
+  { value: "presente",  label: "Presente",  variant: "success" as const },
+  { value: "tardanza",  label: "Tardanza",  variant: "warning" as const },
+  { value: "ausente",   label: "Ausente",   variant: "destructive" as const },
+];
+
+function getStatusVariant(status: string) {
+  return STATUSES.find((s) => s.value === status)?.variant ?? "secondary";
+}
+
+function getStatusLabel(status: string) {
+  return STATUSES.find((s) => s.value === status)?.label ?? status;
+}
+
+function getShiftLabel(shift: string) {
+  return SHIFTS.find((s) => s.value === shift)?.label ?? shift;
+}
+
+function formatDuration(checkIn: string | null, checkOut: string | null): string {
+  if (!checkIn || !checkOut) return "—";
+  const mins = differenceInMinutes(new Date(checkOut), new Date(checkIn));
+  if (mins <= 0) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function formatTime(ts: string | null): string {
+  if (!ts) return "—";
+  return format(new Date(ts), "HH:mm");
+}
+
+function getInitials(first: string, last: string): string {
+  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+function useAttendance() {
+  return useQuery({
+    queryKey: ["attendance"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select(`
+          *,
+          employees(first_name, last_name, employee_code, department_id,
+            departments(id, name)
+          )
+        `)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as AttendanceRecord[];
+    },
+  });
+}
+
+function useDepartments() {
+  return useQuery({
+    queryKey: ["departments-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+interface RegisterModalProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}
+
+function RegisterAttendanceModal({ open, onOpenChange }: RegisterModalProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [shift, setShift] = useState("turno_manana");
+  const [shiftStart, setShiftStart] = useState("08:00");
+  const [shiftEnd, setShiftEnd] = useState("16:00");
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
+  const [status, setStatus] = useState("presente");
+  const [notes, setNotes] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
+  const [dateOpen, setDateOpen] = useState(false);
+
+  function handleShiftChange(val: string) {
+    setShift(val);
+    const found = SHIFTS.find((s) => s.value === val);
+    if (found) {
+      setShiftStart(found.start);
+      setShiftEnd(found.end);
+    }
+  }
+
+  function handleCheckInChange(val: string) {
+    setCheckIn(val);
+    // Auto-suggest tardanza if >10 min after shift start
+    if (val && shiftStart) {
+      const [sh, sm] = shiftStart.split(":").map(Number);
+      const [ch, cm] = val.split("T")[1]?.split(":").map(Number) ?? val.split(":").map(Number);
+      const shiftMins = sh * 60 + sm;
+      const checkMins = ch * 60 + cm;
+      if (checkMins - shiftMins > 10) {
+        setStatus("tardanza");
+      } else {
+        setStatus("presente");
+      }
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("attendance").insert({
+        employee_id: employeeId!,
+        shift,
+        shift_start: shiftStart || null,
+        shift_end: shiftEnd || null,
+        check_in: checkIn ? new Date(checkIn).toISOString() : null,
+        check_out: checkOut ? new Date(checkOut).toISOString() : null,
+        date: format(date, "yyyy-MM-dd"),
+        status,
+        notes: notes || null,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      toast({ title: "Asistencia registrada correctamente" });
+      onOpenChange(false);
+      // Reset
+      setEmployeeId(null);
+      setShift("turno_manana");
+      setShiftStart("08:00");
+      setShiftEnd("16:00");
+      setCheckIn("");
+      setCheckOut("");
+      setStatus("presente");
+      setNotes("");
+      setDate(new Date());
+    },
+    onError: () => toast({ title: "Error al registrar asistencia", variant: "destructive" }),
+  });
+
+  const canSubmit = !!employeeId && !mutation.isPending;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="!flex !flex-col gap-0 max-w-lg p-0 overflow-hidden">
+        {/* Fixed header */}
+        <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border">
+          <DialogTitle className="text-lg font-semibold">Registrar Asistencia</DialogTitle>
+          <p className="text-sm text-muted-foreground">Complete los datos del registro de asistencia</p>
+        </DialogHeader>
+
+        {/* Scrollable body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Empleado */}
+          <div className="space-y-1.5">
+            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
+          </div>
+
+          {/* Fecha */}
+          <div className="space-y-1.5">
+            <Label>Fecha</Label>
+            <Popover open={dateOpen} onOpenChange={setDateOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "dd/MM/yyyy") : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => { if (d) { setDate(d); setDateOpen(false); } }}
+                  initialFocus
+                  locale={es}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Turno */}
+          <div className="space-y-1.5">
+            <Label>Turno</Label>
+            <Select value={shift} onValueChange={handleShiftChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIFTS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label} ({s.start}–{s.end})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Horario */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Inicio Turno</Label>
+              <Input type="time" value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fin Turno</Label>
+              <Input type="time" value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Check-in / Check-out */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Hora de Entrada</Label>
+              <Input
+                type="datetime-local"
+                value={checkIn}
+                onChange={(e) => handleCheckInChange(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Hora de Salida</Label>
+              <Input
+                type="datetime-local"
+                value={checkOut}
+                onChange={(e) => setCheckOut(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Estado */}
+          <div className="space-y-1.5">
+            <Label>Estado</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Notas */}
+          <div className="space-y-1.5">
+            <Label>Notas</Label>
+            <Textarea
+              placeholder="Observaciones adicionales..."
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Fixed footer */}
+        <DialogFooter className="shrink-0 px-6 py-4 border-t border-border bg-muted/30">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
+            Cancelar
+          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={!canSubmit}>
+            {mutation.isPending ? "Registrando..." : "+ Registrar Asistencia"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+export default function HRAttendance() {
+  const { data: records = [], isLoading } = useAttendance();
+  const { data: departments = [] } = useDepartments();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [shiftFilter, setShiftFilter] = useState("all");
+  const [deptTab, setDeptTab] = useState("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [dateFromOpen, setDateFromOpen] = useState(false);
+  const [dateToOpen, setDateToOpen] = useState(false);
+
+  // ─── KPIs ──────────────────────────────────────────────────────────────────
+  const total     = records.length;
+  const presentes = records.filter((r) => r.status === "presente").length;
+  const tardanzas = records.filter((r) => r.status === "tardanza").length;
+  const ausentes  = records.filter((r) => r.status === "ausente").length;
+
+  // ─── Filtering ─────────────────────────────────────────────────────────────
+  const filtered = records.filter((r) => {
+    const emp = r.employees;
+    const fullName = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+    const matchSearch = !search || fullName.includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || r.status === statusFilter;
+    const matchShift  = shiftFilter === "all" || r.shift === shiftFilter;
+    const matchDept   = deptTab === "all" || emp?.department_id === deptTab;
+    const recordDate  = new Date(r.date);
+    const matchFrom   = !dateFrom || recordDate >= dateFrom;
+    const matchTo     = !dateTo   || recordDate <= dateTo;
+    return matchSearch && matchStatus && matchShift && matchDept && matchFrom && matchTo;
+  });
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Fixed Header ──────────────────────────────────────────────────────── */}
+      <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Control de Asistencia</h2>
+              <p className="text-sm text-muted-foreground">Registro y seguimiento de asistencia del equipo</p>
+            </div>
+          </div>
+          <Button onClick={() => setModalOpen(true)} size="sm">
+            + Registrar Asistencia
+          </Button>
+        </div>
+      </header>
+
+      {/* ── Scrollable content ────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto p-6 space-y-5">
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
+          ) : (
+            <>
+              <DashboardMetricCard
+                label="Total Registros"
+                value={String(total)}
+                icon={Users}
+                subtitle="Todos los registros"
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40"
+              />
+              <DashboardMetricCard
+                label="Presentes"
+                value={String(presentes)}
+                icon={UserCheck}
+                subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"}
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40"
+                valueColor={presentes > 0 ? "text-success" : undefined}
+              />
+              <DashboardMetricCard
+                label="Tardanzas"
+                value={String(tardanzas)}
+                icon={Clock}
+                subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"}
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40"
+                valueColor={tardanzas > 0 ? "text-warning" : undefined}
+              />
+              <DashboardMetricCard
+                label="Ausentes"
+                value={String(ausentes)}
+                icon={UserX}
+                subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"}
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40"
+                valueColor={ausentes > 0 ? "text-destructive" : undefined}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Department Tabs */}
+        <Tabs value={deptTab} onValueChange={setDeptTab}>
+          <TabsList className="h-auto flex-wrap gap-1 bg-muted/50">
+            <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
+            {departments.map((d) => (
+              <TabsTrigger key={d.id} value={d.id} className="text-xs">{d.name}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar empleado..."
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={shiftFilter} onValueChange={setShiftFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Turno" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los turnos</SelectItem>
+              {SHIFTS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Date From */}
+          <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                {dateFrom ? format(dateFrom, "dd/MM/yy") : "Desde"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateFrom}
+                onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); }}
+                locale={es}
+                className="p-3 pointer-events-auto"
+              />
+              {dateFrom && (
+                <div className="border-t p-2">
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateFrom(undefined)}>
+                    Limpiar
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Date To */}
+          <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                {dateTo ? format(dateTo, "dd/MM/yy") : "Hasta"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateTo}
+                onSelect={(d) => { setDateTo(d); setDateToOpen(false); }}
+                locale={es}
+                className="p-3 pointer-events-auto"
+              />
+              {dateTo && (
+                <div className="border-t p-2">
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateTo(undefined)}>
+                    Limpiar
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Clear filters */}
+          {(search || statusFilter !== "all" || shiftFilter !== "all" || dateFrom || dateTo) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setShiftFilter("all");
+                setDateFrom(undefined);
+                setDateTo(undefined);
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="overflow-auto max-h-[calc(100vh-28rem)]">
+            <Table>
+              <TableHeader>
+                <TableRow className="sticky top-0 z-10 bg-card border-b">
+                  <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Turno</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Horario</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Check-In</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Check-Out</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Duración</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Notas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 9 }).map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
+                      {records.length === 0
+                        ? "No hay registros de asistencia. Haz clic en \"+ Registrar Asistencia\" para empezar."
+                        : "Sin resultados para los filtros aplicados."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((r) => {
+                    const emp = r.employees;
+                    const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+                    const initials = emp ? getInitials(emp.first_name, emp.last_name) : "?";
+                    return (
+                      <TableRow key={r.id} className="hover:bg-muted/30 transition-colors">
+                        {/* Empleado */}
+                        <TableCell>
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-semibold text-primary">{initials}</span>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{fullName}</p>
+                              {emp?.employee_code && (
+                                <p className="text-xs text-muted-foreground">{emp.employee_code}</p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        {/* Turno */}
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {getShiftLabel(r.shift)}
+                        </TableCell>
+                        {/* Horario */}
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {r.shift_start && r.shift_end ? `${r.shift_start.slice(0,5)}–${r.shift_end.slice(0,5)}` : "—"}
+                        </TableCell>
+                        {/* Fecha */}
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {format(new Date(r.date), "dd/MM/yyyy")}
+                        </TableCell>
+                        {/* Check-In */}
+                        <TableCell className="text-sm whitespace-nowrap font-mono">
+                          {formatTime(r.check_in)}
+                        </TableCell>
+                        {/* Check-Out */}
+                        <TableCell className="text-sm whitespace-nowrap font-mono">
+                          {formatTime(r.check_out)}
+                        </TableCell>
+                        {/* Duración */}
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {formatDuration(r.check_in, r.check_out)}
+                        </TableCell>
+                        {/* Estado */}
+                        <TableCell>
+                          <Badge variant={getStatusVariant(r.status)} className="text-xs">
+                            {getStatusLabel(r.status)}
+                          </Badge>
+                        </TableCell>
+                        {/* Notas */}
+                        <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
+                          {r.notes ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Row count */}
+        {!isLoading && filtered.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Mostrando {filtered.length} de {records.length} registros
+          </p>
+        )}
+      </div>
+
+      <RegisterAttendanceModal open={modalOpen} onOpenChange={setModalOpen} />
+    </div>
+  );
+}
