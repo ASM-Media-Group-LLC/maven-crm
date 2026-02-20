@@ -3,13 +3,8 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format, parse } from "date-fns";
-import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { DateInput } from "@/components/ui/date-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -74,7 +69,6 @@ interface Props {
 }
 
 export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
-  const birthDateValue = data.birthDate ? parse(data.birthDate, "yyyy-MM-dd", new Date()) : undefined;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -94,7 +88,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
       <div className="space-y-1.5">
         <Label>Teléfono *</Label>
-        <Input type="tel" value={data.phone} onChange={(e) => onChange("phone", e.target.value)} placeholder="+57 300 000 0000" />
+        <PhoneInput value={data.phone} onChange={(v) => onChange("phone", v)} />
         {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
       </div>
       <div className="space-y-1.5">
@@ -104,31 +98,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
       <div className="space-y-1.5">
         <Label>Fecha de nacimiento</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !data.birthDate && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {data.birthDate ? format(birthDateValue!, "PPP", { locale: es }) : "Seleccionar fecha"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={birthDateValue}
-              onSelect={(date) => onChange("birthDate", date ? format(date, "yyyy-MM-dd") : "")}
-              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-              initialFocus
-              locale={es}
-              className={cn("p-3 pointer-events-auto")}
-            />
-          </PopoverContent>
-        </Popover>
+        <DateInput value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
       </div>
       <div className="space-y-1.5">
         <Label>País</Label>

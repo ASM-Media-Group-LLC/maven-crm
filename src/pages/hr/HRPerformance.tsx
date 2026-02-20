@@ -7,6 +7,7 @@ import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -166,7 +167,7 @@ export default function HRPerformance() {
               </div>
               <div className="space-y-1.5">
                 <Label>Fecha</Label>
-                <Input type="date" value={form.evaluation_date} onChange={(e) => setForm((f) => ({ ...f, evaluation_date: e.target.value }))} />
+                <DateInput value={form.evaluation_date} onChange={(v) => setForm((f) => ({ ...f, evaluation_date: v }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

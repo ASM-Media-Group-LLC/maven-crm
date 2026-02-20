@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
+import { DateInput } from "@/components/ui/date-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -217,25 +218,25 @@ export default function EmployeeNew() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Teléfono</Label>
-                    <Input {...register("phone")} placeholder="+57 300 000 0000" />
+                    <PhoneInput value={watch("phone") || ""} onChange={(v) => setValue("phone", v)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Celular</Label>
-                    <Input {...register("mobile")} placeholder="+57 300 000 0000" />
+                    <PhoneInput value={watch("mobile") || ""} onChange={(v) => setValue("mobile", v)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Fecha de Nacimiento</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {birthDate ? format(birthDate, "dd/MM/yyyy") : "Seleccionar fecha"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} initialFocus className={cn("p-3 pointer-events-auto")} />
-                      </PopoverContent>
-                    </Popover>
+                    <DateInput
+                      value={birthDate ? format(birthDate, "yyyy-MM-dd") : ""}
+                      onChange={(v) => {
+                        if (v) {
+                          setBirthDate(new Date(v + "T12:00:00"));
+                        } else {
+                          setBirthDate(undefined);
+                        }
+                      }}
+                      toYear={new Date().getFullYear()}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Género</Label>
@@ -258,7 +259,7 @@ export default function EmployeeNew() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Teléfono de Emergencia</Label>
-                    <Input {...register("emergency_contact_phone")} placeholder="+57 300 000 0000" />
+                    <PhoneInput value={watch("emergency_contact_phone") || ""} onChange={(v) => setValue("emergency_contact_phone", v)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Parentesco</Label>
@@ -289,17 +290,16 @@ export default function EmployeeNew() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Fecha de Ingreso</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !hireDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {hireDate ? format(hireDate, "dd/MM/yyyy") : "Seleccionar fecha"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={hireDate} onSelect={setHireDate} initialFocus className={cn("p-3 pointer-events-auto")} />
-                      </PopoverContent>
-                    </Popover>
+                    <DateInput
+                      value={hireDate ? format(hireDate, "yyyy-MM-dd") : ""}
+                      onChange={(v) => {
+                        if (v) {
+                          setHireDate(new Date(v + "T12:00:00"));
+                        } else {
+                          setHireDate(undefined);
+                        }
+                      }}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Tipo de Contrato</Label>
