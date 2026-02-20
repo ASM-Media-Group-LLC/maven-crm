@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, CalendarDays, FileText, BarChart3 } from "lucide-react";
-import { format, isSameDay, differenceInMinutes, startOfDay, subDays } from "date-fns";
+import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, FileText, BarChart3 } from "lucide-react";
+import { format, isSameDay, differenceInMinutes, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,9 +47,10 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterCalidad, setFilterCalidad] = useState("todos");
-  const [filterEstado, setFilterEstado] = useState("todos");
-  const [filterFecha, setFilterFecha] = useState("hoy");
+  const [filterCalidad, setFilterCalidad] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
   const agentLeads = useMemo(() =>
     leads.filter(l =>
@@ -80,20 +82,16 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
 
   const filteredLeads = useMemo(() => {
     let result = agentLeads;
-    if (filterFecha === "hoy") result = result.filter(l => isSameDay(new Date(l.created_at), now));
-    else if (filterFecha === "ayer") {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      result = result.filter(l => isSameDay(new Date(l.created_at), yesterday));
-    }
-    if (filterCalidad !== "todos") result = result.filter(l => l.categoria?.toLowerCase() === filterCalidad);
-    if (filterEstado !== "todos") result = result.filter(l => l.status?.toLowerCase() === filterEstado);
+    if (dateFrom) result = result.filter(l => new Date(l.created_at) >= startOfDay(dateFrom));
+    if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
+    if (filterCalidad) result = result.filter(l => l.categoria?.toLowerCase() === filterCalidad);
+    if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
     if (searchTerm) result = result.filter(l =>
       l.url_perfil?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       l.compania?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return result;
-  }, [agentLeads, filterFecha, filterCalidad, filterEstado, searchTerm]);
+  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, searchTerm]);
 
   const initials = agent.name.slice(0, 2).toUpperCase();
   const activeHours = Math.floor(hoursWorked);
@@ -233,26 +231,19 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  <Select value={filterFecha} onValueChange={setFilterFecha}>
-                    <SelectTrigger className="w-[120px] h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="hoy">Hoy</SelectItem>
-                      <SelectItem value="ayer">Ayer</SelectItem>
-                      <SelectItem value="semana">Semana</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <DateRangePicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+                  placeholder="Seleccionar fechas"
+                  className="h-9"
+                />
                 <Select value={filterCalidad} onValueChange={setFilterCalidad}>
                   <SelectTrigger className="w-[120px] h-9">
                     <SelectValue placeholder="Calidad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todas</SelectItem>
+                    <SelectItem value="">Todas</SelectItem>
                     <SelectItem value="a+">A+</SelectItem>
                     <SelectItem value="a">A</SelectItem>
                     <SelectItem value="b+">B+</SelectItem>
@@ -265,7 +256,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="">Todos</SelectItem>
                     <SelectItem value="nuevo">Nuevo</SelectItem>
                     <SelectItem value="contactado">Contactado</SelectItem>
                     <SelectItem value="no_response">No Response</SelectItem>
