@@ -1864,6 +1864,47 @@ export type Database = {
         }
         Relationships: []
       }
+      hour_bank: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          hours: number
+          id: string
+          movement_type: string
+          reason: string | null
+          reference_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          hours: number
+          id?: string
+          movement_type?: string
+          reason?: string | null
+          reference_date?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          hours?: number
+          id?: string
+          movement_type?: string
+          reason?: string | null
+          reference_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hour_bank_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_notes: {
         Row: {
           created_at: string
@@ -3003,6 +3044,59 @@ export type Database = {
           whaticket_url?: string
         }
         Relationships: []
+      }
+      work_schedules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          description: string | null
+          end_date: string
+          end_time: string | null
+          id: string
+          schedule_type: string
+          start_date: string
+          start_time: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          end_date: string
+          end_time?: string | null
+          id?: string
+          schedule_type?: string
+          start_date: string
+          start_time?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          schedule_type?: string
+          start_date?: string
+          start_time?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

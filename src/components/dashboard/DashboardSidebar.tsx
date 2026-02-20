@@ -71,7 +71,7 @@ const DashboardSidebar = () => {
         { title: "Ausencias", url: "/hr/ausencias" },
         { title: "Vacaciones", url: "/hr/vacaciones" },
         { title: "Permisos", url: "/hr/permisos" },
-        { title: "Horarios y Turnos", url: null },
+        { title: "Horarios y Turnos", url: "/hr/horarios" },
       ],
     },
     {

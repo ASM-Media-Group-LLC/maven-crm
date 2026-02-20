@@ -66,6 +66,9 @@ import HRLayout from "./pages/hr/HRLayout";
 import HRAttendance from "./pages/hr/HRAttendance";
 import HRVacations from "./pages/hr/HRVacations";
 import HRPermisos from "./pages/hr/HRPermisos";
+import HRSchedules from "./pages/hr/HRSchedules";
+import HROvertimeDetail from "./pages/hr/HROvertimeDetail";
+import HRHourBank from "./pages/hr/HRHourBank";
 
 const queryClient = new QueryClient();
 
@@ -137,6 +140,9 @@ const App = () => (
               <Route path="/hr/asistencia" element={<ProtectedRoute><HRLayout><HRAttendance /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/vacaciones" element={<ProtectedRoute><HRLayout><HRVacations /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/permisos" element={<ProtectedRoute><HRLayout><HRPermisos /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/horarios" element={<ProtectedRoute><HRLayout><HRSchedules /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/horarios/horas-extras" element={<ProtectedRoute><HRLayout><HROvertimeDetail /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/horarios/banco-horas" element={<ProtectedRoute><HRLayout><HRHourBank /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
