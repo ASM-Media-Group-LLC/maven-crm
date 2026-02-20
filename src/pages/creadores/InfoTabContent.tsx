@@ -39,7 +39,7 @@ const countryOptions = [
   "República Dominicana", "Uruguay", "Venezuela",
 ];
 
-const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Otra"];
+const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
 const categoryOptions = ["A+", "A", "B+", "B", "C"];
 const managerOptions = ["Full Management", "Hybrid", "Basic"];
 
