@@ -1,104 +1,80 @@
 
-## Mejoras al Dashboard de RRHH: Header, KPI Cards, Quick Actions configurables y Resumen del Equipo
+## Rediseño de la sección "Acciones Rápidas"
 
-### Diagnóstico
+### Estado actual vs. referencia visual
 
-**Problema 1 — Header no coincide con el estándar de la plataforma**
-El dashboard HR usa `HRPageHeader` (un div simple con icono cuadrado `bg-primary/10`) mientras que el resto de páginas usa un patrón estándar: `<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">` con `h2` bold, subtítulo y botones de acción a la derecha. No hay icono cuadrado en el header estándar.
+**Actual:** Cuatro botones `variant="outline"` de `h-10` pequeños con ícono + texto, sin distinción visual.
 
-**Problema 2 — KPI Cards sin el efecto hover de la plataforma**
-`HRMetricCard` no tiene animaciones. El patrón estándar (`DashboardMetricCard`) incluye `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-{color}/15 hover:border-{color}/40 transition-all duration-200`.
+**Referencia (imagen):** Cuatro tarjetas grandes tipo card con:
+- Fondo con borde sutil y esquinas redondeadas
+- Ícono del módulo a la izquierda con fondo de color `primary/10` (igual al cuadro del ícono en las KPI cards)
+- Texto del label en `font-medium`
+- Flecha `ChevronRight` a la derecha
+- Hover con elevación sutil y borde resaltado (patrón estándar de la plataforma)
+- Encabezado de sección con ícono ⚡ (Zap) + título "Acciones Rápidas" + subtítulo descriptivo + engranaje de config a la derecha
 
-**Problema 3 — Quick Actions fijas, no configurables**
-La sección de acciones rápidas está hardcodeada. El usuario quiere poder elegir qué atajos mostrar.
+### Cambios específicos en `src/pages/hr/HRDashboard.tsx`
 
-**Problema 4 — Resumen del Equipo incompleto**
-Solo muestra 4 mini-cards planas (Activos, En Licencia, Nuevos, Total). No refleja el estado completo de la plantilla (vacaciones, inactivos, terminados, etc.).
+#### 1. Encabezado de la sección
 
----
+Cambiar de una fila simple con label uppercase a un encabezado con ícono + título + subtítulo (idéntico al que muestra la imagen de referencia):
 
-### Cambios Propuestos
+```
+[⚡] Acciones Rápidas                                   [⚙]
+Configura los atajos a las funciones que más utilizas en tu día a día
+```
 
-#### 1. Header estándar (sin `HRPageHeader`)
-Reemplazar `HRPageHeader` con el patrón estándar de la plataforma:
+Usando:
+- `Zap` icon con `text-primary`
+- Título `text-base font-semibold`
+- Subtítulo `text-sm text-muted-foreground`
+- Botón de configuración con solo el ícono `Settings2` (sin texto)
 
-```text
-<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
-  <div className="flex items-center justify-between">
-    <div>
-      <h2 className="text-2xl font-bold tracking-tight">Dashboard RRHH</h2>
-      <p className="text-sm text-muted-foreground">Vista general de recursos humanos</p>
-    </div>
-    <div className="flex items-center gap-2">
-      <Button onClick={() => navigate("/hr/empleado/nuevo")}>+ Nuevo Empleado</Button>
-    </div>
+#### 2. Cards de acción (reemplazar `<Button>` por tarjetas card)
+
+Cada acción pasa de ser un `<Button variant="outline">` a un `<div>` con estilos de tarjeta interactiva:
+
+```tsx
+<div
+  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer
+             hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px]
+             transition-all duration-200 group"
+  onClick={() => action.url && navigate(action.url)}
+>
+  {/* Ícono con fondo */}
+  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+    <action.icon className="h-5 w-5 text-primary" />
   </div>
-</header>
+
+  {/* Label */}
+  <span className="flex-1 text-sm font-medium">{action.label}</span>
+
+  {/* Arrow */}
+  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+</div>
 ```
 
-#### 2. KPI Cards con efecto hover (patrón `DashboardMetricCard`)
-Reemplazar `HRMetricCard` por `DashboardMetricCard` (que ya tiene el hover premium) en las 4 tarjetas superiores:
+Grid: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3`
 
-| Card | Color hover |
-|---|---|
-| Total Empleados | `primary` |
-| Check-ins Hoy | `success` |
-| Ausencias Pend. | `warning` |
-| En Onboarding | `accent` |
+#### 3. Iconos más representativos por acción
 
-Cada card tendrá el patrón:
-```
-hover:scale-[1.03] hover:bg-gradient-to-br hover:from-{color}/15 hover:border-{color}/40 transition-all duration-200
-```
+Actualizar el catálogo de acciones con íconos más descriptivos para cada módulo:
 
-#### 3. Quick Actions configurables (modal de preferencias)
-Implementar un sistema de accesos directos personalizables guardados en `localStorage` bajo la clave `hr_quick_actions`:
-
-**Comportamiento:**
-- Se muestran máximo 4 accesos directos en la barra
-- Un botón de engranaje (⚙) en la esquina de la sección abre un modal de configuración
-- En el modal se muestra el **catálogo completo** de acciones HR disponibles (8 opciones) con checkboxes
-- El usuario activa/desactiva hasta 4 atajos
-- Al guardar, se persiste en `localStorage`
-
-**Catálogo de acciones disponibles:**
-```
-Registrar Ausencia → /hr/ausencias
-Ver Directorio     → /hr/directorio
-Agregar Empleado   → /hr/empleado/nuevo
-Ver Candidatos     → /hr/candidatos
-Ver Incidentes     → /hr/incidentes
-Ver Capacitación   → /hr/capacitacion
-Ver Desempeño      → /hr/desempeno
-Ver Dashboard      → /hr
-```
-Las acciones sin URL real (Asistencia, Vacaciones, Horarios) se marcan como "próximamente" y no se pueden seleccionar.
-
-#### 4. Resumen del Equipo mejorado — "Estado Actual de la Plantilla"
-
-Renombrar la sección como **"Estado Actual de la Plantilla"** y expandir de 4 a 6 mini-cards cubriendo todos los estados posibles:
-
-| Card | Dato | Color |
+| Acción | Ícono actual | Ícono propuesto |
 |---|---|---|
-| Activos | `status === "activo"` | `success` (verde) |
-| En Licencia | `status === "en_licencia"` | `warning` (amarillo) |
-| Vacaciones | `status === "vacaciones"` | `blue` |
-| Inactivos | `status === "inactivo"` | `destructive` (rojo) |
-| Nuevos (30d) | `hire_date >= 30d ago` | `primary` (azul) |
-| Total Plantilla | `employees.length` | `muted` |
+| Registrar Ausencia | `AlertTriangle` | `CalendarDays` |
+| Ver Directorio | `Users` | `Users` (ok) |
+| Agregar Empleado | `UserPlus` | `UserPlus` (ok) |
+| Ver Candidatos | `Briefcase` | `Briefcase` (ok) |
+| Ver Incidentes | `AlertTriangle` | `ShieldAlert` |
+| Ver Capacitación | `BookOpen` | `BookOpen` (ok) |
+| Ver Desempeño | `TrendingUp` | `TrendingUp` (ok) |
+| Ver Asistencia | `Activity` | `ClipboardCheck` |
 
-Cada mini-card incluye:
-- Ícono descriptivo a la izquierda
-- Label en muted-foreground
-- Valor grande en el color semántico
-- Porcentaje del total como subtexto (ej. "42% del total")
+### Archivo a modificar
 
----
-
-### Archivos a modificar
-
-| Archivo | Cambio |
+| Archivo | Sección modificada |
 |---|---|
-| `src/pages/hr/HRDashboard.tsx` | Header estándar, KPI hover, Quick Actions configurables, Resumen del Equipo expandido |
+| `src/pages/hr/HRDashboard.tsx` | Lines 258–285 (sección Quick Actions) y catálogo ALL_ACTIONS |
 
-No se crean archivos nuevos. El modal de configuración de atajos se implementa inline en el mismo archivo usando el componente `Dialog` de Shadcn ya disponible. La persistencia usa `localStorage` sin necesidad de base de datos.
+No se tocan otras secciones del dashboard ni otros archivos.
