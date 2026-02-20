@@ -182,8 +182,8 @@ export default function HRDashboard() {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Dashboard RRHH</h2>
-            <p className="text-sm text-muted-foreground">Vista general de recursos humanos</p>
+            <h2 className="text-2xl font-bold tracking-tight">Recursos Humanos</h2>
+            <p className="text-sm text-muted-foreground">Panel de control del equipo</p>
           </div>
           <Button onClick={() => navigate("/hr/empleado/nuevo")} size="sm">
             + Nuevo Empleado
@@ -257,40 +257,44 @@ export default function HRDashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <div>
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary shrink-0" />
-              <div>
-                <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
-                <p className="text-sm text-muted-foreground mt-0.5">Configura los atajos a las funciones que más utilizas en tu día a día</p>
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {activeActions.map((action) => (
-              <div
-                key={action.id}
-                className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
-                onClick={() => action.url && navigate(action.url)}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <action.icon className="h-5 w-5 text-primary" />
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary shrink-0" />
+                <div>
+                  <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Configura los atajos a las funciones que más utilizas en tu día a día</p>
                 </div>
-                <span className="flex-1 text-sm font-medium">{action.label}</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
-            ))}
-            {activeActions.length === 0 && (
-              <p className="col-span-4 text-sm text-muted-foreground text-center py-4">
-                No hay accesos configurados. Haz clic en el engranaje para agregar.
-              </p>
-            )}
-          </div>
-        </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {activeActions.map((action) => (
+                <div
+                  key={action.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
+                  onClick={() => action.url && navigate(action.url)}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <action.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="flex-1 text-sm font-medium">{action.label}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              ))}
+              {activeActions.length === 0 && (
+                <p className="col-span-4 text-sm text-muted-foreground text-center py-4">
+                  No hay accesos configurados. Haz clic en el engranaje para agregar.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Solicitudes + Módulos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
