@@ -151,7 +151,7 @@ const OnboardingContent = () => {
                 <Button
                   key={tab}
                   size="sm"
-                  variant={activeTab === tab ? "default" : "ghost"}
+                  variant={activeTab === tab ? "secondary" : "ghost"}
                   onClick={() => setActiveTab(tab)}
                 >
                   {tab}

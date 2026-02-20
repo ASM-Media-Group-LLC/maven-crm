@@ -183,7 +183,7 @@ export default function EmployeeNew() {
       {/* Scrollable content */}
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 overflow-auto px-6 py-6">
-          <div className="max-w-3xl mx-auto">
+          <div>
             {/* Step 1: Personal Info */}
             {step === 1 && (
               <Card>
@@ -449,7 +449,7 @@ export default function EmployeeNew() {
 
         {/* Fixed footer */}
         <div className="shrink-0 border-t bg-background px-6 py-4">
-          <div className="flex items-center justify-between max-w-3xl mx-auto">
+          <div className="flex items-center justify-between">
             <Button type="button" variant="outline" size="sm" onClick={() => navigate("/hr/directorio")}>
               Cancelar
             </Button>
