@@ -406,29 +406,27 @@ export default function HRPermisos() {
         </div>
 
         {/* Department tabs */}
-        {activeDepts.length > 0 && (
-          <div className="flex flex-wrap gap-1 items-center">
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="flex flex-wrap gap-1 items-center">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            <Button
+              variant={!deptFilter ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setDeptFilter("")}
+            >
+              Todos
+            </Button>
+            {departments.map((d) => (
               <Button
-                variant={!deptFilter ? "secondary" : "ghost"}
+                key={d.id}
+                variant={deptFilter === d.id ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setDeptFilter("")}
+                onClick={() => setDeptFilter(d.id)}
               >
-                Todos
+                {d.name}
               </Button>
-              {activeDepts.map((d) => (
-                <Button
-                  key={d.id}
-                  variant={deptFilter === d.id ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setDeptFilter(d.id)}
-                >
-                  {d.name}
-                </Button>
-              ))}
-            </div>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
