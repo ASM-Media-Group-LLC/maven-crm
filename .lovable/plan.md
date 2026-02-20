@@ -1,177 +1,125 @@
 
-## Plan: Eliminar Licencias + Construir módulo Permisos completo + Fix de filtros
+## Arquitectura robusta: Vinculación Empleado ↔ Usuario de plataforma
 
-### Contexto del estado actual
+### El problema de fondo
 
-- `Licencias` en el sidebar tiene `url: null` — no existe página, solo es un placeholder. Se elimina del sidebar.
-- `Permisos` en el sidebar tiene `url: null` — tampoco existe. Se construye desde cero.
-- No existe ningún archivo `HRPermisos.tsx` ni `HRLicencias.tsx`.
-- El problema de filtros en `HRAbsences.tsx` y `HRVacations.tsx`: los selects están inicializados con `value="all"` y tienen un `<SelectItem value="all">Todos los tipos</SelectItem>`. Esto hace que Radix UI muestre el texto del item seleccionado ("Todos los tipos"), **no** el placeholder. El placeholder en Shadcn/Radix solo se muestra cuando el valor es `undefined` o `""`.
+Actualmente `employees.profile_id` existe en la base de datos pero **nunca se usa en la UI**. Esto crea una brecha peligrosa:
 
-### Problema de filtros — Fix estándar
+- Un empleado puede existir sin cuenta de plataforma → OK (ej: operario sin acceso)
+- Un usuario de plataforma puede existir sin ficha de empleado → OK (ej: admin externo)
+- Pero **no hay forma de conectarlos**, lo que significa que cuando un empleado tiene cuenta, el sistema no lo sabe y los módulos de HR no saben quién está logueado
 
-El patrón correcto para que el Select muestre el nombre de la categoría como placeholder por defecto:
-
-```tsx
-// ANTES — muestra "Todos los tipos" o "Todos" (texto del SelectItem con value="all")
-const [typeFilter, setTypeFilter] = useState("all");
-<Select value={typeFilter} onValueChange={setTypeFilter}>
-  <SelectTrigger><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">Todos los tipos</SelectItem>
-    ...
-  </SelectContent>
-</Select>
-
-// DESPUÉS — muestra "Tipo de Falta" (placeholder) cuando no hay filtro activo
-const [typeFilter, setTypeFilter] = useState("");
-<Select value={typeFilter} onValueChange={setTypeFilter}>
-  <SelectTrigger><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
-  <SelectContent>
-    <SelectItem value="">Todos</SelectItem>  {/* ← value="" dispara reset */}
-    ...
-  </SelectContent>
-</Select>
-// En el filtrado: matchType = !typeFilter || a.absence_type === typeFilter
-```
-
-Este fix aplica a **`HRAbsences.tsx`** (Tipo de Falta + Estado) y a **`HRVacations.tsx`** (Estado), y se implementará también en el nuevo módulo de Permisos desde el inicio.
+La solución es implementar el vínculo `profile_id` de forma visible y manejable en la UI, sin forzar que todo empleado tenga usuario ni viceversa.
 
 ---
 
-### Módulo Permisos — Tabla de datos
-
-Se reutiliza la tabla `absences` filtrando por `absence_type IN (tipos de permiso)`. No se requiere migración.
-
-Los tipos de permiso son:
-- `permiso_remoto` — Trabajo Remoto
-- `salida_temprana` — Salida Temprana
-- `llegada_tarde` — Llegada Tarde
-- `permiso_personal` — Permiso Personal
-- `permiso_medico` — Permiso Médico
-- `permiso_academico` — Permiso Académico
-- `permiso_diligencia` — Diligencia Personal
-
-Estos coinciden con los tipos mostrados en la imagen de referencia (el badge "Trabajo Remoto" y "Salida Temprana" son visibles).
-
----
-
-### Estructura del módulo Permisos (`HRPermisos.tsx`)
+### Regla de negocio establecida
 
 ```text
-<div className="flex flex-col h-full overflow-hidden">
-  ┌─ Header shrink-0 ─────────────────────────────────────────┐
-  │  [🕐] Permisos              [+ Solicitar Permiso]         │
-  │  Gestiona las solicitudes de permisos de horario          │
-  └───────────────────────────────────────────────────────────┘
-  ┌─ flex-1 overflow-auto p-6 ────────────────────────────────┐
-  │  KPI Cards: Total | Pendientes | Aprobados | Este Mes     │
-  │                                                           │
-  │  Department tabs: Todos | Ventas | LeadGen | ...          │
-  │                                                           │
-  │  Filter row: [🔍] [Tipo de Permiso ▾] [Estado ▾] [📅] [≡⊞] │
-  │  "Mostrando X de Y registros"                             │
-  │                                                           │
-  │  Tabla / Grid (sticky header, sticky acciones)            │
-  └───────────────────────────────────────────────────────────┘
-</div>
-```
+EMPLEADO  ──[profile_id opcional]──►  PROFILE (usuario de plataforma)
 
-**KPI Cards (4):**
-
-| Card | Valor | Icono | Color |
-|---|---|---|---|
-| Total | `count(all)` | `FileText` | `primary` |
-| Pendientes | `status === 'pending'` | `Clock` | `warning` |
-| Aprobados | `status === 'approved'` | `CheckCircle2` | `success` |
-| Este Mes | Registros del mes actual | `CalendarDays` | `primary` |
-
-**Columnas de tabla (según imagen de referencia):**
-
-| Columna | Detalle |
-|---|---|
-| Empleado | Avatar iniciales + nombre bold + correo debajo |
-| Tipo | Badge de color con icono (Trabajo Remoto, Salida Temprana, etc.) |
-| Fecha | Fecha formateada (una sola fecha para permisos, no rango) |
-| Horario | Campo `notes` con el horario (ej. "14:00") |
-| Motivo | Texto truncado |
-| Estado | Badge: Pendiente / Aprobado / Rechazado |
-| Acciones | ✓ + ✗ + 👁 si pending; solo 👁 si no |
-
-**Vista Grid:** Cards con misma info que la tabla.
-
-**Modal "Solicitar Permiso"** (patrón `!flex !flex-col gap-0`):
-- Empleado (`EmployeeSearchCombobox`)
-- Tipo de Permiso (`Select` con los 7 tipos)
-- Fecha (`Popover` + `Calendar` — un solo día, no rango)
-- Horario (campo `notes` — Input de texto, ej. "14:00 - 17:00")
-- Motivo (`Textarea`)
-- Botón CTA: `variant="default"` — "Crear Solicitud"
-
-**Filtros con fix de placeholder:**
-- Búsqueda: `Buscar por nombre o mot...`
-- Tipo de Permiso: placeholder "Tipo de Permiso" (no "Todos los tipos")
-- Estado: placeholder "Estado" (no "Todos")
-- DateRangePicker o fecha puntual para filtrar
-- Toggle Lista/Grid
-
----
-
-### Archivos a crear / modificar
-
-| Archivo | Operación | Detalle |
-|---|---|---|
-| `src/pages/hr/HRPermisos.tsx` | **Crear** | Módulo completo de permisos |
-| `src/lib/hrConstants.ts` | **Modificar** | Agregar `PERMISSION_TYPES` array con los 7 tipos |
-| `src/App.tsx` | **Modificar** | Agregar import + ruta `/hr/permisos` |
-| `src/components/dashboard/DashboardSidebar.tsx` | **Modificar** | Eliminar "Licencias", activar "Permisos" → `/hr/permisos` |
-| `src/pages/hr/HRAbsences.tsx` | **Modificar** | Fix filtros: `"all"` → `""` en `typeFilter` y `statusFilter` |
-| `src/pages/hr/HRVacations.tsx` | **Modificar** | Fix filtro: `"all"` → `""` en `statusFilter` |
-
----
-
-### Fix de lógica de filtrado tras cambio de valor vacío
-
-Tras el cambio de `"all"` a `""`:
-
-```tsx
-// HRAbsences — filtered useMemo
-const matchType = !typeFilter || a.absence_type === typeFilter;
-const matchStatus = !statusFilter || a.status === statusFilter;
-
-// HRPermisos — mismo patrón
-const matchType = !typeFilter || a.absence_type === typeFilter;
-const matchStatus = !statusFilter || a.status === statusFilter;
+Caso A: Empleado SIN usuario        → ficha HR existe, sin acceso a plataforma
+Caso B: Empleado CON usuario        → profile_id apunta a profiles.id
+Caso C: Usuario SIN empleado        → admin externo, sin ficha HR
 ```
 
 ---
 
-### Datos para el modal de permisos
+### Cambios de UI a implementar
 
-El modal guarda en `absences` con:
-- `absence_type`: valor del tipo seleccionado (ej. `"permiso_remoto"`)
-- `start_date` = `end_date`: la fecha del permiso (un solo día)
-- `total_days`: 1
-- `notes`: el horario capturado (ej. "14:00 - 17:00")
-- `reason`: el motivo ingresado
-- `status`: `'pending'`
+#### 1. Panel de Empleado — Tab "Acceso a Plataforma" (nuevo)
+
+En `EmployeeProfile.tsx`, agregar una pestaña nueva llamada **"Acceso"** que muestre:
+
+- Si `profile_id` está null → Card con estado "Sin acceso a plataforma" + botón "Vincular usuario"
+- Si `profile_id` existe → Card con estado "Acceso activo" mostrando nombre y rol del usuario vinculado + botón "Desvincular"
+
+Un `Popover` + combobox de búsqueda permite seleccionar un `profile` existente de la tabla `profiles` para vincularlo.
+
+La vinculación guarda `profile_id` en la fila `employees` vía `supabase.from("employees").update({ profile_id })`.
+
+#### 2. Formulario Nuevo Empleado — Paso opcional "Acceso"
+
+En `EmployeeNew.tsx`, agregar un **Paso 5 opcional** al final del wizard con título "Acceso a Plataforma (opcional)":
+- Combobox para buscar y vincular un usuario existente
+- O dejar en blanco si el empleado no tendrá acceso
+
+#### 3. Panel de Admin Usuarios — Columna "Empleado vinculado"
+
+En `UsersTable.tsx` y `UsersGrid.tsx`, agregar una columna/info que muestre si ese usuario de plataforma tiene un empleado vinculado:
+
+- Si tiene → pequeño badge con el nombre del empleado + link a su perfil `/hr/empleado/{id}`
+- Si no → texto "Sin ficha HR" en muted
+
+Esto requiere que `useAdminUsers` consulte también `employees` buscando `profile_id` que coincida con cada `profiles.id`.
+
+#### 4. Fix de filtros en `EmployeeDirectory.tsx`
+
+Los selects de `deptFilter` y `statusFilter` usan `value="all"` con `<SelectItem value="all">`, el mismo bug que ya corregimos en HRAbsences. Aplicar el mismo patrón `__all__` + sentinel value.
 
 ---
 
-### Colores semánticos de badges por tipo de permiso
+### Nuevo hook `useProfileEmployeeLink`
 
-| Tipo | Color badge |
+```ts
+// Verifica si un profile_id ya tiene empleado vinculado
+// Obtiene lista de profiles sin empleado vinculado (para el combobox)
+export function useUnlinkedProfiles() { ... }
+export function useLinkEmployeeProfile(employeeId) { ... }
+export function useUnlinkEmployeeProfile(employeeId) { ... }
+```
+
+---
+
+### Qué NO se toca (para mantener consistencia)
+
+- No se modifican las migraciones de DB (profile_id ya existe en employees)
+- No se cambia el sistema de auth ni los roles
+- No se sincronizan datos entre empleado y usuario (son entidades separadas que se vinculan, no se fusionan)
+- Los módulos de HR (asistencia, permisos, ausencias) siguen usando `employee_id` como referencia primaria — esto es correcto y no cambia
+
+---
+
+### Archivos a modificar
+
+| Archivo | Cambio |
 |---|---|
-| permiso_remoto | azul/blue |
-| salida_temprana | naranja/amber |
-| llegada_tarde | naranja/orange |
-| permiso_personal | violeta/violet |
-| permiso_medico | verde/emerald |
-| permiso_academico | cian/cyan |
-| permiso_diligencia | rosa/rose |
+| `src/hooks/useEmployees.ts` | Agregar `useUnlinkedProfiles`, `useLinkEmployeeProfile`, `useUnlinkEmployeeProfile`; actualizar `EmployeeWithRelations` con `profile_id` |
+| `src/pages/hr/EmployeeProfile.tsx` | Agregar tab "Acceso" con estado de vinculación y combobox para vincular/desvincular |
+| `src/pages/hr/EmployeeNew.tsx` | Agregar paso 5 opcional de acceso; también fix `type="date"` → Popover + Calendar |
+| `src/pages/admin/useAdminUsers.ts` | Enriquecer query con datos del empleado vinculado (join employees por profile_id) |
+| `src/pages/admin/UsersTable.tsx` | Agregar columna "Empleado" con badge de vínculo |
+| `src/pages/admin/UsersGrid.tsx` | Agregar info de empleado vinculado en las cards |
+| `src/pages/hr/EmployeeDirectory.tsx` | Fix filtros `deptFilter`/`statusFilter` con patrón `__all__` |
 
 ---
 
-### No requiere migración de base de datos
+### Indicador visual del vínculo (EmployeeProfile — Tab Acceso)
 
-La tabla `absences` ya soporta cualquier `absence_type` (campo de texto libre). Los nuevos tipos de permiso se almacenan como nuevos valores en ese campo. El filtro en la query excluye tipos de ausencia ya usados por HRAbsences (`enfermedad`, `accidente`, etc.) y tipos usados por HRVacations (`vacaciones`, `dia_personal`), usando `.in("absence_type", PERMISSION_TYPES.map(t => t.value))`.
+```text
+┌─ Tab: Acceso a Plataforma ──────────────────────────────────┐
+│                                                             │
+│  ┌─ Card ──────────────────────────────────────────────┐   │
+│  │  [🔗] Estado de Acceso                              │   │
+│  │                                                     │   │
+│  │  SIN VÍNCULO:                                       │   │
+│  │  ● Sin acceso a plataforma                          │   │
+│  │  "Este empleado no tiene cuenta de usuario          │   │
+│  │   vinculada. Puede operar sin acceso o puede        │   │
+│  │   vincularse a un usuario existente."               │   │
+│  │  [Vincular usuario existente ▾]                     │   │
+│  │                                                     │   │
+│  │  CON VÍNCULO:                                       │   │
+│  │  ● Acceso activo                                    │   │
+│  │  Avatar + Nombre del usuario                        │   │
+│  │  Rol: [badge admin/manager/employee]                │   │
+│  │  [Desvincular]                                      │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Nota sobre `EmployeeNew.tsx` y `type="date"`
+
+Los campos `hire_date` y `birth_date` actualmente usan `<Input type="date" />` que viola el design system (se debe usar Popover + Shadcn Calendar). Se corregirán en el mismo paso, siguiendo la memoria de constraints registrada.
