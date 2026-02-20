@@ -1,22 +1,17 @@
 
 
-## Alinear checkbox con su label
-
-El checkbox y el texto "Confirmo que los datos proporcionados son correctos" no estan alineados verticalmente porque el contenedor usa `items-start`, lo que empuja el checkbox hacia arriba respecto al texto.
+## Renombrar servicios en el paso 4 del Onboarding
 
 ### Cambio
 
-**Archivo:** `src/pages/creadores/onboarding/steps/Step2Documentation.tsx` (linea 100)
+**Archivo:** `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx` (lineas 14 y 16)
 
-Cambiar `items-start` por `items-center` en el div contenedor del checkbox:
+Dos cambios de texto en el array `SERVICES`:
 
-```tsx
-// Antes
-<div className="flex items-start gap-3 pt-2">
+| Linea | Antes | Despues |
+|---|---|---|
+| 14 | `{ key: "cat_4", label: "Categoría 4" }` | `{ key: "cat_4", label: "Backdoor" }` |
+| 16 | `{ key: "valoracion_medios", label: "Valoración de Medios" }` | `{ key: "valoracion_medios", label: "D-Rating" }` |
 
-// Despues
-<div className="flex items-center gap-3 pt-2">
-```
-
-Esto centra verticalmente el checkbox con la primera linea del label.
+Las keys se mantienen iguales para no romper datos ya guardados en la columna `precios_contenido` de la base de datos. Solo cambia el texto visible en la UI.
 
