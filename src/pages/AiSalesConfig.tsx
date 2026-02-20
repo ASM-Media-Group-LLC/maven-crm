@@ -1,5 +1,14 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +51,19 @@ const AiSalesConfig = () => {
           <DashboardTopbar />
 
           <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+            <Breadcrumb className="mb-3">
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link to="/aisales">IA Ventas</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Configuración</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">Configuración AI Sales</h1>
