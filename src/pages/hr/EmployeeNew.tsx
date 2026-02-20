@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { ChevronLeft, ChevronRight, Check, CalendarIcon, Search, Link2, ArrowLeft } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -158,24 +159,25 @@ export default function EmployeeNew() {
       </div>
 
       {/* Stepper */}
-      <div className="shrink-0 border-b bg-background px-6 py-3">
-        <div className="flex items-center gap-0 max-w-3xl mx-auto">
+      <div className="shrink-0 border-b bg-background px-6 py-3 space-y-3">
+        <div className="flex items-center gap-0">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center flex-1 last:flex-none">
               <button
                 type="button"
                 onClick={() => setStep(s.id)}
-                className={cn("flex items-center gap-2 text-sm font-medium transition-colors", step === s.id ? "text-primary" : step > s.id ? "text-primary/70" : "text-muted-foreground")}
+                className={cn("flex items-center gap-2 text-sm font-medium transition-colors", step === s.id ? "text-foreground" : step > s.id ? "text-foreground/70" : "text-muted-foreground")}
               >
-                <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-primary bg-primary text-primary-foreground" : step > s.id ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground")}>
+                <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30" : step > s.id ? "border-transparent bg-gradient-to-r from-accent to-primary text-white" : "border-muted-foreground/30 text-muted-foreground")}>
                   {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
                 </span>
                 <span className="hidden sm:inline">{s.label}</span>
               </button>
-              {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-primary" : "bg-border")} />}
+              {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-gradient-to-r from-accent to-primary" : "bg-border")} />}
             </div>
           ))}
         </div>
+        <Progress value={(step / STEPS.length) * 100} className="h-1.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
       </div>
 
       {/* Scrollable content */}
