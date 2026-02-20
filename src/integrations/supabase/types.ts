@@ -1897,6 +1897,42 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string | null
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       of_gross_earnings: {
         Row: {
           active_fans: number | null

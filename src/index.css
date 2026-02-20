@@ -244,3 +244,12 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   100% { transform: translate(0%, -3%) scale(1); }
 }
 
+/* Badge glow animation for pending verification */
+@keyframes badge-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--warning) / 0.4); }
+  50% { box-shadow: 0 0 8px 2px hsl(var(--warning) / 0.3); }
+}
+.badge-pending-verification {
+  animation: badge-glow 2s ease-in-out infinite;
+}
+

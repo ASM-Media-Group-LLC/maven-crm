@@ -179,7 +179,17 @@ export default function OnboardingWizard({ onCancel }: Props) {
     }
 
     try {
-      await addCreador.mutateAsync(buildPayload(isDraft));
+      const createdId = await addCreador.mutateAsync(buildPayload(isDraft));
+      // Create notification when onboarding is completed (not draft)
+      if (!isDraft && createdId) {
+        await supabase.from("notifications").insert({
+          type: "onboarding_complete",
+          title: "Nueva modelo ha completado el onboarding",
+          message: `${step1.name} ha completado el proceso de onboarding y está pendiente de verificación.`,
+          reference_id: createdId,
+          reference_type: "creator",
+        });
+      }
       toast({ title: isDraft ? "Borrador guardado" : "Onboarding completado exitosamente" });
       resetAndClose();
     } catch (err: any) {

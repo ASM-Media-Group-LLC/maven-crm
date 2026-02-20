@@ -35,6 +35,8 @@ const statusLabel: Record<string, string> = {
   leaving: "Retiro",
   terminated: "Terminada",
   paused: "Pausada",
+  pendiente_verificacion: "Pendiente Verificación",
+  borrador: "Borrador",
 };
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
@@ -43,6 +45,8 @@ const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-s
   leaving: "warning-soft",
   terminated: "destructive-soft",
   paused: "secondary-soft",
+  pendiente_verificacion: "warning-soft",
+  borrador: "secondary-soft",
 };
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -176,7 +180,10 @@ const CreadoresTable = ({ creators }: Props) => {
                   onClick={() => setStatusChangeCreator(c)}
                   className="flex items-center gap-1 focus:outline-none cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  <Badge variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}>
+                  <Badge
+                    variant={statusVariant[c.status ?? ""] ?? "secondary-soft"}
+                    className={c.status === "pendiente_verificacion" ? "badge-pending-verification" : ""}
+                  >
                     {statusLabel[c.status ?? ""] ?? c.status ?? "—"}
                   </Badge>
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />

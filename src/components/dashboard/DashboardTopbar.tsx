@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Search, Sun, Moon, LogOut, KeyRound, Globe, Check } from "lucide-react";
+import { Bell, Search, Sun, Moon, LogOut, KeyRound, Globe, Check, UserCheck, FileText, CheckCheck } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,11 +8,15 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useNotifications } from "@/hooks/useNotifications";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ChangePasswordModal from "./ChangePasswordModal";
 import GlobalSearchCommand from "./GlobalSearchCommand";
 
@@ -22,6 +26,7 @@ const DashboardTopbar = () => {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const { t, language, setLanguage } = useLanguage();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [mounted, setMounted] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -95,14 +100,67 @@ const DashboardTopbar = () => {
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="relative text-muted-foreground">
                 <Bell className="h-5 w-5" />
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
-                  0
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-4">
-              <p className="text-sm font-medium mb-2">{t("topbar.notifications")}</p>
-              <p className="text-xs text-muted-foreground">{t("topbar.noNotifications")}</p>
+            <PopoverContent align="end" className="w-80 p-0">
+              <div className="flex items-center justify-between p-3 border-b">
+                <p className="text-sm font-medium">{t("topbar.notifications")}</p>
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => markAllAsRead.mutate()}
+                  >
+                    <CheckCheck className="h-3 w-3" />
+                    Marcar todas
+                  </Button>
+                )}
+              </div>
+              <ScrollArea className="max-h-72">
+                {notifications.length === 0 ? (
+                  <p className="text-xs text-muted-foreground p-4 text-center">{t("topbar.noNotifications")}</p>
+                ) : (
+                  <div className="divide-y">
+                    {notifications.slice(0, 20).map((n) => {
+                      const icon = n.type === "onboarding_complete" ? (
+                        <UserCheck className="h-4 w-4 text-primary shrink-0" />
+                      ) : n.type.includes("document") ? (
+                        <FileText className="h-4 w-4 text-warning shrink-0" />
+                      ) : (
+                        <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
+                      );
+                      return (
+                        <button
+                          key={n.id}
+                          className={`w-full flex items-start gap-3 p-3 text-left hover:bg-muted/50 transition-colors ${!n.is_read ? "bg-primary/5" : ""}`}
+                          onClick={() => {
+                            if (!n.is_read) markAsRead.mutate(n.id);
+                            if (n.reference_type === "creator" && n.reference_id) {
+                              navigate(`/creadores/${n.reference_id}`);
+                            }
+                          }}
+                        >
+                          {icon}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs leading-tight ${!n.is_read ? "font-semibold" : ""}`}>{n.title}</p>
+                            {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: es })}
+                            </p>
+                          </div>
+                          {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
             </PopoverContent>
           </Popover>
 

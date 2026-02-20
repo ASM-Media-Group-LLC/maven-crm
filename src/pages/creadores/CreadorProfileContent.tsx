@@ -20,6 +20,7 @@ import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
 import ChangeStatusModal from "./ChangeStatusModal";
+import VerificationSection from "./VerificationSection";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -27,6 +28,8 @@ const statusLabel: Record<string, string> = {
   leaving: "Retiro",
   terminated: "Terminada",
   paused: "Pausada",
+  pendiente_verificacion: "Pendiente Verificación",
+  borrador: "Borrador",
 };
 
 const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "destructive-soft" | "secondary-soft"> = {
@@ -35,6 +38,8 @@ const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-s
   leaving: "warning-soft",
   terminated: "destructive-soft",
   paused: "secondary-soft",
+  pendiente_verificacion: "warning-soft",
+  borrador: "secondary-soft",
 };
 
 const countryToCode: Record<string, string> = {
@@ -165,6 +170,10 @@ const CreadorProfileContent = () => {
           </div>
         </div>
       </div>
+
+      {c.status && (
+        <VerificationSection creatorId={id!} creatorName={c.name} currentStatus={c.status} />
+      )}
 
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="operaciones">
