@@ -69,7 +69,7 @@ const DashboardSidebar = () => {
       items: [
         { title: "Asistencia", url: "/hr/asistencia" },
         { title: "Ausencias", url: "/hr/ausencias" },
-        { title: "Vacaciones", url: null },
+        { title: "Vacaciones", url: "/hr/vacaciones" },
         { title: "Licencias", url: null },
         { title: "Permisos", url: null },
         { title: "Horarios y Turnos", url: null },
