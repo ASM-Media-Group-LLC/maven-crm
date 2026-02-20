@@ -21,7 +21,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", permisoIdentidadReal: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "" };
 
 interface Props {
   onCancel: () => void;
@@ -93,6 +93,10 @@ export default function OnboardingWizard({ onCancel }: Props) {
       schedule: step4.schedule,
       monthlyGoal: step4.monthlyGoal,
       timezone: step1.timezone,
+      permisoIdentidadReal: step4.permisoIdentidadReal || null,
+      terminosAfecto: step4.terminosAfecto || null,
+      restriccionesSeguridad: step4.restriccionesSeguridad || null,
+      orientacionPerfil: step4.orientacionPerfil || null,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
