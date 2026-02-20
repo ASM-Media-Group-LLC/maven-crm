@@ -428,9 +428,9 @@ const PromologContent = () => {
               <Plus className="mr-1.5 h-4 w-4" />
               Agregar Campaña
             </Button>
-            <Button variant="outline" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
+            <Button variant="default" size="sm" className="h-9" onClick={() => setCreatorsModalOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" />
-              Agregar Entrada
+              Agregar Promo
             </Button>
           </div>
         </div>

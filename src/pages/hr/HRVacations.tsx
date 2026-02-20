@@ -251,7 +251,7 @@ export default function HRVacations() {
           {VACATION_TYPES.map((vt) => (
             <Button
               key={vt.value}
-              variant={activeType === vt.value ? "default" : "ghost"}
+              variant={activeType === vt.value ? "secondary" : "ghost"}
               size="sm"
               className="gap-1.5"
               onClick={() => setActiveType(vt.value as VacationType)}
@@ -295,7 +295,7 @@ export default function HRVacations() {
           ] as const).map((tab) => (
             <Button
               key={tab.key}
-              variant={activeView === tab.key ? "default" : "ghost"}
+              variant={activeView === tab.key ? "secondary" : "ghost"}
               size="sm"
               className="gap-1.5"
               onClick={() => setActiveView(tab.key as any)}
