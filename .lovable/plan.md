@@ -1,48 +1,36 @@
 
 
-## Corregir KPI Cards y agregar boton Editar en el Directorio de Empleados
+## Corregir header y layout del Perfil de Empleado
 
-### Problema 1: KPI Cards con layout diferente
+### Problema
 
-Las KPI cards actuales del directorio usan un layout **horizontal** (icono a la izquierda, texto a la derecha) con un hover basico (`hover:scale hover:shadow-lg`). El estandar de la plataforma (`ContactosKPICards`) usa:
-
-- Layout **vertical**: label arriba-izquierda, icono arriba-derecha, valor grande debajo, subtitulo al final
-- Hover con **gradiente semantico** (`hover:bg-gradient-to-br hover:from-{color}/15 hover:to-transparent hover:border-{color}/40`)
-- Colores del sistema: `text-muted-foreground`, `text-success`, `text-warning`, `text-destructive` (no `emerald-600` ni `amber-600` hardcoded)
-
-### Problema 2: Sin opcion de editar
-
-Actualmente solo hay botones de Ver (Eye) y Eliminar (Trash2). Falta un boton de Editar (Pencil) que lleve al perfil del empleado en modo edicion (o directamente al perfil donde se puede editar).
-
-### Cambios en `src/pages/hr/EmployeeDirectory.tsx`
-
-**KPI Cards** — Reescribir el componente `KPICard` para que siga exactamente el patron de `ContactosKPICards`:
+`EmployeeProfile.tsx` todavia usa `HRPageHeader` (con caja de icono prohibida) y un boton outline con texto "Volver". Esto viola el estandar de la plataforma que ya se aplica en `EmployeeNew.tsx` y otras vistas de detalle.
 
 ```text
-Antes (horizontal):
-[ [icono] Valor  ]
-[         Label  ]
+Actual (incorrecto):
+[ [icono-caja] Nombre Empleado     ]  [<- Volver (outline)]
+  codigo · cargo
 
-Despues (vertical, como ContactosKPICards):
-[ Label          [icono] ]
-[ Valor (grande)         ]
-[ Subtitulo              ]
+Correcto (como EmployeeNew y EventoDetail):
+[ <- (ghost icon) ] Nombre Empleado  [status badge]  [cargo badge]
+                     codigo · departamento · fecha ingreso
 ```
 
-- Cada card tendra: `label`, `value`, `subtitle`, `icon`, `colorClass`, `bgClass`, `hoverClass`
-- Hover con gradiente semantico y transicion `transition-all duration-200`
-- Tokens semanticos en vez de colores hardcoded:
-  - Total: `text-muted-foreground` / `bg-muted`
-  - Activos: `text-success` / `bg-success/20`
-  - En Licencia: `text-warning` / `bg-warning/20`
-  - Inactivos: `text-destructive` / `bg-destructive/20`
-
-**Boton Editar** — Agregar un boton con icono `Pencil` en:
-- **Tabla**: nueva columna de accion entre Ver y Eliminar, que navega a `/hr/empleado/{id}` (el perfil ya soporta edicion)
-- **Grid**: nuevo boton Pencil en el footer de cada card junto al boton de eliminar
-
-### Archivo a modificar
+### Cambio
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/EmployeeDirectory.tsx` | Reescribir KPICard con layout vertical y hover gradiente (patron ContactosKPICards). Agregar boton Pencil de edicion en tabla y grid. Usar tokens semanticos. |
+| `src/pages/hr/EmployeeProfile.tsx` | Reemplazar `HRPageHeader` por header manual con layout estandar |
+
+### Detalle tecnico
+
+1. **Eliminar** import y uso de `HRPageHeader`
+2. **Envolver** todo el contenido en `<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">`
+3. **Header fijo**: `<header className="shrink-0 border-b bg-background px-6 py-4">`
+   - Boton `ArrowLeft` como `Button variant="ghost" size="icon"` que navega a `/hr/directorio`
+   - Titulo: `text-xl font-semibold` con el nombre completo
+   - Badges inline: `EmployeeStatusBadge` y badge del cargo
+   - Subtitulo: codigo de empleado, departamento, fecha de ingreso (`text-sm text-muted-foreground`)
+4. **Contenido scroll**: `<div className="flex-1 overflow-auto p-6 space-y-6">` con la summary card y los tabs
+5. **Loading y empty states** tambien se adaptan al nuevo layout con `main` wrapper
+
