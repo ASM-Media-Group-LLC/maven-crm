@@ -238,12 +238,12 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   placeholder="Seleccionar fechas"
                   className="h-9"
                 />
-                <Select value={filterCalidad} onValueChange={setFilterCalidad}>
+                <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
                   <SelectTrigger className="w-[120px] h-9">
                     <SelectValue placeholder="Calidad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="a+">A+</SelectItem>
                     <SelectItem value="a">A</SelectItem>
                     <SelectItem value="b+">B+</SelectItem>
@@ -251,12 +251,12 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <SelectItem value="c">C</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={filterEstado} onValueChange={setFilterEstado}>
+                <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
                   <SelectTrigger className="w-[120px] h-9">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="nuevo">Nuevo</SelectItem>
                     <SelectItem value="contactado">Contactado</SelectItem>
                     <SelectItem value="no_response">No Response</SelectItem>
