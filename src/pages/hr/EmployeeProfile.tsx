@@ -1,19 +1,33 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { User, ArrowLeft, FileText, AlertTriangle, GraduationCap, TrendingUp, Calendar, Building2, Phone, Mail, CreditCard } from "lucide-react";
+import { User, ArrowLeft, FileText, AlertTriangle, GraduationCap, TrendingUp, Calendar, Building2, Phone, Mail, CreditCard, Link2, Link2Off, CheckCircle2, XCircle, Search } from "lucide-react";
 import { useEmployee, useEmployeeAbsences, useEmployeeIncidents, useEmployeeDocuments, useEmployeeTraining, useEmployeePerformance } from "@/hooks/useEmployee";
+import { useAllProfiles, useLinkedProfile, useLinkEmployeeProfile, useUnlinkEmployeeProfile } from "@/hooks/useEmployees";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { EmployeeAreaBadge } from "@/components/hr/EmployeeAreaBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ABSENCE_TYPES, INCIDENT_SEVERITIES, TRAINING_STATUSES, PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
+
+const ROLE_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  admin: { label: "Admin", variant: "destructive" },
+  manager: { label: "Manager", variant: "default" },
+  employee: { label: "Empleado", variant: "secondary" },
+  supervisor: { label: "Supervisor", variant: "default" },
+  agent: { label: "Agente", variant: "secondary" },
+  closer: { label: "Closer", variant: "secondary" },
+};
 
 export default function EmployeeProfile() {
   const { id } = useParams();
@@ -24,6 +38,13 @@ export default function EmployeeProfile() {
   const { data: documents = [] } = useEmployeeDocuments(id);
   const { data: training = [] } = useEmployeeTraining(id);
   const { data: performance = [] } = useEmployeePerformance(id);
+
+  // Access tab state
+  const [linkOpen, setLinkOpen] = useState(false);
+  const { data: allProfiles = [] } = useAllProfiles();
+  const { data: linkedProfile } = useLinkedProfile(employee?.profile_id ?? null);
+  const linkMutation = useLinkEmployeeProfile();
+  const unlinkMutation = useUnlinkEmployeeProfile();
 
   if (isLoading) {
     return (
@@ -120,6 +141,15 @@ export default function EmployeeProfile() {
           <TabsTrigger value="training">Capacitación ({training.length})</TabsTrigger>
           <TabsTrigger value="performance">Desempeño ({performance.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
+          <TabsTrigger value="access" className="flex items-center gap-1.5">
+            <Link2 className="h-3.5 w-3.5" />
+            Acceso
+            {employee?.profile_id ? (
+              <span className="h-2 w-2 rounded-full bg-primary inline-block" />
+            ) : (
+              <span className="h-2 w-2 rounded-full bg-muted-foreground/40 inline-block" />
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Info */}
@@ -293,6 +323,104 @@ export default function EmployeeProfile() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Access tab */}
+        <TabsContent value="access" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                Acceso a Plataforma
+              </CardTitle>
+              <CardDescription>
+                Vincula este empleado a una cuenta de usuario de la plataforma. Es opcional: un empleado puede existir sin acceso.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {employee?.profile_id && linkedProfile ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Acceso activo
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={linkedProfile.avatar_url ?? ""} />
+                      <AvatarFallback>{(linkedProfile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{linkedProfile.full_name ?? "Sin nombre"}</p>
+                      {linkedProfile.role && (
+                        <Badge
+                          variant={ROLE_LABELS[linkedProfile.role]?.variant ?? "outline"}
+                          className="mt-1 text-xs"
+                        >
+                          {ROLE_LABELS[linkedProfile.role]?.label ?? linkedProfile.role}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                    onClick={() => id && unlinkMutation.mutate(id)}
+                    disabled={unlinkMutation.isPending}
+                  >
+                    <Link2Off className="h-4 w-4 mr-2" />
+                    {unlinkMutation.isPending ? "Desvinculando..." : "Desvincular usuario"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <XCircle className="h-4 w-4" />
+                    Sin acceso a plataforma
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Este empleado no tiene una cuenta de usuario vinculada. Puede operar sin acceso o vincularse a un usuario existente.
+                  </p>
+                  <Popover open={linkOpen} onOpenChange={setLinkOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Search className="h-4 w-4 mr-2" />
+                        Vincular usuario existente
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar usuario..." />
+                        <CommandList>
+                          <CommandEmpty>No se encontraron usuarios.</CommandEmpty>
+                          <CommandGroup>
+                            {allProfiles.map((profile) => (
+                              <CommandItem
+                                key={profile.id}
+                                value={profile.full_name ?? profile.id}
+                                onSelect={() => {
+                                  if (id) {
+                                    linkMutation.mutate({ employeeId: id, profileId: profile.id });
+                                  }
+                                  setLinkOpen(false);
+                                }}
+                              >
+                                <Avatar className="h-6 w-6 mr-2">
+                                  <AvatarImage src={profile.avatar_url ?? ""} />
+                                  <AvatarFallback className="text-xs">{(profile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                {profile.full_name ?? "Sin nombre"}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

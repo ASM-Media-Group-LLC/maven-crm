@@ -3,18 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserPlus, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { UserPlus, ChevronLeft, ChevronRight, Check, CalendarIcon, Search, Link2 } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useDepartments, usePositions } from "@/hooks/useEmployees";
+import { useDepartments, usePositions, useAllProfiles } from "@/hooks/useEmployees";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
   CONTRACT_TYPES, WORK_MODALITIES, NATIONAL_ID_TYPES, GENDER_OPTIONS,
@@ -61,6 +67,7 @@ const STEPS = [
   { id: 2, label: "Datos Laborales" },
   { id: 3, label: "Seguridad Social" },
   { id: 4, label: "Información Bancaria" },
+  { id: 5, label: "Acceso (opcional)" },
 ];
 
 export default function EmployeeNew() {
@@ -69,8 +76,13 @@ export default function EmployeeNew() {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [birthDate, setBirthDate] = useState<Date | undefined>();
+  const [hireDate, setHireDate] = useState<Date | undefined>();
+  const [linkedProfileId, setLinkedProfileId] = useState<string | null>(null);
+  const [profileSearchOpen, setProfileSearchOpen] = useState(false);
 
   const { data: departments = [] } = useDepartments();
+  const { data: allProfiles = [] } = useAllProfiles();
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { country: "Colombia", national_id_type: "CC", contract_type: "indefinido", work_modality: "presencial", salary_frequency: "mensual", bank_account_type: "ahorros" } });
   const { register, handleSubmit, watch, setValue, formState: { errors } } = form;
 
@@ -87,7 +99,7 @@ export default function EmployeeNew() {
         email: values.email || null,
         phone: values.phone || null,
         mobile: values.mobile || null,
-        birth_date: values.birth_date || null,
+        birth_date: birthDate ? format(birthDate, "yyyy-MM-dd") : null,
         gender: values.gender || null,
         national_id_type: values.national_id_type || null,
         national_id: values.national_id || null,
@@ -99,7 +111,7 @@ export default function EmployeeNew() {
         emergency_contact_relation: values.emergency_contact_relation || null,
         department_id: values.department_id || null,
         position_id: values.position_id || null,
-        hire_date: values.hire_date || null,
+        hire_date: hireDate ? format(hireDate, "yyyy-MM-dd") : null,
         contract_type: values.contract_type || null,
         work_modality: values.work_modality || null,
         base_salary: values.base_salary ? parseFloat(values.base_salary) : null,
@@ -113,6 +125,7 @@ export default function EmployeeNew() {
         caja_compensacion: values.caja_compensacion || null,
         notes: values.notes || null,
         created_by: user?.id,
+        profile_id: linkedProfileId || null,
       };
       const { error } = await supabase.from("employees").insert(payload);
       if (error) throw error;
@@ -146,14 +159,14 @@ export default function EmployeeNew() {
             <button
               type="button"
               onClick={() => setStep(s.id)}
-              className={cn("flex items-center gap-2 text-sm font-medium transition-colors", step === s.id ? "text-primary" : step > s.id ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}
+              className={cn("flex items-center gap-2 text-sm font-medium transition-colors", step === s.id ? "text-primary" : step > s.id ? "text-primary/70" : "text-muted-foreground")}
             >
-              <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-primary bg-primary text-primary-foreground" : step > s.id ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground/30 text-muted-foreground")}>
+              <span className={cn("flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all", step === s.id ? "border-primary bg-primary text-primary-foreground" : step > s.id ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30 text-muted-foreground")}>
                 {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
               </span>
               <span className="hidden sm:inline">{s.label}</span>
             </button>
-            {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-green-500" : "bg-border")} />}
+            {i < STEPS.length - 1 && <div className={cn("h-px flex-1 mx-2 transition-colors", step > s.id ? "bg-primary" : "bg-border")} />}
           </div>
         ))}
       </div>
@@ -200,7 +213,17 @@ export default function EmployeeNew() {
               </div>
               <div className="space-y-1.5">
                 <Label>Fecha de Nacimiento</Label>
-                <Input {...register("birth_date")} type="date" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !birthDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {birthDate ? format(birthDate, "dd/MM/yyyy") : "Seleccionar fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={birthDate} onSelect={setBirthDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label>Género</Label>
@@ -254,7 +277,17 @@ export default function EmployeeNew() {
               </div>
               <div className="space-y-1.5">
                 <Label>Fecha de Ingreso</Label>
-                <Input {...register("hire_date")} type="date" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !hireDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {hireDate ? format(hireDate, "dd/MM/yyyy") : "Seleccionar fecha"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={hireDate} onSelect={setHireDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1.5">
                 <Label>Tipo de Contrato</Label>
@@ -347,6 +380,59 @@ export default function EmployeeNew() {
           </Card>
         )}
 
+        {/* Step 5: Platform Access (optional) */}
+        {step === 5 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><Link2 className="h-4 w-4" />Acceso a Plataforma</CardTitle>
+              <CardDescription>Opcional. Vincula este empleado a un usuario existente en la plataforma.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {linkedProfileId ? (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback>{(allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{allProfiles.find(p => p.id === linkedProfileId)?.full_name ?? "Usuario"}</p>
+                    <p className="text-xs text-muted-foreground">Usuario vinculado</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setLinkedProfileId(null)}>Cambiar</Button>
+                </div>
+              ) : (
+                <Popover open={profileSearchOpen} onOpenChange={setProfileSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Search className="h-4 w-4 mr-2 text-muted-foreground" />
+                      Buscar y vincular usuario...
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar usuario..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontraron usuarios.</CommandEmpty>
+                        <CommandGroup>
+                          {allProfiles.map((profile) => (
+                            <CommandItem key={profile.id} value={profile.full_name ?? profile.id} onSelect={() => { setLinkedProfileId(profile.id); setProfileSearchOpen(false); }}>
+                              <Avatar className="h-6 w-6 mr-2">
+                                <AvatarImage src={profile.avatar_url ?? ""} />
+                                <AvatarFallback className="text-xs">{(profile.full_name ?? "U")[0].toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              {profile.full_name ?? "Sin nombre"}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+              <p className="text-xs text-muted-foreground">Si el empleado no necesita acceso a la plataforma, deja este campo vacío y haz clic en "Crear Empleado".</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Navigation */}
         <div className="flex justify-between pt-2">
           <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1}>
@@ -366,3 +452,4 @@ export default function EmployeeNew() {
     </div>
   );
 }
+

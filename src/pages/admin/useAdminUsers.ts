@@ -10,6 +10,7 @@ export interface AdminUser {
   email: string;
   created_at: string;
   role: AppRole | null;
+  linked_employee: { id: string; first_name: string; last_name: string } | null;
 }
 
 export const useAdminUsers = () => {
@@ -33,8 +34,19 @@ export const useAdminUsers = () => {
 
       if (rolesError) throw rolesError;
 
+      // Fetch employees that have a profile_id linked
+      const { data: employees } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name, profile_id")
+        .not("profile_id", "is", null);
+
       const rolesMap = new Map<string, AppRole>();
       roles?.forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
+
+      const employeeByProfileId = new Map<string, { id: string; first_name: string; last_name: string }>();
+      employees?.forEach((e) => {
+        if (e.profile_id) employeeByProfileId.set(e.profile_id, { id: e.id, first_name: e.first_name, last_name: e.last_name });
+      });
 
       return (profiles || []).map((p) => ({
         id: p.id,
@@ -43,6 +55,7 @@ export const useAdminUsers = () => {
         email: "", // email comes from auth.users, not accessible from client
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
+        linked_employee: employeeByProfileId.get(p.id) ?? null,
       })) as AdminUser[];
     },
   });

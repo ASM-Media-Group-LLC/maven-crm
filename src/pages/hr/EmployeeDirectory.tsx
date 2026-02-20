@@ -23,8 +23,8 @@ export default function EmployeeDirectory() {
   const deleteEmployee = useDeleteEmployee();
 
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -33,8 +33,8 @@ export default function EmployeeDirectory() {
     const matchSearch = fullName.includes(search.toLowerCase()) ||
       (e.employee_code?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
       (e.email?.toLowerCase().includes(search.toLowerCase()) ?? false);
-    const matchDept = deptFilter === "all" || e.department_id === deptFilter;
-    const matchStatus = statusFilter === "all" || e.status === statusFilter;
+    const matchDept = !deptFilter || e.department_id === deptFilter;
+    const matchStatus = !statusFilter || e.status === statusFilter;
     return matchSearch && matchDept && matchStatus;
   });
 
@@ -60,23 +60,23 @@ export default function EmployeeDirectory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nombre, código o email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
+        <Select value={deptFilter || "__all__"} onValueChange={(v) => setDeptFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Departamento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los depts.</SelectItem>
+            <SelectItem value="__all__">Todos los depts.</SelectItem>
             {departments.map((d) => (
               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             <SelectItem value="activo">Activo</SelectItem>
             <SelectItem value="inactivo">Inactivo</SelectItem>
             <SelectItem value="en_licencia">En Licencia</SelectItem>
