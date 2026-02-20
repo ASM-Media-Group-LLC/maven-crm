@@ -1,48 +1,144 @@
 
 
-## Nueva pestaña "Panel de Operaciones" en el perfil de Creadora
+## Paso 6: Centro de Notificaciones y Control de Verificacion
 
-### Objetivo
+### Resumen
 
-Agregar una nueva pestaña llamada **"Operaciones"** como la primera pestaña del perfil de creadora, disenada para que los Chatters tengan toda la informacion operacional a la vista. Los datos se extraen automaticamente de los campos ya existentes en la base de datos.
+Implementar un sistema de notificaciones en la base de datos, conectar la campana del header para mostrar eventos pendientes con punto rojo, agregar una seccion de verificacion visible solo para Managers/Admins en el perfil de creadora, y resaltar visualmente el estado `pendiente_verificacion` en la tabla principal.
 
-### Estructura de la pestaña
+---
 
-La pestaña tendra 4 secciones visuales distintas:
+### 1. Tabla de notificaciones en Supabase
 
-**1. Tarjeta de Estilo de Chat**
-- Tono de voz mostrado en grande (campo `tono_voz`)
-- Apodos permitidos como badges (campo `apodos_permitidos`)
-- Palabras prohibidas en rojo brillante (campo `palabras_prohibidas`)
+Crear una nueva tabla `notifications` para almacenar eventos del sistema:
 
-**2. Muro de Contencion (Limites)**
-- Seccion destacada con borde rojo/destructive
-- Texto: "ESTA MODELO JAMAS HARA:" seguido del contenido del campo `contenido_jamas_haria`
-- Icono de alerta para llamar la atencion
+```sql
+CREATE TABLE public.notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid, -- NULL = broadcast to managers/admins
+  type text NOT NULL, -- 'onboarding_complete', 'documents_pending', 'verification_rejected'
+  title text NOT NULL,
+  message text,
+  reference_id uuid, -- creator_id u otro recurso relacionado
+  reference_type text, -- 'creator', 'document', etc.
+  is_read boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
-**3. Ganchos de Conversacion (Hooks)**
-- Lista rapida con iconos para:
-  - Hobbies (campo `hobbies`)
-  - Mascotas (campo `mascotas_nombres`)
-  - Comida favorita (campo `comida_favorita`)
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-**4. Resumen Comercial**
-- Tabla de solo lectura con los precios del campo `precios_contenido` (JSONB)
-- Columnas: Servicio, Precio, Notas
-- Solo muestra servicios con precio mayor a 0
+CREATE POLICY "Authenticated users can view notifications"
+  ON public.notifications FOR SELECT TO authenticated
+  USING (user_id IS NULL OR user_id = auth.uid());
 
-### Archivos a crear/modificar
+CREATE POLICY "Authenticated users can update own notifications"
+  ON public.notifications FOR UPDATE TO authenticated
+  USING (user_id IS NULL OR user_id = auth.uid());
 
-| Archivo | Accion |
+CREATE POLICY "Authenticated users can insert notifications"
+  ON public.notifications FOR INSERT TO authenticated
+  WITH CHECK (true);
+```
+
+### 2. Generar notificacion al completar onboarding
+
+En `OnboardingWizard.tsx`, tras el `addCreador.mutateAsync(payload)` exitoso (cuando `isDraft === false`), insertar una notificacion:
+
+```ts
+await supabase.from("notifications").insert({
+  type: "onboarding_complete",
+  title: "Nueva modelo ha completado el onboarding",
+  message: `${step1.name} ha completado el proceso de onboarding y esta pendiente de verificacion.`,
+  reference_id: createdId, // se necesita extraer el ID del creador recien creado
+  reference_type: "creator",
+});
+```
+
+**Nota**: Actualmente `useAddCreadorWithBusiness` no retorna el ID del creador creado. Se modificara la mutacion para retornarlo.
+
+### 3. Hook de notificaciones
+
+Crear `src/hooks/useNotifications.ts`:
+
+- Query para obtener notificaciones no leidas (ordenadas por fecha descendente)
+- Contador de no leidas
+- Mutacion para marcar como leida (individual o todas)
+- Polling cada 30 segundos con `refetchInterval`
+
+### 4. Centro de Notificaciones en el Header
+
+Modificar `DashboardTopbar.tsx`:
+
+- Reemplazar el Popover estatico actual de la campana (lineas 94-107) con uno funcional
+- Mostrar el punto rojo con el conteo real de notificaciones no leidas
+- Ocultar el badge cuando el conteo es 0
+- Listar las ultimas notificaciones con:
+  - Icono segun tipo (UserCheck para onboarding, FileText para documentos)
+  - Titulo y tiempo relativo (hace X minutos)
+  - Click para navegar al perfil de la creadora relacionada
+  - Boton "Marcar todas como leidas"
+
+### 5. Seccion de Verificacion para Managers
+
+Crear `src/pages/creadores/VerificationSection.tsx`:
+
+- Solo visible cuando el rol del usuario es `admin` o `manager` (usando `useUserRole`)
+- Solo visible cuando el estado de la creadora es `pendiente_verificacion`
+- Contiene:
+  - Card con borde de color (warning) y titulo "Verificacion Pendiente"
+  - Boton "Aprobar Verificacion" (verde): cambia estado a `active`, registra en historial, crea notificacion de aprobacion
+  - Boton "Rechazar" (rojo): abre un campo de texto para el motivo, cambia estado a `borrador`, registra motivo en historial y notas
+
+Integrar en `CreadorProfileContent.tsx` justo debajo del header card y antes de las tabs.
+
+### 6. Actualizacion del tipo AppRole
+
+En `useUserRole.ts`, actualizar el tipo para incluir los roles reales del sistema:
+
+```ts
+export type AppRole = "admin" | "manager" | "employee" | "agent" | "closer" | "supervisor";
+```
+
+### 7. Badge pulsante para `pendiente_verificacion`
+
+En `CreadoresTable.tsx` y `CreadoresGrid.tsx`:
+
+- Agregar `pendiente_verificacion` al mapa de estados con label "Pendiente Verificacion" y variant `warning-soft`
+- Aplicar clase CSS `animate-pulse` al Badge cuando el estado es `pendiente_verificacion`
+- Agregar un punto amarillo/naranja junto al badge para mayor visibilidad
+
+En `src/index.css`, agregar una animacion sutil tipo "glow":
+
+```css
+@keyframes badge-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
+  50% { box-shadow: 0 0 8px 2px rgba(234, 179, 8, 0.3); }
+}
+.badge-pending-verification {
+  animation: badge-glow 2s ease-in-out infinite;
+}
+```
+
+---
+
+### Archivos a crear
+
+| Archivo | Descripcion |
 |---|---|
-| `src/pages/creadores/OperacionesTabContent.tsx` | **Nuevo** — Componente con las 4 secciones descritas |
-| `src/pages/creadores/CreadorProfileContent.tsx` | **Modificar** — Agregar la pestaña "Operaciones" como primera tab, importar el nuevo componente |
+| `src/hooks/useNotifications.ts` | Hook para consultar y gestionar notificaciones |
+| `src/pages/creadores/VerificationSection.tsx` | Seccion de aprobacion/rechazo para Managers |
 
-### Detalles tecnicos
+### Archivos a modificar
 
-- El componente recibe `creator` (tipo `CreatorFull`) como prop, sin necesidad de queries adicionales
-- Los campos `apodos_permitidos` y `palabras_prohibidas` son strings de texto libre; se parsean separando por comas para mostrarlos como badges individuales
-- `precios_contenido` es JSONB con estructura `{ [key]: { price: number, notes: string } }`
-- Labels de precios mapeados: "Contenido X" (cat1), "Contenido XX" (cat2), "Contenido XXX" (cat3), "Backdoor" (cat4), "Contenido Personalizado", "D-Rating", "Videollamadas", "Venta de Ropa Interior"
-- Cuando un campo no tiene datos, se muestra "Sin configurar" en texto muted
-- Se usa el patron de Cards existente con bordes y bg-card del design system
+| Archivo | Cambio |
+|---|---|
+| Migracion SQL | Crear tabla `notifications` con RLS |
+| `src/pages/creadores/useCreadores.ts` | Modificar `useAddCreadorWithBusiness` para retornar el ID creado |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Insertar notificacion al completar onboarding |
+| `src/components/dashboard/DashboardTopbar.tsx` | Integrar hook de notificaciones en la campana |
+| `src/pages/creadores/CreadorProfileContent.tsx` | Agregar VerificationSection antes de tabs |
+| `src/pages/creadores/CreadoresTable.tsx` | Agregar estado `pendiente_verificacion` con badge pulsante |
+| `src/pages/creadores/CreadoresGrid.tsx` | Agregar estado `pendiente_verificacion` con badge pulsante |
+| `src/hooks/useUserRole.ts` | Actualizar tipo AppRole con roles completos |
+| `src/index.css` | Agregar animacion `badge-glow` |
+
