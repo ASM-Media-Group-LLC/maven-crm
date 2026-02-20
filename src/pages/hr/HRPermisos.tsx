@@ -323,6 +323,8 @@ export default function HRPermisos() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [viewPermiso, setViewPermiso] = useState<PermisoRecord | null>(null);
+  const [editData, setEditData] = useState<PermisoRecord | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -342,6 +344,38 @@ export default function HRPermisos() {
       toast({ title: "Estado actualizado" });
     },
     onError: () => toast({ title: "Error al actualizar estado", variant: "destructive" }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async (vals: { id: string; absence_type: string; start_date: string; end_date: string; notes: string | null; reason: string | null }) => {
+      const { error } = await supabase.from("absences").update({
+        absence_type: vals.absence_type,
+        start_date: vals.start_date,
+        end_date: vals.end_date,
+        notes: vals.notes,
+        reason: vals.reason,
+      }).eq("id", vals.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["permisos"] });
+      toast({ title: "Permiso actualizado" });
+      setEditData(null);
+    },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("absences").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["permisos"] });
+      toast({ title: "Permiso eliminado" });
+      setDeleteId(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
   // KPIs
@@ -569,6 +603,9 @@ export default function HRPermisos() {
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewPermiso(p)}>
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditData(p)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                             {p.status === "pending" && (
                               <>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success hover:text-success" onClick={() => updateStatus.mutate({ id: p.id, status: "approved" })}>
@@ -579,6 +616,9 @@ export default function HRPermisos() {
                                 </Button>
                               </>
                             )}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteId(p.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -640,6 +680,9 @@ export default function HRPermisos() {
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setViewPermiso(p)}>
                         <Eye className="h-3 w-3" /> Ver
                       </Button>
+                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => setEditData(p)}>
+                        <Pencil className="h-3 w-3" /> Editar
+                      </Button>
                       {p.status === "pending" && (
                         <>
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-success hover:text-success ml-auto" onClick={() => updateStatus.mutate({ id: p.id, status: "approved" })}>
@@ -650,6 +693,9 @@ export default function HRPermisos() {
                           </Button>
                         </>
                       )}
+                      <Button variant="ghost" size="sm" className={cn("h-7 w-7 p-0 text-destructive hover:text-destructive", p.status !== "pending" && "ml-auto")} onClick={() => setDeleteId(p.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -662,6 +708,156 @@ export default function HRPermisos() {
       {/* Modals */}
       <CreatePermisoModal open={modalOpen} onOpenChange={setModalOpen} />
       <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
+
+      {/* Edit Modal */}
+      {editData && (
+        <EditPermisoModal
+          permiso={editData}
+          onClose={() => setEditData(null)}
+          onSave={(vals) => editMutation.mutate(vals)}
+          isPending={editMutation.isPending}
+        />
+      )}
+
+      {/* Delete Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar permiso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. El registro del permiso será eliminado permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+function EditPermisoModal({
+  permiso,
+  onClose,
+  onSave,
+  isPending,
+}: {
+  permiso: PermisoRecord;
+  onClose: () => void;
+  onSave: (vals: { id: string; absence_type: string; start_date: string; end_date: string; notes: string | null; reason: string | null }) => void;
+  isPending: boolean;
+}) {
+  const emp = permiso.employees;
+  const empName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+
+  const [permisoType, setPermisoType] = useState(permiso.absence_type);
+  const [date, setDate] = useState<Date | undefined>(new Date(permiso.start_date + "T12:00:00"));
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [horario, setHorario] = useState(permiso.notes ?? "");
+  const [motivo, setMotivo] = useState(permiso.reason ?? "");
+
+  const handleSave = () => {
+    if (!date) return;
+    const dateStr = format(date, "yyyy-MM-dd");
+    onSave({
+      id: permiso.id,
+      absence_type: permisoType,
+      start_date: dateStr,
+      end_date: dateStr,
+      notes: horario || null,
+      reason: motivo || null,
+    });
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="!flex !flex-col gap-0 max-w-md p-0 overflow-hidden">
+        <DialogHeader className="shrink-0 px-6 py-5 border-b">
+          <div className="flex items-center gap-2">
+            <Pencil className="h-5 w-5 text-primary" />
+            <DialogTitle>Editar Permiso</DialogTitle>
+          </div>
+          <DialogDescription>Modifica los datos de la solicitud de permiso</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Empleado (readonly) */}
+          <div className="space-y-1.5">
+            <Label>Empleado</Label>
+            <Input value={empName} readOnly className="bg-muted" />
+          </div>
+
+          {/* Tipo */}
+          <div className="space-y-1.5">
+            <Label>Tipo de Permiso</Label>
+            <Select value={permisoType} onValueChange={setPermisoType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERMISSION_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    <span className="flex items-center gap-2">
+                      <t.icon className="h-3.5 w-3.5" />
+                      {t.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Fecha */}
+          <div className="space-y-1.5">
+            <Label>Fecha</Label>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
+                  locale={es}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Horario */}
+          <div className="space-y-1.5">
+            <Label>Horario</Label>
+            <Input placeholder="Ej: 14:00 - 17:00" value={horario} onChange={(e) => setHorario(e.target.value)} />
+          </div>
+
+          {/* Motivo */}
+          <div className="space-y-1.5">
+            <Label>Motivo</Label>
+            <Textarea placeholder="Describa el motivo..." rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+          </div>
+        </div>
+
+        <DialogFooter className="shrink-0 px-6 py-4 border-t flex gap-2">
+          <Button variant="outline" onClick={onClose} className="flex-1">Cancelar</Button>
+          <Button onClick={handleSave} disabled={!date || isPending} className="flex-1">
+            {isPending ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
