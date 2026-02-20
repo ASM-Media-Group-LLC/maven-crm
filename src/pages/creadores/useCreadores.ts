@@ -44,13 +44,20 @@ function uniqueValues(creators: CreatorWithBusiness[], key: keyof Tables<"creato
   return Array.from(set).sort();
 }
 
+const AGENCY_ORDER = [
+  "Atomic Agency", "Elite Models", "Kash Agency",
+  "Unlok Platform", "Trafix", "Otra",
+];
+
 function uniqueAgencies(creators: CreatorWithBusiness[]): string[] {
   const set = new Set<string>();
   for (const c of creators) {
     const agency = c.creator_business?.assigned_agency;
     if (agency) set.add(agency);
   }
-  return Array.from(set).sort();
+  const known = AGENCY_ORDER.filter((a) => set.has(a));
+  const others = Array.from(set).filter((a) => !AGENCY_ORDER.includes(a)).sort();
+  return [...known, ...others];
 }
 
 function uniqueManagers(creators: CreatorWithBusiness[]): string[] {

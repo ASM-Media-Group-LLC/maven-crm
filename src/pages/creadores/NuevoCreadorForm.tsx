@@ -17,7 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
 
-const AGENCIES = ["Kash Agency", "Atomic Agency", "Unlok Platform", "Elite Models", "ORA Agency", "Exchange", "Trafix", "Otra"];
+const AGENCIES = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "ORA Agency", "Exchange", "Otra"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
 const STATUSES = [
   { value: "onboarding", label: "En Onboarding" },
