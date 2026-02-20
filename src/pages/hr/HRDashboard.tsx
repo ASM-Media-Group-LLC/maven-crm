@@ -1,9 +1,10 @@
 import { useState } from "react";
 import {
-  Users, UserCheck, UserX, Clock, LayoutDashboard, UserPlus,
+  Users, UserCheck, Clock, LayoutDashboard, UserPlus,
   CalendarDays, AlertTriangle, TrendingDown, TrendingUp,
-  BookOpen, Briefcase, Activity, ChevronRight,
+  BookOpen, Briefcase, ChevronRight, Zap, Activity,
   Percent, Timer, RotateCcw, Settings2, Check, UserMinus,
+  ShieldAlert, ClipboardCheck,
 } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
@@ -34,16 +35,16 @@ interface QuickAction {
 
 // ─── All available quick actions catalog ────────────────────────────────────
 const ALL_ACTIONS: QuickAction[] = [
-  { id: "ausencias",     label: "Registrar Ausencia", icon: AlertTriangle,  url: "/hr/ausencias" },
-  { id: "directorio",    label: "Ver Directorio",     icon: Users,           url: "/hr/directorio" },
-  { id: "nuevo",         label: "Agregar Empleado",   icon: UserPlus,        url: "/hr/empleado/nuevo" },
-  { id: "candidatos",    label: "Ver Candidatos",     icon: Briefcase,       url: "/hr/candidatos" },
-  { id: "incidentes",    label: "Ver Incidentes",     icon: AlertTriangle,   url: "/hr/incidentes" },
-  { id: "capacitacion",  label: "Ver Capacitación",   icon: BookOpen,        url: "/hr/capacitacion" },
-  { id: "desempeno",     label: "Ver Desempeño",      icon: TrendingUp,      url: "/hr/desempeno" },
-  { id: "asistencia",    label: "Ver Asistencia",     icon: Activity,        url: null, soon: true },
-  { id: "vacaciones",    label: "Vacaciones",          icon: CalendarDays,    url: null, soon: true },
-  { id: "horarios",      label: "Horarios",            icon: Clock,           url: null, soon: true },
+  { id: "ausencias",     label: "Registrar Ausencia", icon: CalendarDays,  url: "/hr/ausencias" },
+  { id: "directorio",    label: "Ver Directorio",     icon: Users,          url: "/hr/directorio" },
+  { id: "nuevo",         label: "Agregar Empleado",   icon: UserPlus,       url: "/hr/empleado/nuevo" },
+  { id: "candidatos",    label: "Ver Candidatos",     icon: Briefcase,      url: "/hr/candidatos" },
+  { id: "incidentes",    label: "Ver Incidentes",     icon: ShieldAlert,    url: "/hr/incidentes" },
+  { id: "capacitacion",  label: "Ver Capacitación",   icon: BookOpen,       url: "/hr/capacitacion" },
+  { id: "desempeno",     label: "Ver Desempeño",      icon: TrendingUp,     url: "/hr/desempeno" },
+  { id: "asistencia",    label: "Ver Asistencia",     icon: ClipboardCheck, url: null, soon: true },
+  { id: "vacaciones",    label: "Vacaciones",          icon: CalendarDays,   url: null, soon: true },
+  { id: "horarios",      label: "Horarios",            icon: Clock,          url: null, soon: true },
 ];
 
 const DEFAULT_ACTION_IDS = ["ausencias", "directorio", "nuevo", "candidatos"];
@@ -257,28 +258,35 @@ export default function HRDashboard() {
 
         {/* Quick Actions */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Acciones Rápidas</p>
-            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground" onClick={openConfig}>
-              <Settings2 className="h-3.5 w-3.5" />
-              Configurar
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary shrink-0" />
+              <div>
+                <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Configura los atajos a las funciones que más utilizas en tu día a día</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
+              <Settings2 className="h-4 w-4" />
             </Button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {activeActions.map((action) => (
-              <Button
+              <div
                 key={action.id}
-                variant="outline"
-                className="flex items-center gap-2 h-10 justify-start"
+                className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
                 onClick={() => action.url && navigate(action.url)}
               >
-                <action.icon className="h-4 w-4 shrink-0" />
-                <span className="truncate text-sm">{action.label}</span>
-              </Button>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <action.icon className="h-5 w-5 text-primary" />
+                </div>
+                <span className="flex-1 text-sm font-medium">{action.label}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
             ))}
             {activeActions.length === 0 && (
               <p className="col-span-4 text-sm text-muted-foreground text-center py-4">
-                No hay accesos configurados. Haz clic en "Configurar" para agregar.
+                No hay accesos configurados. Haz clic en el engranaje para agregar.
               </p>
             )}
           </div>
