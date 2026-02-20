@@ -53,6 +53,15 @@ import AuditoriaRoles from "./pages/admin/AuditoriaRoles";
 import AdminRoute from "./components/AdminRoute";
 import Roadmap from "./pages/Roadmap";
 import NotFound from "./pages/NotFound";
+import HRDashboard from "./pages/hr/HRDashboard";
+import EmployeeDirectory from "./pages/hr/EmployeeDirectory";
+import EmployeeNew from "./pages/hr/EmployeeNew";
+import EmployeeProfile from "./pages/hr/EmployeeProfile";
+import HRAbsences from "./pages/hr/HRAbsences";
+import HRIncidents from "./pages/hr/HRIncidents";
+import HRApplicants from "./pages/hr/HRApplicants";
+import HRTraining from "./pages/hr/HRTraining";
+import HRPerformance from "./pages/hr/HRPerformance";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +120,16 @@ const App = () => (
               <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
+              {/* HR routes */}
+              <Route path="/hr" element={<ProtectedRoute><HRDashboard /></ProtectedRoute>} />
+              <Route path="/hr/directorio" element={<ProtectedRoute><EmployeeDirectory /></ProtectedRoute>} />
+              <Route path="/hr/empleado/nuevo" element={<ProtectedRoute><EmployeeNew /></ProtectedRoute>} />
+              <Route path="/hr/empleado/:id" element={<ProtectedRoute><EmployeeProfile /></ProtectedRoute>} />
+              <Route path="/hr/ausencias" element={<ProtectedRoute><HRAbsences /></ProtectedRoute>} />
+              <Route path="/hr/incidentes" element={<ProtectedRoute><HRIncidents /></ProtectedRoute>} />
+              <Route path="/hr/candidatos" element={<ProtectedRoute><HRApplicants /></ProtectedRoute>} />
+              <Route path="/hr/capacitacion" element={<ProtectedRoute><HRTraining /></ProtectedRoute>} />
+              <Route path="/hr/desempeno" element={<ProtectedRoute><HRPerformance /></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
