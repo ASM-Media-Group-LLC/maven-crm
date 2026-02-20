@@ -7,6 +7,7 @@ import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -153,7 +154,7 @@ export default function HRTraining() {
             </div>
             <div className="space-y-1.5">
               <Label>Fecha de Inicio</Label>
-              <Input type="date" value={assignForm.start_date} onChange={(e) => setAssignForm((f) => ({ ...f, start_date: e.target.value }))} />
+              <DateInput value={assignForm.start_date} onChange={(v) => setAssignForm((f) => ({ ...f, start_date: v }))} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

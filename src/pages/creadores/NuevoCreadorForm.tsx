@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -327,7 +329,7 @@ const NuevoCreadorForm = () => {
               <Input type="number" value={form.age || ""} onChange={(e) => set("age", Number(e.target.value))} min={18} className={errors.age ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
             <Field label="Fecha de Nacimiento *" error={errors.birth_date} fieldKey="birth_date">
-              <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className={errors.birth_date ? "border-destructive focus-visible:ring-destructive" : ""} />
+              <DateInput value={form.birth_date} onChange={(v) => set("birth_date", v)} toYear={new Date().getFullYear()} className={errors.birth_date ? "[&_input]:border-destructive" : ""} />
             </Field>
             <Field label="País *" error={errors.country} fieldKey="country">
               <Select value={form.country} onValueChange={(v) => set("country", v)}>
@@ -365,7 +367,7 @@ const NuevoCreadorForm = () => {
               <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" className={errors.email ? "border-destructive focus-visible:ring-destructive" : ""} />
             </Field>
             <Field label="Teléfono">
-              <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+573001234567" />
+              <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
             </Field>
           </div>
         </Section>
@@ -416,7 +418,7 @@ const NuevoCreadorForm = () => {
               </Select>
             </Field>
             <Field label="Fecha de Inicio Oficial">
-              <Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
+              <DateInput value={form.start_date} onChange={(v) => set("start_date", v)} />
             </Field>
           </div>
         </Section>

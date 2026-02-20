@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -271,7 +272,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         {/* Fecha de Nacimiento */}
         {isEditing ? (
           <EditField label="Fecha de Nacimiento">
-            <Input type="date" className="h-9 text-sm" value={editData.birth_date} onChange={(e) => updateField("birth_date", e.target.value)} />
+            <DateInput value={editData.birth_date} onChange={(v) => updateField("birth_date", v)} toYear={new Date().getFullYear()} />
           </EditField>
         ) : (
           <InfoField label="Fecha de Nacimiento" value={
