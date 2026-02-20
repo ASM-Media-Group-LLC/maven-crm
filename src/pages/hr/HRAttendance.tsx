@@ -345,8 +345,8 @@ export default function HRAttendance() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [shiftFilter, setShiftFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [shiftFilter, setShiftFilter] = useState("");
   const [deptTab, setDeptTab] = useState("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
@@ -364,8 +364,8 @@ export default function HRAttendance() {
     const emp = r.employees;
     const fullName = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
     const matchSearch = !search || fullName.includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const matchShift  = shiftFilter === "all" || r.shift === shiftFilter;
+    const matchStatus = !statusFilter || r.status === statusFilter;
+    const matchShift  = !shiftFilter || r.shift === shiftFilter;
     const matchDept   = deptTab === "all" || emp?.department_id === deptTab;
     const recordDate  = new Date(r.date);
     const matchFrom   = !dateFrom || recordDate >= dateFrom;
@@ -378,14 +378,9 @@ export default function HRAttendance() {
       {/* ── Fixed Header ──────────────────────────────────────────────────────── */}
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <ClipboardCheck className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Control de Asistencia</h1>
-              <p className="text-sm text-muted-foreground">Registro y seguimiento de asistencia del equipo</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Control de Asistencia</h1>
+            <p className="text-sm text-muted-foreground">Registro y seguimiento de asistencia del equipo</p>
           </div>
           <Button onClick={() => setModalOpen(true)} size="sm">
             + Registrar Asistencia
@@ -459,24 +454,24 @@ export default function HRAttendance() {
             />
           </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               {STATUSES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select value={shiftFilter} onValueChange={setShiftFilter}>
+          <Select value={shiftFilter || undefined} onValueChange={(v) => setShiftFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Turno" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los turnos</SelectItem>
+              <SelectItem value="__all__">Todos los turnos</SelectItem>
               {SHIFTS.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}

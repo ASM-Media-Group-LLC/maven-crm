@@ -345,7 +345,7 @@ export default function HRAbsences() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const updateStatus = useMutation({
@@ -384,7 +384,7 @@ export default function HRAbsences() {
       const matchSearch = !search || empName.includes(search.toLowerCase()) || (a.notes ?? "").toLowerCase().includes(search.toLowerCase());
       const matchType = !typeFilter || a.absence_type === typeFilter;
       const matchStatus = !statusFilter || a.status === statusFilter;
-      const matchDept = deptFilter === "all" || emp?.department_id === deptFilter;
+      const matchDept = !deptFilter || emp?.department_id === deptFilter;
       return matchSearch && matchType && matchStatus && matchDept;
     });
   }, [absences, search, typeFilter, statusFilter, deptFilter]);
@@ -394,14 +394,9 @@ export default function HRAbsences() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="shrink-0 border-b bg-background px-6 py-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Ausencias / Faltas</h1>
-              <p className="text-sm text-muted-foreground">Faltas injustificadas y sin aviso previo</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Ausencias / Faltas</h1>
+            <p className="text-sm text-muted-foreground">Faltas injustificadas y sin aviso previo</p>
           </div>
           <Button onClick={() => setModalOpen(true)} size="sm">
             <Plus className="h-4 w-4 mr-1" />
@@ -438,9 +433,9 @@ export default function HRAbsences() {
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
             <Button
               size="sm"
-              variant={deptFilter === "all" ? "secondary" : "ghost"}
+              variant={!deptFilter ? "secondary" : "ghost"}
               className="text-sm"
-              onClick={() => setDeptFilter("all")}
+              onClick={() => setDeptFilter("")}
             >
               Todos
             </Button>
@@ -470,7 +465,7 @@ export default function HRAbsences() {
             />
           </div>
 
-          <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
+          <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-44 h-9">
               <SelectValue placeholder="Tipo de Falta" />
             </SelectTrigger>
@@ -482,7 +477,7 @@ export default function HRAbsences() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36 h-9">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
