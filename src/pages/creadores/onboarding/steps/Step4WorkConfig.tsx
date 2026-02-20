@@ -11,9 +11,9 @@ const SERVICES = [
   { key: "cat_1", label: "Contenido X" },
   { key: "cat_2", label: "Contenido XX" },
   { key: "cat_3", label: "Contenido XXX" },
-  { key: "cat_4", label: "Categoría 4" },
+  { key: "cat_4", label: "Backdoor" },
   { key: "contenido_personalizado", label: "Contenido Personalizado" },
-  { key: "valoracion_medios", label: "Valoración de Medios" },
+  { key: "valoracion_medios", label: "D-Rating" },
   { key: "sesiones_video", label: "Sesiones de Video en Vivo" },
   { key: "envio_articulos", label: "Envío de Artículos Físicos" },
 ] as const;
