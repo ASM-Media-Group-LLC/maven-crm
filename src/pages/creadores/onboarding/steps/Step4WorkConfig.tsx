@@ -132,23 +132,23 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label>Preferencia de términos de afecto</Label>
-          <Input
-            value={data.terminosAfecto}
-            onChange={(e) => onChange("terminosAfecto", e.target.value)}
-            placeholder="Ej: mi amor, bebe, cariño..."
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Restricciones de seguridad y contenido no permitido</Label>
-          <Textarea
-            value={data.restriccionesSeguridad}
-            onChange={(e) => onChange("restriccionesSeguridad", e.target.value)}
-            placeholder="Describe restricciones..."
-            rows={3}
-          />
-        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Preferencia de términos de afecto</Label>
+        <Input
+          value={data.terminosAfecto}
+          onChange={(e) => onChange("terminosAfecto", e.target.value)}
+          placeholder="Ej: mi amor, bebe, cariño..."
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Restricciones de seguridad y contenido no permitido</Label>
+        <Textarea
+          value={data.restriccionesSeguridad}
+          onChange={(e) => onChange("restriccionesSeguridad", e.target.value)}
+          placeholder="Describe restricciones..."
+          rows={3}
+        />
       </div>
 
       {/* Monthly Goal */}
