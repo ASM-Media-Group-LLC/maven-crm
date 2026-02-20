@@ -1,50 +1,52 @@
 
 
-## Mejora de la vista "Nuevo Empleado" — Layout profesional con scroll interno
+## Mejora de Steppers: Full-width + Gradientes premium
 
-### Cambios a implementar en `src/pages/hr/EmployeeNew.tsx`
+### Problema actual
 
-#### 1. Layout full-height con scroll interno
+1. **EmployeeNew**: El stepper esta limitado a `max-w-3xl mx-auto` dentro de la franja, no ocupa el ancho completo. Ademas, los circulos usan `bg-primary` plano (azul solido).
+2. **OnboardingWizard**: El stepper esta dentro del `CardContent`, no tiene layout sticky. Los circulos tambien usan `bg-primary` plano. Tiene una barra `Progress` debajo pero sin gradiente.
+3. **Ambos**: Los circulos activos/completados usan color plano sin el gradiente `from-accent to-primary` que ya es el estandar del boton `default` en la plataforma.
 
-Reemplazar el contenedor actual (`p-6 max-w-3xl mx-auto space-y-6`) por la arquitectura estandar de la plataforma:
+### Cambios a implementar
+
+#### 1. `EmployeeNew.tsx` — Stepper full-width + gradiente
+
+- Eliminar `max-w-3xl mx-auto` del contenedor del stepper para que ocupe todo el ancho disponible dentro del `px-6`
+- Reemplazar `bg-primary text-primary-foreground` en los circulos por `bg-gradient-to-r from-accent to-primary text-white`
+- Reemplazar `bg-primary` en las lineas de progreso completadas por `bg-gradient-to-r from-accent to-primary`
+- Agregar una barra `Progress` debajo del stepper (como tiene OnboardingWizard) pero con gradiente aplicado al indicador
+
+#### 2. `OnboardingWizard.tsx` — Stepper con gradiente
+
+- Reemplazar `bg-primary text-primary-foreground` en los circulos por `bg-gradient-to-r from-accent to-primary text-white`
+- El `ring-2 ring-primary/30` del paso activo cambia a `ring-accent/30` para que el halo sea coherente con el gradiente
+- Aplicar gradiente al indicador de la barra `Progress` existente
+
+#### 3. Componente `Progress` — Soporte de gradiente
+
+El componente `progress.tsx` tiene el indicador hardcodeado con `bg-primary`. Para que ambos steppers muestren gradiente, se agregara una prop `indicatorClassName` que permita pasar clases personalizadas al indicador sin romper el uso actual del componente.
+
+### Detalle tecnico del componente Progress
 
 ```text
-div.flex.flex-col.h-full
-  |-- header (shrink-0, border-b, bg-background, px-6 py-4)
-  |     |-- Boton "Volver al Directorio" con ArrowLeft
-  |     |-- Titulo "Nuevo Empleado" + subtitulo (sin icono)
-  |-- stepper (shrink-0, border-b, bg-background, px-6 py-3)
-  |-- contenido (flex-1, overflow-auto, px-6 py-6)
-  |     |-- Card del paso actual (max-w-3xl mx-auto)
-  |-- footer (shrink-0, border-t, bg-background, px-6 py-4)
-  |     |-- Cancelar | Anterior | Siguiente/Crear
+// progress.tsx — agregar prop indicatorClassName
+<ProgressPrimitive.Indicator
+  className={cn("h-full w-full flex-1 bg-primary transition-all", indicatorClassName)}
+  style={...}
+/>
 ```
 
-#### 2. Header estandarizado
+Uso en los steppers:
+```text
+<Progress value={...} className="h-1.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
+```
 
-- Eliminar el uso de `HRPageHeader` con icono
-- Agregar boton de retorno con `ArrowLeft` + "Volver al Directorio" (patron de detalle de registro)
-- Titulo `text-xl font-semibold` y subtitulo `text-sm text-muted-foreground`
-- Sin caja de icono
-
-#### 3. Stepper fijo
-
-- Mover el stepper a su propia franja `shrink-0` con `border-b` para que no se desplace con el scroll
-- Mantener la misma logica visual (circulos numerados, lineas de progreso)
-
-#### 4. Footer fijo
-
-- Mover los botones de navegacion (Cancelar, Anterior, Siguiente/Crear) a un footer fijo con `shrink-0 border-t`
-- Alinear: Cancelar a la izquierda, Anterior + Siguiente a la derecha
-
-#### 5. Area de contenido con scroll
-
-- El `Card` de cada paso se renderiza dentro de un contenedor `flex-1 overflow-auto` con padding
-- Se aplica `max-w-3xl mx-auto` al contenido interno para mantener el ancho limitado
-
-### Archivo a modificar
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/EmployeeNew.tsx` | Reestructurar layout completo: header con back button, stepper fijo, contenido scrollable, footer fijo |
+| `src/components/ui/progress.tsx` | Agregar prop `indicatorClassName` para permitir clases custom en el indicador |
+| `src/pages/hr/EmployeeNew.tsx` | Eliminar `max-w-3xl mx-auto` del stepper; aplicar gradiente a circulos, lineas y agregar barra Progress con gradiente |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Aplicar gradiente a circulos del stepper y al indicador de la barra Progress |
 
