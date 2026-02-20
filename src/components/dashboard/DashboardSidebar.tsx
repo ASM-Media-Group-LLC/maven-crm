@@ -18,7 +18,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 import { useUserRole } from "@/hooks/useUserRole";
 
-const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2 text-sm sidebar-glass-hover";
+const LINK_CLASS = "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm sidebar-glass-hover";
 const ACTIVE_CLASS = "sidebar-glass-active font-medium";
 
 const DashboardSidebar = () => {
@@ -129,7 +129,7 @@ const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-3">
+      <SidebarHeader className="p-4">
         <Logo size="sm" collapsed={collapsed} />
       </SidebarHeader>
 
