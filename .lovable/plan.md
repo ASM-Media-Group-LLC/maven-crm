@@ -1,36 +1,43 @@
 
 
-## Corregir header y layout del Perfil de Empleado
+## Estandarizar Tab Bar en Permisos y Asistencia
 
-### Problema
+### Problemas detectados
 
-`EmployeeProfile.tsx` todavia usa `HRPageHeader` (con caja de icono prohibida) y un boton outline con texto "Volver". Esto viola el estandar de la plataforma que ya se aplica en `EmployeeNew.tsx` y otras vistas de detalle.
+**HRPermisos** (linea 370-373): El tab bar solo muestra departamentos que tienen permisos registrados (`activeDepts` filtra por IDs presentes en los datos). Deberia mostrar **todos** los departamentos activos, igual que en la imagen de referencia (Todos, Direccion, Finanzas, Marketing, Operaciones, Recursos Humanos, Tecnologia, Ventas).
+
+**HRAttendance** (linea 436-443): Usa el componente Radix `Tabs/TabsList/TabsTrigger` en vez del patron estandar con `Button`. Esto produce un tab bar con tamanio y estilo diferente (`text-xs`, fondo y bordes de Radix). El estandar de la plataforma es:
 
 ```text
-Actual (incorrecto):
-[ [icono-caja] Nombre Empleado     ]  [<- Volver (outline)]
-  codigo · cargo
+Estandar (Button-based):
+<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+  <Button variant="secondary|ghost" size="sm">...</Button>
+</div>
 
-Correcto (como EmployeeNew y EventoDetail):
-[ <- (ghost icon) ] Nombre Empleado  [status badge]  [cargo badge]
-                     codigo · departamento · fecha ingreso
+Actual en Asistencia (Radix Tabs - incorrecto):
+<Tabs><TabsList className="h-auto flex-wrap gap-1 bg-muted/50">
+  <TabsTrigger className="text-xs">...</TabsTrigger>
+</TabsList></Tabs>
 ```
 
-### Cambio
+### Cambios
+
+#### 1. `src/pages/hr/HRPermisos.tsx`
+
+- Cambiar `activeDepts` por `departments` directamente en el tab bar (mostrar todos los departamentos activos, no solo los que tienen registros)
+- Eliminar la condicion `activeDepts.length > 0` para que siempre se muestre el tab bar (con loading state si es necesario)
+
+#### 2. `src/pages/hr/HRAttendance.tsx`
+
+- Eliminar imports de `Tabs, TabsList, TabsTrigger` de Radix
+- Reemplazar el bloque `<Tabs>` (lineas 436-443) por el patron estandar con `<div className="inline-flex...">` y `<Button variant="secondary|ghost" size="sm">`
+- Cambiar `deptTab` de `"all"` a `""` (string vacio) para consistencia con HRPermisos
+- Ajustar el filtro `matchDept` para usar `!deptTab` en vez de `deptTab === "all"`
+
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/EmployeeProfile.tsx` | Reemplazar `HRPageHeader` por header manual con layout estandar |
-
-### Detalle tecnico
-
-1. **Eliminar** import y uso de `HRPageHeader`
-2. **Envolver** todo el contenido en `<main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">`
-3. **Header fijo**: `<header className="shrink-0 border-b bg-background px-6 py-4">`
-   - Boton `ArrowLeft` como `Button variant="ghost" size="icon"` que navega a `/hr/directorio`
-   - Titulo: `text-xl font-semibold` con el nombre completo
-   - Badges inline: `EmployeeStatusBadge` y badge del cargo
-   - Subtitulo: codigo de empleado, departamento, fecha de ingreso (`text-sm text-muted-foreground`)
-4. **Contenido scroll**: `<div className="flex-1 overflow-auto p-6 space-y-6">` con la summary card y los tabs
-5. **Loading y empty states** tambien se adaptan al nuevo layout con `main` wrapper
+| `src/pages/hr/HRPermisos.tsx` | Mostrar todos los departamentos en el tab bar, no solo los que tienen registros |
+| `src/pages/hr/HRAttendance.tsx` | Reemplazar Radix Tabs por Button-based tab bar estandar |
 
