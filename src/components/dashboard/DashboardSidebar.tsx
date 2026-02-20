@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
-  UserCog, BookOpen, AlertTriangle, UserCheck,
+  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -61,13 +61,69 @@ const DashboardSidebar = () => {
 
   const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
 
-  const hrSubItems = [
-    { title: "Dashboard", url: "/hr" },
-    { title: "Directorio", url: "/hr/directorio" },
-    { title: "Ausencias", url: "/hr/ausencias" },
-    { title: "Incidentes", url: "/hr/incidentes" },
-    { title: "Candidatos", url: "/hr/candidatos" },
+  const hrGroups = [
+    {
+      label: "Operación Diaria",
+      icon: Clock,
+      key: "operacion",
+      items: [
+        { title: "Asistencia", url: null },
+        { title: "Ausencias", url: "/hr/ausencias" },
+        { title: "Vacaciones", url: null },
+        { title: "Licencias", url: null },
+        { title: "Permisos", url: null },
+        { title: "Horarios y Turnos", url: null },
+      ],
+    },
+    {
+      label: "Seguimiento y Control",
+      icon: Eye,
+      key: "seguimiento",
+      items: [
+        { title: "Incidentes", url: "/hr/incidentes" },
+        { title: "Monitoreo", url: null },
+      ],
+    },
+    {
+      label: "Desarrollo",
+      icon: GraduationCap,
+      key: "desarrollo",
+      items: [
+        { title: "Capacitación", url: "/hr/capacitacion" },
+        { title: "Desempeño", url: "/hr/desempeno" },
+      ],
+    },
+    {
+      label: "Información",
+      icon: Users,
+      key: "informacion",
+      items: [
+        { title: "Directorio", url: "/hr/directorio" },
+        { title: "Organigrama", url: null },
+      ],
+    },
+    {
+      label: "Reclutamiento",
+      icon: UserPlus,
+      key: "reclutamiento",
+      items: [
+        { title: "Candidatos", url: "/hr/candidatos" },
+        { title: "Onboarding", url: null },
+        { title: "Offboarding", url: null },
+      ],
+    },
+    {
+      label: "Finanzas Operativas",
+      icon: Wallet,
+      key: "finanzas",
+      items: [
+        { title: "Deducciones", url: null },
+      ],
+    },
   ];
+
+  // Flat list for collapsed dropdown
+  const hrFlatItems = hrGroups.flatMap((g) => g.items.filter((i) => i.url !== null)) as { title: string; url: string }[];
 
   const isHRActive = pathname === "/hr" || pathname.startsWith("/hr/");
 
@@ -208,20 +264,20 @@ const DashboardSidebar = () => {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>RRHH</SidebarGroupLabel>
+          <SidebarGroupLabel>Recursos Humanos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {collapsed ? (
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuButton tooltip="RRHH" className={`sidebar-glass-hover ${isHRActive ? "sidebar-glass-active font-medium" : ""}`}>
+                      <SidebarMenuButton tooltip="Empleados" className={`sidebar-glass-hover ${isHRActive ? "sidebar-glass-active font-medium" : ""}`}>
                         <UserCog className="h-4 w-4 shrink-0" />
-                        <span>RRHH</span>
+                        <span>Empleados</span>
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
-                      {hrSubItems.map((item) => (
+                      {hrFlatItems.map((item) => (
                         <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
                           {item.title}
                         </DropdownMenuItem>
@@ -233,20 +289,51 @@ const DashboardSidebar = () => {
                 <Collapsible defaultOpen={isHRActive} className="group/hrCollapsible">
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="RRHH" className="sidebar-glass-hover">
+                      <SidebarMenuButton tooltip="Empleados" className="sidebar-glass-hover">
                         <UserCog className="h-4 w-4 shrink-0" />
-                        <span>RRHH</span>
+                        <span>Empleados</span>
                         <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/hrCollapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        {hrSubItems.map((item) => (
-                          <SidebarMenuSubItem key={item.url}>
-                            <SidebarMenuSubButton asChild isActive={item.url === "/hr" ? pathname === "/hr" : pathname.startsWith(item.url)} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                              <NavLink to={item.url}>{item.title}</NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                        {hrGroups.map((group) => (
+                          <Collapsible
+                            key={group.key}
+                            defaultOpen={group.items.some((i) => i.url && pathname.startsWith(i.url))}
+                            className={`group/hrGroup-${group.key}`}
+                          >
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="sidebar-glass-hover font-medium text-muted-foreground cursor-pointer w-full justify-between pr-1">
+                                  <span className="flex items-center gap-1.5">
+                                    <group.icon className="h-3.5 w-3.5 shrink-0" />
+                                    {group.label}
+                                  </span>
+                                  <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrGroup-${group.key}:rotate-90`} />
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub>
+                                  {group.items.map((item) =>
+                                    item.url ? (
+                                      <SidebarMenuSubItem key={item.title}>
+                                        <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                          <NavLink to={item.url}>{item.title}</NavLink>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    ) : (
+                                      <SidebarMenuSubItem key={item.title}>
+                                        <SidebarMenuSubButton className="opacity-40 cursor-not-allowed pointer-events-none">
+                                          <span>{item.title}</span>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    )
+                                  )}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
                         ))}
                       </SidebarMenuSub>
                     </CollapsibleContent>
