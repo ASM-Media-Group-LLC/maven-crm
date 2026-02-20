@@ -322,7 +322,7 @@ export default function HRPermisos() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const updateStatus = useMutation({
@@ -361,7 +361,7 @@ export default function HRPermisos() {
       const matchSearch = !search || empName.includes(search.toLowerCase()) || (p.reason ?? "").toLowerCase().includes(search.toLowerCase());
       const matchType = !typeFilter || p.absence_type === typeFilter;
       const matchStatus = !statusFilter || p.status === statusFilter;
-      const matchDept = deptFilter === "all" || emp?.department_id === deptFilter;
+      const matchDept = !deptFilter || emp?.department_id === deptFilter;
       return matchSearch && matchType && matchStatus && matchDept;
     });
   }, [permisos, search, typeFilter, statusFilter, deptFilter]);
@@ -377,14 +377,9 @@ export default function HRPermisos() {
       {/* Header */}
       <header className="shrink-0 border-b bg-background px-6 py-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Clock className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">Permisos</h1>
-              <p className="text-sm text-muted-foreground">Gestiona las solicitudes de permisos de horario</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Permisos</h1>
+            <p className="text-sm text-muted-foreground">Gestiona las solicitudes de permisos de horario</p>
           </div>
           <Button onClick={() => setModalOpen(true)} size="sm">
             <Plus className="h-4 w-4 mr-1" />
@@ -415,9 +410,9 @@ export default function HRPermisos() {
           <div className="flex flex-wrap gap-1 items-center">
             <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
               <Button
-                variant={deptFilter === "all" ? "secondary" : "ghost"}
+                variant={!deptFilter ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => setDeptFilter("all")}
+                onClick={() => setDeptFilter("")}
               >
                 Todos
               </Button>
@@ -447,7 +442,7 @@ export default function HRPermisos() {
             />
           </div>
 
-          <Select value={typeFilter || "__all__"} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
+          <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-44">
               <SelectValue placeholder="Tipo de Permiso" />
             </SelectTrigger>
@@ -459,7 +454,7 @@ export default function HRPermisos() {
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>

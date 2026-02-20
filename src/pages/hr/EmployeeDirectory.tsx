@@ -60,7 +60,7 @@ export default function EmployeeDirectory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nombre, código o email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Select value={deptFilter || "__all__"} onValueChange={(v) => setDeptFilter(v === "__all__" ? "" : v)}>
+        <Select value={deptFilter || undefined} onValueChange={(v) => setDeptFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Departamento" />
           </SelectTrigger>
@@ -71,7 +71,7 @@ export default function EmployeeDirectory() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+        <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-36">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
