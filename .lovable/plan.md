@@ -1,75 +1,50 @@
 
 
-## Fix: Filtros con placeholder correcto + Headers consistentes
+## Mejora de la vista "Nuevo Empleado" — Layout profesional con scroll interno
 
-### Problema 1 — Filtros dicen "Todos" en vez del nombre de la categoria
+### Cambios a implementar en `src/pages/hr/EmployeeNew.tsx`
 
-Actualmente el patron es:
-```tsx
-value={typeFilter || "__all__"}
-```
-Cuando `typeFilter` es `""`, esto resuelve a `"__all__"`, y Radix renderiza el texto del SelectItem: "Todos los tipos". El placeholder nunca se muestra.
+#### 1. Layout full-height con scroll interno
 
-**Fix**: cambiar a `value={typeFilter || undefined}`. Cuando el estado es `""`, Radix recibe `undefined` y muestra el placeholder ("Tipo de Falta", "Estado", "Turno", etc.).
+Reemplazar el contenedor actual (`p-6 max-w-3xl mx-auto space-y-6`) por la arquitectura estandar de la plataforma:
 
-Archivos afectados:
-
-| Archivo | Filtros a corregir |
-|---|---|
-| `HRAttendance.tsx` | `statusFilter` y `shiftFilter` todavia usan `useState("all")` + `<SelectItem value="all">`. Migrar a `useState("")` + `__all__` + `value \|\| undefined` |
-| `HRAbsences.tsx` | `typeFilter` y `statusFilter` ya usan `__all__` pero el `value` resuelve a `"__all__"`. Cambiar a `value \|\| undefined`. Tambien `deptFilter` sigue con `useState("all")` en la logica de filtrado |
-| `HRPermisos.tsx` | `typeFilter` y `statusFilter` misma situacion. `deptFilter` sigue con `useState("all")` |
-| `HRVacations.tsx` | `statusFilter` mismo problema |
-| `EmployeeDirectory.tsx` | `deptFilter` y `statusFilter` misma situacion |
-
-El patron estandar final sera:
-```tsx
-const [typeFilter, setTypeFilter] = useState("");
-
-<Select
-  value={typeFilter || undefined}
-  onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}
->
-  <SelectTrigger><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Todos</SelectItem>
-    ...
-  </SelectContent>
-</Select>
-
-// Filtrado: const matchType = !typeFilter || item.type === typeFilter;
-```
-
-### Problema 2 — Headers inconsistentes (iconos)
-
-Estado actual:
-- `HRAttendance` — tiene icono en caja (ClipboardCheck + bg-primary/10)
-- `HRAbsences` — tiene icono en caja (AlertTriangle + bg-destructive/10)
-- `HRPermisos` — tiene icono en caja (Clock + bg-primary/10)
-- `HRVacations` — NO tiene icono, solo texto
-- `EmployeeDirectory` — usa HRPageHeader con icono
-
-**Fix**: eliminar las cajas de iconos de los headers de HRAttendance, HRAbsences y HRPermisos para que todos sigan el mismo patron limpio sin icono (como HRVacations). El header queda solo con titulo + subtitulo a la izquierda y boton CTA a la derecha.
-
-Patron estandar de header:
 ```text
-<header shrink-0 border-b bg-background px-6 py-4>
-  <div flex items-center justify-between>
-    <div>
-      <h1>Titulo de la Pagina</h1>
-      <p muted>Descripcion breve</p>
-    </div>
-    <Button>+ Accion Principal</Button>
-  </div>
-</header>
+div.flex.flex-col.h-full
+  |-- header (shrink-0, border-b, bg-background, px-6 py-4)
+  |     |-- Boton "Volver al Directorio" con ArrowLeft
+  |     |-- Titulo "Nuevo Empleado" + subtitulo (sin icono)
+  |-- stepper (shrink-0, border-b, bg-background, px-6 py-3)
+  |-- contenido (flex-1, overflow-auto, px-6 py-6)
+  |     |-- Card del paso actual (max-w-3xl mx-auto)
+  |-- footer (shrink-0, border-t, bg-background, px-6 py-4)
+  |     |-- Cancelar | Anterior | Siguiente/Crear
 ```
 
-### Archivos a modificar
+#### 2. Header estandarizado
 
-| Archivo | Cambios |
+- Eliminar el uso de `HRPageHeader` con icono
+- Agregar boton de retorno con `ArrowLeft` + "Volver al Directorio" (patron de detalle de registro)
+- Titulo `text-xl font-semibold` y subtitulo `text-sm text-muted-foreground`
+- Sin caja de icono
+
+#### 3. Stepper fijo
+
+- Mover el stepper a su propia franja `shrink-0` con `border-b` para que no se desplace con el scroll
+- Mantener la misma logica visual (circulos numerados, lineas de progreso)
+
+#### 4. Footer fijo
+
+- Mover los botones de navegacion (Cancelar, Anterior, Siguiente/Crear) a un footer fijo con `shrink-0 border-t`
+- Alinear: Cancelar a la izquierda, Anterior + Siguiente a la derecha
+
+#### 5. Area de contenido con scroll
+
+- El `Card` de cada paso se renderiza dentro de un contenedor `flex-1 overflow-auto` con padding
+- Se aplica `max-w-3xl mx-auto` al contenido interno para mantener el ancho limitado
+
+### Archivo a modificar
+
+| Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRAttendance.tsx` | Eliminar icono del header; migrar filtros `statusFilter`/`shiftFilter` de `"all"` a `""` + `__all__` + `value \|\| undefined` |
-| `src/pages/hr/HRAbsences.tsx` | Eliminar icono del header; cambiar `value` de filtros a `\|\| undefined`; fix `deptFilter` |
-| `src/pages/hr/HRPermisos.tsx` | Eliminar icono del header; cambiar `value` de filtros a `\|\| undefined`; fix `deptFilter` |
-| `src/pages/hr/HRVacations.tsx` | Cambiar `value` de filtro status a `\|\| undefined` |
-| `src/pages/hr/EmployeeDirectory.tsx` | Cambiar `value` de filtros a `\|\| undefined` |
+| `src/pages/hr/EmployeeNew.tsx` | Reestructurar layout completo: header con back button, stepper fijo, contenido scrollable, footer fijo |
+
