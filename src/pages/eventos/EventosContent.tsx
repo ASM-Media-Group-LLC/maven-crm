@@ -100,7 +100,7 @@ const EventosContent = () => {
               <Share2 className="mr-2 h-4 w-4" />
               Compartir Agenda
             </Button>
-            <Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
+            <Button onClick={() => navigate("/eventos/nuevo")}>
               <Plus className="mr-2 h-4 w-4" />
               Crear Evento
             </Button>

@@ -119,7 +119,7 @@ const ContactosContent = () => {
             </p>
           </div>
           {activeTab === "contactos" ? (
-            <Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
+            <Button onClick={() => navigate("/contactos/nuevo")}>
               <Plus className="mr-2 h-4 w-4" />
               Agregar Contacto
             </Button>

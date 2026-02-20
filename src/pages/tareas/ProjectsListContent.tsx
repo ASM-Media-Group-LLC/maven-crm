@@ -149,7 +149,7 @@ const ProjectsListContent = () => {
             <h1 className="text-2xl font-bold">Tareas</h1>
             <p className="text-sm text-muted-foreground">Gestión de tareas y proyectos</p>
           </div>
-          <Button variant="outline" onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo Proyecto
           </Button>
         </div>

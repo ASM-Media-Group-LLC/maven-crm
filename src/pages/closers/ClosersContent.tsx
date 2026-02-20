@@ -40,7 +40,7 @@ const ClosersContent = () => {
               Gestión de deals y llamadas
             </p>
           </div>
-          <Button variant="outline" onClick={() => setShowNewDeal(true)}>
+          <Button onClick={() => setShowNewDeal(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Nuevo Deal
           </Button>
