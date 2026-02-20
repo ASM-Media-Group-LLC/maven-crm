@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
+  UserCog, BookOpen, AlertTriangle, UserCheck,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
