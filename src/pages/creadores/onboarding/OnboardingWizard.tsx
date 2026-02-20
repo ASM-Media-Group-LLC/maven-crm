@@ -324,9 +324,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
                   <div
                     className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-semibold shrink-0 transition-colors ${
                       isDone
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-gradient-to-r from-accent to-primary text-white"
                         : isActive
-                        ? "bg-primary text-primary-foreground ring-2 ring-primary/30"
+                        ? "bg-gradient-to-r from-accent to-primary text-white ring-2 ring-accent/30"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
@@ -340,7 +340,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
               );
             })}
           </div>
-          <Progress value={(step / 4) * 100} className="h-1.5" />
+          <Progress value={(step / 4) * 100} className="h-1.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
         </div>
 
         {/* Step Content */}
