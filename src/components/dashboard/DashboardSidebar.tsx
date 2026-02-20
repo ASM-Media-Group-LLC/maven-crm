@@ -67,7 +67,7 @@ const DashboardSidebar = () => {
       icon: Clock,
       key: "operacion",
       items: [
-        { title: "Asistencia", url: null },
+        { title: "Asistencia", url: "/hr/asistencia" },
         { title: "Ausencias", url: "/hr/ausencias" },
         { title: "Vacaciones", url: null },
         { title: "Licencias", url: null },
