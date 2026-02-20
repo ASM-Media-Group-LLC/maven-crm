@@ -1,54 +1,28 @@
 
-## Agregar "Trafix" a todas las listas de agencias/compañías
+## Mover "Otra" al final en el tab bar de Onboarding
 
-### Archivos afectados y cambios exactos
+### Diagnóstico
 
-**1. `src/pages/creadores/onboarding/OnboardingContent.tsx` — Tab bar del módulo Onboarding**
+Revisando los tres arrays de agencias:
 
-Línea 13 actual:
+| Archivo | Estado actual | ¿Necesita cambio? |
+|---|---|---|
+| `OnboardingContent.tsx` | `["Todas", "Atomic", "Elite", "Kash", "Otra", "Trafix", "Unlok"]` | Sí — "Otra" está en posición 5 |
+| `NuevoCreadorForm.tsx` | `[..., "Trafix", "Otra"]` | No — "Otra" ya es la última |
+| `InfoTabContent.tsx` | `[..., "Unlok Platform", "Otra"]` | No — "Otra" ya es la última |
+
+### Cambio
+
+**`src/pages/creadores/onboarding/OnboardingContent.tsx`**
+
+Antes:
 ```
-const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Unlok Platform"];
+["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Trafix", "Unlok Platform"]
 ```
+
 Después:
 ```
-const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Trafix", "Unlok Platform"];
-```
-Trafix se inserta en orden alfabético, antes de "Unlok Platform".
-
----
-
-**2. `src/pages/creadores/NuevoCreadorForm.tsx` — Select de agencia al registrar un creador nuevo**
-
-Línea 20 actual:
-```
-const AGENCIES = ["Kash Agency", "Atomic Agency", "Unlok Platform", "Elite Models", "ORA Agency", "Exchange", "Otra"];
-```
-Después:
-```
-const AGENCIES = ["Kash Agency", "Atomic Agency", "Unlok Platform", "Elite Models", "ORA Agency", "Exchange", "Trafix", "Otra"];
+["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"]
 ```
 
----
-
-**3. `src/pages/creadores/InfoTabContent.tsx` — Select de agencia en el perfil/edición del creador**
-
-Línea 42 actual:
-```
-const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Otra"];
-```
-Después:
-```
-const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
-```
-
----
-
-### Resumen de archivos
-
-| Archivo | Ubicación del cambio |
-|---|---|
-| `OnboardingContent.tsx` | Array `areaTabs` — tab bar de filtros |
-| `NuevoCreadorForm.tsx` | Array `AGENCIES` — select al crear creador |
-| `InfoTabContent.tsx` | Array `agencyOptions` — select en edición de perfil |
-
-No se necesitan migraciones de base de datos. El valor `"Trafix"` se almacena directamente como texto en la columna `assigned_agency` de la tabla `creator_business_info`, igual que las demás agencias.
+"Otra" se mueve al final. "Trafix" y "Unlok Platform" quedan en orden alfabético entre sí.
