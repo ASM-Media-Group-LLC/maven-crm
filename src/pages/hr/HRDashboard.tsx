@@ -1,24 +1,67 @@
+import { useState } from "react";
 import {
   Users, UserCheck, UserX, Clock, LayoutDashboard, UserPlus,
   CalendarDays, AlertTriangle, TrendingDown, TrendingUp,
-  BookOpen, FileText, Briefcase, Activity, ChevronRight,
-  Percent, Timer, RotateCcw,
+  BookOpen, Briefcase, Activity, ChevronRight,
+  Percent, Timer, RotateCcw, Settings2, Check, UserMinus,
 } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface QuickAction {
+  id: string;
+  label: string;
+  icon: typeof Users;
+  url: string | null;
+  soon?: boolean;
+}
+
+// ─── All available quick actions catalog ────────────────────────────────────
+const ALL_ACTIONS: QuickAction[] = [
+  { id: "ausencias",     label: "Registrar Ausencia", icon: AlertTriangle,  url: "/hr/ausencias" },
+  { id: "directorio",    label: "Ver Directorio",     icon: Users,           url: "/hr/directorio" },
+  { id: "nuevo",         label: "Agregar Empleado",   icon: UserPlus,        url: "/hr/empleado/nuevo" },
+  { id: "candidatos",    label: "Ver Candidatos",     icon: Briefcase,       url: "/hr/candidatos" },
+  { id: "incidentes",    label: "Ver Incidentes",     icon: AlertTriangle,   url: "/hr/incidentes" },
+  { id: "capacitacion",  label: "Ver Capacitación",   icon: BookOpen,        url: "/hr/capacitacion" },
+  { id: "desempeno",     label: "Ver Desempeño",      icon: TrendingUp,      url: "/hr/desempeno" },
+  { id: "asistencia",    label: "Ver Asistencia",     icon: Activity,        url: null, soon: true },
+  { id: "vacaciones",    label: "Vacaciones",          icon: CalendarDays,    url: null, soon: true },
+  { id: "horarios",      label: "Horarios",            icon: Clock,           url: null, soon: true },
+];
+
+const DEFAULT_ACTION_IDS = ["ausencias", "directorio", "nuevo", "candidatos"];
+const MAX_SHORTCUTS = 4;
+const LS_KEY = "hr_quick_actions";
+
+function loadShortcuts(): string[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return DEFAULT_ACTION_IDS;
+}
+
+// ─── Pending absences hook ────────────────────────────────────────────────────
 function usePendingAbsences() {
   return useQuery({
     queryKey: ["absences-pending"],
@@ -43,96 +86,112 @@ const absenceTypeLabel: Record<string, string> = {
   otro: "Otro",
 };
 
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function HRDashboard() {
   const { data: employees = [], isLoading } = useEmployees();
   const { data: pendingAbsences = [], isLoading: absencesLoading } = usePendingAbsences();
   const navigate = useNavigate();
 
+  // Quick actions state
+  const [selectedIds, setSelectedIds] = useState<string[]>(loadShortcuts);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
+
+  function openConfig() {
+    setDraftIds([...selectedIds]);
+    setConfigOpen(true);
+  }
+
+  function toggleDraft(id: string, soon?: boolean) {
+    if (soon) return;
+    setDraftIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_SHORTCUTS) return prev;
+      return [...prev, id];
+    });
+  }
+
+  function saveConfig() {
+    setSelectedIds(draftIds);
+    localStorage.setItem(LS_KEY, JSON.stringify(draftIds));
+    setConfigOpen(false);
+  }
+
+  // Stats
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
   const twelveMonthsAgo = subDays(now, 365);
 
-  const total = employees.length;
-  const activos = employees.filter((e) => e.status === "activo").length;
-  const enLicencia = employees.filter((e) => e.status === "en_licencia").length;
-  const vacaciones = employees.filter((e) => e.status === "vacaciones").length;
+  const total        = employees.length;
+  const activos      = employees.filter((e) => e.status === "activo").length;
+  const enLicencia   = employees.filter((e) => e.status === "en_licencia").length;
+  const vacaciones   = employees.filter((e) => e.status === "vacaciones").length;
+  const inactivos    = employees.filter((e) => e.status === "inactivo").length;
+  const nuevos30d    = employees.filter((e) => e.hire_date && new Date(e.hire_date) >= thirtyDaysAgo).length;
+  const terminados30d  = employees.filter((e) => e.termination_date && new Date(e.termination_date) >= thirtyDaysAgo).length;
+  const terminados12m  = employees.filter((e) => e.termination_date && new Date(e.termination_date) >= twelveMonthsAgo).length;
 
-  // Nuevos en los últimos 30 días (En Onboarding)
-  const nuevos30d = employees.filter(
-    (e) => e.hire_date && new Date(e.hire_date) >= thirtyDaysAgo
-  ).length;
-
-  // Terminados en los últimos 30 días (Retiros)
-  const terminados30d = employees.filter(
-    (e) => e.termination_date && new Date(e.termination_date) >= thirtyDaysAgo
-  ).length;
-
-  // Terminados en los últimos 12 meses
-  const terminados12m = employees.filter(
-    (e) => e.termination_date && new Date(e.termination_date) >= twelveMonthsAgo
-  ).length;
-
-  // Rotación 30d = terminados / total * 100
-  const rotacion30d = total > 0 ? ((terminados30d / total) * 100).toFixed(1) : "0.0";
-  // % Ingresos 30d
+  const rotacion30d  = total > 0 ? ((terminados30d / total) * 100).toFixed(1) : "0.0";
   const pctIngresos30d = total > 0 ? ((nuevos30d / total) * 100).toFixed(1) : "0.0";
-  // Rotación 12m
-  const rotacion12m = total > 0 ? ((terminados12m / total) * 100).toFixed(1) : "0.0";
+  const rotacion12m  = total > 0 ? ((terminados12m / total) * 100).toFixed(1) : "0.0";
 
-  // Antigüedad promedio (en días → meses)
   const avgAntiguedadDays =
     employees.filter((e) => e.hire_date).length > 0
-      ? employees
-          .filter((e) => e.hire_date)
-          .reduce((acc, e) => acc + differenceInDays(now, new Date(e.hire_date!)), 0) /
+      ? employees.filter((e) => e.hire_date).reduce((acc, e) => acc + differenceInDays(now, new Date(e.hire_date!)), 0) /
         employees.filter((e) => e.hire_date).length
       : 0;
   const avgAntiguedadMeses = Math.round(avgAntiguedadDays / 30);
 
+  const pct = (n: number) => total > 0 ? `${((n / total) * 100).toFixed(0)}% del total` : "—";
+
+  // Active shortcuts
+  const activeActions = selectedIds
+    .map((id) => ALL_ACTIONS.find((a) => a.id === id))
+    .filter(Boolean) as QuickAction[];
+
   const rotacionCards = [
-    { label: "Rotación 30d", value: `${rotacion30d}%`, color: "bg-red-950/40 border-red-800/30", icon: RotateCcw, textColor: "text-red-300" },
-    { label: "Retiros 30d", value: `${terminados30d}`, color: "bg-orange-950/40 border-orange-800/30", icon: TrendingDown, textColor: "text-orange-300" },
-    { label: "% Ingresos 30d", value: `${pctIngresos30d}%`, color: "bg-green-950/40 border-green-800/30", icon: TrendingUp, textColor: "text-green-300" },
-    { label: "Antigüedad Prom.", value: `${avgAntiguedadMeses}m`, color: "bg-blue-950/40 border-blue-800/30", icon: Timer, textColor: "text-blue-300" },
-    { label: "Rotación 12m", value: `${rotacion12m}%`, color: "bg-purple-950/40 border-purple-800/30", icon: Percent, textColor: "text-purple-300" },
+    { label: "Rotación 30d",   value: `${rotacion30d}%`,      color: "bg-destructive/10 border-destructive/20", icon: RotateCcw,    textColor: "text-destructive" },
+    { label: "Retiros 30d",    value: `${terminados30d}`,      color: "bg-orange-950/40 border-orange-800/30",   icon: TrendingDown,  textColor: "text-orange-300" },
+    { label: "% Ingresos 30d", value: `${pctIngresos30d}%`,   color: "bg-success/10 border-success/20",         icon: TrendingUp,    textColor: "text-success" },
+    { label: "Antigüedad Prom.", value: `${avgAntiguedadMeses}m`, color: "bg-primary/10 border-primary/20",     icon: Timer,         textColor: "text-primary" },
+    { label: "Rotación 12m",   value: `${rotacion12m}%`,      color: "bg-muted border-border",                  icon: Percent,       textColor: "text-muted-foreground" },
   ];
 
-  const quickActions = [
-    { label: "Registrar Ausencia", icon: AlertTriangle, url: "/hr/ausencias" },
-    { label: "Ver Asistencia", icon: Activity, url: null },
-    { label: "Ver Directorio", icon: Users, url: "/hr/directorio" },
-    { label: "Agregar Empleado", icon: UserPlus, url: "/hr/empleado/nuevo" },
+  const teamStatus = [
+    { label: "Activos",      value: activos,    subtitle: pct(activos),    icon: UserCheck,  color: "bg-success/10 border-success/20",       textColor: "text-success" },
+    { label: "En Licencia",  value: enLicencia, subtitle: pct(enLicencia), icon: Clock,      color: "bg-warning/10 border-warning/20",        textColor: "text-warning" },
+    { label: "Vacaciones",   value: vacaciones, subtitle: pct(vacaciones), icon: CalendarDays, color: "bg-blue-500/10 border-blue-500/20",    textColor: "text-blue-400" },
+    { label: "Inactivos",    value: inactivos,  subtitle: pct(inactivos),  icon: UserMinus,  color: "bg-destructive/10 border-destructive/20", textColor: "text-destructive" },
+    { label: "Nuevos (30d)", value: nuevos30d,  subtitle: pct(nuevos30d),  icon: UserPlus,   color: "bg-primary/10 border-primary/20",        textColor: "text-primary" },
+    { label: "Total",        value: total,      subtitle: "plantilla",     icon: Users,      color: "bg-muted border-border",                  textColor: "text-foreground" },
   ];
 
   const hrModules = [
-    { label: "Asistencia", icon: Activity, url: null },
-    { label: "Vacaciones", icon: CalendarDays, url: null },
-    { label: "Horarios", icon: Clock, url: null },
-    { label: "Capacitación", icon: BookOpen, url: "/hr/capacitacion" },
-    { label: "Incidentes", icon: AlertTriangle, url: "/hr/incidentes" },
-    { label: "Candidatos", icon: Briefcase, url: "/hr/candidatos" },
-  ];
-
-  const teamSummary = [
-    { label: "Activos", value: activos, color: "bg-green-950/40 border-green-800/30", textColor: "text-green-300" },
-    { label: "En Licencia", value: enLicencia, color: "bg-yellow-950/40 border-yellow-800/30", textColor: "text-yellow-300" },
-    { label: "Nuevos (30d)", value: nuevos30d, color: "bg-blue-950/40 border-blue-800/30", textColor: "text-blue-300" },
-    { label: "Total", value: total, color: "bg-primary/10 border-primary/20", textColor: "text-primary" },
+    { label: "Asistencia",  icon: Activity,     url: null },
+    { label: "Vacaciones",  icon: CalendarDays, url: null },
+    { label: "Horarios",    icon: Clock,        url: null },
+    { label: "Capacitación",icon: BookOpen,     url: "/hr/capacitacion" },
+    { label: "Incidentes",  icon: AlertTriangle,url: "/hr/incidentes" },
+    { label: "Candidatos",  icon: Briefcase,    url: "/hr/candidatos" },
   ];
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="p-6 space-y-5">
-        <HRPageHeader
-          title="Dashboard RRHH"
-          subtitle="Resumen de recursos humanos"
-          icon={LayoutDashboard}
-          actions={
-            <Button onClick={() => navigate("/hr/empleado/nuevo")} size="sm">
-              + Nuevo Empleado
-            </Button>
-          }
-        />
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Dashboard RRHH</h2>
+            <p className="text-sm text-muted-foreground">Vista general de recursos humanos</p>
+          </div>
+          <Button onClick={() => navigate("/hr/empleado/nuevo")} size="sm">
+            + Nuevo Empleado
+          </Button>
+        </div>
+      </header>
+
+      {/* ── Scrollable content ────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto p-6 space-y-5">
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -140,10 +199,35 @@ export default function HRDashboard() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <HRMetricCard title="Total Empleados" value={total} icon={Users} color="primary" subtitle="En nómina" />
-              <HRMetricCard title="Check-ins Hoy" value={0} icon={UserCheck} color="success" subtitle="Sin sistema de asistencia" />
-              <HRMetricCard title="Ausencias Pend." value={pendingAbsences.length} icon={AlertTriangle} color="warning" subtitle="Pendientes de revisión" />
-              <HRMetricCard title="En Onboarding" value={nuevos30d} icon={UserPlus} color="default" subtitle="Ingresos últimos 30d" />
+              <DashboardMetricCard
+                label="Total Empleados"
+                value={String(total)}
+                icon={Users}
+                subtitle="En nómina"
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40"
+              />
+              <DashboardMetricCard
+                label="Check-ins Hoy"
+                value="0"
+                icon={UserCheck}
+                subtitle="Sin sistema de asistencia"
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40"
+              />
+              <DashboardMetricCard
+                label="Ausencias Pend."
+                value={String(pendingAbsences.length)}
+                icon={AlertTriangle}
+                subtitle="Pendientes de revisión"
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40"
+                valueColor={pendingAbsences.length > 0 ? "text-warning" : undefined}
+              />
+              <DashboardMetricCard
+                label="En Onboarding"
+                value={String(nuevos30d)}
+                icon={UserPlus}
+                subtitle="Ingresos últimos 30d"
+                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/10 hover:border-primary/30"
+              />
             </>
           )}
         </div>
@@ -159,10 +243,7 @@ export default function HRDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {rotacionCards.map((card) => (
-                <div
-                  key={card.label}
-                  className={cn("rounded-lg border p-3 flex flex-col gap-1", card.color)}
-                >
+                <div key={card.label} className={cn("rounded-lg border p-3 flex flex-col gap-1", card.color)}>
                   <div className="flex items-center gap-1.5">
                     <card.icon className={cn("h-3.5 w-3.5", card.textColor)} />
                     <span className="text-xs text-muted-foreground">{card.label}</span>
@@ -174,20 +255,33 @@ export default function HRDashboard() {
           </CardContent>
         </Card>
 
-        {/* Acciones Rápidas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map((action) => (
-            <Button
-              key={action.label}
-              variant="outline"
-              className={cn("flex items-center gap-2 h-10 justify-start", !action.url && "opacity-50 cursor-not-allowed")}
-              onClick={() => action.url && navigate(action.url)}
-              disabled={!action.url}
-            >
-              <action.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate text-sm">{action.label}</span>
+        {/* Quick Actions */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Acciones Rápidas</p>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground" onClick={openConfig}>
+              <Settings2 className="h-3.5 w-3.5" />
+              Configurar
             </Button>
-          ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {activeActions.map((action) => (
+              <Button
+                key={action.id}
+                variant="outline"
+                className="flex items-center gap-2 h-10 justify-start"
+                onClick={() => action.url && navigate(action.url)}
+              >
+                <action.icon className="h-4 w-4 shrink-0" />
+                <span className="truncate text-sm">{action.label}</span>
+              </Button>
+            ))}
+            {activeActions.length === 0 && (
+              <p className="col-span-4 text-sm text-muted-foreground text-center py-4">
+                No hay accesos configurados. Haz clic en "Configurar" para agregar.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Solicitudes + Módulos */}
@@ -250,9 +344,7 @@ export default function HRDashboard() {
                     disabled={!mod.url}
                     className={cn(
                       "flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
-                      mod.url
-                        ? "hover:bg-muted/50 cursor-pointer"
-                        : "opacity-40 cursor-not-allowed"
+                      mod.url ? "hover:bg-muted/50 cursor-pointer" : "opacity-40 cursor-not-allowed"
                     )}
                   >
                     <mod.icon className="h-5 w-5 text-muted-foreground" />
@@ -264,21 +356,75 @@ export default function HRDashboard() {
           </Card>
         </div>
 
-        {/* Resumen del Equipo */}
+        {/* Estado Actual de la Plantilla */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Resumen del Equipo</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Estado Actual de la Plantilla</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {isLoading
-              ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)
-              : teamSummary.map((item) => (
-                  <div key={item.label} className={cn("rounded-lg border p-3 flex items-center justify-between", item.color)}>
-                    <span className="text-xs text-muted-foreground">{item.label}</span>
-                    <span className={cn("text-2xl font-bold", item.textColor)}>{item.value}</span>
+              ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)
+              : teamStatus.map((item) => (
+                  <div key={item.label} className={cn("rounded-lg border p-3 flex flex-col gap-1.5", item.color)}>
+                    <div className="flex items-center gap-1.5">
+                      <item.icon className={cn("h-3.5 w-3.5", item.textColor)} />
+                      <span className="text-xs text-muted-foreground">{item.label}</span>
+                    </div>
+                    <span className={cn("text-2xl font-bold leading-none", item.textColor)}>{item.value}</span>
+                    <span className="text-xs text-muted-foreground leading-tight">{item.subtitle}</span>
                   </div>
                 ))}
           </div>
         </div>
       </div>
+
+      {/* ── Quick Actions Config Dialog ──────────────────────────────── */}
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Configurar Acciones Rápidas
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground -mt-1">
+            Selecciona hasta {MAX_SHORTCUTS} accesos directos para mostrar en el dashboard.
+          </p>
+          <div className="space-y-2 py-1">
+            {ALL_ACTIONS.map((action) => {
+              const isChecked = draftIds.includes(action.id);
+              const isDisabled = action.soon || (!isChecked && draftIds.length >= MAX_SHORTCUTS);
+              return (
+                <div
+                  key={action.id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+                    isChecked ? "border-primary/40 bg-primary/5" : "border-border",
+                    !action.soon && !isDisabled ? "cursor-pointer hover:bg-muted/50" : "",
+                    action.soon ? "opacity-50" : "",
+                  )}
+                  onClick={() => toggleDraft(action.id, action.soon)}
+                >
+                  <Checkbox
+                    checked={isChecked}
+                    disabled={isDisabled}
+                    onCheckedChange={() => toggleDraft(action.id, action.soon)}
+                  />
+                  <action.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className={cn("text-sm font-medium", action.soon && "text-muted-foreground")}>{action.label}</p>
+                    {action.soon && <p className="text-xs text-muted-foreground">Próximamente</p>}
+                  </div>
+                  {isChecked && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">{draftIds.length}/{MAX_SHORTCUTS} seleccionados</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+            <Button onClick={saveConfig}>Guardar cambios</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
