@@ -1,70 +1,51 @@
 
-## Agregar acciones de Editar y Eliminar en Asistencia, Ausencias, Vacaciones y Permisos
 
-### Situacion actual
+## Completar Editar y Eliminar en HRPermisos
 
-| Pagina | Acciones disponibles | Falta |
-|---|---|---|
-| HRAttendance | Ninguna (no hay columna de acciones) | Editar + Eliminar |
-| HRAbsences | Ver (Eye) + Aprobar/Rechazar | Editar + Eliminar |
-| HRVacations | Ver (Eye) + Aprobar/Rechazar | Editar + Eliminar |
-| HRPermisos | Ver (Eye) + Aprobar/Rechazar | Editar + Eliminar |
+### Contexto
 
-Las cuatro paginas usan la tabla `absences` (ausencias, vacaciones, permisos) o `attendance` (asistencia), y ya tienen mutaciones para actualizar el status pero no para editar campos ni eliminar registros.
+El archivo `src/pages/hr/HRPermisos.tsx` ya tiene los imports necesarios (`Pencil`, `Trash2`, `AlertDialog` components) pero le falta la logica, modales y botones de editar/eliminar.
 
-### Cambios por archivo
+### Cambios en `src/pages/hr/HRPermisos.tsx`
 
-#### 1. `src/pages/hr/HRAttendance.tsx`
-- Agregar columna **Acciones** (sticky right) en la tabla
-- **Editar**: Boton `Pencil` que abre un modal `EditAttendanceModal` con campos: empleado (readonly), fecha, turno, horario, check-in, check-out, estado, notas
-- **Eliminar**: Boton `Trash2` que abre un `AlertDialog` de confirmacion y ejecuta `supabase.from("attendance").delete().eq("id", id)`
-- Agregar la mutacion `deleteMutation` y `editMutation` con `useQueryClient().invalidateQueries`
+#### 1. Agregar estados (despues de linea 325)
 
-#### 2. `src/pages/hr/HRAbsences.tsx`
-- Agregar boton `Pencil` junto al `Eye` en la tabla y en la grid
-- **Editar**: Modal `EditAbsenceModal` con campos: empleado (readonly), tipo de ausencia, fecha inicio, fecha fin, motivo, notas
-- **Eliminar**: Boton `Trash2` con `AlertDialog` de confirmacion, ejecuta `supabase.from("absences").delete().eq("id", id)`
-- Agregar mutaciones `deleteMutation` y `editMutation`
+Nuevos estados `editData` y `deleteId` para controlar los modales de edicion y eliminacion.
 
-#### 3. `src/pages/hr/HRVacations.tsx`
-- Agregar botones `Pencil` y `Trash2` en la funcion `renderActions` junto al `Eye` existente
-- **Editar**: Modal `EditVacationModal` con campos: empleado (readonly), tipo, fecha inicio, fecha fin, dias totales, motivo
-- **Eliminar**: `AlertDialog` de confirmacion con delete en `absences`
-- Agregar mutaciones correspondientes
+#### 2. Agregar mutaciones (despues de `updateStatus`, linea 345)
 
-#### 4. `src/pages/hr/HRPermisos.tsx`
-- Agregar botones `Pencil` y `Trash2` en tabla y grid junto al `Eye` existente
-- **Editar**: Modal `EditPermisoModal` con campos: empleado (readonly), tipo de permiso, fecha, horario (notes), motivo
-- **Eliminar**: `AlertDialog` de confirmacion con delete en `absences`
-- Agregar mutaciones correspondientes
+- **editMutation**: `supabase.from("absences").update({ absence_type, start_date, end_date, notes, reason }).eq("id", id)` con invalidacion de query `["permisos"]`
+- **deleteMutation**: `supabase.from("absences").delete().eq("id", id)` con invalidacion de query `["permisos"]`
 
-### Detalle tecnico
+#### 3. Agregar botones en la tabla (lineas 566-583)
 
-Cada archivo recibira tres adiciones internas (sin crear archivos nuevos):
-
-1. **Mutacion de edicion**: `useMutation` que hace `supabase.from("tabla").update(data).eq("id", id)` e invalida la query correspondiente
-2. **Mutacion de eliminacion**: `useMutation` que hace `supabase.from("tabla").delete().eq("id", id)` e invalida la query
-3. **Modal de edicion**: Componente inline con `Dialog` que muestra un formulario con los campos editables. El empleado se muestra como texto readonly (no editable)
-4. **Dialog de eliminacion**: `AlertDialog` con mensaje "Esta accion no se puede deshacer" y botones Cancelar / Eliminar (destructive)
-5. **Botones en tabla/grid**: `Pencil` (editar) y `Trash2` (eliminar) como `Button variant="ghost" size="sm" className="h-7 w-7 p-0"`
-
-Patron de acciones en cada fila:
+Insertar botones `Pencil` y `Trash2` en la celda de acciones, junto al `Eye` y los botones de aprobar/rechazar existentes:
 
 ```text
-[ Eye (ver) ] [ Pencil (editar) ] [ Check/X (aprobar/rechazar, solo si pending) ] [ Trash2 (eliminar) ]
+[ Eye ] [ Pencil ] [ Check/X si pending ] [ Trash2 ]
 ```
 
-Para Asistencia (sin aprobar/rechazar):
+#### 4. Agregar botones en la grid (lineas 639-652)
 
-```text
-[ Pencil (editar) ] [ Trash2 (eliminar) ]
-```
+Insertar botones `Pencil` y `Trash2` en la seccion de acciones de cada card, mismo patron.
 
-### Archivos a modificar
+#### 5. Agregar EditPermisoModal (componente inline)
+
+Modal con `Dialog` que permite editar:
+- Tipo de permiso (Select con PERMISSION_TYPES)
+- Fecha (DatePicker)
+- Horario (Input, campo `notes`)
+- Motivo (Textarea, campo `reason`)
+
+El empleado se muestra como texto readonly.
+
+#### 6. Agregar AlertDialog de eliminacion
+
+Dialog de confirmacion con mensaje "Esta accion no se puede deshacer" y botones Cancelar / Eliminar (destructive). Se renderiza al final junto con los otros modales.
+
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRAttendance.tsx` | Agregar columna Acciones con Pencil + Trash2, modal de edicion, dialog de eliminacion, mutaciones |
-| `src/pages/hr/HRAbsences.tsx` | Agregar Pencil + Trash2 en tabla y grid, modal de edicion, dialog de eliminacion, mutaciones |
-| `src/pages/hr/HRVacations.tsx` | Agregar Pencil + Trash2 en renderActions, modal de edicion, dialog de eliminacion, mutaciones |
-| `src/pages/hr/HRPermisos.tsx` | Agregar Pencil + Trash2 en tabla y grid, modal de edicion, dialog de eliminacion, mutaciones |
+| `src/pages/hr/HRPermisos.tsx` | Agregar estados, mutaciones, botones Pencil+Trash2 en tabla y grid, modal de edicion, dialog de eliminacion |
+
