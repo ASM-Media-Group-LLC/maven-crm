@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SHIFTS = ["Mañana", "Tarde", "Noche"];
@@ -32,6 +33,10 @@ export interface Step4Data {
   pricing: Record<string, ServicePricing>;
   monthlyGoal: string;
   notes: string;
+  permisoIdentidadReal: string;
+  terminosAfecto: string;
+  restriccionesSeguridad: string;
+  orientacionPerfil: string;
 }
 
 interface Props {
@@ -99,6 +104,50 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               ))}
             </TableBody>
           </Table>
+        </div>
+      </div>
+
+      {/* Interaction Config */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Permiso de uso de identidad real</Label>
+          <Select value={data.permisoIdentidadReal} onValueChange={(v) => onChange("permisoIdentidadReal", v)}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="si">Sí</SelectItem>
+              <SelectItem value="no">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Orientación declarada para el perfil</Label>
+          <Select value={data.orientacionPerfil} onValueChange={(v) => onChange("orientacionPerfil", v)}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Heterosexual">Heterosexual</SelectItem>
+              <SelectItem value="Bisexual">Bisexual</SelectItem>
+              <SelectItem value="Lesbiana">Lesbiana</SelectItem>
+              <SelectItem value="Gay">Gay</SelectItem>
+              <SelectItem value="Otro">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Preferencia de términos de afecto</Label>
+          <Input
+            value={data.terminosAfecto}
+            onChange={(e) => onChange("terminosAfecto", e.target.value)}
+            placeholder="Ej: mi amor, bebe, cariño..."
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Restricciones de seguridad y contenido no permitido</Label>
+          <Textarea
+            value={data.restriccionesSeguridad}
+            onChange={(e) => onChange("restriccionesSeguridad", e.target.value)}
+            placeholder="Describe restricciones..."
+            rows={3}
+          />
         </div>
       </div>
 
