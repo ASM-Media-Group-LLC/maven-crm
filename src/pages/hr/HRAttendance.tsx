@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, differenceInMinutes } from "date-fns";
@@ -347,7 +347,7 @@ export default function HRAttendance() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
-  const [deptTab, setDeptTab] = useState("all");
+  const [deptTab, setDeptTab] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [dateFromOpen, setDateFromOpen] = useState(false);
@@ -366,7 +366,7 @@ export default function HRAttendance() {
     const matchSearch = !search || fullName.includes(search.toLowerCase());
     const matchStatus = !statusFilter || r.status === statusFilter;
     const matchShift  = !shiftFilter || r.shift === shiftFilter;
-    const matchDept   = deptTab === "all" || emp?.department_id === deptTab;
+    const matchDept   = !deptTab || emp?.department_id === deptTab;
     const recordDate  = new Date(r.date);
     const matchFrom   = !dateFrom || recordDate >= dateFrom;
     const matchTo     = !dateTo   || recordDate <= dateTo;
@@ -433,14 +433,25 @@ export default function HRAttendance() {
         </div>
 
         {/* Department Tabs */}
-        <Tabs value={deptTab} onValueChange={setDeptTab}>
-          <TabsList className="h-auto flex-wrap gap-1 bg-muted/50">
-            <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
-            {departments.map((d) => (
-              <TabsTrigger key={d.id} value={d.id} className="text-xs">{d.name}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <Button
+            variant={!deptTab ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setDeptTab("")}
+          >
+            Todos
+          </Button>
+          {departments.map((d) => (
+            <Button
+              key={d.id}
+              variant={deptTab === d.id ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setDeptTab(d.id)}
+            >
+              {d.name}
+            </Button>
+          ))}
+        </div>
 
         {/* Filter row */}
         <div className="flex flex-wrap items-center gap-2">
