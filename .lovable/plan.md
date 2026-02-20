@@ -1,82 +1,131 @@
 
-## Tres cambios en IA Ventas
+## Estandarización: botón `default` (primary) para la acción principal de cada sección
 
-### 1. Sidebar — quitar el engranaje de "IA Ventas"
+### La regla corregida
 
-`src/components/dashboard/DashboardSidebar.tsx`:
-- Quitar el renderizado especial de "IA Ventas" con el botón de Settings.
-- Devolver "IA Ventas" a un `SidebarMenuSubItem` estándar (como Dashboard y Reportes).
-- Quitar "Config IA" del dropdown del estado colapsado.
-
-Resultado del submenú Ventas:
-```text
-Ventas ▾
-  ├─ Dashboard   → /sales-overview
-  ├─ Reportes    → /salesdashboard
-  └─ IA Ventas   → /aisales
-```
+El botón `default` (gradiente azul-morado) es el CTA principal de la plataforma. Debe usarse para **la acción de creación primaria en cada header de sección**. Las acciones secundarias (compartir, exportar, acción adicional) van en `outline`.
 
 ---
 
-### 2. Página IA Ventas — header con acciones
+### Mapa completo de cambios por sección
 
-`src/pages/AiSales.tsx`: añadir un header sticky con tres acciones a la derecha:
-
-| Botón | Ícono | Acción |
+| Sección | Botón principal → `default` | Botón secundario → `outline` (ya correcto o ajustar) |
 |---|---|---|
-| Configuración | `Settings` | Navega a `/ai-sales-config` |
-| Archivar chat | `Archive` | Limpia el historial de mensajes |
+| **Creadores** | "Agregar Creador" | — |
+| **Contactos** | "Agregar Contacto" | "Agregar Agencia" (secundario, queda `outline`) |
+| **Eventos** | "Crear Evento" | "Compartir Agenda" (secundario, queda `outline`) |
+| **Tickets** | "Nuevo Ticket" | — |
+| **Tareas (Proyectos)** | "Nuevo Proyecto" | — |
+| **Tareas (dentro de proyecto)** | "Nueva Tarea" | — |
+| **Onboarding** | "Iniciar Onboarding" | — |
+| **LeadGen** | "Agregar Lead" (texto completo) | "Agregar Contacto" (queda `outline`) |
+| **Closers** | "Nuevo Deal" | — |
 
-Para archivar: se usa un `resetKey` (estado numérico) como `key` del componente `ClariAiChat`. Al incrementarlo, React desmonta y vuelve a montar el componente, restableciendo todo el estado de mensajes de forma limpia sin necesidad de pasar props extra.
+### Detalles técnicos por archivo
 
----
-
-### 3. Componente ClariAiChat — botón de voz (micrófono)
-
-`src/components/ClariAiChat.tsx`:
-
-**Tecnología**: Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`), nativa en el navegador, sin costo ni API key adicional. Compatible con Chrome, Edge y Safari.
-
-**Comportamiento**:
-- Nuevo botón de micrófono (`Mic` / `MicOff`) junto al botón de enviar.
-- Al hacer clic: inicia grabación y muestra el ícono en rojo con una animación de pulso (`animate-pulse`).
-- Mientras graba: el texto reconocido aparece en tiempo real en el textarea (resultados interinos).
-- Al terminar de hablar: el texto final queda en el input listo para enviar (o se puede enviar automáticamente).
-- Si el browser no soporta la API: el botón se oculta.
-
-**Implementación**:
+**`src/pages/creadores/CreadoresContent.tsx`** (línea 43):
 ```tsx
-const recognition = useRef<SpeechRecognition | null>(null);
-const [isRecording, setIsRecording] = useState(false);
-
-const toggleRecording = () => {
-  if (isRecording) {
-    recognition.current?.stop();
-    return;
-  }
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRec) return;
-  const rec = new SpeechRec();
-  rec.lang = "es-ES";
-  rec.continuous = false;
-  rec.interimResults = true;
-  rec.onresult = (e) => {
-    const transcript = Array.from(e.results).map(r => r[0].transcript).join("");
-    setInput(transcript);
-  };
-  rec.onend = () => setIsRecording(false);
-  rec.start();
-  setIsRecording(true);
-  recognition.current = rec;
-};
+// Antes
+<Button variant="outline" onClick={() => navigate("/creadores/nuevo")}>
+// Después
+<Button onClick={() => navigate("/creadores/nuevo")}>
 ```
 
----
+**`src/pages/contactos/ContactosContent.tsx`** (línea 122):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => navigate("/contactos/nuevo")}>
+// Después
+<Button onClick={() => navigate("/contactos/nuevo")}>
+// "Agregar Agencia" permanece outline (acción secundaria)
+```
 
-### Archivos a modificar
+**`src/pages/eventos/EventosContent.tsx`** (línea 103):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => navigate("/eventos/nuevo")}>
+// Después
+<Button onClick={() => navigate("/eventos/nuevo")}>
+// "Compartir Agenda" permanece outline
+```
 
-| Archivo | Cambios |
-|---|---|
-| `src/components/dashboard/DashboardSidebar.tsx` | Quitar gear icon y volver IA Ventas a link estándar |
-| `src/pages/AiSales.tsx` | Añadir header con Settings + Archive |
-| `src/components/ClariAiChat.tsx` | Añadir botón de micrófono con Web Speech API |
+**`src/pages/tickets/TicketsContent.tsx`** (línea 83):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => setModalOpen(true)}>
+// Después
+<Button onClick={() => setModalOpen(true)}>
+```
+
+**`src/pages/tareas/ProjectsListContent.tsx`** (línea 152):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => setCreateOpen(true)}>
+// Después
+<Button onClick={() => setCreateOpen(true)}>
+```
+
+**`src/pages/tareas/TareasContent.tsx`** (línea 129):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => setCreateOpen(true)}>
+// Después
+<Button onClick={() => setCreateOpen(true)}>
+```
+
+**`src/pages/creadores/onboarding/OnboardingContent.tsx`** (línea 62):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => setShowWizard(true)}>
+// Después
+<Button onClick={() => setShowWizard(true)}>
+```
+
+**`src/pages/leadgen/LeadGenContent.tsx`** (líneas 121-128):
+```tsx
+// Antes - texto corto "Lead" en outline
+<Button variant="outline" size="sm" onClick={() => setAddLeadOpen(true)}>
+  <Plus className="h-4 w-4" />
+  Lead
+</Button>
+<Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
+  <UserPlus className="h-4 w-4" />
+  Contacto
+</Button>
+
+// Después - "Agregar Lead" como default (primary), "Agregar Contacto" outline
+<Button size="sm" onClick={() => setAddLeadOpen(true)}>
+  <Plus className="h-4 w-4" />
+  Agregar Lead
+</Button>
+<Button variant="outline" size="sm" onClick={() => setAddContactoOpen(true)}>
+  <UserPlus className="h-4 w-4" />
+  Agregar Contacto
+</Button>
+```
+
+**`src/pages/closers/ClosersContent.tsx`** (línea 43):
+```tsx
+// Antes
+<Button variant="outline" onClick={() => setShowNewDeal(true)}>
+// Después
+<Button onClick={() => setShowNewDeal(true)}>
+```
+
+### Archivos a modificar (9 archivos)
+
+1. `src/pages/creadores/CreadoresContent.tsx`
+2. `src/pages/contactos/ContactosContent.tsx`
+3. `src/pages/eventos/EventosContent.tsx`
+4. `src/pages/tickets/TicketsContent.tsx`
+5. `src/pages/tareas/ProjectsListContent.tsx`
+6. `src/pages/tareas/TareasContent.tsx`
+7. `src/pages/creadores/onboarding/OnboardingContent.tsx`
+8. `src/pages/leadgen/LeadGenContent.tsx`
+9. `src/pages/closers/ClosersContent.tsx`
+
+### Actualización de la regla en el design system
+
+Se actualizará la memoria `style/contextual-button-usage-v2` para reflejar:
+- Acción **principal** de header de sección → variante `default` (gradiente primary)
+- Acciones **secundarias** de header → variante `outline`
