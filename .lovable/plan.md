@@ -1,73 +1,73 @@
 
-## Dos mejoras: Sidebar HR compacto + Dashboard de Recursos Humanos rediseñado
+## Problema: Sidebar y Topbar ausentes en todas las páginas internas de HR
 
-### Problema 1: Submenú HR con títulos en dos líneas
+### Causa Raíz
 
-Los labels de los grupos anidados en el sidebar de RRHH son demasiado largos para caber en una línea en el espacio disponible:
-- "Seguimiento y Control" → **"Seguimiento"**
-- "Finanzas Operativas" → **"Finanzas"**
-- "Operación Diaria" → **"Operaciones"**
-- "Reclutamiento" → queda bien
-- "Desarrollo" → queda bien
-- "Información" → queda bien
+Cada página HR (`HRDashboard`, `EmployeeDirectory`, `EmployeeNew`, `EmployeeProfile`, `HRAbsences`, `HRIncidents`, `HRApplicants`, `HRTraining`, `HRPerformance`) devuelve únicamente su contenido propio — un `<div className="p-6 ...">` — **sin el shell de layout** (`SidebarProvider + DashboardSidebar + DashboardTopbar`).
 
-Además, añadir un enlace directo al Dashboard de HR (`/hr`) como primer sub-item de la sección, antes de los grupos colapsables, para que el usuario pueda navegar directamente al dashboard.
+El patrón correcto, como en `Tickets.tsx` y `OnboardingPage.tsx`, es envolver el contenido en:
 
-**Archivo:** `src/components/dashboard/DashboardSidebar.tsx`
-
-Cambios en el array `hrGroups`:
 ```
-"Operación Diaria"      → "Operaciones"
-"Seguimiento y Control" → "Seguimiento"
-"Finanzas Operativas"   → "Finanzas"
+<SidebarProvider>
+  <div className="flex h-screen w-full overflow-hidden">
+    <DashboardSidebar />
+    <div className="flex flex-1 flex-col min-w-0">
+      <DashboardTopbar />
+      <contenido-de-la-página />
+    </div>
+  </div>
+</SidebarProvider>
 ```
 
-También añadir un item directo "Dashboard" (con `LayoutDashboard` icon) apuntando a `/hr` antes de los grupos expandibles.
+Ninguna de las 9 páginas HR tiene este wrapper, por eso el sidebar y el topbar desaparecen al navegar a cualquier ruta `/hr/*`.
 
 ---
 
-### Problema 2: Rediseño del HR Dashboard
+### Solución: Crear un HRLayout compartido
 
-El `HRDashboard.tsx` actual solo tiene 4 KPI cards básicas + distribución por departamento + contrataciones recientes.
+En lugar de repetir el mismo boilerplate en las 9 páginas, se crea **un único componente de layout** `src/pages/hr/HRLayout.tsx` que actúa como shell reutilizable:
 
-La referencia visual muestra:
-
-**Sección 1 - KPI Cards superiores** (4 tarjetas):
-- Total Empleados, Check-ins Hoy (= 0 placeholder), Ausencias Pendientes (pendientes de revisión), En Onboarding (nuevos en 30d)
-
-**Sección 2 - Rotación y Retención** (card contenedor con 5 mini-cards):
-- Rotación 30d (%), Retiros 30d (#), % Ingresos 30d, Antigüedad Promedio, Rotación 12m
-- Cada mini-card tiene fondo de color sutil (rojo oscuro, naranja oscuro, verde oscuro, azul oscuro, púrpura oscuro)
-
-**Sección 3 - Acciones Rápidas** (4 botones horizontales):
-- Registrar Ausencia → `/hr/ausencias`
-- Ver Asistencia → (placeholder)
-- Ver Directorio → `/hr/directorio`
-- Agregar Empleado → `/hr/empleado/nuevo`
-
-**Sección 4 - Dos columnas**:
-- **Solicitudes Pendientes** (lado izquierdo): Lista de ausencias con estado `pendiente`, usando datos de la tabla `absences`. Botón "Ver todas →"
-- **Módulos HR** (lado derecho): Grid 2x3 de tarjetas de navegación (Asistencia, Vacaciones, Horarios, Capacitación, Incidentes, Candidatos) + botón "Exportar Arquitectura"
-
-**Sección 5 - Resumen del Equipo** (4 mini-cards con fondo de color):
-- Activos, En Licencia, Nuevos (30d), Total
+```tsx
+// src/pages/hr/HRLayout.tsx
+const HRLayout = ({ children }) => (
+  <SidebarProvider>
+    <div className="flex h-screen w-full overflow-hidden">
+      <DashboardSidebar />
+      <div className="flex flex-1 flex-col min-w-0">
+        <DashboardTopbar />
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  </SidebarProvider>
+);
+```
 
 ---
 
-### Datos requeridos
-
-Para las métricas de rotación se calculan desde los datos ya disponibles:
-- `employees` (hook `useEmployees`)
-- `absences` (query directa a Supabase para las pendientes)
-- Métricas calculadas en el componente (no requieren tablas nuevas)
-
-Para "Ausencias pendientes" se necesita una query a la tabla `absences` con `status = 'pending'`. Se puede hacer con un hook inline en el mismo componente.
-
----
-
-### Archivos a modificar
+### Archivos a crear/modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/components/dashboard/DashboardSidebar.tsx` | Acortar labels HR, añadir link directo a Dashboard HR |
-| `src/pages/hr/HRDashboard.tsx` | Rediseño completo siguiendo la referencia visual |
+| `src/pages/hr/HRLayout.tsx` | **Nuevo** — shell de layout compartido para todo el módulo HR |
+| `src/App.tsx` | Envolver las 9 rutas HR con `<HRLayout>` dentro de `<ProtectedRoute>` |
+
+Las 9 rutas afectadas:
+- `/hr` → `HRDashboard`
+- `/hr/directorio` → `EmployeeDirectory`
+- `/hr/empleado/nuevo` → `EmployeeNew`
+- `/hr/empleado/:id` → `EmployeeProfile`
+- `/hr/ausencias` → `HRAbsences`
+- `/hr/incidentes` → `HRIncidents`
+- `/hr/candidatos` → `HRApplicants`
+- `/hr/capacitacion` → `HRTraining`
+- `/hr/desempeno` → `HRPerformance`
+
+**Nota:** Los archivos de contenido HR (`HRDashboard.tsx`, `EmployeeDirectory.tsx`, etc.) **no se modifican** — solo se envuelven desde `App.tsx`. Esto es más limpio y sigue exactamente el mismo patrón de otras páginas como `Tickets.tsx` (que tiene su propio wrapper) pero centralizado en un solo lugar.
+
+---
+
+### Sin cambios a las páginas HR individuales
+
+Las páginas internas ya están correctamente construidas como componentes de contenido puro. Solo faltaba el shell de layout. Este enfoque minimiza el riesgo de introducir errores.
