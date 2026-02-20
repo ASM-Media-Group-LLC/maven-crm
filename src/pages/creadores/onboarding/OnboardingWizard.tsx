@@ -74,6 +74,7 @@ export default function OnboardingWizard({ onCancel }: Props) {
 
   const handleNext = () => {
     if (!validateCurrentStep()) return;
+    toast({ title: `Paso ${step} completado` });
     setStep((s) => Math.min(s + 1, 4));
   };
 
@@ -205,6 +206,7 @@ export default function OnboardingWizard({ onCancel }: Props) {
     setStep4(initialStep4);
     setStep1Errors({});
     setStep3DocErrors({});
+    toast({ title: "Edición cancelada" });
     onCancel();
   };
 
@@ -215,7 +217,7 @@ export default function OnboardingWizard({ onCancel }: Props) {
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold leading-none tracking-tight">Iniciar Onboarding</h2>
-          <p className="text-sm text-muted-foreground mt-1.5">Completa la información del nuevo creador en 4 pasos</p>
+          <p className="text-sm text-muted-foreground mt-1.5">4 pasos para completar el registro</p>
         </div>
         <Button variant="ghost" size="sm" onClick={resetAndClose} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -256,7 +258,7 @@ export default function OnboardingWizard({ onCancel }: Props) {
         </div>
 
         {/* Step Content */}
-        <div>
+        <div key={step} className="animate-fade-in">
           {step === 1 && <Step1PersonalInfo data={step1} errors={step1Errors} onChange={updateStep1} />}
           {step === 2 && <Step2PsychologyLimits data={step2Psy} onChange={updateStep2Psy} />}
           {step === 3 && <Step2Documentation data={step3Doc} errors={step3DocErrors} tempId={tempId} onChange={updateStep3Doc} />}

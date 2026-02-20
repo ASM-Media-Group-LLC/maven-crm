@@ -56,7 +56,7 @@ const OnboardingContent = () => {
         <div className="flex items-center justify-between mt-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Onboarding</h1>
-            <p className="text-sm text-muted-foreground">Gestiona el proceso de onboarding de nuevos creadores</p>
+            <p className="text-sm text-muted-foreground">Gestiona el onboarding de nuevos creadores</p>
           </div>
           {!showWizard && (
             <Button onClick={() => setShowWizard(true)}>
@@ -70,16 +70,18 @@ const OnboardingContent = () => {
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
         {/* KPI Cards - always visible */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-          <DashboardMetricCard label="Total Onboarding" value={String(total)} icon={Users} />
+          <DashboardMetricCard label="Total" value={String(total)} icon={Users} />
           <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} valueColor="text-amber-500" />
           <DashboardMetricCard label="En Progreso" value={String(inProgress)} icon={Loader2} valueColor="text-blue-500" />
           <DashboardMetricCard label="Completados" value={String(completed)} icon={CheckCircle2} valueColor="text-emerald-500" />
         </div>
 
         {showWizard ? (
-          <OnboardingWizard onCancel={() => setShowWizard(false)} />
+          <div key="wizard" className="animate-fade-in">
+            <OnboardingWizard onCancel={() => setShowWizard(false)} />
+          </div>
         ) : (
-          <>
+          <div key="list" className="animate-fade-in">
             {/* Area Tabs */}
             <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
               {areaTabs.map((tab) => (
@@ -95,7 +97,7 @@ const OnboardingContent = () => {
             </div>
 
             {/* Filters */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-4 mt-4">
               <div className="relative max-w-sm flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -120,12 +122,16 @@ const OnboardingContent = () => {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : view === "table" ? (
-              <OnboardingTable data={filtered} />
             ) : (
-              <OnboardingGrid data={filtered} />
+              <div key={view} className="animate-fade-in mt-4">
+                {view === "table" ? (
+                  <OnboardingTable data={filtered} />
+                ) : (
+                  <OnboardingGrid data={filtered} />
+                )}
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
