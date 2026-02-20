@@ -15,8 +15,8 @@ const SERVICES = [
   { key: "cat_4", label: "Backdoor" },
   { key: "contenido_personalizado", label: "Contenido Personalizado" },
   { key: "valoracion_medios", label: "D-Rating" },
-  { key: "sesiones_video", label: "Sesiones de Video en Vivo" },
-  { key: "envio_articulos", label: "Envío de Artículos Físicos" },
+  { key: "sesiones_video", label: "Videollamadas" },
+  { key: "envio_articulos", label: "Venta de Ropa Interior" },
 ] as const;
 
 export interface ScheduleGrid {
