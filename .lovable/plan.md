@@ -1,47 +1,75 @@
 
-## Correcciones: Header de Asistencia + Módulo de Ausencias completo
+## Plan: Eliminar Licencias + Construir módulo Permisos completo + Fix de filtros
 
-### Problema 1 — Header de Control de Asistencia
+### Contexto del estado actual
 
-El header actual usa `text-2xl font-bold` en lugar de `text-xl font-semibold`, que es el estándar de la plataforma. Comparando con otros módulos como Vacaciones y Creadores, el título debe ser `text-xl font-semibold` para mantener la jerarquía visual consistente.
+- `Licencias` en el sidebar tiene `url: null` — no existe página, solo es un placeholder. Se elimina del sidebar.
+- `Permisos` en el sidebar tiene `url: null` — tampoco existe. Se construye desde cero.
+- No existe ningún archivo `HRPermisos.tsx` ni `HRLicencias.tsx`.
+- El problema de filtros en `HRAbsences.tsx` y `HRVacations.tsx`: los selects están inicializados con `value="all"` y tienen un `<SelectItem value="all">Todos los tipos</SelectItem>`. Esto hace que Radix UI muestre el texto del item seleccionado ("Todos los tipos"), **no** el placeholder. El placeholder en Shadcn/Radix solo se muestra cuando el valor es `undefined` o `""`.
 
-**Cambio:**
+### Problema de filtros — Fix estándar
+
+El patrón correcto para que el Select muestre el nombre de la categoría como placeholder por defecto:
+
 ```tsx
-// Línea 386 — ACTUAL
-<h2 className="text-2xl font-bold tracking-tight">Control de Asistencia</h2>
+// ANTES — muestra "Todos los tipos" o "Todos" (texto del SelectItem con value="all")
+const [typeFilter, setTypeFilter] = useState("all");
+<Select value={typeFilter} onValueChange={setTypeFilter}>
+  <SelectTrigger><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todos los tipos</SelectItem>
+    ...
+  </SelectContent>
+</Select>
 
-// CORRECTO
-<h1 className="text-xl font-semibold text-foreground">Control de Asistencia</h1>
+// DESPUÉS — muestra "Tipo de Falta" (placeholder) cuando no hay filtro activo
+const [typeFilter, setTypeFilter] = useState("");
+<Select value={typeFilter} onValueChange={setTypeFilter}>
+  <SelectTrigger><SelectValue placeholder="Tipo de Falta" /></SelectTrigger>
+  <SelectContent>
+    <SelectItem value="">Todos</SelectItem>  {/* ← value="" dispara reset */}
+    ...
+  </SelectContent>
+</Select>
+// En el filtrado: matchType = !typeFilter || a.absence_type === typeFilter
 ```
+
+Este fix aplica a **`HRAbsences.tsx`** (Tipo de Falta + Estado) y a **`HRVacations.tsx`** (Estado), y se implementará también en el nuevo módulo de Permisos desde el inicio.
 
 ---
 
-### Problema 2 — HRAbsences: Reconstrucción completa
+### Módulo Permisos — Tabla de datos
 
-El módulo actual es una página básica sin seguir el estándar de la plataforma. La imagen de referencia muestra exactamente la estructura requerida:
+Se reutiliza la tabla `absences` filtrando por `absence_type IN (tipos de permiso)`. No se requiere migración.
 
-**Estado actual (incompleto):**
-- Layout: `p-6 space-y-5` (sin scroll interno, sin h-full)
-- Sin KPI cards
-- Sin tabs de departamento
-- Sin búsqueda ni toggle lista/grid
-- Modal sin header/footer fijos (no sigue el patrón `!flex !flex-col gap-0`)
-- Sin vista Grid
+Los tipos de permiso son:
+- `permiso_remoto` — Trabajo Remoto
+- `salida_temprana` — Salida Temprana
+- `llegada_tarde` — Llegada Tarde
+- `permiso_personal` — Permiso Personal
+- `permiso_medico` — Permiso Médico
+- `permiso_academico` — Permiso Académico
+- `permiso_diligencia` — Diligencia Personal
 
-**Estado requerido (basado en imagen de referencia y estándar de plataforma):**
+Estos coinciden con los tipos mostrados en la imagen de referencia (el badge "Trabajo Remoto" y "Salida Temprana" son visibles).
+
+---
+
+### Estructura del módulo Permisos (`HRPermisos.tsx`)
 
 ```text
 <div className="flex flex-col h-full overflow-hidden">
   ┌─ Header shrink-0 ─────────────────────────────────────────┐
-  │  [⚠] Ausencias / Faltas                  [+ Registrar Falta] │
-  │  Faltas injustificadas y sin aviso previo                 │
+  │  [🕐] Permisos              [+ Solicitar Permiso]         │
+  │  Gestiona las solicitudes de permisos de horario          │
   └───────────────────────────────────────────────────────────┘
   ┌─ flex-1 overflow-auto p-6 ────────────────────────────────┐
-  │  KPI Cards: Total Faltas | Pendientes | Este Mes          │
+  │  KPI Cards: Total | Pendientes | Aprobados | Este Mes     │
   │                                                           │
   │  Department tabs: Todos | Ventas | LeadGen | ...          │
   │                                                           │
-  │  Filter row: [🔍] [Todos los tipos ▾] [Todos ▾] [📅] [≡ ⊞] │
+  │  Filter row: [🔍] [Tipo de Permiso ▾] [Estado ▾] [📅] [≡⊞] │
   │  "Mostrando X de Y registros"                             │
   │                                                           │
   │  Tabla / Grid (sticky header, sticky acciones)            │
@@ -49,89 +77,101 @@ El módulo actual es una página básica sin seguir el estándar de la plataform
 </div>
 ```
 
----
-
-### KPI Cards (3 cards — según imagen de referencia)
+**KPI Cards (4):**
 
 | Card | Valor | Icono | Color |
 |---|---|---|---|
-| Total Faltas | `count(all)` | `AlertTriangle` | `primary` |
+| Total | `count(all)` | `FileText` | `primary` |
 | Pendientes | `status === 'pending'` | `Clock` | `warning` |
+| Aprobados | `status === 'approved'` | `CheckCircle2` | `success` |
 | Este Mes | Registros del mes actual | `CalendarDays` | `primary` |
 
----
-
-### Tabla (vista Lista)
-
-Columnas según imagen de referencia:
+**Columnas de tabla (según imagen de referencia):**
 
 | Columna | Detalle |
 |---|---|
-| Empleado | Avatar iniciales + nombre bold + cargo debajo |
-| Tipo de Falta | Badge con el tipo (colores semánticos) |
-| Fechas | Rango compacto: "19 dic - 21 dic" |
-| Días | Número en círculo |
-| Observaciones | Texto truncado |
-| Estado | Badge: Pendiente Justificar (warning) / Aprobada (success) / Rechazada (destructive) |
-| Acciones | ✓ (aprobar) + ✗ (rechazar) + 👁 (ver), sticky right |
+| Empleado | Avatar iniciales + nombre bold + correo debajo |
+| Tipo | Badge de color con icono (Trabajo Remoto, Salida Temprana, etc.) |
+| Fecha | Fecha formateada (una sola fecha para permisos, no rango) |
+| Horario | Campo `notes` con el horario (ej. "14:00") |
+| Motivo | Texto truncado |
+| Estado | Badge: Pendiente / Aprobado / Rechazado |
+| Acciones | ✓ + ✗ + 👁 si pending; solo 👁 si no |
+
+**Vista Grid:** Cards con misma info que la tabla.
+
+**Modal "Solicitar Permiso"** (patrón `!flex !flex-col gap-0`):
+- Empleado (`EmployeeSearchCombobox`)
+- Tipo de Permiso (`Select` con los 7 tipos)
+- Fecha (`Popover` + `Calendar` — un solo día, no rango)
+- Horario (campo `notes` — Input de texto, ej. "14:00 - 17:00")
+- Motivo (`Textarea`)
+- Botón CTA: `variant="default"` — "Crear Solicitud"
+
+**Filtros con fix de placeholder:**
+- Búsqueda: `Buscar por nombre o mot...`
+- Tipo de Permiso: placeholder "Tipo de Permiso" (no "Todos los tipos")
+- Estado: placeholder "Estado" (no "Todos")
+- DateRangePicker o fecha puntual para filtrar
+- Toggle Lista/Grid
 
 ---
 
-### Vista Grid
+### Archivos a crear / modificar
 
-Cards por ausencia:
-- Avatar iniciales + nombre + cargo
-- Badge tipo de falta + badge estado
-- Fechas (rango) + días
-- Observaciones (line-clamp-2)
-- Footer: acciones (✓/✗/👁)
+| Archivo | Operación | Detalle |
+|---|---|---|
+| `src/pages/hr/HRPermisos.tsx` | **Crear** | Módulo completo de permisos |
+| `src/lib/hrConstants.ts` | **Modificar** | Agregar `PERMISSION_TYPES` array con los 7 tipos |
+| `src/App.tsx` | **Modificar** | Agregar import + ruta `/hr/permisos` |
+| `src/components/dashboard/DashboardSidebar.tsx` | **Modificar** | Eliminar "Licencias", activar "Permisos" → `/hr/permisos` |
+| `src/pages/hr/HRAbsences.tsx` | **Modificar** | Fix filtros: `"all"` → `""` en `typeFilter` y `statusFilter` |
+| `src/pages/hr/HRVacations.tsx` | **Modificar** | Fix filtro: `"all"` → `""` en `statusFilter` |
 
 ---
 
-### Modal "Registrar Falta" (patrón estándar con header + scroll + footer fijos)
+### Fix de lógica de filtrado tras cambio de valor vacío
 
-Siguiendo exactamente la imagen de referencia:
-```text
-DialogContent "!flex !flex-col gap-0 max-w-md p-0 overflow-hidden"
-  DialogHeader shrink-0 (border-b)
-    ⚠ Registrar Falta
-    "Registra una falta injustificada o sin aviso previo"
-  div flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4
-    Empleado * (EmployeeSearchCombobox)
-    Tipo de Falta * (Select con icono y descripción)
-    Fecha Inicio * + Fecha Fin * (grid 2 cols, Popover calendar)
-    Observaciones (Textarea)
-  DialogFooter shrink-0 (border-t)
-    Cancelar | + Registrar Falta (variant="destructive")
+Tras el cambio de `"all"` a `""`:
+
+```tsx
+// HRAbsences — filtered useMemo
+const matchType = !typeFilter || a.absence_type === typeFilter;
+const matchStatus = !statusFilter || a.status === statusFilter;
+
+// HRPermisos — mismo patrón
+const matchType = !typeFilter || a.absence_type === typeFilter;
+const matchStatus = !statusFilter || a.status === statusFilter;
 ```
 
-El botón de submit usa `variant="destructive"` (rojo) como en la imagen de referencia, por tratarse de una acción de registro de falta — diferente del estándar azul de creación normal.
+---
+
+### Datos para el modal de permisos
+
+El modal guarda en `absences` con:
+- `absence_type`: valor del tipo seleccionado (ej. `"permiso_remoto"`)
+- `start_date` = `end_date`: la fecha del permiso (un solo día)
+- `total_days`: 1
+- `notes`: el horario capturado (ej. "14:00 - 17:00")
+- `reason`: el motivo ingresado
+- `status`: `'pending'`
 
 ---
 
-### Filtros
+### Colores semánticos de badges por tipo de permiso
 
-- **Búsqueda**: Input con icono Search (buscar por empleado o razón)
-- **Todos los tipos**: Select con `ABSENCE_TYPES` + "Todos los tipos"  
-- **Todos**: Select de estado (Todos / Pendiente / Aprobada / Rechazada)
-- **Filtrar por fecha**: Popover con DateRangePicker compacto
-- **Toggle Lista/Grid**: Botones con `ListIcon` y `LayoutGrid`
-
----
-
-### Tabs de departamento
-
-Mismo patrón que Asistencia: `inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1` con botones `secondary`/`ghost`.
-
-La query de absences se actualiza para incluir `employees(first_name, last_name, employee_code, job_title, department_id, departments(id, name))`.
-
----
-
-### Archivos a modificar
-
-| Archivo | Cambio |
+| Tipo | Color badge |
 |---|---|
-| `src/pages/hr/HRAttendance.tsx` | Línea 386: `text-2xl font-bold tracking-tight` → `text-xl font-semibold text-foreground` |
-| `src/pages/hr/HRAbsences.tsx` | Reconstrucción completa con layout estándar, KPIs, tabla, grid, modal con patrón fijo |
+| permiso_remoto | azul/blue |
+| salida_temprana | naranja/amber |
+| llegada_tarde | naranja/orange |
+| permiso_personal | violeta/violet |
+| permiso_medico | verde/emerald |
+| permiso_academico | cian/cyan |
+| permiso_diligencia | rosa/rose |
 
-La tabla `absences` ya tiene todos los campos necesarios. No se requieren migraciones de base de datos.
+---
+
+### No requiere migración de base de datos
+
+La tabla `absences` ya soporta cualquier `absence_type` (campo de texto libre). Los nuevos tipos de permiso se almacenan como nuevos valores en ese campo. El filtro en la query excluye tipos de ausencia ya usados por HRAbsences (`enfermedad`, `accidente`, etc.) y tipos usados por HRVacations (`vacaciones`, `dia_personal`), usando `.in("absence_type", PERMISSION_TYPES.map(t => t.value))`.
