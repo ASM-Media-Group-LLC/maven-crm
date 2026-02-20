@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Pencil, Upload, X, ImageIcon, Film, FileText, Save } from "lucide-react";
+import { Pencil, Upload, X, ImageIcon, Film, FileText, Save, Check, ChevronsUpDown, Plus } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -11,6 +11,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
@@ -24,7 +27,9 @@ const CATEGORIES = [
   { value: "C", label: "C (Básica)" },
 ];
 
-const COMPANIES = ["KASH Agency", "alvaroletshoot", "Blue app", "Piclink.me", "Pagomundo", "Exchange", "Unlok"];
+const DEFAULT_COMPANIES = [
+  "Kash", "Alvaro Letshoot", "Blue App", "PicLink", "Pagomundo", "Exchange", "Unlok", "Trafix",
+];
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
 
 const COUNTRY_CODES = [
@@ -55,6 +60,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
   const [extraFiles, setExtraFiles] = useState<UploadedFile[]>([]);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
+  const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const tempId = useMemo(() => crypto.randomUUID(), []);
 
   // Sync form when contacto changes
@@ -133,12 +139,12 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               {/* Compañía */}
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Compañía</Label>
-                <Select value={compania} onValueChange={setCompania}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar compañía" /></SelectTrigger>
-                  <SelectContent>
-                    {COMPANIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <CompanySelector
+                  value={compania}
+                  onChange={setCompania}
+                  companies={companies}
+                  onAddCompany={(name) => setCompanies((prev) => [...prev, name])}
+                />
               </div>
 
               {/* Email + Teléfono */}
@@ -250,5 +256,94 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     </>
   );
 };
+
+interface CompanySelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+  companies: string[];
+  onAddCompany: (name: string) => void;
+}
+
+function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySelectorProps) {
+  const [open, setOpen] = useState(false);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const handleAdd = () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    onAddCompany(trimmed);
+    onChange(trimmed);
+    setNewName("");
+    setAddingNew(false);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setAddingNew(false); }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          {value || <span className="text-muted-foreground">Seleccionar compañía</span>}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0" align="start">
+        {addingNew ? (
+          <div className="p-3 space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Nueva compañía</p>
+            <Input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Nombre de la compañía"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+                if (e.key === "Escape") { setAddingNew(false); setNewName(""); }
+              }}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>
+                Agregar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Command>
+            <CommandInput placeholder="Buscar compañía..." />
+            <CommandList>
+              <CommandEmpty>Sin resultados.</CommandEmpty>
+              <CommandGroup>
+                {companies.map((c) => (
+                  <CommandItem
+                    key={c}
+                    value={c}
+                    onSelect={() => { onChange(c === value ? "" : c); setOpen(false); }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", value === c ? "opacity-100" : "opacity-0")} />
+                    {c}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+              <CommandGroup>
+                <CommandItem onSelect={() => setAddingNew(true)} className="text-muted-foreground">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar nueva compañía…
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default EditContactoModal;
