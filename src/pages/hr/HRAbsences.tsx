@@ -343,8 +343,8 @@ export default function HRAbsences() {
   const [modalOpen, setModalOpen] = useState(false);
   const [viewAbsence, setViewAbsence] = useState<AbsenceRecord | null>(null);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
@@ -382,8 +382,8 @@ export default function HRAbsences() {
       const emp = (a as any).employees;
       const empName = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
       const matchSearch = !search || empName.includes(search.toLowerCase()) || (a.notes ?? "").toLowerCase().includes(search.toLowerCase());
-      const matchType = typeFilter === "all" || a.absence_type === typeFilter;
-      const matchStatus = statusFilter === "all" || a.status === statusFilter;
+      const matchType = !typeFilter || a.absence_type === typeFilter;
+      const matchStatus = !statusFilter || a.status === statusFilter;
       const matchDept = deptFilter === "all" || emp?.department_id === deptFilter;
       return matchSearch && matchType && matchStatus && matchDept;
     });
@@ -472,10 +472,10 @@ export default function HRAbsences() {
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-44 h-9">
-              <SelectValue placeholder="Todos los tipos" />
+              <SelectValue placeholder="Tipo de Falta" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="">Todos los tipos</SelectItem>
               {ABSENCE_TYPES.map((t) => (
                 <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
               ))}
@@ -484,10 +484,10 @@ export default function HRAbsences() {
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-36 h-9">
-              <SelectValue placeholder="Todos" />
+              <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="">Todos</SelectItem>
               {ABSENCE_STATUSES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
               ))}
