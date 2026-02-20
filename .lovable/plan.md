@@ -1,179 +1,96 @@
 
-## Módulo de Empleados (RRHH) — Plan de Implementación
+## Agregar sección RRHH al Sidebar
 
-Este plan cubre la implementación completa del módulo de Recursos Humanos basado en el documento de arquitectura "Empleados 2.0", adaptado al stack y convenciones del proyecto actual (React 18, TypeScript, Supabase, Tailwind, shadcn/ui).
+### Diagnóstico
 
----
-
-### Alcance y estrategia
-
-El documento define 36 rutas, 29 componentes, 22 tablas y una arquitectura compleja. Para entregarlo de forma funcional, sólida y no saturar el codebase, se implementará en **fases priorizadas**:
-
-**Fase 1 — Base estructural (este PR):**
-- Migración de base de datos (13 tablas core)
-- Sidebar actualizado con sección RRHH
-- Rutas registradas en App.tsx
-- Dashboard principal de RRHH
-- Directorio de empleados (listado + alta + perfil)
-- Módulos de operación diaria (Ausencias, Vacaciones, Incidentes)
-- Reclutamiento (Candidatos)
-- Constantes y utilidades centralizadas
-
----
-
-### Base de datos — 13 tablas (migración única)
-
-Las tablas se crean en este orden para respetar dependencias:
+El sidebar actual (`DashboardSidebar.tsx`) tiene esta estructura:
 
 ```text
-1. departments
-2. positions
-3. employees  (central — self-join + FK a departments/positions/profiles)
-4. absences
-5. overtime
-6. time_bank + time_bank_balances
-7. employee_incidents
-8. employee_deductions
-9. performance_evaluations
-10. applicants
-11. employee_onboarding + employee_onboarding_tasks
-12. employee_offboarding
-13. employee_documents
-14. training_programs + employee_training_assignments
+Menú Principal
+  - Dashboard, Contactos, Tareas, Eventos
+  - [Creadores] (colapsable)
+  - [Ventas] (colapsable)
+
+Operaciones
+  - Promolog, LeadGen, Closers, Tickets
+
+Administración (solo admins)
+  - Usuarios, Auditoría
+
+Recursos
+  - Design System, Docs, Roadmap
 ```
 
-Todas con RLS habilitado y políticas permisivas para usuarios autenticados (igual que el resto del sistema). La tabla `employees` incluye el trigger `generate_employee_code` (auto-código por departamento).
-
-Se **omiten** tablas de `shifts` y `attendance` en esta primera fase por su complejidad de modelo de turnos rotativos — quedarán como Fase 2.
+La sección RRHH **falta completamente** — quedó pendiente en la implementación anterior. Se agrega entre Operaciones y Administración como un nuevo `SidebarGroup` colapsable con el mismo patrón que Creadores y Ventas.
 
 ---
 
-### Estructura de archivos
+### Cambios en `src/components/dashboard/DashboardSidebar.tsx`
+
+**1. Import del icono adicional**
+
+`UserCog` ya está importado. Se necesita agregar `Building2` para Directorio (o usar `Users` que también ya existe). Se usará `UserCog` para el grupo raíz y los iconos existentes para los sub-ítems.
+
+**2. Sub-ítems del módulo RRHH**
+
+```ts
+const hrSubItems = [
+  { title: "Dashboard", url: "/hr" },
+  { title: "Directorio", url: "/hr/directorio" },
+  { title: "Ausencias", url: "/hr/ausencias" },
+  { title: "Incidentes", url: "/hr/incidentes" },
+  { title: "Candidatos", url: "/hr/candidatos" },
+];
+```
+
+**3. Lógica de estado activo**
+
+```ts
+const isHRActive = pathname === "/hr" || pathname.startsWith("/hr/");
+```
+
+**4. Nuevo grupo colapsable — igual al patrón de Creadores/Ventas**
+
+- En modo **expandido**: `Collapsible` con `ChevronRight` giratorio, `defaultOpen={isHRActive}`, mismo `group/hrCollapsible` pattern
+- En modo **colapsado**: `DropdownMenu` lateral con los sub-ítems
+
+**5. Posición en el sidebar**
+
+Se inserta el nuevo `SidebarGroup` con label "RRHH" **después** del grupo "Operaciones" y **antes** del grupo "Administración" (visible solo para admins).
+
+---
+
+### Estructura final del sidebar
 
 ```text
-src/
-  lib/
-    hrConstants.ts          ← Constantes centralizadas del documento
-    hrAreaUtils.ts          ← Mapeo departamento→área→color
-  hooks/
-    useEmployees.ts         ← Listado de empleados con join
-    useEmployee.ts          ← Empleado individual por ID
-  pages/
-    hr/
-      HRDashboard.tsx       ← Dashboard principal RRHH (KPIs, distribuciones)
-      EmployeeDirectory.tsx ← Directorio con filtros y tab bar
-      EmployeeNew.tsx       ← Formulario de alta multi-sección
-      EmployeeProfile.tsx   ← Perfil con tabs (Info, Documentos, Evaluaciones, etc.)
-      HRAbsences.tsx        ← Gestión de ausencias
-      HRIncidents.tsx       ← Registro de incidentes laborales
-      HRApplicants.tsx      ← Pipeline de candidatos
-      HRTraining.tsx        ← Programas de capacitación
-      HRPerformance.tsx     ← Evaluaciones de desempeño
-  components/
-    hr/
-      HRPageHeader.tsx      ← Header estándar HR (título + acciones)
-      HRMetricCard.tsx      ← KPI card para dashboards
-      EmployeeStatusBadge.tsx
-      EmployeeAreaBadge.tsx
-      EmployeeSearchCombobox.tsx
+Menú Principal
+  - Dashboard, Contactos, Tareas, Eventos
+  - [Creadores] → Dashboard / Listado / Onboarding
+  - [Ventas] → Dashboard / Reportes / IA Ventas
+
+Operaciones
+  - Promolog, LeadGen, Closers, Tickets
+
+RRHH                          ← NUEVO
+  - Dashboard (/hr)
+  - Directorio (/hr/directorio)
+  - Ausencias (/hr/ausencias)
+  - Incidentes (/hr/incidentes)
+  - Candidatos (/hr/candidatos)
+
+Administración (solo admins)
+  - Usuarios, Auditoría
+
+Recursos
+  - Design System, Docs, Roadmap
 ```
 
 ---
 
-### Rutas a registrar en App.tsx
+### Archivos a modificar
 
-Se adaptan las rutas del documento al prefijo `/hr` (sin `/app`) para consistencia con el resto del sistema:
-
-| Ruta | Página |
+| Archivo | Cambio |
 |---|---|
-| `/hr` | HRDashboard |
-| `/hr/directorio` | EmployeeDirectory |
-| `/hr/empleado/nuevo` | EmployeeNew |
-| `/hr/empleado/:id` | EmployeeProfile |
-| `/hr/ausencias` | HRAbsences |
-| `/hr/incidentes` | HRIncidents |
-| `/hr/candidatos` | HRApplicants |
-| `/hr/capacitacion` | HRTraining |
-| `/hr/desempeno` | HRPerformance |
+| `src/components/dashboard/DashboardSidebar.tsx` | Agregar array `hrSubItems`, lógica `isHRActive`, y nuevo `SidebarGroup` "RRHH" con collapsible+dropdown |
 
----
-
-### Sidebar — Nueva sección RRHH
-
-Se agrega en `DashboardSidebar.tsx` un grupo colapsable **"RRHH"** entre Operaciones y Administración con icono `UserCog`, con sub-items: Dashboard, Directorio, Ausencias, Incidentes, Candidatos.
-
----
-
-### Páginas a implementar
-
-**HRDashboard** — Métricas KPI (total empleados, activos, en licencia, vacantes) + distribución por departamento + contrataciones recientes.
-
-**EmployeeDirectory** — Tabla/grid de empleados con búsqueda, filtro por departamento/estado, badge de área colorido, y botón "Nuevo Empleado".
-
-**EmployeeNew** — Formulario multi-sección con react-hook-form + zod: datos personales, datos laborales (departamento, cargo, contrato), seguridad social (EPS, ARL, AFP), datos bancarios.
-
-**EmployeeProfile** — Página con tabs: Info general | Documentos | Evaluaciones | Capacitación | Incidentes | Historial.
-
-**HRAbsences** — Listado de ausencias con estado (pendiente/aprobada/rechazada), botón de aprobar/rechazar inline, filtro por tipo.
-
-**HRIncidents** — Registro de incidentes por empleado con severidad (Baja/Media/Alta/Crítica), estado (abierto/cerrado), y acción correctiva.
-
-**HRApplicants** — Pipeline kanban-style con columnas por estado (Postulado → Revisión → Entrevista → Oferta → Contratado/Rechazado).
-
-**HRTraining** — Listado de programas de capacitación asignados con barra de progreso y estado.
-
-**HRPerformance** — Evaluaciones de desempeño periódicas con calificación y scores.
-
----
-
-### Componentes compartidos HR
-
-- `HRPageHeader` — Header con título, subtítulo y slot de acciones (igual que el patrón del resto del sistema)
-- `HRMetricCard` — KPI card con icono, valor, trend y color
-- `EmployeeStatusBadge` — Badge de estado (Activo/Inactivo/En Licencia/Suspendido)
-- `EmployeeAreaBadge` — Badge colorido por área/departamento
-- `EmployeeSearchCombobox` — Combobox para seleccionar empleado en formularios
-
----
-
-### Constantes y utilidades
-
-- `src/lib/hrConstants.ts` — Todos los arrays de opciones del documento: CONTRACT_TYPES, WORK_MODALITIES, EMPLOYEE_STATUS_OPTIONS, ABSENCE_TYPES, INCIDENT_SEVERITIES, INCIDENT_TYPES, APPLICANT_STATUSES, APPLICANT_SOURCES, EPS_OPTIONS, ARL_OPTIONS, AFP_OPTIONS, DEDUCTION_TYPES, PERFORMANCE_RATINGS, OVERTIME_TYPES, LEAVE_TYPES
-- `src/lib/hrAreaUtils.ts` — AREA_COLORS y función getDepartmentArea
-
----
-
-### Resumen de archivos a crear/modificar
-
-| Acción | Archivo |
-|---|---|
-| Migración BD | supabase/migrations/YYYYMMDD_hr_module.sql |
-| Modificar | src/App.tsx (rutas HR) |
-| Modificar | src/components/dashboard/DashboardSidebar.tsx |
-| Crear | src/lib/hrConstants.ts |
-| Crear | src/lib/hrAreaUtils.ts |
-| Crear | src/hooks/useEmployees.ts |
-| Crear | src/hooks/useEmployee.ts |
-| Crear | src/components/hr/HRPageHeader.tsx |
-| Crear | src/components/hr/HRMetricCard.tsx |
-| Crear | src/components/hr/EmployeeStatusBadge.tsx |
-| Crear | src/components/hr/EmployeeAreaBadge.tsx |
-| Crear | src/components/hr/EmployeeSearchCombobox.tsx |
-| Crear | src/pages/hr/HRDashboard.tsx |
-| Crear | src/pages/hr/EmployeeDirectory.tsx |
-| Crear | src/pages/hr/EmployeeNew.tsx |
-| Crear | src/pages/hr/EmployeeProfile.tsx |
-| Crear | src/pages/hr/HRAbsences.tsx |
-| Crear | src/pages/hr/HRIncidents.tsx |
-| Crear | src/pages/hr/HRApplicants.tsx |
-| Crear | src/pages/hr/HRTraining.tsx |
-| Crear | src/pages/hr/HRPerformance.tsx |
-
----
-
-### Notas de compatibilidad
-
-- Todas las dependencias NPM que requiere el módulo ya están instaladas en el proyecto.
-- El módulo sigue exactamente los mismos patrones de layout, tabs, modales, KPIs y toast del resto del sistema (Creadores, Eventos, Contactos).
-- Las tablas `shifts` y `attendance` (asistencia diaria con turnos) se dejan para Fase 2 por su mayor complejidad operativa.
-- La tabla `time_permissions` (permisos de tiempo) también se deja para Fase 2.
+Un solo archivo, cambio quirúrgico.
