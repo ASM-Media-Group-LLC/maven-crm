@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 export const InputsSection = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [singleDate, setSingleDate] = useState<string>("");
 
   return (
   <section id="inputs" className="space-y-8">
@@ -173,6 +175,52 @@ export const InputsSection = () => {
       </div>
     </div>
 
+    {/* Date Input */}
+    <div>
+      <h3 className="text-xl font-medium mb-4 text-muted-foreground">Date Input</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
+        Selector de fecha individual con trigger unificado, calendario con dropdowns de mes/año para navegación rápida,
+        entrada manual <code className="font-mono text-primary">dd/mm/aaaa</code> y footer con Cancelar/Aplicar.
+        Ideal para fechas de nacimiento, fechas de inicio, vencimientos, etc.
+      </p>
+      <div className="space-y-4 max-w-2xl">
+        <div className="space-y-2">
+          <Label>Default</Label>
+          <DateInput
+            value={singleDate}
+            onChange={setSingleDate}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Con valor</Label>
+          <DateInput
+            value="1995-06-15"
+            onChange={() => {}}
+            placeholder="Fecha de nacimiento"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Disabled</Label>
+          <DateInput
+            value=""
+            onChange={() => {}}
+            disabled
+          />
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
+          <p><strong className="text-foreground">Props:</strong></p>
+          <p><code className="font-mono text-foreground">value</code>: <code className="font-mono">string</code> (formato <code className="font-mono">yyyy-MM-dd</code>)</p>
+          <p><code className="font-mono text-foreground">onChange</code>: <code className="font-mono">(value: string) =&gt; void</code></p>
+          <p><code className="font-mono text-foreground">placeholder?</code>: <code className="font-mono">string</code> (default: "Seleccionar fecha")</p>
+          <p><code className="font-mono text-foreground">disabled?</code>: <code className="font-mono">boolean</code></p>
+          <p><code className="font-mono text-foreground">fromYear?</code>: <code className="font-mono">number</code> (default: 1940)</p>
+          <p><code className="font-mono text-foreground">toYear?</code>: <code className="font-mono">number</code> (default: año actual + 5)</p>
+          <p className="mt-2"><strong className="text-foreground">Cuándo usar:</strong> Fechas individuales (nacimiento, inicio, vencimiento). Para rangos usar <code className="font-mono text-foreground">DateRangePicker</code>.</p>
+        </div>
+      </div>
+    </div>
+
     {/* Date Range Picker */}
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Date Range Picker</h3>
@@ -195,7 +243,8 @@ export const InputsSection = () => {
           <p><code className="font-mono text-foreground">to</code>: <code className="font-mono">Date | undefined</code></p>
           <p><code className="font-mono text-foreground">onApply</code>: <code className="font-mono">(from, to) =&gt; void</code></p>
           <p><code className="font-mono text-foreground">placeholder?</code>: <code className="font-mono">string</code> (default: "Seleccionar fechas")</p>
-          <p className="mt-2"><strong className="text-foreground">Tokens:</strong> bg-popover, border-border, primary (selección), muted (today), pointer-events-auto</p>
+          <p className="mt-2"><strong className="text-foreground">Cuándo usar:</strong> Filtros por periodo, reportes, búsquedas con rango temporal. Para fecha individual usar <code className="font-mono text-foreground">DateInput</code>.</p>
+          <p className="mt-1"><strong className="text-foreground">Tokens:</strong> bg-popover, border-border, primary (selección), muted (today), pointer-events-auto</p>
         </div>
       </div>
     </div>
