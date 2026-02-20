@@ -63,7 +63,7 @@ const DashboardSidebar = () => {
 
   const hrGroups = [
     {
-      label: "Operación Diaria",
+      label: "Operaciones",
       icon: Clock,
       key: "operacion",
       items: [
@@ -76,7 +76,7 @@ const DashboardSidebar = () => {
       ],
     },
     {
-      label: "Seguimiento y Control",
+      label: "Seguimiento",
       icon: Eye,
       key: "seguimiento",
       items: [
@@ -113,7 +113,7 @@ const DashboardSidebar = () => {
       ],
     },
     {
-      label: "Finanzas Operativas",
+      label: "Finanzas",
       icon: Wallet,
       key: "finanzas",
       items: [
@@ -277,6 +277,9 @@ const DashboardSidebar = () => {
                       </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                      <DropdownMenuItem onClick={() => navigate("/hr")} className={pathname === "/hr" ? "bg-accent text-accent-foreground font-medium" : ""}>
+                        Dashboard
+                      </DropdownMenuItem>
                       {hrFlatItems.map((item) => (
                         <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
                           {item.title}
@@ -295,10 +298,19 @@ const DashboardSidebar = () => {
                         <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/hrCollapsible:rotate-90" />
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {hrGroups.map((group) => (
-                          <Collapsible
+                     <CollapsibleContent>
+                       <SidebarMenuSub>
+                         {/* Dashboard directo */}
+                         <SidebarMenuSubItem>
+                           <SidebarMenuSubButton asChild isActive={pathname === "/hr"} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                             <NavLink to="/hr">
+                               <LayoutDashboard className="h-3.5 w-3.5 mr-1.5 inline-block" />
+                               Dashboard
+                             </NavLink>
+                           </SidebarMenuSubButton>
+                         </SidebarMenuSubItem>
+                         {hrGroups.map((group) => (
+                           <Collapsible
                             key={group.key}
                             defaultOpen={group.items.some((i) => i.url && pathname.startsWith(i.url))}
                             className={`group/hrGroup-${group.key}`}
