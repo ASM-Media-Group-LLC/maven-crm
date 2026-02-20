@@ -1,177 +1,107 @@
 
-## Control de Asistencia — Módulo HR completo
 
-### Análisis del estado actual
+## Sección "Procesos en Curso" en Onboarding
 
-No existe una tabla `attendance` (control de asistencia) en la base de datos ni un archivo `HRAttendance.tsx`. El módulo debe construirse desde cero, incluyendo:
-1. Migración SQL para crear la tabla `attendance`
-2. Página `HRAttendance.tsx` con el estándar visual de la plataforma
-3. Registro de la ruta `/hr/asistencia` en `App.tsx`
-4. Actualización del catálogo de acciones rápidas en `HRDashboard.tsx`
+### Objetivo
 
----
+Agregar una fila de tarjetas horizontales debajo de los KPIs que muestre las creadoras con status `borrador` o `pendiente_verificacion`, indicando su progreso en el wizard de 4 pasos. Al hacer clic en una tarjeta, se abre el wizard pre-cargado en el paso donde se quedaron.
 
-### Referencia de diseño analizada
+### Logica para determinar el paso actual
 
-**Imagen 1 — Vista principal:**
-- Header fijo: título "Control de asistencia" + subtítulo + botón "+ Registrar Asistencia"
-- 4 KPI cards: Total Registros, Presentes, Tardanzas, Ausentes
-- Tabs de departamento: Todos | Ventas | LeadGen | Contenido | Marketing | Tecnología | Recursos Humanos | Administración | Operaciones | Otros
-- Fila de filtros: búsqueda + Estado (Todos) + Turno + Posición + Desde + Hasta + toggle Lista/Grid
-- Tabla: Empleado | Turno | Horario | Fecha | Check-In | Check-Out | Duración | Estado | Notas
-- Estados en badges: Presente (success), Tarde (warning), Ausente (destructive)
+Se evalua la completitud de datos de cada creadora para determinar en que paso se detuvo:
 
-**Imagen 2 — Modal "Registrar Asistencia":**
-- Header del modal fijo con título + subtítulo
-- Campos: Empleado (combobox), Turno (select), Hora de Entrada (datetime-local), Hora de Salida (datetime-local), Estado (select: Presente/Tarde/Ausente), Notas (textarea)
-- Footer fijo con botones: Cancelar | + Registrar Asistencia
+| Paso completado | Condicion |
+|---|---|
+| Paso 1 listo | `name` y `email` y `country` tienen valor |
+| Paso 2 listo | Paso 1 listo + al menos 2 campos de psicologia tienen valor (`rutina_diaria`, `hobbies`, `tono_voz`, etc.) |
+| Paso 3 listo | Paso 2 listo + `profile_photo_url` tiene valor |
+| Paso 4 (final) | status es `pendiente_verificacion` |
 
----
+El "paso actual" es el primer paso no completado. Si todos estan listos y el status es `pendiente_verificacion`, se muestra "Pendiente de aprobacion".
 
-### Estructura de la tabla SQL
+### Etiquetas segun el paso
 
-```sql
-CREATE TABLE attendance (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id     uuid NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-  shift           text NOT NULL DEFAULT 'turno_manana',
-  shift_start     time,
-  shift_end       time,
-  check_in        timestamptz,
-  check_out       timestamptz,
-  date            date NOT NULL DEFAULT CURRENT_DATE,
-  status          text NOT NULL DEFAULT 'presente',  -- presente | tardanza | ausente
-  notes           text,
-  created_by      uuid REFERENCES auth.users(id),
-  created_at      timestamptz DEFAULT now(),
-  updated_at      timestamptz DEFAULT now()
-);
-ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "auth_users_all" ON attendance FOR ALL TO authenticated USING (true) WITH CHECK (true);
-```
+| Paso actual | Etiqueta mostrada |
+|---|---|
+| 1 | "Completando datos personales" |
+| 2 | "Completando perfil psicologico" |
+| 3 | "Esperando documentos" |
+| 4 | "Configurando precios" |
+| Completado (pendiente_verificacion) | "Pendiente de aprobacion" |
 
----
+### Diseno de las tarjetas
 
-### Archivos a crear / modificar
+Cada tarjeta es un `Card` interactivo con:
+- Nombre de la creadora (font-medium)
+- Mini `Progress` bar (h-1.5) con valor = `(pasoActual - 1) / 4 * 100`
+- Texto "Paso X de 4" en text-xs
+- Badge con la etiqueta descriptiva
+- Hover con `hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px]`
+- Cursor pointer
 
-| Archivo | Operación | Detalle |
-|---|---|---|
-| `supabase/migrations/YYYYMMDD_create_attendance.sql` | **Crear** | DDL de la tabla + RLS |
-| `src/pages/hr/HRAttendance.tsx` | **Crear** | Página completa |
-| `src/App.tsx` | **Modificar** | Agregar import + ruta `/hr/asistencia` |
-| `src/pages/hr/HRDashboard.tsx` | **Modificar** | Activar "asistencia" en `ALL_ACTIONS` (quitar `soon: true` y asignar URL `/hr/asistencia`) |
+Layout: scroll horizontal con `flex gap-3 overflow-x-auto pb-2` dentro de un `Card` contenedor con header "Procesos en Curso" + icono `RefreshCw` + badge con cantidad.
 
----
+### Cambios en el Wizard
 
-### Detalle de `HRAttendance.tsx`
+El `OnboardingWizard` necesita aceptar props opcionales para:
+- `initialStep`: numero del paso donde abrir (default 1)
+- `editCreatorId`: UUID del creador existente que se esta editando
+- `initialData`: datos pre-cargados del creador (step1, step2Psy, step3Doc, step4)
 
-#### Layout (patrón estándar de la plataforma)
+Cuando se abre con un creador existente, el wizard carga sus datos en los estados internos y navega al paso indicado. Al guardar, hace `update` en lugar de `insert`.
 
-```text
-<div className="flex flex-col h-full overflow-hidden">
-  <header shrink-0>          ← Fijo: título + botón
-  <div flex-1 overflow-auto> ← Scrolleable:
-    KPI cards
-    Tabs departamento
-    Fila de filtros
-    Tabla con header sticky
-  </div>
-</div>
-```
+### Archivos a modificar
 
-#### Hook `useAttendance`
+| Archivo | Cambio |
+|---|---|
+| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Agregar seccion "Procesos en Curso" entre KPIs y tabla. Agregar estado para `editingCreator`. Pasar props al wizard. |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Aceptar `initialStep`, `editCreatorId`, `initialData`. Pre-cargar datos. Usar update si `editCreatorId` existe. |
+| `src/pages/creadores/onboarding/useOnboarding.ts` | Expandir el query para incluir campos de psicologia y documentos necesarios para calcular el paso. Exportar un helper `calculateCurrentStep`. |
 
-Consulta con React Query a la tabla `attendance` con join a `employees`, `departments`, `positions`. Retorna registros ordenados por `date desc`.
+### Flujo de interaccion
 
-#### KPI Cards (patrón `DashboardMetricCard`)
+1. El usuario entra a `/creadores/onboarding`
+2. Ve los KPIs arriba
+3. Debajo, ve la seccion "Procesos en Curso" con tarjetas de creadoras en borrador/pendiente
+4. Hace clic en una tarjeta
+5. El wizard se abre directamente en el paso donde se quedo, con los datos pre-cargados
+6. Al guardar, se actualiza el registro existente (no se crea uno nuevo)
 
-| Card | Cálculo | Hover |
-|---|---|---|
-| Total Registros | `attendance.length` | `primary` |
-| Presentes | `status === "presente"` | `success` |
-| Tardanzas | `status === "tardanza"` | `warning` |
-| Ausentes | `status === "ausente"` | `destructive` |
+### Detalles tecnicos
 
-Cada una con `hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-{color}/15 hover:border-{color}/40"`.
-
-#### Tabs de departamento
-
-Filtro dinámico usando los departamentos cargados de Supabase más la opción "Todos". Al hacer clic en un tab, filtra la tabla y el grid por `employee.department_id`.
-
-#### Fila de filtros
-
-```text
-[🔍 Buscar empleado...] [Estado ▾] [Turno ▾] [📅 Desde] [📅 Hasta] [≡ ⊞]
-```
-
-- Búsqueda: filtra por nombre del empleado
-- Estado: Todos | Presente | Tardanza | Ausente
-- Turno: Todos los turnos | Turno Mañana | Turno Tarde | Turno Noche
-- Desde / Hasta: input `type="date"`
-- Toggle Lista/Grid (por ahora solo lista)
-
-#### Tabla
-
-Columnas: Empleado (avatar iniciales + nombre en bold) | Turno | Horario (start–end) | Fecha | Check-In | Check-Out | Duración (cálculo automático) | Estado (badge semántico) | Notas
-
-Header de tabla sticky (`sticky top-0 z-10 bg-card`) siguiendo el patrón de la plataforma.
-
-#### Modal "Registrar Asistencia" (Dialog con layout fijo)
-
-```text
-<DialogContent className="!flex !flex-col gap-0 max-w-lg">
-  <DialogHeader shrink-0>   ← Fijo: título + subtítulo
-  <div flex-1 overflow-y-auto p-6 space-y-4>  ← Scrolleable
-    Empleado (combobox)
-    Turno (select)
-    [Hora Entrada] [Hora Salida] (grid 2 cols, datetime-local)
-    Estado (select)
-    Notas (textarea)
-  </div>
-  <DialogFooter shrink-0>   ← Fijo: Cancelar | + Registrar Asistencia
-</DialogContent>
-```
-
-Los campos del turno (Mañana: 08:00–16:00, Tarde: 14:00–22:00, Noche: 22:00–06:00) se auto-completan al seleccionar el turno, aunque el usuario puede sobrescribirlos.
-
-#### Cálculo de duración
-
-```tsx
-const duration = checkIn && checkOut
-  ? differenceInMinutes(new Date(checkOut), new Date(checkIn))
-  : null;
-const hours = Math.floor(duration / 60);
-const mins  = duration % 60;
-// → "9h 0m"
-```
-
-#### Lógica de estado auto-sugerido
-
-Al ingresar la hora de check-in, si es mayor a la hora de inicio del turno en más de 10 minutos, el estado se sugiere como "tardanza". El usuario puede cambiar manualmente.
-
----
-
-### Actualización de Quick Actions
-
-En `HRDashboard.tsx`, cambiar la entrada de `asistencia`:
+**Calculo del paso (helper en useOnboarding.ts):**
 
 ```ts
-// Antes:
-{ id: "asistencia", label: "Ver Asistencia", icon: ClipboardCheck, url: null, soon: true }
-
-// Después:
-{ id: "asistencia", label: "Control Asistencia", icon: ClipboardCheck, url: "/hr/asistencia" }
+function calculateCurrentStep(creator: any): number {
+  const hasStep1 = creator.name && creator.email && creator.country;
+  if (!hasStep1) return 1;
+  
+  const psyFields = [creator.rutina_diaria, creator.hobbies, creator.tono_voz, 
+                      creator.emoji_frecuente, creator.contenido_jamas_haria];
+  const hasStep2 = psyFields.filter(Boolean).length >= 2;
+  if (!hasStep2) return 2;
+  
+  const hasStep3 = !!creator.profile_photo_url;
+  if (!hasStep3) return 3;
+  
+  return 4;
+}
 ```
 
-Y actualizar el `DEFAULT_ACTION_IDS` para incluirla en lugar de `candidatos` si se desea, o dejarla disponible en el catálogo.
+**Seccion visual (en OnboardingContent.tsx):**
 
----
+Se renderiza solo cuando `!showWizard` y hay procesos en curso. Envuelta en un `Card` con `CardHeader` y `CardContent` siguiendo el patron estandar de la plataforma.
 
-### Badges de estado
+**Props del Wizard actualizadas:**
 
-| Status | Variante |
-|---|---|
-| `presente` | `success` |
-| `tardanza` | `warning` |
-| `ausente` | `destructive` |
+```ts
+interface Props {
+  onCancel: () => void;
+  initialStep?: number;
+  editCreatorId?: string;
+  initialData?: { step1, step2Psy, step3Doc, step4 };
+}
+```
+
+Cuando `editCreatorId` esta presente, el `handleSubmit` usa `supabase.from("creators").update(...)` en lugar de la mutacion `addCreador`.
 
