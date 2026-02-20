@@ -62,6 +62,7 @@ import HRIncidents from "./pages/hr/HRIncidents";
 import HRApplicants from "./pages/hr/HRApplicants";
 import HRTraining from "./pages/hr/HRTraining";
 import HRPerformance from "./pages/hr/HRPerformance";
+import HRLayout from "./pages/hr/HRLayout";
 
 const queryClient = new QueryClient();
 
@@ -121,15 +122,15 @@ const App = () => (
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               {/* HR routes */}
-              <Route path="/hr" element={<ProtectedRoute><HRDashboard /></ProtectedRoute>} />
-              <Route path="/hr/directorio" element={<ProtectedRoute><EmployeeDirectory /></ProtectedRoute>} />
-              <Route path="/hr/empleado/nuevo" element={<ProtectedRoute><EmployeeNew /></ProtectedRoute>} />
-              <Route path="/hr/empleado/:id" element={<ProtectedRoute><EmployeeProfile /></ProtectedRoute>} />
-              <Route path="/hr/ausencias" element={<ProtectedRoute><HRAbsences /></ProtectedRoute>} />
-              <Route path="/hr/incidentes" element={<ProtectedRoute><HRIncidents /></ProtectedRoute>} />
-              <Route path="/hr/candidatos" element={<ProtectedRoute><HRApplicants /></ProtectedRoute>} />
-              <Route path="/hr/capacitacion" element={<ProtectedRoute><HRTraining /></ProtectedRoute>} />
-              <Route path="/hr/desempeno" element={<ProtectedRoute><HRPerformance /></ProtectedRoute>} />
+              <Route path="/hr" element={<ProtectedRoute><HRLayout><HRDashboard /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/directorio" element={<ProtectedRoute><HRLayout><EmployeeDirectory /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/empleado/nuevo" element={<ProtectedRoute><HRLayout><EmployeeNew /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/empleado/:id" element={<ProtectedRoute><HRLayout><EmployeeProfile /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/ausencias" element={<ProtectedRoute><HRLayout><HRAbsences /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/incidentes" element={<ProtectedRoute><HRLayout><HRIncidents /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/candidatos" element={<ProtectedRoute><HRLayout><HRApplicants /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/capacitacion" element={<ProtectedRoute><HRLayout><HRTraining /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/desempeno" element={<ProtectedRoute><HRLayout><HRPerformance /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
