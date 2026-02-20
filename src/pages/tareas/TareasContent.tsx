@@ -126,7 +126,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
               <p className="text-sm text-muted-foreground">Tareas del proyecto</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
           </Button>
         </div>

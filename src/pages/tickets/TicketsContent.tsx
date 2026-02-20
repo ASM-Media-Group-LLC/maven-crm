@@ -80,7 +80,7 @@ const TicketsContent = () => {
               Gestión de soporte y escalaciones
             </p>
           </div>
-          <Button variant="outline" onClick={() => setModalOpen(true)}>
+          <Button onClick={() => setModalOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Nuevo Ticket
           </Button>
