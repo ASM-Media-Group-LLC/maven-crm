@@ -1,80 +1,78 @@
 
-## Correcciones en AgentDetailView — Filtros de la pestaña Leads
+## Breadcrumb y navegación de vuelta en AiSalesConfig
 
-### Problemas identificados
+### Diagnóstico
 
-**1. Selector de fecha incorrecto**
-El filtro de fecha es un `<Select>` simple con opciones fijas (Todos / Hoy / Ayer / Semana), controlado por `filterFecha = "hoy"`. Debe reemplazarse por el `DateRangePicker` ya usado en Eventos, Promolog y otros módulos.
+La página `/ai-sales-config` actualmente no tiene ningún mecanismo para volver a `/aisales`. El header solo muestra el título "Configuración AI Sales" como si fuera una sección de primer nivel, cuando en realidad es una sub-página dependiente de "IA Ventas".
 
-**2. Filtros con "Todos" visible como valor inicial (bug de consistencia)**
-Los selectores de Calidad y Estado usan `value="todos"` como estado inicial, lo que hace que el trigger muestre "Todos" en lugar del placeholder descriptivo. El patrón correcto del sistema es `value=""` (vacío) + placeholder descriptivo, y "Todos" aparece solo dentro del dropdown como opción de reset.
+Revisando el sistema, hay dos patrones de navegación de retorno usados en la plataforma:
 
-```
-// MAL — muestra "Todos" en el trigger
-const [filterCalidad, setFilterCalidad] = useState("todos");
-<SelectValue placeholder="Calidad" />  ← nunca se ve porque hay un value
+- **Breadcrumb** (Onboarding → Creadores): para páginas de configuración o sub-secciones funcionales. Usa `BreadcrumbLink + BreadcrumbSeparator + BreadcrumbPage`.
+- **Botón ArrowLeft en header** (Evento Detail, Tareas dentro de proyecto): para vistas de detalle de un registro específico.
 
-// BIEN — muestra "Calidad" en el trigger
-const [filterCalidad, setFilterCalidad] = useState("");
-<SelectValue placeholder="Calidad" />  ← se ve correctamente
-```
+Para `AiSalesConfig`, el patrón correcto es el **Breadcrumb**, igual que Onboarding, ya que es una página de configuración de una sección (no un detalle de registro).
 
 ---
 
-### Cambios en `src/pages/leadgen/AgentDetailView.tsx`
-
-**Estado inicial de filtros (líneas 49-51):**
-```tsx
-// Antes
-const [filterCalidad, setFilterCalidad] = useState("todos");
-const [filterEstado, setFilterEstado] = useState("todos");
-const [filterFecha, setFilterFecha] = useState("hoy");
-
-// Después
-const [filterCalidad, setFilterCalidad] = useState("");
-const [filterEstado, setFilterEstado] = useState("");
-const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
-```
-
-**Lógica de filtrado por fecha (líneas 83-88):**
-```tsx
-// Antes — comparación por string
-if (filterFecha === "hoy") result = result.filter(...)
-else if (filterFecha === "ayer") result = result.filter(...)
-
-// Después — comparación por rango de fechas real
-if (dateFrom) result = result.filter(l => new Date(l.created_at) >= startOfDay(dateFrom));
-if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
-```
-
-**Lógica de filtrado por calidad y estado (líneas 89-90):**
-```tsx
-// Antes
-if (filterCalidad !== "todos") result = result.filter(...)
-if (filterEstado !== "todos") result = result.filter(...)
-
-// Después
-if (filterCalidad) result = result.filter(l => l.categoria?.toLowerCase() === filterCalidad);
-if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
-```
-
-**UI de filtros (líneas 226-282):**
-- Quitar el bloque `<CalendarDays>` + `<Select>` de fecha
-- Añadir `<DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />`
-- En los selectores de Calidad y Estado: cambiar el value de `"todos"` a `""` y mantener placeholder descriptivo
-- El item "Todos" del dropdown pasa a disparar `""` en onValueChange (igual que en el resto del sistema)
+### Cambio único: `src/pages/AiSalesConfig.tsx`
 
 **Imports a añadir:**
-- `DateRangePicker` desde `@/components/ui/date-range-picker`
-- `endOfDay` desde `date-fns`
-- Quitar `CalendarDays` de lucide-react (ya no se usa)
+- `Link` desde `react-router-dom`
+- `Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator` desde `@/components/ui/breadcrumb`
+
+**Antes** — el header solo tiene título + acciones:
+```tsx
+<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+  <div className="flex items-center justify-between">
+    <div>
+      <h1 className="text-2xl font-bold">Configuración AI Sales</h1>
+      <p className="text-sm text-muted-foreground">Ajusta cómo responde el asistente de ventas</p>
+    </div>
+    <div className="flex items-center gap-3">
+      <Badge variant="secondary-soft">Local</Badge>
+      <Button variant="outline" onClick={handleSave}>...
+```
+
+**Después** — se añade el breadcrumb encima del título, siguiendo exactamente el patrón de OnboardingContent:
+```tsx
+<header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+  {/* Breadcrumb de navegación */}
+  <Breadcrumb className="mb-3">
+    <BreadcrumbList>
+      <BreadcrumbItem>
+        <BreadcrumbLink asChild>
+          <Link to="/aisales">IA Ventas</Link>
+        </BreadcrumbLink>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem>
+        <BreadcrumbPage>Configuración</BreadcrumbPage>
+      </BreadcrumbItem>
+    </BreadcrumbList>
+  </Breadcrumb>
+
+  <div className="flex items-center justify-between">
+    <div>
+      <h1 className="text-2xl font-bold">Configuración AI Sales</h1>
+      <p className="text-sm text-muted-foreground">Ajusta cómo responde el asistente de ventas</p>
+    </div>
+    <div className="flex items-center gap-3">
+      <Badge variant="secondary-soft">Local</Badge>
+      <Button variant="outline" onClick={handleSave}>...
+```
 
 ---
 
-### Archivos a modificar
+### ¿Los breadcrumbs están bien en el resto de la plataforma?
 
-| Archivo | Cambios |
+Revisando el codebase completo, los breadcrumbs solo existen actualmente en **un único lugar**: `OnboardingContent.tsx` (Creadores → Onboarding). El resto de páginas de sub-nivel (Evento Detail, Tareas en proyecto, Perfil de creadora) usan el botón `ArrowLeft` en el header, que también es correcto.
+
+No hay breadcrumbs rotos ni con rutas incorrectas. El único problema real es la ausencia de navegación de retorno en `AiSalesConfig`.
+
+---
+
+### Archivo a modificar
+
+| Archivo | Cambio |
 |---|---|
-| `src/pages/leadgen/AgentDetailView.tsx` | Reemplazar filtro de fecha por DateRangePicker; corregir estado inicial de Calidad y Estado a `""`; actualizar lógica de filtrado |
-
+| `src/pages/AiSalesConfig.tsx` | Añadir breadcrumb "IA Ventas → Configuración" encima del título en el header |
