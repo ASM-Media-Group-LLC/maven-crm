@@ -12,6 +12,15 @@ export interface OnboardingCreator {
   manager: string;
   progress: number;
   status: "Pendiente" | "En Progreso" | "Completado";
+  // Raw fields for step calculation
+  email: string | null;
+  country: string | null;
+  rutina_diaria: string | null;
+  hobbies: string | null;
+  tono_voz: string | null;
+  emoji_frecuente: string | null;
+  contenido_jamas_haria: string | null;
+  dbStatus: string | null;
 }
 
 function calculateProgress(training: any): number {
@@ -28,6 +37,31 @@ function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "C
   if (dbStatus === "pendiente_verificacion") return "Pendiente";
   if (dbStatus === "asignado" || dbStatus === "activo") return "Completado";
   return "En Progreso";
+}
+
+export function calculateCurrentStep(creator: OnboardingCreator): number {
+  const hasStep1 = creator.name && creator.email && creator.country;
+  if (!hasStep1) return 1;
+
+  const psyFields = [creator.rutina_diaria, creator.hobbies, creator.tono_voz, creator.emoji_frecuente, creator.contenido_jamas_haria];
+  const hasStep2 = psyFields.filter(Boolean).length >= 2;
+  if (!hasStep2) return 2;
+
+  const hasStep3 = !!creator.profile_photo_url;
+  if (!hasStep3) return 3;
+
+  return 4;
+}
+
+export function getStepLabel(step: number, dbStatus: string | null): string {
+  if (dbStatus === "pendiente_verificacion") return "Pendiente de aprobación";
+  switch (step) {
+    case 1: return "Completando datos personales";
+    case 2: return "Completando perfil psicológico";
+    case 3: return "Esperando documentos";
+    case 4: return "Configurando precios";
+    default: return "";
+  }
 }
 
 export function useOnboarding() {
@@ -57,6 +91,14 @@ export function useOnboarding() {
           manager: "Sin asignar",
           progress,
           status: deriveStatus(c.status),
+          email: c.email,
+          country: c.country,
+          rutina_diaria: c.rutina_diaria,
+          hobbies: c.hobbies,
+          tono_voz: c.tono_voz,
+          emoji_frecuente: c.emoji_frecuente,
+          contenido_jamas_haria: c.contenido_jamas_haria,
+          dbStatus: c.status,
         };
       });
     },
