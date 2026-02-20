@@ -10,7 +10,7 @@ import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding } from "./useOnboarding";
 
-const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Unlok Platform"];
+const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Otra", "Trafix", "Unlok Platform"];
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
