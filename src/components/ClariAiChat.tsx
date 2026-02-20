@@ -5,6 +5,7 @@ import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import { getAiConfig } from "@/lib/ai-config";
+import { useAiMessages } from "@/hooks/useAiConversations";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -82,7 +83,7 @@ async function streamChat({
   onDone();
 }
 
-// Detect Speech API support (cast to any for cross-browser compatibility)
+// Detect Speech API support
 const SpeechRecAPI: any =
   typeof window !== "undefined"
     ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null)
@@ -90,21 +91,51 @@ const SpeechRecAPI: any =
 
 interface ClariAiChatProps {
   mode?: "full" | "panel";
+  conversationId?: string | null;
+  onMessageSaved?: () => void;
+  onConversationTitleSet?: (title: string) => void;
 }
 
-const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
-  const [messages, setMessages] = useState<Msg[]>([WELCOME]);
+const ClariAiChat = ({
+  mode = "full",
+  conversationId,
+  onMessageSaved,
+  onConversationTitleSet,
+}: ClariAiChatProps) => {
+  const { messages: dbMessages, saveMessage, updateConversationTitle } = useAiMessages(conversationId ?? null);
+  const [localMessages, setLocalMessages] = useState<Msg[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [titleSet, setTitleSet] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
 
+  // When conversationId changes, load messages from DB or reset
+  useEffect(() => {
+    setTitleSet(false);
+    if (!conversationId) {
+      setLocalMessages([WELCOME]);
+      return;
+    }
+    if (dbMessages.length > 0) {
+      setLocalMessages(dbMessages.map((m) => ({ role: m.role, content: m.content })));
+    } else {
+      setLocalMessages([WELCOME]);
+    }
+  }, [conversationId, dbMessages.length]);
+
+  // Update local messages when DB messages load
+  useEffect(() => {
+    if (conversationId && dbMessages.length > 0) {
+      setLocalMessages(dbMessages.map((m) => ({ role: m.role, content: m.content })));
+    }
+  }, [dbMessages, conversationId]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [localMessages]);
 
-  // Stop recording on unmount
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
@@ -131,14 +162,11 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
     };
 
     rec.onerror = (e: any) => {
-      if (e.error !== "aborted") {
-        toast.error("Error de micrófono: " + e.error);
-      }
+      if (e.error !== "aborted") toast.error("Error de micrófono: " + e.error);
       setIsRecording(false);
     };
 
     rec.onend = () => setIsRecording(false);
-
     rec.start();
     setIsRecording(true);
     recognitionRef.current = rec;
@@ -148,22 +176,37 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
     const text = input.trim();
     if (!text || isLoading) return;
 
-    // Stop recording if active
-    if (isRecording) {
-      recognitionRef.current?.stop();
-    }
-
+    if (isRecording) recognitionRef.current?.stop();
     setInput("");
 
     const userMsg: Msg = { role: "user", content: text };
-    const allMsgs = [...messages.filter((m) => m !== WELCOME), userMsg];
-    setMessages((prev) => [...prev, userMsg]);
+    const contextMsgs = localMessages.filter((m) => m !== WELCOME);
+    const allMsgs = [...contextMsgs, userMsg];
+
+    setLocalMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
+
+    // Persist user message
+    if (conversationId) {
+      try {
+        await saveMessage(conversationId, "user", text);
+        // Auto-title from first user message
+        if (!titleSet && contextMsgs.length === 0) {
+          const autoTitle = text.slice(0, 40) + (text.length > 40 ? "…" : "");
+          await updateConversationTitle(conversationId, autoTitle);
+          onConversationTitleSet?.(autoTitle);
+          setTitleSet(true);
+        }
+        onMessageSaved?.();
+      } catch (e) {
+        console.error("Error saving user message:", e);
+      }
+    }
 
     let assistantSoFar = "";
     const upsert = (chunk: string) => {
       assistantSoFar += chunk;
-      setMessages((prev) => {
+      setLocalMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === "assistant" && last !== WELCOME) {
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
@@ -177,7 +220,18 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
       await streamChat({
         messages: allMsgs,
         onDelta: upsert,
-        onDone: () => setIsLoading(false),
+        onDone: async () => {
+          setIsLoading(false);
+          // Persist assistant message
+          if (conversationId && assistantSoFar) {
+            try {
+              await saveMessage(conversationId, "assistant", assistantSoFar);
+              onMessageSaved?.();
+            } catch (e) {
+              console.error("Error saving assistant message:", e);
+            }
+          }
+        },
         onError: (msg) => {
           toast.error(msg);
           setIsLoading(false);
@@ -192,7 +246,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
       toast.error("Error de conexión");
       setIsLoading(false);
     }
-  }, [input, isLoading, isRecording, messages]);
+  }, [input, isLoading, isRecording, localMessages, conversationId, titleSet, saveMessage, updateConversationTitle, onMessageSaved, onConversationTitleSet]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -207,7 +261,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
     <div className="flex flex-col h-full">
       <ScrollArea className={`flex-1 px-4 py-4 ${isPanel ? "" : "py-6"}`} ref={scrollRef}>
         <div className={`space-y-4 ${isPanel ? "" : "mx-auto max-w-3xl space-y-6"}`}>
-          {messages.map((m, i) => (
+          {localMessages.map((m, i) => (
             <div
               key={i}
               className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}
@@ -240,7 +294,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
               </div>
             </div>
           ))}
-          {isLoading && messages[messages.length - 1]?.role === "user" && (
+          {isLoading && localMessages[localMessages.length - 1]?.role === "user" && (
             <div className="flex gap-3">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <Bot className="h-3.5 w-3.5" />
@@ -260,9 +314,16 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isRecording ? "Escuchando…" : "Pregunta sobre creadoras y ganancias…"}
+            placeholder={
+              !conversationId
+                ? "Crea o selecciona un chat para comenzar…"
+                : isRecording
+                ? "Escuchando…"
+                : "Pregunta sobre creadoras y ganancias…"
+            }
             rows={1}
-            className={`flex-1 resize-none rounded-xl border bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${
+            disabled={!conversationId}
+            className={`flex-1 resize-none rounded-xl border bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               isRecording ? "border-destructive" : "border-input"
             }`}
           />
@@ -271,6 +332,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
               onClick={toggleRecording}
               variant="outline"
               size="icon"
+              disabled={!conversationId}
               className={`h-10 w-10 shrink-0 rounded-xl transition-colors ${
                 isRecording
                   ? "border-destructive text-destructive animate-pulse hover:bg-destructive/10"
@@ -283,7 +345,7 @@ const ClariAiChat = ({ mode = "full" }: ClariAiChatProps) => {
           )}
           <Button
             onClick={send}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !conversationId}
             size="icon"
             className="h-10 w-10 shrink-0 rounded-xl"
           >
