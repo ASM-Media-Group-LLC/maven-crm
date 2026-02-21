@@ -59,7 +59,7 @@ const HRSchedules = () => {
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid" | "calendar">("list");
   const [createOpen, setCreateOpen] = useState(false);
   const [editData, setEditData] = useState<any | null>(null);
@@ -211,7 +211,7 @@ const HRSchedules = () => {
       const q = search.toLowerCase();
       result = result.filter((s: any) => s.title?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q));
     }
-    if (typeFilter !== "all") result = result.filter((s: any) => s.schedule_type === typeFilter);
+    if (typeFilter) result = result.filter((s: any) => s.schedule_type === typeFilter);
     return result;
   }, [schedules, search, typeFilter]);
 
@@ -357,9 +357,6 @@ const HRSchedules = () => {
             <p className="text-sm text-muted-foreground">Gestión de turnos, horas extra y banco de horas</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setViewMode("calendar")}>
-              <CalendarDays className="h-4 w-4 mr-2" /> Ver Calendario
-            </Button>
             <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> Crear Turno
             </Button>
@@ -370,12 +367,12 @@ const HRSchedules = () => {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} />
-          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} />
+          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-primary/10 hover:to-transparent" />
+          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-accent/10 hover:to-transparent" />
           <DashboardMetricCard label="Horas Extra" value={String(overtimeCount)} icon={Timer}
-            subtitle="Click para ver detalle" />
+            subtitle="Click para ver detalle" hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent" />
           <DashboardMetricCard label="Banco de Horas" value={`${hourBankTotal}h`} icon={Banknote}
-            subtitle="Click para ver detalle" />
+            subtitle="Click para ver detalle" hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-success/10 hover:to-transparent" />
         </div>
 
         {/* Navigation Cards */}
@@ -412,13 +409,18 @@ const HRSchedules = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar turnos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               {SCHEDULE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
             </SelectContent>
           </Select>
+          {(search || typeFilter) && (
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setTypeFilter(""); }}>
+              <span className="mr-1.5">✕</span> Limpiar filtros
+            </Button>
+          )}
           <div className="ml-auto flex items-center border rounded-lg">
             <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("list")}><ListIcon className="h-4 w-4" /></Button>
             <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
