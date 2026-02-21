@@ -1,62 +1,60 @@
 
 
-## Mejora del Modulo de Capacitacion: Gestion Completa de Programas
+## Vistas de Lista/Grid y Filtros en Configuracion de Programas
 
-El problema actual es que la pagina principal solo muestra asignaciones y redirige a sub-paginas para crear/gestionar programas. Se necesita que la vista general tambien permita crear, configurar y gestionar programas completos, dandole una sensacion de herramienta integral.
-
----
-
-### Cambios en la Pagina Principal (`/hr/capacitacion`)
-
-**Header actualizado**: Se agrega un boton "Configuracion" (outline) al lado de "Asignar Capacitacion" que lleva a una vista de gestion de TODOS los programas (sin filtro de rol).
-
-**Nueva seccion "Programas Activos"**: Debajo de las Navigation Cards, se agrega una seccion con cards compactas mostrando TODOS los programas activos (de cualquier rol). Cada card muestra:
-- Nombre del programa
-- Badge del rol target (Chatters / Tecnologia / General)
-- Duracion, cantidad de modulos
-- Indicador de contenido subido (ej: "3/5 con contenido")
-- Boton rapido para ver modulos
-
-Esto da visibilidad inmediata de que programas existen en el sistema.
-
-**Nuevas vistas internas**: Se agregan los estados `'config'` y `'modules'` al componente principal, permitiendo crear/editar programas y gestionar modulos directamente desde la pagina general (sin necesidad de ir a Chatters o Tecnologia primero).
+Se agregaran toggle de vista (lista/grid), filtros adicionales y buscador mejorado a las tres vistas de configuracion de programas: la general (`GeneralProgramConfigView` en HRTraining.tsx) y las especificas por rol (`ProgramConfigView` en RoleTrainingPage.tsx).
 
 ---
 
-### Flujo Completo Visible
+### Cambios en `GeneralProgramConfigView` (HRTraining.tsx)
 
-El flujo de trabajo queda claro en la pagina principal:
+**Filtros nuevos** (al lado del buscador existente):
+- Select "Rol" con opciones de `TRAINING_TARGET_ROLES` (placeholder "Rol", sin default)
+- Select "Modalidad" con opciones de `TRAINING_MODALITIES` (placeholder "Modalidad", sin default)
+- Boton "Limpiar filtros" condicional (visible solo si hay filtros activos)
 
+**Toggle de vista** (list/grid, alineado a la derecha):
+- Vista Grid: la actual (cards en grid 3 columnas)
+- Vista List: tabla con columnas Nombre, Rol Target, Modalidad, Duracion, Modulos (con indicador de contenido), Obligatorio, Acciones (Modulos, Editar, Eliminar)
+
+**Estados nuevos**:
 ```text
-1. Crear Programa (Configuracion -> Nuevo Programa -> seleccionar rol target)
-2. Agregar Modulos (dentro del programa -> definir titulo, tipo, duracion)
-3. Subir Contenido (por modulo -> archivo o URL)
-4. Asignar a Empleado (seleccionar programa + empleado + fecha)
-5. Hacer Seguimiento (vista detalle con checkboxes por modulo)
+const [roleFilter, setRoleFilter] = useState("");
+const [modalityFilter, setModalityFilter] = useState("");
+const [configView, setConfigView] = useState<"list" | "grid">("grid");
+```
+
+**Filtrado**: Se extiende el `useMemo` de `filtered` para incluir `roleFilter` y `modalityFilter` ademas del `search` existente.
+
+---
+
+### Cambios en `ProgramConfigView` (RoleTrainingPage.tsx)
+
+**Filtros nuevos** (al lado del buscador):
+- Select "Modalidad" (placeholder "Modalidad", sin default). No se necesita filtro de rol porque ya esta scoped.
+- Boton "Limpiar filtros" condicional
+
+**Toggle de vista** (list/grid):
+- Vista Grid: la actual
+- Vista List: tabla con columnas Nombre, Modalidad, Duracion, Modulos, Obligatorio, Acciones
+
+**Estados nuevos**:
+```text
+const [modalityFilter, setModalityFilter] = useState("");
+const [configView, setConfigView] = useState<"list" | "grid">("grid");
 ```
 
 ---
 
-### Detalle de Cambios
+### Vista de Lista (tabla) para programas
 
-**`src/pages/hr/HRTraining.tsx`**:
+Ambos componentes compartiran el mismo layout de tabla:
 
-1. Agregar `ViewState` ampliado: `'list' | 'assign' | 'config' | 'modules' | 'detail'`
-2. Agregar estado `selectedProgram` para navegacion a modulos
-3. En el header, agregar boton "Configuracion" que lleva a `currentView = 'config'`
-4. Agregar seccion "Programas Activos" en el dashboard (entre Navigation Cards y Filtros), mostrando cards de TODOS los programas con badge de rol
-5. Reutilizar los componentes `ProgramConfigView` y `ModuleManagementView` que ya existen en `RoleTrainingPage.tsx`, pero adaptados para manejar TODOS los roles (no filtrado por uno solo). Se crearan versiones "generales" de estos componentes dentro de HRTraining.tsx:
-   - `GeneralProgramConfigView`: igual que `ProgramConfigView` pero sin filtro de `target_role`, muestra todos los programas y al crear uno se debe seleccionar el rol target
-   - `GeneralModuleManagementView`: identico al existente (no necesita cambios ya que recibe el programa como prop)
+| Nombre | Rol Target* | Modalidad | Duracion | Modulos | Obligatorio | Acciones |
+|--------|------------|-----------|----------|---------|-------------|----------|
+| Programa X | Chatters | Virtual | 8h | 3/5 con contenido | Si | Modulos / Editar / Eliminar |
 
-**Formulario de Nuevo Programa (desde la vista general)**:
-- Se agrega un campo "Rol Target" (Select con opciones: Chatters, Tecnologia, General, etc.) al formulario de creacion de programa, ya que desde la vista general se pueden crear programas para cualquier rol
-
-**Seccion "Programas Activos" en el dashboard**:
-- Query de TODOS los programas activos (sin filtro de rol)
-- Grid de cards compactas (4 columnas)
-- Cada card: nombre, badge de rol, duracion, modulos, indicador de contenido
-- Clic en la card lleva a la vista de modulos del programa
+(*) La columna "Rol Target" solo aparece en la vista general, no en las vistas por rol.
 
 ---
 
@@ -64,25 +62,27 @@ El flujo de trabajo queda claro en la pagina principal:
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRTraining.tsx` | Agregar boton "Configuracion", seccion de programas activos en el dashboard, vistas internas de config/modules con soporte multi-rol, formulario de programa con selector de rol target |
-
-No se requieren cambios en la base de datos ni en RoleTrainingPage.tsx, ya que la estructura existente ya soporta multiples roles.
+| `src/pages/hr/HRTraining.tsx` | En `GeneralProgramConfigView`: agregar estados de filtro (role, modality, configView), barra de filtros con selects + toggle list/grid, vista de tabla alternativa, boton limpiar filtros |
+| `src/pages/hr/RoleTrainingPage.tsx` | En `ProgramConfigView`: agregar estados de filtro (modality, configView), barra de filtros con select + toggle list/grid, vista de tabla alternativa, boton limpiar filtros |
 
 ---
 
 ### Detalle tecnico
 
-**ViewState ampliado:**
+**Barra de filtros**: Misma linea horizontal con: buscador (izquierda) + selects de filtro + boton limpiar + toggle vista (derecha con ml-auto). Sigue el patron estandar de otros modulos como Creadores y Contactos.
+
+**Toggle de vista**: Usa el mismo patron visual del dashboard principal (botones con iconos LayoutList/LayoutGrid dentro de un contenedor con borde y fondo muted).
+
+**Logica de filtrado extendida** (GeneralProgramConfigView):
 ```text
-type ViewState = "list" | "assign" | "config" | "modules" | "detail";
+const filtered = useMemo(() => {
+  let result = programs;
+  if (search) result = result.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  if (roleFilter && roleFilter !== "__all__") result = result.filter(p => p.target_role === roleFilter);
+  if (modalityFilter && modalityFilter !== "__all__") result = result.filter(p => p.modality === modalityFilter);
+  return result;
+}, [programs, search, roleFilter, modalityFilter]);
 ```
 
-**Seccion de programas en el dashboard:** Se reutiliza el hook `useTrainingPrograms()` existente (que ya trae todos los programas activos) y se agrega un query de conteo de modulos por programa. Las cards muestran un Badge coloreado segun el `target_role`:
-- `chatter` -> violeta
-- `technology` -> cyan  
-- otros -> gris
-
-**Formulario de programa general:** Identico al de ProgramConfigView pero con un Select adicional de "Rol Target" que usa `TRAINING_TARGET_ROLES` de hrConstants. Al crear, el `target_role` se toma del formulario en lugar de estar hardcodeado.
-
-**Reutilizacion de ModuleManagementView:** Como el componente ya recibe `program` como prop y no depende del rol, se puede usar directamente. Solo se importa la logica (se duplica el componente dentro de HRTraining.tsx para evitar dependencias circulares, siguiendo el patron actual donde ambos archivos tienen sus propias versiones de AssignmentDetailView y similares).
+**Boton limpiar filtros**: Visible cuando `search || roleFilter || modalityFilter`. Al clickear, resetea los tres estados a `""`.
 
