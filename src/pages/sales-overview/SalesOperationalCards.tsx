@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  BarChart3, Trophy, TrendingDown, Zap, Bell, FileText,
+  BarChart3, Trophy, TrendingDown, Zap, Bell,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
@@ -93,15 +93,6 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       content: (
         <p className="text-2xl font-bold text-warning">{alertCount}</p>
       ),
-    },
-    {
-      id: "sales_report",
-      title: "Sales Report",
-      icon: FileText,
-      content: (
-        <p className="text-xs text-muted-foreground">Ver reporte completo</p>
-      ),
-      onClick: () => navigate("/salesdashboard"),
     },
   ];
 
