@@ -1,120 +1,82 @@
 
 
-## Seccion de Detalle de Agente en Monitoreo
+## Detalle de Agente como Pagina Completa
 
-Se creara una vista de detalle accesible al hacer clic en un agente (boton Eye o clic en la fila/card). Esta vista se implementara como un panel/modal dentro de la misma pagina (sin ruta nueva), mostrando capturas de pantalla, tiempo trabajado y rendimiento en tres periodos.
+Se convertira la vista de detalle de agente de un panel lateral (Sheet) a una pagina interna a pantalla completa dentro del mismo componente `HRMonitoring`, usando un estado para alternar entre el listado y el detalle. Esto sigue el patron de navegacion del proyecto: boton ArrowLeft ghost en el header para volver.
 
 ---
 
-### Estructura del Detalle
+### Enfoque
 
-Al seleccionar un agente, se abrira un panel lateral (Sheet) que ocupa la mitad derecha de la pantalla, con las siguientes secciones:
+En lugar de crear una ruta nueva (que requeriria pasar el agente como parametro o hacer fetch), se usara un patron de "vista interna" dentro de `HRMonitoring.tsx`:
+
+- Cuando `selectedAgent` es `null`: se muestra el listado normal (KPIs, filtros, tabla/grid/calendar)
+- Cuando `selectedAgent` tiene valor: se muestra la vista de detalle a pantalla completa
+
+Esto mantiene la simplicidad y no requiere cambios en `App.tsx`.
 
 ```text
-+-------------------------------------------+
-| [<- Volver]  Carlos Mendoza    [Activo]   |
-| Closer Senior - Ventas                     |
-+-------------------------------------------+
-| [Diario] [Semanal] [Mensual]              |
-+-------------------------------------------+
-| KPIs del periodo seleccionado:             |
-| Horas | Productividad | Mouse | Teclado   |
-+-------------------------------------------+
-| Grafico de Rendimiento                     |
-| Barra/area chart con actividad por hora    |
-| (diario), por dia (semanal), por dia (mes) |
-+-------------------------------------------+
-| Capturas de Pantalla                       |
-| Grid de thumbnails con timestamp           |
-| Click para ver en grande (dialog)          |
-+-------------------------------------------+
-| Linea de Tiempo de Actividad               |
-| Timeline con inicio/pausas/fin del dia     |
-+-------------------------------------------+
+Estado del componente:
+selectedAgent = null  -->  Vista Listado (actual)
+selectedAgent = agent -->  Vista Detalle (pantalla completa)
+                          [ArrowLeft] Carlos Mendoza  [Activo]
+                          Closer Senior - Ventas
+                          ----------------------------------
+                          [Diario] [Semanal] [Mensual]
+                          KPIs | Grafico | Capturas | Timeline
 ```
 
 ---
 
-### 1. Panel lateral (Sheet)
+### Cambios en archivos
 
-Se usara el componente `Sheet` de Shadcn (side="right") para abrir el detalle sin salir de la pagina. Esto mantiene el contexto del listado visible detras.
+**`src/pages/hr/AgentDetailSheet.tsx`** -- Refactorizar completamente:
 
-Estado nuevo: `selectedAgent: AgentActivity | null`. Al hacer clic en Eye (tabla) o en una card (grid), se establece el agente seleccionado y se abre el Sheet.
+- Eliminar el wrapper `Sheet`/`SheetContent` y `ScrollArea`
+- Convertirlo en un componente de pagina completa que recibe `agent` y `onBack`
+- Renombrar a exportar como `AgentDetailView` (el archivo se puede mantener o renombrar)
+- El layout sera: header fijo con boton ArrowLeft ghost (sin texto) + nombre + badge de estado, seguido de contenido scrollable
+- Mantener todo el contenido interno intacto: tabs de periodo, KPIs, grafico recharts, galeria de capturas, timeline
+- El header usara el patron estandarizado: `shrink-0 border-b bg-background px-6 py-4`
 
----
+**`src/pages/hr/HRMonitoring.tsx`** -- Ajustar integracion:
 
-### 2. Tabs de periodo: Diario / Semanal / Mensual
-
-Tres tabs usando el componente `Tabs` de Shadcn que cambian los datos mostrados:
-
-- **Diario**: Actividad hora por hora del dia actual
-- **Semanal**: Actividad dia por dia de la semana actual
-- **Mensual**: Actividad dia por dia del mes actual
-
-Cada tab actualiza los KPIs y el grafico de rendimiento con datos mock del periodo correspondiente.
-
----
-
-### 3. KPI Cards del periodo
-
-Cuatro mini-cards dentro del detalle:
-- **Horas Totales**: Total de horas en el periodo
-- **Productividad**: Promedio de (mouse + teclado) / 2
-- **Actividad Mouse**: Promedio del periodo
-- **Actividad Teclado**: Promedio del periodo
-
----
-
-### 4. Grafico de Rendimiento
-
-Grafico de area/barras usando recharts (ya instalado en el proyecto):
-
-- **Vista Diaria**: Eje X = horas (8am-6pm), Eje Y = % actividad. Dos lineas/areas: mouse y teclado
-- **Vista Semanal**: Eje X = Lun-Dom, Eje Y = % actividad promedio por dia
-- **Vista Mensual**: Eje X = dias 1-30/31, Eje Y = % actividad promedio por dia
-
----
-
-### 5. Galeria de Capturas de Pantalla
-
-Grid de thumbnails simulando capturas tomadas por Hubstaff:
-
-- Mock: 6-8 placeholders con timestamp (ej: "10:32 AM", "11:15 AM")
-- Cada thumbnail es un rectangulo gris con icono de Monitor y la hora
-- Al hacer clic se abre un Dialog con la imagen en grande (placeholder)
-- Preparado para recibir URLs reales de capturas cuando se conecte Hubstaff
-
----
-
-### 6. Timeline de Actividad
-
-Lista vertical con iconos mostrando eventos del dia:
-- Inicio de jornada (verde)
-- Periodos de alta actividad (verde)
-- Periodos de baja actividad (amarillo)
-- Pausas (azul)
-- Desconexiones (rojo)
-- Fin de jornada
-
-Todo con datos mock que simulan un dia tipico de trabajo.
-
----
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---|---|
-| `src/pages/hr/HRMonitoring.tsx` | Agregar estado `selectedAgent`, boton Eye en tabla y cards clickeables, componente Sheet con detalle, tabs de periodo, graficos recharts, galeria de capturas y timeline |
+- Eliminar el import de `AgentDetailSheet` y reemplazar por el nuevo componente
+- Envolver el return en una condicion: si `selectedAgent` existe, renderizar `AgentDetailView`; si no, renderizar el listado actual
+- Pasar `onBack={() => setSelectedAgent(null)}` al componente de detalle
 
 ---
 
 ### Detalle tecnico
 
-**Mock data para graficos**: Se generaran funciones que producen arrays de datos simulados por periodo. Por ejemplo, para vista diaria: `[{ hour: "8:00", mouse: 45, keyboard: 30 }, { hour: "9:00", mouse: 78, keyboard: 65 }, ...]`. Los valores se generan de forma deterministica usando el ID del agente como semilla para que sean consistentes.
+**Layout del detalle** (patron estandarizado del proyecto):
 
-**Capturas mock**: Array de objetos `{ id, timestamp, url: null }`. El UI mostrara un placeholder visual (fondo gris con icono Monitor + hora). Cuando Hubstaff se conecte, el campo `url` se llenara con la URL real de la captura.
+```text
+<div className="flex flex-col h-full">
+  {/* Header fijo */}
+  <div className="shrink-0 border-b border-border bg-background px-6 py-4">
+    <div className="flex items-center gap-3">
+      <Button variant="ghost" size="sm" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <Avatar />
+      <div>
+        <h3 + Badge de estado</h3>
+        <p>rol - departamento</p>
+      </div>
+    </div>
+  </div>
+  {/* Contenido scrollable */}
+  <div className="flex-1 overflow-auto px-6 py-4">
+    Tabs + KPIs + Grafico + Capturas + Timeline
+  </div>
+</div>
+```
 
-**Sheet vs Ruta**: Se opta por Sheet (panel lateral) en lugar de una ruta separada para mantener al usuario en contexto. El Sheet se puede cerrar facilmente para volver al listado sin perder filtros ni posicion de scroll.
+**Archivos a modificar:**
 
-**Recharts**: Se usaran los componentes `AreaChart`, `Area`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` directamente de recharts (ya instalado como dependencia del proyecto).
+| Archivo | Cambio |
+|---|---|
+| `src/pages/hr/AgentDetailSheet.tsx` | Refactorizar de Sheet a componente de pagina completa con props `agent` y `onBack` |
+| `src/pages/hr/HRMonitoring.tsx` | Condicional render: listado vs detalle; actualizar import |
 
