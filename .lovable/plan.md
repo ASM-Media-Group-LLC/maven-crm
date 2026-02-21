@@ -1,61 +1,102 @@
 
 
-## Mejoras a la pagina de Monitoreo
+## Seccion de Detalle de Agente en Monitoreo
 
-Se corregiran los filtros, se agregara el selector de fechas (DateRangePicker), la vista de calendario y el boton de Configurar API con modal preparado para Hubstaff.
-
----
-
-### 1. Selector de fechas (DateRangePicker)
-
-Agregar el componente `DateRangePicker` en la fila de filtros, siguiendo el patron de `HRIncidents.tsx`. Permitira filtrar agentes por rango de fechas (preparado para cuando se conecte Hubstaff y se tengan datos historicos). Con mock data, el filtro estara presente visualmente pero no afectara los resultados hasta que haya datos reales con timestamps.
+Se creara una vista de detalle accesible al hacer clic en un agente (boton Eye o clic en la fila/card). Esta vista se implementara como un panel/modal dentro de la misma pagina (sin ruta nueva), mostrando capturas de pantalla, tiempo trabajado y rendimiento en tres periodos.
 
 ---
 
-### 2. Corregir placeholders de Select
+### Estructura del Detalle
 
-Cambiar el patron de los selectores para que:
-- El `value` del Select use `undefined` cuando esta vacio (en lugar de `"all"`)
-- El placeholder muestre la categoria del filtro: "Estado" y "Rol" en lugar de "Todos los estados"
-- La opcion "Todos" use el valor centinela `__all__` mapeado a cadena vacia en el estado
-- La logica de filtrado trate cadena vacia como ausencia de filtro
+Al seleccionar un agente, se abrira un panel lateral (Sheet) que ocupa la mitad derecha de la pantalla, con las siguientes secciones:
 
-Ejemplo:
 ```text
-// Antes
-value={statusFilter}  // "all"
-<SelectItem value="all">Todos los estados</SelectItem>
-
-// Despues
-value={statusFilter || undefined}  // undefined cuando vacio
-placeholder="Estado"
-<SelectItem value="__all__">Todos</SelectItem>
++-------------------------------------------+
+| [<- Volver]  Carlos Mendoza    [Activo]   |
+| Closer Senior - Ventas                     |
++-------------------------------------------+
+| [Diario] [Semanal] [Mensual]              |
++-------------------------------------------+
+| KPIs del periodo seleccionado:             |
+| Horas | Productividad | Mouse | Teclado   |
++-------------------------------------------+
+| Grafico de Rendimiento                     |
+| Barra/area chart con actividad por hora    |
+| (diario), por dia (semanal), por dia (mes) |
++-------------------------------------------+
+| Capturas de Pantalla                       |
+| Grid de thumbnails con timestamp           |
+| Click para ver en grande (dialog)          |
++-------------------------------------------+
+| Linea de Tiempo de Actividad               |
+| Timeline con inicio/pausas/fin del dia     |
++-------------------------------------------+
 ```
 
 ---
 
-### 3. Vista de Calendario
+### 1. Panel lateral (Sheet)
 
-Agregar una tercera vista (list/grid/calendar) con el boton `CalendarDays` en el toggle de vistas, siguiendo el patron exacto de `HRSchedules.tsx`:
+Se usara el componente `Sheet` de Shadcn (side="right") para abrir el detalle sin salir de la pagina. Esto mantiene el contexto del listado visible detras.
 
-- Calendario mensual con navegacion de meses (flechas izquierda/derecha)
-- Cada celda del dia muestra indicadores de color por estado de los agentes que tuvieron actividad ese dia
-- Leyenda de colores: Activo (verde), Inactivo (amarillo), Desconectado (gris), En Pausa (azul)
-- Vista de semana actual debajo del calendario mensual
-
-Con datos mock, se mostrara actividad simulada distribuida en los dias del mes actual.
+Estado nuevo: `selectedAgent: AgentActivity | null`. Al hacer clic en Eye (tabla) o en una card (grid), se establece el agente seleccionado y se abre el Sheet.
 
 ---
 
-### 4. Modal de Configurar API (Hubstaff)
+### 2. Tabs de periodo: Diario / Semanal / Mensual
 
-Reemplazar el toast de "Proximamente" por un modal/dialog real con:
-- Titulo: "Configurar Integracion Hubstaff"
-- Campo para API Token de Hubstaff (input password)
-- Campo para Organization ID
-- Boton de "Probar Conexion" (mostrara toast "Proximamente - conexion real")
-- Boton de "Guardar Configuracion" (deshabilitado por ahora)
-- Nota informativa indicando que la integracion real esta en desarrollo
+Tres tabs usando el componente `Tabs` de Shadcn que cambian los datos mostrados:
+
+- **Diario**: Actividad hora por hora del dia actual
+- **Semanal**: Actividad dia por dia de la semana actual
+- **Mensual**: Actividad dia por dia del mes actual
+
+Cada tab actualiza los KPIs y el grafico de rendimiento con datos mock del periodo correspondiente.
+
+---
+
+### 3. KPI Cards del periodo
+
+Cuatro mini-cards dentro del detalle:
+- **Horas Totales**: Total de horas en el periodo
+- **Productividad**: Promedio de (mouse + teclado) / 2
+- **Actividad Mouse**: Promedio del periodo
+- **Actividad Teclado**: Promedio del periodo
+
+---
+
+### 4. Grafico de Rendimiento
+
+Grafico de area/barras usando recharts (ya instalado en el proyecto):
+
+- **Vista Diaria**: Eje X = horas (8am-6pm), Eje Y = % actividad. Dos lineas/areas: mouse y teclado
+- **Vista Semanal**: Eje X = Lun-Dom, Eje Y = % actividad promedio por dia
+- **Vista Mensual**: Eje X = dias 1-30/31, Eje Y = % actividad promedio por dia
+
+---
+
+### 5. Galeria de Capturas de Pantalla
+
+Grid de thumbnails simulando capturas tomadas por Hubstaff:
+
+- Mock: 6-8 placeholders con timestamp (ej: "10:32 AM", "11:15 AM")
+- Cada thumbnail es un rectangulo gris con icono de Monitor y la hora
+- Al hacer clic se abre un Dialog con la imagen en grande (placeholder)
+- Preparado para recibir URLs reales de capturas cuando se conecte Hubstaff
+
+---
+
+### 6. Timeline de Actividad
+
+Lista vertical con iconos mostrando eventos del dia:
+- Inicio de jornada (verde)
+- Periodos de alta actividad (verde)
+- Periodos de baja actividad (amarillo)
+- Pausas (azul)
+- Desconexiones (rojo)
+- Fin de jornada
+
+Todo con datos mock que simulan un dia tipico de trabajo.
 
 ---
 
@@ -63,17 +104,17 @@ Reemplazar el toast de "Proximamente" por un modal/dialog real con:
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRMonitoring.tsx` | Agregar DateRangePicker, corregir selects, agregar vista calendario, agregar modal configurar API, cambiar view state a `"list" \| "grid" \| "calendar"` |
+| `src/pages/hr/HRMonitoring.tsx` | Agregar estado `selectedAgent`, boton Eye en tabla y cards clickeables, componente Sheet con detalle, tabs de periodo, graficos recharts, galeria de capturas y timeline |
 
 ---
 
 ### Detalle tecnico
 
-**Select filters**: El estado `statusFilter` iniciara como `""` (cadena vacia). El `value` del Select sera `statusFilter || undefined` para que el placeholder sea visible. La opcion "Todos" usara `value="__all__"` y el `onValueChange` mapeara `__all__` a `""`.
+**Mock data para graficos**: Se generaran funciones que producen arrays de datos simulados por periodo. Por ejemplo, para vista diaria: `[{ hour: "8:00", mouse: 45, keyboard: 30 }, { hour: "9:00", mouse: 78, keyboard: 65 }, ...]`. Los valores se generan de forma deterministica usando el ID del agente como semilla para que sean consistentes.
 
-**Vista calendario**: Se agregaran estados `calMonth` (Date) para navegacion mensual. Se generara un grid de 7 columnas (Lun-Dom) con celdas por cada dia del mes. Cada celda mostrara bolitas de color representando el estado de cada agente activo ese dia. Con mock data, se simulara actividad para los ultimos 5-7 dias.
+**Capturas mock**: Array de objetos `{ id, timestamp, url: null }`. El UI mostrara un placeholder visual (fondo gris con icono Monitor + hora). Cuando Hubstaff se conecte, el campo `url` se llenara con la URL real de la captura.
 
-**DateRangePicker**: Se importara de `@/components/ui/date-range-picker` con estados `dateFrom` y `dateTo`. Se colocara en la fila de filtros junto a los selects.
+**Sheet vs Ruta**: Se opta por Sheet (panel lateral) en lugar de una ruta separada para mantener al usuario en contexto. El Sheet se puede cerrar facilmente para volver al listado sin perder filtros ni posicion de scroll.
 
-**Modal API**: Se usara el componente Dialog de Shadcn con inputs para token y org ID. Los botones estaran preparados pero sin funcionalidad real hasta la integracion con Hubstaff.
+**Recharts**: Se usaran los componentes `AreaChart`, `Area`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` directamente de recharts (ya instalado como dependencia del proyecto).
 
