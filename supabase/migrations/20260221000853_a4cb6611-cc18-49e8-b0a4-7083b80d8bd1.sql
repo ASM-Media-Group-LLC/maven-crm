@@ -1,0 +1,1 @@
+ALTER TABLE work_schedules ADD COLUMN team text NOT NULL DEFAULT 'hr';

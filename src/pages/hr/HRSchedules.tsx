@@ -83,6 +83,7 @@ const HRSchedules = () => {
       const { data, error } = await supabase
         .from("work_schedules")
         .select("*, departments(name)")
+        .eq("team", "hr")
         .order("start_date", { ascending: false });
       if (error) throw error;
       return data as any[];
@@ -196,6 +197,7 @@ const HRSchedules = () => {
       end_time: formEndTime || null,
       department_id: formDepartment !== "all" ? formDepartment : null,
       description: formDescription || null,
+      team: "hr",
     };
     if (editData) {
       editMutation.mutate({ id: editData.id, ...vals });
