@@ -275,6 +275,13 @@ export default function HRPerformanceNew() {
               <CardDescription>Define metas claras y medibles para el siguiente período de evaluación.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {objectives.length === 1 && !objectives[0].title && (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <Target className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">Sin objetivos definidos aún</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">Agrega objetivos específicos y medibles para guiar el crecimiento del empleado en el próximo período.</p>
+                </div>
+              )}
               {objectives.map((obj, idx) => (
                 <div key={idx} className="flex gap-3 items-start">
                   <div className="flex-1 space-y-2">
