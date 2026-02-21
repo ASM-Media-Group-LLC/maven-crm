@@ -12,6 +12,7 @@ import ContactosGrid from "./ContactosGrid";
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
+import ConvertContactoModal from "./ConvertContactoModal";
 import AgenciasContent from "./AgenciasContent";
 import AddAgenciaModal from "./AddAgenciaModal";
 
@@ -45,6 +46,8 @@ const ContactosContent = () => {
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [convertRawContacto, setConvertRawContacto] = useState<typeof dbContactos[number] | null>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -80,7 +83,12 @@ const ContactosContent = () => {
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
   const handleConvert = (c: Contacto) => {
-    toast({ title: "Próximamente", description: `La conversión de "${c.nombre}" a creador estará disponible pronto.` });
+    const raw = dbContactos.find((db) => db.id === c.id);
+    if (raw) {
+      setSelectedContacto(c);
+      setConvertRawContacto(raw);
+      setConvertOpen(true);
+    }
   };
 
   const updateFilters = (patch: Partial<ContactoFilters>) =>
@@ -191,6 +199,12 @@ const ContactosContent = () => {
       <EditContactoModal open={editOpen} onOpenChange={setEditOpen} contacto={selectedContacto} />
       <DeleteContactoDialog open={deleteOpen} onOpenChange={setDeleteOpen} contacto={selectedContacto} />
       <AddAgenciaModal open={addAgenciaOpen} onOpenChange={setAddAgenciaOpen} />
+      <ConvertContactoModal
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        contacto={convertRawContacto}
+        onConverted={() => setConvertOpen(false)}
+      />
     </main>
   );
 };
