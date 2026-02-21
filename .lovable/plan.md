@@ -1,85 +1,67 @@
 
 
-## Mejorar Sales Overview: Graficas + Accesos Directos
+## Convertir Contacto a Creador
 
-### Problema actual
+### Objetivo
+Implementar la funcionalidad del boton "Convertir a Creador" que actualmente muestra un mensaje de "Proximamente". Se creara un modal de confirmacion (siguiendo el patron de `ConvertLeadModal`) que transfiere los datos del contacto a la tabla `creators` y marca el contacto como "Convertido".
 
-La pagina `/sales-overview` solo muestra tarjetas KPI y tarjetas operacionales. No tiene ningun grafico visual que permita ver tendencias de un vistazo. Ademas, no hay acceso claro y directo a "Reporte de Ventas" (`/salesdashboard`) ni a "IA Ventas" (`/aisales`) desde esta vista.
+### Datos que se transferiran
 
----
+| Campo Contacto | Campo Creator |
+|---|---|
+| nombre | name |
+| instagram | instagram_handle |
+| pais | country |
+| categoria_fisica | category |
+| telefono + country_code | phone, country_code |
+| email | email |
+| profile_photo_url | profile_photo_url |
+| compania | (nota interna) |
 
-### Cambios propuestos
+### Archivos a crear/modificar
 
-#### 1. Header con accesos directos
+#### 1. Crear `src/pages/contactos/ConvertContactoModal.tsx`
 
-Agregar dos botones prominentes en el header junto al titulo:
-- **Reporte de Ventas** (icono FileBarChart, variante outline) - navega a `/salesdashboard`
-- **IA Ventas** (icono Bot/Sparkles, variante outline con gradiente accent) - navega a `/aisales`
+Modal con el mismo estilo visual que `ConvertLeadModal`:
+- Header con icono Sparkles y titulo "Convertir Contacto a Creador"
+- Lista de datos que se transferiran (nombre, instagram, pais, categoria, telefono, email)
+- Nota informativa indicando que el contacto quedara marcado como "Convertido"
+- Botones Cancelar / Confirmar Conversion
 
-Esto reemplaza la tarjeta "Sales Report" de las operational cards (redundante) y da acceso inmediato.
+Logica de la mutacion:
+1. Insertar en `creators` con los datos mapeados
+2. Actualizar `contactos` set `estado = 'Convertido'` where `id = contacto.id`
+3. Invalidar queries `["contactos"]` y `["creators"]`
 
-#### 2. Grafico de tendencia de ganancias (nuevo)
+#### 2. Modificar `src/pages/contactos/ContactosContent.tsx`
 
-Debajo de los KPI cards, agregar un grafico de barras de tendencia diaria (reutilizando el patron de `EarningsTrendChart`) filtrado al rango de fechas seleccionado. Muestra las ganancias brutas dia a dia con barras de color primary.
+- Agregar estados `convertOpen` y enlazar con `selectedContacto`
+- Cambiar `handleConvert` para abrir el modal en lugar de mostrar toast
+- Importar y renderizar `ConvertContactoModal`
 
-#### 3. Grafico de ganancias por canal (nuevo)
+### Sin cambios en DB
+La tabla `creators` ya tiene todas las columnas necesarias. No se requieren migraciones.
 
-Al lado o debajo del grafico de tendencia, agregar un grafico de lineas por canal (Subscriptions, Tips, Messages, Other) siguiendo el patron de `EarningsByChannelChart`. Permite ver que canales impulsan el revenue.
-
-#### 4. Mini tabla Top 5 creadoras
-
-Debajo de los graficos, una tabla compacta con las 5 creadoras top del periodo: nombre, earnings brutos, variacion porcentual y badge de tendencia. Con un boton "Ver todas" que lleva a `/sales-overview/top10`.
-
-#### 5. Layout reorganizado
-
-El orden de la pagina sera:
+### Detalle tecnico de la mutacion
 
 ```text
-+------------------------------------------+
-| Header: Titulo + [Reporte] [IA Ventas]   |
-+------------------------------------------+
-| DateRangePicker                          |
-+------------------------------------------+
-| KPI Cards (5 tarjetas)                   |
-+------------------------------------------+
-| Tendencia Diaria  |  Ganancias por Canal |
-| (BarChart)        |  (LineChart)         |
-+------------------------------------------+
-| Top 5 Creadoras (mini tabla)             |
-+------------------------------------------+
-| Operational Cards (5, sin "Sales Report")|
-+------------------------------------------+
+// 1. Insertar creator
+supabase.from("creators").insert({
+  name: contacto.nombre,
+  instagram_handle: contacto.instagram,
+  country: contacto.pais,
+  category: contacto.categoria_fisica,
+  phone: contacto.telefono,
+  country_code: contacto.country_code,
+  email: contacto.email,
+  profile_photo_url: contacto.profile_photo_url,
+  source: "contacto",
+  status: "pendiente",
+})
+
+// 2. Marcar contacto como convertido
+supabase.from("contactos").update({ estado: "Convertido" }).eq("id", contacto.id)
 ```
 
----
-
-### Detalle tecnico
-
-#### `SalesOverviewHeader.tsx`
-
-- Agregar props `onNavigateReport` y `onNavigateAi` (o usar `useNavigate` internamente)
-- Renderizar dos botones: `<Button variant="outline">` con iconos `FileBarChart` y `Sparkles`
-
-#### `SalesOverview.tsx`
-
-- Calcular `filteredRows` (filas del periodo seleccionado) para pasar a los graficos
-- Importar y renderizar `EarningsTrendChart` y `EarningsByChannelChart` en grid `grid-cols-1 xl:grid-cols-2`
-- Crear componente inline o separado `TopCreatorsTable` con las top 5 del `comparison.top10`
-
-#### `SalesOperationalCards.tsx`
-
-- Eliminar la tarjeta "Sales Report" (ya esta en el header)
-- Quedan 5 tarjetas operacionales: Comparativas, Top 10, Bajando, Alto Potencial, Alertas
-
----
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---|---|
-| `src/pages/sales-overview/SalesOverviewHeader.tsx` | Agregar botones de navegacion a Reporte e IA Ventas |
-| `src/pages/SalesOverview.tsx` | Agregar filteredRows, importar graficos, agregar mini tabla Top 5 |
-| `src/pages/sales-overview/SalesOperationalCards.tsx` | Eliminar tarjeta "Sales Report" (ahora esta en el header) |
-
-Sin cambios en DB ni rutas.
+Nota: Para acceder a los campos raw de la DB (telefono, country_code, etc.) se usara el registro original de `dbContactos` en lugar del objeto `Contacto` mapeado, pasando el ID al modal y consultando el contacto completo, o bien ajustando el tipo `Contacto` para incluir los campos necesarios. La solucion mas limpia sera pasar el registro crudo de Supabase al modal.
 
