@@ -64,6 +64,7 @@ import HRTraining from "./pages/hr/HRTraining";
 import HRTrainingChatters from "./pages/hr/HRTrainingChatters";
 import HRTrainingTech from "./pages/hr/HRTrainingTech";
 import HRPerformance from "./pages/hr/HRPerformance";
+import HRPerformanceNew from "./pages/hr/HRPerformanceNew";
 import HRLayout from "./pages/hr/HRLayout";
 import HRAttendance from "./pages/hr/HRAttendance";
 import HRVacations from "./pages/hr/HRVacations";
@@ -145,6 +146,7 @@ const App = () => (
               <Route path="/hr/capacitacion/chatters" element={<ProtectedRoute><HRLayout><HRTrainingChatters /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion/tecnologia" element={<ProtectedRoute><HRLayout><HRTrainingTech /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/desempeno" element={<ProtectedRoute><HRLayout><HRPerformance /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/desempeno/nuevo" element={<ProtectedRoute><HRLayout><HRPerformanceNew /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/asistencia" element={<ProtectedRoute><HRLayout><HRAttendance /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/vacaciones" element={<ProtectedRoute><HRLayout><HRVacations /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/permisos" element={<ProtectedRoute><HRLayout><HRPermisos /></HRLayout></ProtectedRoute>} />
