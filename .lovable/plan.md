@@ -1,43 +1,52 @@
 
 
-## Correcciones en HRSchedules.tsx
+## Nueva Pagina: Horarios Chatters
 
-### Cambios a realizar
+### Resumen
 
-#### 1. Eliminar boton "Ver Calendario"
-Remover el boton `Ver Calendario` que esta junto a `Crear Turno` en el header (lineas 360-362). La vista calendario ya es accesible desde el toggle de vistas en los filtros.
+Crear una pagina de gestion de horarios y turnos para el equipo de chatters, identica a la pagina actual de HR (`HRSchedules`), reutilizando la misma tabla `work_schedules` con un campo `team` para diferenciar los registros.
 
-#### 2. Agregar efectos hover a las KPI Cards
-Aplicar el patron estandar de hover premium usando el prop `hoverClass` de `DashboardMetricCard`:
-- Turnos Esta Semana: hover con gradiente primary
-- Turnos Hoy: hover con gradiente accent
-- Horas Extra: hover con gradiente warning
-- Banco de Horas: hover con gradiente success
+### Cambios en la base de datos
 
-Patron: `hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-{color}/10 hover:to-transparent`
+**Migracion**: Agregar columna `team` a la tabla `work_schedules`.
 
-#### 3. Corregir filtro de tipo
-- Cambiar estado inicial de `typeFilter` de `"all"` a `""`
-- Usar `value={typeFilter || undefined}` en el Select para que muestre el placeholder
-- Cambiar placeholder de `"Tipo"` a `"Tipo"`  (ya esta correcto)
-- Eliminar la opcion `SelectItem value="all"` que dice "Todos los tipos"
-- Usar el valor centinela `__all__` mapeado a cadena vacia, o simplemente filtrar solo cuando `typeFilter !== ""`
-- Agregar boton "Limpiar filtros" visible solo cuando hay filtros activos
+- `ALTER TABLE work_schedules ADD COLUMN team text NOT NULL DEFAULT 'hr';`
+- Valores posibles: `'hr'` (default, para la pagina actual) y `'chatters'` (para la nueva pagina)
 
-### Detalle tecnico
+### Nuevos archivos
 
-| Linea(s) | Cambio |
-|---|---|
-| 62 | `useState("all")` -> `useState("")` |
-| 214 | Condicion de filtro: `typeFilter !== "all"` -> `typeFilter !== ""` |
-| 360-362 | Eliminar boton "Ver Calendario" |
-| 372-378 | Agregar `hoverClass` a cada KPI card |
-| 415-421 | Corregir Select: `value={typeFilter \|\| undefined}`, eliminar opcion "Todos los tipos", usar `__all__` -> `""` en onValueChange |
-| ~427 | Agregar boton "Limpiar filtros" condicional |
+#### `src/pages/hr/HRChatterSchedules.tsx`
 
-### Archivo a modificar
+Copia funcional de `HRSchedules.tsx` con las siguientes diferencias:
+- Titulo: "Horarios Chatters" / subtitulo: "Gestion de turnos para el equipo de chatters"
+- Query filtra por `team = 'chatters'`: `.eq("team", "chatters")`
+- Crear turno inserta con `team: "chatters"`
+- Las navigation cards de "Horas Extras" y "Banco de Horas" NO se incluyen (son exclusivas de HR)
+- Las KPI cards se limitan a: Turnos Esta Semana y Turnos Hoy (filtrados por chatters)
+- Vista calendario, grid y lista identicas
+- CRUD completo: Ver, Editar, Eliminar con los mismos patrones
+
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRSchedules.tsx` | Eliminar boton calendario, hover cards, corregir filtros |
+| **DB Migration** | Agregar columna `team` a `work_schedules` |
+| `src/pages/hr/HRChatterSchedules.tsx` | **Nuevo** - Pagina de horarios para chatters |
+| `src/pages/hr/HRSchedules.tsx` | Agregar filtro `.eq("team", "hr")` en la query y `team: "hr"` en el insert |
+| `src/App.tsx` | Agregar ruta `/hr/horarios-chatters` con HRLayout |
+| `src/components/dashboard/DashboardSidebar.tsx` | Agregar item "Horarios Chatters" despues de "Horarios y Turnos" en el grupo Operaciones |
+
+### Patron de acciones en tabla
+
+Mismo patron que HRSchedules:
+```text
+[ Eye (ver) ] [ Pencil (editar) ] [ Trash2 (eliminar) ]
+```
+
+### Secuencia de implementacion
+
+1. Migracion DB (agregar columna `team`)
+2. Actualizar `HRSchedules.tsx` para filtrar por `team = 'hr'`
+3. Crear `HRChatterSchedules.tsx`
+4. Actualizar `App.tsx` y `DashboardSidebar.tsx`
 
