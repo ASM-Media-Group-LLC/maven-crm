@@ -1,67 +1,67 @@
 
 
-## Estandarizar Pagina de Incidentes al Layout de Referencia
+## Correccion de 3 problemas en Incidentes Laborales
 
-La pagina actual de Incidentes (`HRIncidents.tsx`) no sigue el layout estandarizado que tienen las demas secciones como Control de Asistencia. A continuacion los problemas y la solucion.
+### 1. Reemplazar "Desde/Hasta" con DateRangePicker
 
-### Problemas detectados
+Actualmente se usan dos Popovers separados (Desde y Hasta) para filtrar por fecha. Se reemplazaran por el componente `DateRangePicker` ya estandarizado en el proyecto, que incluye presets rapidos, vista dual de meses y entrada manual.
 
-| Elemento | Estado actual | Estado esperado (como Asistencia) |
-|---|---|---|
-| Layout raiz | `div p-6` simple | `flex flex-col h-full overflow-hidden` con header fijo y scroll independiente |
-| KPI Cards | `Card` basico con `border-t` | `DashboardMetricCard` con hover premium (scale, gradiente, border semantico) |
-| Buscador | No existe | Input con icono Search y placeholder "Buscar empleado..." |
-| Pestanas de departamento | No existen | Tabs por departamento (Todos, Direccion, Finanzas, etc.) |
-| Filtros de fecha | No existen | Popover con Calendar para "Desde" y "Hasta" |
-| Toggle vista | No existe | Botones List/Grid para alternar entre tabla y tarjetas |
-| Tabla | Sin scroll interno, sin sticky header/actions | Contenedor con `max-h`, `sticky top-0` en header, `sticky right-0` en acciones |
-| Contador | No existe | "Mostrando X de Y registros" al pie |
-| Vista Grid | No existe | Grid de tarjetas con datos del incidente |
+**Cambio**: Eliminar los dos Popovers de fecha (lineas 238-272), los estados `dateFromOpen`/`dateToOpen` (lineas 103-104), y reemplazar con un solo `DateRangePicker` importado de `@/components/ui/date-range-picker`.
 
-### Cambios en `src/pages/hr/HRIncidents.tsx`
+```text
+// Antes (2 popovers separados)
+<Popover> Desde </Popover>
+<Popover> Hasta </Popover>
 
-**1. Layout fijo con scroll**
-- Raiz: `flex flex-col h-full overflow-hidden`
-- Header: `shrink-0 bg-background border-b px-6 pt-6 pb-4`
-- Contenido: `flex-1 overflow-auto p-6 space-y-5`
+// Despues (1 componente unificado)
+<DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+```
 
-**2. KPIs con DashboardMetricCard**
-- Reemplazar los Card basicos por `DashboardMetricCard` con iconos (AlertTriangle, AlertCircle, Clock, ShieldAlert) y hover effects premium identicos a los de Asistencia
+---
 
-**3. Pestanas de departamento**
-- Consultar tabla `departments` (mismo hook `useDepartments` de Asistencia)
-- Filtrar incidentes por `employees.department_id`
-- Barra de tabs: Todos + departamentos activos
+### 2. Tooltips ocultos en acciones de tabla
 
-**4. Barra de filtros completa**
-- Buscador por nombre de empleado (Input con Search icon)
-- Select de Severidad (placeholder, sin "Todos" visible por defecto)
-- Select de Estado (placeholder)
-- Date pickers "Desde" y "Hasta" (Popover + Calendar)
-- Toggle de vista List/Grid (iconos ListIcon y LayoutGrid)
-- Boton "Limpiar filtros" condicional
+Los tooltips de Ver/Editar/Eliminar quedan cortados por el `overflow-auto` del contenedor de la tabla. La solucion es agregar `overflow-visible` al contenedor de acciones y asegurar que los `TooltipContent` usen `side="left"` para que no se corten por el borde derecho.
 
-**5. Tabla estandarizada**
-- Contenedor con `overflow-auto max-h-[calc(100vh-28rem)]`
-- TableHeader con `sticky top-0 z-10 bg-card`
-- Columna Acciones con `sticky right-0 bg-card`
-- Columna Empleado con avatar (iniciales + nombre + codigo)
-- Row hover: `group hover:bg-muted/30 transition-colors`
+**Cambio**: Agregar `side="left"` a cada `TooltipContent` en la columna de acciones (lineas 354-366).
 
-**6. Vista Grid**
-- Tarjetas con datos del incidente: empleado, tipo, severidad (badge), fecha, estado, titulo truncado
-- Acciones Eye/Pencil/Trash2 en cada tarjeta
-- Grid responsivo `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`
+---
 
-**7. Contador de resultados**
-- "Mostrando X de Y incidentes" debajo de la tabla/grid
+### 3. Error al eliminar incidente
+
+Hay una condicion de carrera: al hacer clic en "Eliminar" dentro del AlertDialog, el `onOpenChange` del AlertDialog se dispara y ejecuta `setDeleteItem(null)` **antes** de que la mutacion use `deleteItem!.id`. Esto causa que `deleteItem` sea `null` y la mutacion falle.
+
+**Solucion**: Cambiar la mutacion para recibir el ID como parametro en lugar de depender del estado. Patron identico al usado en `HRAttendance.tsx` (linea 462: `mutationFn: async (id: string)`).
+
+```text
+// Antes (depende del estado, puede ser null)
+const deleteMutation = useMutation({
+  mutationFn: async () => {
+    await supabase.from("employee_incidents").delete().eq("id", deleteItem!.id);
+  },
+  onSuccess: () => { setDeleteItem(null); }
+});
+
+// Despues (recibe ID como parametro)
+const deleteMutation = useMutation({
+  mutationFn: async (id: string) => {
+    const { error } = await supabase.from("employee_incidents").delete().eq("id", id);
+    if (error) throw error;
+  },
+  onSuccess: () => { setDeleteItem(null); }
+});
+
+// En el AlertDialogAction:
+onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
+```
+
+---
 
 ### Archivo a modificar
 
-| Archivo | Cambio |
+| Archivo | Cambios |
 |---|---|
-| `src/pages/hr/HRIncidents.tsx` | Refactorizar completamente para seguir el patron de Asistencia |
+| `src/pages/hr/HRIncidents.tsx` | 1) Importar DateRangePicker, eliminar estados dateFromOpen/dateToOpen, reemplazar 2 Popovers por 1 DateRangePicker. 2) Agregar `side="left"` a TooltipContent. 3) Corregir deleteMutation para recibir ID como parametro. |
 
-### Sin cambios en DB ni rutas
-Todo es puramente visual/layout. No se requieren migraciones ni nuevas rutas.
+Sin cambios en DB, rutas ni otros archivos.
 
