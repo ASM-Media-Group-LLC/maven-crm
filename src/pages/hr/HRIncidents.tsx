@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, AlertCircle, Clock, ShieldAlert, Plus, Eye, Pencil, Trash2,
-  Search, X, ListIcon, LayoutGrid, CalendarIcon,
+  Search, X, ListIcon, LayoutGrid,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -19,8 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,8 +99,6 @@ export default function HRIncidents() {
   const [deptTab, setDeptTab] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-  const [dateFromOpen, setDateFromOpen] = useState(false);
-  const [dateToOpen, setDateToOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Modals
@@ -131,8 +128,8 @@ export default function HRIncidents() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("employee_incidents").delete().eq("id", deleteItem!.id);
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("employee_incidents").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -235,41 +232,11 @@ export default function HRIncidents() {
             </SelectContent>
           </Select>
 
-          {/* Date From */}
-          <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateFrom && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {dateFrom ? format(dateFrom, "dd/MM/yy") : "Desde"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); }} locale={es} className="p-3 pointer-events-auto" />
-              {dateFrom && (
-                <div className="border-t p-2">
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateFrom(undefined)}>Limpiar</Button>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
-
-          {/* Date To */}
-          <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("w-32 justify-start text-left font-normal text-xs", !dateTo && "text-muted-foreground")}>
-                <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                {dateTo ? format(dateTo, "dd/MM/yy") : "Hasta"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setDateToOpen(false); }} locale={es} className="p-3 pointer-events-auto" />
-              {dateTo && (
-                <div className="border-t p-2">
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setDateTo(undefined)}>Limpiar</Button>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          />
 
           {/* View toggle */}
           <div className="inline-flex items-center rounded-md border border-border">
@@ -353,17 +320,17 @@ export default function HRIncidents() {
                             <div className="flex items-center gap-1">
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inc)}><Eye className="h-3.5 w-3.5" /></Button>
-                              </TooltipTrigger><TooltipContent>Ver</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setEditItem(inc); setEditForm({ status: inc.status, severity: inc.severity, corrective_action: inc.corrective_action || "" }); }}>
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
                               <Tooltip><TooltipTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inc)}>
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
-                              </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
+                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -526,7 +493,7 @@ export default function HRIncidents() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
