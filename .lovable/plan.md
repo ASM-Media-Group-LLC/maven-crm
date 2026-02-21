@@ -1,107 +1,113 @@
 
 
-## Reorganizacion del Modulo de Capacitacion
+## Reestructuracion de Capacitacion: Modelo Horarios y Turnos
 
-Se reestructurara el modulo para tener una navegacion mas clara y funcional, con tabs dedicados por audiencia, filtrado por departamento, tracking real por modulos, y vistas especializadas para Chatters y Tecnologia.
-
----
-
-### Nueva Estructura de Tabs (4 tabs)
-
-1. **Asignaciones** -- Todas las asignaciones de todos los roles. Incluye filtro por departamento (Select con departamentos), filtro por estado, y buscador. Vista tabla/grid.
-2. **Chatters** -- Solo asignaciones y programas donde `target_role = 'chatter'`. Muestra primero una seccion de programas disponibles (cards compactas) y debajo la tabla de asignaciones filtrada.
-3. **Tecnologia** -- Mismo layout que Chatters pero filtrado por `target_role = 'technology'`. Programas de tech y sus asignaciones.
-4. **Programas por Puesto** -- Catalogo completo de programas agrupados por rol (vista actual).
+Se rediseñara el modulo de Capacitacion siguiendo el mismo patron que Horarios y Turnos, donde Chatters y Tecnologia son **sub-paginas independientes** (como Horas Extras y Banco de Horas) accesibles mediante Navigation Cards. La pagina principal se simplifica como vista general de todas las asignaciones.
 
 ---
 
-### Tabs de Chatters y Tecnologia: Layout Interno
+### Arquitectura de Navegacion
 
-Cada uno de estos tabs tendra dos secciones:
-
-**Seccion superior**: Cards horizontales con los programas disponibles para ese rol (nombre, duracion, modulos, badge obligatorio). Boton para ver modulos de cada programa.
-
-**Seccion inferior**: Tabla de asignaciones filtrada automaticamente por el rol. Mismas columnas que la tabla general pero sin necesidad de filtrar manualmente.
-
-Esto permite ver de un vistazo que programas existen para chatters/tech y quienes los estan cursando.
-
----
-
-### Filtro por Departamento (Tab Asignaciones)
-
-Se agrega un Select de departamento al lado del filtro de estado en el tab "Asignaciones". Los departamentos se cargan de la tabla `departments`. Filtra las asignaciones por `employees.department_id`.
-
----
-
-### Tracking Real por Modulos
-
-**Nueva tabla `training_module_progress`**:
+La pagina principal `/hr/capacitacion` tendra:
 
 ```text
-training_module_progress
-- id (uuid, PK)
-- assignment_id (uuid, FK -> employee_training_assignments.id, ON DELETE CASCADE)
-- module_id (uuid, FK -> training_modules.id, ON DELETE CASCADE)
-- status (text, default 'pending') -- pending, in_progress, completed
-- completed_at (timestamptz)
-- score (numeric) -- para quizzes
-- notes (text)
-- created_at (timestamptz)
-- updated_at (timestamptz)
-- UNIQUE(assignment_id, module_id)
+Header: "Capacitacion" + subtitulo + botones "Configuracion" (outline) y "+ Asignar" (default)
+
+KPI Cards (4):
+  - Total Asignadas | En Progreso | Completadas | Vencidas
+
+Navigation Cards (2, igual que Horarios):
+  - "Capacitacion Chatters" -> /hr/capacitacion/chatters
+    Subtitulo: "Programas, contenidos y seguimiento para chatters"
+  - "Capacitacion Tecnologia" -> /hr/capacitacion/tecnologia
+    Subtitulo: "Programas, contenidos y seguimiento del equipo tech"
+
+Filtros: Buscador + Select estado (sin "Todos" por default) + Select departamento + DateRangePicker + Toggle vista (lista/grid/calendario)
+
+Tabla/Grid/Calendario de TODAS las asignaciones
 ```
 
-**Calculo de progreso**: En lugar del `progressMap` estatico actual, el progreso se calcula como `modulos_completados / total_modulos * 100`. Esto requiere un query adicional o un conteo en el frontend.
+Las dos sub-paginas seran paginas completas (con HRLayout) dedicadas a gestionar los programas, modulos, contenidos y asignaciones especificos de cada rol.
 
 ---
 
-### Vista de Detalle de Asignacion (nuevo view: 'detail')
+### Sub-pagina: Capacitacion Chatters (`/hr/capacitacion/chatters`)
 
-Al hacer clic en "Ver" (Eye) en cualquier asignacion, se abre una vista a pantalla completa con:
-
-- Header: ArrowLeft + Nombre del empleado + Programa + Badge de estado
-- Info general: empleado, programa, fechas, supervisor, notas
-- Lista de modulos con checkboxes para marcar completados
-- Barra de progreso general calculada en tiempo real
-- Al completar todos los modulos requeridos, la asignacion se marca automaticamente como "completed"
-
----
-
-### Vistas internas actualizadas
+Pagina independiente con header ArrowLeft + "Capacitacion Chatters". Internamente maneja sus propias vistas:
 
 ```text
-currentView:
-  'list'    -> Dashboard (KPIs + 4 Tabs)
-  'assign'  -> Formulario asignar capacitacion
-  'config'  -> Configuracion de programas
-  'modules' -> Modulos de un programa
-  'detail'  -> Detalle/tracking de una asignacion (NUEVO)
+Vistas internas (estado local):
+  'list'    -> Dashboard con programas de chatters + asignaciones filtradas
+  'config'  -> Crear/editar programas (pre-filtrado target_role='chatter')
+  'modules' -> Modulos de un programa especifico
+  'assign'  -> Asignar programa de chatter a empleado
+  'detail'  -> Detalle de asignacion con tracking por modulo
 ```
+
+Contenido de la vista 'list':
+- KPIs filtrados solo para asignaciones de chatters
+- Seccion de programas disponibles (cards con nombre, duracion, modulos, badge obligatorio, boton Modulos/Editar/Eliminar)
+- Tabla de asignaciones filtrada automaticamente por `target_role = 'chatter'`
+- Filtros: buscador, estado, toggle vista
 
 ---
 
-### Archivos a modificar/crear
+### Sub-pagina: Capacitacion Tecnologia (`/hr/capacitacion/tecnologia`)
+
+Identica estructura que Chatters pero filtrada por `target_role = 'technology'`. Se reutilizara un componente `RoleTrainingPage` que recibe el `targetRole` como prop.
+
+---
+
+### Vista de Calendario (nueva)
+
+En la vista principal y en las sub-paginas, se agrega una tercera opcion de visualizacion: Calendario mensual. Muestra las asignaciones segun su `start_date` y `completion_date` en una rejilla mensual, similar al calendario de Horarios. Cada dia muestra badges con las asignaciones activas.
+
+---
+
+### Mejoras UX adicionales
+
+1. **Select de estado sin "Todos" por default**: El select de estado arranca vacio (placeholder "Estado") y las opciones incluyen "Todos los estados" como primera opcion seleccionable, pero no es el default.
+
+2. **DateRangePicker**: Se agrega un selector de rango de fechas para filtrar asignaciones por fecha de inicio. Usa el componente `DateRangePicker` existente con placeholder "Selecciona fechas".
+
+3. **KPIs clickeables**: Al hacer clic en un KPI, se aplica el filtro correspondiente (ej: clic en "En Progreso" filtra por status in_progress).
+
+4. **Indicador de contenido subido**: En las cards de programas, mostrar un indicador visual de cuantos modulos tienen contenido subido vs total (ej: "3/5 con contenido").
+
+5. **Badge de vencimiento proximo**: En la tabla, resaltar asignaciones cuya fecha limite esta a menos de 7 dias con un badge naranja "Por vencer".
+
+---
+
+### Rutas nuevas
+
+| Ruta | Componente | Descripcion |
+|---|---|---|
+| `/hr/capacitacion` | `HRTraining` | Vista general (simplificada, sin tabs de Chatters/Tech) |
+| `/hr/capacitacion/chatters` | `HRTrainingChatters` | Sub-pagina dedicada a chatters |
+| `/hr/capacitacion/tecnologia` | `HRTrainingTech` | Sub-pagina dedicada a tecnologia |
+
+---
+
+### Archivos a crear/modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRTraining.tsx` | Agregar tab "Tecnologia", layout interno de Chatters/Tech con seccion de programas + asignaciones, filtro por departamento, vista de detalle con tracking por modulos, calculo de progreso real |
-| **Migracion SQL** | Crear tabla `training_module_progress` con RLS, indice unico en (assignment_id, module_id) |
+| `src/pages/hr/HRTraining.tsx` | Simplificar: quitar tabs Chatters/Tecnologia, agregar Navigation Cards, agregar vista calendario, DateRangePicker, KPIs clickeables, badge "Por vencer", fix default del select de estado |
+| `src/pages/hr/HRTrainingChatters.tsx` | **NUEVO** - Sub-pagina dedicada para chatters con gestion completa de programas, modulos, contenidos y asignaciones |
+| `src/pages/hr/HRTrainingTech.tsx` | **NUEVO** - Sub-pagina dedicada para tecnologia (wrapper de componente reutilizable) |
+| `src/App.tsx` | Agregar rutas `/hr/capacitacion/chatters` y `/hr/capacitacion/tecnologia` con HRLayout |
+
+---
 
 ### Detalle tecnico
 
-**Tabs de Chatters/Tecnologia**: Componente `RoleTrainingTab` reutilizable que recibe `targetRole` como prop. Internamente hace dos queries: programas filtrados por `target_role` y asignaciones filtradas por el mismo campo via join con `training_programs`.
+**Componente reutilizable `RoleTrainingPage`**: Se creara un componente interno (dentro de HRTrainingChatters.tsx o como componente separado) que recibe `targetRole`, `roleLabel`, `roleIcon` como props. Tanto HRTrainingChatters como HRTrainingTech lo usan con sus respectivos valores. Este componente contiene toda la logica de vistas internas (list, config, modules, assign, detail) ya existente pero scoped al rol.
 
-**Progreso real**: Para cada asignacion visible en la tabla, se consultan los modulos del programa y el conteo de progreso. Se usa un query agrupado para evitar N+1:
+**Vista Calendario**: Reutiliza el patron de HRSchedules. Muestra un grid mensual donde cada celda contiene las asignaciones cuyo rango start_date - completion_date incluye ese dia. Las asignaciones se muestran como badges coloreados por estado.
 
-```text
-SELECT assignment_id, COUNT(*) FILTER (WHERE status = 'completed') as completed,
-       COUNT(*) as total
-FROM training_module_progress
-WHERE assignment_id IN (...)
-GROUP BY assignment_id
-```
+**Filtro de estado sin default**: Se cambia `useState("all")` por `useState("")` y en el filtrado se verifica `if (statusFilter && statusFilter !== "all")`. El placeholder del Select muestra "Estado".
 
-**Auto-completar asignacion**: Cuando se marca el ultimo modulo requerido como completado en la vista de detalle, se ejecuta un update automatico de la asignacion a `status = 'completed'` y `completion_date = now()`.
+**DateRangePicker**: Filtra asignaciones donde `start_date` esta dentro del rango seleccionado. Se integra al lado del select de departamento.
 
-**Filtro por departamento**: Se reutiliza el hook `useDepartments` existente en `useEmployees.ts` para poblar el Select de departamentos. El filtrado se hace en el frontend comparando `employees.department_id`.
+**KPIs clickeables**: Cada HRMetricCard recibe un `onClick` que setea el `statusFilter` correspondiente (ej: "in_progress" para "En Progreso").
 
