@@ -1,95 +1,79 @@
 
 
-## Pagina de Monitoreo en Tiempo Real (HR > Seguimiento)
+## Mejoras a la pagina de Monitoreo
 
-Se creara la pagina `/hr/monitoreo` con datos simulados (mock), siguiendo la estructura visual de la imagen de referencia y los patrones establecidos en el proyecto. La integracion real con Hubstaff se dejara preparada para una fase posterior.
+Se corregiran los filtros, se agregara el selector de fechas (DateRangePicker), la vista de calendario y el boton de Configurar API con modal preparado para Hubstaff.
 
 ---
 
-### Layout y estructura
+### 1. Selector de fechas (DateRangePicker)
 
-La pagina seguira el patron estandarizado: header fijo con titulo, subtitulo y botones de accion, KPI cards, tab bar de departamentos, filtros con buscador, toggle de vistas (Lista/Grid) y tabla/grid de agentes.
+Agregar el componente `DateRangePicker` en la fila de filtros, siguiendo el patron de `HRIncidents.tsx`. Permitira filtrar agentes por rango de fechas (preparado para cuando se conecte Hubstaff y se tengan datos historicos). Con mock data, el filtro estara presente visualmente pero no afectara los resultados hasta que haya datos reales con timestamps.
 
+---
+
+### 2. Corregir placeholders de Select
+
+Cambiar el patron de los selectores para que:
+- El `value` del Select use `undefined` cuando esta vacio (en lugar de `"all"`)
+- El placeholder muestre la categoria del filtro: "Estado" y "Rol" en lugar de "Todos los estados"
+- La opcion "Todos" use el valor centinela `__all__` mapeado a cadena vacia en el estado
+- La logica de filtrado trate cadena vacia como ausencia de filtro
+
+Ejemplo:
 ```text
-+-----------------------------------------------------------+
-| Monitoreo                    [Hubstaff] [Actualizar] [API] |
-| Monitoreo en tiempo real de agentes                        |
-+-----------------------------------------------------------+
-| Agentes Activos | Productividad | Alertas | Horas Totales  |
-| 4/7             | 55%           | 3       | 41.2h          |
-+-----------------------------------------------------------+
-| [Todos] [Ventas] [LeadGen] [Contenido] [Marketing] ...    |
-+-----------------------------------------------------------+
-| [Buscar...] [Estado v] [Rol v]           [Lista] [Grid]   |
-+-----------------------------------------------------------+
-| Tabla/Grid de agentes con metricas de actividad            |
-+-----------------------------------------------------------+
+// Antes
+value={statusFilter}  // "all"
+<SelectItem value="all">Todos los estados</SelectItem>
+
+// Despues
+value={statusFilter || undefined}  // undefined cuando vacio
+placeholder="Estado"
+<SelectItem value="__all__">Todos</SelectItem>
 ```
 
 ---
 
-### Datos mock
+### 3. Vista de Calendario
 
-Se generara un array de agentes simulados con los campos que Hubstaff proporcionaria:
+Agregar una tercera vista (list/grid/calendar) con el boton `CalendarDays` en el toggle de vistas, siguiendo el patron exacto de `HRSchedules.tsx`:
 
-- Nombre, departamento, rol/cargo
-- Estado: Activo, Inactivo, Desconectado, En Pausa
-- Actividad de mouse (%) con mini barra de progreso
-- Actividad de teclado (%) con mini barra de progreso
-- Horas trabajadas hoy
-- Ultima actividad (timestamp relativo)
-- Alertas activas (numero)
+- Calendario mensual con navegacion de meses (flechas izquierda/derecha)
+- Cada celda del dia muestra indicadores de color por estado de los agentes que tuvieron actividad ese dia
+- Leyenda de colores: Activo (verde), Inactivo (amarillo), Desconectado (gris), En Pausa (azul)
+- Vista de semana actual debajo del calendario mensual
 
----
-
-### Header con botones de accion
-
-Tres botones en el header:
-- **Hubstaff Conectado/Desconectado**: Badge de estado de conexion (verde = mock activo)
-- **Actualizar**: Boton outline con icono RefreshCw para simular refresh de datos
-- **Configurar API**: Boton outline con icono Settings, muestra toast "Proximamente" (preparado para futura configuracion de Hubstaff)
+Con datos mock, se mostrara actividad simulada distribuida en los dias del mes actual.
 
 ---
 
-### KPI Cards (4 tarjetas)
+### 4. Modal de Configurar API (Hubstaff)
 
-1. **Agentes Activos**: X/Y (activos sobre total), icono Users
-2. **Productividad Hoy**: Promedio de (mouse + teclado) / 2, icono TrendingUp
-3. **Alertas Activas**: Conteo de agentes con alertas > 0, icono AlertTriangle, color warning
-4. **Horas Totales Hoy**: Suma de horas de todos los agentes, icono Clock
-
----
-
-### Vistas
-
-**Vista Lista (tabla)**: Columnas: Agente (avatar+nombre+cargo), Departamento (badge color), Estado (badge), Mouse (barra + %), Teclado (barra + %), Horas Hoy, Ultima Actividad, Alertas (badge numerico rojo si > 0), Acciones (Eye para ver detalle)
-
-**Vista Grid**: Tarjetas con avatar, nombre, departamento, barras de actividad, horas y estado. Patron similar a las grid cards de otros modulos HR.
+Reemplazar el toast de "Proximamente" por un modal/dialog real con:
+- Titulo: "Configurar Integracion Hubstaff"
+- Campo para API Token de Hubstaff (input password)
+- Campo para Organization ID
+- Boton de "Probar Conexion" (mostrara toast "Proximamente - conexion real")
+- Boton de "Guardar Configuracion" (deshabilitado por ahora)
+- Nota informativa indicando que la integracion real esta en desarrollo
 
 ---
-
-### Archivos a crear
-
-| Archivo | Descripcion |
-|---|---|
-| `src/pages/hr/HRMonitoring.tsx` | Pagina principal con mock data, KPIs, filtros, tabs de departamento, toggle de vistas, tabla y grid |
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/App.tsx` | Agregar ruta `/hr/monitoreo` con HRLayout |
-| `src/components/dashboard/DashboardSidebar.tsx` | Cambiar `{ title: "Monitoreo", url: null }` a `{ title: "Monitoreo", url: "/hr/monitoreo" }` |
+| `src/pages/hr/HRMonitoring.tsx` | Agregar DateRangePicker, corregir selects, agregar vista calendario, agregar modal configurar API, cambiar view state a `"list" \| "grid" \| "calendar"` |
 
 ---
 
 ### Detalle tecnico
 
-**Mock data**: Array estatico de ~7 agentes con datos variados (algunos activos con alta productividad, otros inactivos/desconectados con baja actividad, algunos con alertas). Los datos se envuelven en un `useState` para permitir futura sustitucion por datos reales de Hubstaff.
+**Select filters**: El estado `statusFilter` iniciara como `""` (cadena vacia). El `value` del Select sera `statusFilter || undefined` para que el placeholder sea visible. La opcion "Todos" usara `value="__all__"` y el `onValueChange` mapeara `__all__` a `""`.
 
-**Barras de actividad**: Componente inline que muestra una barra de progreso coloreada (verde >70%, amarillo 30-70%, rojo <30%) junto al porcentaje numerico y un mini icono de tendencia.
+**Vista calendario**: Se agregaran estados `calMonth` (Date) para navegacion mensual. Se generara un grid de 7 columnas (Lun-Dom) con celdas por cada dia del mes. Cada celda mostrara bolitas de color representando el estado de cada agente activo ese dia. Con mock data, se simulara actividad para los ultimos 5-7 dias.
 
-**Badges de estado**: Activo (verde), Inactivo (amarillo), Desconectado (gris), En Pausa (azul).
+**DateRangePicker**: Se importara de `@/components/ui/date-range-picker` con estados `dateFrom` y `dateTo`. Se colocara en la fila de filtros junto a los selects.
 
-**Preparacion para Hubstaff**: La estructura de datos mock replica exactamente los campos que devuelve la API de Hubstaff (activities endpoint), facilitando la sustitucion directa cuando se implemente la integracion real mediante un edge function.
+**Modal API**: Se usara el componente Dialog de Shadcn con inputs para token y org ID. Los botones estaran preparados pero sin funcionalidad real hasta la integracion con Hubstaff.
 
