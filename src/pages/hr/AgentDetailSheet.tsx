@@ -182,7 +182,7 @@ export default function AgentDetailView({ agent, onBack }: AgentDetailViewProps)
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-auto px-6 py-4">
-          <div className="space-y-6 max-w-5xl">
+          <div className="space-y-6">
             {/* Period Tabs */}
             <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
               <TabsList>
