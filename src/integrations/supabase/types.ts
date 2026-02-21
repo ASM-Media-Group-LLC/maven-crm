@@ -2976,6 +2976,56 @@ export type Database = {
           },
         ]
       }
+      training_modules: {
+        Row: {
+          content_type: string | null
+          content_url: string | null
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_required: boolean
+          position: number
+          title: string
+          training_program_id: string
+          updated_at: string
+        }
+        Insert: {
+          content_type?: string | null
+          content_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_required?: boolean
+          position?: number
+          title: string
+          training_program_id: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string | null
+          content_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_required?: boolean
+          position?: number
+          title?: string
+          training_program_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_modules_training_program_id_fkey"
+            columns: ["training_program_id"]
+            isOneToOne: false
+            referencedRelation: "training_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_programs: {
         Row: {
           category: string | null
@@ -2989,6 +3039,7 @@ export type Database = {
           modality: string | null
           name: string
           provider: string | null
+          target_role: string | null
           updated_at: string
         }
         Insert: {
@@ -3003,6 +3054,7 @@ export type Database = {
           modality?: string | null
           name: string
           provider?: string | null
+          target_role?: string | null
           updated_at?: string
         }
         Update: {
@@ -3017,6 +3069,7 @@ export type Database = {
           modality?: string | null
           name?: string
           provider?: string | null
+          target_role?: string | null
           updated_at?: string
         }
         Relationships: []

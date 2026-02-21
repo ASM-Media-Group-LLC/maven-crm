@@ -232,3 +232,20 @@ export const INCIDENT_IMPACTS = [
   { value: "alto", label: "Alto" },
   { value: "critico", label: "Crítico" },
 ];
+
+export const TRAINING_TARGET_ROLES = [
+  { value: "general", label: "General" },
+  { value: "chatter", label: "Chatter" },
+  { value: "closer", label: "Closer" },
+  { value: "leadgen", label: "Lead Gen" },
+  { value: "content", label: "Contenido" },
+  { value: "manager", label: "Manager" },
+  { value: "technology", label: "Tecnología" },
+];
+
+export const TRAINING_CONTENT_TYPES = [
+  { value: "video", label: "Video" },
+  { value: "documento", label: "Documento" },
+  { value: "quiz", label: "Quiz" },
+  { value: "practica", label: "Práctica" },
+];

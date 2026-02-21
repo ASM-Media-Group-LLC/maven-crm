@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { GraduationCap, Plus } from "lucide-react";
+import {
+  GraduationCap, Plus, Settings, ArrowLeft, Search, BookOpen,
+  Pencil, Trash2, Eye, Upload, Video, FileText, HelpCircle, Wrench,
+  Users, MessageSquare, TrendingUp, Monitor, Briefcase, Star,
+  ClipboardList, Clock, CheckCircle, AlertTriangle, LayoutList, LayoutGrid,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
+import { useAuth } from "@/hooks/useAuth";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
+import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -13,21 +19,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TRAINING_STATUSES, TRAINING_MODALITIES } from "@/lib/hrConstants";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
 
-function useTrainingData() {
+// ── Types ──
+type ViewState = "list" | "assign" | "config" | "modules";
+type TabState = "asignaciones" | "chatters" | "programas";
+
+// ── Data hooks ──
+function useTrainingAssignments() {
   return useQuery({
-    queryKey: ["training-all"],
+    queryKey: ["training-assignments"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_training_assignments")
-        .select("*, employees(first_name, last_name), training_programs(name, duration_hours, modality)")
+        .select("*, employees(first_name, last_name, profile_photo_url, department_id, departments:department_id(name)), training_programs(id, name, duration_hours, modality, target_role, is_mandatory)")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 }
@@ -38,85 +52,246 @@ function useTrainingPrograms() {
     queryFn: async () => {
       const { data, error } = await supabase.from("training_programs").select("*").eq("is_active", true).order("name");
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 }
 
-const STATUS_PROGRESS: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
+function useTrainingModules(programId: string | null) {
+  return useQuery({
+    queryKey: ["training-modules", programId],
+    queryFn: async () => {
+      if (!programId) return [];
+      const { data, error } = await supabase
+        .from("training_modules")
+        .select("*")
+        .eq("training_program_id", programId)
+        .order("position");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!programId,
+  });
+}
 
+// ── Helper functions ──
+const ROLE_ICONS: Record<string, typeof GraduationCap> = {
+  general: GraduationCap, chatter: MessageSquare, closer: TrendingUp,
+  leadgen: Search, content: Star, manager: Briefcase, technology: Monitor,
+};
+
+const CONTENT_TYPE_ICONS: Record<string, typeof Video> = {
+  video: Video, documento: FileText, quiz: HelpCircle, practica: Wrench,
+};
+
+function getRoleIcon(role: string) { return ROLE_ICONS[role] || GraduationCap; }
+function getContentIcon(type: string) { return CONTENT_TYPE_ICONS[type] || FileText; }
+
+function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "completed") return "default";
+  if (status === "failed" || status === "cancelled") return "destructive";
+  return "secondary";
+}
+
+// ══════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════
 export default function HRTraining() {
-  const { data: assignments = [], isLoading } = useTrainingData();
-  const { data: programs = [] } = useTrainingPrograms();
+  const [currentView, setCurrentView] = useState<ViewState>("list");
+  const [selectedProgram, setSelectedProgram] = useState<any>(null);
+
+  if (currentView === "assign") return <AssignTrainingView onBack={() => setCurrentView("list")} />;
+  if (currentView === "config") return (
+    <ProgramConfigView
+      onBack={() => setCurrentView("list")}
+      onManageModules={(p) => { setSelectedProgram(p); setCurrentView("modules"); }}
+    />
+  );
+  if (currentView === "modules" && selectedProgram) return (
+    <ModuleManagementView program={selectedProgram} onBack={() => setCurrentView("config")} />
+  );
+
+  return <TrainingDashboard onAssign={() => setCurrentView("assign")} onConfig={() => setCurrentView("config")} />;
+}
+
+// ══════════════════════════════════════════════
+// DASHBOARD (main list view)
+// ══════════════════════════════════════════════
+function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onConfig: () => void }) {
+  const { data: assignments = [], isLoading } = useTrainingAssignments();
+  const [activeTab, setActiveTab] = useState<TabState>("asignaciones");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const filteredAssignments = useMemo(() => {
+    let filtered = assignments;
+    if (activeTab === "chatters") {
+      filtered = filtered.filter((a: any) => a.training_programs?.target_role === "chatter");
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter((a: any) => {
+        const emp = a.employees;
+        const prog = a.training_programs;
+        return (emp && `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(q)) ||
+          (prog?.name?.toLowerCase().includes(q));
+      });
+    }
+    if (statusFilter !== "all") filtered = filtered.filter((a) => a.status === statusFilter);
+    return filtered;
+  }, [assignments, activeTab, search, statusFilter]);
+
+  const kpis = useMemo(() => ({
+    total: assignments.length,
+    inProgress: assignments.filter((a) => a.status === "in_progress").length,
+    completed: assignments.filter((a) => a.status === "completed").length,
+    overdue: assignments.filter((a) => {
+      if (!a.completion_date || a.status === "completed") return false;
+      return new Date(a.completion_date) < new Date();
+    }).length,
+  }), [assignments]);
+
+  const tabs: { key: TabState; label: string }[] = [
+    { key: "asignaciones", label: "Asignaciones" },
+    { key: "chatters", label: "Capacitación Chatters" },
+    { key: "programas", label: "Programas por Puesto" },
+  ];
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="shrink-0 bg-background border-b px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Capacitación por Puesto</h1>
+            <p className="text-sm text-muted-foreground">Programas de entrenamiento especializados por rol</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onConfig}><Settings className="h-4 w-4 mr-1.5" />Configuración</Button>
+            <Button onClick={onAssign}><Plus className="h-4 w-4 mr-1.5" />Asignar Capacitación</Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-auto">
+        <div className="px-6 py-5 space-y-5">
+          {/* KPIs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <HRMetricCard title="Total Asignadas" value={kpis.total} icon={ClipboardList} color="primary" />
+            <HRMetricCard title="En Progreso" value={kpis.inProgress} icon={Clock} color="warning" />
+            <HRMetricCard title="Completadas" value={kpis.completed} icon={CheckCircle} color="success" />
+            <HRMetricCard title="Vencidas" value={kpis.overdue} icon={AlertTriangle} color="destructive" />
+          </div>
+
+          {/* Tabs */}
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {tabs.map((t) => (
+              <Button key={t.key} variant={activeTab === t.key ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t.key)}>
+                {t.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Render tab content */}
+          {activeTab === "programas" ? (
+            <ProgramsByRoleTab />
+          ) : (
+            <>
+              {/* Filters */}
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Buscar empleado o programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    {TRAINING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                  <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}><LayoutList className="h-4 w-4" /></Button>
+                  <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+                </div>
+              </div>
+
+              {/* Table / Grid */}
+              {viewMode === "list" ? (
+                <AssignmentsTable assignments={filteredAssignments} isLoading={isLoading} />
+              ) : (
+                <AssignmentsGrid assignments={filteredAssignments} isLoading={isLoading} />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Assignments Table ──
+function AssignmentsTable({ assignments, isLoading }: { assignments: any[]; isLoading: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [openNewProg, setOpenNewProg] = useState(false);
-  const [assignForm, setAssignForm] = useState({ employee_id: "", training_program_id: "", start_date: "" });
-  const [progForm, setProgForm] = useState({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const assignMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("employee_training_assignments").insert({ ...assignForm, assigned_by: user?.id });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("employee_training_assignments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-all"] }); toast({ title: "Capacitación asignada" }); setOpen(false); setAssignForm({ employee_id: "", training_program_id: "", start_date: "" }); },
-    onError: () => toast({ title: "Error al asignar", variant: "destructive" }),
-  });
-
-  const createProgMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("training_programs").insert({ ...progForm, duration_hours: progForm.duration_hours ? parseFloat(progForm.duration_hours) : null, created_by: user?.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa creado" }); setOpenNewProg(false); setProgForm({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false }); },
-    onError: () => toast({ title: "Error al crear programa", variant: "destructive" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: "Asignación eliminada" }); setDeleteId(null); },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
   return (
-    <div className="p-6 space-y-5">
-      <HRPageHeader
-        title="Capacitación"
-        subtitle={`${assignments.filter((a) => a.status === "in_progress").length} en progreso`}
-        icon={GraduationCap}
-        actions={
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setOpenNewProg(true)}>Nuevo Programa</Button>
-            <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Asignar</Button>
-          </div>
-        }
-      />
-
+    <>
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Empleado</TableHead>
               <TableHead>Programa</TableHead>
-              <TableHead>Duración</TableHead>
+              <TableHead>Fecha Inicio</TableHead>
+              <TableHead>Fecha Límite</TableHead>
               <TableHead>Progreso</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>{Array.from({ length: 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
+                <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
               ))
             ) : assignments.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-10">Sin capacitaciones asignadas</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">Sin capacitaciones asignadas</TableCell></TableRow>
             ) : (
-              assignments.map((a) => {
-                const emp = (a as any).employees;
-                const prog = (a as any).training_programs;
-                const progress = STATUS_PROGRESS[a.status] ?? 0;
+              assignments.map((a: any) => {
+                const emp = a.employees;
+                const prog = a.training_programs;
+                const progressMap: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
+                const progress = progressMap[a.status] ?? 0;
                 return (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium text-sm">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</TableCell>
-                    <TableCell className="text-sm">{prog?.name ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{prog?.duration_hours ? `${prog.duration_hours}h` : "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={emp?.profile_photo_url} />
+                          <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
+                          <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm">{prog?.name || "—"}</TableCell>
+                    <TableCell className="text-sm">{a.start_date ? new Date(a.start_date).toLocaleDateString("es-CO") : "—"}</TableCell>
+                    <TableCell className="text-sm">{a.completion_date ? new Date(a.completion_date).toLocaleDateString("es-CO") : "—"}</TableCell>
                     <TableCell className="w-32">
                       <div className="flex items-center gap-2">
                         <Progress value={progress} className="h-1.5 flex-1" />
@@ -124,9 +299,16 @@ export default function HRTraining() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={a.status === "completed" ? "default" : a.status === "failed" ? "destructive" : "secondary"}>
+                      <Badge variant={getStatusBadgeVariant(a.status)}>
                         {TRAINING_STATUSES.find((s) => s.value === a.status)?.label ?? a.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -136,75 +318,627 @@ export default function HRTraining() {
         </Table>
       </div>
 
-      {/* Assign dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Asignar Capacitación</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Empleado</Label>
-              <EmployeeSearchCombobox value={assignForm.employee_id || null} onChange={(v) => setAssignForm((f) => ({ ...f, employee_id: v ?? "" }))} />
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// ── Assignments Grid ──
+function AssignmentsGrid({ assignments, isLoading }: { assignments: any[]; isLoading: boolean }) {
+  if (isLoading) return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
+    </div>
+  );
+  if (assignments.length === 0) return <p className="text-center text-muted-foreground py-10">Sin capacitaciones asignadas</p>;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {assignments.map((a: any) => {
+        const emp = a.employees;
+        const prog = a.training_programs;
+        const progressMap: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
+        const progress = progressMap[a.status] ?? 0;
+        return (
+          <Card key={a.id}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={emp?.profile_photo_url} />
+                  <AvatarFallback className="text-xs">{emp ? `${emp.first_name?.[0]}${emp.last_name?.[0]}` : "?"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</p>
+                  <p className="text-xs text-muted-foreground">{emp?.departments?.name || "—"}</p>
+                </div>
+                <Badge variant={getStatusBadgeVariant(a.status)} className="shrink-0">
+                  {TRAINING_STATUSES.find((s) => s.value === a.status)?.label ?? a.status}
+                </Badge>
+              </div>
+              <p className="text-sm font-medium">{prog?.name || "—"}</p>
+              <div className="flex items-center gap-2">
+                <Progress value={progress} className="h-1.5 flex-1" />
+                <span className="text-xs text-muted-foreground">{progress}%</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Programs by Role Tab ──
+function ProgramsByRoleTab() {
+  const { data: programs = [] } = useTrainingPrograms();
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, any[]>();
+    TRAINING_TARGET_ROLES.forEach((r) => map.set(r.value, []));
+    programs.forEach((p: any) => {
+      const role = p.target_role || "general";
+      if (!map.has(role)) map.set(role, []);
+      map.get(role)!.push(p);
+    });
+    return Array.from(map.entries()).filter(([, progs]) => progs.length > 0);
+  }, [programs]);
+
+  if (grouped.length === 0) return <p className="text-center text-muted-foreground py-10">No hay programas configurados</p>;
+
+  return (
+    <div className="space-y-6">
+      {grouped.map(([role, progs]) => {
+        const roleLabel = TRAINING_TARGET_ROLES.find((r) => r.value === role)?.label || role;
+        const RoleIcon = getRoleIcon(role);
+        return (
+          <div key={role} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <RoleIcon className="h-5 w-5 text-muted-foreground" />
+              <h3 className="text-base font-semibold">{roleLabel}</h3>
+              <Badge variant="outline" className="ml-1">{progs.length}</Badge>
             </div>
-            <div className="space-y-1.5">
-              <Label>Programa</Label>
-              <Select onValueChange={(v) => setAssignForm((f) => ({ ...f, training_program_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar programa..." /></SelectTrigger>
-                <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Fecha de Inicio</Label>
-              <DateInput value={assignForm.start_date} onChange={(v) => setAssignForm((f) => ({ ...f, start_date: v }))} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={() => assignMutation.mutate()} disabled={!assignForm.employee_id || !assignForm.training_program_id || assignMutation.isPending}>
-                {assignMutation.isPending ? "Guardando..." : "Asignar"}
-              </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {progs.map((p: any) => (
+                <Card key={p.id}>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm font-semibold">{p.name}</p>
+                      {p.is_mandatory && <Badge variant="default" className="shrink-0 text-xs">Obligatorio</Badge>}
+                    </div>
+                    {p.description && <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
+                      <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{p.modality}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        );
+      })}
+    </div>
+  );
+}
 
-      {/* New program dialog */}
-      <Dialog open={openNewProg} onOpenChange={setOpenNewProg}>
+// ══════════════════════════════════════════════
+// ASSIGN TRAINING VIEW (full screen)
+// ══════════════════════════════════════════════
+function AssignTrainingView({ onBack }: { onBack: () => void }) {
+  const { data: programs = [] } = useTrainingPrograms();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [form, setForm] = useState({ employee_id: "", training_program_id: "", start_date: "", supervisor_id: "", notes: "" });
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("employee_training_assignments").insert({
+        employee_id: form.employee_id,
+        training_program_id: form.training_program_id,
+        start_date: form.start_date || null,
+        assigned_by: form.supervisor_id || user?.id,
+        notes: form.notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-assignments"] }); toast({ title: "Capacitación asignada" }); onBack(); },
+    onError: () => toast({ title: "Error al asignar", variant: "destructive" }),
+  });
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0 bg-background border-b px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <div>
+            <h1 className="text-xl font-semibold">Asignar Capacitación</h1>
+            <p className="text-sm text-muted-foreground">Asigna un programa de entrenamiento a un empleado</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="px-6 py-6 space-y-5 max-w-2xl">
+          <div className="space-y-1.5">
+            <Label>Empleado <span className="text-destructive">*</span></Label>
+            <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((f) => ({ ...f, employee_id: v ?? "" }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Programa de Capacitación <span className="text-destructive">*</span></Label>
+            <Select value={form.training_program_id} onValueChange={(v) => setForm((f) => ({ ...f, training_program_id: v }))}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar programa..." /></SelectTrigger>
+              <SelectContent>{programs.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Fecha de Inicio</Label>
+            <DateInput value={form.start_date} onChange={(v) => setForm((f) => ({ ...f, start_date: v }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Supervisor (opcional)</Label>
+            <EmployeeSearchCombobox value={form.supervisor_id || null} onChange={(v) => setForm((f) => ({ ...f, supervisor_id: v ?? "" }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Notas adicionales</Label>
+            <Textarea placeholder="Notas o instrucciones..." rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={onBack}>Cancelar</Button>
+            <Button onClick={() => mutation.mutate()} disabled={!form.employee_id || !form.training_program_id || mutation.isPending}>
+              {mutation.isPending ? "Asignando..." : "Asignar Capacitación"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+// PROGRAM CONFIG VIEW (full screen)
+// ══════════════════════════════════════════════
+function ProgramConfigView({ onBack, onManageModules }: { onBack: () => void; onManageModules: (p: any) => void }) {
+  const { data: programs = [], isLoading } = useTrainingPrograms();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [editProgram, setEditProgram] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false, target_role: "general" });
+
+  const resetForm = () => setForm({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false, target_role: "general" });
+
+  const filtered = useMemo(() => {
+    if (!search) return programs;
+    const q = search.toLowerCase();
+    return programs.filter((p: any) => p.name.toLowerCase().includes(q));
+  }, [programs, search]);
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("training_programs").insert({
+        name: form.name, description: form.description || null,
+        duration_hours: form.duration_hours ? parseFloat(form.duration_hours) : null,
+        modality: form.modality, provider: form.provider || null,
+        is_mandatory: form.is_mandatory, target_role: form.target_role,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa creado" }); setShowNew(false); resetForm(); },
+    onError: () => toast({ title: "Error al crear", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editProgram) return;
+      const { error } = await supabase.from("training_programs").update({
+        name: form.name, description: form.description || null,
+        duration_hours: form.duration_hours ? parseFloat(form.duration_hours) : null,
+        modality: form.modality, provider: form.provider || null,
+        is_mandatory: form.is_mandatory, target_role: form.target_role,
+      }).eq("id", editProgram.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa actualizado" }); setEditProgram(null); resetForm(); },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("training_programs").update({ is_active: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-programs"] }); toast({ title: "Programa eliminado" }); setDeleteId(null); },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const openEdit = (p: any) => {
+    setForm({
+      name: p.name, description: p.description || "", duration_hours: p.duration_hours?.toString() || "",
+      modality: p.modality || "presencial", provider: p.provider || "",
+      is_mandatory: p.is_mandatory || false, target_role: p.target_role || "general",
+    });
+    setEditProgram(p);
+  };
+
+  const isFormDialog = showNew || !!editProgram;
+  const isEditing = !!editProgram;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0 bg-background border-b px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+            <div>
+              <h1 className="text-xl font-semibold">Configuración de Programas</h1>
+              <p className="text-sm text-muted-foreground">Gestiona los programas de capacitación y sus módulos</p>
+            </div>
+          </div>
+          <Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Programa</Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="px-6 py-5 space-y-5">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-muted-foreground py-10">No hay programas configurados</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((p: any) => {
+                const RoleIcon = getRoleIcon(p.target_role || "general");
+                const roleLabel = TRAINING_TARGET_ROLES.find((r) => r.value === (p.target_role || "general"))?.label || "General";
+                return (
+                  <Card key={p.id}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <RoleIcon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{p.name}</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Badge variant="outline" className="text-xs">{roleLabel}</Badge>
+                            {p.is_mandatory && <Badge variant="default" className="text-xs">Obligatorio</Badge>}
+                          </div>
+                        </div>
+                      </div>
+                      {p.description && <p className="text-xs text-muted-foreground line-clamp-2">{p.description}</p>}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
+                      </div>
+                      <div className="flex items-center gap-1 pt-1">
+                        <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />Módulos</Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={isFormDialog} onOpenChange={(o) => { if (!o) { setShowNew(false); setEditProgram(null); resetForm(); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo Programa de Capacitación</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{isEditing ? "Editar Programa" : "Nuevo Programa de Capacitación"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Nombre <span className="text-destructive">*</span></Label>
-              <Input placeholder="Nombre del programa" value={progForm.name} onChange={(e) => setProgForm((f) => ({ ...f, name: e.target.value }))} />
+              <Input placeholder="Nombre del programa" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Duración (horas)</Label>
-                <Input type="number" placeholder="8" value={progForm.duration_hours} onChange={(e) => setProgForm((f) => ({ ...f, duration_hours: e.target.value }))} />
+                <Label>Puesto / Rol</Label>
+                <Select value={form.target_role} onValueChange={(v) => setForm((f) => ({ ...f, target_role: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{TRAINING_TARGET_ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Modalidad</Label>
-                <Select defaultValue="presencial" onValueChange={(v) => setProgForm((f) => ({ ...f, modality: v }))}>
+                <Select value={form.modality} onValueChange={(v) => setForm((f) => ({ ...f, modality: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Proveedor / Instructor</Label>
-              <Input placeholder="Nombre del proveedor" value={progForm.provider} onChange={(e) => setProgForm((f) => ({ ...f, provider: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Duración (horas)</Label>
+                <Input type="number" placeholder="8" value={form.duration_hours} onChange={(e) => setForm((f) => ({ ...f, duration_hours: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Proveedor</Label>
+                <Input placeholder="Proveedor" value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Descripción</Label>
-              <Textarea placeholder="Describe el programa..." rows={3} value={progForm.description} onChange={(e) => setProgForm((f) => ({ ...f, description: e.target.value }))} />
+              <Textarea placeholder="Describe el programa..." rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpenNewProg(false)}>Cancelar</Button>
-              <Button onClick={() => createProgMutation.mutate()} disabled={!progForm.name || createProgMutation.isPending}>
-                {createProgMutation.isPending ? "Creando..." : "Crear Programa"}
-              </Button>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="mandatory" checked={form.is_mandatory} onChange={(e) => setForm((f) => ({ ...f, is_mandatory: e.target.checked }))} className="rounded border-border" />
+              <Label htmlFor="mandatory">Programa obligatorio</Label>
             </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNew(false); setEditProgram(null); resetForm(); }}>Cancelar</Button>
+            <Button
+              onClick={() => isEditing ? updateMutation.mutate() : createMutation.mutate()}
+              disabled={!form.name || createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) ? "Guardando..." : isEditing ? "Guardar" : "Crear Programa"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar programa?</AlertDialogTitle>
+            <AlertDialogDescription>El programa se desactivará y no estará disponible para nuevas asignaciones.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+// MODULE MANAGEMENT VIEW (full screen)
+// ══════════════════════════════════════════════
+function ModuleManagementView({ program, onBack }: { program: any; onBack: () => void }) {
+  const { data: modules = [], isLoading } = useTrainingModules(program.id);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showNew, setShowNew] = useState(false);
+  const [editModule, setEditModule] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: "", description: "", duration_minutes: "", content_type: "documento", content_url: "", is_required: true });
+
+  const resetForm = () => setForm({ title: "", description: "", duration_minutes: "", content_type: "documento", content_url: "", is_required: true });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const nextPosition = modules.length;
+      const { error } = await supabase.from("training_modules").insert({
+        training_program_id: program.id,
+        title: form.title,
+        description: form.description || null,
+        duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : null,
+        content_type: form.content_type,
+        content_url: form.content_url || null,
+        is_required: form.is_required,
+        position: nextPosition,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo creado" }); setShowNew(false); resetForm(); },
+    onError: () => toast({ title: "Error al crear módulo", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editModule) return;
+      const { error } = await supabase.from("training_modules").update({
+        title: form.title,
+        description: form.description || null,
+        duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : null,
+        content_type: form.content_type,
+        content_url: form.content_url || null,
+        is_required: form.is_required,
+      }).eq("id", editModule.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo actualizado" }); setEditModule(null); resetForm(); },
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("training_modules").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] }); toast({ title: "Módulo eliminado" }); setDeleteId(null); },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const openEdit = (m: any) => {
+    setForm({
+      title: m.title, description: m.description || "", duration_minutes: m.duration_minutes?.toString() || "",
+      content_type: m.content_type || "documento", content_url: m.content_url || "", is_required: m.is_required ?? true,
+    });
+    setEditModule(m);
+  };
+
+  const handleFileUpload = async (moduleId: string) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.doc,.docx,.mp4,.webm,.pptx";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const path = `training-modules/${program.id}/${moduleId}/${file.name}`;
+      const { error: uploadError } = await supabase.storage.from("creator-files").upload(path, file, { upsert: true });
+      if (uploadError) { toast({ title: "Error al subir archivo", variant: "destructive" }); return; }
+      const { data: urlData } = supabase.storage.from("creator-files").getPublicUrl(path);
+      const { error: updateError } = await supabase.from("training_modules").update({ content_url: urlData.publicUrl }).eq("id", moduleId);
+      if (updateError) { toast({ title: "Error al guardar URL", variant: "destructive" }); return; }
+      queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] });
+      toast({ title: "Contenido subido exitosamente" });
+    };
+    input.click();
+  };
+
+  const isFormDialog = showNew || !!editModule;
+  const isEditing = !!editModule;
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="shrink-0 bg-background border-b px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+            <div>
+              <h1 className="text-xl font-semibold">{program.name}</h1>
+              <p className="text-sm text-muted-foreground">Módulos del programa · {modules.length} módulos</p>
+            </div>
+          </div>
+          <Button onClick={() => { resetForm(); setShowNew(true); }}><Plus className="h-4 w-4 mr-1.5" />Nuevo Módulo</Button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="px-6 py-5">
+          {isLoading ? (
+            <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+          ) : modules.length === 0 ? (
+            <p className="text-center text-muted-foreground py-10">No hay módulos en este programa. Agrega uno para comenzar.</p>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">#</TableHead>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Duración</TableHead>
+                    <TableHead>Contenido</TableHead>
+                    <TableHead>Requerido</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {modules.map((m: any, idx: number) => {
+                    const ContentIcon = getContentIcon(m.content_type);
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="text-sm text-muted-foreground font-mono">{idx + 1}</TableCell>
+                        <TableCell className="text-sm font-medium">{m.title}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <ContentIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-sm">{TRAINING_CONTENT_TYPES.find((t) => t.value === m.content_type)?.label || m.content_type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{m.duration_minutes ? `${m.duration_minutes} min` : "—"}</TableCell>
+                        <TableCell>
+                          {m.content_url ? (
+                            <a href={m.content_url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">Ver</a>
+                          ) : (
+                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleFileUpload(m.id)}>
+                              <Upload className="h-3.5 w-3.5 mr-1" />Subir
+                            </Button>
+                          )}
+                        </TableCell>
+                        <TableCell>{m.is_required ? <Badge variant="default" className="text-xs">Sí</Badge> : <Badge variant="outline" className="text-xs">No</Badge>}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(m)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create / Edit Module Dialog */}
+      <Dialog open={isFormDialog} onOpenChange={(o) => { if (!o) { setShowNew(false); setEditModule(null); resetForm(); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{isEditing ? "Editar Módulo" : "Nuevo Módulo"}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Título <span className="text-destructive">*</span></Label>
+              <Input placeholder="Título del módulo" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tipo de Contenido</Label>
+                <Select value={form.content_type} onValueChange={(v) => setForm((f) => ({ ...f, content_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{TRAINING_CONTENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Duración (min)</Label>
+                <Input type="number" placeholder="30" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descripción</Label>
+              <Textarea placeholder="Descripción del módulo..." rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>URL del contenido (opcional)</Label>
+              <Input placeholder="https://..." value={form.content_url} onChange={(e) => setForm((f) => ({ ...f, content_url: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="required" checked={form.is_required} onChange={(e) => setForm((f) => ({ ...f, is_required: e.target.checked }))} className="rounded border-border" />
+              <Label htmlFor="required">Módulo requerido</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNew(false); setEditModule(null); resetForm(); }}>Cancelar</Button>
+            <Button
+              onClick={() => isEditing ? updateMutation.mutate() : createMutation.mutate()}
+              disabled={!form.title || createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) ? "Guardando..." : isEditing ? "Guardar" : "Crear Módulo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar módulo?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
