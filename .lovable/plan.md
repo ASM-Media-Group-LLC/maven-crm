@@ -1,67 +1,46 @@
 
 
-## Mejoras al Modulo de Desempeno: Eliminar + UX
+## Fix: Creadores no visibles tras conversion desde Contactos
 
-### 1. Agregar accion "Eliminar Evaluacion"
+Hay dos problemas que impiden localizar un creador recien convertido:
 
-Se anade un boton de eliminar (icono Trash2) en las acciones de tabla y grid, con dialogo de confirmacion AlertDialog (mismo patron que otros modulos HR).
+### Problema 1: Busqueda limitada
+El buscador solo revisa `name` y `artistic_name`. No busca en `instagram_handle`, `email` ni `phone`, por lo que buscar "mariel" no encuentra a "Mari prueba 13feb" aunque su handle es "@marielby_".
 
-**Cambios en `HRPerformance.tsx`**:
-- Importar `Trash2` de lucide-react y `AlertDialog` components
-- Agregar estado `deleteId` para controlar el dialogo
-- Agregar `deleteMutation` con `useMutation` que hace DELETE de `performance_evaluations` e invalida queries
-- Agregar boton Trash2 en acciones de tabla y grid
-- Agregar AlertDialog de confirmacion al final del componente
+**Solucion**: Ampliar el filtro de busqueda en `useCreadores.ts` para incluir `instagram_handle` y `email`.
 
-### 2. Mejoras funcionales y de UX adicionales
+### Problema 2: Estado "pendiente" no existe en el sistema de KPIs
+La conversion desde contactos inserta con `status: "pendiente"`, pero las KPI cards y filtros solo reconocen: active, onboarding, paused, leaving, terminated. El creador aparece en la lista sin filtros pero no se cuenta en ningun KPI.
 
-**a) Exportar evaluaciones (boton en header)**
-- Boton "Exportar" junto a "Nueva Evaluacion" que genera CSV con los datos filtrados (empleado, periodo, scores, estado)
-- Usa la libreria `xlsx` ya instalada
+**Solucion**: Agregar "pendiente" y "pendiente_verificacion" al mapa de estados reconocidos en los KPI cards.
 
-**b) Badge de estado con colores diferenciados**
-- completed = verde, pending = amarillo/warning, draft = gris, reviewed = azul
-- Actualmente solo usa "default" vs "secondary", se mejora con clases de color especificas
-
-**c) Tooltip en scores individuales en la tabla (hover sobre el rating muestra desglose)**
-- Al hacer hover sobre el score en la tabla, un tooltip muestra Puntualidad/Calidad/Equipo/Iniciativa
-
-**d) Empty state mejorado en el wizard (paso 4)**
-- Agregar iconografia y texto motivacional para cuando no hay objetivos definidos
+---
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRPerformance.tsx` | Agregar: boton eliminar con AlertDialog, delete mutation, exportar CSV, badges de color por estado, tooltip de desglose en score |
-| `src/pages/hr/HRPerformanceNew.tsx` | Mejora visual menor en paso 4 (empty state) |
+| `src/pages/creadores/useCreadores.ts` | Ampliar la funcion de busqueda para incluir `instagram_handle` y `email`. Agregar "pendiente" y "pendiente_verificacion" al STATUS_LIST y StatusCounts. |
+| `src/pages/creadores/CreadoresKPICards.tsx` | Agregar tarjeta o incorporar conteo para los estados pendiente/pendiente_verificacion |
 
 ### Detalle tecnico
 
-**Delete mutation**:
+**Busqueda ampliada** en `applyFilters`:
 ```text
-const deleteMutation = useMutation({
-  mutationFn: async (id: string) => {
-    const { error } = await supabase.from("performance_evaluations").delete().eq("id", id);
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["performance-all"] });
-    toast({ title: "Evaluacion eliminada" });
-    setDeleteId(null);
-  },
-});
+// Antes: solo name y artistic_name
+// Despues: name, artistic_name, instagram_handle, email
+result = result.filter(c =>
+  c.name.toLowerCase().includes(q) ||
+  (c.artistic_name?.toLowerCase().includes(q)) ||
+  (c.instagram_handle?.toLowerCase().includes(q)) ||
+  (c.email?.toLowerCase().includes(q))
+);
 ```
 
-**AlertDialog**: Mismo patron estandar de otros modulos HR - titulo "Eliminar evaluacion?", descripcion "Esta accion no se puede deshacer", botones Cancelar/Eliminar.
+**STATUS_LIST actualizado**:
+```text
+// Agregar "pendiente" y "pendiente_verificacion" al listado
+const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated", "pendiente", "pendiente_verificacion"] as const;
+```
 
-**Exportar CSV**: Boton que filtra `filtered` y genera un archivo .xlsx con columnas Empleado, Periodo, Fecha, Score, Estado. Usa la libreria `xlsx` ya disponible.
-
-**Badges de estado con color**:
-- completed: `bg-green-100 text-green-700 border-green-200`
-- pending: `bg-amber-100 text-amber-700 border-amber-200`
-- draft: `bg-gray-100 text-gray-600 border-gray-200`
-- reviewed: `bg-blue-100 text-blue-700 border-blue-200`
-
-**Tooltip de desglose**: En la celda de Rating de la tabla, se envuelve el ScoreStars en un Tooltip que muestra los 4 scores individuales al hacer hover.
-
+Esto agrega los conteos correspondientes en StatusCounts y permite filtrar por estos estados.
