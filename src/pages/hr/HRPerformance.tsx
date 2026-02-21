@@ -1,200 +1,457 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, Plus, Star } from "lucide-react";
+import {
+  Star, TrendingUp, CheckCircle2, Target, Plus, Eye, Pencil, Check, X as XIcon,
+  Search, ListIcon, LayoutGrid,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
-import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+interface EvalRecord {
+  id: string;
+  employee_id: string;
+  period: string | null;
+  evaluation_date: string;
+  overall_score: number | null;
+  punctuality_score: number | null;
+  quality_score: number | null;
+  teamwork_score: number | null;
+  initiative_score: number | null;
+  strengths: string | null;
+  areas_for_improvement: string | null;
+  goals_next_period: string | null;
+  comments: string | null;
+  status: string;
+  created_at: string;
+  employees: {
+    first_name: string;
+    last_name: string;
+    employee_code: string | null;
+    department_id: string | null;
+    profile_photo_url: string | null;
+  } | null;
+}
+
+// ─── Hooks ──────────────────────────────────────────────────────────────────
 function usePerformanceData() {
   return useQuery({
     queryKey: ["performance-all"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("performance_evaluations")
-        .select("*, employees(first_name, last_name)")
+        .select("*, employees(first_name, last_name, employee_code, department_id, profile_photo_url)")
         .order("evaluation_date", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as EvalRecord[];
     },
   });
 }
 
-function ScoreInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function useDepartments() {
+  return useQuery({
+    queryKey: ["departments-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+function getInitials(first: string, last: string) {
+  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
+}
+
+function ScoreStars({ score }: { score: number | null }) {
+  if (!score) return <span className="text-muted-foreground text-xs">—</span>;
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs">{label} (1-5)</Label>
-      <Input type="number" min={1} max={5} step={0.1} placeholder="3.0" value={value} onChange={(e) => onChange(e.target.value)} />
+    <div className="flex items-center gap-1">
+      <span className="text-sm font-bold">{score.toFixed(1)}</span>
+      <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
     </div>
   );
 }
 
+const STATUS_TAB_LIST = [
+  { value: "", label: "Todos" },
+  { value: "completed", label: "Completadas" },
+  { value: "pending", label: "Pendientes" },
+  { value: "draft", label: "Borrador" },
+];
+
+// ─── Main ───────────────────────────────────────────────────────────────────
 export default function HRPerformance() {
+  const navigate = useNavigate();
   const { data: evals = [], isLoading } = usePerformanceData();
+  const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    employee_id: "", period: "", evaluation_date: new Date().toISOString().split("T")[0],
-    punctuality_score: "", quality_score: "", teamwork_score: "", initiative_score: "",
-    strengths: "", areas_for_improvement: "", goals_next_period: "", comments: "",
-  });
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const scores = [form.punctuality_score, form.quality_score, form.teamwork_score, form.initiative_score]
-        .map((s) => parseFloat(s) || 0);
-      const overall = scores.reduce((a, b) => a + b, 0) / scores.filter((s) => s > 0).length || null;
-      const { error } = await supabase.from("performance_evaluations").insert({
-        employee_id: form.employee_id,
-        period: form.period,
-        evaluation_date: form.evaluation_date,
-        punctuality_score: parseFloat(form.punctuality_score) || null,
-        quality_score: parseFloat(form.quality_score) || null,
-        teamwork_score: parseFloat(form.teamwork_score) || null,
-        initiative_score: parseFloat(form.initiative_score) || null,
-        overall_score: overall,
-        strengths: form.strengths,
-        areas_for_improvement: form.areas_for_improvement,
-        goals_next_period: form.goals_next_period,
-        comments: form.comments,
-        status: "completed",
-        created_by: user?.id,
-        evaluator_id: user?.id,
-      });
+  // Filters
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [deptTab, setDeptTab] = useState("");
+  const [statusTab, setStatusTab] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // View modal
+  const [viewItem, setViewItem] = useState<EvalRecord | null>(null);
+
+  // ─── Status mutation ──────────────────────────────────────────────────
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("performance_evaluations").update({ status }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["performance-all"] });
-      toast({ title: "Evaluación creada" });
-      setOpen(false);
+      toast({ title: "Estado actualizado" });
     },
-    onError: () => toast({ title: "Error al crear la evaluación", variant: "destructive" }),
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
   });
 
-  function ScoreStars({ score }: { score: number | null }) {
-    if (!score) return <span className="text-muted-foreground text-xs">—</span>;
-    return (
-      <div className="flex items-center gap-1">
-        <span className="text-sm font-bold">{score.toFixed(1)}</span>
-        <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-      </div>
-    );
+  // ─── KPIs ─────────────────────────────────────────────────────────────
+  const avgScore = useMemo(() => {
+    const scored = evals.filter((e) => e.overall_score);
+    if (!scored.length) return 0;
+    return scored.reduce((sum, e) => sum + (e.overall_score ?? 0), 0) / scored.length;
+  }, [evals]);
+  const completedCount = evals.filter((e) => e.status === "completed").length;
+  const withGoals = evals.filter((e) => e.goals_next_period).length;
+
+  // ─── Filtering ────────────────────────────────────────────────────────
+  const hasFilters = search || statusFilter || dateFrom || dateTo;
+
+  const filtered = useMemo(() => {
+    return evals.filter((e) => {
+      const emp = e.employees;
+      const fullName = emp ? `${emp.first_name} ${emp.last_name}`.toLowerCase() : "";
+      if (search && !fullName.includes(search.toLowerCase())) return false;
+      if (statusFilter && e.status !== statusFilter) return false;
+      if (statusTab && e.status !== statusTab) return false;
+      if (deptTab && emp?.department_id !== deptTab) return false;
+      if (dateFrom) {
+        const d = new Date(e.evaluation_date);
+        if (d < dateFrom) return false;
+      }
+      if (dateTo) {
+        const d = new Date(e.evaluation_date);
+        if (d > dateTo) return false;
+      }
+      return true;
+    });
+  }, [evals, search, statusFilter, statusTab, deptTab, dateFrom, dateTo]);
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
   }
 
   return (
-    <div className="p-6 space-y-5">
-      <HRPageHeader
-        title="Evaluaciones de Desempeño"
-        subtitle={`${evals.length} evaluaciones registradas`}
-        icon={TrendingUp}
-        actions={<Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Nueva Evaluación</Button>}
-      />
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Evaluaciones & Performance</h1>
+            <p className="text-sm text-muted-foreground">{evals.length} evaluaciones registradas · {completedCount} completadas</p>
+          </div>
+          <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
+            <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
+          </Button>
+        </div>
+      </header>
 
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Empleado</TableHead>
-              <TableHead>Período</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Puntualidad</TableHead>
-              <TableHead>Calidad</TableHead>
-              <TableHead>Trabajo en Equipo</TableHead>
-              <TableHead>Iniciativa</TableHead>
-              <TableHead>General</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>{Array.from({ length: 9 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
-              ))
-            ) : evals.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-10">Sin evaluaciones registradas</TableCell></TableRow>
-            ) : (
-              evals.map((e) => {
-                const emp = (e as any).employees;
-                return (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium text-sm">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</TableCell>
-                    <TableCell className="text-sm">{e.period}</TableCell>
-                    <TableCell className="text-sm">{format(new Date(e.evaluation_date), "dd/MM/yyyy")}</TableCell>
-                    <TableCell><ScoreStars score={e.punctuality_score} /></TableCell>
-                    <TableCell><ScoreStars score={e.quality_score} /></TableCell>
-                    <TableCell><ScoreStars score={e.teamwork_score} /></TableCell>
-                    <TableCell><ScoreStars score={e.initiative_score} /></TableCell>
-                    <TableCell><ScoreStars score={e.overall_score} /></TableCell>
-                    <TableCell>
-                      <Badge variant={e.status === "completed" ? "default" : "secondary"}>
-                        {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === e.status)?.label ?? e.status}
-                      </Badge>
-                    </TableCell>
+      {/* ── Scrollable content ────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto p-6 space-y-5">
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
+          ) : (
+            <>
+              <DashboardMetricCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} subtitle="Score general" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-amber-500/15 hover:border-amber-500/40" />
+              <DashboardMetricCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} subtitle="Total registradas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
+              <DashboardMetricCard label="Con Objetivos" value={String(withGoals)} icon={Target} subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+            </>
+          )}
+        </div>
+
+        {/* Department Tabs */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          {departments.map((d) => (
+            <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
+          ))}
+        </div>
+
+        {/* Status Tabs */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          {STATUS_TAB_LIST.map((s) => (
+            <Button key={s.value} variant={statusTab === s.value ? "secondary" : "ghost"} size="sm" onClick={() => setStatusTab(s.value)}>{s.label}</Button>
+          ))}
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar empleado..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              {PERFORMANCE_EVALUATION_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          />
+
+          {/* View toggle */}
+          <div className="inline-flex items-center rounded-md border border-border">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}>
+              <ListIcon className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {hasFilters && (
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
+              <XIcon className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        {/* ── Table View ──────────────────────────────────────────────────── */}
+        {viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="sticky top-0 z-10 bg-card border-b">
+                    <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Período</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Evaluado</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Rating</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Objetivos</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
                   </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    ))
+                  ) : filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                        {evals.length === 0 ? 'No hay evaluaciones registradas. Haz clic en "Nueva Evaluación" para empezar.' : "Sin resultados para los filtros aplicados."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((ev) => {
+                      const emp = ev.employees;
+                      const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+                      const initials = emp ? getInitials(emp.first_name, emp.last_name) : "?";
+                      return (
+                        <TableRow key={ev.id} className="group hover:bg-muted/30 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={emp?.profile_photo_url ?? undefined} />
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{fullName}</p>
+                                {emp?.employee_code && <p className="text-xs text-muted-foreground">{emp.employee_code}</p>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">{ev.period ?? "—"}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(ev.evaluation_date), "dd/MM/yyyy")}</TableCell>
+                          <TableCell><ScoreStars score={ev.overall_score} /></TableCell>
+                          <TableCell>
+                            {ev.goals_next_period ? (
+                              <Badge variant="outline" className="text-xs">Definidos</Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={ev.status === "completed" ? "default" : "secondary"}>
+                              {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
+                            <div className="flex items-center gap-1">
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-green-600" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="left">Aprobar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => statusMutation.mutate({ id: ev.id, status: "draft" })} disabled={ev.status === "draft"}>
+                                  <XIcon className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="left">Rechazar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ev)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`/hr/desempeno/nuevo?edit=${ev.id}`)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : (
+          /* ── Grid View ──────────────────────────────────────────────────── */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)
+            ) : filtered.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-12">
+                {evals.length === 0 ? 'No hay evaluaciones registradas.' : "Sin resultados para los filtros aplicados."}
+              </div>
+            ) : (
+              filtered.map((ev) => {
+                const emp = ev.employees;
+                const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+                const initials = emp ? getInitials(emp.first_name, emp.last_name) : "?";
+                return (
+                  <Card key={ev.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src={emp?.profile_photo_url ?? undefined} />
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">{initials}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{fullName}</p>
+                            <p className="text-xs text-muted-foreground">{ev.period ?? "Sin período"}</p>
+                          </div>
+                        </div>
+                        <Badge variant={ev.status === "completed" ? "default" : "secondary"} className="text-xs">
+                          {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <ScoreStars score={ev.overall_score} />
+                        <span className="text-xs text-muted-foreground">{format(new Date(ev.evaluation_date), "dd MMM yyyy", { locale: es })}</span>
+                      </div>
+                      {ev.goals_next_period && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{ev.goals_next_period}</p>
+                      )}
+                      <div className="flex items-center gap-1 pt-1">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-green-600" onClick={() => statusMutation.mutate({ id: ev.id, status: "completed" })} disabled={ev.status === "completed"}>
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => statusMutation.mutate({ id: ev.id, status: "draft" })} disabled={ev.status === "draft"}>
+                          <XIcon className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(ev)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`/hr/desempeno/nuevo?edit=${ev.id}`)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })
             )}
-          </TableBody>
-        </Table>
+          </div>
+        )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* ── View Modal ────────────────────────────────────────────────────── */}
+      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Nueva Evaluación de Desempeño</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-            <div className="space-y-1.5">
-              <Label>Empleado</Label>
-              <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((f) => ({ ...f, employee_id: v ?? "" }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Período</Label>
-                <Input placeholder="Ej: Q1 2026" value={form.period} onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))} />
+          <DialogHeader><DialogTitle>Detalle de Evaluación</DialogTitle></DialogHeader>
+          {viewItem && (() => {
+            const emp = viewItem.employees;
+            const fullName = emp ? `${emp.first_name} ${emp.last_name}` : "—";
+            return (
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={emp?.profile_photo_url ?? undefined} />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">{emp ? getInitials(emp.first_name, emp.last_name) : "?"}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{fullName}</p>
+                    <p className="text-sm text-muted-foreground">{viewItem.period} · {format(new Date(viewItem.evaluation_date), "dd MMM yyyy", { locale: es })}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Puntualidad</p><ScoreStars score={viewItem.punctuality_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Calidad</p><ScoreStars score={viewItem.quality_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Trabajo en Equipo</p><ScoreStars score={viewItem.teamwork_score} /></div>
+                  <div className="space-y-1"><p className="text-xs text-muted-foreground">Iniciativa</p><ScoreStars score={viewItem.initiative_score} /></div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Score General</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold">{viewItem.overall_score?.toFixed(1) ?? "—"}</span>
+                    <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                  </div>
+                </div>
+                {viewItem.strengths && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Fortalezas</p><p className="text-sm">{viewItem.strengths}</p></div>}
+                {viewItem.areas_for_improvement && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Áreas de Mejora</p><p className="text-sm">{viewItem.areas_for_improvement}</p></div>}
+                {viewItem.goals_next_period && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Objetivos Próximo Período</p><p className="text-sm">{viewItem.goals_next_period}</p></div>}
+                {viewItem.comments && <div className="space-y-1"><p className="text-xs font-medium text-muted-foreground">Comentarios</p><p className="text-sm">{viewItem.comments}</p></div>}
               </div>
-              <div className="space-y-1.5">
-                <Label>Fecha</Label>
-                <DateInput value={form.evaluation_date} onChange={(v) => setForm((f) => ({ ...f, evaluation_date: v }))} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <ScoreInput label="Puntualidad" value={form.punctuality_score} onChange={(v) => setForm((f) => ({ ...f, punctuality_score: v }))} />
-              <ScoreInput label="Calidad del trabajo" value={form.quality_score} onChange={(v) => setForm((f) => ({ ...f, quality_score: v }))} />
-              <ScoreInput label="Trabajo en equipo" value={form.teamwork_score} onChange={(v) => setForm((f) => ({ ...f, teamwork_score: v }))} />
-              <ScoreInput label="Iniciativa" value={form.initiative_score} onChange={(v) => setForm((f) => ({ ...f, initiative_score: v }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Fortalezas</Label>
-              <Textarea placeholder="¿En qué destaca este empleado?" rows={2} value={form.strengths} onChange={(e) => setForm((f) => ({ ...f, strengths: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Áreas de Mejora</Label>
-              <Textarea placeholder="¿Qué debe mejorar?" rows={2} value={form.areas_for_improvement} onChange={(e) => setForm((f) => ({ ...f, areas_for_improvement: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Objetivos Próximo Período</Label>
-              <Textarea placeholder="Metas para el siguiente período..." rows={2} value={form.goals_next_period} onChange={(e) => setForm((f) => ({ ...f, goals_next_period: e.target.value }))} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={() => createMutation.mutate()} disabled={!form.employee_id || !form.period || createMutation.isPending}>
-              {createMutation.isPending ? "Guardando..." : "Crear Evaluación"}
-            </Button>
-          </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>
