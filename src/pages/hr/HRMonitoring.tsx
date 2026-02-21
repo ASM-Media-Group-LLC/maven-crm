@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import AgentDetailSheet from "@/pages/hr/AgentDetailSheet";
+import AgentDetailView from "@/pages/hr/AgentDetailSheet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AgentActivity {
@@ -186,6 +186,10 @@ export default function HRMonitoring() {
     toast({ title: "Datos actualizados", description: "Se han actualizado los datos de monitoreo (mock)" });
   }
 
+  if (selectedAgent) {
+    return <AgentDetailView agent={selectedAgent} onBack={() => setSelectedAgent(null)} />;
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -315,12 +319,6 @@ export default function HRMonitoring() {
         </DialogContent>
       </Dialog>
 
-      {/* Agent Detail Sheet */}
-      <AgentDetailSheet
-        agent={selectedAgent}
-        open={!!selectedAgent}
-        onOpenChange={(open) => { if (!open) setSelectedAgent(null); }}
-      />
     </div>
   );
 }
