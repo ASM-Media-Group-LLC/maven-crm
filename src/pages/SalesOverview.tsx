@@ -8,6 +8,9 @@ import SalesOverviewFilters from "./sales-overview/SalesOverviewFilters";
 import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
+import EarningsTrendChart from "./sales-dashboard/EarningsTrendChart";
+import EarningsByChannelChart from "./sales-dashboard/EarningsByChannelChart";
+import TopCreatorsTable from "./sales-overview/TopCreatorsTable";
 import { usePeriodComparison } from "./sales-overview/usePeriodComparison";
 import { useEarningsData } from "./sales-performance/useEarningsData";
 import ClariAiFab from "@/components/ClariAiFab";
@@ -30,6 +33,16 @@ const SalesOverview = () => {
     setDateFrom(from);
     setDateTo(to);
   };
+
+  // Filtered rows for charts
+  const filteredRows = useMemo(() => {
+    const from = dateFrom ?? today;
+    const to = dateTo ?? today;
+    return allRows.filter((r) => {
+      const d = new Date(r.effective_date);
+      return d >= from && d <= endOfDay(to);
+    });
+  }, [allRows, dateFrom, dateTo, today]);
 
   // Sparkline: last 4 months totals
   const sparklineData = useMemo(() => {
@@ -84,6 +97,11 @@ const SalesOverview = () => {
                   onDateChange={handleDateChange}
                 />
                 <SalesKPICards data={comparison} onCardClick={setModalType} />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <EarningsTrendChart rows={filteredRows} />
+                  <EarningsByChannelChart rows={filteredRows} />
+                </div>
+                <TopCreatorsTable creators={comparison.top10} />
                 <SalesOperationalCards
                   data={comparison}
                   onCardClick={setModalType}
