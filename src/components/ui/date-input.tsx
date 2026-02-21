@@ -162,7 +162,7 @@ export function DateInput({
               day_disabled: "text-muted-foreground opacity-50",
               day_hidden: "invisible",
               vhidden: "sr-only",
-              dropdown: "appearance-none bg-transparent border border-border rounded-md px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer",
+              dropdown: "bg-background border border-border rounded-md px-2 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 cursor-pointer hover:bg-muted transition-colors",
               dropdown_month: "mr-1",
               dropdown_year: "",
               dropdown_icon: "hidden",
