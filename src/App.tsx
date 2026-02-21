@@ -61,6 +61,8 @@ import HRAbsences from "./pages/hr/HRAbsences";
 import HRIncidents from "./pages/hr/HRIncidents";
 import HRApplicants from "./pages/hr/HRApplicants";
 import HRTraining from "./pages/hr/HRTraining";
+import HRTrainingChatters from "./pages/hr/HRTrainingChatters";
+import HRTrainingTech from "./pages/hr/HRTrainingTech";
 import HRPerformance from "./pages/hr/HRPerformance";
 import HRLayout from "./pages/hr/HRLayout";
 import HRAttendance from "./pages/hr/HRAttendance";
@@ -140,6 +142,8 @@ const App = () => (
               <Route path="/hr/incidentes/nuevo" element={<ProtectedRoute><HRLayout><HRIncidentNew /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/candidatos" element={<ProtectedRoute><HRLayout><HRApplicants /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion" element={<ProtectedRoute><HRLayout><HRTraining /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/capacitacion/chatters" element={<ProtectedRoute><HRLayout><HRTrainingChatters /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/capacitacion/tecnologia" element={<ProtectedRoute><HRLayout><HRTrainingTech /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/desempeno" element={<ProtectedRoute><HRLayout><HRPerformance /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/asistencia" element={<ProtectedRoute><HRLayout><HRAttendance /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/vacaciones" element={<ProtectedRoute><HRLayout><HRVacations /></HRLayout></ProtectedRoute>} />
