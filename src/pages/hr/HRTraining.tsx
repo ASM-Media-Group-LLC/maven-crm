@@ -25,11 +25,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TRAINING_STATUSES, TRAINING_MODALITIES, TRAINING_TARGET_ROLES, TRAINING_CONTENT_TYPES } from "@/lib/hrConstants";
 
 // ── Types ──
-type ViewState = "list" | "assign" | "config" | "modules";
-type TabState = "asignaciones" | "chatters" | "programas";
+type ViewState = "list" | "assign" | "config" | "modules" | "detail";
+type TabState = "asignaciones" | "chatters" | "tecnologia" | "programas";
 
 // ── Data hooks ──
 function useTrainingAssignments() {
@@ -74,6 +75,54 @@ function useTrainingModules(programId: string | null) {
   });
 }
 
+function useDepartments() {
+  return useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name").eq("is_active", true).order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+function useModuleProgress(assignmentIds: string[]) {
+  return useQuery({
+    queryKey: ["module-progress", assignmentIds],
+    queryFn: async () => {
+      if (assignmentIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("training_module_progress")
+        .select("assignment_id, status")
+        .in("assignment_id", assignmentIds);
+      if (error) throw error;
+      const map: Record<string, { completed: number; total: number }> = {};
+      (data || []).forEach((row: any) => {
+        if (!map[row.assignment_id]) map[row.assignment_id] = { completed: 0, total: 0 };
+        map[row.assignment_id].total++;
+        if (row.status === "completed") map[row.assignment_id].completed++;
+      });
+      return map;
+    },
+    enabled: assignmentIds.length > 0,
+  });
+}
+
+function useAssignmentModuleProgress(assignmentId: string) {
+  return useQuery({
+    queryKey: ["assignment-module-progress", assignmentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("training_module_progress")
+        .select("*")
+        .eq("assignment_id", assignmentId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!assignmentId,
+  });
+}
+
 // ── Helper functions ──
 const ROLE_ICONS: Record<string, typeof GraduationCap> = {
   general: GraduationCap, chatter: MessageSquare, closer: TrendingUp,
@@ -93,12 +142,25 @@ function getStatusBadgeVariant(status: string): "default" | "secondary" | "destr
   return "secondary";
 }
 
+function calcProgress(assignment: any, progressMap: Record<string, { completed: number; total: number }>, moduleCounts: Record<string, number>) {
+  const pm = progressMap[assignment.id];
+  const totalModules = moduleCounts[assignment.training_programs?.id] ?? 0;
+  if (totalModules === 0) {
+    // Fallback to status-based
+    const statusMap: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
+    return statusMap[assignment.status] ?? 0;
+  }
+  const completed = pm?.completed ?? 0;
+  return Math.round((completed / totalModules) * 100);
+}
+
 // ══════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════
 export default function HRTraining() {
   const [currentView, setCurrentView] = useState<ViewState>("list");
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
 
   if (currentView === "assign") return <AssignTrainingView onBack={() => setCurrentView("list")} />;
   if (currentView === "config") return (
@@ -110,24 +172,59 @@ export default function HRTraining() {
   if (currentView === "modules" && selectedProgram) return (
     <ModuleManagementView program={selectedProgram} onBack={() => setCurrentView("config")} />
   );
+  if (currentView === "detail" && selectedAssignment) return (
+    <AssignmentDetailView assignment={selectedAssignment} onBack={() => setCurrentView("list")} />
+  );
 
-  return <TrainingDashboard onAssign={() => setCurrentView("assign")} onConfig={() => setCurrentView("config")} />;
+  return (
+    <TrainingDashboard
+      onAssign={() => setCurrentView("assign")}
+      onConfig={() => setCurrentView("config")}
+      onViewDetail={(a: any) => { setSelectedAssignment(a); setCurrentView("detail"); }}
+    />
+  );
 }
 
 // ══════════════════════════════════════════════
 // DASHBOARD (main list view)
 // ══════════════════════════════════════════════
-function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onConfig: () => void }) {
+function TrainingDashboard({ onAssign, onConfig, onViewDetail }: { onAssign: () => void; onConfig: () => void; onViewDetail: (a: any) => void }) {
   const { data: assignments = [], isLoading } = useTrainingAssignments();
+  const { data: programs = [] } = useTrainingPrograms();
+  const { data: departments = [] } = useDepartments();
   const [activeTab, setActiveTab] = useState<TabState>("asignaciones");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Module counts per program for progress calc
+  const programIds = useMemo(() => [...new Set(assignments.map((a: any) => a.training_programs?.id).filter(Boolean))], [assignments]);
+  const { data: allModuleCounts = {} } = useQuery({
+    queryKey: ["module-counts", programIds],
+    queryFn: async () => {
+      if (programIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("training_modules")
+        .select("training_program_id")
+        .in("training_program_id", programIds);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data || []).forEach((m: any) => { counts[m.training_program_id] = (counts[m.training_program_id] || 0) + 1; });
+      return counts;
+    },
+    enabled: programIds.length > 0,
+  });
+
+  const assignmentIds = useMemo(() => assignments.map((a: any) => a.id), [assignments]);
+  const { data: progressMap = {} } = useModuleProgress(assignmentIds);
 
   const filteredAssignments = useMemo(() => {
     let filtered = assignments;
     if (activeTab === "chatters") {
       filtered = filtered.filter((a: any) => a.training_programs?.target_role === "chatter");
+    } else if (activeTab === "tecnologia") {
+      filtered = filtered.filter((a: any) => a.training_programs?.target_role === "technology");
     }
     if (search) {
       const q = search.toLowerCase();
@@ -139,8 +236,9 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
       });
     }
     if (statusFilter !== "all") filtered = filtered.filter((a) => a.status === statusFilter);
+    if (departmentFilter !== "all") filtered = filtered.filter((a: any) => a.employees?.department_id === departmentFilter);
     return filtered;
-  }, [assignments, activeTab, search, statusFilter]);
+  }, [assignments, activeTab, search, statusFilter, departmentFilter]);
 
   const kpis = useMemo(() => ({
     total: assignments.length,
@@ -154,9 +252,13 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
 
   const tabs: { key: TabState; label: string }[] = [
     { key: "asignaciones", label: "Asignaciones" },
-    { key: "chatters", label: "Capacitación Chatters" },
+    { key: "chatters", label: "Chatters" },
+    { key: "tecnologia", label: "Tecnología" },
     { key: "programas", label: "Programas por Puesto" },
   ];
+
+  const isRoleTab = activeTab === "chatters" || activeTab === "tecnologia";
+  const targetRole = activeTab === "chatters" ? "chatter" : activeTab === "tecnologia" ? "technology" : null;
 
   return (
     <div className="flex flex-col h-full">
@@ -197,10 +299,20 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
           {/* Render tab content */}
           {activeTab === "programas" ? (
             <ProgramsByRoleTab />
+          ) : isRoleTab ? (
+            <RoleTrainingTab
+              targetRole={targetRole!}
+              programs={programs}
+              assignments={filteredAssignments}
+              isLoading={isLoading}
+              progressMap={progressMap}
+              moduleCounts={allModuleCounts}
+              onViewDetail={onViewDetail}
+            />
           ) : (
             <>
               {/* Filters */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input placeholder="Buscar empleado o programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -212,6 +324,13 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
                     {TRAINING_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-48"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los departamentos</SelectItem>
+                    {departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                   <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("list")}><LayoutList className="h-4 w-4" /></Button>
                   <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
@@ -220,9 +339,9 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
 
               {/* Table / Grid */}
               {viewMode === "list" ? (
-                <AssignmentsTable assignments={filteredAssignments} isLoading={isLoading} />
+                <AssignmentsTable assignments={filteredAssignments} isLoading={isLoading} progressMap={progressMap} moduleCounts={allModuleCounts} onViewDetail={onViewDetail} />
               ) : (
-                <AssignmentsGrid assignments={filteredAssignments} isLoading={isLoading} />
+                <AssignmentsGrid assignments={filteredAssignments} isLoading={isLoading} progressMap={progressMap} moduleCounts={allModuleCounts} onViewDetail={onViewDetail} />
               )}
             </>
           )}
@@ -232,8 +351,68 @@ function TrainingDashboard({ onAssign, onConfig }: { onAssign: () => void; onCon
   );
 }
 
+// ── Role Training Tab (Chatters / Tecnología) ──
+function RoleTrainingTab({ targetRole, programs, assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
+  targetRole: string;
+  programs: any[];
+  assignments: any[];
+  isLoading: boolean;
+  progressMap: Record<string, { completed: number; total: number }>;
+  moduleCounts: Record<string, number>;
+  onViewDetail: (a: any) => void;
+}) {
+  const rolePrograms = useMemo(() => programs.filter((p: any) => p.target_role === targetRole), [programs, targetRole]);
+  const roleLabel = targetRole === "chatter" ? "Chatters" : "Tecnología";
+  const RoleIcon = getRoleIcon(targetRole);
+
+  return (
+    <div className="space-y-6">
+      {/* Programs section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <RoleIcon className="h-5 w-5 text-muted-foreground" />
+          <h3 className="text-base font-semibold">Programas de {roleLabel}</h3>
+          <Badge variant="outline" className="ml-1">{rolePrograms.length}</Badge>
+        </div>
+        {rolePrograms.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No hay programas configurados para {roleLabel}.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {rolePrograms.map((p: any) => (
+              <Card key={p.id}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <p className="text-sm font-semibold">{p.name}</p>
+                    {p.is_mandatory && <Badge variant="default" className="shrink-0 text-xs">Obligatorio</Badge>}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {p.duration_hours && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{p.duration_hours}h</span>}
+                    <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{moduleCounts[p.id] ?? 0} módulos</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Assignments section */}
+      <div className="space-y-3">
+        <h3 className="text-base font-semibold">Asignaciones de {roleLabel}</h3>
+        <AssignmentsTable assignments={assignments} isLoading={isLoading} progressMap={progressMap} moduleCounts={moduleCounts} onViewDetail={onViewDetail} />
+      </div>
+    </div>
+  );
+}
+
 // ── Assignments Table ──
-function AssignmentsTable({ assignments, isLoading }: { assignments: any[]; isLoading: boolean }) {
+function AssignmentsTable({ assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
+  assignments: any[];
+  isLoading: boolean;
+  progressMap: Record<string, { completed: number; total: number }>;
+  moduleCounts: Record<string, number>;
+  onViewDetail: (a: any) => void;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -273,8 +452,7 @@ function AssignmentsTable({ assignments, isLoading }: { assignments: any[]; isLo
               assignments.map((a: any) => {
                 const emp = a.employees;
                 const prog = a.training_programs;
-                const progressMap: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
-                const progress = progressMap[a.status] ?? 0;
+                const progress = calcProgress(a, progressMap, moduleCounts);
                 return (
                   <TableRow key={a.id}>
                     <TableCell>
@@ -305,8 +483,7 @@ function AssignmentsTable({ assignments, isLoading }: { assignments: any[]; isLo
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onViewDetail(a)}><Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(a.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
@@ -335,7 +512,13 @@ function AssignmentsTable({ assignments, isLoading }: { assignments: any[]; isLo
 }
 
 // ── Assignments Grid ──
-function AssignmentsGrid({ assignments, isLoading }: { assignments: any[]; isLoading: boolean }) {
+function AssignmentsGrid({ assignments, isLoading, progressMap, moduleCounts, onViewDetail }: {
+  assignments: any[];
+  isLoading: boolean;
+  progressMap: Record<string, { completed: number; total: number }>;
+  moduleCounts: Record<string, number>;
+  onViewDetail: (a: any) => void;
+}) {
   if (isLoading) return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
@@ -348,10 +531,9 @@ function AssignmentsGrid({ assignments, isLoading }: { assignments: any[]; isLoa
       {assignments.map((a: any) => {
         const emp = a.employees;
         const prog = a.training_programs;
-        const progressMap: Record<string, number> = { assigned: 0, in_progress: 50, completed: 100, failed: 100, cancelled: 0 };
-        const progress = progressMap[a.status] ?? 0;
+        const progress = calcProgress(a, progressMap, moduleCounts);
         return (
-          <Card key={a.id}>
+          <Card key={a.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => onViewDetail(a)}>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-center gap-2.5">
                 <Avatar className="h-9 w-9">
@@ -428,6 +610,183 @@ function ProgramsByRoleTab() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+// ASSIGNMENT DETAIL VIEW (full screen)
+// ══════════════════════════════════════════════
+function AssignmentDetailView({ assignment, onBack }: { assignment: any; onBack: () => void }) {
+  const emp = assignment.employees;
+  const prog = assignment.training_programs;
+  const { data: modules = [], isLoading: modulesLoading } = useTrainingModules(prog?.id || null);
+  const { data: moduleProgress = [], isLoading: progressLoading } = useAssignmentModuleProgress(assignment.id);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const progressByModule = useMemo(() => {
+    const map: Record<string, any> = {};
+    moduleProgress.forEach((mp: any) => { map[mp.module_id] = mp; });
+    return map;
+  }, [moduleProgress]);
+
+  const completedCount = moduleProgress.filter((mp: any) => mp.status === "completed").length;
+  const totalModules = modules.length;
+  const progressPercent = totalModules > 0 ? Math.round((completedCount / totalModules) * 100) : 0;
+
+  const toggleModuleMutation = useMutation({
+    mutationFn: async ({ moduleId, currentStatus }: { moduleId: string; currentStatus: string | null }) => {
+      const newStatus = currentStatus === "completed" ? "pending" : "completed";
+      const existing = progressByModule[moduleId];
+
+      if (existing) {
+        const { error } = await supabase.from("training_module_progress").update({
+          status: newStatus,
+          completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+        }).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("training_module_progress").insert({
+          assignment_id: assignment.id,
+          module_id: moduleId,
+          status: newStatus,
+          completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+        });
+        if (error) throw error;
+      }
+
+      // Check if all required modules are now completed
+      const requiredModules = modules.filter((m: any) => m.is_required);
+      const willBeCompleted = requiredModules.every((m: any) => {
+        if (m.id === moduleId) return newStatus === "completed";
+        return progressByModule[m.id]?.status === "completed";
+      });
+
+      if (willBeCompleted && requiredModules.length > 0 && newStatus === "completed") {
+        await supabase.from("employee_training_assignments").update({
+          status: "completed",
+          completion_date: new Date().toISOString().split("T")[0],
+        }).eq("id", assignment.id);
+      } else if (newStatus === "pending" && assignment.status === "completed") {
+        await supabase.from("employee_training_assignments").update({
+          status: "in_progress",
+          completion_date: null,
+        }).eq("id", assignment.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assignment-module-progress", assignment.id] });
+      queryClient.invalidateQueries({ queryKey: ["training-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["module-progress"] });
+    },
+    onError: () => toast({ title: "Error al actualizar progreso", variant: "destructive" }),
+  });
+
+  const isLoading = modulesLoading || progressLoading;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="shrink-0 bg-background border-b px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">{emp ? `${emp.first_name} ${emp.last_name}` : "—"}</h1>
+              <Badge variant={getStatusBadgeVariant(assignment.status)}>
+                {TRAINING_STATUSES.find((s) => s.value === assignment.status)?.label ?? assignment.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{prog?.name || "—"}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <div className="px-6 py-5 space-y-6 max-w-3xl">
+          {/* Info cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Fecha Inicio</p>
+              <p className="text-sm font-medium">{assignment.start_date ? new Date(assignment.start_date).toLocaleDateString("es-CO") : "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Fecha Límite</p>
+              <p className="text-sm font-medium">{assignment.completion_date ? new Date(assignment.completion_date).toLocaleDateString("es-CO") : "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Departamento</p>
+              <p className="text-sm font-medium">{emp?.departments?.name || "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Rol del Programa</p>
+              <p className="text-sm font-medium">{TRAINING_TARGET_ROLES.find((r) => r.value === prog?.target_role)?.label || "General"}</p>
+            </div>
+          </div>
+
+          {assignment.notes && (
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Notas</p>
+              <p className="text-sm">{assignment.notes}</p>
+            </div>
+          )}
+
+          {/* Progress bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Progreso General</p>
+              <span className="text-sm font-semibold">{completedCount}/{totalModules} módulos · {progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-2.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
+          </div>
+
+          {/* Module list */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Módulos del Programa</h3>
+            {isLoading ? (
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-lg" />)}</div>
+            ) : modules.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">Este programa no tiene módulos configurados.</p>
+            ) : (
+              <div className="border rounded-lg divide-y">
+                {modules.map((m: any, idx: number) => {
+                  const mp = progressByModule[m.id];
+                  const isCompleted = mp?.status === "completed";
+                  const ContentIcon = getContentIcon(m.content_type);
+                  return (
+                    <div key={m.id} className="flex items-center gap-3 px-4 py-3">
+                      <Checkbox
+                        checked={isCompleted}
+                        onCheckedChange={() => toggleModuleMutation.mutate({ moduleId: m.id, currentStatus: mp?.status || null })}
+                        disabled={toggleModuleMutation.isPending}
+                      />
+                      <span className="text-xs text-muted-foreground font-mono w-6">{idx + 1}</span>
+                      <ContentIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{m.title}</p>
+                        {m.description && <p className="text-xs text-muted-foreground truncate">{m.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {m.duration_minutes && <span className="text-xs text-muted-foreground">{m.duration_minutes} min</span>}
+                        {m.is_required && <Badge variant="outline" className="text-xs">Req.</Badge>}
+                        {m.content_url && (
+                          <a href={m.content_url} target="_blank" rel="noreferrer">
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
+                          </a>
+                        )}
+                        {isCompleted && mp?.completed_at && (
+                          <span className="text-xs text-muted-foreground">{new Date(mp.completed_at).toLocaleDateString("es-CO")}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

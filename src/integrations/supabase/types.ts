@@ -2976,6 +2976,57 @@ export type Database = {
           },
         ]
       }
+      training_module_progress: {
+        Row: {
+          assignment_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          module_id: string
+          notes: string | null
+          score: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          module_id: string
+          notes?: string | null
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          module_id?: string
+          notes?: string | null
+          score?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_module_progress_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "employee_training_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_module_progress_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "training_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_modules: {
         Row: {
           content_type: string | null
