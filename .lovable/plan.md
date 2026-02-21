@@ -1,121 +1,43 @@
 
 
-## Horarios y Turnos - Modulo Completo
+## Correcciones en HRSchedules.tsx
 
-### Resumen
+### Cambios a realizar
 
-Construir la seccion "Horarios y Turnos" con una pagina principal y dos sub-paginas internas (Horas Extras y Banco de Horas), siguiendo los mockups proporcionados y los patrones estandar del modulo HR.
+#### 1. Eliminar boton "Ver Calendario"
+Remover el boton `Ver Calendario` que esta junto a `Crear Turno` en el header (lineas 360-362). La vista calendario ya es accesible desde el toggle de vistas en los filtros.
 
-### Nuevas tablas en la base de datos
+#### 2. Agregar efectos hover a las KPI Cards
+Aplicar el patron estandar de hover premium usando el prop `hoverClass` de `DashboardMetricCard`:
+- Turnos Esta Semana: hover con gradiente primary
+- Turnos Hoy: hover con gradiente accent
+- Horas Extra: hover con gradiente warning
+- Banco de Horas: hover con gradiente success
 
-#### Tabla `work_schedules`
+Patron: `hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-{color}/10 hover:to-transparent`
 
-Almacena turnos programados.
+#### 3. Corregir filtro de tipo
+- Cambiar estado inicial de `typeFilter` de `"all"` a `""`
+- Usar `value={typeFilter || undefined}` en el Select para que muestre el placeholder
+- Cambiar placeholder de `"Tipo"` a `"Tipo"`  (ya esta correcto)
+- Eliminar la opcion `SelectItem value="all"` que dice "Todos los tipos"
+- Usar el valor centinela `__all__` mapeado a cadena vacia, o simplemente filtrar solo cuando `typeFilter !== ""`
+- Agregar boton "Limpiar filtros" visible solo cuando hay filtros activos
 
-| Columna | Tipo | Default | Nullable |
-|---|---|---|---|
-| id | uuid | gen_random_uuid() | No |
-| title | text | - | No |
-| schedule_type | text | 'manana' | No |
-| start_date | date | - | No |
-| end_date | date | - | No |
-| start_time | time | - | Yes |
-| end_time | time | - | Yes |
-| department_id | uuid | - | Yes |
-| description | text | - | Yes |
-| created_by | uuid | - | Yes |
-| created_at | timestamptz | now() | No |
-| updated_at | timestamptz | now() | No |
+### Detalle tecnico
 
-RLS: Authenticated users can manage (ALL, true).
+| Linea(s) | Cambio |
+|---|---|
+| 62 | `useState("all")` -> `useState("")` |
+| 214 | Condicion de filtro: `typeFilter !== "all"` -> `typeFilter !== ""` |
+| 360-362 | Eliminar boton "Ver Calendario" |
+| 372-378 | Agregar `hoverClass` a cada KPI card |
+| 415-421 | Corregir Select: `value={typeFilter \|\| undefined}`, eliminar opcion "Todos los tipos", usar `__all__` -> `""` en onValueChange |
+| ~427 | Agregar boton "Limpiar filtros" condicional |
 
-#### Tabla `hour_bank`
-
-Registra movimientos del banco de horas (depositos y retiros).
-
-| Columna | Tipo | Default | Nullable |
-|---|---|---|---|
-| id | uuid | gen_random_uuid() | No |
-| employee_id | uuid | - | No |
-| hours | numeric | - | No |
-| movement_type | text | 'deposit' | No |
-| reason | text | - | Yes |
-| reference_date | date | CURRENT_DATE | No |
-| created_by | uuid | - | Yes |
-| created_at | timestamptz | now() | No |
-
-RLS: Authenticated users can manage (ALL, true). FK: employee_id -> employees(id).
-
-### Nuevos archivos
-
-#### 1. `src/pages/hr/HRSchedules.tsx` - Pagina principal
-
-Basado en los mockups (imagen 127, 128, 130):
-
-- **Header**: "Horarios y Turnos" con botones "Ver Calendario" (outline) y "+ Crear Turno" (default)
-- **4 KPI Cards**: Turnos Esta Semana, Turnos Hoy, Horas Extra (link "Ver"), Banco de Horas (link "Ver")
-- **Tab bar departamentos**: Todos + departamentos activos (patron estandar Button-based)
-- **2 Cards de navegacion**: "Horas Extras" y "Banco de Horas" como cards clickeables con flechas (navegan a sub-paginas)
-- **Filtros**: Buscar, Select tipo, DateRangePicker
-- **Toggle vista**: Lista / Grid / Calendario
-- **Vista Tabla** (imagen 128): Titulo, Tipo (badge), Fecha Inicio, Fecha Fin, Descripcion, Creado por, Acciones (Ver, Editar, Eliminar)
-- **Vista Grid**: Cards con la misma info
-- **Vista Calendario** (imagen 130): Calendario mensual con leyenda de colores por tipo de turno (Manana/Tarde/Noche/Flexible), sidebar "Proximos Turnos"
-- **Semana Actual**: Rejilla semanal (LUN-DOM) mostrando turnos programados
-- **Modal Crear/Editar Turno** (imagen 129): Titulo, Tipo de turno (Select), Fecha Inicio, Fecha Fin, Hora Inicio, Hora Fin, Departamento, Descripcion
-- **AlertDialog Eliminar**: Confirmacion estandar
-- **CRUD completo**: Queries y mutations contra `work_schedules`
-
-#### 2. `src/pages/hr/HROvertimeDetail.tsx` - Sub-pagina Horas Extras
-
-Basado en mockup (imagen 131):
-
-- **Header**: Flecha atras + "Horas Extras" + boton "+ Registrar Horas Extra"
-- **4 KPI Cards**: Total Horas, Pendientes, Aprobadas, Pagadas
-- **Filtros**: Buscar, Select estado (Todos/Pendiente/Aprobado/Rechazado/Pagado)
-- **Toggle vista**: Lista / Grid
-- **Vista Tabla**: Empleado (avatar+nombre+email), Fecha, Horas, Tasa, Razon, Estado (badge), Acciones (Aprobar/Rechazar si pending, Ver, Editar, Eliminar)
-- **Vista Grid**: Cards con misma info
-- **Modal Registrar/Editar**: Empleado (combobox), Tipo (OVERTIME_TYPES), Fecha, Horas, Tasa multiplicadora, Razon
-- **AlertDialog Eliminar**
-- **CRUD completo** contra tabla `overtime` existente
-
-#### 3. `src/pages/hr/HRHourBank.tsx` - Sub-pagina Banco de Horas
-
-Basado en mockup (imagen 132):
-
-- **Header**: Flecha atras + "Banco de Horas" + botones "Registrar Uso" (outline) y "+ Agregar Horas" (default)
-- **4 KPI Cards**: Total Acumulado, Promedio por Empleado, Balance Alto (+30h), Balance Bajo (-10h)
-- **Tabs internas**: "Balances" / "Movimientos"
-- **Tab Balances**: Tabla con Empleado, Balance (Xh / 40h), Progreso (barra), Ultimo Mov., Acciones (Ver)
-- **Tab Movimientos**: Tabla con Empleado, Tipo (deposito/retiro), Horas, Razon, Fecha, Acciones (Ver, Editar, Eliminar)
-- **Modal Agregar Horas**: Empleado, Horas, Razon (movement_type = deposit)
-- **Modal Registrar Uso**: Empleado, Horas, Razon (movement_type = withdrawal)
-- **CRUD completo** contra tabla `hour_bank`
-
-### Archivos a modificar
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---|---|
-| **DB Migration** | Crear tablas `work_schedules` y `hour_bank` con RLS |
-| `src/pages/hr/HRSchedules.tsx` | **Nuevo** - Pagina principal Horarios y Turnos |
-| `src/pages/hr/HROvertimeDetail.tsx` | **Nuevo** - Sub-pagina Horas Extras |
-| `src/pages/hr/HRHourBank.tsx` | **Nuevo** - Sub-pagina Banco de Horas |
-| `src/App.tsx` | Agregar 3 rutas: `/hr/horarios`, `/hr/horarios/horas-extras`, `/hr/horarios/banco-horas` |
-| `src/components/dashboard/DashboardSidebar.tsx` | Cambiar "Horarios y Turnos" de `url: null` a `url: "/hr/horarios"` |
+| `src/pages/hr/HRSchedules.tsx` | Eliminar boton calendario, hover cards, corregir filtros |
 
-### Patron de acciones en tablas
-
-Todas las tablas incluiran las 3 acciones estandar:
-
-```text
-Turnos:     [ Eye (ver) ] [ Pencil (editar) ] [ Trash2 (eliminar) ]
-Overtime:   [ Check/X (aprobar/rechazar si pending) ] [ Eye (ver) ] [ Pencil (editar) ] [ Trash2 (eliminar) ]
-Hour Bank:  [ Eye (ver) ] [ Pencil (editar) ] [ Trash2 (eliminar) ]
-```
-
-### Secuencia de implementacion
-
-1. Migracion de base de datos (tablas + RLS)
-2. Crear los 3 archivos de pagina en paralelo
-3. Actualizar App.tsx y DashboardSidebar.tsx
