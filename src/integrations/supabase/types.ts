@@ -1205,15 +1205,21 @@ export type Database = {
       }
       employee_incidents: {
         Row: {
+          category: string | null
           corrective_action: string | null
           created_at: string
           created_by: string | null
           description: string | null
           document_url: string | null
           employee_id: string
+          follow_up_date: string | null
+          follow_up_notes: string | null
+          follow_up_responsible: string | null
           id: string
+          impact: string | null
           incident_date: string
           incident_type: string
+          internal_notes: string | null
           resolved_at: string | null
           resolved_by: string | null
           severity: string
@@ -1222,15 +1228,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           corrective_action?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           document_url?: string | null
           employee_id: string
+          follow_up_date?: string | null
+          follow_up_notes?: string | null
+          follow_up_responsible?: string | null
           id?: string
+          impact?: string | null
           incident_date: string
           incident_type: string
+          internal_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           severity?: string
@@ -1239,15 +1251,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           corrective_action?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           document_url?: string | null
           employee_id?: string
+          follow_up_date?: string | null
+          follow_up_notes?: string | null
+          follow_up_responsible?: string | null
           id?: string
+          impact?: string | null
           incident_date?: string
           incident_type?: string
+          internal_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           severity?: string

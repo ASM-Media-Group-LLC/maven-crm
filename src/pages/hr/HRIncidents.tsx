@@ -1,21 +1,24 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Eye, Pencil, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { EmployeeSearchCombobox } from "@/components/hr/EmployeeSearchCombobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
+import { DateInput } from "@/components/ui/date-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/lib/hrConstants";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES, INCIDENT_CATEGORIES, INCIDENT_IMPACTS } from "@/lib/hrConstants";
 import { SEVERITY_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -35,61 +38,119 @@ function useIncidents() {
 }
 
 export default function HRIncidents() {
+  const navigate = useNavigate();
   const { data: incidents = [], isLoading } = useIncidents();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [severityFilter, setSeverityFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [form, setForm] = useState({ employee_id: "", incident_type: "", severity: "low", title: "", description: "", incident_date: new Date().toISOString().split("T")[0], corrective_action: "" });
+  const [severityFilter, setSeverityFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [viewItem, setViewItem] = useState<any>(null);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [deleteItem, setDeleteItem] = useState<any>(null);
 
-  const createMutation = useMutation({
+  // Edit form state
+  const [editForm, setEditForm] = useState({ status: "", severity: "", corrective_action: "" });
+
+  const updateMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("employee_incidents").insert({ ...form, created_by: user?.id });
+      const updates: any = { status: editForm.status, severity: editForm.severity, corrective_action: editForm.corrective_action || null };
+      if (editForm.status === "resolved" || editForm.status === "closed") {
+        const { data: { user } } = await supabase.auth.getUser();
+        updates.resolved_at = new Date().toISOString();
+        updates.resolved_by = user?.id;
+      }
+      const { error } = await supabase.from("employee_incidents").update(updates).eq("id", editItem.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-incidents-all"] });
-      toast({ title: "Incidente registrado" });
-      setOpen(false);
-      setForm({ employee_id: "", incident_type: "", severity: "low", title: "", description: "", incident_date: new Date().toISOString().split("T")[0], corrective_action: "" });
+      toast({ title: "Incidente actualizado" });
+      setEditItem(null);
     },
-    onError: () => toast({ title: "Error al registrar el incidente", variant: "destructive" }),
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("employee_incidents").delete().eq("id", deleteItem.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-incidents-all"] });
+      toast({ title: "Incidente eliminado" });
+      setDeleteItem(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const hasFilters = severityFilter || statusFilter;
+
   const filtered = incidents.filter((i) => {
-    const matchSev = severityFilter === "all" || i.severity === severityFilter;
-    const matchStatus = statusFilter === "all" || i.status === statusFilter;
+    const matchSev = !severityFilter || i.severity === severityFilter;
+    const matchStatus = !statusFilter || i.status === statusFilter;
     return matchSev && matchStatus;
   });
 
+  const totalOpen = incidents.filter((i) => i.status === "open").length;
+  const totalInProgress = incidents.filter((i) => i.status === "in_progress").length;
+  const totalCritical = incidents.filter((i) => i.severity === "critical").length;
+
+  const kpis = [
+    { label: "Total Incidentes", value: incidents.length, color: "border-t-primary" },
+    { label: "Abiertos", value: totalOpen, color: "border-t-accent" },
+    { label: "En Proceso", value: totalInProgress, color: "border-t-warning" },
+    { label: "Críticos", value: totalCritical, color: "border-t-destructive" },
+  ];
+
   return (
     <div className="p-6 space-y-5">
-      <HRPageHeader
-        title="Incidentes Laborales"
-        subtitle={`${incidents.filter((i) => i.status === "open").length} incidentes abiertos`}
-        icon={AlertTriangle}
-        actions={<Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Nuevo Incidente</Button>}
-      />
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Incidentes Laborales</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{totalOpen} incidentes abiertos · {incidents.length} total</p>
+        </div>
+        <Button size="sm" onClick={() => navigate("/hr/incidentes/nuevo")}>
+          <Plus className="h-4 w-4 mr-1" />Reportar Incidente
+        </Button>
+      </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpis.map((k) => (
+          <Card key={k.label} className={cn("border-t-3 transition-all hover:scale-[1.03] hover:shadow-lg cursor-default", k.color)}>
+            <CardContent className="px-5 py-3">
+              <p className="text-xs text-muted-foreground">{k.label}</p>
+              <p className="text-2xl font-bold mt-1">{k.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <Select value={severityFilter || undefined} onValueChange={(v) => setSeverityFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Severidad" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="__all__">Todas</SelectItem>
             {INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="__all__">Todos</SelectItem>
             {INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
           </SelectContent>
         </Select>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setSeverityFilter(""); setStatusFilter(""); }}>
+            <X className="h-4 w-4 mr-1" />Limpiar filtros
+          </Button>
+        )}
       </div>
 
+      {/* Table */}
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -100,15 +161,16 @@ export default function HRIncidents() {
               <TableHead>Severidad</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
+                <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5" /></TableCell>)}</TableRow>
               ))
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-10">Sin incidentes registrados</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">Sin incidentes registrados</TableCell></TableRow>
             ) : (
               filtered.map((inc) => {
                 const emp = (inc as any).employees;
@@ -129,6 +191,21 @@ export default function HRIncidents() {
                         {INCIDENT_STATUSES.find((s) => s.value === inc.status)?.label ?? inc.status}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewItem(inc)}><Eye className="h-4 w-4" /></Button>
+                        </TooltipTrigger><TooltipContent>Ver</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditItem(inc); setEditForm({ status: inc.status, severity: inc.severity, corrective_action: inc.corrective_action || "" }); }}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inc)}><Trash2 className="h-4 w-4" /></Button>
+                        </TooltipTrigger><TooltipContent>Eliminar</TooltipContent></Tooltip>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -137,55 +214,83 @@ export default function HRIncidents() {
         </Table>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* View Modal */}
+      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo Incidente</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Empleado</Label>
-              <EmployeeSearchCombobox value={form.employee_id || null} onChange={(v) => setForm((f) => ({ ...f, employee_id: v ?? "" }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Título</Label>
-              <Input placeholder="Breve descripción del incidente" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select onValueChange={(v) => setForm((f) => ({ ...f, incident_type: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Tipo..." /></SelectTrigger>
-                  <SelectContent>{INCIDENT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                </Select>
+          <DialogHeader><DialogTitle>Detalle del Incidente</DialogTitle></DialogHeader>
+          {viewItem && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-muted-foreground">Empleado</Label><p className="font-medium">{(viewItem as any).employees ? `${(viewItem as any).employees.first_name} ${(viewItem as any).employees.last_name}` : "—"}</p></div>
+                <div><Label className="text-muted-foreground">Fecha</Label><p className="font-medium">{format(new Date(viewItem.incident_date), "dd/MM/yyyy")}</p></div>
+                <div><Label className="text-muted-foreground">Tipo</Label><p className="font-medium">{INCIDENT_TYPES.find((t) => t.value === viewItem.incident_type)?.label ?? viewItem.incident_type}</p></div>
+                <div><Label className="text-muted-foreground">Severidad</Label><p className="font-medium">{INCIDENT_SEVERITIES.find((s) => s.value === viewItem.severity)?.label ?? viewItem.severity}</p></div>
+                <div><Label className="text-muted-foreground">Estado</Label><p className="font-medium">{INCIDENT_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}</p></div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Severidad</Label>
-                <Select defaultValue="low" onValueChange={(v) => setForm((f) => ({ ...f, severity: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              <div><Label className="text-muted-foreground">Título</Label><p className="font-medium">{viewItem.title}</p></div>
+              {viewItem.description && <div><Label className="text-muted-foreground">Descripción</Label><p>{viewItem.description}</p></div>}
+              {viewItem.corrective_action && <div><Label className="text-muted-foreground">Acción Correctiva</Label><p>{viewItem.corrective_action}</p></div>}
             </div>
-            <div className="space-y-1.5">
-              <Label>Fecha del Incidente</Label>
-              <DateInput value={form.incident_date} onChange={(v) => setForm((f) => ({ ...f, incident_date: v }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Descripción</Label>
-              <Textarea placeholder="Detalle del incidente..." rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Acción Correctiva</Label>
-              <Textarea placeholder="Medidas tomadas o a tomar..." rows={2} value={form.corrective_action} onChange={(e) => setForm((f) => ({ ...f, corrective_action: e.target.value }))} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={() => createMutation.mutate()} disabled={!form.employee_id || !form.title || !form.incident_type || createMutation.isPending}>
-                {createMutation.isPending ? "Guardando..." : "Registrar"}
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Incidente</DialogTitle></DialogHeader>
+          {editItem && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-muted-foreground text-xs">Empleado</Label><p className="text-sm font-medium">{(editItem as any).employees ? `${(editItem as any).employees.first_name} ${(editItem as any).employees.last_name}` : "—"}</p></div>
+                <div><Label className="text-muted-foreground text-xs">Título</Label><p className="text-sm font-medium">{editItem.title}</p></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Estado</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{INCIDENT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Severidad</Label>
+                  <Select value={editForm.severity} onValueChange={(v) => setEditForm((f) => ({ ...f, severity: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{INCIDENT_SEVERITIES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Acción Correctiva</Label>
+                <Textarea value={editForm.corrective_action} onChange={(e) => setEditForm((f) => ({ ...f, corrective_action: e.target.value }))} rows={3} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+                <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar incidente?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará permanentemente el incidente "{deleteItem?.title}".</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
