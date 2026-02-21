@@ -218,3 +218,17 @@ export const GENDER_OPTIONS = [
   { value: "no_binario", label: "No Binario" },
   { value: "prefiero_no_decir", label: "Prefiero no decir" },
 ];
+
+export const INCIDENT_CATEGORIES = [
+  { value: "leve", label: "Leve" },
+  { value: "moderada", label: "Moderada" },
+  { value: "grave", label: "Grave" },
+  { value: "muy_grave", label: "Muy Grave" },
+];
+
+export const INCIDENT_IMPACTS = [
+  { value: "bajo", label: "Bajo" },
+  { value: "medio", label: "Medio" },
+  { value: "alto", label: "Alto" },
+  { value: "critico", label: "Crítico" },
+];
