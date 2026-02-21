@@ -71,6 +71,7 @@ import HROvertimeDetail from "./pages/hr/HROvertimeDetail";
 import HRHourBank from "./pages/hr/HRHourBank";
 import HRChatterSchedules from "./pages/hr/HRChatterSchedules";
 import HRIncidentNew from "./pages/hr/HRIncidentNew";
+import HRMonitoring from "./pages/hr/HRMonitoring";
 
 const queryClient = new QueryClient();
 
@@ -147,6 +148,7 @@ const App = () => (
               <Route path="/hr/horarios/horas-extras" element={<ProtectedRoute><HRLayout><HROvertimeDetail /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/horarios/banco-horas" element={<ProtectedRoute><HRLayout><HRHourBank /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/horarios-chatters" element={<ProtectedRoute><HRLayout><HRChatterSchedules /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/monitoreo" element={<ProtectedRoute><HRLayout><HRMonitoring /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />

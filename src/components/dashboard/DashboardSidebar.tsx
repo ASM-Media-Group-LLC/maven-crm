@@ -81,7 +81,7 @@ const DashboardSidebar = () => {
       key: "seguimiento",
       items: [
         { title: "Incidentes", url: "/hr/incidentes" },
-        { title: "Monitoreo", url: null },
+        { title: "Monitoreo", url: "/hr/monitoreo" },
       ],
     },
     {
