@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Star, TrendingUp, CheckCircle2, Target, Plus, Eye, Pencil, Check, X as XIcon,
-  Search, ListIcon, LayoutGrid,
+  Search, ListIcon, LayoutGrid, Trash2, Download,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -23,6 +24,7 @@ import { PERFORMANCE_EVALUATION_STATUSES } from "@/lib/hrConstants";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface EvalRecord {
@@ -94,6 +96,29 @@ function ScoreStars({ score }: { score: number | null }) {
   );
 }
 
+// ─── Status badge helper ────────────────────────────────────────────────────
+function getStatusBadgeClasses(status: string) {
+  switch (status) {
+    case "completed": return "bg-green-100 text-green-700 border-green-200";
+    case "pending": return "bg-amber-100 text-amber-700 border-amber-200";
+    case "draft": return "bg-gray-100 text-gray-600 border-gray-200";
+    case "reviewed": return "bg-blue-100 text-blue-700 border-blue-200";
+    default: return "";
+  }
+}
+
+// ─── Score tooltip content ──────────────────────────────────────────────────
+function ScoreBreakdownTooltip({ ev }: { ev: EvalRecord }) {
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Puntualidad</span><span className="font-medium">{ev.punctuality_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Calidad</span><span className="font-medium">{ev.quality_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Equipo</span><span className="font-medium">{ev.teamwork_score?.toFixed(1) ?? "—"}</span></div>
+      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Iniciativa</span><span className="font-medium">{ev.initiative_score?.toFixed(1) ?? "—"}</span></div>
+    </div>
+  );
+}
+
 const STATUS_TAB_LIST = [
   { value: "", label: "Todos" },
   { value: "completed", label: "Completadas" },
@@ -121,6 +146,9 @@ export default function HRPerformance() {
   // View modal
   const [viewItem, setViewItem] = useState<EvalRecord | null>(null);
 
+  // Delete
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   // ─── Status mutation ──────────────────────────────────────────────────
   const statusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -133,6 +161,46 @@ export default function HRPerformance() {
     },
     onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
   });
+
+  // ─── Delete mutation ──────────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("performance_evaluations").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["performance-all"] });
+      toast({ title: "Evaluación eliminada" });
+      setDeleteId(null);
+    },
+    onError: () => {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+      setDeleteId(null);
+    },
+  });
+
+  // ─── Export ───────────────────────────────────────────────────────────
+  function handleExport() {
+    const rows = filtered.map((ev) => {
+      const emp = ev.employees;
+      return {
+        Empleado: emp ? `${emp.first_name} ${emp.last_name}` : "—",
+        Código: emp?.employee_code ?? "",
+        Período: ev.period ?? "",
+        Fecha: format(new Date(ev.evaluation_date), "dd/MM/yyyy"),
+        Puntualidad: ev.punctuality_score ?? "",
+        Calidad: ev.quality_score ?? "",
+        Equipo: ev.teamwork_score ?? "",
+        Iniciativa: ev.initiative_score ?? "",
+        "Score General": ev.overall_score?.toFixed(1) ?? "",
+        Estado: PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status,
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Evaluaciones");
+    XLSX.writeFile(wb, `evaluaciones_${format(new Date(), "yyyyMMdd")}.xlsx`);
+  }
 
   // ─── KPIs ─────────────────────────────────────────────────────────────
   const avgScore = useMemo(() => {
@@ -182,9 +250,14 @@ export default function HRPerformance() {
             <h1 className="text-xl font-semibold text-foreground">Evaluaciones & Performance</h1>
             <p className="text-sm text-muted-foreground">{evals.length} evaluaciones registradas · {completedCount} completadas</p>
           </div>
-          <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
-            <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={filtered.length === 0}>
+              <Download className="h-4 w-4 mr-1" />Exportar
+            </Button>
+            <Button size="sm" onClick={() => navigate("/hr/desempeno/nuevo")}>
+              <Plus className="h-4 w-4 mr-1" />Nueva Evaluación
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -306,7 +379,16 @@ export default function HRPerformance() {
                           </TableCell>
                           <TableCell className="text-sm">{ev.period ?? "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{format(new Date(ev.evaluation_date), "dd/MM/yyyy")}</TableCell>
-                          <TableCell><ScoreStars score={ev.overall_score} /></TableCell>
+                          <TableCell>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-default"><ScoreStars score={ev.overall_score} /></div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="p-3">
+                                <ScoreBreakdownTooltip ev={ev} />
+                              </TooltipContent>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell>
                             {ev.goals_next_period ? (
                               <Badge variant="outline" className="text-xs">Definidos</Badge>
@@ -315,7 +397,7 @@ export default function HRPerformance() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={ev.status === "completed" ? "default" : "secondary"}>
+                            <Badge variant="outline" className={cn("text-xs", getStatusBadgeClasses(ev.status))}>
                               {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
                             </Badge>
                           </TableCell>
@@ -341,6 +423,11 @@ export default function HRPerformance() {
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteId(ev.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -379,7 +466,7 @@ export default function HRPerformance() {
                             <p className="text-xs text-muted-foreground">{ev.period ?? "Sin período"}</p>
                           </div>
                         </div>
-                        <Badge variant={ev.status === "completed" ? "default" : "secondary"} className="text-xs">
+                        <Badge variant="outline" className={cn("text-xs", getStatusBadgeClasses(ev.status))}>
                           {PERFORMANCE_EVALUATION_STATUSES.find((s) => s.value === ev.status)?.label ?? ev.status}
                         </Badge>
                       </div>
@@ -402,6 +489,9 @@ export default function HRPerformance() {
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => navigate(`/hr/desempeno/nuevo?edit=${ev.id}`)}>
                           <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteId(ev.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </CardContent>
@@ -454,6 +544,25 @@ export default function HRPerformance() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete AlertDialog ────────────────────────────────────────────── */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar evaluación?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. La evaluación será eliminada permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteId) deleteMutation.mutate(deleteId); }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
