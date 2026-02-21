@@ -21,10 +21,9 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  if (!contacto) return null;
-
   const convert = useMutation({
     mutationFn: async () => {
+      if (!contacto) throw new Error("No contacto");
       const { error: insertError } = await supabase.from("creators").insert({
         name: contacto.nombre,
         instagram_handle: contacto.instagram,
@@ -56,6 +55,8 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
       toast({ title: "Error al convertir", variant: "destructive" });
     },
   });
+
+  if (!contacto) return null;
 
   const items = [
     { label: "Nombre", value: contacto.nombre },
