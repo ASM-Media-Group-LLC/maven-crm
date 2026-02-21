@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   GraduationCap, Plus, Settings, ArrowLeft, Search, BookOpen,
-  Pencil, Trash2, Eye, Clock, CheckCircle, AlertTriangle,
+  Pencil, Trash2, Eye, Clock, CheckCircle, AlertTriangle, X, List,
   LayoutList, LayoutGrid, CalendarDays, ClipboardList, ArrowRight,
   MessageSquare, Monitor, Upload, Video, FileText, HelpCircle, Wrench,
 } from "lucide-react";
@@ -942,6 +942,9 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
   const [showNew, setShowNew] = useState(false);
   const [editProgram, setEditProgram] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState("");
+  const [modalityFilter, setModalityFilter] = useState("");
+  const [configView, setConfigView] = useState<"list" | "grid">("grid");
   const [form, setForm] = useState({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false, target_role: "general" });
 
   const resetForm = () => setForm({ name: "", description: "", duration_hours: "", modality: "presencial", provider: "", is_mandatory: false, target_role: "general" });
@@ -968,11 +971,16 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
     enabled: allProgramIds.length > 0,
   });
 
+  const hasActiveFilters = !!(search || roleFilter || modalityFilter);
+  const clearFilters = () => { setSearch(""); setRoleFilter(""); setModalityFilter(""); };
+
   const filtered = useMemo(() => {
-    if (!search) return programs;
-    const q = search.toLowerCase();
-    return programs.filter((p: any) => p.name.toLowerCase().includes(q));
-  }, [programs, search]);
+    let result = programs;
+    if (search) { const q = search.toLowerCase(); result = result.filter((p: any) => p.name.toLowerCase().includes(q)); }
+    if (roleFilter && roleFilter !== "__all__") result = result.filter((p: any) => p.target_role === roleFilter);
+    if (modalityFilter && modalityFilter !== "__all__") result = result.filter((p: any) => p.modality === modalityFilter);
+    return result;
+  }, [programs, search, roleFilter, modalityFilter]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -1037,9 +1045,35 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
       </div>
       <div className="flex-1 overflow-auto">
         <div className="px-6 py-5 space-y-5">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          {/* Filters bar */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar programa..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={roleFilter || undefined} onValueChange={(v) => setRoleFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Rol" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {TRAINING_TARGET_ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={modalityFilter || undefined} onValueChange={(v) => setModalityFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Modalidad" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                {TRAINING_MODALITIES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="mr-1.5 h-4 w-4" />Limpiar filtros
+              </Button>
+            )}
+            <div className="ml-auto flex gap-1">
+              <Button variant={configView === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("list")}><List className="h-4 w-4" /></Button>
+              <Button variant={configView === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setConfigView("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -1048,7 +1082,7 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-center text-muted-foreground py-10">No hay programas configurados</p>
-          ) : (
+          ) : configView === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((p: any) => {
                 const mc = programModuleCounts[p.id];
@@ -1080,6 +1114,53 @@ function GeneralProgramConfigView({ onBack, onManageModules }: {
                   </Card>
                 );
               })}
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Rol Target</TableHead>
+                    <TableHead>Modalidad</TableHead>
+                    <TableHead>Duración</TableHead>
+                    <TableHead>Módulos</TableHead>
+                    <TableHead>Obligatorio</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((p: any) => {
+                    const mc = programModuleCounts[p.id];
+                    const roleLabel = TRAINING_TARGET_ROLES.find((r) => r.value === p.target_role)?.label || "General";
+                    const modalityLabel = TRAINING_MODALITIES.find((m) => m.value === p.modality)?.label || p.modality || "—";
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.name}</TableCell>
+                        <TableCell><Badge variant="outline" className={cn("text-xs", getRoleBadgeClass(p.target_role))}>{roleLabel}</Badge></TableCell>
+                        <TableCell className="text-sm">{modalityLabel}</TableCell>
+                        <TableCell className="text-sm">{p.duration_hours ? `${p.duration_hours}h` : "—"}</TableCell>
+                        <TableCell>
+                          <span className="text-sm">{mc ? mc.total : 0}</span>
+                          {mc && mc.total > 0 && (
+                            <span className={cn("ml-1.5 text-xs", mc.withContent === mc.total ? "text-green-600" : "text-amber-600")}>
+                              ({mc.withContent}/{mc.total})
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>{p.is_mandatory ? <Badge variant="default" className="text-xs">Sí</Badge> : <span className="text-muted-foreground text-sm">No</span>}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="outline" size="sm" onClick={() => onManageModules(p)}><BookOpen className="h-3.5 w-3.5 mr-1" />Módulos</Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteId(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
