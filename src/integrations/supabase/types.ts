@@ -3057,6 +3057,7 @@ export type Database = {
           schedule_type: string
           start_date: string
           start_time: string | null
+          team: string
           title: string
           updated_at: string
         }
@@ -3071,6 +3072,7 @@ export type Database = {
           schedule_type?: string
           start_date: string
           start_time?: string | null
+          team?: string
           title: string
           updated_at?: string
         }
@@ -3085,6 +3087,7 @@ export type Database = {
           schedule_type?: string
           start_date?: string
           start_time?: string | null
+          team?: string
           title?: string
           updated_at?: string
         }

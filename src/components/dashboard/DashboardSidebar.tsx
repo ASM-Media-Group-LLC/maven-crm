@@ -72,6 +72,7 @@ const DashboardSidebar = () => {
         { title: "Vacaciones", url: "/hr/vacaciones" },
         { title: "Permisos", url: "/hr/permisos" },
         { title: "Horarios y Turnos", url: "/hr/horarios" },
+        { title: "Horarios Chatters", url: "/hr/horarios-chatters" },
       ],
     },
     {
