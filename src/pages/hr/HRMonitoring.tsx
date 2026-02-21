@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import AgentDetailSheet from "@/pages/hr/AgentDetailSheet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AgentActivity {
@@ -153,6 +154,7 @@ export default function HRMonitoring() {
   const [apiModalOpen, setApiModalOpen] = useState(false);
   const [apiToken, setApiToken] = useState("");
   const [orgId, setOrgId] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<AgentActivity | null>(null);
 
   const deptTabs = useMemo(() => {
     const mockDepts = [...new Set(MOCK_AGENTS.map((a) => a.department))];
@@ -275,9 +277,9 @@ export default function HRMonitoring() {
       {/* Content */}
       <div className="flex-1 overflow-auto px-6 py-4">
         {view === "list" ? (
-          <MonitoringTable agents={filtered} />
+          <MonitoringTable agents={filtered} onSelectAgent={setSelectedAgent} />
         ) : view === "grid" ? (
-          <MonitoringGrid agents={filtered} />
+          <MonitoringGrid agents={filtered} onSelectAgent={setSelectedAgent} />
         ) : (
           <MonitoringCalendar month={calMonth} onMonthChange={setCalMonth} data={calendarData} />
         )}
@@ -312,12 +314,19 @@ export default function HRMonitoring() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Agent Detail Sheet */}
+      <AgentDetailSheet
+        agent={selectedAgent}
+        open={!!selectedAgent}
+        onOpenChange={(open) => { if (!open) setSelectedAgent(null); }}
+      />
     </div>
   );
 }
 
 // ─── Table View ───────────────────────────────────────────────────────────────
-function MonitoringTable({ agents }: { agents: AgentActivity[] }) {
+function MonitoringTable({ agents, onSelectAgent }: { agents: AgentActivity[]; onSelectAgent: (a: AgentActivity) => void }) {
   if (agents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -340,6 +349,7 @@ function MonitoringTable({ agents }: { agents: AgentActivity[] }) {
             <TableHead className="text-right">Horas Hoy</TableHead>
             <TableHead>Última Actividad</TableHead>
             <TableHead className="text-center">Alertas</TableHead>
+            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -369,6 +379,11 @@ function MonitoringTable({ agents }: { agents: AgentActivity[] }) {
                   <span className="text-xs text-muted-foreground">0</span>
                 )}
               </TableCell>
+              <TableCell>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => onSelectAgent(agent)}>
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -378,7 +393,7 @@ function MonitoringTable({ agents }: { agents: AgentActivity[] }) {
 }
 
 // ─── Grid View ────────────────────────────────────────────────────────────────
-function MonitoringGrid({ agents }: { agents: AgentActivity[] }) {
+function MonitoringGrid({ agents, onSelectAgent }: { agents: AgentActivity[]; onSelectAgent: (a: AgentActivity) => void }) {
   if (agents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
@@ -391,7 +406,7 @@ function MonitoringGrid({ agents }: { agents: AgentActivity[] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {agents.map((agent) => (
-        <Card key={agent.id} className="relative overflow-hidden">
+        <Card key={agent.id} className="relative overflow-hidden cursor-pointer hover:border-primary/50 transition-colors" onClick={() => onSelectAgent(agent)}>
           {agent.alerts > 0 && (
             <div className="absolute top-3 right-3">
               <Badge variant="destructive" className="text-xs min-w-[24px] justify-center">{agent.alerts}</Badge>
