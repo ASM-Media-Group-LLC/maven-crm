@@ -1,113 +1,88 @@
 
 
-## Reestructuracion de Capacitacion: Modelo Horarios y Turnos
+## Mejora del Modulo de Capacitacion: Gestion Completa de Programas
 
-Se rediseñara el modulo de Capacitacion siguiendo el mismo patron que Horarios y Turnos, donde Chatters y Tecnologia son **sub-paginas independientes** (como Horas Extras y Banco de Horas) accesibles mediante Navigation Cards. La pagina principal se simplifica como vista general de todas las asignaciones.
+El problema actual es que la pagina principal solo muestra asignaciones y redirige a sub-paginas para crear/gestionar programas. Se necesita que la vista general tambien permita crear, configurar y gestionar programas completos, dandole una sensacion de herramienta integral.
 
 ---
 
-### Arquitectura de Navegacion
+### Cambios en la Pagina Principal (`/hr/capacitacion`)
 
-La pagina principal `/hr/capacitacion` tendra:
+**Header actualizado**: Se agrega un boton "Configuracion" (outline) al lado de "Asignar Capacitacion" que lleva a una vista de gestion de TODOS los programas (sin filtro de rol).
+
+**Nueva seccion "Programas Activos"**: Debajo de las Navigation Cards, se agrega una seccion con cards compactas mostrando TODOS los programas activos (de cualquier rol). Cada card muestra:
+- Nombre del programa
+- Badge del rol target (Chatters / Tecnologia / General)
+- Duracion, cantidad de modulos
+- Indicador de contenido subido (ej: "3/5 con contenido")
+- Boton rapido para ver modulos
+
+Esto da visibilidad inmediata de que programas existen en el sistema.
+
+**Nuevas vistas internas**: Se agregan los estados `'config'` y `'modules'` al componente principal, permitiendo crear/editar programas y gestionar modulos directamente desde la pagina general (sin necesidad de ir a Chatters o Tecnologia primero).
+
+---
+
+### Flujo Completo Visible
+
+El flujo de trabajo queda claro en la pagina principal:
 
 ```text
-Header: "Capacitacion" + subtitulo + botones "Configuracion" (outline) y "+ Asignar" (default)
-
-KPI Cards (4):
-  - Total Asignadas | En Progreso | Completadas | Vencidas
-
-Navigation Cards (2, igual que Horarios):
-  - "Capacitacion Chatters" -> /hr/capacitacion/chatters
-    Subtitulo: "Programas, contenidos y seguimiento para chatters"
-  - "Capacitacion Tecnologia" -> /hr/capacitacion/tecnologia
-    Subtitulo: "Programas, contenidos y seguimiento del equipo tech"
-
-Filtros: Buscador + Select estado (sin "Todos" por default) + Select departamento + DateRangePicker + Toggle vista (lista/grid/calendario)
-
-Tabla/Grid/Calendario de TODAS las asignaciones
+1. Crear Programa (Configuracion -> Nuevo Programa -> seleccionar rol target)
+2. Agregar Modulos (dentro del programa -> definir titulo, tipo, duracion)
+3. Subir Contenido (por modulo -> archivo o URL)
+4. Asignar a Empleado (seleccionar programa + empleado + fecha)
+5. Hacer Seguimiento (vista detalle con checkboxes por modulo)
 ```
 
-Las dos sub-paginas seran paginas completas (con HRLayout) dedicadas a gestionar los programas, modulos, contenidos y asignaciones especificos de cada rol.
+---
+
+### Detalle de Cambios
+
+**`src/pages/hr/HRTraining.tsx`**:
+
+1. Agregar `ViewState` ampliado: `'list' | 'assign' | 'config' | 'modules' | 'detail'`
+2. Agregar estado `selectedProgram` para navegacion a modulos
+3. En el header, agregar boton "Configuracion" que lleva a `currentView = 'config'`
+4. Agregar seccion "Programas Activos" en el dashboard (entre Navigation Cards y Filtros), mostrando cards de TODOS los programas con badge de rol
+5. Reutilizar los componentes `ProgramConfigView` y `ModuleManagementView` que ya existen en `RoleTrainingPage.tsx`, pero adaptados para manejar TODOS los roles (no filtrado por uno solo). Se crearan versiones "generales" de estos componentes dentro de HRTraining.tsx:
+   - `GeneralProgramConfigView`: igual que `ProgramConfigView` pero sin filtro de `target_role`, muestra todos los programas y al crear uno se debe seleccionar el rol target
+   - `GeneralModuleManagementView`: identico al existente (no necesita cambios ya que recibe el programa como prop)
+
+**Formulario de Nuevo Programa (desde la vista general)**:
+- Se agrega un campo "Rol Target" (Select con opciones: Chatters, Tecnologia, General, etc.) al formulario de creacion de programa, ya que desde la vista general se pueden crear programas para cualquier rol
+
+**Seccion "Programas Activos" en el dashboard**:
+- Query de TODOS los programas activos (sin filtro de rol)
+- Grid de cards compactas (4 columnas)
+- Cada card: nombre, badge de rol, duracion, modulos, indicador de contenido
+- Clic en la card lleva a la vista de modulos del programa
 
 ---
 
-### Sub-pagina: Capacitacion Chatters (`/hr/capacitacion/chatters`)
-
-Pagina independiente con header ArrowLeft + "Capacitacion Chatters". Internamente maneja sus propias vistas:
-
-```text
-Vistas internas (estado local):
-  'list'    -> Dashboard con programas de chatters + asignaciones filtradas
-  'config'  -> Crear/editar programas (pre-filtrado target_role='chatter')
-  'modules' -> Modulos de un programa especifico
-  'assign'  -> Asignar programa de chatter a empleado
-  'detail'  -> Detalle de asignacion con tracking por modulo
-```
-
-Contenido de la vista 'list':
-- KPIs filtrados solo para asignaciones de chatters
-- Seccion de programas disponibles (cards con nombre, duracion, modulos, badge obligatorio, boton Modulos/Editar/Eliminar)
-- Tabla de asignaciones filtrada automaticamente por `target_role = 'chatter'`
-- Filtros: buscador, estado, toggle vista
-
----
-
-### Sub-pagina: Capacitacion Tecnologia (`/hr/capacitacion/tecnologia`)
-
-Identica estructura que Chatters pero filtrada por `target_role = 'technology'`. Se reutilizara un componente `RoleTrainingPage` que recibe el `targetRole` como prop.
-
----
-
-### Vista de Calendario (nueva)
-
-En la vista principal y en las sub-paginas, se agrega una tercera opcion de visualizacion: Calendario mensual. Muestra las asignaciones segun su `start_date` y `completion_date` en una rejilla mensual, similar al calendario de Horarios. Cada dia muestra badges con las asignaciones activas.
-
----
-
-### Mejoras UX adicionales
-
-1. **Select de estado sin "Todos" por default**: El select de estado arranca vacio (placeholder "Estado") y las opciones incluyen "Todos los estados" como primera opcion seleccionable, pero no es el default.
-
-2. **DateRangePicker**: Se agrega un selector de rango de fechas para filtrar asignaciones por fecha de inicio. Usa el componente `DateRangePicker` existente con placeholder "Selecciona fechas".
-
-3. **KPIs clickeables**: Al hacer clic en un KPI, se aplica el filtro correspondiente (ej: clic en "En Progreso" filtra por status in_progress).
-
-4. **Indicador de contenido subido**: En las cards de programas, mostrar un indicador visual de cuantos modulos tienen contenido subido vs total (ej: "3/5 con contenido").
-
-5. **Badge de vencimiento proximo**: En la tabla, resaltar asignaciones cuya fecha limite esta a menos de 7 dias con un badge naranja "Por vencer".
-
----
-
-### Rutas nuevas
-
-| Ruta | Componente | Descripcion |
-|---|---|---|
-| `/hr/capacitacion` | `HRTraining` | Vista general (simplificada, sin tabs de Chatters/Tech) |
-| `/hr/capacitacion/chatters` | `HRTrainingChatters` | Sub-pagina dedicada a chatters |
-| `/hr/capacitacion/tecnologia` | `HRTrainingTech` | Sub-pagina dedicada a tecnologia |
-
----
-
-### Archivos a crear/modificar
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRTraining.tsx` | Simplificar: quitar tabs Chatters/Tecnologia, agregar Navigation Cards, agregar vista calendario, DateRangePicker, KPIs clickeables, badge "Por vencer", fix default del select de estado |
-| `src/pages/hr/HRTrainingChatters.tsx` | **NUEVO** - Sub-pagina dedicada para chatters con gestion completa de programas, modulos, contenidos y asignaciones |
-| `src/pages/hr/HRTrainingTech.tsx` | **NUEVO** - Sub-pagina dedicada para tecnologia (wrapper de componente reutilizable) |
-| `src/App.tsx` | Agregar rutas `/hr/capacitacion/chatters` y `/hr/capacitacion/tecnologia` con HRLayout |
+| `src/pages/hr/HRTraining.tsx` | Agregar boton "Configuracion", seccion de programas activos en el dashboard, vistas internas de config/modules con soporte multi-rol, formulario de programa con selector de rol target |
+
+No se requieren cambios en la base de datos ni en RoleTrainingPage.tsx, ya que la estructura existente ya soporta multiples roles.
 
 ---
 
 ### Detalle tecnico
 
-**Componente reutilizable `RoleTrainingPage`**: Se creara un componente interno (dentro de HRTrainingChatters.tsx o como componente separado) que recibe `targetRole`, `roleLabel`, `roleIcon` como props. Tanto HRTrainingChatters como HRTrainingTech lo usan con sus respectivos valores. Este componente contiene toda la logica de vistas internas (list, config, modules, assign, detail) ya existente pero scoped al rol.
+**ViewState ampliado:**
+```text
+type ViewState = "list" | "assign" | "config" | "modules" | "detail";
+```
 
-**Vista Calendario**: Reutiliza el patron de HRSchedules. Muestra un grid mensual donde cada celda contiene las asignaciones cuyo rango start_date - completion_date incluye ese dia. Las asignaciones se muestran como badges coloreados por estado.
+**Seccion de programas en el dashboard:** Se reutiliza el hook `useTrainingPrograms()` existente (que ya trae todos los programas activos) y se agrega un query de conteo de modulos por programa. Las cards muestran un Badge coloreado segun el `target_role`:
+- `chatter` -> violeta
+- `technology` -> cyan  
+- otros -> gris
 
-**Filtro de estado sin default**: Se cambia `useState("all")` por `useState("")` y en el filtrado se verifica `if (statusFilter && statusFilter !== "all")`. El placeholder del Select muestra "Estado".
+**Formulario de programa general:** Identico al de ProgramConfigView pero con un Select adicional de "Rol Target" que usa `TRAINING_TARGET_ROLES` de hrConstants. Al crear, el `target_role` se toma del formulario en lugar de estar hardcodeado.
 
-**DateRangePicker**: Filtra asignaciones donde `start_date` esta dentro del rango seleccionado. Se integra al lado del select de departamento.
-
-**KPIs clickeables**: Cada HRMetricCard recibe un `onClick` que setea el `statusFilter` correspondiente (ej: "in_progress" para "En Progreso").
+**Reutilizacion de ModuleManagementView:** Como el componente ya recibe `program` como prop y no depende del rol, se puede usar directamente. Solo se importa la logica (se duplica el componente dentro de HRTraining.tsx para evitar dependencias circulares, siguiendo el patron actual donde ambos archivos tienen sus propias versiones de AssignmentDetailView y similares).
 
