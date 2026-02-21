@@ -6,7 +6,7 @@ export type CreatorWithBusiness = Tables<"creators"> & {
   creator_business: { assigned_agency: string | null; manager_type: string | null; kash_type: string | null; start_date: string | null } | null;
 };
 
-const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated"] as const;
+const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated", "pendiente", "pendiente_verificacion"] as const;
 export type CreatorStatus = (typeof STATUS_LIST)[number];
 
 export interface StatusCounts {
@@ -15,6 +15,8 @@ export interface StatusCounts {
   paused: number;
   leaving: number;
   terminated: number;
+  pendiente: number;
+  pendiente_verificacion: number;
   total: number;
 }
 
@@ -27,7 +29,7 @@ async function fetchCreators(): Promise<CreatorWithBusiness[]> {
 }
 
 function computeStatusCounts(creators: CreatorWithBusiness[]): StatusCounts {
-  const counts: StatusCounts = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0, total: creators.length };
+  const counts: StatusCounts = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0, pendiente: 0, pendiente_verificacion: 0, total: creators.length };
   for (const c of creators) {
     const s = c.status as CreatorStatus;
     if (s in counts) counts[s]++;
@@ -105,7 +107,9 @@ function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters):
     result = result.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
-        (c.artistic_name && c.artistic_name.toLowerCase().includes(q))
+        (c.artistic_name && c.artistic_name.toLowerCase().includes(q)) ||
+        (c.instagram_handle && c.instagram_handle.toLowerCase().includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q))
     );
   }
 
