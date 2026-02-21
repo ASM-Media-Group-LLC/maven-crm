@@ -1,100 +1,82 @@
 
 
-## Rediseno Completo de Capacitacion por Puesto
+## Reorganizacion del Modulo de Capacitacion
 
-Se rediseñara la pagina de Capacitacion para que coincida con el layout estandarizado del proyecto y las referencias visuales proporcionadas. La pagina tendra 3 tabs principales, vista de configuracion de programas con modulos, y un formulario de asignacion a pantalla completa.
-
----
-
-### Estructura de Navegacion
-
-La pagina principal tendra:
-- **Header**: Titulo "Capacitacion por Puesto" con subtitulo "Programas de entrenamiento especializados por rol", botones "Configuracion" (outline) y "+ Asignar Capacitacion" (default)
-- **4 KPI Cards**: Total Asignadas, En Progreso, Completadas, Vencidas
-- **3 Tabs**: "Asignaciones", "Capacitacion Chatters", "Programas por Puesto"
-- **Filtros**: Buscador + Select de estado + Toggle vista (lista/grid)
-
-Vistas internas (sin ruta nueva, usando estado):
-1. **Vista de Asignacion** (formulario pantalla completa con ArrowLeft)
-2. **Vista de Configuracion de Programas** (listado de programas con ArrowLeft)
-3. **Vista de Modulos de un Programa** (detalle del programa con sus modulos)
+Se reestructurara el modulo para tener una navegacion mas clara y funcional, con tabs dedicados por audiencia, filtrado por departamento, tracking real por modulos, y vistas especializadas para Chatters y Tecnologia.
 
 ---
 
-### Base de Datos
+### Nueva Estructura de Tabs (4 tabs)
 
-Se necesita una nueva tabla `training_modules` para almacenar los modulos/contenido de cada programa:
+1. **Asignaciones** -- Todas las asignaciones de todos los roles. Incluye filtro por departamento (Select con departamentos), filtro por estado, y buscador. Vista tabla/grid.
+2. **Chatters** -- Solo asignaciones y programas donde `target_role = 'chatter'`. Muestra primero una seccion de programas disponibles (cards compactas) y debajo la tabla de asignaciones filtrada.
+3. **Tecnologia** -- Mismo layout que Chatters pero filtrado por `target_role = 'technology'`. Programas de tech y sus asignaciones.
+4. **Programas por Puesto** -- Catalogo completo de programas agrupados por rol (vista actual).
+
+---
+
+### Tabs de Chatters y Tecnologia: Layout Interno
+
+Cada uno de estos tabs tendra dos secciones:
+
+**Seccion superior**: Cards horizontales con los programas disponibles para ese rol (nombre, duracion, modulos, badge obligatorio). Boton para ver modulos de cada programa.
+
+**Seccion inferior**: Tabla de asignaciones filtrada automaticamente por el rol. Mismas columnas que la tabla general pero sin necesidad de filtrar manualmente.
+
+Esto permite ver de un vistazo que programas existen para chatters/tech y quienes los estan cursando.
+
+---
+
+### Filtro por Departamento (Tab Asignaciones)
+
+Se agrega un Select de departamento al lado del filtro de estado en el tab "Asignaciones". Los departamentos se cargan de la tabla `departments`. Filtra las asignaciones por `employees.department_id`.
+
+---
+
+### Tracking Real por Modulos
+
+**Nueva tabla `training_module_progress`**:
 
 ```text
-training_modules
+training_module_progress
 - id (uuid, PK)
-- training_program_id (uuid, FK -> training_programs.id)
-- title (text, NOT NULL)
-- description (text)
-- position (integer, default 0) -- orden del modulo
-- duration_minutes (integer)
-- content_type (text) -- video, documento, quiz, practica
-- content_url (text) -- URL del contenido subido
-- is_required (boolean, default true)
+- assignment_id (uuid, FK -> employee_training_assignments.id, ON DELETE CASCADE)
+- module_id (uuid, FK -> training_modules.id, ON DELETE CASCADE)
+- status (text, default 'pending') -- pending, in_progress, completed
+- completed_at (timestamptz)
+- score (numeric) -- para quizzes
+- notes (text)
 - created_at (timestamptz)
 - updated_at (timestamptz)
+- UNIQUE(assignment_id, module_id)
 ```
 
-Tambien se agrega el campo `target_role` a `training_programs` para clasificar programas por puesto (chatter, closer, leadgen, content, manager, technology, general).
+**Calculo de progreso**: En lugar del `progressMap` estatico actual, el progreso se calcula como `modulos_completados / total_modulos * 100`. Esto requiere un query adicional o un conteo en el frontend.
 
 ---
 
-### Tab "Asignaciones"
+### Vista de Detalle de Asignacion (nuevo view: 'detail')
 
-Tabla con columnas: Empleado (avatar + nombre + area), Programa, Supervisor, Fecha Inicio, Fecha Limite, Progreso (X/Y modulos con barra), Estado, Acciones (ver, editar, eliminar).
+Al hacer clic en "Ver" (Eye) en cualquier asignacion, se abre una vista a pantalla completa con:
 
-El progreso se calculara basandose en los modulos completados vs total de modulos del programa.
-
----
-
-### Tab "Capacitacion Chatters"
-
-Misma estructura que Asignaciones pero filtrada automaticamente para mostrar solo asignaciones donde el programa tiene `target_role = 'chatter'`. Los programas de chatters tendran contenido especifico diferente al resto.
+- Header: ArrowLeft + Nombre del empleado + Programa + Badge de estado
+- Info general: empleado, programa, fechas, supervisor, notas
+- Lista de modulos con checkboxes para marcar completados
+- Barra de progreso general calculada en tiempo real
+- Al completar todos los modulos requeridos, la asignacion se marca automaticamente como "completed"
 
 ---
 
-### Tab "Programas por Puesto"
+### Vistas internas actualizadas
 
-Lista de programas agrupados visualmente por rol/puesto. Cada programa muestra: icono, nombre, badge de rol, badge obligatorio/opcional, descripcion, duracion, cantidad de modulos, y botones de Modulos, Editar, Eliminar.
-
----
-
-### Vista "Asignar Capacitacion" (pantalla completa)
-
-Se activa al presionar "+ Asignar Capacitacion". Layout con ArrowLeft + "Volver a Capacitacion" en header. Formulario con:
-- Empleado (EmployeeSearchCombobox)
-- Programa de Capacitacion (Select filtrado)
-- Fecha de Inicio (DateInput)
-- Supervisor (opcional, EmployeeSearchCombobox)
-- Notas adicionales (Textarea)
-- Botones: Cancelar / Asignar Capacitacion
-
----
-
-### Vista "Configuracion de Programas" (pantalla completa)
-
-Se activa al presionar "Configuracion". Header con ArrowLeft + "Configuracion de Programas", buscador y boton "+ Nuevo Programa".
-
-Lista de programas como cards con: icono segun rol, nombre, badge de rol, badge obligatorio, descripcion, duracion, cantidad de modulos, y botones: Modulos, Editar (lapiz), Eliminar (trash).
-
----
-
-### Vista "Modulos de un Programa" (pantalla completa)
-
-Se activa al presionar "Modulos" en un programa. Header con ArrowLeft + nombre del programa. Lista de modulos del programa con:
-- Posicion/orden
-- Titulo
-- Tipo de contenido (video, documento, quiz)
-- Duracion
-- Boton para subir contenido (FileUploadModal o input file)
-- Editar / Eliminar
-
-Boton "+ Nuevo Modulo" para agregar modulos al programa.
+```text
+currentView:
+  'list'    -> Dashboard (KPIs + 4 Tabs)
+  'assign'  -> Formulario asignar capacitacion
+  'config'  -> Configuracion de programas
+  'modules' -> Modulos de un programa
+  'detail'  -> Detalle/tracking de una asignacion (NUEVO)
+```
 
 ---
 
@@ -102,27 +84,24 @@ Boton "+ Nuevo Modulo" para agregar modulos al programa.
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/hr/HRTraining.tsx` | Reescritura completa: layout estandarizado, KPIs, 3 tabs, vistas internas con estado, formulario de asignacion a pantalla completa, configuracion de programas, gestion de modulos |
-| `src/lib/hrConstants.ts` | Agregar constantes `TRAINING_TARGET_ROLES` y `TRAINING_CONTENT_TYPES` |
-| **Migracion SQL** | Crear tabla `training_modules`, agregar columna `target_role` a `training_programs` |
-
----
+| `src/pages/hr/HRTraining.tsx` | Agregar tab "Tecnologia", layout interno de Chatters/Tech con seccion de programas + asignaciones, filtro por departamento, vista de detalle con tracking por modulos, calculo de progreso real |
+| **Migracion SQL** | Crear tabla `training_module_progress` con RLS, indice unico en (assignment_id, module_id) |
 
 ### Detalle tecnico
 
-**Patron de vistas internas**: Se usara un estado `currentView` con valores como `'list'`, `'assign'`, `'config'`, `'modules'`. Segun el valor se renderiza la vista correspondiente. Cada vista interna tiene un ArrowLeft que vuelve a `'list'`.
+**Tabs de Chatters/Tecnologia**: Componente `RoleTrainingTab` reutilizable que recibe `targetRole` como prop. Internamente hace dos queries: programas filtrados por `target_role` y asignaciones filtradas por el mismo campo via join con `training_programs`.
+
+**Progreso real**: Para cada asignacion visible en la tabla, se consultan los modulos del programa y el conteo de progreso. Se usa un query agrupado para evitar N+1:
 
 ```text
-currentView:
-  'list'    -> Vista principal (KPIs + Tabs + Tabla)
-  'assign'  -> Formulario asignar capacitacion
-  'config'  -> Configuracion de programas
-  'modules' -> Modulos de un programa especifico (+ selectedProgram state)
+SELECT assignment_id, COUNT(*) FILTER (WHERE status = 'completed') as completed,
+       COUNT(*) as total
+FROM training_module_progress
+WHERE assignment_id IN (...)
+GROUP BY assignment_id
 ```
 
-**Filtrado de Chatters**: El tab "Capacitacion Chatters" filtra las asignaciones haciendo join con `training_programs` y verificando `target_role = 'chatter'`. Los programas de tecnologia se manejan de forma similar con `target_role = 'technology'`.
+**Auto-completar asignacion**: Cuando se marca el ultimo modulo requerido como completado en la vista de detalle, se ejecuta un update automatico de la asignacion a `status = 'completed'` y `completion_date = now()`.
 
-**Subida de contenido**: Se reutilizara el componente `FileUploadModal` existente o un input file directo para subir contenido a cada modulo (PDF, video, etc.) al storage de Supabase.
-
-**Progreso real por modulos**: El progreso de cada asignacion se calculara como `modulos_completados / total_modulos * 100` en lugar del mapeo estatico actual basado en el estado.
+**Filtro por departamento**: Se reutiliza el hook `useDepartments` existente en `useEmployees.ts` para poblar el Select de departamentos. El filtrado se hace en el frontend comparando `employees.department_id`.
 
