@@ -21,7 +21,7 @@ const STEPS = [
 ];
 
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "" };
-const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
+const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD" };
 
@@ -83,6 +83,20 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           nivelEstudios: c.nivel_estudios || "", apodosPermitidos: c.apodos_permitidos || "",
           palabrasProhibidas: c.palabras_prohibidas || "", emojiFrecuente: c.emoji_frecuente || "",
           tonoVoz: c.tono_voz || "", contenidoJamasHaria: c.contenido_jamas_haria || "",
+          heladoFavorito: extraData.heladoFavorito || "",
+          bebidaFavorita: extraData.bebidaFavorita || "",
+          musicaArtistas: extraData.musicaArtistas || "",
+          peliculasTV: extraData.peliculasTV || "",
+          viajesFavoritos: extraData.viajesFavoritos || "",
+          viajesPorVisitar: extraData.viajesPorVisitar || "",
+          hermanos: extraData.hermanos || "",
+          diaPerfecto: extraData.diaPerfecto || "",
+          comoEresCuandoNadieVe: extraData.comoEresCuandoNadieVe || "",
+          comoQuieresQueTeLlamen: extraData.comoQuieresQueTeLlamen || "",
+          respuestaSexoEnPersona: extraData.respuestaSexoEnPersona || "",
+          respuestaUsuarioGrosero: extraData.respuestaUsuarioGrosero || "",
+          respuestaPedirDesnudos: extraData.respuestaPedirDesnudos || "",
+          queTeIncomoda: extraData.queTeIncomoda || "",
         });
         setCreatorStatus(c.status || null);
         setStep4({
@@ -162,6 +176,20 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       permisoNombreReal: step1.permisoNombreReal || null,
       permisoEdadReal: step1.permisoEdadReal || null,
       permisoUbicacion: step1.permisoUbicacion || null,
+      heladoFavorito: step2Psy.heladoFavorito || null,
+      bebidaFavorita: step2Psy.bebidaFavorita || null,
+      musicaArtistas: step2Psy.musicaArtistas || null,
+      peliculasTV: step2Psy.peliculasTV || null,
+      viajesFavoritos: step2Psy.viajesFavoritos || null,
+      viajesPorVisitar: step2Psy.viajesPorVisitar || null,
+      hermanos: step2Psy.hermanos || null,
+      diaPerfecto: step2Psy.diaPerfecto || null,
+      comoEresCuandoNadieVe: step2Psy.comoEresCuandoNadieVe || null,
+      comoQuieresQueTeLlamen: step2Psy.comoQuieresQueTeLlamen || null,
+      respuestaSexoEnPersona: step2Psy.respuestaSexoEnPersona || null,
+      respuestaUsuarioGrosero: step2Psy.respuestaUsuarioGrosero || null,
+      respuestaPedirDesnudos: step2Psy.respuestaPedirDesnudos || null,
+      queTeIncomoda: step2Psy.queTeIncomoda || null,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
