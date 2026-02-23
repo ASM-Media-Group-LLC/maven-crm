@@ -22,6 +22,10 @@ const SERVICES = [
   { key: "sesiones_video", label: "Videollamadas" },
   { key: "envio_articulos", label: "Venta de Ropa Interior" },
   { key: "zings", label: "Zings" },
+  { key: "contenido_sensual_artistico", label: "Contenido Sensual Artístico" },
+  { key: "saludos_personalizados", label: "Saludos Personalizados" },
+  { key: "colaboraciones_externas", label: "Colaboraciones Externas" },
+  { key: "interaccion_vivo_amistosa", label: "Interacción en Vivo (Amistosa)" },
 ] as const;
 
 const CURRENCIES = [
