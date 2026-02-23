@@ -23,7 +23,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "" };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "" };
 
 interface Props {
   onCancel: () => void;
@@ -120,6 +120,8 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           personalidadMarca: extraData.personalidadMarca || "",
           estrategiaRechazo: extraData.estrategiaRechazo || "",
           tonoEmocional: extraData.tonoEmocional || "",
+          frasesVenta: extraData.frasesVenta || "",
+          usuariosVip: extraData.usuariosVip || "",
         });
       }
       setLoadingCreator(false);
@@ -208,6 +210,8 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       personalidadMarca: step4.personalidadMarca || null,
       estrategiaRechazo: step4.estrategiaRechazo || null,
       tonoEmocional: step4.tonoEmocional || null,
+      frasesVenta: step4.frasesVenta || null,
+      usuariosVip: step4.usuariosVip || null,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;

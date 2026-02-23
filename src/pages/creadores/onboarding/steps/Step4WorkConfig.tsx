@@ -23,10 +23,10 @@ const SERVICES = [
   { key: "sesiones_video", label: "Videollamadas" },
   { key: "envio_articulos", label: "Venta de Ropa Interior" },
   { key: "zings", label: "Zings" },
-  { key: "contenido_sensual_artistico", label: "Contenido Sensual Artístico" },
-  { key: "saludos_personalizados", label: "Saludos Personalizados" },
-  { key: "colaboraciones_externas", label: "Colaboraciones Externas" },
-  { key: "interaccion_vivo_amistosa", label: "Interacción en Vivo (Amistosa)" },
+  { key: "contenido_sensual_artistico", label: "Material de Cortesía/Sensual" },
+  { key: "saludos_personalizados", label: "Saludos a Medida" },
+  { key: "colaboraciones_externas", label: "Colaboraciones con Terceros" },
+  { key: "interaccion_vivo_amistosa", label: "Sesiones de Acompañamiento" },
 ] as const;
 
 const CURRENCIES = [
@@ -62,6 +62,8 @@ export interface Step4Data {
   personalidadMarca: string;
   estrategiaRechazo: string;
   tonoEmocional: string;
+  frasesVenta: string;
+  usuariosVip: string;
 }
 
 interface Props {
@@ -241,6 +243,24 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                   <SelectItem value="Sensual">Sensual</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Frases de Venta Predilectas</Label>
+              <Textarea
+                value={data.frasesVenta}
+                onChange={(e) => onChange("frasesVenta", e.target.value)}
+                placeholder="Describe tus términos o frases favoritas para incentivar la compra de contenido (ej. ¿Quieres ver algo especial?, Tengo una sorpresa para ti, etc.)"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Gestión de Usuarios VIP</Label>
+              <Textarea
+                value={data.usuariosVip}
+                onChange={(e) => onChange("usuariosVip", e.target.value)}
+                placeholder="Detalla nombres de usuarios que requieren un manejo preferencial o instrucciones específicas de atención"
+                rows={3}
+              />
             </div>
           </div>
         </AccordionContent>
