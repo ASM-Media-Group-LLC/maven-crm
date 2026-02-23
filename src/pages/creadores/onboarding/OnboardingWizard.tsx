@@ -157,6 +157,13 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       setStep3DocErrors(errors);
       return Object.keys(errors).length === 0;
     }
+    if (step === 4) {
+      const hasPrice = Object.values(step4.pricing).some((p) => parseFloat(p.price) > 0);
+      if (!hasPrice) {
+        toast({ title: "Precios requeridos", description: "Define al menos un servicio con precio mayor a 0.", variant: "destructive" });
+        return false;
+      }
+    }
     return true;
   };
 
