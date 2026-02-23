@@ -23,7 +23,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "", horariosSueno: "", deporteEquipo: "", colorFavorito: "", estadoCivil: "", queBuscasPareja: "", mejorAtributoFisico: "", metasLargoPlazo: "", queHacesRelajarte: "", queTeHaceReir: "", queTeMotivaCrear: "", respuestaCuantoCobraEncuentro: "", respuestaMuestraIntimas: "", estrategiaMaterialGratis: "", estrategiaProblemasPersonales: "" };
 const initialStep3Doc: Step2Data = { idDocumentFront: [], idDocumentBack: [], selfieDocument: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "", linkOtrasPlataformas: "" };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "", plataformaVideollamada: "", estrategiaRecuperacion: "", interesaDinamicasGrupales: false };
 
 interface Props {
   onCancel: () => void;
@@ -144,6 +144,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           tonoEmocional: extraData.tonoEmocional || "",
           frasesVenta: extraData.frasesVenta || "",
           usuariosVip: extraData.usuariosVip || "",
+          plataformaVideollamada: extraData.plataformaVideollamada || "",
+          estrategiaRecuperacion: extraData.estrategiaRecuperacion || "",
+          interesaDinamicasGrupales: extraData.interesaDinamicasGrupales || false,
         });
       }
       setLoadingCreator(false);
@@ -263,6 +266,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       tonoEmocional: step4.tonoEmocional || null,
       frasesVenta: step4.frasesVenta || null,
       usuariosVip: step4.usuariosVip || null,
+      plataformaVideollamada: step4.plataformaVideollamada || null,
+      estrategiaRecuperacion: step4.estrategiaRecuperacion || null,
+      interesaDinamicasGrupales: step4.interesaDinamicasGrupales || false,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
