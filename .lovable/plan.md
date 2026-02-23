@@ -1,36 +1,45 @@
 
 
-## Incluirse como miembro + Notificacion al asignar
+## Asignar tareas y subtareas a cualquier usuario del sistema
 
-### Cambios
+### Problema
 
-#### 1. Incluirse a si misma en la lista de miembros
+Actualmente, tanto en tareas como en subtareas, la lista de usuarios disponibles para asignar se obtiene filtrando por `company_id`. Como ningun usuario tiene `company_id` configurado, el sistema solo muestra al usuario actual, impidiendo asignar tareas a otros miembros del equipo.
 
-En `ProjectsListContent.tsx` (linea 39), actualmente se excluye al usuario actual con `.filter(p => p.id !== profile?.id)`. Se eliminara ese filtro para que el usuario actual tambien aparezca en la lista de miembros seleccionables.
+Esto ocurre en dos lugares:
+1. **Tareas** (`useTareas.ts`, linea 78-91): la query de `companyProfiles` cae al fallback de un solo usuario.
+2. **Subtareas** (`SubtasksPanel.tsx`, lineas 48-62): la misma logica de fallback en `fetchedProfiles`.
 
-#### 2. Notificacion al asignar miembros a un proyecto
+### Solucion
 
-Cuando se crea o edita un proyecto y se agregan miembros, se insertara una notificacion en la tabla `notifications` para cada miembro nuevo. La tabla `notifications` ya existe con los campos necesarios (`user_id`, `type`, `title`, `message`, `reference_id`, `reference_type`).
+Aplicar la misma correccion que ya se hizo en `ProjectsListContent.tsx`: cuando no hay `company_id`, traer todos los perfiles del sistema.
 
----
-
-### Detalle tecnico
+### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Quitar el `.filter(p => p.id !== profile?.id)` de la query de perfiles (linea 39) |
-| `src/pages/tareas/useProjects.ts` | En `createProject` y `updateProject`, despues de insertar miembros, insertar notificaciones en la tabla `notifications` para cada miembro agregado |
+| `src/pages/tareas/useTareas.ts` | Modificar la query `companyProfiles` (lineas 80-89) para que traiga todos los perfiles cuando no hay `company_id` |
+| `src/pages/tareas/SubtasksPanel.tsx` | Modificar la query `fetchedProfiles` (lineas 48-62) para que traiga todos los perfiles cuando no hay `company_id` |
 
-#### Formato de la notificacion
+### Detalle del cambio
 
+En ambos archivos, reemplazar el patron:
+
+```typescript
+// ANTES
+if (profile?.company_id) {
+  const { data } = await supabase.from("profiles").select("id, full_name").eq("company_id", profile.company_id);
+  return data || [];
+}
+return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
+
+// DESPUES
+let query = supabase.from("profiles").select("id, full_name");
+if (profile?.company_id) {
+  query = query.eq("company_id", profile.company_id);
+}
+const { data } = await query;
+return data || [];
 ```
-type: "project_assignment"
-title: "Te asignaron a un proyecto"
-message: "Fuiste agregado(a) al proyecto '{nombre}'"
-reference_id: project_id
-reference_type: "project"
-user_id: id del miembro asignado
-```
 
-No se requieren migraciones de base de datos. La tabla `notifications` ya tiene una policy de INSERT permisiva para usuarios autenticados, y los usuarios pueden ver sus propias notificaciones (policy de SELECT filtra por `user_id`).
-
+Esto permite que todos los usuarios aparezcan en los selectores de asignacion, tanto para tareas principales como para subtareas, habilitando la gestion colaborativa completa.
