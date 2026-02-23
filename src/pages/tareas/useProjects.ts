@@ -74,12 +74,24 @@ export const useProjects = () => {
       if (error) throw error;
       
       if (project.memberIds && project.memberIds.length > 0 && data) {
+        const projectId = (data as any).id;
         const rows = project.memberIds.map(uid => ({
-          project_id: (data as any).id,
+          project_id: projectId,
           user_id: uid,
           role: "member",
         }));
         await supabase.from("project_members" as any).insert(rows as any);
+
+        // Send notifications to assigned members
+        const notifications = project.memberIds.map(uid => ({
+          user_id: uid,
+          type: "project_assignment",
+          title: "Te asignaron a un proyecto",
+          message: `Fuiste agregado(a) al proyecto '${project.name}'`,
+          reference_id: projectId,
+          reference_type: "project",
+        }));
+        await supabase.from("notifications").insert(notifications);
       }
     },
     onSuccess: () => {
@@ -101,6 +113,13 @@ export const useProjects = () => {
       if (error) throw error;
 
       if (project.memberIds !== undefined) {
+        // Get existing members before deleting
+        const { data: existingMembers } = await supabase
+          .from("project_members" as any)
+          .select("user_id")
+          .eq("project_id", project.id);
+        const existingIds = new Set((existingMembers || []).map((m: any) => m.user_id));
+
         await supabase.from("project_members" as any).delete().eq("project_id", project.id);
         if (project.memberIds.length > 0) {
           const rows = project.memberIds.map(uid => ({
@@ -109,6 +128,20 @@ export const useProjects = () => {
             role: "member",
           }));
           await supabase.from("project_members" as any).insert(rows as any);
+
+          // Notify only newly added members
+          const newMemberIds = project.memberIds.filter(uid => !existingIds.has(uid));
+          if (newMemberIds.length > 0) {
+            const notifications = newMemberIds.map(uid => ({
+              user_id: uid,
+              type: "project_assignment",
+              title: "Te asignaron a un proyecto",
+              message: `Fuiste agregado(a) al proyecto '${project.name}'`,
+              reference_id: project.id,
+              reference_type: "project",
+            }));
+            await supabase.from("notifications").insert(notifications);
+          }
         }
       }
     },
