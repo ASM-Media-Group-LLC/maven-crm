@@ -12,7 +12,7 @@ const emptyFilters = { search: "", agency: "", status: "", category: "", country
 
 const statusConfig = [
   { key: "active",     label: "Activas",     icon: UserCheck,   color: "text-success",      border: "border-t-success",      bg: "hover:from-success/10",      iconBg: "bg-success/10" },
-  { key: "onboarding", label: "Onboarding",  icon: Clock,       color: "text-primary",      border: "border-t-primary",      bg: "hover:from-primary/10",      iconBg: "bg-primary/10" },
+  { key: "onboarding", label: "En Onboarding",  icon: Clock,       color: "text-primary",      border: "border-t-primary",      bg: "hover:from-primary/10",      iconBg: "bg-primary/10" },
   { key: "paused",     label: "Pausadas",    icon: PauseCircle, color: "text-warning",      border: "border-t-warning",      bg: "hover:from-warning/10",      iconBg: "bg-warning/10" },
   { key: "leaving",    label: "En retiro",   icon: LogOut,      color: "text-destructive",  border: "border-t-destructive",  bg: "hover:from-destructive/10",  iconBg: "bg-destructive/10" },
   { key: "terminated", label: "Terminadas",  icon: XCircle,     color: "text-muted-foreground", border: "border-t-border",   bg: "hover:from-muted/30",        iconBg: "bg-muted" },
@@ -26,7 +26,8 @@ const CreadorasDashboardContent = () => {
     const counts: Record<string, number> = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0 };
     for (const c of allCreators) {
       const s = c.status ?? "";
-      if (s in counts) counts[s]++;
+      if (s === "pendiente" || s === "pendiente_verificacion") counts["onboarding"]++;
+      else if (s in counts) counts[s]++;
     }
     return counts;
   }, [allCreators]);
