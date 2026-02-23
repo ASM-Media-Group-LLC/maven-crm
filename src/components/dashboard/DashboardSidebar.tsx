@@ -108,7 +108,7 @@ const DashboardSidebar = () => {
       key: "reclutamiento",
       items: [
         { title: "Candidatos", url: "/hr/candidatos" },
-        { title: "Onboarding", url: null },
+        { title: "Onboarding", url: "/hr/onboarding" },
         { title: "Offboarding", url: null },
       ],
     },
