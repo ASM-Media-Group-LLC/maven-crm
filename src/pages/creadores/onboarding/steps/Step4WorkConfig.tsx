@@ -48,7 +48,6 @@ export interface Step4Data {
   pricing: Record<string, ServicePricing>;
   monthlyGoal: string;
   notes: string;
-  permisoIdentidadReal: string;
   terminosAfecto: string;
   restriccionesSeguridad: string;
   orientacionPerfil: string;
@@ -156,16 +155,6 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         <AccordionContent>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Permiso de uso de identidad real</Label>
-                <Select value={data.permisoIdentidadReal} onValueChange={(v) => onChange("permisoIdentidadReal", v)}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="si">Sí</SelectItem>
-                    <SelectItem value="no">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="space-y-1.5">
                 <Label>Orientación declarada para el perfil</Label>
                 <Select value={data.orientacionPerfil} onValueChange={(v) => onChange("orientacionPerfil", v)}>
