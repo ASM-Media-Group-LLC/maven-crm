@@ -1,43 +1,75 @@
 
+## Sistema de Permisos por Rol en el Modulo de Creadoras
 
-## Rediseno de la seccion "Onboardings en Curso"
+### Contexto
 
-Se reemplaza la seccion actual de "Procesos en Curso" (scroll horizontal con tarjetas pequenas) por una seccion completa con grid de cards, empty state y boton "Continuar" que abre el wizard inline.
+El sistema ya tiene roles definidos en `useUserRole.ts`: admin, manager, employee, agent, closer, supervisor. Segun la documentacion del proyecto, el rol **"agent"** corresponde al perfil de **Chatter/Specialist**. Se usara este mapeo sin necesidad de cambios en la base de datos.
 
 ---
 
-### Cambios en `OnboardingContent.tsx`
+### Cambios por archivo
 
-**1. Seccion "Onboardings en Curso" rediseñada (reemplaza lineas 98-136)**
+#### 1. `src/hooks/useUserRole.ts` - Agregar helpers para agent/chatter
 
-- Titulo "Onboardings en Curso" con icono y badge de conteo
-- Grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`)
-- Cada tarjeta (Card) incluye:
-  - Avatar circular con iniciales + nombre (o "Borrador sin nombre")
-  - Barra de progreso delgada (h-1.5) con color primary
-  - Badge con texto descriptivo del paso faltante (ej: "Falta Documentacion", "Paso 2 incompleto")
-  - Boton secundario "Continuar" que oculta el grid y abre el wizard en el paso correcto
-- La seccion se muestra siempre (no solo cuando hay datos)
+- Agregar `isAgent: role === "agent"` al objeto de retorno
+- Agregar `isSupervisor: role === "supervisor"` para completar
+- Estos helpers simplifican las verificaciones en los componentes
 
-**2. Empty State**
+#### 2. `src/components/dashboard/DashboardTopbar.tsx` - Badge de rol en el header
 
-Cuando `inProgressCreators.length === 0`:
-- Contenedor centrado con borde fino y fondo sutil
-- Icono de carpeta (FolderOpen) en gris
-- Texto: "No hay onboardings en curso. Haz clic en + Iniciar Onboarding para registrar una nueva creadora."
+- Importar `useUserRole` y `Badge`
+- Mostrar un Badge pequeno junto al nombre del usuario con el rol actual
+- Mapeo de labels: admin = "Admin", manager = "Manager", agent = "Chatter", employee = "Empleado", closer = "Closer", supervisor = "Supervisor"
+- Color diferenciado por rol (primary-soft para admin/manager, secondary-soft para otros)
 
-**3. Interaccion**
+#### 3. `src/pages/creadores/onboarding/OnboardingContent.tsx` - Ocultar boton para chatters
 
-- El boton "Continuar" en cada card llama a `handleCardClick(creator)` que ya existe y abre el wizard inline en el paso correcto
-- El wizard se muestra integrado en la pagina (ya funciona asi), no en modal
+- Importar `useUserRole`
+- Si `isAgent` es true, ocultar el boton "+ Iniciar Onboarding"
+- Ocultar tambien la seccion "Onboardings en Curso" (solo managers/admins gestionan onboarding)
+- Los chatters aun pueden ver la lista/tabla de onboardings en modo lectura
 
-### Archivo a modificar
+#### 4. `src/pages/creadores/CreadorProfileContent.tsx` - Tabs restringidos para chatters
 
-| Archivo | Cambio |
-|---|---|
-| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Reemplazar seccion "Procesos en Curso" por grid de cards con avatar, progreso, badge descriptivo, boton "Continuar" y empty state con icono FolderOpen |
+- Importar `useUserRole`
+- Definir las tabs visibles por rol:
+  - **Manager/Admin**: todas las tabs (operaciones, info, lineamientos, redes, monetizacion, documentos, notas, tickets, historial)
+  - **Agent (Chatter)**: solo la tab "operaciones" (que contiene pricing, tono de voz, limites -- la informacion operativa que el chatter necesita). Se renombra visualmente a "Insights" para chatters
+- Ocultar el boton de cambio de estado (badge clickeable) para chatters
+- Ocultar la seccion de verificacion para chatters
+- Tab default cambia a "operaciones" para todos (ya es asi)
+
+#### 5. `src/pages/creadores/DocumentosTabContent.tsx` - Ocultar documentos de identidad
+
+- Importar `useUserRole`
+- Si `isAgent` es true, filtrar los documentos para excluir archivos cuyo nombre contenga "cedula", "selfie", "identidad", "DNI" u otros terminos de documentos de identidad
+- Ocultar el boton de "Subir Documento" para chatters
+- Nota: como los chatters no veran la tab de documentos (punto 4), esto es una capa adicional de seguridad
+
+---
+
+### Resumen de visibilidad por rol
+
+```text
+Funcionalidad                    | Manager/Admin | Chatter (Agent)
+---------------------------------|---------------|----------------
++ Iniciar Onboarding             | Visible       | Oculto
+Onboardings en Curso             | Visible       | Oculto
+Editar formulario onboarding     | Habilitado    | N/A
+Tab Operaciones/Insights         | Visible       | Visible (solo lectura)
+Tabs Info/Redes/Monetizacion...  | Visible       | Oculto
+Tab Documentos                   | Visible       | Oculto
+Aprobar/Rechazar perfiles        | Habilitado    | Oculto
+Badge de rol en header           | Visible       | Visible
+Cambio de estado creadora        | Habilitado    | Oculto
+```
 
 ### Detalle tecnico
 
-La seccion de cards usa los datos de `inProgressCreators` (ya calculado con filtro `borrador` o `pendiente_verificacion`). Se reutilizan `calculateCurrentStep` y `getStepLabel` para determinar progreso y etiqueta. El nombre fallback es "Borrador sin nombre" cuando `creator.name` esta vacio. El boton "Continuar" invoca `handleCardClick` existente. La seccion siempre se renderiza cuando `!showWizard`, mostrando el empty state si no hay datos.
+**Badge de rol en Topbar**:
+Se inserta entre el nombre del usuario y el avatar un Badge pequeno con el rol. Usa el patron existente de Badge con variantes soft.
 
+**Logica de tabs condicional**:
+Se define un array `visibleTabs` basado en el rol. Para chatters: `[{ value: "operaciones", label: "Insights" }]`. Para managers/admins: el array completo actual. Se itera sobre este array para renderizar TabsTrigger y TabsContent.
+
+**No se requieren cambios en la base de datos** ya que los roles "agent" y "manager" ya existen en la tabla `user_roles` y en el enum `app_role`.
