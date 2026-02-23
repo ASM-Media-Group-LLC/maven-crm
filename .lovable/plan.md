@@ -1,46 +1,40 @@
 
-## Reparacion de la Vista de Onboarding
 
-### Problema raiz
+## Verificacion de Flujos y Navegacion en Onboarding
 
-La pagina `/creadores/onboarding` muestra 0 porque el hook `useOnboarding` filtra por los estados `["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"]` pero **no incluye `"onboarding"`**, que es el estado real de los 7 creadores detectados por el dashboard.
+### Resultado del analisis
 
-La base de datos confirma: 7 creadores con `status = 'onboarding'` y 1 con `status = 'pendiente_verificacion'`.
+Se revisaron los 4 componentes principales del modulo:
+- `OnboardingContent.tsx` -- contenedor principal con KPIs, cards en curso, tabla/grid
+- `OnboardingWizard.tsx` -- wizard inline de 4 pasos
+- `OnboardingTable.tsx` -- tabla de creadores
+- `OnboardingGrid.tsx` -- grid de creadores
 
-### Cambios a realizar
+**Navegacion**: No hay problemas de redireccion. El wizard se abre inline mediante estado local (`showWizard`), no mediante cambio de ruta. La tabla y el grid no tienen handlers de clic ni enlaces que redireccionen fuera de `/creadores/onboarding`. El boton "Continuar" en las cards de "Onboardings en Curso" tambien opera sobre estado local.
 
-**Archivo 1: `src/pages/creadores/onboarding/useOnboarding.ts`**
+**Unico problema encontrado**: El orden de las pestanas de agencia no sigue el orden canonico del sistema.
 
-- Agregar `"onboarding"` a la lista de estados en el filtro `.in("status", [...])`
-- Actualizar `deriveStatus` para mapear `"onboarding"` a `"En Progreso"`
+### Cambio a realizar
 
-**Archivo 2: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
+**Archivo**: `src/pages/creadores/onboarding/OnboardingContent.tsx`
 
-- Ajustar la logica de `inProgressCreators` para incluir tambien `dbStatus === "onboarding"` (ademas de `"borrador"` y `"pendiente_verificacion"`)
-- Con esto, la seccion "Onboardings en Curso" mostrara las 7+1 cards con su progreso y boton "Continuar"
-
-### Resultado esperado
-
-| KPI Card | Valor |
-|---|---|
-| Total | 8 (7 onboarding + 1 pendiente_verificacion) |
-| Pendientes | 1 (pendiente_verificacion) |
-| En Progreso | 7 (onboarding) |
-| Completados | 0 |
-
-La tabla/grid principal mostrara los 8 creadores con sus datos de agencia, fecha de inicio y progreso. La seccion "Onboardings en Curso" mostrara las cards interactivas para continuar cada proceso.
-
-### Detalle tecnico
+Corregir el array `areaTabs` (linea 18) para que siga el orden canonico estandarizado:
 
 ```text
-// useOnboarding.ts - linea 74
-Antes:  .in("status", ["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"])
-Despues: .in("status", ["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"])
-
-// useOnboarding.ts - deriveStatus
-Agregar: if (dbStatus === "onboarding") return "En Progreso";
-
-// OnboardingContent.tsx - inProgressCreators
-Antes:  c.dbStatus === "borrador" || c.dbStatus === "pendiente_verificacion"
-Despues: c.dbStatus === "borrador" || c.dbStatus === "onboarding" || c.dbStatus === "pendiente_verificacion"
+Antes:  ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"]
+Despues: ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"]
 ```
+
+El cambio es una transposicion de "Trafix" y "Unlok Platform" para respetar la jerarquia oficial: Atomic, Elite, Kash, Unlok, Trafix, Otra (siempre al final).
+
+### Verificacion confirmada
+
+| Flujo | Estado |
+|---|---|
+| Clic en fila de tabla | Sin handler, no navega -- OK |
+| Clic en card de grid | Sin handler, no navega -- OK |
+| Boton "Continuar" en card | Abre wizard inline -- OK |
+| Boton "Volver a la lista" en wizard | Cierra wizard, muestra lista -- OK |
+| Breadcrumb "Creadores" | Navega a /creadores -- OK |
+| Filtros por agencia | Funcionan correctamente, solo falta corregir orden -- Fix |
+
