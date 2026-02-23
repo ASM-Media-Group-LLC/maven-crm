@@ -116,8 +116,8 @@ const CreadorasDashboardContent = () => {
             return (
               <Card
                 key={key}
-                className={`border-t-[3px] ${border} cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br ${bg} hover:to-transparent hover:border-b hover:border-x`}
-                onClick={() => navigate(`/creadores?status=${key}`)}
+                className={`border-t-[3px] ${border} cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br ${bg} hover:to-transparent hover:border-b hover:border-x ${key === "onboarding" ? "group" : ""}`}
+                onClick={() => navigate(key === "onboarding" ? "/creadores/onboarding" : `/creadores?status=${key}`)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -125,6 +125,11 @@ const CreadorasDashboardContent = () => {
                       <p className="text-xs text-muted-foreground font-medium">{label}</p>
                       <p className={`text-3xl font-bold mt-1 ${color}`}>{count}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{pct}% del total</p>
+                      {key === "onboarding" && (
+                        <p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+                          Ver listado →
+                        </p>
+                      )}
                     </div>
                     <div className={`p-2 rounded-lg ${iconBg} shrink-0`}>
                       <Icon className={`h-5 w-5 ${color}`} />
