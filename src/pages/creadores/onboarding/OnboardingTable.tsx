@@ -67,9 +67,8 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="secondary" size="sm" onClick={() => onManage?.(item)}>
-                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                    Gestionar
+                  <Button variant="secondary" size="icon" className="h-8 w-8" onClick={() => onManage?.(item)}>
+                    <Settings2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>

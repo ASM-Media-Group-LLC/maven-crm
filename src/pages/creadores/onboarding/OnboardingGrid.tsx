@@ -55,9 +55,8 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
                 </div>
                 <Progress value={item.progress} className="h-2" />
               </div>
-              <Button variant="secondary" size="sm" className="w-full" onClick={() => onManage?.(item)}>
-                <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                Gestionar
+              <Button variant="secondary" size="icon" className="h-8 w-8 ml-auto" onClick={() => onManage?.(item)}>
+                <Settings2 className="h-4 w-4" />
               </Button>
             </CardContent>
           </Card>
