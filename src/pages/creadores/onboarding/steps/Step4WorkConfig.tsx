@@ -23,6 +23,17 @@ const SERVICES = [
   { key: "envio_articulos", label: "Venta de Ropa Interior" },
 ] as const;
 
+const CURRENCIES = [
+  { value: "USD", symbol: "$", label: "USD ($)" },
+  { value: "EUR", symbol: "€", label: "EUR (€)" },
+  { value: "COP", symbol: "COP", label: "COP" },
+  { value: "MXN", symbol: "MXN", label: "MXN" },
+  { value: "ARS", symbol: "ARS", label: "ARS" },
+  { value: "CLP", symbol: "CLP", label: "CLP" },
+  { value: "PEN", symbol: "PEN", label: "PEN" },
+  { value: "BRL", symbol: "R$", label: "BRL (R$)" },
+] as const;
+
 export interface ScheduleGrid {
   [day: string]: string[];
 }
@@ -41,6 +52,7 @@ export interface Step4Data {
   terminosAfecto: string;
   restriccionesSeguridad: string;
   orientacionPerfil: string;
+  currency: string;
 }
 
 interface Props {
@@ -65,6 +77,8 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
     });
   };
 
+  const currencySymbol = CURRENCIES.find((c) => c.value === data.currency)?.symbol || "$";
+
   return (
     <Accordion type="multiple" defaultValue={["precios"]} className="space-y-2">
       {/* Pricing Table */}
@@ -76,12 +90,25 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           </div>
         </AccordionTrigger>
         <AccordionContent>
-          <div className="border rounded-lg overflow-hidden mt-2">
+          <div className="flex items-center gap-3 mt-2 mb-3">
+            <Label className="text-sm whitespace-nowrap">Moneda:</Label>
+            <Select value={data.currency || "USD"} onValueChange={(v) => onChange("currency", v)}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="font-medium">Servicio</TableHead>
-                  <TableHead className="font-medium w-[160px]">Precio sugerido ($)</TableHead>
+                  <TableHead className="font-medium w-[160px]">Precio sugerido ({currencySymbol})</TableHead>
                   <TableHead className="font-medium">Notas del servicio</TableHead>
                 </TableRow>
               </TableHeader>
@@ -91,7 +118,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                     <TableCell className="font-medium text-sm">{label}</TableCell>
                     <TableCell>
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">{currencySymbol}</span>
                         <Input
                           type="number"
                           min={0}

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Check, Loader2, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -22,7 +23,7 @@ const STEPS = [
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", permisoIdentidadReal: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", permisoIdentidadReal: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD" };
 
 interface Props {
   onCancel: () => void;
@@ -39,6 +40,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   const [step1Errors, setStep1Errors] = useState<Step1Errors>({});
   const [step3DocErrors, setStep3DocErrors] = useState<Step2Errors>({});
   const [loadingCreator, setLoadingCreator] = useState(!!editCreatorId);
+  const [creatorStatus, setCreatorStatus] = useState<string | null>(null);
 
   const { toast } = useToast();
   const addCreador = useAddCreadorWithBusiness();
@@ -73,6 +75,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           palabrasProhibidas: c.palabras_prohibidas || "", emojiFrecuente: c.emoji_frecuente || "",
           tonoVoz: c.tono_voz || "", contenidoJamasHaria: c.contenido_jamas_haria || "",
         });
+        setCreatorStatus(c.status || null);
         setStep4({
           schedule: extraData.schedule || {}, pricing: {},
           monthlyGoal: biz?.monthly_sales_target ? String(biz.monthly_sales_target) : "",
@@ -81,6 +84,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           terminosAfecto: extraData.terminosAfecto || "",
           restriccionesSeguridad: extraData.restriccionesSeguridad || "",
           orientacionPerfil: extraData.orientacionPerfil || "",
+          currency: extraData.currency || "USD",
         });
       }
       setLoadingCreator(false);
@@ -140,6 +144,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       schedule: step4.schedule,
       monthlyGoal: step4.monthlyGoal,
       timezone: step1.timezone,
+      currency: step4.currency || "USD",
       permisoIdentidadReal: step4.permisoIdentidadReal || null,
       terminosAfecto: step4.terminosAfecto || null,
       restriccionesSeguridad: step4.restriccionesSeguridad || null,
@@ -299,11 +304,28 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   return (
     <Card className="rounded-lg">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold leading-none tracking-tight">
             {editCreatorId ? "Continuar Onboarding" : "Iniciar Onboarding"}
           </h2>
-          <p className="text-sm text-muted-foreground mt-1.5">4 pasos para completar el registro</p>
+          <Badge
+            variant={
+              !editCreatorId ? "secondary-soft" :
+              creatorStatus === "borrador" ? "warning-soft" :
+              creatorStatus === "onboarding" ? "primary-soft" :
+              creatorStatus === "pendiente_verificacion" ? "warning" :
+              creatorStatus === "verificado" || creatorStatus === "activo" ? "success-soft" :
+              "secondary-soft"
+            }
+            className="text-xs"
+          >
+            {!editCreatorId ? "Nuevo" :
+             creatorStatus === "borrador" ? "Borrador" :
+             creatorStatus === "onboarding" ? "Onboarding" :
+             creatorStatus === "pendiente_verificacion" ? "Pendiente verificación" :
+             creatorStatus === "verificado" || creatorStatus === "activo" ? "Verificado" :
+             creatorStatus || "Nuevo"}
+          </Badge>
         </div>
         <Button variant="ghost" size="sm" onClick={resetAndClose} disabled={isSubmitting}>
           <ArrowLeft className="h-4 w-4 mr-2" />
