@@ -15,7 +15,7 @@ import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, getStepLabel, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
 
-const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
+const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
