@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { APPLICANT_SOURCES } from "@/lib/hrConstants";
+import { useDepartments } from "@/hooks/useEmployees";
+
+interface FormState {
+  full_name: string;
+  email: string;
+  phone: string;
+  position_applied: string;
+  department_id: string;
+  source: string;
+  notes: string;
+}
+
+const initialForm: FormState = {
+  full_name: "",
+  email: "",
+  phone: "",
+  position_applied: "",
+  department_id: "",
+  source: "direct",
+  notes: "",
+};
+
+export default function HRApplicantNew() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: departments = [] } = useDepartments();
+  const [form, setForm] = useState<FormState>(initialForm);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const set = (field: keyof FormState, value: string) => setForm((f) => ({ ...f, [field]: value }));
+
+  const canSubmit = form.full_name.trim().length >= 2;
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("applicants").insert({
+        full_name: form.full_name,
+        email: form.email || null,
+        phone: form.phone || null,
+        position_applied: form.position_applied || null,
+        department_id: form.department_id || null,
+        source: form.source || null,
+        notes: form.notes || null,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["applicants"] });
+      toast({ title: "Candidato registrado correctamente" });
+      navigate("/hr/candidatos");
+    } catch {
+      toast({ title: "Error al registrar el candidato", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="shrink-0 border-b bg-background px-6 py-4">
+        <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/candidatos")}>
+          <ArrowLeft className="h-4 w-4 mr-1" />Volver a Candidatos
+        </Button>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Nuevo Candidato</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Agrega un nuevo candidato al proceso de reclutamiento</p>
+        </div>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-auto px-6 py-6">
+        <Card className="max-w-3xl">
+          <CardHeader>
+            <CardTitle className="text-base">Información del Candidato</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Nombre Completo <span className="text-destructive">*</span></Label>
+                <Input placeholder="Nombre del candidato" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Teléfono</Label>
+              <PhoneInput value={form.phone} onChange={(v) => set("phone", v)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cargo al que Aplica</Label>
+              <Input placeholder="Ej: Desarrollador Frontend" value={form.position_applied} onChange={(e) => set("position_applied", e.target.value)} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Departamento</Label>
+                <Select value={form.department_id || undefined} onValueChange={(v) => set("department_id", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>{departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fuente</Label>
+                <Select value={form.source} onValueChange={(v) => set("source", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{APPLICANT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas</Label>
+              <Textarea placeholder="Observaciones del candidato..." rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Footer */}
+      <div className="shrink-0 border-t bg-background px-6 py-3 flex items-center justify-end gap-3">
+        <Button variant="outline" onClick={() => navigate("/hr/candidatos")}>Cancelar</Button>
+        <Button onClick={handleSubmit} disabled={!canSubmit || isSubmitting}>
+          <Plus className="h-4 w-4 mr-1" />
+          {isSubmitting ? "Guardando..." : "Guardar Candidato"}
+        </Button>
+      </div>
+    </div>
+  );
+}

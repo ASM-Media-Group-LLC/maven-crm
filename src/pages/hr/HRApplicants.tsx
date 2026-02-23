@@ -1,179 +1,472 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UserCheck, Plus, ChevronRight } from "lucide-react";
+import {
+  UserCheck, Users, Clock, CheckCircle, Plus, Eye, Pencil, Trash2,
+  Search, X, ListIcon, LayoutGrid,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { HRPageHeader } from "@/components/hr/HRPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent } from "@/components/ui/card";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { APPLICANT_STATUSES, APPLICANT_SOURCES } from "@/lib/hrConstants";
 import { APPLICANT_STATUS_COLORS } from "@/lib/hrAreaUtils";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 import { useDepartments } from "@/hooks/useEmployees";
+import { PhoneInput } from "@/components/ui/phone-input";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface ApplicantRecord {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  position_applied: string | null;
+  department_id: string | null;
+  source: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  departments: { name: string } | null;
+}
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 function useApplicants() {
   return useQuery({
     queryKey: ["applicants"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("applicants").select("*, departments(name)").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("applicants")
+        .select("*, departments(name)")
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as ApplicantRecord[];
     },
   });
 }
 
-const KANBAN_COLS = APPLICANT_STATUSES.slice(0, 5); // applied → offer
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    : (parts[0]?.[0] ?? "?").toUpperCase();
+}
 
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function HRApplicants() {
+  const navigate = useNavigate();
   const { data: applicants = [], isLoading } = useApplicants();
   const { data: departments = [] } = useDepartments();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ full_name: "", email: "", phone: "", position_applied: "", department_id: "", source: "direct", notes: "" });
 
-  const createMutation = useMutation({
+  // Filters
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [deptTab, setDeptTab] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Modals
+  const [viewItem, setViewItem] = useState<ApplicantRecord | null>(null);
+  const [editItem, setEditItem] = useState<ApplicantRecord | null>(null);
+  const [deleteItem, setDeleteItem] = useState<ApplicantRecord | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", phone: "", position_applied: "", department_id: "", source: "", status: "", notes: "" });
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
+  const updateMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("applicants").insert({ ...form, created_by: user?.id });
+      const { error } = await supabase.from("applicants").update({
+        full_name: editForm.full_name,
+        email: editForm.email || null,
+        phone: editForm.phone || null,
+        position_applied: editForm.position_applied || null,
+        department_id: editForm.department_id || null,
+        source: editForm.source || null,
+        status: editForm.status,
+        notes: editForm.notes || null,
+      }).eq("id", editItem!.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applicants"] });
-      toast({ title: "Candidato registrado" });
-      setOpen(false);
-      setForm({ full_name: "", email: "", phone: "", position_applied: "", department_id: "", source: "direct", notes: "" });
+      toast({ title: "Candidato actualizado" });
+      setEditItem(null);
     },
-    onError: () => toast({ title: "Error al registrar el candidato", variant: "destructive" }),
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("applicants").update({ status }).eq("id", id);
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("applicants").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applicants"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applicants"] });
+      toast({ title: "Candidato eliminado" });
+      setDeleteItem(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
-  return (
-    <div className="p-6 space-y-5">
-      <HRPageHeader
-        title="Pipeline de Candidatos"
-        subtitle={`${applicants.length} candidatos en seguimiento`}
-        icon={UserCheck}
-        actions={<Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Nuevo Candidato</Button>}
-      />
+  // ─── KPIs ─────────────────────────────────────────────────────────────────
+  const totalPending = applicants.filter((a) => a.status === "applied" || a.status === "reviewing").length;
+  const totalInterview = applicants.filter((a) => a.status === "interview").length;
+  const totalHired = applicants.filter((a) => a.status === "hired").length;
 
-      {/* Kanban board */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          {KANBAN_COLS.map((col) => <Skeleton key={col.value} className="h-64 rounded-lg" />)}
+  // ─── Filtering ────────────────────────────────────────────────────────────
+  const hasFilters = search || statusFilter;
+
+  const filtered = applicants.filter((a) => {
+    const matchSearch = !search || a.full_name.toLowerCase().includes(search.toLowerCase()) || a.email?.toLowerCase().includes(search.toLowerCase()) || a.position_applied?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = !statusFilter || a.status === statusFilter;
+    const matchDept = !deptTab || a.department_id === deptTab;
+    return matchSearch && matchStatus && matchDept;
+  });
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("");
+  }
+
+  function openEdit(item: ApplicantRecord) {
+    setEditForm({
+      full_name: item.full_name,
+      email: item.email ?? "",
+      phone: item.phone ?? "",
+      position_applied: item.position_applied ?? "",
+      department_id: item.department_id ?? "",
+      source: item.source ?? "",
+      status: item.status,
+      notes: item.notes ?? "",
+    });
+    setEditItem(item);
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Fixed Header ──────────────────────────────────────────────────── */}
+      <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Candidatos</h1>
+            <p className="text-sm text-muted-foreground">Gestiona candidatos y conviértelos en empleados</p>
+          </div>
+          <Button size="sm" onClick={() => navigate("/hr/candidatos/nuevo")}>
+            <Plus className="h-4 w-4 mr-1" />Nuevo Candidato
+          </Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto">
-          {KANBAN_COLS.map((col) => {
-            const colApplicants = applicants.filter((a) => a.status === col.value);
-            const colors = APPLICANT_STATUS_COLORS[col.value] ?? { bg: "bg-muted", text: "text-muted-foreground" };
-            return (
-              <div key={col.value} className="space-y-3 min-w-[200px]">
-                <div className="flex items-center justify-between">
-                  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", colors.bg, colors.text)}>
-                    {col.label}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">{colApplicants.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {colApplicants.length === 0 ? (
-                    <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                      <p className="text-xs text-muted-foreground">Sin candidatos</p>
-                    </div>
-                  ) : (
-                    colApplicants.map((app) => (
-                      <Card key={app.id} className="cursor-default hover:border-primary/30 transition-colors">
-                        <CardContent className="p-3 space-y-2">
-                          <p className="text-sm font-medium leading-tight">{app.full_name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{app.position_applied ?? "Sin cargo"}</p>
-                          {(app as any).departments?.name && (
-                            <p className="text-xs text-muted-foreground">{(app as any).departments.name}</p>
-                          )}
-                          <div className="flex gap-1 pt-1">
-                            {APPLICANT_STATUSES.indexOf(col) < APPLICANT_STATUSES.length - 1 && (
-                              <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => {
-                                const nextStatus = APPLICANT_STATUSES[APPLICANT_STATUSES.indexOf(col) + 1]?.value;
-                                if (nextStatus) updateStatus.mutate({ id: app.id, status: nextStatus });
-                              }}>
-                                <ChevronRight className="h-3 w-3 mr-0.5" />Avanzar
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+      </header>
+
+      {/* ── Scrollable content ────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto p-6 space-y-5">
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
+          ) : (
+            <>
+              <DashboardMetricCard label="Total Candidatos" value={String(applicants.length)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={totalPending > 0 ? "text-primary" : undefined} />
+              <DashboardMetricCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalInterview > 0 ? "text-warning" : undefined} />
+              <DashboardMetricCard label="Contratados" value={String(totalHired)} icon={CheckCircle} subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalHired > 0 ? "text-accent-foreground" : undefined} />
+            </>
+          )}
+        </div>
+
+        {/* Department Tabs */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          {departments.map((d: any) => (
+            <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
+          ))}
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar por nombre, email o posición..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+
+          <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              {APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {/* View toggle */}
+          <div className="inline-flex items-center rounded-md border border-border">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-r-none" onClick={() => setViewMode("list")}>
+              <ListIcon className="h-4 w-4" />
+            </Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8 rounded-l-none" onClick={() => setViewMode("grid")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {hasFilters && (
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={clearFilters}>
+              <X className="h-3.5 w-3.5 mr-1" />Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        {/* ── Table View ──────────────────────────────────────────────────── */}
+        {viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="sticky top-0 z-10 bg-card border-b">
+                    <TableHead className="text-xs font-medium text-muted-foreground">Nombre</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Email</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Posición</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Área</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Fuente</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                     ))
+                  ) : filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                        {applicants.length === 0
+                          ? "No hay candidatos registrados. Haz clic en \"Nuevo Candidato\" para empezar."
+                          : "Sin resultados para los filtros aplicados."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((app) => {
+                      const initials = getInitials(app.full_name);
+                      const statusColors = APPLICANT_STATUS_COLORS[app.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
+                      return (
+                        <TableRow key={app.id} className="group hover:bg-muted/30 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-semibold text-primary">{initials}</span>
+                              </div>
+                              <p className="text-sm font-medium">{app.full_name}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{app.email ?? "—"}</TableCell>
+                          <TableCell className="text-sm max-w-40 truncate">{app.position_applied ?? "—"}</TableCell>
+                          <TableCell>
+                            {app.departments?.name ? (
+                              <Badge variant="secondary" className="text-xs">{app.departments.name}</Badge>
+                            ) : <span className="text-sm text-muted-foreground">—</span>}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {APPLICANT_SOURCES.find((s) => s.value === app.source)?.label ?? app.source ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{format(new Date(app.created_at), "dd/MM/yyyy")}</TableCell>
+                          <TableCell>
+                            <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusColors.bg, statusColors.text)}>
+                              {APPLICANT_STATUSES.find((s) => s.value === app.status)?.label ?? app.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
+                            <div className="flex items-center gap-1">
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(app)}><Eye className="h-3.5 w-3.5" /></Button>
+                              </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(app)}><Pencil className="h-3.5 w-3.5" /></Button>
+                              </TooltipTrigger><TooltipContent side="left">Editar</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(app)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                              </TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : (
+          /* ── Grid View ──────────────────────────────────────────────────── */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {isLoading ? (
+              Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)
+            ) : filtered.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-muted-foreground">
+                {applicants.length === 0 ? "No hay candidatos registrados." : "Sin resultados para los filtros aplicados."}
+              </div>
+            ) : (
+              filtered.map((app) => {
+                const initials = getInitials(app.full_name);
+                const statusColors = APPLICANT_STATUS_COLORS[app.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
+                return (
+                  <Card key={app.id} className="hover:border-primary/30 transition-colors">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-semibold text-primary">{initials}</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium leading-tight">{app.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[160px]">{app.email ?? "Sin email"}</p>
+                          </div>
+                        </div>
+                        <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0", statusColors.bg, statusColors.text)}>
+                          {APPLICANT_STATUSES.find((s) => s.value === app.status)?.label ?? app.status}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <p><span className="font-medium text-foreground">Posición:</span> {app.position_applied ?? "—"}</p>
+                        {app.departments?.name && <p><span className="font-medium text-foreground">Área:</span> {app.departments.name}</p>}
+                        <p><span className="font-medium text-foreground">Fuente:</span> {APPLICANT_SOURCES.find((s) => s.value === app.source)?.label ?? "—"}</p>
+                        <p><span className="font-medium text-foreground">Fecha:</span> {format(new Date(app.created_at), "dd/MM/yyyy")}</p>
+                      </div>
+                      <div className="flex items-center gap-1 pt-1 border-t border-border">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewItem(app)}><Eye className="h-3 w-3 mr-1" />Ver</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(app)}><Pencil className="h-3 w-3 mr-1" />Editar</Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => setDeleteItem(app)}><Trash2 className="h-3 w-3 mr-1" />Eliminar</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── View Modal ────────────────────────────────────────────────────── */}
+      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Detalle del Candidato</DialogTitle></DialogHeader>
+          {viewItem && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><p className="text-xs text-muted-foreground">Nombre</p><p className="font-medium">{viewItem.full_name}</p></div>
+                <div><p className="text-xs text-muted-foreground">Email</p><p>{viewItem.email ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Teléfono</p><p>{viewItem.phone ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Posición</p><p>{viewItem.position_applied ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Área</p><p>{viewItem.departments?.name ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Fuente</p><p>{APPLICANT_SOURCES.find((s) => s.value === viewItem.source)?.label ?? "—"}</p></div>
+                <div><p className="text-xs text-muted-foreground">Fecha</p><p>{format(new Date(viewItem.created_at), "dd/MM/yyyy")}</p></div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                  {(() => {
+                    const c = APPLICANT_STATUS_COLORS[viewItem.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
+                    return <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", c.bg, c.text)}>{APPLICANT_STATUSES.find((s) => s.value === viewItem.status)?.label ?? viewItem.status}</span>;
+                  })()}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              {viewItem.notes && (
+                <div><p className="text-xs text-muted-foreground">Notas</p><p className="whitespace-pre-wrap">{viewItem.notes}</p></div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      {/* ── Edit Modal ────────────────────────────────────────────────────── */}
+      <Dialog open={!!editItem} onOpenChange={() => setEditItem(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nuevo Candidato</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Editar Candidato</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Nombre Completo <span className="text-destructive">*</span></Label>
-              <Input placeholder="Nombre del candidato" value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+              <Input value={editForm.full_name} onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Email</Label>
-                <Input type="email" placeholder="correo@ejemplo.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                <Input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
                 <Label>Teléfono</Label>
-                <Input placeholder="+57 300..." value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                <PhoneInput value={editForm.phone} onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Cargo al que Aplica</Label>
-              <Input placeholder="Ej: Desarrollador Frontend" value={form.position_applied} onChange={(e) => setForm((f) => ({ ...f, position_applied: e.target.value }))} />
+              <Label>Posición</Label>
+              <Input value={editForm.position_applied} onChange={(e) => setEditForm((f) => ({ ...f, position_applied: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Departamento</Label>
-                <Select onValueChange={(v) => setForm((f) => ({ ...f, department_id: v }))}>
+                <Select value={editForm.department_id || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, department_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                  <SelectContent>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{departments.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Fuente</Label>
-                <Select defaultValue="direct" onValueChange={(v) => setForm((f) => ({ ...f, source: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={editForm.source || undefined} onValueChange={(v) => setEditForm((f) => ({ ...f, source: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                   <SelectContent>{APPLICANT_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1.5">
+              <Label>Estado</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{APPLICANT_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>Notas</Label>
-              <Textarea placeholder="Observaciones del candidato..." rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+              <Textarea rows={3} value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button onClick={() => createMutation.mutate()} disabled={!form.full_name || createMutation.isPending}>
-                {createMutation.isPending ? "Guardando..." : "Registrar"}
+              <Button variant="outline" onClick={() => setEditItem(null)}>Cancelar</Button>
+              <Button onClick={() => updateMutation.mutate()} disabled={!editForm.full_name || updateMutation.isPending}>
+                {updateMutation.isPending ? "Guardando..." : "Guardar Cambios"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Dialog ─────────────────────────────────────────────────── */}
+      <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar candidato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará permanentemente a <strong>{deleteItem?.full_name}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}>
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
