@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag, Calendar } from "lucide-react";
+import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,10 +73,6 @@ const CreadorasDashboardContent = () => {
   );
 
   // Onboarding in progress
-  const onboardingCreators = useMemo(() =>
-    allCreators.filter((c) => c.status === "onboarding"),
-    [allCreators]
-  );
 
   const statusBadgeClass: Record<string, string> = {
     active: "bg-success/15 text-success border-success/30",
@@ -237,7 +233,7 @@ const CreadorasDashboardContent = () => {
         </div>
 
         {/* Section 3 — Recent Activity */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {/* Latest registrations */}
           <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/20">
             <CardHeader className="pb-3">
@@ -269,46 +265,6 @@ const CreadorasDashboardContent = () => {
                     <span className="text-[10px] text-muted-foreground">
                       {c.created_at ? format(new Date(c.created_at), "dd MMM", { locale: es }) : ""}
                     </span>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Onboarding in progress */}
-          <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
-                Onboarding en Curso
-                <Badge variant="outline" className="ml-auto text-[10px] bg-primary/10 text-primary border-primary/30">
-                  {onboardingCreators.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              {onboardingCreators.length === 0 && (
-                <p className="text-xs text-muted-foreground">No hay creadoras en onboarding</p>
-              )}
-              {onboardingCreators.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => navigate(`/creadores/${c.id}`)}
-                  className="w-full flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-muted/60 transition-colors text-left group"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                      {c.artistic_name ?? c.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.creator_business?.assigned_agency ?? "Sin agencia"}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {c.creator_business?.start_date
-                      ? format(new Date(c.creator_business.start_date), "dd MMM yyyy", { locale: es })
-                      : "Sin fecha"}
                   </div>
                 </button>
               ))}
