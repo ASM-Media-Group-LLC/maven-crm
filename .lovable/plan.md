@@ -1,36 +1,53 @@
 
 
-## Enlace de la Card de Onboarding al Listado
+## Sincronizacion de Contadores y Etiquetas "En Onboarding"
 
-### Cambio a realizar
+### Problema
 
-**Archivo**: `src/pages/creadores/CreadorasDashboardContent.tsx`
+- El Dashboard y el Listado muestran **7** en la card de Onboarding (solo cuenta `status === "onboarding"`)
+- La seccion de Onboarding muestra **9** (suma de `pendiente` + `onboarding` + `pendiente_verificacion`)
+- La etiqueta dice "Onboarding" cuando deberia decir "En Onboarding"
 
-Se modificara unicamente la card de estado "onboarding" dentro del grid de KPIs (linea ~120) para que:
+### Cambios por archivo
 
-1. **Navegue a `/creadores/onboarding`** en lugar de `/creadores?status=onboarding`
-2. **Muestre un texto "Ver listado"** con una flecha que aparece en hover, debajo del porcentaje
+---
 
-### Detalle tecnico
+**Archivo 1: `src/pages/creadores/CreadorasDashboardContent.tsx`**
 
-En el bloque `statusConfig.map(...)` (lineas 113-140), se agregara una condicion: cuando `key === "onboarding"`, el `onClick` apuntara a `/creadores/onboarding` y se renderizara un texto adicional.
+1. Cambiar la etiqueta de la card de `"Onboarding"` a `"En Onboarding"` en `statusConfig` (linea 15)
+2. Modificar `statusCounts` (lineas 25-31) para que la clave `"onboarding"` sume los tres estados relacionados: `onboarding` + `pendiente` + `pendiente_verificacion`
 
 ```text
-// Linea ~120 - onClick condicional
-onClick={() => navigate(key === "onboarding" ? "/creadores/onboarding" : `/creadores?status=${key}`)}
+// Antes (linea 26-30):
+counts = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0 }
+if (s in counts) counts[s]++
 
-// Dentro del CardContent, despues del porcentaje (linea ~130)
-// Solo para key === "onboarding":
-<p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-1">
-  Ver listado ->
-</p>
+// Despues:
+counts = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0 }
+if (s === "pendiente" || s === "pendiente_verificacion") counts["onboarding"]++
+else if (s in counts) counts[s]++
 ```
 
-Se agregara `group` a la clase del Card de onboarding para habilitar el efecto `group-hover` en el texto hijo.
+Esto hara que la card azul muestre **9** en lugar de 7. La navegacion a `/creadores/onboarding` y el hover "Ver listado" ya estan implementados.
 
-### Resultado
+---
 
-- La card de "Onboarding (7)" sera clickeable y llevara directamente a `/creadores/onboarding`
-- Al pasar el cursor aparecera el texto "Ver listado ->" en color primary
-- Las demas cards mantienen su comportamiento actual (filtro por status en `/creadores`)
+**Archivo 2: `src/pages/creadores/CreadoresKPICards.tsx`**
+
+1. Cambiar la etiqueta de `"Onboarding"` a `"En Onboarding"` (linea 14)
+2. Modificar el conteo para que sume `counts.onboarding + counts.pendiente + counts.pendiente_verificacion`
+3. Eliminar las cards separadas de "Pendientes" y "Verificacion" (lineas 18-19) ya que ahora estan englobadas en "En Onboarding"
+4. Reducir el grid de 7 columnas a 5: `lg:grid-cols-5`
+
+---
+
+### Resultado esperado
+
+| Pantalla | Card | Numero |
+|---|---|---|
+| Dashboard de Creadores | "En Onboarding" | 9 |
+| Listado de Creadores | "En Onboarding" | 9 |
+| Seccion Onboarding | Total (KPI) | 9 |
+
+Al hacer clic en "En Onboarding" desde el Dashboard, el usuario llega a `/creadores/onboarding` donde ve el desglose: 2 Pendientes + 7 En Progreso + 0 Completados.
 
