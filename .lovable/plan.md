@@ -1,45 +1,82 @@
 
 
-## Asignar tareas y subtareas a cualquier usuario del sistema
+## Asignacion multiple de usuarios en Tareas y Subtareas (estilo Asana)
 
-### Problema
+### Resumen
 
-Actualmente, tanto en tareas como en subtareas, la lista de usuarios disponibles para asignar se obtiene filtrando por `company_id`. Como ningun usuario tiene `company_id` configurado, el sistema solo muestra al usuario actual, impidiendo asignar tareas a otros miembros del equipo.
+Actualmente las tareas y subtareas solo permiten asignar **un usuario** (columna `assigned_to` tipo UUID). Se necesita permitir **multiples asignados** en tareas, subtareas, y mantener la consistencia con la asignacion de proyectos.
 
-Esto ocurre en dos lugares:
-1. **Tareas** (`useTareas.ts`, linea 78-91): la query de `companyProfiles` cae al fallback de un solo usuario.
-2. **Subtareas** (`SubtasksPanel.tsx`, lineas 48-62): la misma logica de fallback en `fetchedProfiles`.
+### Enfoque: Tabla de relacion (junction table)
 
-### Solucion
+Se creara una tabla `task_assignees` y `subtask_assignees` para manejar las relaciones muchos-a-muchos, manteniendo la columna `assigned_to` original como "asignado principal" para compatibilidad.
 
-Aplicar la misma correccion que ya se hizo en `ProjectsListContent.tsx`: cuando no hay `company_id`, traer todos los perfiles del sistema.
+---
 
-### Archivos a modificar
+### 1. Migracion de base de datos
+
+Crear dos tablas nuevas:
+
+```sql
+-- task_assignees: multiples asignados por tarea
+CREATE TABLE task_assignees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(task_id, user_id)
+);
+ALTER TABLE task_assignees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can manage task_assignees" ON task_assignees FOR ALL USING (true) WITH CHECK (true);
+
+-- subtask_assignees: multiples asignados por subtarea
+CREATE TABLE subtask_assignees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subtask_id uuid NOT NULL REFERENCES subtasks(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(subtask_id, user_id)
+);
+ALTER TABLE subtask_assignees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can manage subtask_assignees" ON subtask_assignees FOR ALL USING (true) WITH CHECK (true);
+```
+
+### 2. Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/useTareas.ts` | Modificar la query `companyProfiles` (lineas 80-89) para que traiga todos los perfiles cuando no hay `company_id` |
-| `src/pages/tareas/SubtasksPanel.tsx` | Modificar la query `fetchedProfiles` (lineas 48-62) para que traiga todos los perfiles cuando no hay `company_id` |
+| `src/pages/tareas/CreateTaskModal.tsx` | Cambiar selector de usuario unico a multi-select con chips (como en proyectos) |
+| `src/pages/tareas/EditTaskModal.tsx` | Mismo cambio: multi-select con chips |
+| `src/pages/tareas/useTareas.ts` | En `createTask`: insertar en `task_assignees` + notificaciones. En `updateTask`: sincronizar asignados. Agregar query de `task_assignees` para cada tarea |
+| `src/pages/tareas/SubtaskItem.tsx` | Cambiar selector de asignado unico a multi-select |
+| `src/pages/tareas/SubtasksPanel.tsx` | Cambiar selector de asignado en formulario de creacion a multi-select |
+| `src/pages/tareas/useSubtasks.ts` | En create/update: insertar/sincronizar `subtask_assignees` |
+| `src/pages/tareas/TaskCard.tsx` | Mostrar multiples avatares/nombres de asignados |
+| `src/pages/tareas/TaskListRow.tsx` | Mostrar multiples asignados en la fila |
+| `src/pages/tareas/TasksTable.tsx` | Mostrar multiples asignados en la columna |
 
-### Detalle del cambio
+### 3. Logica de UI
 
-En ambos archivos, reemplazar el patron:
+- **Selector multi-usuario**: Se reutilizara el patron de combobox multi-select con `Badge` + `X` que ya existe en `CreateProjectModal.tsx` (exactamente el mismo componente de seleccion de miembros de proyecto).
+- **Visualizacion**: Los asignados se mostraran como avatares apilados (max 3 visibles + "+N") en las tarjetas y filas.
+- **Compatibilidad**: La columna `assigned_to` existente se mantendra como el "primer asignado" para no romper queries RLS existentes. La tabla `task_assignees` sera la fuente de verdad.
 
-```typescript
-// ANTES
-if (profile?.company_id) {
-  const { data } = await supabase.from("profiles").select("id, full_name").eq("company_id", profile.company_id);
-  return data || [];
-}
-return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
+### 4. Notificaciones
 
-// DESPUES
-let query = supabase.from("profiles").select("id, full_name");
-if (profile?.company_id) {
-  query = query.eq("company_id", profile.company_id);
-}
-const { data } = await query;
-return data || [];
+Al asignar nuevos usuarios a una tarea o subtarea, se insertara una notificacion tipo `task_assignment` para cada usuario nuevo:
+
+```
+type: "task_assignment"
+title: "Te asignaron una tarea"
+message: "Fuiste asignado(a) a la tarea '{titulo}'"
+reference_id: task_id o subtask_id
+reference_type: "task" o "subtask"
 ```
 
-Esto permite que todos los usuarios aparezcan en los selectores de asignacion, tanto para tareas principales como para subtareas, habilitando la gestion colaborativa completa.
+### 5. Flujo simplificado
+
+1. Usuario crea/edita tarea -> selecciona multiples usuarios
+2. Se guarda `assigned_to` con el primer seleccionado (compatibilidad)
+3. Se insertan todos los seleccionados en `task_assignees`
+4. Se envian notificaciones a los nuevos asignados
+5. En las vistas se muestran todos los asignados desde `task_assignees`
+
