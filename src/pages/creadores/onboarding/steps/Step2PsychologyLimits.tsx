@@ -7,7 +7,10 @@ import {
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { BookOpen, Sparkles, ShieldAlert } from "lucide-react";
+import { BookOpen, Sparkles, ShieldAlert, Info } from "lucide-react";
+import {
+  Tooltip, TooltipTrigger, TooltipContent, TooltipProvider,
+} from "@/components/ui/tooltip";
 
 const NIVELES_ESTUDIO = ["Bachillerato", "Técnico", "Universitario", "Postgrado", "Otro"];
 const TONOS_VOZ = ["Dulce", "Picante", "Dominante", "Tierna", "Directa", "Juguetona"];
@@ -46,6 +49,7 @@ interface Props {
 
 export default function Step2PsychologyLimits({ data, onChange }: Props) {
   return (
+    <TooltipProvider>
     <Accordion type="multiple" defaultValue={["biografia"]} className="space-y-2">
       {/* Sección A: Biografía y Gustos */}
       <AccordionItem value="biografia" className="border rounded-lg px-4">
@@ -191,7 +195,15 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>¿Cómo responderías si un usuario pide sexo en persona?</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>¿Cómo responderías si un usuario pide sexo en persona?</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
               <Textarea
                 value={data.respuestaSexoEnPersona}
                 onChange={(e) => onChange("respuestaSexoEnPersona", e.target.value)}
@@ -200,7 +212,15 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>¿Cómo manejas a un usuario grosero?</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>¿Cómo manejas a un usuario grosero?</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
               <Textarea
                 value={data.respuestaUsuarioGrosero}
                 onChange={(e) => onChange("respuestaUsuarioGrosero", e.target.value)}
@@ -209,7 +229,15 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>¿Cómo respondes a "quiero ver tus desnudos"?</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>¿Cómo respondes a "quiero ver tus desnudos"?</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
               <Textarea
                 value={data.respuestaPedirDesnudos}
                 onChange={(e) => onChange("respuestaPedirDesnudos", e.target.value)}
@@ -221,5 +249,6 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+    </TooltipProvider>
   );
 }
