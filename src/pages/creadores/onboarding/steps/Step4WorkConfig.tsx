@@ -65,6 +65,9 @@ export interface Step4Data {
   tonoEmocional: string;
   frasesVenta: string;
   usuariosVip: string;
+  plataformaVideollamada: string;
+  estrategiaRecuperacion: string;
+  interesaDinamicasGrupales: boolean;
 }
 
 interface Props {
@@ -182,6 +185,19 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label>Plataforma preferida para Videollamadas</Label>
+                <Select value={data.plataformaVideollamada} onValueChange={(v) => onChange("plataformaVideollamada", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Telegram">Telegram</SelectItem>
+                    <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                    <SelectItem value="Zoom">Zoom</SelectItem>
+                    <SelectItem value="Skype">Skype</SelectItem>
+                    <SelectItem value="Otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Preferencia de términos de afecto</Label>
@@ -208,6 +224,16 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               <Switch
                 checked={data.gfeDisponible || false}
                 onCheckedChange={(v) => onChange("gfeDisponible", v)}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">¿Interesada en participar en juegos, rifas o metas de ventas grupales?</Label>
+                <p className="text-xs text-muted-foreground">Actividades grupales de engagement y ventas</p>
+              </div>
+              <Switch
+                checked={data.interesaDinamicasGrupales || false}
+                onCheckedChange={(v) => onChange("interesaDinamicasGrupales", v)}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -244,6 +270,15 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                   <SelectItem value="Sensual">Sensual</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Estrategia de recuperación de suscriptores y manejo de quejas</Label>
+              <Textarea
+                value={data.estrategiaRecuperacion}
+                onChange={(e) => onChange("estrategiaRecuperacion", e.target.value)}
+                placeholder="Describe cómo recuperar suscriptores inactivos y manejar quejas..."
+                rows={3}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Frases de Venta Predilectas</Label>
