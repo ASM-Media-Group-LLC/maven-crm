@@ -1,32 +1,46 @@
 
+## Reparacion de la Vista de Onboarding
 
-## Limpieza del Dashboard de Creadores
+### Problema raiz
 
-### Cambio unico
+La pagina `/creadores/onboarding` muestra 0 porque el hook `useOnboarding` filtra por los estados `["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"]` pero **no incluye `"onboarding"`**, que es el estado real de los 7 creadores detectados por el dashboard.
 
-**Archivo**: `src/pages/creadores/CreadorasDashboardContent.tsx`
+La base de datos confirma: 7 creadores con `status = 'onboarding'` y 1 con `status = 'pendiente_verificacion'`.
 
-**Eliminar**: La Card "Onboarding en Curso" (lineas 278-316) que muestra la lista de nombres con fechas de inicio.
+### Cambios a realizar
 
-**Mantener intacto**:
-- La KPI card de "Onboarding" en la seccion superior (linea 15) que muestra el conteo total
-- El calculo `statusCounts` que alimenta esa KPI
-- La Card de "Ultimas Incorporaciones" a la izquierda
+**Archivo 1: `src/pages/creadores/onboarding/useOnboarding.ts`**
 
-**Ajuste de layout**: La seccion 3 (linea 240) actualmente usa un grid de 2 columnas (`grid-cols-1 md:grid-cols-2`). Al quedar solo "Ultimas Incorporaciones", se cambia a una sola columna para que la card ocupe todo el ancho disponible sin dejar un hueco vacio.
+- Agregar `"onboarding"` a la lista de estados en el filtro `.in("status", [...])`
+- Actualizar `deriveStatus` para mapear `"onboarding"` a `"En Progreso"`
 
-### Codigo a limpiar
+**Archivo 2: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
 
-Se eliminan tambien las variables y imports que quedan sin uso:
-- `onboardingCreators` (useMemo, linea 76-79)
-- Import de `Calendar` de lucide-react (linea 3) -- ya no se usa
-- Import de `Clock` solo se mantiene si se usa en otro lugar (se usa en statusConfig, asi que se mantiene)
+- Ajustar la logica de `inProgressCreators` para incluir tambien `dbStatus === "onboarding"` (ademas de `"borrador"` y `"pendiente_verificacion"`)
+- Con esto, la seccion "Onboardings en Curso" mostrara las 7+1 cards con su progreso y boton "Continuar"
 
-### Resultado visual
+### Resultado esperado
 
-El dashboard queda con:
-1. Header con titulo y subtitulo
-2. 5 KPI cards de estado (incluyendo Onboarding con su conteo)
-3. 3 cards de distribucion (Agencia, Paises, Categorias)
-4. 1 card de Ultimas Incorporaciones a ancho completo
+| KPI Card | Valor |
+|---|---|
+| Total | 8 (7 onboarding + 1 pendiente_verificacion) |
+| Pendientes | 1 (pendiente_verificacion) |
+| En Progreso | 7 (onboarding) |
+| Completados | 0 |
 
+La tabla/grid principal mostrara los 8 creadores con sus datos de agencia, fecha de inicio y progreso. La seccion "Onboardings en Curso" mostrara las cards interactivas para continuar cada proceso.
+
+### Detalle tecnico
+
+```text
+// useOnboarding.ts - linea 74
+Antes:  .in("status", ["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"])
+Despues: .in("status", ["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"])
+
+// useOnboarding.ts - deriveStatus
+Agregar: if (dbStatus === "onboarding") return "En Progreso";
+
+// OnboardingContent.tsx - inProgressCreators
+Antes:  c.dbStatus === "borrador" || c.dbStatus === "pendiente_verificacion"
+Despues: c.dbStatus === "borrador" || c.dbStatus === "onboarding" || c.dbStatus === "pendiente_verificacion"
+```
