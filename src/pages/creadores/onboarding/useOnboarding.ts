@@ -23,21 +23,27 @@ export interface OnboardingCreator {
   dbStatus: string | null;
 }
 
-function calculateProgress(training: any): number {
-  if (!training) return 0;
+function calculateProgress(creator: any): number {
   let count = 0;
-  if (training.script_status === "completed" || training.script_status === "completado") count++;
-  if (training.call_completed_date) count++;
-  if (training.first_content_date) count++;
-  if (training.autonomous_since_date) count++;
-  return Math.round((count / 4) * 100);
+  const total = 4;
+  // Step 1: personal info
+  if (creator.name && creator.email && creator.country) count++;
+  // Step 2: psychology/limits
+  const psyFields = [creator.rutina_diaria, creator.hobbies, creator.tono_voz, creator.emoji_frecuente, creator.contenido_jamas_haria];
+  if (psyFields.filter(Boolean).length >= 2) count++;
+  // Step 3: profile photo / docs
+  if (creator.profile_photo_url) count++;
+  // Step 4: business config
+  const biz = Array.isArray(creator.creator_business) ? creator.creator_business[0] : creator.creator_business;
+  if (biz?.main_platform || biz?.payment_method) count++;
+  return Math.round((count / total) * 100);
 }
 
 function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "Completado" {
-  if (dbStatus === "pendiente_verificacion") return "Pendiente";
-  if (dbStatus === "asignado" || dbStatus === "activo") return "Completado";
+  if (dbStatus === "borrador" || dbStatus === "pendiente" || dbStatus === "pendiente_verificacion") return "Pendiente";
+  if (dbStatus === "verificado") return "Completado";
   if (dbStatus === "onboarding") return "En Progreso";
-  return "En Progreso";
+  return "Pendiente";
 }
 
 export function calculateCurrentStep(creator: OnboardingCreator): number {
@@ -71,15 +77,14 @@ export function useOnboarding() {
     queryFn: async (): Promise<OnboardingCreator[]> => {
       const { data, error } = await supabase
         .from("creators")
-        .select("*, creator_business(*), creator_training(*)")
-        .in("status", ["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"]);
+        .select("*, creator_business(*)")
+        .in("status", ["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado"]);
 
       if (error) throw error;
 
       return (data || []).map((c: any) => {
         const biz = Array.isArray(c.creator_business) ? c.creator_business[0] : c.creator_business;
-        const training = Array.isArray(c.creator_training) ? c.creator_training[0] : c.creator_training;
-        const progress = calculateProgress(training);
+        const progress = calculateProgress(c);
 
         return {
           id: c.id,
