@@ -4,6 +4,7 @@ import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Glob
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useCreadores } from "./useCreadores";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,6 +31,10 @@ const CreadorasDashboardContent = () => {
       else if (s in counts) counts[s]++;
     }
     return counts;
+  }, [allCreators]);
+
+  const pendingCount = useMemo(() => {
+    return allCreators.filter(c => c.status === "pendiente" || c.status === "pendiente_verificacion").length;
   }, [allCreators]);
 
   const total = allCreators.length;
@@ -117,9 +122,22 @@ const CreadorasDashboardContent = () => {
             return (
               <Card
                 key={key}
-                className={`border-t-[3px] ${border} cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br ${bg} hover:to-transparent hover:border-b hover:border-x ${key === "onboarding" ? "group" : ""}`}
+                className={`${key === "onboarding" ? "relative " : ""}border-t-[3px] ${border} cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br ${bg} hover:to-transparent hover:border-b hover:border-x ${key === "onboarding" ? "group" : ""}`}
                 onClick={() => navigate(key === "onboarding" ? "/creadores/onboarding" : `/creadores?status=${key}`)}
               >
+                {key === "onboarding" && pendingCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 z-10">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive/60" />
+                          <span className="relative inline-flex rounded-full h-4 w-4 bg-destructive" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>Tienes {pendingCount} registros por verificar</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
