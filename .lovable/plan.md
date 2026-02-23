@@ -1,44 +1,82 @@
 
 
-## Separar el Wizard de Onboarding en su propia pagina
+## Rediseno de la pagina de Candidatos y Nuevo Candidato
 
 ### Objetivo
 
-Mover el formulario de onboarding (wizard) de un estado inline dentro de `/creadores/onboarding` a una pagina dedicada con su propia ruta, navegacion y estructura.
+Reemplazar la vista actual de Kanban + modal por una estructura profesional que sigue los patrones establecidos: pagina de listado con KPIs, tabla/grid, filtros y una pagina dedicada para crear nuevos candidatos (en lugar de un modal).
 
 ### Cambios planificados
 
-#### 1. Nueva ruta: `/creadores/onboarding/nuevo` y `/creadores/onboarding/:id`
+#### 1. Pagina principal de Candidatos (`src/pages/hr/HRApplicants.tsx`) - Rediseno completo
 
-- `/creadores/onboarding/nuevo` -- Iniciar un onboarding nuevo (sin `editCreatorId`)
-- `/creadores/onboarding/:id` -- Continuar/editar el onboarding de un creador existente (con `editCreatorId` y `initialStep` calculado)
+**Header:**
+- Titulo "Candidatos" con subtitulo "Gestiona candidatos y conviertelos en empleados"
+- Breadcrumbs: Empleados > Reclutamiento > Candidatos
+- Boton CTA "Nuevo Candidato" (variante default) que navega a `/hr/candidatos/nuevo`
 
-#### 2. Archivos a modificar
+**KPI Cards (4 tarjetas):**
+- Total Candidatos (muted)
+- Pendientes (filtro: applied + reviewing) (primary)
+- En Entrevista (filtro: interview) (warning)
+- Aprobados/Contratados (filtro: hired) (success)
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/App.tsx` | Agregar las dos nuevas rutas protegidas |
-| `src/pages/creadores/onboarding/OnboardingWizardPage.tsx` | **Nuevo archivo** -- Pagina completa con layout (Sidebar + Topbar), breadcrumbs (Creadores > Onboarding > Nuevo/Editar) y el componente `OnboardingWizard`. Usa `useParams` para obtener el `id` y `useNavigate` para el boton cancelar |
-| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Eliminar el estado `showWizard`/`editingCreator` y la renderizacion condicional del wizard. El boton "Iniciar Onboarding" ahora navega a `/creadores/onboarding/nuevo`. El click en una fila/tarjeta navega a `/creadores/onboarding/:id` |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Cambiar la prop `onCancel` para que acepte navegacion (el componente padre pasara `navigate(-1)` o `navigate("/creadores/onboarding")`) |
+**Pestanas de departamento:**
+- Todos, Ventas, LeadGen, Contenido, Marketing, Tecnologia (filtrado por `departments.name`)
 
-#### 3. Estructura de la nueva pagina
+**Filtros:**
+- Buscador por nombre, email o posicion
+- Select de estado (Todos, Postulado, En Revision, Entrevista, Oferta, Contratado, Rechazado)
+- Toggle List/Grid
 
-La pagina `OnboardingWizardPage` seguira el patron estandar del proyecto:
+**Vista Lista (tabla):**
+- Columnas: Nombre (con avatar iniciales), Email, Posicion, Area (badge), Fuente, Fecha, Estado (badge con dropdown para cambiar), Acciones (Ver, Editar, Eliminar)
+- Header sticky, columna acciones sticky right
+- Ordenacion estandar
 
-- Layout: `SidebarProvider` + `DashboardSidebar` + `DashboardTopbar`
-- Header con boton ArrowLeft (ghost) para volver a `/creadores/onboarding`
-- Breadcrumbs: Creadores > Onboarding > Nuevo Onboarding (o nombre del creador si es edicion)
-- El wizard ocupa todo el area de contenido con scroll independiente
+**Vista Grid:**
+- Tarjetas con nombre, posicion, area, fuente, fecha y estado
 
-#### 4. Navegacion desde la lista
+**Modales:**
+- ViewApplicantModal: para ver detalles completos
+- EditApplicantModal: para editar inline
+- DeleteApplicantDialog: confirmacion de eliminacion
 
-- Boton "Iniciar Onboarding": `navigate("/creadores/onboarding/nuevo")`
-- Click en fila/tarjeta de creador: `navigate(\`/creadores/onboarding/${creator.id}\`)`
-- Boton cancelar del wizard: `navigate("/creadores/onboarding")`
-- Al completar el wizard exitosamente: `navigate("/creadores/onboarding")` con toast de confirmacion
+#### 2. Nueva pagina Nuevo Candidato (`src/pages/hr/HRApplicantNew.tsx`)
+
+**Layout:**
+- Pagina completa con `h-screen overflow-hidden`
+- Breadcrumbs: Empleados > Reclutamiento > Nuevo Candidato
+- Boton ArrowLeft ghost para volver a `/hr/candidatos`
+- Header: "Nuevo Candidato" con subtitulo "Agrega un nuevo candidato al proceso de reclutamiento"
+
+**Formulario (dentro de Card):**
+- Nombre completo * (Input) + Email * (Input) en grid 2 cols
+- Telefono con `PhoneInput` (selector de pais + numero)
+- Posicion * (Select desde tabla `positions`)
+- Fuente de reclutamiento (Select con APPLICANT_SOURCES)
+- Notas (Textarea)
+
+**Footer fijo:**
+- Separador horizontal
+- Botones: Cancelar (outline) + Guardar Candidato (default con icono Plus)
+- Al guardar exitosamente: navegar a `/hr/candidatos` con toast
+
+#### 3. Rutas nuevas en App.tsx
+
+- `/hr/candidatos/nuevo` -> `HRApplicantNew` envuelto en `HRLayout` y `ProtectedRoute`
 
 ### Detalle tecnico
 
-No se requieren cambios en base de datos ni nuevas dependencias. Solo es reestructuracion de UI y rutas.
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/hr/HRApplicants.tsx` | Rediseno completo: eliminar Kanban y modal, implementar layout estandarizado con KPIs, tabs, filtros, tabla/grid con acciones Ver/Editar/Eliminar, modales de detalle |
+| `src/pages/hr/HRApplicantNew.tsx` | **Nuevo archivo** - Pagina dedicada con formulario de creacion, breadcrumbs, PhoneInput, Select de posicion, footer fijo con botones |
+| `src/App.tsx` | Agregar ruta `/hr/candidatos/nuevo` |
+
+### Patron de referencia
+
+Se sigue exactamente el patron de `HRIncidents.tsx` (lista) + `HRIncidentNew.tsx` (formulario en pagina separada): header con titulo text-xl, KPIs con iconos y colores semanticos, buscador + filtros + toggle vista, tabla con acciones estandarizadas, y pagina de creacion con ArrowLeft + breadcrumbs + formulario + footer fijo.
+
+No se requieren cambios en base de datos ni nuevas dependencias.
 
