@@ -8,6 +8,8 @@ import {
 import { DateInput } from "@/components/ui/date-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Separator } from "@/components/ui/separator";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -101,12 +103,20 @@ interface Props {
   onChange: (field: keyof Step1Data, value: string) => void;
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, tooltip }: { children: React.ReactNode; tooltip?: string }) {
   return (
     <div className="md:col-span-2 pt-2">
       <div className="flex items-center gap-3">
         <Separator className="flex-1" />
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{children}</span>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help shrink-0" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        )}
         <Separator className="flex-1" />
       </div>
     </div>
@@ -115,6 +125,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
   return (
+    <TooltipProvider>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* ── Datos básicos ── */}
       <div className="space-y-1.5">
@@ -185,7 +196,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
 
       {/* ── Perfil Artístico ── */}
-      <SectionLabel>Perfil Artístico</SectionLabel>
+      <SectionLabel tooltip="Define la identidad que verán tus fans. Estos datos son los que utilizará tu equipo de chat para mantener tu personaje.">Perfil Artístico</SectionLabel>
       <div className="space-y-1.5">
         <Label>Apodos / Sobrenombres</Label>
         <Input value={data.apodos} onChange={(e) => onChange("apodos", e.target.value)} placeholder="Sobrenombres que usa..." />
@@ -251,7 +262,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
 
       {/* ── Privacidad ── */}
-      <SectionLabel>Privacidad</SectionLabel>
+      <SectionLabel tooltip="Tú controlas qué datos reales compartimos. Estos ajustes protegen tu identidad fuera de la plataforma.">Privacidad</SectionLabel>
       <div className="md:col-span-2 space-y-3">
         <div className="flex items-center justify-between rounded-lg border p-3">
           <Label className="text-sm font-normal">¿Podemos mencionar tu nombre real?</Label>
@@ -276,5 +287,6 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

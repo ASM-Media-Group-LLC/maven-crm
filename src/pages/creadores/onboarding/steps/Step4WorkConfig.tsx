@@ -8,7 +8,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { DollarSign, MessageCircle, Calendar, StickyNote } from "lucide-react";
+import { DollarSign, MessageCircle, Calendar, StickyNote, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SHIFTS = ["Mañana", "Tarde", "Noche"];
@@ -95,6 +96,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
   const currencySymbol = CURRENCIES.find((c) => c.value === data.currency)?.symbol || "$";
 
   return (
+    <TooltipProvider>
     <Accordion type="multiple" defaultValue={["precios"]} className="space-y-2">
       {/* Pricing Table */}
       <AccordionItem value="precios" className="border rounded-lg px-4">
@@ -281,7 +283,15 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Frases de Venta Predilectas</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>Frases de Venta Predilectas</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">Tus 'palabras mágicas'. Usaremos tus expresiones únicas para cerrar ventas de forma natural y efectiva.</TooltipContent>
+                </Tooltip>
+              </div>
               <Textarea
                 value={data.frasesVenta}
                 onChange={(e) => onChange("frasesVenta", e.target.value)}
@@ -290,7 +300,15 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Gestión de Usuarios VIP</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>Gestión de Usuarios VIP</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">Instrucciones de manejo para tus mejores clientes. Asegura que reciban el trato exclusivo por el que están pagando.</TooltipContent>
+                </Tooltip>
+              </div>
               <Textarea
                 value={data.usuariosVip}
                 onChange={(e) => onChange("usuariosVip", e.target.value)}
@@ -308,6 +326,12 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Calendar className="h-4 w-4 text-primary" />
             Horarios y Disponibilidad
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">Vital para que el equipo sepa cuándo estás disponible para generar contenido nuevo solicitado por fans.</TooltipContent>
+            </Tooltip>
           </div>
         </AccordionTrigger>
         <AccordionContent>
@@ -377,5 +401,6 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+    </TooltipProvider>
   );
 }

@@ -75,7 +75,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">Esta información permite que tus operarios encuentren temas de conversación en común con tus suscriptores. Saber tus gustos ayuda a generar confianza y aumentar las propinas mediante la conexión real.</TooltipContent>
+              <TooltipContent className="max-w-xs">Detalles cotidianos que sirven para crear conexión emocional y 'mirroring' con tus suscriptores.</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
@@ -241,7 +241,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
               <TooltipTrigger asChild>
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles (como encuentros físicos o contenido gratuito) bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+              <TooltipContent className="max-w-xs">Tus reglas de oro. Nos permite rechazar solicitudes prohibidas de forma firme y sin interrumpir tu día.</TooltipContent>
             </Tooltip>
           </div>
         </AccordionTrigger>
@@ -273,7 +273,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -290,7 +290,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -307,7 +307,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -324,7 +324,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -341,7 +341,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -358,7 +358,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                   <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                   <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea
@@ -375,7 +375,7 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">¡Vital para tu tranquilidad! Define de antemano cómo responder a situaciones incómodas. Esto nos permite manejar solicitudes difíciles bajo tus propias reglas y sin tener que interrumpir tu día para preguntarte.</TooltipContent>
+                  <TooltipContent className="max-w-xs">Tener respuestas preparadas para preguntas difíciles asegura ventas rápidas y consistencia total.</TooltipContent>
                 </Tooltip>
               </div>
               <Textarea

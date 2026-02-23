@@ -188,7 +188,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange }: P
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Permite a tu equipo gestionar regalos de tus fans y aumentar tu monetización
+                Facilita que tus fans te envíen regalos. Es una de las formas más efectivas de generar ingresos extra sin esfuerzo.
               </TooltipContent>
             </Tooltip>
           </div>
@@ -210,7 +210,7 @@ export default function Step2Documentation({ data, errors, tempId, onChange }: P
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Vital para la auditoría de marca y sincronización del tono de voz
+                Nos ayudan a estudiar tu estilo de comunicación actual para replicar tu voz con precisión en el chat.
               </TooltipContent>
             </Tooltip>
           </div>

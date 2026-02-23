@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Check, Loader2, ArrowLeft } from "lucide-react";
+import { Check, Loader2, ArrowLeft, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,10 @@ import Step4WorkConfig, { type Step4Data } from "./steps/Step4WorkConfig";
 import { supabase } from "@/integrations/supabase/client";
 
 const STEPS = [
-  { label: "Información Personal" },
-  { label: "Psicología y Límites" },
-  { label: "Documentación" },
-  { label: "Configuración" },
+  { label: "Información Personal", tooltip: "Datos básicos para validar tu identidad y generar tus contratos legales de forma segura." },
+  { label: "Psicología y Límites", tooltip: "Ayúdanos a clonar tu personalidad. Tus respuestas permiten que tu equipo venda exactamente como tú lo harías." },
+  { label: "Documentación", tooltip: "Archivos necesarios para cumplir con la normativa de las plataformas y verificar la mayoría de edad." },
+  { label: "Configuración", tooltip: "Tu menú comercial. Aquí defines qué vendes y a qué precio para que tu equipo cierre tratos de alto valor." },
 ];
 
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
@@ -487,6 +488,14 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
                   <span className={`text-xs hidden sm:inline ${isActive ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
                     {s.label}
                   </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help hidden sm:inline shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">{s.tooltip}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {i < STEPS.length - 1 && <div className="flex-1 h-px bg-border mx-2" />}
                 </div>
               );
