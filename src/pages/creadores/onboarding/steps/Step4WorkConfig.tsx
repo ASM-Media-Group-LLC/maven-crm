@@ -21,6 +21,7 @@ const SERVICES = [
   { key: "valoracion_medios", label: "D-Rating" },
   { key: "sesiones_video", label: "Videollamadas" },
   { key: "envio_articulos", label: "Venta de Ropa Interior" },
+  { key: "zings", label: "Zings" },
 ] as const;
 
 const CURRENCIES = [
@@ -89,25 +90,26 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
           </div>
         </AccordionTrigger>
         <AccordionContent>
-          <div className="flex items-center gap-3 mt-2 mb-3">
-            <Label className="text-sm whitespace-nowrap">Moneda:</Label>
-            <Select value={data.currency || "USD"} onValueChange={(v) => onChange("currency", v)}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden mt-2">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="font-medium">Servicio</TableHead>
-                  <TableHead className="font-medium w-[160px]">Precio sugerido ({currencySymbol})</TableHead>
+                  <TableHead className="font-medium w-[200px]">
+                    <div className="flex items-center gap-2">
+                      <span>Precio sugerido</span>
+                      <Select value={data.currency || "USD"} onValueChange={(v) => onChange("currency", v)}>
+                        <SelectTrigger className="w-[100px] h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableHead>
                   <TableHead className="font-medium">Notas del servicio</TableHead>
                 </TableRow>
               </TableHeader>
