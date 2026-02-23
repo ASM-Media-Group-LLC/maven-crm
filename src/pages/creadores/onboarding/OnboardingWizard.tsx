@@ -22,7 +22,7 @@ const STEPS = [
 
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "", horariosSueno: "", deporteEquipo: "", colorFavorito: "", estadoCivil: "", queBuscasPareja: "", mejorAtributoFisico: "", metasLargoPlazo: "", queHacesRelajarte: "", queTeHaceReir: "", queTeMotivaCrear: "", respuestaCuantoCobraEncuentro: "", respuestaMuestraIntimas: "", estrategiaMaterialGratis: "", estrategiaProblemasPersonales: "" };
-const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "" };
+const initialStep3Doc: Step2Data = { idDocumentFront: [], idDocumentBack: [], selfieDocument: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "", linkOtrasPlataformas: "" };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "" };
 
 interface Props {
@@ -127,6 +127,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           twitterHandle: c.twitter_handle || "",
           onlyfansUrl: c.onlyfans_url || "",
           otrasPlataformas: extraData.otrasPlataformas || "",
+          linkOtrasPlataformas: extraData.linkOtrasPlataformas || "",
         }));
         setCreatorStatus(c.status || null);
         setStep4({
@@ -255,6 +256,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       estrategiaMaterialGratis: step2Psy.estrategiaMaterialGratis || null,
       estrategiaProblemasPersonales: step2Psy.estrategiaProblemasPersonales || null,
       otrasPlataformas: step3Doc.otrasPlataformas || null,
+      linkOtrasPlataformas: step3Doc.linkOtrasPlataformas || null,
       gfeDisponible: step4.gfeDisponible || false,
       personalidadMarca: step4.personalidadMarca || null,
       estrategiaRechazo: step4.estrategiaRechazo || null,
@@ -266,7 +268,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
 
     const documents = [
-      ...step3Doc.idDocuments.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad" })),
+      ...step3Doc.idDocumentFront.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (frente)" })),
+      ...step3Doc.idDocumentBack.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (reverso)" })),
+      ...step3Doc.selfieDocument.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Selfie con documento" })),
       ...step3Doc.profilePhotos.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Foto de perfil" })),
     ];
 
