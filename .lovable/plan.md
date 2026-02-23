@@ -1,46 +1,65 @@
 
 
-## Refactorizacion del Paso 1: Campos Faltantes
+## Ampliacion del Paso 2: Psicologia y Limites
 
 ### Resumen
 
-Agregar 7 nuevos campos al Paso 1 del onboarding, organizados en 2 nuevas secciones visuales, mas 2 campos adicionales en la seccion existente de datos basicos.
+Agregar 14 nuevos campos al Paso 2 del onboarding, distribuidos en las 3 secciones colapsables existentes. Todos los campos son opcionales y se persisten en el JSON `internal_notes`.
 
 ---
 
-### 1. Nuevos campos en Step1Data (interface)
+### 1. Nuevos campos en Step2PsyData (interface)
 
-| Campo | Tipo | Seccion |
-|-------|------|---------|
-| `segundoNombre` | string | Datos basicos |
-| `direccion` | string | Datos basicos (ancho completo, Textarea) |
-| `apodos` | string | Perfil Artistico (nuevo bloque) |
-| `edadMostrar` | string (numerico) | Perfil Artistico |
-| `ubicacionArtistica` | string | Perfil Artistico |
-| `redesSociales` | string | Conectividad (nuevo bloque) |
-| `wishlistAmazon` | string (URL) | Conectividad |
+| Campo | Seccion |
+|-------|---------|
+| `horariosSueno` | Biografia y Gustos |
+| `deporteEquipo` | Biografia y Gustos |
+| `colorFavorito` | Biografia y Gustos |
+| `estadoCivil` | Biografia y Gustos |
+| `queBuscasPareja` | Biografia y Gustos |
+| `mejorAtributoFisico` | Biografia y Gustos |
+| `metasLargoPlazo` | Biografia y Gustos |
+| `queHacesRelajarte` | Personalidad y Tono |
+| `queTeHaceReir` | Personalidad y Tono |
+| `queTeMotivaCrear` | Personalidad y Tono |
+| `respuestaCuantoCobraEncuentro` | Limites y Manejo de Crisis |
+| `respuestaMuestraIntimas` | Limites y Manejo de Crisis |
+| `estrategiaMaterialGratis` | Limites y Manejo de Crisis |
+| `estrategiaProblemasPersonales` | Limites y Manejo de Crisis |
 
 ---
 
-### 2. Cambios en la UI de Step1PersonalInfo.tsx
+### 2. Cambios en la UI de Step2PsychologyLimits.tsx
 
-Orden de secciones resultante:
-1. **Datos basicos** (existente) -- agregar `segundoNombre` al lado de "Nombre completo", y `direccion` (Textarea, ancho completo) despues de "Ciudad"
-2. **Perfil Artistico** (nuevo SectionLabel) -- antes de "Identidad Visual", con `apodos`, `edadMostrar`, `ubicacionArtistica`
-3. **Identidad Visual** (existente, sin cambios)
-4. **Idiomas** (existente, sin cambios)
-5. **Conectividad** (nuevo SectionLabel) -- antes de "Privacidad", con `redesSociales` (ancho completo) y `wishlistAmazon`
-6. **Privacidad** (existente, sin cambios)
+**Seccion A - Biografia y Gustos** (agregar despues de "Nivel de estudios", antes de "Rutina diaria"):
+- `horariosSueno` (Input, placeholder: "Despierta 9am, duerme 1am")
+- `deporteEquipo` (Input, placeholder: "Futbol, Real Madrid...")
+- `colorFavorito` (Input, placeholder: "Rosa, negro...")
+- `estadoCivil` (Input, placeholder: "Soltera, en una relacion...")
+- `queBuscasPareja` (Textarea, md:col-span-2)
+- `mejorAtributoFisico` (Input)
+- `metasLargoPlazo` (Textarea, md:col-span-2)
+
+**Seccion B - Personalidad y Tono** (agregar despues de "Tono de voz"):
+- `queHacesRelajarte` (Textarea, md:col-span-2)
+- `queTeHaceReir` (Textarea, md:col-span-2)
+- `queTeMotivaCrear` (Textarea, md:col-span-2)
+
+**Seccion C - Limites y Manejo de Crisis** (agregar despues de los 3 scripts existentes):
+- `respuestaCuantoCobraEncuentro` (Textarea con tooltip Info)
+- `respuestaMuestraIntimas` (Textarea con tooltip Info)
+- `estrategiaMaterialGratis` (Textarea con tooltip Info)
+- `estrategiaProblemasPersonales` (Textarea con tooltip Info)
+
+Los 4 nuevos campos de crisis llevan el mismo icono Info con tooltip "Esto ayudara a nuestros chatters a hablar exactamente como tu".
 
 ---
 
 ### 3. Cambios en OnboardingWizard.tsx
 
-- **initialStep1**: agregar los 7 campos con valor `""`
-- **Hidratacion (useEffect)**: cargar `segundoNombre`, `direccion`, `apodos`, `edadMostrar`, `ubicacionArtistica` desde `extraData`; `redesSociales` y `wishlistAmazon` tambien desde `extraData`
-- **buildPayload**: serializar los 7 campos nuevos en el objeto `extraData` (JSON en `internal_notes`)
-
-No se necesitan cambios en la base de datos ya que todo se persiste en el campo JSON `internal_notes`.
+- **initialStep2Psy**: agregar los 14 campos con valor `""`
+- **Hidratacion (useEffect)**: cargar los 14 campos desde `extraData`
+- **buildPayload**: serializar los 14 campos nuevos en `extraData`
 
 ---
 
@@ -48,13 +67,13 @@ No se necesitan cambios en la base de datos ya que todo se persiste en el campo 
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` | Agregar 7 campos a la interface, agregar UI con 2 nuevas secciones |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Actualizar initialStep1, hidratacion y buildPayload con los 7 campos |
+| `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx` | Agregar 14 campos a la interface y UI en las 3 secciones existentes |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Actualizar initialStep2Psy (linea 24), hidratacion (lineas 87-107) y buildPayload (lineas 215-228) |
 
 ### Notas tecnicas
 
-- Los campos `direccion` y `redesSociales` usan `Textarea` con `md:col-span-2` para ancho completo
-- `edadMostrar` usa `Input type="number" min={18}` igual que el campo de edad existente
-- `wishlistAmazon` usa `Input type="url"` con placeholder de ejemplo
-- No se agrega validacion obligatoria a ninguno de estos campos (son opcionales segun el requisito de que solo Paso 1 basico y Paso 4 son obligatorios)
+- Todos los campos nuevos son tipo `string` y opcionales
+- Los campos tipo "estrategia" y "respuesta" usan Textarea con rows={3}
+- No se necesitan cambios en la base de datos: todo se persiste en `internal_notes` (JSON)
+- Los tooltips de crisis reutilizan el patron existente con `Tooltip + TooltipTrigger + Info icon`
 
