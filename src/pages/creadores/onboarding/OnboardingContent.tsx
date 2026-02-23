@@ -12,8 +12,7 @@ import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
 
-const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
-const statusTabs = ["Todas", "Pendientes", "En Progreso", "Completados"] as const;
+const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
@@ -52,13 +51,21 @@ const OnboardingContent = () => {
   const inProgress = creators.filter((c) => c.status === "En Progreso").length;
   const completed = creators.filter((c) => c.status === "Completado").length;
 
-  const hasActiveFilters = statusFilter !== "Todas" || stepFilter !== "" || search !== "";
+  const hasActiveFilters = statusFilter !== "Todas" || activeTab !== "Todas" || stepFilter !== "" || search !== "";
 
   const clearFilters = () => {
     setStatusFilter("Todas");
+    setActiveTab("Todas");
     setStepFilter("");
     setSearch("");
   };
+
+  const kpiCards = [
+    { label: "Total", value: total, icon: Users, filter: "Todas", valueColor: undefined },
+    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", valueColor: "text-amber-500" },
+    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", valueColor: "text-blue-500" },
+    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", valueColor: "text-emerald-500" },
+  ];
 
   const handleCardClick = (creator: OnboardingCreator) => {
     const step = calculateCurrentStep(creator);
@@ -103,12 +110,19 @@ const OnboardingContent = () => {
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
-        {/* KPI Cards */}
+        {/* KPI Cards — clickeables como filtros maestros */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-          <DashboardMetricCard label="Total" value={String(total)} icon={Users} />
-          <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} valueColor="text-amber-500" />
-          <DashboardMetricCard label="En Progreso" value={String(inProgress)} icon={Loader2} valueColor="text-blue-500" />
-          <DashboardMetricCard label="Completados" value={String(completed)} icon={CheckCircle2} valueColor="text-emerald-500" />
+          {kpiCards.map((kpi) => (
+            <div key={kpi.label} onClick={() => setStatusFilter(kpi.filter)} className="cursor-pointer">
+              <DashboardMetricCard
+                label={kpi.label}
+                value={String(kpi.value)}
+                icon={kpi.icon}
+                valueColor={kpi.valueColor}
+                hoverClass={statusFilter === kpi.filter ? "ring-2 ring-primary" : "hover:shadow-md"}
+              />
+            </div>
+          ))}
         </div>
 
         {showWizard ? (
@@ -121,69 +135,51 @@ const OnboardingContent = () => {
           </div>
         ) : (
           <div key="list" className="animate-fade-in space-y-4">
-            {/* Status Pills */}
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {statusTabs.map((tab) => (
-                <Button
-                  key={tab}
-                  size="sm"
-                  variant={statusFilter === tab ? "secondary" : "ghost"}
-                  onClick={() => setStatusFilter(tab)}
-                >
-                  {tab}
-                </Button>
-              ))}
-            </div>
-
-            {/* Area Tabs */}
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {areaTabs.map((tab) => (
-                <Button
-                  key={tab}
-                  size="sm"
-                  variant={activeTab === tab ? "secondary" : "ghost"}
-                  onClick={() => setActiveTab(tab)}
-                >
-                  {tab}
-                </Button>
-              ))}
-            </div>
-
-            {/* Filters Row */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="relative max-w-sm flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nombre o empresa..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-
-                <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="Etapa del Proceso" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas las etapas</SelectItem>
-                    <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
-                    <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
-                    <SelectItem value="3">Paso 3: Documentación</SelectItem>
-                    <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    <X className="mr-1.5 h-4 w-4" />
-                    Limpiar filtros
-                  </Button>
-                )}
+            {/* Barra de filtros unificada */}
+            <div className="flex items-center gap-3">
+              <div className="relative max-w-sm flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre o empresa..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
 
-              <div className="flex items-center gap-1 rounded-lg border p-1">
+              <Select value={activeTab === "Todas" ? undefined : activeTab} onValueChange={(v) => setActiveTab(v === "__all__" ? "Todas" : v)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Agencia" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas las agencias</SelectItem>
+                  {agencyOptions.map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Etapa del Proceso" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas las etapas</SelectItem>
+                  <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
+                  <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
+                  <SelectItem value="3">Paso 3: Documentación</SelectItem>
+                  <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  <X className="mr-1.5 h-4 w-4" />
+                  Limpiar filtros
+                </Button>
+              )}
+
+              <div className="ml-auto flex items-center gap-1 rounded-lg border p-1">
                 <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")}>
                   <List className="h-4 w-4" />
                 </Button>
