@@ -1,46 +1,28 @@
 
 
-## Restaurar Tabs de Agencia en Onboarding
+## Auto-formato del campo Medidas (80-60-90)
 
 ### Archivo a modificar
 
-**`src/pages/creadores/onboarding/OnboardingContent.tsx`**
+**`src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx`**
 
-### Cambios
+### Cambio
 
-#### 1. Agregar fila de tabs de agencia entre las KPI cards y la barra de filtros
+Reemplazar el `onChange` directo del campo "Medidas" (linea 118) por una funcion que auto-inserte guiones a medida que el usuario escribe, forzando el formato `XX-XX-XX`.
 
-Insertar justo despues del grid de KPI cards (linea 126) y antes de la seccion wizard/list (linea 128), una fila de botones tipo pill siguiendo el patron estandar de la plataforma (`inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1`):
+**Logica de la funcion `formatMedidas`:**
+- Eliminar todo lo que no sea digito
+- Insertar un guion automaticamente despues del 2do y 4to digito
+- Limitar a 6 digitos maximo (formato `XX-XX-XX`)
 
-```text
-<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-  <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"}
-    onClick={() => setActiveTab("Todas")}>Todas</Button>
-  <Button size="sm" variant={activeTab === "Atomic Agency" ? "secondary" : "ghost"}
-    onClick={() => setActiveTab("Atomic Agency")}>Atomic Agency</Button>
-  <Button size="sm" variant={activeTab === "Elite Models" ? "secondary" : "ghost"}
-    onClick={() => setActiveTab("Elite Models")}>Elite Models</Button>
-  ... (Kash Agency, Unlok Platform, Trafix, Otra)
-</div>
+```typescript
+function formatMedidas(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return digits.slice(0, 2) + "-" + digits.slice(2);
+  return digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4);
+}
 ```
 
-Se usara el array `agencyOptions` ya definido en linea 15 para generar los botones dinamicamente, con "Todas" como primer boton fijo.
-
-#### 2. Eliminar el dropdown de Agencia de la barra de filtros
-
-Remover el bloque `Select` de agencias (lineas 150-160) de la barra de filtros unificada, ya que la funcion de filtrado por agencia pasa a los tabs. Esto evita duplicidad.
-
-#### 3. Sin cambios en la logica de filtrado
-
-La variable `activeTab` y su uso en el `useMemo` de `filtered` (lineas 32-34) ya funcionan correctamente. `hasActiveFilters` y `clearFilters` ya contemplan `activeTab`. No se requiere ningun cambio logico.
-
-### Resultado visual
-
-```text
-[Header: Onboarding + Boton "Iniciar Onboarding"]
-[KPI: Total | Pendientes | En Progreso | Completados]     <-- filtros maestros
-[Todas | Atomic Agency | Elite Models | Kash | Unlok | Trafix | Otra]  <-- tabs restaurados
-[Buscar... | Etapa del Proceso v | Limpiar filtros | [Lista|Grid]]
-[Tabla o Grid de resultados]
-```
+En el Input de Medidas, el `onChange` pasara a llamar `onChange("medidas", formatMedidas(e.target.value))` en lugar de pasar el valor crudo. Se mantiene el `placeholder="90-60-90"` como referencia visual. Se agregara `maxLength={8}` al input (6 digitos + 2 guiones).
 
