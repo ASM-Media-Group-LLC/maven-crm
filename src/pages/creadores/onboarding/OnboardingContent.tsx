@@ -1,43 +1,64 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus } from "lucide-react";
+import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, X } from "lucide-react";
 import OnboardingWizard from "./OnboardingWizard";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
-import { useOnboarding, calculateCurrentStep, getStepLabel, type OnboardingCreator } from "./useOnboarding";
+import { useOnboarding, calculateCurrentStep, type OnboardingCreator } from "./useOnboarding";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"];
+const statusTabs = ["Todas", "Pendientes", "En Progreso", "Completados"] as const;
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
   const { isAgent } = useUserRole();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Todas");
+  const [statusFilter, setStatusFilter] = useState<string>("Todas");
+  const [stepFilter, setStepFilter] = useState("");
   const [view, setView] = useState<"table" | "grid">("table");
   const [showWizard, setShowWizard] = useState(false);
   const [editingCreator, setEditingCreator] = useState<{ id: string; initialStep: number } | null>(null);
+
+  const statusMap: Record<string, string> = { Pendientes: "Pendiente", "En Progreso": "En Progreso", Completados: "Completado" };
 
   const filtered = useMemo(() => {
     let list = creators;
     if (activeTab !== "Todas") {
       list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
     }
+    if (statusFilter !== "Todas") {
+      const mapped = statusMap[statusFilter];
+      if (mapped) list = list.filter((c) => c.status === mapped);
+    }
+    if (stepFilter) {
+      list = list.filter((c) => String(calculateCurrentStep(c)) === stepFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((c) => c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q));
     }
     return list;
-  }, [creators, activeTab, search]);
+  }, [creators, activeTab, statusFilter, stepFilter, search]);
 
   const total = creators.length;
   const pending = creators.filter((c) => c.status === "Pendiente").length;
   const inProgress = creators.filter((c) => c.status === "En Progreso").length;
   const completed = creators.filter((c) => c.status === "Completado").length;
+
+  const hasActiveFilters = statusFilter !== "Todas" || stepFilter !== "" || search !== "";
+
+  const clearFilters = () => {
+    setStatusFilter("Todas");
+    setStepFilter("");
+    setSearch("");
+  };
 
   const handleCardClick = (creator: OnboardingCreator) => {
     const step = calculateCurrentStep(creator);
@@ -82,7 +103,7 @@ const OnboardingContent = () => {
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
-        {/* KPI Cards - always visible */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
           <DashboardMetricCard label="Total" value={String(total)} icon={Users} />
           <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} valueColor="text-amber-500" />
@@ -99,7 +120,21 @@ const OnboardingContent = () => {
             />
           </div>
         ) : (
-          <div key="list" className="animate-fade-in">
+          <div key="list" className="animate-fade-in space-y-4">
+            {/* Status Pills */}
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              {statusTabs.map((tab) => (
+                <Button
+                  key={tab}
+                  size="sm"
+                  variant={statusFilter === tab ? "secondary" : "ghost"}
+                  onClick={() => setStatusFilter(tab)}
+                >
+                  {tab}
+                </Button>
+              ))}
+            </div>
+
             {/* Area Tabs */}
             <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
               {areaTabs.map((tab) => (
@@ -114,17 +149,40 @@ const OnboardingContent = () => {
               ))}
             </div>
 
-            {/* Filters */}
-            <div className="flex items-center justify-between gap-4 mt-4">
-              <div className="relative max-w-sm flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre o empresa..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
+            {/* Filters Row */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="relative max-w-sm flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre o empresa..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Etapa del Proceso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todas las etapas</SelectItem>
+                    <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
+                    <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
+                    <SelectItem value="3">Paso 3: Documentación</SelectItem>
+                    <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="mr-1.5 h-4 w-4" />
+                    Limpiar filtros
+                  </Button>
+                )}
               </div>
+
               <div className="flex items-center gap-1 rounded-lg border p-1">
                 <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")}>
                   <List className="h-4 w-4" />
@@ -141,7 +199,7 @@ const OnboardingContent = () => {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div key={view} className="animate-fade-in mt-4">
+              <div key={view} className="animate-fade-in">
                 {view === "table" ? (
                   <OnboardingTable data={filtered} onManage={handleCardClick} />
                 ) : (
