@@ -1,6 +1,6 @@
 
 
-## Filtros de Progreso en Onboarding
+## Limpiar y Unificar la Interfaz de Onboarding
 
 ### Archivo a modificar
 
@@ -8,89 +8,102 @@
 
 ### Cambios
 
-#### 1. Nuevos estados de filtro
+#### 1. Hacer las KPI Cards clickeables como filtros maestros
 
-Agregar dos nuevos estados al componente:
+Las 4 tarjetas (Total, Pendientes, En Progreso, Completados) pasaran a funcionar como filtros de estado. Al hacer clic en una, se actualizara `statusFilter` con el valor correspondiente. La card activa tendra un borde o anillo visual para indicar la seleccion.
 
-- `statusFilter`: string con valores `"Todas" | "Pendientes" | "En Progreso" | "Completados"`, default `"Todas"`
-- `stepFilter`: string con valores `"" | "1" | "2" | "3" | "4"`, default `""`
+- Envolver cada `DashboardMetricCard` en un `div` con `onClick` y `cursor-pointer`
+- Agregar un anillo visual (`ring-2 ring-primary`) a la card seleccionada
+- "Total" reseteara el filtro a `"Todas"`
+- El `DashboardMetricCard` ya acepta `hoverClass`, se usara para pasar estilos condicionales
 
-#### 2. Pills de estado (debajo de KPIs, encima de los tabs de agencia)
+#### 2. Eliminar las dos filas de botones pills
 
-Insertar una fila de botones tipo pill justo despues de las KPI cards (linea 91) y antes de la seccion del wizard/list (linea 93), siguiendo el patron estandar de tabs:
+Eliminar completamente:
+- La fila de **Status Pills** (lineas 124-136): "Todas, Pendientes, En Progreso, Completados"
+- La fila de **Area Tabs** (lineas 138-150): "Todas, Atomic Agency, Elite Models, ..."
+
+Tambien eliminar la constante `statusTabs` (linea 16) y `areaTabs` (linea 15).
+
+#### 3. Convertir agencias en dropdown
+
+Reemplazar los botones de agencias por un `Select` dropdown con las mismas opciones, usando el patron estandar `__all__` para "Todas".
+
+#### 4. Consolidar en una sola barra de filtros
+
+Una unica fila horizontal con este orden:
+1. **Buscador** (Input con icono Search)
+2. **Dropdown Agencia** (Select, w-[180px])
+3. **Dropdown Etapa del Proceso** (Select, w-[220px], ya existente)
+4. **Limpiar filtros** (Button ghost, condicional)
+5. **Toggle vista Lista/Grid** (al extremo derecho, con `ml-auto`)
+
+#### 5. Actualizar logica de filtros activos y limpieza
+
+`hasActiveFilters` ahora incluira `activeTab !== "Todas"` ademas de los filtros existentes. `clearFilters` reseteara tambien `activeTab` a `"Todas"`.
+
+### Resultado visual
 
 ```text
-<div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-  <Button size="sm" variant={statusFilter === "Todas" ? "secondary" : "ghost"} ...>Todas</Button>
-  <Button size="sm" variant={statusFilter === "Pendientes" ? "secondary" : "ghost"} ...>Pendientes</Button>
-  <Button size="sm" variant={statusFilter === "En Progreso" ? "secondary" : "ghost"} ...>En Progreso</Button>
-  <Button size="sm" variant={statusFilter === "Completados" ? "secondary" : "ghost"} ...>Completados</Button>
+[Header: Onboarding + Boton "Iniciar Onboarding"]
+[KPI: Total* | Pendientes | En Progreso | Completados]  <-- clickeables
+[Buscar... | Agencia v | Etapa v | Limpiar filtros | [Lista|Grid]]
+[Tabla o Grid de resultados]
+```
+
+### Detalle tecnico
+
+```text
+// KPI Cards clickeables (reemplazando lineas 107-112):
+const kpiCards = [
+  { label: "Total", value: total, icon: Users, filter: "Todas", valueColor: undefined },
+  { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", valueColor: "text-amber-500" },
+  { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", valueColor: "text-blue-500" },
+  { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", valueColor: "text-emerald-500" },
+];
+
+// Render:
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+  {kpiCards.map((kpi) => (
+    <div key={kpi.label} onClick={() => setStatusFilter(kpi.filter)} className="cursor-pointer">
+      <DashboardMetricCard
+        label={kpi.label}
+        value={String(kpi.value)}
+        icon={kpi.icon}
+        valueColor={kpi.valueColor}
+        hoverClass={statusFilter === kpi.filter ? "ring-2 ring-primary" : "hover:shadow-md"}
+      />
+    </div>
+  ))}
+</div>
+
+// Barra de filtros unificada (una sola linea):
+<div className="flex items-center gap-3">
+  <div className="relative max-w-sm flex-1">
+    <Search ... />
+    <Input placeholder="Buscar por nombre o empresa..." ... />
+  </div>
+
+  <Select value={activeTab === "Todas" ? undefined : activeTab} onValueChange={...}>
+    <SelectTrigger className="w-[180px]">
+      <SelectValue placeholder="Agencia" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="__all__">Todas las agencias</SelectItem>
+      <SelectItem value="Atomic Agency">Atomic Agency</SelectItem>
+      ...
+    </SelectContent>
+  </Select>
+
+  <Select value={stepFilter || undefined} onValueChange={...}>
+    ...Etapa del Proceso (sin cambios)
+  </Select>
+
+  {hasActiveFilters && <Button variant="ghost" ...>Limpiar filtros</Button>}
+
+  <div className="ml-auto flex items-center gap-1 rounded-lg border p-1">
+    ...toggle vista (sin cambios)
+  </div>
 </div>
 ```
-
-#### 3. Dropdown "Etapa del Proceso" (junto al buscador)
-
-Importar `Select`, `SelectContent`, `SelectItem`, `SelectTrigger`, `SelectValue` desde `@/components/ui/select`.
-
-Agregar un dropdown en la barra de filtros (linea 118-136), al lado del Input de busqueda:
-
-```text
-<Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
-  <SelectTrigger className="w-[200px]">
-    <SelectValue placeholder="Etapa del Proceso" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Todas las etapas</SelectItem>
-    <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
-    <SelectItem value="2">Paso 2: Perfil Psicologico</SelectItem>
-    <SelectItem value="3">Paso 3: Documentacion</SelectItem>
-    <SelectItem value="4">Paso 4: Configuracion Comercial</SelectItem>
-  </SelectContent>
-</Select>
-```
-
-Tambien agregar un boton "Limpiar filtros" visible cuando hay filtros activos (statusFilter distinto de "Todas", stepFilter no vacio, o search no vacio).
-
-#### 4. Actualizar la logica de filtrado
-
-Modificar el `useMemo` de `filtered` (lineas 25-35) para incluir los nuevos filtros:
-
-```text
-const filtered = useMemo(() => {
-  let list = creators;
-  // Filtro por agencia
-  if (activeTab !== "Todas") {
-    list = list.filter((c) => c.company.toLowerCase() === activeTab.toLowerCase());
-  }
-  // Filtro por estado
-  if (statusFilter !== "Todas") {
-    list = list.filter((c) => c.status === statusFilter);
-  }
-  // Filtro por etapa del proceso
-  if (stepFilter) {
-    list = list.filter((c) => String(calculateCurrentStep(c)) === stepFilter);
-  }
-  // Filtro por busqueda
-  if (search) {
-    const q = search.toLowerCase();
-    list = list.filter((c) => c.name.toLowerCase().includes(q) || c.company.toLowerCase().includes(q));
-  }
-  return list;
-}, [creators, activeTab, statusFilter, stepFilter, search]);
-```
-
-#### 5. Jerarquia visual final
-
-El orden de elementos en la seccion de contenido quedara asi:
-
-1. KPI Cards (Total, Pendientes, En Progreso, Completados)
-2. Pills de estado (Todas, Pendientes, En Progreso, Completados) -- nuevo
-3. Tabs de agencia (Todas, Atomic Agency, Elite Models, ...)
-4. Barra de filtros: Buscador + Dropdown "Etapa del Proceso" + Limpiar filtros + Toggle vista
-5. Tabla o Grid de resultados
-
-### Imports adicionales
-
-- `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` desde `@/components/ui/select`
-- `X` desde `lucide-react` (para el boton de limpiar filtros)
 
