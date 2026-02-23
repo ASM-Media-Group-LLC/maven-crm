@@ -39,7 +39,7 @@ const OnboardingContent = () => {
   }, [creators, activeTab, search]);
 
   const inProgressCreators = useMemo(() => {
-    return creators.filter((c) => c.dbStatus === "borrador" || c.dbStatus === "pendiente_verificacion");
+    return creators.filter((c) => c.dbStatus === "borrador" || c.dbStatus === "onboarding" || c.dbStatus === "pendiente_verificacion");
   }, [creators]);
 
   const total = creators.length;
