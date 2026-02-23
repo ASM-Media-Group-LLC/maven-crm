@@ -1,52 +1,44 @@
 
-## Mejoras visuales en la Agenda Compartida (SharedAgendaPage)
+
+## Separar el Wizard de Onboarding en su propia pagina
 
 ### Objetivo
 
-Aplicar las mismas mejoras de UI del calendario interno (`EventosCalendar.tsx`) a la pagina de agenda compartida (`SharedAgendaPage.tsx`), incluyendo el calendario y las tarjetas de proximos eventos.
+Mover el formulario de onboarding (wizard) de un estado inline dentro de `/creadores/onboarding` a una pagina dedicada con su propia ruta, navegacion y estructura.
 
-### Cambios en `src/pages/eventos/SharedAgendaPage.tsx`
+### Cambios planificados
 
-#### 1. Calendario
+#### 1. Nueva ruta: `/creadores/onboarding/nuevo` y `/creadores/onboarding/:id`
 
-- **Header**: Tipografia mas grande y bold para el mes/ano, botones de navegacion con estilo pill/rounded, badge con conteo de eventos del mes
-- **Boton "Hoy"**: Estilo pill con rounded-full igual que en EventosCalendar
-- **Dia actual**: Aplicar clase `calendar-day-today` (gradiente primary-to-accent) en lugar del simple `bg-primary/15`
-- **Dias con evento**: Agregar animacion pulse sutil a los dots de proyecto
-- **Celdas**: Aumentar altura de `h-10` a `h-11`, agregar `hover:scale-105` para efecto de elevacion
-- **Footer del calendario**: Agregar barra de resumen con gradiente sutil (igual que EventosCalendar), mostrando icono + conteo de eventos del mes
+- `/creadores/onboarding/nuevo` -- Iniciar un onboarding nuevo (sin `editCreatorId`)
+- `/creadores/onboarding/:id` -- Continuar/editar el onboarding de un creador existente (con `editCreatorId` y `initialStep` calculado)
 
-#### 2. Tarjetas de Proximos Eventos
-
-- **Header de seccion**: Agregar icono Sparkles animado y linea decorativa con gradiente debajo del titulo (como en EventosCalendar)
-- **Tarjetas individuales**: Aplicar el nuevo estilo de tarjeta con:
-  - Borde izquierdo de 3px de color segun `event_type` (Shooting=azul/primary, Podcast=violeta/accent, Casting=verde/success, Reunion=naranja/warning)
-  - Columna de fecha prominente a la izquierda (dia grande + mes abreviado)
-  - Icono del tipo de evento con fondo redondeado y color correspondiente
-  - Badge "Hoy" con estilo primary cuando el evento es del dia actual
-  - Tiempo relativo ("en 3 dias") debajo del nombre
-  - Efecto hover con elevacion (`hover:shadow-md hover:-translate-y-0.5`)
-
-#### 3. Mapping de tipos de evento a estilos
-
-Reutilizar la misma funcion `getEventTypeStyle` y el mapeo `typeIcons` del EventosCalendar:
-
-| Tipo | Borde | Fondo icono | Color icono |
-|------|-------|-------------|-------------|
-| Shooting | `border-l-primary` | `bg-primary/10` | `text-primary` |
-| Podcast | `border-l-accent` | `bg-accent/10` | `text-accent` |
-| Casting | `border-l-success` | `bg-success/10` | `text-success` |
-| Reunion | `border-l-warning` | `bg-warning/10` | `text-warning` |
-| Otro | `border-l-muted-foreground` | `bg-muted` | `text-muted-foreground` |
-
-### Detalle tecnico
+#### 2. Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/eventos/SharedAgendaPage.tsx` | Modernizar calendario (header, celdas, today gradient, footer con resumen) y tarjetas de proximos eventos (borde color, fecha prominente, iconos por tipo, badge Hoy, hover effects) |
+| `src/App.tsx` | Agregar las dos nuevas rutas protegidas |
+| `src/pages/creadores/onboarding/OnboardingWizardPage.tsx` | **Nuevo archivo** -- Pagina completa con layout (Sidebar + Topbar), breadcrumbs (Creadores > Onboarding > Nuevo/Editar) y el componente `OnboardingWizard`. Usa `useParams` para obtener el `id` y `useNavigate` para el boton cancelar |
+| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Eliminar el estado `showWizard`/`editingCreator` y la renderizacion condicional del wizard. El boton "Iniciar Onboarding" ahora navega a `/creadores/onboarding/nuevo`. El click en una fila/tarjeta navega a `/creadores/onboarding/:id` |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Cambiar la prop `onCancel` para que acepte navegacion (el componente padre pasara `navigate(-1)` o `navigate("/creadores/onboarding")`) |
 
-### Sin cambios adicionales
+#### 3. Estructura de la nueva pagina
 
-- No se requieren modificaciones en `index.css` (las clases necesarias ya existen del cambio anterior)
-- No se requieren nuevas dependencias
-- No se modifica la logica de datos ni las queries RPC
+La pagina `OnboardingWizardPage` seguira el patron estandar del proyecto:
+
+- Layout: `SidebarProvider` + `DashboardSidebar` + `DashboardTopbar`
+- Header con boton ArrowLeft (ghost) para volver a `/creadores/onboarding`
+- Breadcrumbs: Creadores > Onboarding > Nuevo Onboarding (o nombre del creador si es edicion)
+- El wizard ocupa todo el area de contenido con scroll independiente
+
+#### 4. Navegacion desde la lista
+
+- Boton "Iniciar Onboarding": `navigate("/creadores/onboarding/nuevo")`
+- Click en fila/tarjeta de creador: `navigate(\`/creadores/onboarding/${creator.id}\`)`
+- Boton cancelar del wizard: `navigate("/creadores/onboarding")`
+- Al completar el wizard exitosamente: `navigate("/creadores/onboarding")` con toast de confirmacion
+
+### Detalle tecnico
+
+No se requieren cambios en base de datos ni nuevas dependencias. Solo es reestructuracion de UI y rutas.
+
