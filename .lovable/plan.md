@@ -1,82 +1,79 @@
 
 
-## Asignacion multiple de usuarios en Tareas y Subtareas (estilo Asana)
+## Rediseno visual del Calendario y Proximos Eventos
 
-### Resumen
+### Objetivo
 
-Actualmente las tareas y subtareas solo permiten asignar **un usuario** (columna `assigned_to` tipo UUID). Se necesita permitir **multiples asignados** en tareas, subtareas, y mantener la consistencia con la asignacion de proyectos.
+Transformar la vista actual del calendario y la tarjeta de proximos eventos en una interfaz mas moderna, visualmente atractiva y con mejor experiencia de usuario.
 
-### Enfoque: Tabla de relacion (junction table)
+### Cambios planificados
 
-Se creara una tabla `task_assignees` y `subtask_assignees` para manejar las relaciones muchos-a-muchos, manteniendo la columna `assigned_to` original como "asignado principal" para compatibilidad.
+#### 1. Calendario mejorado (`EventosCalendar.tsx`)
+
+**Header del calendario:**
+- Tipografia mas grande y bold para el mes/ano
+- Botones de navegacion con estilo pill/rounded mas moderno
+- Indicador visual del conteo de eventos en el header (badge con numero)
+
+**Dias del calendario:**
+- Celdas mas grandes y espaciadas
+- El dia actual tendra un circulo con gradiente primary en lugar de un simple fondo gris
+- Los dias con eventos tendran un dot indicator con animacion pulse sutil
+- Al hacer hover sobre un dia con evento, se mostrara un efecto de elevacion suave
+
+**Footer del calendario:**
+- Barra de resumen con gradiente sutil y borde redondeado
+- Iconos decorativos junto al conteo
+
+#### 2. Tarjeta de Proximos Eventos
+
+**Header de la tarjeta:**
+- Titulo con icono animado
+- Linea decorativa con gradiente debajo del titulo
+
+**Tarjetas de evento individual:**
+- Borde izquierdo de color segun el tipo de evento (Shooting=azul, Podcast=violeta, Casting=verde, Reunion=naranja, Otro=gris)
+- Icono del tipo de evento con fondo gradiente en lugar de color solido
+- Fecha formateada mas prominente (dia + mes en columna a la izquierda)
+- Efecto hover con elevacion y transicion suave
+- Badge de "Hoy" cuando el evento es del dia actual (distinto al de "Proximo")
+- Mostrar hora del evento si esta disponible (`start_time`)
+
+#### 3. Estilos CSS (`index.css`)
+
+- Mejorar el indicador de punto del calendario con animacion pulse
+- Agregar clases utilitarias para los bordes de color por tipo de evento
 
 ---
 
-### 1. Migracion de base de datos
-
-Crear dos tablas nuevas:
-
-```sql
--- task_assignees: multiples asignados por tarea
-CREATE TABLE task_assignees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id uuid NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(task_id, user_id)
-);
-ALTER TABLE task_assignees ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated can manage task_assignees" ON task_assignees FOR ALL USING (true) WITH CHECK (true);
-
--- subtask_assignees: multiples asignados por subtarea
-CREATE TABLE subtask_assignees (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  subtask_id uuid NOT NULL REFERENCES subtasks(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(subtask_id, user_id)
-);
-ALTER TABLE subtask_assignees ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated can manage subtask_assignees" ON subtask_assignees FOR ALL USING (true) WITH CHECK (true);
-```
-
-### 2. Archivos a modificar
+### Detalle tecnico
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/CreateTaskModal.tsx` | Cambiar selector de usuario unico a multi-select con chips (como en proyectos) |
-| `src/pages/tareas/EditTaskModal.tsx` | Mismo cambio: multi-select con chips |
-| `src/pages/tareas/useTareas.ts` | En `createTask`: insertar en `task_assignees` + notificaciones. En `updateTask`: sincronizar asignados. Agregar query de `task_assignees` para cada tarea |
-| `src/pages/tareas/SubtaskItem.tsx` | Cambiar selector de asignado unico a multi-select |
-| `src/pages/tareas/SubtasksPanel.tsx` | Cambiar selector de asignado en formulario de creacion a multi-select |
-| `src/pages/tareas/useSubtasks.ts` | En create/update: insertar/sincronizar `subtask_assignees` |
-| `src/pages/tareas/TaskCard.tsx` | Mostrar multiples avatares/nombres de asignados |
-| `src/pages/tareas/TaskListRow.tsx` | Mostrar multiples asignados en la fila |
-| `src/pages/tareas/TasksTable.tsx` | Mostrar multiples asignados en la columna |
+| `src/pages/eventos/EventosCalendar.tsx` | Rediseno completo del componente: layout mejorado, tarjetas de evento con borde de color por tipo, fecha prominente, efecto hover, badge "Hoy", hora visible |
+| `src/index.css` | Agregar animacion pulse para el dot indicator del calendario y clases de color por tipo de evento |
 
-### 3. Logica de UI
+### Colores por tipo de evento
 
-- **Selector multi-usuario**: Se reutilizara el patron de combobox multi-select con `Badge` + `X` que ya existe en `CreateProjectModal.tsx` (exactamente el mismo componente de seleccion de miembros de proyecto).
-- **Visualizacion**: Los asignados se mostraran como avatares apilados (max 3 visibles + "+N") en las tarjetas y filas.
-- **Compatibilidad**: La columna `assigned_to` existente se mantendra como el "primer asignado" para no romper queries RLS existentes. La tabla `task_assignees` sera la fuente de verdad.
+| Tipo | Color del borde izquierdo |
+|------|--------------------------|
+| Shooting | `hsl(211, 100%, 50%)` (primary/azul) |
+| Podcast | `hsl(271, 91%, 50%)` (accent/violeta) |
+| Casting | `hsl(145, 63%, 32%)` (success/verde) |
+| Reunion | `hsl(40, 96%, 40%)` (warning/naranja) |
+| Otro | `hsl(240, 4%, 46%)` (muted) |
 
-### 4. Notificaciones
+### Visualizacion de la tarjeta de evento (proximos)
 
-Al asignar nuevos usuarios a una tarea o subtarea, se insertara una notificacion tipo `task_assignment` para cada usuario nuevo:
-
-```
-type: "task_assignment"
-title: "Te asignaron una tarea"
-message: "Fuiste asignado(a) a la tarea '{titulo}'"
-reference_id: task_id o subtask_id
-reference_type: "task" o "subtask"
+```text
++--+--------------------------------------+
+|  | [Icon]  Nombre del evento    [Badge] |
+|14|         en 3 dias                     |
+|FEB        10:00 - 12:00                  |
+|  |         Plaza Central                 |
++--+--------------------------------------+
+ ^borde color por tipo
 ```
 
-### 5. Flujo simplificado
-
-1. Usuario crea/edita tarea -> selecciona multiples usuarios
-2. Se guarda `assigned_to` con el primer seleccionado (compatibilidad)
-3. Se insertan todos los seleccionados en `task_assignees`
-4. Se envian notificaciones a los nuevos asignados
-5. En las vistas se muestran todos los asignados desde `task_assignees`
+No se requieren cambios en la base de datos ni nuevas dependencias.
 
