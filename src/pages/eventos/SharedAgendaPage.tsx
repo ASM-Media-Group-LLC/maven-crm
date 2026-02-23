@@ -11,6 +11,7 @@ import {
   getDay,
   addMonths,
   subMonths,
+  formatDistanceToNow,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -23,6 +24,10 @@ import {
   Search,
   Sun,
   Moon,
+  Camera,
+  Mic,
+  Video,
+  Sparkles,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -31,6 +36,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 
@@ -69,6 +75,25 @@ const STATUS_LABELS: Record<string, string> = {
   completed: "Completado",
   cancelled: "Cancelado",
   rescheduled: "Reagendado",
+};
+
+const typeIcons: Record<string, React.ElementType> = {
+  Shooting: Camera,
+  Podcast: Mic,
+  Casting: Users,
+  Reunion: Video,
+  Otro: CalendarDays,
+};
+
+const getEventTypeStyle = (type: string) => {
+  const styles: Record<string, { border: string; iconBg: string; iconText: string }> = {
+    Shooting: { border: "border-l-primary", iconBg: "bg-primary/10", iconText: "text-primary" },
+    Podcast: { border: "border-l-accent", iconBg: "bg-accent/10", iconText: "text-accent" },
+    Casting: { border: "border-l-success", iconBg: "bg-success/10", iconText: "text-success" },
+    Reunion: { border: "border-l-warning", iconBg: "bg-warning/10", iconText: "text-warning" },
+    Otro: { border: "border-l-muted-foreground", iconBg: "bg-muted", iconText: "text-muted-foreground" },
+  };
+  return styles[type] || styles.Otro;
 };
 
 const PROJECT_TABS = ["Todos", "Ora", "Kash", "Trafix", "Unlok"];
@@ -119,6 +144,15 @@ const SharedAgendaPage = () => {
     });
     return map;
   }, [filteredEvents]);
+
+  const eventsThisMonth = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    return filteredEvents.filter((e) => {
+      const d = new Date(e.date);
+      return d >= monthStart && d <= monthEnd;
+    }).length;
+  }, [filteredEvents, currentMonth]);
 
   const selectedDayEvents = selectedDate
     ? filteredEvents.filter((e) => isSameDay(new Date(e.date), selectedDate))
@@ -227,11 +261,21 @@ const SharedAgendaPage = () => {
         {/* ─── Calendar ─── */}
         <Card>
           <CardContent className="p-4 md:p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+            {/* Calendar Header - modernized */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold capitalize tracking-tight">
+                  {format(currentMonth, "MMMM yyyy", { locale: es })}
+                </h2>
+                <Badge variant="secondary" className="text-xs font-semibold tabular-nums">
+                  {eventsThisMonth} eventos
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
+                  className="rounded-full text-xs font-medium h-8 px-3"
                   onClick={() => {
                     setCurrentMonth(new Date());
                     setSelectedDate(new Date());
@@ -239,28 +283,21 @@ const SharedAgendaPage = () => {
                 >
                   Hoy
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
-                <h2 className="text-sm font-semibold capitalize ml-1">
-                  {format(currentMonth, "MMMM yyyy", { locale: es })}
-                </h2>
-              </div>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-                <Button variant="secondary" size="sm" className="text-xs h-7">Mes</Button>
-                <Button variant="ghost" size="sm" className="text-xs h-7">Semana</Button>
               </div>
             </div>
 
             <div className="grid grid-cols-7 gap-px">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center text-[11px] font-medium text-muted-foreground py-2">{d}</div>
+                <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground py-2">{d}</div>
               ))}
               {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-10" />
+                <div key={`empty-${i}`} className="h-11" />
               ))}
               {daysInMonth.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd");
@@ -268,7 +305,6 @@ const SharedAgendaPage = () => {
                 const hasEvent = !!dayEvents;
                 const isSelected = selectedDate && isSameDay(day, selectedDate);
                 const today = isToday(day);
-                // Get unique project colors for this day's events
                 const dayProjectColors = dayEvents
                   ? [...new Set(dayEvents.map((e) => e.project_type).filter(Boolean))]
                       .map((p) => PROJECT_COLORS[p!]?.dot)
@@ -280,19 +316,20 @@ const SharedAgendaPage = () => {
                   <button
                     key={dateStr}
                     onClick={() => setSelectedDate(isSelected ? null : day)}
-                    className={`relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all duration-150 ${
+                    className={cn(
+                      "relative flex flex-col items-center justify-center rounded-lg h-11 text-sm transition-all duration-150 hover:scale-105",
                       isSelected
-                        ? "bg-primary text-primary-foreground font-semibold"
+                        ? "bg-primary text-primary-foreground font-semibold shadow-md"
                         : today
-                        ? "bg-primary/15 text-primary font-semibold"
+                        ? "calendar-day-today"
                         : hasEvent
                         ? "hover:bg-muted font-medium"
                         : "hover:bg-muted/50 text-muted-foreground"
-                    }`}
+                    )}
                   >
                     {format(day, "d")}
                     {hasEvent && !isSelected && (
-                      <span className="absolute bottom-1 flex gap-0.5">
+                      <span className="absolute bottom-1 flex gap-0.5 calendar-day-has-event">
                         {dayProjectColors.map((dotColor, i) => (
                           <span key={i} className={`h-1 w-1 rounded-full ${dotColor}`} />
                         ))}
@@ -302,16 +339,29 @@ const SharedAgendaPage = () => {
                 );
               })}
             </div>
+
+            {/* Calendar Footer - gradient summary */}
+            <div className="mt-4 rounded-xl bg-gradient-to-r from-primary/5 via-accent/5 to-transparent px-4 py-3 flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+                <CalendarDays className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">{eventsThisMonth}</span> eventos programados este mes
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* ─── All Events (grouped by date) ─── */}
+        {/* ─── Upcoming Events (with modernized cards) ─── */}
         {!selectedDate && upcomingEvents.length > 0 && (
           <div className="space-y-5">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              Próximos Eventos
-            </h3>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-4 w-4 text-accent" />
+                <h3 className="text-sm font-bold tracking-tight">Próximos Eventos</h3>
+              </div>
+              <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent" />
+            </div>
             {(() => {
               const grouped = new Map<string, AgendaEvent[]>();
               upcomingEvents.forEach((ev) => {
@@ -355,8 +405,6 @@ const SharedAgendaPage = () => {
 
 /* ─── Sub-components ─── */
 
-
-
 const DayHeader = ({ date, count }: { date: Date; count: number }) => (
   <div className="flex items-end gap-3">
     <div>
@@ -381,6 +429,12 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
     ? pendingGuests
     : confirmedGuests;
 
+  const eventDate = new Date(event.date);
+  const todayEvent = isToday(eventDate);
+  const relativeTime = formatDistanceToNow(eventDate, { locale: es, addSuffix: true });
+  const typeStyle = getEventTypeStyle(event.event_type);
+  const TypeIcon = typeIcons[event.event_type] ?? CalendarDays;
+
   return (
     <div className="flex gap-4">
       {/* Time column */}
@@ -390,12 +444,36 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
         )}
       </div>
 
-      {/* Card */}
-      <Card className={`flex-1 overflow-hidden border-t-[3px] ${colors ? colors.border : "border-border"} transition-all duration-200 hover:shadow-lg hover:scale-[1.01]`}>
+      {/* Card with color-coded left border by event type */}
+      <Card className={cn(
+        "flex-1 overflow-hidden border-l-[3px] transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
+        typeStyle.border,
+        colors ? `border-t-[3px] ${colors.border}` : ""
+      )}>
         <CardContent className="p-4 space-y-3">
-          {/* Badges row */}
+          {/* Header row with icon, badges */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", typeStyle.iconBg)}>
+                <TypeIcon className={cn("h-4 w-4", typeStyle.iconText)} />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-bold text-base truncate">{event.name}</h4>
+                <p className="text-[11px] text-muted-foreground capitalize">{relativeTime}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {todayEvent && (
+                <Badge className="text-[10px] font-semibold bg-primary text-primary-foreground">
+                  Hoy
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-[10px]">{event.event_type}</Badge>
+            </div>
+          </div>
+
+          {/* Project & status badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-[10px]">{event.event_type}</Badge>
             {event.project_type && colors && (
               <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${colors.bg} ${colors.text}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${colors.dot} mr-1.5`} />
@@ -406,8 +484,6 @@ const EventDetailCard = ({ event }: { event: AgendaEvent }) => {
               {STATUS_LABELS[event.status] ?? event.status}
             </Badge>
           </div>
-
-          <h4 className="font-bold text-base">{event.name}</h4>
 
           {event.location && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
