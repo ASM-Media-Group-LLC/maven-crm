@@ -51,14 +51,12 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
   const { data: fetchedProfiles = [] } = useQuery({
     queryKey: ["company-profiles", myProfile?.company_id],
     queryFn: async () => {
+      let query = supabase.from("profiles").select("id, full_name");
       if (myProfile?.company_id) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .eq("company_id", myProfile.company_id);
-        return data || [];
+        query = query.eq("company_id", myProfile.company_id);
       }
-      return myProfile ? [{ id: myProfile.id, full_name: myProfile.full_name }] : [];
+      const { data } = await query;
+      return data || [];
     },
     enabled: !!myProfile && !externalProfiles,
   });

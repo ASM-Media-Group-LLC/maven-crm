@@ -78,14 +78,12 @@ export const useTareas = (projectId?: string) => {
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id, profile?.id],
     queryFn: async () => {
+      let query = supabase.from("profiles").select("id, full_name");
       if (profile?.company_id) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .eq("company_id", profile.company_id);
-        return data || [];
+        query = query.eq("company_id", profile.company_id);
       }
-      return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
+      const { data } = await query;
+      return data || [];
     },
     enabled: !!profile,
   });
