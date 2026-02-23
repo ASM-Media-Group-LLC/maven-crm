@@ -1,15 +1,26 @@
 import { useState } from "react";
-import { Upload, FileText, ImageIcon, X } from "lucide-react";
+import { Upload, FileText, ImageIcon, X, Gift, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import FileUploadModal, { type UploadedFile } from "@/components/FileUploadModal";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import XIcon from "@/components/icons/XIcon";
 
 export interface Step2Data {
   idDocuments: UploadedFile[];
   profilePhotos: UploadedFile[];
   dataConfirmed: boolean;
+  wishlistUrl: string;
+  instagramHandle: string;
+  tiktokHandle: string;
+  twitterHandle: string;
+  onlyfansUrl: string;
+  otrasPlataformas: string;
 }
 
 export interface Step2Errors {
@@ -94,6 +105,80 @@ export default function Step2Documentation({ data, errors, tempId, onChange }: P
             ))}
           </div>
         )}
+      </div>
+
+      {/* Wishlist */}
+      <div className="space-y-2 pt-2">
+        <div className="flex items-center gap-2">
+          <Gift className="h-4 w-4 text-primary" />
+          <Label className="text-sm font-medium">Wishlist</Label>
+        </div>
+        <Input
+          placeholder="https://amazon.com/hz/wishlist/ls/..."
+          value={data.wishlistUrl}
+          onChange={(e) => onChange("wishlistUrl", e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">Link de Wishlist de Amazon</p>
+      </div>
+
+      {/* Social Media Links */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-primary" />
+          <Label className="text-sm font-medium">Redes Sociales (Verificación de Identidad)</Label>
+        </div>
+        <p className="text-xs text-muted-foreground">Estos links nos ayudan a verificar tu identidad</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <InstagramIcon className="h-3.5 w-3.5" /> Instagram
+            </Label>
+            <Input
+              placeholder="@usuario"
+              value={data.instagramHandle}
+              onChange={(e) => onChange("instagramHandle", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <TikTokIcon className="h-3.5 w-3.5" /> TikTok
+            </Label>
+            <Input
+              placeholder="@usuario"
+              value={data.tiktokHandle}
+              onChange={(e) => onChange("tiktokHandle", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <XIcon className="h-3.5 w-3.5" /> Twitter / X
+            </Label>
+            <Input
+              placeholder="@usuario"
+              value={data.twitterHandle}
+              onChange={(e) => onChange("twitterHandle", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">OnlyFans URL</Label>
+            <Input
+              placeholder="https://onlyfans.com/usuario"
+              value={data.onlyfansUrl}
+              onChange={(e) => onChange("onlyfansUrl", e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Otras plataformas donde vendes contenido</Label>
+          <Textarea
+            placeholder="Fansly, Chaturbate, etc."
+            value={data.otrasPlataformas}
+            onChange={(e) => onChange("otrasPlataformas", e.target.value)}
+            rows={2}
+          />
+        </div>
       </div>
 
       {/* Confirmation */}
