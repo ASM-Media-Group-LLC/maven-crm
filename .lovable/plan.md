@@ -1,105 +1,81 @@
 
 
-## Paso 2 Expandido: Psicologia y Limites (El Manual del Personaje)
+## Paso 3: Documentacion - Agregar Wishlist y Redes Sociales
 
 ### Resumen
 
-Reemplazar el contenido actual del Step 2 con 3 secciones colapsables (Acordeones) mucho mas completas, agregando campos nuevos para biografia detallada, personalidad/tono y manejo de crisis. Los campos existentes se mantienen y se redistribuyen en las nuevas secciones.
+Enriquecer el Step 3 (Documentacion) agregando campos de texto para el link de Wishlist de Amazon y links de redes sociales para validacion de identidad cruzada. Los uploads de documentos y foto de perfil se mantienen intactos.
 
 ---
 
 ### Archivos a modificar
 
-**1. `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx`** - Reescribir UI con 3 acordeones expandidos
-**2. `src/pages/creadores/onboarding/OnboardingWizard.tsx`** - Extender `Step2PsyData`, `initialStep2Psy`, carga y payload
+**1. `src/pages/creadores/onboarding/steps/Step2Documentation.tsx`** - Agregar campos de links
+**2. `src/pages/creadores/onboarding/OnboardingWizard.tsx`** - Extender Step2Data, initialStep3Doc, carga y payload
 
 ---
 
-### Campos nuevos a agregar en Step2PsyData
+### Campos nuevos en Step2Data
 
 | Campo | Tipo | Columna BD | Almacenamiento |
 |-------|------|------------|----------------|
-| `heladoFavorito` | string | -- | `internal_notes` JSON |
-| `bebidaFavorita` | string | -- | `internal_notes` JSON |
-| `musicaArtistas` | string | -- | `internal_notes` JSON |
-| `peliculasTV` | string | -- | `internal_notes` JSON |
-| `viajesFavoritos` | string | -- | `internal_notes` JSON |
-| `viajesPorVisitar` | string | -- | `internal_notes` JSON |
-| `hermanos` | string | -- | `internal_notes` JSON |
-| `diaPerecto` | string | -- | `internal_notes` JSON |
-| `comoEresCuandoNadieVe` | string | -- | `internal_notes` JSON |
-| `comoQuieresQueTeLlamen` | string | -- | `internal_notes` JSON |
-| `respuestaSexoEnPersona` | string | -- | `internal_notes` JSON |
-| `respuestaUsuarioGrosero` | string | -- | `internal_notes` JSON |
-| `respuestaPedirDesnudos` | string | -- | `internal_notes` JSON |
-| `queTeIncomoda` | string | -- | `internal_notes` JSON |
-
-**Campos que ya existen y se mantienen:** `rutinaDiaria`, `hobbies`, `mascotasNombres`, `comidaFavorita`, `nivelEstudios`, `apodosPermitidos`, `palabrasProhibidas`, `emojiFrecuente`, `tonoVoz`, `contenidoJamasHaria`
+| `wishlistUrl` | string (input) | `wishlist_url` | Columna directa |
+| `instagramHandle` | string (input) | `instagram_handle` | Columna directa |
+| `tiktokHandle` | string (input) | `tiktok_handle` | Columna directa |
+| `twitterHandle` | string (input) | `twitter_handle` | Columna directa |
+| `onlyfansUrl` | string (input) | `onlyfans_url` | Columna directa |
+| `otrasPlataformas` | string (textarea) | -- | `internal_notes` JSON |
 
 ---
 
-### Cambio 1: Step2PsychologyLimits.tsx (UI completa)
+### Cambio 1: Step2Documentation.tsx (UI)
 
-Reorganizar en 3 acordeones:
+Despues de los uploads (ID y Foto) y antes del checkbox de confirmacion, agregar dos secciones:
 
-**Seccion A: "Biografia y Gustos"** (icono: BookOpen)
-- Hobbies (existente)
-- Rutina diaria (existente, textarea)
-- Comida favorita (existente) | Helado favorito (nuevo)
-- Bebida favorita (nuevo) | Musica/Artistas (nuevo)
-- Peliculas/TV (nuevo) | Mascotas y nombres (existente)
-- Viajes favoritos (nuevo) | Destinos por visitar (nuevo)
-- Hermanos/Hijos (nuevo) | Nivel de estudios (existente, select)
+**Seccion "Wishlist":**
+- Input para "Link de Wishlist (Amazon)" con placeholder "https://amazon.com/..."
 
-**Seccion B: "Personalidad y Tono"** (icono: Sparkles)
-- Dia perfecto (nuevo, textarea)
-- Como eres cuando nadie te ve (nuevo, textarea)
-- Como quieres que te llamen los fans (nuevo, input - ej: "Diosa, Reina, Princesa")
-- Apodos permitidos (existente)
-- Palabras prohibidas (existente)
-- Emojis mas usados (existente)
-- Tono de voz (existente, select)
+**Seccion "Redes Sociales (Verificacion)":**
+- Texto explicativo: "Estos links nos ayudan a verificar tu identidad"
+- Grid de 2 columnas con inputs para:
+  - Instagram (con icono)
+  - TikTok (con icono)
+  - Twitter/X (con icono)
+  - OnlyFans URL
+- Textarea a ancho completo para "Otras plataformas donde vendes contenido"
 
-**Seccion C: "Limites y Manejo de Crisis"** (icono: ShieldAlert, borde rojo)
-- Contenido que JAMAS harias (existente, textarea con borde rojo)
-- Que te incomoda (nuevo, textarea)
-- Como responderias si un usuario pide sexo en persona (nuevo, textarea)
-- Como manejas a un usuario grosero (nuevo, textarea)
-- Como respondes a "quiero ver tus desnudos" (nuevo, textarea)
-
-Cada seccion C tendra un fondo suave de alerta (bg-destructive/5) para resaltar la importancia.
+Actualizar la interfaz `Step2Data` para incluir los 6 campos nuevos (todos string, default `""`).
 
 ### Cambio 2: OnboardingWizard.tsx
 
-- Extender la interfaz `Step2PsyData` con los 14 campos nuevos (todos string, default `""`)
-- Actualizar `initialStep2Psy` con los valores vacios
-- En el `useEffect` de carga, leer los nuevos campos desde `internal_notes` JSON (los campos existentes ya se leen de columnas directas)
-- En `buildPayload`, agregar los 14 campos nuevos al objeto `extraData` que se serializa en `internal_notes`
+- Actualizar `initialStep3Doc` con los 6 campos nuevos (strings vacios)
+- En el `useEffect` de carga, leer `wishlist_url`, `instagram_handle`, `tiktok_handle`, `twitter_handle`, `onlyfans_url` de columnas directas y `otrasPlataformas` de `internal_notes`
+- En `buildPayload`, mapear:
+  - `wishlist_url` -> columna directa
+  - `instagram_handle` -> columna directa
+  - `tiktok_handle` -> columna directa
+  - `twitter_handle` -> columna directa
+  - `onlyfans_url` -> columna directa
+  - `otrasPlataformas` -> `extraData` en `internal_notes`
 
-### Layout visual del Paso 2 actualizado
+### Layout visual actualizado del Paso 3
 
 ```text
-[Acordeon A: Biografia y Gustos - abierto por defecto]
-  [Hobbies]                    [Comida favorita]
-  [Helado favorito]            [Bebida favorita]
-  [Musica/Artistas]            [Peliculas/TV]
-  [Mascotas y nombres]         [Hermanos/Hijos]
-  [Viajes favoritos]           [Destinos por visitar]
-  [Nivel de estudios (select)] 
-  [Rutina diaria (textarea full width)]
+[Upload: Documento de Identidad]
+[Archivos subidos...]
 
-[Acordeon B: Personalidad y Tono]
-  [Dia perfecto (textarea full width)]
-  [Como eres cuando nadie te ve (textarea full width)]
-  [Como quieres que te llamen]  [Apodos permitidos]
-  [Palabras prohibidas]         [Emojis mas usados]
-  [Tono de voz (select)]
+[Upload: Foto de Perfil]
+[Archivos subidos...]
 
-[Acordeon C: Limites y Manejo de Crisis - borde rojo]
-  [Contenido que JAMAS harias (textarea full width)]
-  [Que te incomoda (textarea full width)]
-  [Respuesta: sexo en persona (textarea full width)]
-  [Respuesta: usuario grosero (textarea full width)]
-  [Respuesta: pedir desnudos (textarea full width)]
+--- Wishlist ---
+[Link de Wishlist (Amazon) - full width]
+
+--- Redes Sociales (Verificacion de Identidad) ---
+[Instagram]              [TikTok]
+[Twitter/X]              [OnlyFans URL]
+[Otras plataformas (textarea full width)]
+
+[x] Confirmo que los datos son correctos
+[Estado: Pendiente]
 ```
 
