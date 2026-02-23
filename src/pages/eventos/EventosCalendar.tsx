@@ -2,7 +2,7 @@ import { useState } from "react";
 import { format, isSameMonth, isSameDay, isAfter, startOfToday, formatDistanceToNow, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { DayPicker } from "react-day-picker";
-import { Camera, Mic, Users, Video, CalendarDays, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { Camera, Mic, Users, Video, CalendarDays, ChevronLeft, ChevronRight, MapPin, Clock, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,17 @@ const typeIcons: Record<string, React.ElementType> = {
   Casting: Users,
   Reunion: Video,
   Otro: CalendarDays,
+};
+
+const getEventTypeStyle = (type: string) => {
+  const styles: Record<string, { border: string; iconBg: string; iconText: string }> = {
+    Shooting: { border: "border-l-primary", iconBg: "bg-primary/10", iconText: "text-primary" },
+    Podcast: { border: "border-l-accent", iconBg: "bg-accent/10", iconText: "text-accent" },
+    Casting: { border: "border-l-success", iconBg: "bg-success/10", iconText: "text-success" },
+    Reunion: { border: "border-l-warning", iconBg: "bg-warning/10", iconText: "text-warning" },
+    Otro: { border: "border-l-muted-foreground", iconBg: "bg-muted", iconText: "text-muted-foreground" },
+  };
+  return styles[type] || styles.Otro;
 };
 
 interface Props {
@@ -41,21 +52,26 @@ const EventosCalendar = ({ events }: Props) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendar Card */}
-      <Card className="lg:col-span-2">
-        <CardContent className="p-4">
+      <Card className="lg:col-span-2 overflow-hidden">
+        <CardContent className="p-5">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold capitalize">
-              {format(month, "MMMM yyyy", { locale: es })}
-            </h3>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={goToToday}>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-bold capitalize tracking-tight">
+                {format(month, "MMMM yyyy", { locale: es })}
+              </h3>
+              <Badge variant="secondary" className="text-xs font-semibold tabular-nums">
+                {eventsThisMonth} eventos
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" className="rounded-full text-xs font-medium h-8 px-3" onClick={goToToday}>
                 Hoy
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonth(subMonths(month, 1))}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setMonth(subMonths(month, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMonth(addMonths(month, 1))}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setMonth(addMonths(month, 1))}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -76,67 +92,115 @@ const EventosCalendar = ({ events }: Props) => {
               months: "w-full",
               month: "w-full",
               caption: "hidden",
-              table: "w-full",
+              table: "w-full border-separate border-spacing-y-1",
               head_row: "flex w-full",
-              head_cell: "text-muted-foreground text-xs font-medium flex-1 text-center",
-              row: "flex w-full mt-1",
+              head_cell: "text-muted-foreground text-[11px] font-semibold uppercase tracking-wider flex-1 text-center pb-2",
+              row: "flex w-full",
               cell: "flex-1 text-center p-0 relative",
               day: cn(
                 buttonVariants({ variant: "ghost" }),
-                "h-10 w-full p-0 text-sm rounded-md font-normal aria-selected:opacity-100"
+                "h-11 w-full p-0 text-sm rounded-lg font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-105"
               ),
-              day_selected: "bg-primary text-primary-foreground hover:bg-primary",
-              day_today: "bg-muted text-foreground font-bold",
-              day_outside: "text-muted-foreground opacity-50",
-              day_disabled: "text-muted-foreground opacity-50",
+              day_selected: "bg-primary text-primary-foreground hover:bg-primary shadow-md",
+              day_today: "calendar-day-today",
+              day_outside: "text-muted-foreground opacity-40",
+              day_disabled: "text-muted-foreground opacity-40",
               nav: "hidden",
             }}
           />
 
           {/* Footer */}
-          <div className="mt-3 rounded-md bg-muted/50 px-3 py-2">
+          <div className="mt-4 rounded-xl bg-gradient-to-r from-primary/5 via-accent/5 to-transparent px-4 py-3 flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+              <CalendarDays className="h-3.5 w-3.5 text-primary" />
+            </div>
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{eventsThisMonth}</span> eventos este mes
+              <span className="font-semibold text-foreground">{eventsThisMonth}</span> eventos programados este mes
             </p>
           </div>
         </CardContent>
       </Card>
 
       {/* Upcoming Events Card */}
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="text-sm font-semibold mb-4">Próximos eventos</h3>
+      <Card className="overflow-hidden">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-bold tracking-tight">Próximos eventos</h3>
+          </div>
+          <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent mb-5" />
+
           {upcoming.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground">Sin eventos próximos</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {upcoming.map((e) => {
                 const Icon = typeIcons[e.event_type] ?? CalendarDays;
                 const eventDate = new Date(e.date);
+                const isToday = isSameDay(eventDate, today);
                 const relativeTime = formatDistanceToNow(eventDate, { locale: es, addSuffix: true });
+                const style = getEventTypeStyle(e.event_type);
 
                 return (
-                  <div key={e.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                          <Icon className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{e.name}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{relativeTime}</p>
-                        </div>
-                      </div>
-                      <Badge variant="primary-soft" className="text-[10px] shrink-0">
-                        Próximo
-                      </Badge>
-                    </div>
-                    {e.location && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{e.location}</span>
-                      </div>
+                  <div
+                    key={e.id}
+                    className={cn(
+                      "rounded-xl border border-border bg-card p-3 space-y-2 border-l-[3px] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+                      style.border
                     )}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Date column */}
+                      <div className="flex flex-col items-center justify-center shrink-0 w-10">
+                        <span className="text-lg font-bold leading-none tabular-nums">{format(eventDate, "d")}</span>
+                        <span className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider">
+                          {format(eventDate, "MMM", { locale: es })}
+                        </span>
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", style.iconBg)}>
+                              <Icon className={cn("h-3.5 w-3.5", style.iconText)} />
+                            </div>
+                            <p className="text-sm font-semibold truncate">{e.name}</p>
+                          </div>
+                          <Badge
+                            variant={isToday ? "default" : "secondary"}
+                            className={cn(
+                              "text-[10px] shrink-0 font-semibold",
+                              isToday && "bg-primary text-primary-foreground"
+                            )}
+                          >
+                            {isToday ? "Hoy" : "Próximo"}
+                          </Badge>
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground mt-1 capitalize">{relativeTime}</p>
+
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          {e.start_time && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Clock className="h-3 w-3 shrink-0" />
+                              <span>{e.start_time.slice(0, 5)}{e.end_time ? ` - ${e.end_time.slice(0, 5)}` : ""}</span>
+                            </div>
+                          )}
+                          {e.location && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              <span className="truncate max-w-[120px]">{e.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
