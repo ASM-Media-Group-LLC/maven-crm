@@ -1,79 +1,53 @@
 
 
-## Ampliacion del Paso 2: Psicologia y Limites
+## Tooltips informativos por seccion en Paso 2
 
 ### Resumen
 
-Agregar 14 nuevos campos al Paso 2 del onboarding, distribuidos en las 3 secciones colapsables existentes. Todos los campos son opcionales y se persisten en el JSON `internal_notes`.
+Reemplazar los tooltips genericos actuales por mensajes especificos y persuasivos para cada seccion, y agregar tooltips nuevos en las secciones que aun no los tienen (Biografia y Personalidad).
 
 ---
 
-### 1. Nuevos campos en Step2PsyData (interface)
+### Cambios en Step2PsychologyLimits.tsx
 
-| Campo | Seccion |
-|-------|---------|
-| `horariosSueno` | Biografia y Gustos |
-| `deporteEquipo` | Biografia y Gustos |
-| `colorFavorito` | Biografia y Gustos |
-| `estadoCivil` | Biografia y Gustos |
-| `queBuscasPareja` | Biografia y Gustos |
-| `mejorAtributoFisico` | Biografia y Gustos |
-| `metasLargoPlazo` | Biografia y Gustos |
-| `queHacesRelajarte` | Personalidad y Tono |
-| `queTeHaceReir` | Personalidad y Tono |
-| `queTeMotivaCrear` | Personalidad y Tono |
-| `respuestaCuantoCobraEncuentro` | Limites y Manejo de Crisis |
-| `respuestaMuestraIntimas` | Limites y Manejo de Crisis |
-| `estrategiaMaterialGratis` | Limites y Manejo de Crisis |
-| `estrategiaProblemasPersonales` | Limites y Manejo de Crisis |
+**1. Seccion A - Biografia y Gustos (lineas 70-74)**
+Agregar un icono Info con tooltip al lado del titulo del AccordionTrigger:
+- Texto: "Esta informacion permite que tus operarios encuentren temas de conversacion en comun con tus suscriptores. Saber tus gustos ayuda a generar confianza y aumentar las propinas mediante la conexion real."
+
+**2. Seccion B - Personalidad y Tono (lineas 166-169)**
+Agregar un icono Info con tooltip al lado del titulo del AccordionTrigger:
+- Texto: "Tus respuestas aqui definen el 'alma' de tu cuenta. Al saber como te describes y que emojis usas, tu equipo de chat podra hablar exactamente como tu, evitando que los fans sospechen que hay alguien mas detras de la pantalla."
+
+**3. Seccion C - Limites y Manejo de Crisis (lineas 225-228)**
+Agregar un icono Info con tooltip al lado del titulo del AccordionTrigger:
+- Texto: "Vital para tu tranquilidad! Define de antemano como responder a situaciones incomodas. Esto nos permite manejar solicitudes dificiles (como encuentros fisicos o contenido gratuito) bajo tus propias reglas y sin tener que interrumpir tu dia para preguntarte."
+
+**4. Tooltips individuales de los campos de crisis (lineas 258, 275, 292, 309, 326, 343, 360)**
+Actualizar los 7 tooltips existentes en los campos de script de la seccion C. Reemplazar el texto generico "Esto ayudara a nuestros chatters a hablar exactamente como tu" por el nuevo texto de seccion: "Vital para tu tranquilidad! Define de antemano como responder a situaciones incomodas. Esto nos permite manejar solicitudes dificiles bajo tus propias reglas y sin tener que interrumpir tu dia para preguntarte."
 
 ---
 
-### 2. Cambios en la UI de Step2PsychologyLimits.tsx
+### Detalle tecnico
 
-**Seccion A - Biografia y Gustos** (agregar despues de "Nivel de estudios", antes de "Rutina diaria"):
-- `horariosSueno` (Input, placeholder: "Despierta 9am, duerme 1am")
-- `deporteEquipo` (Input, placeholder: "Futbol, Real Madrid...")
-- `colorFavorito` (Input, placeholder: "Rosa, negro...")
-- `estadoCivil` (Input, placeholder: "Soltera, en una relacion...")
-- `queBuscasPareja` (Textarea, md:col-span-2)
-- `mejorAtributoFisico` (Input)
-- `metasLargoPlazo` (Textarea, md:col-span-2)
+Cada titulo de seccion (AccordionTrigger) pasara de:
 
-**Seccion B - Personalidad y Tono** (agregar despues de "Tono de voz"):
-- `queHacesRelajarte` (Textarea, md:col-span-2)
-- `queTeHaceReir` (Textarea, md:col-span-2)
-- `queTeMotivaCrear` (Textarea, md:col-span-2)
+```text
+<BookOpen icon /> Biografia y Gustos
+```
 
-**Seccion C - Limites y Manejo de Crisis** (agregar despues de los 3 scripts existentes):
-- `respuestaCuantoCobraEncuentro` (Textarea con tooltip Info)
-- `respuestaMuestraIntimas` (Textarea con tooltip Info)
-- `estrategiaMaterialGratis` (Textarea con tooltip Info)
-- `estrategiaProblemasPersonales` (Textarea con tooltip Info)
+a:
 
-Los 4 nuevos campos de crisis llevan el mismo icono Info con tooltip "Esto ayudara a nuestros chatters a hablar exactamente como tu".
+```text
+<BookOpen icon /> Biografia y Gustos <Info icon con Tooltip>
+```
+
+Se usa el mismo patron de `Tooltip > TooltipTrigger > Info icon > TooltipContent` que ya existe en los campos de crisis, con `max-w-xs` en el TooltipContent para que el texto largo no se desborde.
 
 ---
 
-### 3. Cambios en OnboardingWizard.tsx
-
-- **initialStep2Psy**: agregar los 14 campos con valor `""`
-- **Hidratacion (useEffect)**: cargar los 14 campos desde `extraData`
-- **buildPayload**: serializar los 14 campos nuevos en `extraData`
-
----
-
-### Archivos a modificar
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx` | Agregar 14 campos a la interface y UI en las 3 secciones existentes |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Actualizar initialStep2Psy (linea 24), hidratacion (lineas 87-107) y buildPayload (lineas 215-228) |
-
-### Notas tecnicas
-
-- Todos los campos nuevos son tipo `string` y opcionales
-- Los campos tipo "estrategia" y "respuesta" usan Textarea con rows={3}
-- No se necesitan cambios en la base de datos: todo se persiste en `internal_notes` (JSON)
-- Los tooltips de crisis reutilizan el patron existente con `Tooltip + TooltipTrigger + Info icon`
+| `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx` | Agregar tooltips a los 3 titulos de seccion y actualizar texto de los 7 tooltips existentes |
 
