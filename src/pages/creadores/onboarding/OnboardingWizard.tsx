@@ -22,7 +22,7 @@ const STEPS = [
 
 const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "" };
-const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
+const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "" };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD" };
 
 interface Props {
@@ -98,6 +98,15 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           respuestaPedirDesnudos: extraData.respuestaPedirDesnudos || "",
           queTeIncomoda: extraData.queTeIncomoda || "",
         });
+        setStep3Doc(prev => ({
+          ...prev,
+          wishlistUrl: c.wishlist_url || "",
+          instagramHandle: c.instagram_handle || "",
+          tiktokHandle: c.tiktok_handle || "",
+          twitterHandle: c.twitter_handle || "",
+          onlyfansUrl: c.onlyfans_url || "",
+          otrasPlataformas: extraData.otrasPlataformas || "",
+        }));
         setCreatorStatus(c.status || null);
         setStep4({
           schedule: extraData.schedule || {}, pricing: {},
@@ -190,6 +199,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       respuestaUsuarioGrosero: step2Psy.respuestaUsuarioGrosero || null,
       respuestaPedirDesnudos: step2Psy.respuestaPedirDesnudos || null,
       queTeIncomoda: step2Psy.queTeIncomoda || null,
+      otrasPlataformas: step3Doc.otrasPlataformas || null,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
@@ -224,6 +234,11 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         emoji_frecuente: step2Psy.emojiFrecuente || null,
         tono_voz: step2Psy.tonoVoz || null,
         contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
+        wishlist_url: step3Doc.wishlistUrl || null,
+        instagram_handle: step3Doc.instagramHandle || null,
+        tiktok_handle: step3Doc.tiktokHandle || null,
+        twitter_handle: step3Doc.twitterHandle || null,
+        onlyfans_url: step3Doc.onlyfansUrl || null,
         status: isDraft ? "borrador" : "pendiente_verificacion",
         profile_photo_url: profilePhotoUrl,
         precios_contenido: Object.keys(preciosContenido).length > 0 ? preciosContenido : null,
