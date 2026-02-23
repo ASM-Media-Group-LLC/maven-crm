@@ -20,7 +20,7 @@ const STEPS = [
   { label: "Configuración" },
 ];
 
-const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "" };
+const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "" };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "" };
@@ -63,8 +63,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         const biz = Array.isArray(c.creator_business) ? c.creator_business[0] : c.creator_business;
 
         setStep1({
-          name: c.name || "", email: c.email || "", phone: c.phone || "",
+          name: c.name || "", segundoNombre: extraData.segundoNombre || "",
+          email: c.email || "", phone: c.phone || "",
           age: c.age ? String(c.age) : "", country: c.country || "", city: c.city || "",
+          direccion: extraData.direccion || "",
           timezone: extraData.timezone || "", artisticName: c.artistic_name || "",
           birthDate: c.birth_date || "", medidas: c.medidas_cm || "", tallaBrasier: c.talla_brasier || "",
           signoZodiacal: c.signo_zodiacal || "",
@@ -76,6 +78,11 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           permisoNombreReal: extraData.permisoNombreReal || "",
           permisoEdadReal: extraData.permisoEdadReal || "",
           permisoUbicacion: extraData.permisoUbicacion || "",
+          apodos: extraData.apodos || "",
+          edadMostrar: extraData.edadMostrar || "",
+          ubicacionArtistica: extraData.ubicacionArtistica || "",
+          redesSociales: extraData.redesSociales || "",
+          wishlistAmazon: extraData.wishlistAmazon || "",
         });
         setStep2Psy({
           rutinaDiaria: c.rutina_diaria || "", hobbies: c.hobbies || "",
@@ -198,6 +205,13 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       permisoNombreReal: step1.permisoNombreReal || null,
       permisoEdadReal: step1.permisoEdadReal || null,
       permisoUbicacion: step1.permisoUbicacion || null,
+      segundoNombre: step1.segundoNombre || null,
+      direccion: step1.direccion || null,
+      apodos: step1.apodos || null,
+      edadMostrar: step1.edadMostrar || null,
+      ubicacionArtistica: step1.ubicacionArtistica || null,
+      redesSociales: step1.redesSociales || null,
+      wishlistAmazon: step1.wishlistAmazon || null,
       heladoFavorito: step2Psy.heladoFavorito || null,
       bebidaFavorita: step2Psy.bebidaFavorita || null,
       musicaArtistas: step2Psy.musicaArtistas || null,

@@ -50,11 +50,13 @@ const TIMEZONES = [
 
 export interface Step1Data {
   name: string;
+  segundoNombre: string;
   email: string;
   phone: string;
   age: string;
   country: string;
   city: string;
+  direccion: string;
   timezone: string;
   artisticName: string;
   birthDate: string;
@@ -69,6 +71,11 @@ export interface Step1Data {
   permisoNombreReal: string;
   permisoEdadReal: string;
   permisoUbicacion: string;
+  apodos: string;
+  edadMostrar: string;
+  ubicacionArtistica: string;
+  redesSociales: string;
+  wishlistAmazon: string;
 }
 
 export interface Step1Errors {
@@ -116,6 +123,10 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
       </div>
       <div className="space-y-1.5">
+        <Label>Segundo nombre</Label>
+        <Input value={data.segundoNombre} onChange={(e) => onChange("segundoNombre", e.target.value)} placeholder="Segundo nombre" />
+      </div>
+      <div className="space-y-1.5">
         <Label>Nombre artístico</Label>
         <Input value={data.artisticName} onChange={(e) => onChange("artisticName", e.target.value)} placeholder="Nombre artístico" />
       </div>
@@ -151,6 +162,10 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Label>Ciudad</Label>
         <Input value={data.city} onChange={(e) => onChange("city", e.target.value)} placeholder="Ciudad" />
       </div>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Dirección de residencia completa</Label>
+        <Textarea value={data.direccion} onChange={(e) => onChange("direccion", e.target.value)} placeholder="Dirección completa..." rows={2} />
+      </div>
       <div className="space-y-1.5">
         <Label>Medidas (cm)</Label>
         <Input value={data.medidas} onChange={(e) => onChange("medidas", formatMedidas(e.target.value))} placeholder="90-60-90" maxLength={8} />
@@ -167,6 +182,21 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
             {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* ── Perfil Artístico ── */}
+      <SectionLabel>Perfil Artístico</SectionLabel>
+      <div className="space-y-1.5">
+        <Label>Apodos / Sobrenombres</Label>
+        <Input value={data.apodos} onChange={(e) => onChange("apodos", e.target.value)} placeholder="Sobrenombres que usa..." />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Edad a mostrar</Label>
+        <Input type="number" min={18} value={data.edadMostrar} onChange={(e) => onChange("edadMostrar", e.target.value)} placeholder="18" />
+      </div>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Ubicación artística</Label>
+        <Input value={data.ubicacionArtistica} onChange={(e) => onChange("ubicacionArtistica", e.target.value)} placeholder="País/Ciudad que mencionará a los usuarios" />
       </div>
 
       {/* ── Identidad Visual ── */}
@@ -207,6 +237,17 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
             {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* ── Conectividad ── */}
+      <SectionLabel>Conectividad</SectionLabel>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Links de Redes Sociales</Label>
+        <Textarea value={data.redesSociales} onChange={(e) => onChange("redesSociales", e.target.value)} placeholder="Instagram, X, TikTok..." rows={2} />
+      </div>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Wishlist de Amazon</Label>
+        <Input type="url" value={data.wishlistAmazon} onChange={(e) => onChange("wishlistAmazon", e.target.value)} placeholder="https://www.amazon.com/hz/wishlist/ls/..." />
       </div>
 
       {/* ── Privacidad ── */}
