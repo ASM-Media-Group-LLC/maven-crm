@@ -1,8 +1,9 @@
 import { useState, useRef } from "react";
-import { Plus, CalendarIcon, Check } from "lucide-react";
+import { Plus, CalendarIcon, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +29,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
   const [newPriority, setNewPriority] = useState("");
   const [newDueDate, setNewDueDate] = useState<Date | undefined>(undefined);
   const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);
-  const [newAssignedTo, setNewAssignedTo] = useState("");
+  const [newAssignedUsers, setNewAssignedUsers] = useState<string[]>([]);
   const [assignPopoverOpen, setAssignPopoverOpen] = useState(false);
   const dragIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -63,7 +64,11 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
 
   const profiles = externalProfiles || fetchedProfiles;
 
-  const selectedAssignName = profiles.find(p => p.id === newAssignedTo)?.full_name || "";
+  const toggleUser = (userId: string) => {
+    setNewAssignedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   const handleAdd = () => {
     if (!newTitle.trim()) return;
@@ -72,13 +77,13 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
       priority: newPriority || "medium",
       due_at: newDueDate ? newDueDate.toISOString() : null,
       start_at: newStartDate ? newStartDate.toISOString() : null,
-      assigned_to: newAssignedTo || null,
+      assignee_ids: newAssignedUsers.length > 0 ? newAssignedUsers : undefined,
     });
     setNewTitle("");
     setNewPriority("");
     setNewDueDate(undefined);
     setNewStartDate(undefined);
-    setNewAssignedTo("");
+    setNewAssignedUsers([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -106,12 +111,12 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
     const reordered = [...subtasks];
     const [moved] = reordered.splice(dragIndex.current, 1);
     reordered.splice(dragOverIndex, 0, moved);
-    reorderSubtasks.mutate(reordered.map(s => s.id));
+    reorderSubtasks.mutate(reordered.map((s) => s.id));
     dragIndex.current = null;
     setDragOverIndex(null);
   };
 
-  const completedCount = subtasks.filter(s => s.status === "completed").length;
+  const completedCount = subtasks.filter((s) => s.status === "completed").length;
 
   return (
     <div className="space-y-2">
@@ -139,7 +144,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
         ))}
       </div>
 
-      {/* Creation form — all fields always visible */}
+      {/* Creation form */}
       <div className="flex items-center gap-2 flex-wrap">
         <Input
           placeholder="Nueva subtarea..."
@@ -186,41 +191,51 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
         </Popover>
 
         {profiles.length > 0 && (
-          <Popover open={assignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0 w-[100px] justify-start", !newAssignedTo && "text-muted-foreground")}>
-                <span className="truncate">{newAssignedTo ? selectedAssignName || "Asignar" : "Asignar"}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
-                <CommandList>
-                  <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="__none__"
-                      onSelect={() => { setNewAssignedTo(""); setAssignPopoverOpen(false); }}
-                      className="text-xs"
-                    >
-                      Sin asignar
-                    </CommandItem>
-                    {profiles.map(p => (
-                      <CommandItem
-                        key={p.id}
-                        value={p.full_name || p.id}
-                        onSelect={() => { setNewAssignedTo(p.id); setAssignPopoverOpen(false); }}
-                        className="text-xs"
-                      >
-                        {p.full_name || "Sin nombre"}
-                        {newAssignedTo === p.id && <Check className="ml-auto h-3 w-3" />}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <>
+            {newAssignedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-0.5">
+                {newAssignedUsers.map((uid) => {
+                  const p = profiles.find((pr) => pr.id === uid);
+                  return (
+                    <Badge key={uid} variant="secondary" className="text-[10px] gap-0.5 h-6 pr-0.5">
+                      {p?.full_name?.split(" ")[0] || "?"}
+                      <button type="button" onClick={() => toggleUser(uid)} className="hover:text-destructive">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+            <Popover open={assignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", newAssignedUsers.length === 0 && "text-muted-foreground")}>
+                  <span className="truncate">{newAssignedUsers.length > 0 ? `+Asignar` : "Asignar"}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar usuario..." className="h-8 text-xs" />
+                  <CommandList>
+                    <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
+                    <CommandGroup>
+                      {profiles.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.full_name || p.id}
+                          onSelect={() => toggleUser(p.id)}
+                          className="text-xs"
+                        >
+                          {p.full_name || "Sin nombre"}
+                          {newAssignedUsers.includes(p.id) && <Check className="ml-auto h-3 w-3" />}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </>
         )}
 
         <Button

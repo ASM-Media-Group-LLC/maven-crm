@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export interface Task {
   share_token: string | null;
   created_at: string | null;
   updated_at: string | null;
+  assignees: string[];
 }
 
 export const useTareas = (projectId?: string) => {
@@ -43,7 +45,7 @@ export const useTareas = (projectId?: string) => {
     enabled: !!user,
   });
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: rawTasks = [], isLoading } = useQuery({
     queryKey: ["tasks", user?.id, projectId],
     queryFn: async () => {
       let query = supabase
@@ -56,10 +58,34 @@ export const useTareas = (projectId?: string) => {
       }
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as unknown as Task[];
+      return (data || []) as unknown as Omit<Task, "assignees">[];
     },
     enabled: !!user,
   });
+
+  const { data: allTaskAssignees = [] } = useQuery({
+    queryKey: ["task-assignees", projectId || "all"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("task_assignees" as any)
+        .select("task_id, user_id");
+      return (data || []) as unknown as { task_id: string; user_id: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const tasks: Task[] = useMemo(() => {
+    const map = new Map<string, string[]>();
+    allTaskAssignees.forEach((a) => {
+      const list = map.get(a.task_id) || [];
+      list.push(a.user_id);
+      map.set(a.task_id, list);
+    });
+    return rawTasks.map((t) => ({
+      ...t,
+      assignees: map.get(t.id) || (t.assigned_to ? [t.assigned_to] : []),
+    }));
+  }, [rawTasks, allTaskAssignees]);
 
   const { data: projectData } = useQuery({
     queryKey: ["task-project-detail", projectId],
@@ -88,11 +114,17 @@ export const useTareas = (projectId?: string) => {
     enabled: !!profile,
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["task-assignees"] });
+    queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+  };
+
   const createTask = useMutation({
     mutationFn: async (task: {
       title: string;
       description?: string;
-      assigned_to: string;
+      assignee_ids: string[];
       due_at: string;
       duration_hours: number;
       duration_minutes: number;
@@ -101,25 +133,54 @@ export const useTareas = (projectId?: string) => {
       start_at?: string;
     }) => {
       if (!user || !profile) throw new Error("Not authenticated");
+      const primaryAssignee = task.assignee_ids[0] || user.id;
 
-      const { error } = await supabase.from("tasks" as any).insert({
-        title: task.title,
-        description: task.description || null,
-        assigned_to: task.assigned_to,
-        created_by: user.id,
-        company_id: profile.company_id,
-        project_id: task.project_id || null,
-        duration_hours: task.duration_hours,
-        duration_minutes: task.duration_minutes,
-        due_at: task.due_at,
-        priority: task.priority || 'medium',
-        start_at: task.start_at || null,
-      } as any);
+      const { data: newTask, error } = await supabase
+        .from("tasks" as any)
+        .insert({
+          title: task.title,
+          description: task.description || null,
+          assigned_to: primaryAssignee,
+          created_by: user.id,
+          company_id: profile.company_id,
+          project_id: task.project_id || null,
+          duration_hours: task.duration_hours,
+          duration_minutes: task.duration_minutes,
+          due_at: task.due_at,
+          priority: task.priority || "medium",
+          start_at: task.start_at || null,
+        } as any)
+        .select("id")
+        .single();
       if (error) throw error;
+
+      const taskId = (newTask as any).id;
+
+      // Insert all assignees into junction table
+      if (task.assignee_ids.length > 0) {
+        const rows = task.assignee_ids.map((uid) => ({
+          task_id: taskId,
+          user_id: uid,
+        }));
+        await supabase.from("task_assignees" as any).insert(rows as any);
+      }
+
+      // Notifications for assigned users
+      for (const uid of task.assignee_ids) {
+        if (uid !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: uid,
+            type: "task_assignment",
+            title: "Te asignaron una tarea",
+            message: `Fuiste asignado(a) a la tarea '${task.title}'`,
+            reference_id: taskId,
+            reference_type: "task",
+          });
+        }
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
       toast({ title: "Tarea creada", description: "La tarea fue creada exitosamente." });
     },
     onError: () => {
@@ -136,8 +197,7 @@ export const useTareas = (projectId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
       toast({ title: "Tarea completada", description: "La tarea fue marcada como completada." });
     },
     onError: () => {
@@ -148,13 +208,6 @@ export const useTareas = (projectId?: string) => {
   const updateTaskStatus = useMutation({
     mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
       const updates: Record<string, any> = { status };
-      if (status === "in_progress") {
-        // Only set started timestamp if not already started
-        const task = tasks.find(t => t.id === taskId);
-        if (!task?.completed_at) {
-          // We don't have started_at in tasks table, just update status
-        }
-      }
       if (status === "completed") {
         updates.completed_at = new Date().toISOString();
       }
@@ -165,8 +218,7 @@ export const useTareas = (projectId?: string) => {
       if (error) throw error;
     },
     onSuccess: (_, { status }) => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
       const labels: Record<string, string> = {
         in_progress: "Tarea iniciada",
         paused: "Tarea pausada",
@@ -189,7 +241,7 @@ export const useTareas = (projectId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateAll();
       toast({ title: "Justificación enviada", description: "La razón fue registrada." });
     },
     onError: () => {
@@ -202,7 +254,7 @@ export const useTareas = (projectId?: string) => {
       id: string;
       title: string;
       description?: string;
-      assigned_to: string;
+      assignee_ids: string[];
       due_at: string;
       duration_hours: number;
       duration_minutes: number;
@@ -210,14 +262,17 @@ export const useTareas = (projectId?: string) => {
       start_at?: string;
       status?: string;
     }) => {
+      if (!user) throw new Error("Not authenticated");
+      const primaryAssignee = task.assignee_ids[0] || user.id;
+
       const updates: Record<string, any> = {
         title: task.title,
         description: task.description || null,
-        assigned_to: task.assigned_to,
+        assigned_to: primaryAssignee,
         due_at: task.due_at,
         duration_hours: task.duration_hours,
         duration_minutes: task.duration_minutes,
-        priority: task.priority || 'medium',
+        priority: task.priority || "medium",
         start_at: task.start_at || null,
       };
       if (task.status) {
@@ -231,10 +286,36 @@ export const useTareas = (projectId?: string) => {
         .update(updates as any)
         .eq("id", task.id);
       if (error) throw error;
+
+      // Sync assignees: delete old, insert new
+      await supabase.from("task_assignees" as any).delete().eq("task_id", task.id);
+      if (task.assignee_ids.length > 0) {
+        const rows = task.assignee_ids.map((uid) => ({
+          task_id: task.id,
+          user_id: uid,
+        }));
+        await supabase.from("task_assignees" as any).insert(rows as any);
+      }
+
+      // Get previous assignees to determine who's new
+      const existingTask = tasks.find((t) => t.id === task.id);
+      const prevAssignees = existingTask?.assignees || [];
+      const newAssignees = task.assignee_ids.filter((uid) => !prevAssignees.includes(uid));
+      for (const uid of newAssignees) {
+        if (uid !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: uid,
+            type: "task_assignment",
+            title: "Te asignaron una tarea",
+            message: `Fuiste asignado(a) a la tarea '${task.title}'`,
+            reference_id: task.id,
+            reference_type: "task",
+          });
+        }
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
       toast({ title: "Tarea actualizada", description: "La tarea fue actualizada exitosamente." });
     },
     onError: () => {
@@ -251,8 +332,7 @@ export const useTareas = (projectId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
       toast({ title: "Tarea eliminada", description: "La tarea fue eliminada exitosamente." });
     },
     onError: () => {
@@ -270,8 +350,7 @@ export const useTareas = (projectId?: string) => {
       if (failed?.error) throw failed.error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+      invalidateAll();
     },
   });
 

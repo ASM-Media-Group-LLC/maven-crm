@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -24,7 +25,7 @@ interface EditTaskModalProps {
     id: string;
     title: string;
     description?: string;
-    assigned_to: string;
+    assignee_ids: string[];
     due_at: string;
     duration_hours: number;
     duration_minutes: number;
@@ -39,7 +40,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [priority, setPriority] = useState("medium");
   const [status, setStatus] = useState("active");
@@ -52,7 +53,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
     if (task) {
       setTitle(task.title);
       setDescription(task.description || "");
-      setAssignedTo(task.assigned_to);
+      setAssignedUsers(task.assignees?.length > 0 ? [...task.assignees] : (task.assigned_to ? [task.assigned_to] : []));
       setPriority(task.priority || "medium");
       setStatus(task.status || "active");
       const due = new Date(task.due_at);
@@ -69,7 +70,11 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
     }
   }, [task]);
 
-  const selectedProfile = profiles.find((p) => p.id === assignedTo);
+  const toggleUser = (userId: string) => {
+    setAssignedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,8 +82,8 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       toast({ title: "Error", description: "El título es obligatorio.", variant: "destructive" });
       return;
     }
-    if (!assignedTo) {
-      toast({ title: "Error", description: "Selecciona un usuario.", variant: "destructive" });
+    if (assignedUsers.length === 0) {
+      toast({ title: "Error", description: "Selecciona al menos un usuario.", variant: "destructive" });
       return;
     }
     if (!endDate) {
@@ -114,7 +119,7 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       id: task.id,
       title: title.trim(),
       description: description.trim() || undefined,
-      assigned_to: assignedTo,
+      assignee_ids: assignedUsers,
       due_at: end.toISOString(),
       duration_hours: durationH,
       duration_minutes: durationM,
@@ -159,12 +164,28 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
             </div>
           </div>
 
+          {/* Multi-select de usuarios */}
           <div>
             <Label>Asignar a</Label>
+            {assignedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {assignedUsers.map((uid) => {
+                  const p = profiles.find((pr) => pr.id === uid);
+                  return (
+                    <Badge key={uid} variant="secondary" className="text-xs gap-1 pr-1">
+                      {p?.full_name || "Sin nombre"}
+                      <button type="button" onClick={() => toggleUser(uid)} className="ml-0.5 hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
             <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                  {selectedProfile ? (selectedProfile.full_name || "Sin nombre") : "Selecciona usuario"}
+                  {assignedUsers.length === 0 ? "Seleccionar usuarios" : `${assignedUsers.length} seleccionado(s)`}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -178,9 +199,9 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
                         <CommandItem
                           key={p.id}
                           value={p.full_name || "Sin nombre"}
-                          onSelect={() => { setAssignedTo(p.id); setComboboxOpen(false); }}
+                          onSelect={() => toggleUser(p.id)}
                         >
-                          <Check className={cn("mr-2 h-4 w-4", assignedTo === p.id ? "opacity-100" : "opacity-0")} />
+                          <Check className={cn("mr-2 h-4 w-4", assignedUsers.includes(p.id) ? "opacity-100" : "opacity-0")} />
                           {p.full_name || "Sin nombre"}
                         </CommandItem>
                       ))}

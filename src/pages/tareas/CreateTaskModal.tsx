@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
+import { CalendarIcon, Check, ChevronsUpDown, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -22,7 +23,7 @@ interface CreateTaskModalProps {
   onSubmit: (data: {
     title: string;
     description?: string;
-    assigned_to: string;
+    assignee_ids: string[];
     due_at: string;
     duration_hours: number;
     duration_minutes: number;
@@ -37,27 +38,27 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedUsers, setAssignedUsers] = useState<string[]>([]);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [priority, setPriority] = useState("medium");
-
-  // Duration mode
   const [timeMode, setTimeMode] = useState<"duration" | "date">("duration");
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(0);
-
-  // Date mode
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
 
-  const selectedProfile = profiles.find((p) => p.id === assignedTo);
+  const toggleUser = (userId: string) => {
+    setAssignedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setAssignedTo("");
+    setAssignedUsers([]);
     setHours(0);
     setMinutes(0);
     setTimeMode("duration");
@@ -74,8 +75,8 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       toast({ title: "Error", description: "El título es obligatorio.", variant: "destructive" });
       return;
     }
-    if (!assignedTo) {
-      toast({ title: "Error", description: "Selecciona un usuario.", variant: "destructive" });
+    if (assignedUsers.length === 0) {
+      toast({ title: "Error", description: "Selecciona al menos un usuario.", variant: "destructive" });
       return;
     }
 
@@ -106,7 +107,6 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
       }
       dueAt = end.toISOString();
 
-      // Build start_at if provided
       if (startDate) {
         const start = new Date(startDate);
         if (startTime) {
@@ -118,7 +118,6 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
         startAtIso = start.toISOString();
       }
 
-      // Calculate approximate duration for display
       const startRef = startDate ? new Date(startDate) : new Date();
       if (startTime) {
         const [startH, startM] = startTime.split(":").map(Number);
@@ -132,7 +131,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
     onSubmit({
       title: title.trim(),
       description: description.trim() || undefined,
-      assigned_to: assignedTo,
+      assignee_ids: assignedUsers,
       due_at: dueAt,
       duration_hours: durationH,
       duration_minutes: durationM,
@@ -162,9 +161,24 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
 
           <PrioritySelect value={priority} onChange={setPriority} />
 
-          {/* Combobox de usuario */}
+          {/* Multi-select de usuarios */}
           <div>
             <Label>Asignar a</Label>
+            {assignedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {assignedUsers.map((uid) => {
+                  const p = profiles.find((pr) => pr.id === uid);
+                  return (
+                    <Badge key={uid} variant="secondary" className="text-xs gap-1 pr-1">
+                      {p?.full_name || "Sin nombre"}
+                      <button type="button" onClick={() => toggleUser(uid)} className="ml-0.5 hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
             <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -173,7 +187,7 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
                   aria-expanded={comboboxOpen}
                   className="w-full justify-between font-normal"
                 >
-                  {selectedProfile ? (selectedProfile.full_name || "Sin nombre") : "Selecciona usuario"}
+                  {assignedUsers.length === 0 ? "Seleccionar usuarios" : `${assignedUsers.length} seleccionado(s)`}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -187,12 +201,9 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
                         <CommandItem
                           key={p.id}
                           value={p.full_name || "Sin nombre"}
-                          onSelect={() => {
-                            setAssignedTo(p.id);
-                            setComboboxOpen(false);
-                          }}
+                          onSelect={() => toggleUser(p.id)}
                         >
-                          <Check className={cn("mr-2 h-4 w-4", assignedTo === p.id ? "opacity-100" : "opacity-0")} />
+                          <Check className={cn("mr-2 h-4 w-4", assignedUsers.includes(p.id) ? "opacity-100" : "opacity-0")} />
                           {p.full_name || "Sin nombre"}
                         </CommandItem>
                       ))}
@@ -226,7 +237,6 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
               </TabsContent>
 
               <TabsContent value="date" className="mt-3 space-y-3">
-                {/* Fecha inicio */}
                 <div>
                   <Label>Fecha inicio (opcional)</Label>
                   <div className="flex gap-2">
@@ -245,7 +255,6 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
                   </div>
                 </div>
 
-                {/* Fecha fin */}
                 <div>
                   <Label>Fecha fin *</Label>
                   <div className="flex gap-2">

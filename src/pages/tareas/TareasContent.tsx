@@ -55,7 +55,7 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
       const matchesSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
       const taskStatus = getTaskStatus(t);
       const matchesStatus = !statusFilter || taskStatus === statusFilter;
-      const matchesAssigned = !assignedFilter || t.assigned_to === assignedFilter;
+      const matchesAssigned = !assignedFilter || (t.assignees || []).includes(assignedFilter);
       const matchesPriority = !priorityFilter || t.priority === priorityFilter;
       return matchesSearch && matchesStatus && matchesAssigned && matchesPriority;
     });

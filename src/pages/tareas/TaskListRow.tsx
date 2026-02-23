@@ -75,7 +75,7 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
   const needsJustification = isOverdue && !isCompleted && !task.overdue_reason;
 
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
-  const assignedProfile = profiles.find(p => p.id === task.assigned_to);
+  const assignedProfiles = profiles.filter(p => (task.assignees || []).includes(p.id));
   const currentStatusConfig = statusConfig[effectiveStatus] || statusConfig.active;
 
   const transitions = getStatusTransitions(task.status, isOverdue, !!task.overdue_reason);
@@ -151,9 +151,18 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
           {/* Assignee column */}
           <div className="flex items-center gap-1.5 min-w-0">
             <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground truncate">
-              {assignedProfile?.full_name || "Sin asignar"}
-            </span>
+            <div className="flex flex-wrap gap-0.5 min-w-0">
+              {assignedProfiles.length > 0 ? (
+                <>
+                  {assignedProfiles.slice(0, 2).map((p) => (
+                    <span key={p.id} className="text-xs text-muted-foreground">{p.full_name?.split(" ")[0]}</span>
+                  ))}
+                  {assignedProfiles.length > 2 && <span className="text-xs text-muted-foreground">+{assignedProfiles.length - 2}</span>}
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground">Sin asignar</span>
+              )}
+            </div>
           </div>
 
           {/* Due date column */}
