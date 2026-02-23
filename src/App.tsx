@@ -76,6 +76,8 @@ import HRHourBank from "./pages/hr/HRHourBank";
 import HRChatterSchedules from "./pages/hr/HRChatterSchedules";
 import HRIncidentNew from "./pages/hr/HRIncidentNew";
 import HRApplicantNew from "./pages/hr/HRApplicantNew";
+import HROnboarding from "./pages/hr/HROnboarding";
+import HROnboardingNew from "./pages/hr/HROnboardingNew";
 import HRMonitoring from "./pages/hr/HRMonitoring";
 
 const queryClient = new QueryClient();
@@ -147,6 +149,8 @@ const App = () => (
               <Route path="/hr/incidentes/nuevo" element={<ProtectedRoute><HRLayout><HRIncidentNew /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/candidatos" element={<ProtectedRoute><HRLayout><HRApplicants /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/candidatos/nuevo" element={<ProtectedRoute><HRLayout><HRApplicantNew /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/onboarding" element={<ProtectedRoute><HRLayout><HROnboarding /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/onboarding/nuevo" element={<ProtectedRoute><HRLayout><HROnboardingNew /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion" element={<ProtectedRoute><HRLayout><HRTraining /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion/chatters" element={<ProtectedRoute><HRLayout><HRTrainingChatters /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/capacitacion/tecnologia" element={<ProtectedRoute><HRLayout><HRTrainingTech /></HRLayout></ProtectedRoute>} />
