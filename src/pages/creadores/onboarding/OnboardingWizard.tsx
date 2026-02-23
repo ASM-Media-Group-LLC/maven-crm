@@ -393,7 +393,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
             {!editCreatorId ? "Nuevo" :
              creatorStatus === "borrador" ? "Borrador" :
              creatorStatus === "onboarding" ? "Onboarding" :
-             creatorStatus === "pendiente_verificacion" ? "Pendiente verificación" :
+             creatorStatus === "pendiente_verificacion" ? "En Revisión" :
              creatorStatus === "verificado" || creatorStatus === "activo" ? "Verificado" :
              creatorStatus || "Nuevo"}
           </Badge>

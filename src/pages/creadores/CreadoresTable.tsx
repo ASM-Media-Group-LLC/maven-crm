@@ -35,7 +35,7 @@ const statusLabel: Record<string, string> = {
   leaving: "Retiro",
   terminated: "Terminada",
   paused: "Pausada",
-  pendiente_verificacion: "Pendiente Verificación",
+  pendiente_verificacion: "En Revisión",
   borrador: "Borrador",
 };
 

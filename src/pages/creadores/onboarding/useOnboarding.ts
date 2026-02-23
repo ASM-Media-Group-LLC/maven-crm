@@ -61,7 +61,7 @@ export function calculateCurrentStep(creator: OnboardingCreator): number {
 }
 
 export function getStepLabel(step: number, dbStatus: string | null): string {
-  if (dbStatus === "pendiente_verificacion") return "Pendiente de aprobación";
+  if (dbStatus === "pendiente_verificacion") return "En Revisión";
   switch (step) {
     case 1: return "Completando datos personales";
     case 2: return "Completando perfil psicológico";
