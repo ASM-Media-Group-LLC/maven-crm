@@ -1,10 +1,13 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { Separator } from "@/components/ui/separator";
 
 const COUNTRIES = [
   "Afganistán","Albania","Alemania","Andorra","Angola","Arabia Saudita","Argelia","Argentina",
@@ -23,6 +26,13 @@ const COUNTRIES = [
   "Suiza","Tailandia","Taiwán","Trinidad y Tobago","Túnez","Turquía","Ucrania","Uruguay",
   "Venezuela","Vietnam","Otro",
 ];
+
+const SIGNOS_ZODIACALES = [
+  "Aries", "Tauro", "Géminis", "Cáncer", "Leo", "Virgo",
+  "Libra", "Escorpio", "Sagitario", "Capricornio", "Acuario", "Piscis",
+];
+
+const NIVELES_IDIOMA = ["Básico", "Intermedio", "Avanzado", "Nativo"];
 
 function formatMedidas(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 6);
@@ -50,6 +60,15 @@ export interface Step1Data {
   birthDate: string;
   medidas: string;
   tallaBrasier: string;
+  signoZodiacal: string;
+  etnicidad: string;
+  tatuajesPiercings: string;
+  cicatrices: string;
+  idiomas: string;
+  nivelLectura: string;
+  permisoNombreReal: string;
+  permisoEdadReal: string;
+  permisoUbicacion: string;
 }
 
 export interface Step1Errors {
@@ -75,10 +94,22 @@ interface Props {
   onChange: (field: keyof Step1Data, value: string) => void;
 }
 
-export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="md:col-span-2 pt-2">
+      <div className="flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">{children}</span>
+        <Separator className="flex-1" />
+      </div>
+    </div>
+  );
+}
 
+export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Datos básicos ── */}
       <div className="space-y-1.5">
         <Label>Nombre completo *</Label>
         <Input value={data.name} onChange={(e) => onChange("name", e.target.value)} placeholder="Nombre completo" />
@@ -136,6 +167,72 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
             {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* ── Identidad Visual ── */}
+      <SectionLabel>Identidad Visual</SectionLabel>
+      <div className="space-y-1.5">
+        <Label>Signo zodiacal</Label>
+        <Select value={data.signoZodiacal} onValueChange={(v) => onChange("signoZodiacal", v)}>
+          <SelectTrigger><SelectValue placeholder="Seleccionar signo" /></SelectTrigger>
+          <SelectContent>
+            {SIGNOS_ZODIACALES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Etnicidad / Nacionalidad</Label>
+        <Input value={data.etnicidad} onChange={(e) => onChange("etnicidad", e.target.value)} placeholder="Ej: Latina, Europea..." />
+      </div>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Tatuajes / Piercings (cantidad y ubicación)</Label>
+        <Textarea value={data.tatuajesPiercings} onChange={(e) => onChange("tatuajesPiercings", e.target.value)} placeholder="Ej: 2 tatuajes en brazo derecho, piercing en ombligo..." rows={2} />
+      </div>
+      <div className="md:col-span-2 space-y-1.5">
+        <Label>Cicatrices</Label>
+        <Input value={data.cicatrices} onChange={(e) => onChange("cicatrices", e.target.value)} placeholder="Describir si aplica..." />
+      </div>
+
+      {/* ── Idiomas ── */}
+      <SectionLabel>Idiomas</SectionLabel>
+      <div className="space-y-1.5">
+        <Label>Idiomas que habla</Label>
+        <Input value={data.idiomas} onChange={(e) => onChange("idiomas", e.target.value)} placeholder="Español, Inglés, Portugués..." />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Nivel de lectura/escritura</Label>
+        <Select value={data.nivelLectura} onValueChange={(v) => onChange("nivelLectura", v)}>
+          <SelectTrigger><SelectValue placeholder="Seleccionar nivel" /></SelectTrigger>
+          <SelectContent>
+            {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* ── Privacidad ── */}
+      <SectionLabel>Privacidad</SectionLabel>
+      <div className="md:col-span-2 space-y-3">
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <Label className="text-sm font-normal">¿Podemos mencionar tu nombre real?</Label>
+          <Switch
+            checked={data.permisoNombreReal === "si"}
+            onCheckedChange={(checked) => onChange("permisoNombreReal", checked ? "si" : "no")}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <Label className="text-sm font-normal">¿Podemos decir tu edad real?</Label>
+          <Switch
+            checked={data.permisoEdadReal === "si"}
+            onCheckedChange={(checked) => onChange("permisoEdadReal", checked ? "si" : "no")}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <Label className="text-sm font-normal">¿Podemos mencionar tu ubicación actual?</Label>
+          <Switch
+            checked={data.permisoUbicacion === "si"}
+            onCheckedChange={(checked) => onChange("permisoUbicacion", checked ? "si" : "no")}
+          />
+        </div>
       </div>
     </div>
   );

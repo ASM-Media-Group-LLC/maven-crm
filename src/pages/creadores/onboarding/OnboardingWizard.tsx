@@ -20,10 +20,10 @@ const STEPS = [
   { label: "Configuración" },
 ];
 
-const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "" };
+const initialStep1: Step1Data = { name: "", email: "", phone: "", age: "", country: "", city: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false };
-const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", permisoIdentidadReal: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD" };
+const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD" };
 
 interface Props {
   onCancel: () => void;
@@ -67,6 +67,15 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           age: c.age ? String(c.age) : "", country: c.country || "", city: c.city || "",
           timezone: extraData.timezone || "", artisticName: c.artistic_name || "",
           birthDate: c.birth_date || "", medidas: c.medidas_cm || "", tallaBrasier: c.talla_brasier || "",
+          signoZodiacal: c.signo_zodiacal || "",
+          etnicidad: extraData.etnicidad || "",
+          tatuajesPiercings: c.tatuajes_piercings_detalle || "",
+          cicatrices: extraData.cicatrices || "",
+          idiomas: Array.isArray(c.languages) ? c.languages.join(", ") : "",
+          nivelLectura: extraData.nivelLectura || "",
+          permisoNombreReal: extraData.permisoNombreReal || "",
+          permisoEdadReal: extraData.permisoEdadReal || "",
+          permisoUbicacion: extraData.permisoUbicacion || "",
         });
         setStep2Psy({
           rutinaDiaria: c.rutina_diaria || "", hobbies: c.hobbies || "",
@@ -80,7 +89,6 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           schedule: extraData.schedule || {}, pricing: {},
           monthlyGoal: biz?.monthly_sales_target ? String(biz.monthly_sales_target) : "",
           notes: c.notes || "",
-          permisoIdentidadReal: extraData.permisoIdentidadReal || "",
           terminosAfecto: extraData.terminosAfecto || "",
           restriccionesSeguridad: extraData.restriccionesSeguridad || "",
           orientacionPerfil: extraData.orientacionPerfil || "",
@@ -145,10 +153,15 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       monthlyGoal: step4.monthlyGoal,
       timezone: step1.timezone,
       currency: step4.currency || "USD",
-      permisoIdentidadReal: step4.permisoIdentidadReal || null,
       terminosAfecto: step4.terminosAfecto || null,
       restriccionesSeguridad: step4.restriccionesSeguridad || null,
       orientacionPerfil: step4.orientacionPerfil || null,
+      etnicidad: step1.etnicidad || null,
+      cicatrices: step1.cicatrices || null,
+      nivelLectura: step1.nivelLectura || null,
+      permisoNombreReal: step1.permisoNombreReal || null,
+      permisoEdadReal: step1.permisoEdadReal || null,
+      permisoUbicacion: step1.permisoUbicacion || null,
     });
 
     const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
@@ -170,6 +183,9 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         birth_date: step1.birthDate || null,
         medidas_cm: step1.medidas || null,
         talla_brasier: step1.tallaBrasier || null,
+        signo_zodiacal: step1.signoZodiacal || null,
+        tatuajes_piercings_detalle: step1.tatuajesPiercings || null,
+        languages: step1.idiomas ? step1.idiomas.split(",").map((l: string) => l.trim()).filter(Boolean) : null,
         rutina_diaria: step2Psy.rutinaDiaria || null,
         hobbies: step2Psy.hobbies || null,
         mascotas_nombres: step2Psy.mascotasNombres || null,
