@@ -1,40 +1,72 @@
 
 
-## Verificacion de Flujos y Navegacion en Onboarding
+## Sincronizacion y Activacion de la Vista de Onboarding
 
-### Resultado del analisis
+### Diagnostico
 
-Se revisaron los 4 componentes principales del modulo:
-- `OnboardingContent.tsx` -- contenedor principal con KPIs, cards en curso, tabla/grid
-- `OnboardingWizard.tsx` -- wizard inline de 4 pasos
-- `OnboardingTable.tsx` -- tabla de creadores
-- `OnboardingGrid.tsx` -- grid de creadores
+La base de datos confirma: **7 creadores con status "onboarding"**, 1 con "pendiente_verificacion", 1 con "pendiente". Sin embargo, la query actual en `useOnboarding` tambien incluye "verificado", "asignado" y "activo", lo que mezclaria 135+ creadores activos con los de onboarding real. El filtro debe limitarse a los estados previos a "activo".
 
-**Navegacion**: No hay problemas de redireccion. El wizard se abre inline mediante estado local (`showWizard`), no mediante cambio de ruta. La tabla y el grid no tienen handlers de clic ni enlaces que redireccionen fuera de `/creadores/onboarding`. El boton "Continuar" en las cards de "Onboardings en Curso" tambien opera sobre estado local.
+### Cambios por archivo
 
-**Unico problema encontrado**: El orden de las pestanas de agencia no sigue el orden canonico del sistema.
+---
 
-### Cambio a realizar
+**Archivo 1: `src/pages/creadores/onboarding/useOnboarding.ts`**
 
-**Archivo**: `src/pages/creadores/onboarding/OnboardingContent.tsx`
+1. Ajustar el filtro de la query para traer solo estados de onboarding real:
+   - Antes: `["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"]`
+   - Despues: `["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado"]`
+   - Se eliminan "asignado" y "activo" (ya pasaron onboarding) y se agrega "pendiente" (estado por defecto al convertir contacto)
 
-Corregir el array `areaTabs` (linea 18) para que siga el orden canonico estandarizado:
+2. Actualizar `deriveStatus` para mapear correctamente:
+   - `"borrador"` y `"pendiente"` -> `"Pendiente"`
+   - `"onboarding"` -> `"En Progreso"`
+   - `"pendiente_verificacion"` -> `"Pendiente"` (se mantiene)
+   - `"verificado"` -> `"Completado"`
 
-```text
-Antes:  ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"]
-Despues: ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "Otra"]
-```
+---
 
-El cambio es una transposicion de "Trafix" y "Unlok Platform" para respetar la jerarquia oficial: Atomic, Elite, Kash, Unlok, Trafix, Otra (siempre al final).
+**Archivo 2: `src/pages/creadores/onboarding/OnboardingTable.tsx`**
 
-### Verificacion confirmada
+Redisenar las columnas de la tabla segun el requerimiento:
 
-| Flujo | Estado |
+| Columna actual | Columna nueva |
 |---|---|
-| Clic en fila de tabla | Sin handler, no navega -- OK |
-| Clic en card de grid | Sin handler, no navega -- OK |
-| Boton "Continuar" en card | Abre wizard inline -- OK |
-| Boton "Volver a la lista" en wizard | Cierra wizard, muestra lista -- OK |
-| Breadcrumb "Creadores" | Navega a /creadores -- OK |
-| Filtros por agencia | Funcionan correctamente, solo falta corregir orden -- Fix |
+| Empleado | Creadora (foto + nombre) |
+| Posicion | (se elimina) |
+| Area | (se elimina) |
+| Empresa | Agencia |
+| Fecha Inicio | Fecha Inicio |
+| Manager | (se elimina) |
+| Progreso | Progreso (barra visual) |
+| Estado | Estado (badge de color) |
+| (no existia) | Acciones (boton "Gestionar") |
+
+El boton "Gestionar" emitira un callback `onManage(creator)` que se conectara al wizard existente.
+
+---
+
+**Archivo 3: `src/pages/creadores/onboarding/OnboardingGrid.tsx`**
+
+Agregar un boton "Gestionar" en cada card del grid, con el mismo callback `onManage`.
+
+---
+
+**Archivo 4: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
+
+1. Actualizar `inProgressCreators` para incluir `"pendiente"` en el filtro
+2. Pasar un handler `onManage` a `OnboardingTable` y `OnboardingGrid` que abra el wizard inline (reutilizando la logica existente de `handleCardClick`)
+3. Los KPIs se calculan automaticamente desde los datos filtrados -- no requieren cambio adicional
+
+---
+
+### Resultado esperado
+
+| KPI Card | Contenido |
+|---|---|
+| Total | 9 (7 onboarding + 1 pendiente_verificacion + 1 pendiente) |
+| Pendientes | 2 (pendiente + pendiente_verificacion) |
+| En Progreso | 7 (onboarding) |
+| Completados | 0 (ningun verificado actualmente) |
+
+La tabla mostrara las 9 creadoras con columnas limpias y boton de accion. Los filtros por agencia funcionaran en tiempo real sobre la tabla.
 
