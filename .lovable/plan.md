@@ -1,41 +1,46 @@
 
-## Validacion de Campos y Tooltips de Ayuda
+
+## Refactorizacion del Paso 1: Campos Faltantes
 
 ### Resumen
 
-Dos cambios principales:
-1. Agregar validacion obligatoria en el Paso 4 para que al menos un servicio tenga precio definido (Paso 2 ya es opcional, Paso 1 ya valida campos requeridos)
-2. Agregar tooltips informativos en las 3 preguntas de "Como responderias a..." del Paso 2
+Agregar 7 nuevos campos al Paso 1 del onboarding, organizados en 2 nuevas secciones visuales, mas 2 campos adicionales en la seccion existente de datos basicos.
 
 ---
 
-### 1. Validacion del Paso 4 (Precios obligatorios)
+### 1. Nuevos campos en Step1Data (interface)
 
-**Estado actual:**
-- Paso 1: Ya valida nombre, email, telefono (obligatorios)
-- Paso 2 (Psicologia): No tiene validacion - ya es opcional, no se toca
-- Paso 3 (Documentacion): Ya tiene su propia validacion
-- Paso 4: No tiene validacion - hay que agregar
-
-**Cambio en `OnboardingWizard.tsx`:**
-- En `validateCurrentStep()`, agregar validacion para `step === 4`: verificar que al menos un servicio en `step4.pricing` tenga un precio mayor a 0
-- Mostrar toast de error si no se cumple
-
-**Lineas afectadas:** ~149-161 en OnboardingWizard.tsx
+| Campo | Tipo | Seccion |
+|-------|------|---------|
+| `segundoNombre` | string | Datos basicos |
+| `direccion` | string | Datos basicos (ancho completo, Textarea) |
+| `apodos` | string | Perfil Artistico (nuevo bloque) |
+| `edadMostrar` | string (numerico) | Perfil Artistico |
+| `ubicacionArtistica` | string | Perfil Artistico |
+| `redesSociales` | string | Conectividad (nuevo bloque) |
+| `wishlistAmazon` | string (URL) | Conectividad |
 
 ---
 
-### 2. Tooltips en preguntas de crisis (Paso 2)
+### 2. Cambios en la UI de Step1PersonalInfo.tsx
 
-**Cambio en `Step2PsychologyLimits.tsx`:**
-- Importar `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` y el icono `Info` de lucide-react
-- En las 3 preguntas de la seccion "Limites y Manejo de Crisis":
-  - "Como responderias si un usuario pide sexo en persona?"
-  - "Como manejas a un usuario grosero?"
-  - "Como respondes a quiero ver tus desnudos?"
-- Agregar un icono `Info` (h-3.5 w-3.5) al lado del Label, envuelto en un Tooltip que muestre: "Esto ayudara a nuestros chatters a hablar exactamente como tu"
+Orden de secciones resultante:
+1. **Datos basicos** (existente) -- agregar `segundoNombre` al lado de "Nombre completo", y `direccion` (Textarea, ancho completo) despues de "Ciudad"
+2. **Perfil Artistico** (nuevo SectionLabel) -- antes de "Identidad Visual", con `apodos`, `edadMostrar`, `ubicacionArtistica`
+3. **Identidad Visual** (existente, sin cambios)
+4. **Idiomas** (existente, sin cambios)
+5. **Conectividad** (nuevo SectionLabel) -- antes de "Privacidad", con `redesSociales` (ancho completo) y `wishlistAmazon`
+6. **Privacidad** (existente, sin cambios)
 
-**Lineas afectadas:** ~193-218 en Step2PsychologyLimits.tsx
+---
+
+### 3. Cambios en OnboardingWizard.tsx
+
+- **initialStep1**: agregar los 7 campos con valor `""`
+- **Hidratacion (useEffect)**: cargar `segundoNombre`, `direccion`, `apodos`, `edadMostrar`, `ubicacionArtistica` desde `extraData`; `redesSociales` y `wishlistAmazon` tambien desde `extraData`
+- **buildPayload**: serializar los 7 campos nuevos en el objeto `extraData` (JSON en `internal_notes`)
+
+No se necesitan cambios en la base de datos ya que todo se persiste en el campo JSON `internal_notes`.
 
 ---
 
@@ -43,14 +48,13 @@ Dos cambios principales:
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Agregar validacion de precios en Step 4 dentro de `validateCurrentStep()` |
-| `src/pages/creadores/onboarding/steps/Step2PsychologyLimits.tsx` | Agregar tooltips con icono Info en las 3 preguntas de respuesta a crisis |
+| `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` | Agregar 7 campos a la interface, agregar UI con 2 nuevas secciones |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Actualizar initialStep1, hidratacion y buildPayload con los 7 campos |
 
-### Detalle tecnico del tooltip
+### Notas tecnicas
 
-```text
-Label + [i icon with tooltip]
-  └─ "Esto ayudara a nuestros chatters a hablar exactamente como tu"
-```
+- Los campos `direccion` y `redesSociales` usan `Textarea` con `md:col-span-2` para ancho completo
+- `edadMostrar` usa `Input type="number" min={18}` igual que el campo de edad existente
+- `wishlistAmazon` usa `Input type="url"` con placeholder de ejemplo
+- No se agrega validacion obligatoria a ninguno de estos campos (son opcionales segun el requisito de que solo Paso 1 basico y Paso 4 son obligatorios)
 
-Se usa el componente `TooltipProvider` envolviendo el accordion completo, y cada icono `Info` dentro de `Tooltip > TooltipTrigger > TooltipContent`.
