@@ -21,7 +21,7 @@ const STEPS = [
 ];
 
 const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
-const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "" };
+const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "", horariosSueno: "", deporteEquipo: "", colorFavorito: "", estadoCivil: "", queBuscasPareja: "", mejorAtributoFisico: "", metasLargoPlazo: "", queHacesRelajarte: "", queTeHaceReir: "", queTeMotivaCrear: "", respuestaCuantoCobraEncuentro: "", respuestaMuestraIntimas: "", estrategiaMaterialGratis: "", estrategiaProblemasPersonales: "" };
 const initialStep3Doc: Step2Data = { idDocuments: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "" };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "" };
 
@@ -104,6 +104,20 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           respuestaUsuarioGrosero: extraData.respuestaUsuarioGrosero || "",
           respuestaPedirDesnudos: extraData.respuestaPedirDesnudos || "",
           queTeIncomoda: extraData.queTeIncomoda || "",
+          horariosSueno: extraData.horariosSueno || "",
+          deporteEquipo: extraData.deporteEquipo || "",
+          colorFavorito: extraData.colorFavorito || "",
+          estadoCivil: extraData.estadoCivil || "",
+          queBuscasPareja: extraData.queBuscasPareja || "",
+          mejorAtributoFisico: extraData.mejorAtributoFisico || "",
+          metasLargoPlazo: extraData.metasLargoPlazo || "",
+          queHacesRelajarte: extraData.queHacesRelajarte || "",
+          queTeHaceReir: extraData.queTeHaceReir || "",
+          queTeMotivaCrear: extraData.queTeMotivaCrear || "",
+          respuestaCuantoCobraEncuentro: extraData.respuestaCuantoCobraEncuentro || "",
+          respuestaMuestraIntimas: extraData.respuestaMuestraIntimas || "",
+          estrategiaMaterialGratis: extraData.estrategiaMaterialGratis || "",
+          estrategiaProblemasPersonales: extraData.estrategiaProblemasPersonales || "",
         });
         setStep3Doc(prev => ({
           ...prev,
@@ -226,6 +240,20 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       respuestaUsuarioGrosero: step2Psy.respuestaUsuarioGrosero || null,
       respuestaPedirDesnudos: step2Psy.respuestaPedirDesnudos || null,
       queTeIncomoda: step2Psy.queTeIncomoda || null,
+      horariosSueno: step2Psy.horariosSueno || null,
+      deporteEquipo: step2Psy.deporteEquipo || null,
+      colorFavorito: step2Psy.colorFavorito || null,
+      estadoCivil: step2Psy.estadoCivil || null,
+      queBuscasPareja: step2Psy.queBuscasPareja || null,
+      mejorAtributoFisico: step2Psy.mejorAtributoFisico || null,
+      metasLargoPlazo: step2Psy.metasLargoPlazo || null,
+      queHacesRelajarte: step2Psy.queHacesRelajarte || null,
+      queTeHaceReir: step2Psy.queTeHaceReir || null,
+      queTeMotivaCrear: step2Psy.queTeMotivaCrear || null,
+      respuestaCuantoCobraEncuentro: step2Psy.respuestaCuantoCobraEncuentro || null,
+      respuestaMuestraIntimas: step2Psy.respuestaMuestraIntimas || null,
+      estrategiaMaterialGratis: step2Psy.estrategiaMaterialGratis || null,
+      estrategiaProblemasPersonales: step2Psy.estrategiaProblemasPersonales || null,
       otrasPlataformas: step3Doc.otrasPlataformas || null,
       gfeDisponible: step4.gfeDisponible || false,
       personalidadMarca: step4.personalidadMarca || null,
