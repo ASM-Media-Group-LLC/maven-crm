@@ -1,81 +1,42 @@
 
 
-## Paso 3: Documentacion - Agregar Wishlist y Redes Sociales
+## Cambios en la tabla de precios del Step 4
 
-### Resumen
+### 1. Agregar categoria "Zings" al array SERVICES
 
-Enriquecer el Step 3 (Documentacion) agregando campos de texto para el link de Wishlist de Amazon y links de redes sociales para validacion de identidad cruzada. Los uploads de documentos y foto de perfil se mantienen intactos.
-
----
-
-### Archivos a modificar
-
-**1. `src/pages/creadores/onboarding/steps/Step2Documentation.tsx`** - Agregar campos de links
-**2. `src/pages/creadores/onboarding/OnboardingWizard.tsx`** - Extender Step2Data, initialStep3Doc, carga y payload
-
----
-
-### Campos nuevos en Step2Data
-
-| Campo | Tipo | Columna BD | Almacenamiento |
-|-------|------|------------|----------------|
-| `wishlistUrl` | string (input) | `wishlist_url` | Columna directa |
-| `instagramHandle` | string (input) | `instagram_handle` | Columna directa |
-| `tiktokHandle` | string (input) | `tiktok_handle` | Columna directa |
-| `twitterHandle` | string (input) | `twitter_handle` | Columna directa |
-| `onlyfansUrl` | string (input) | `onlyfans_url` | Columna directa |
-| `otrasPlataformas` | string (textarea) | -- | `internal_notes` JSON |
-
----
-
-### Cambio 1: Step2Documentation.tsx (UI)
-
-Despues de los uploads (ID y Foto) y antes del checkbox de confirmacion, agregar dos secciones:
-
-**Seccion "Wishlist":**
-- Input para "Link de Wishlist (Amazon)" con placeholder "https://amazon.com/..."
-
-**Seccion "Redes Sociales (Verificacion)":**
-- Texto explicativo: "Estos links nos ayudan a verificar tu identidad"
-- Grid de 2 columnas con inputs para:
-  - Instagram (con icono)
-  - TikTok (con icono)
-  - Twitter/X (con icono)
-  - OnlyFans URL
-- Textarea a ancho completo para "Otras plataformas donde vendes contenido"
-
-Actualizar la interfaz `Step2Data` para incluir los 6 campos nuevos (todos string, default `""`).
-
-### Cambio 2: OnboardingWizard.tsx
-
-- Actualizar `initialStep3Doc` con los 6 campos nuevos (strings vacios)
-- En el `useEffect` de carga, leer `wishlist_url`, `instagram_handle`, `tiktok_handle`, `twitter_handle`, `onlyfans_url` de columnas directas y `otrasPlataformas` de `internal_notes`
-- En `buildPayload`, mapear:
-  - `wishlist_url` -> columna directa
-  - `instagram_handle` -> columna directa
-  - `tiktok_handle` -> columna directa
-  - `twitter_handle` -> columna directa
-  - `onlyfans_url` -> columna directa
-  - `otrasPlataformas` -> `extraData` en `internal_notes`
-
-### Layout visual actualizado del Paso 3
+Se agrega un nuevo servicio al final del array `SERVICES` en `Step4WorkConfig.tsx`:
 
 ```text
-[Upload: Documento de Identidad]
-[Archivos subidos...]
-
-[Upload: Foto de Perfil]
-[Archivos subidos...]
-
---- Wishlist ---
-[Link de Wishlist (Amazon) - full width]
-
---- Redes Sociales (Verificacion de Identidad) ---
-[Instagram]              [TikTok]
-[Twitter/X]              [OnlyFans URL]
-[Otras plataformas (textarea full width)]
-
-[x] Confirmo que los datos son correctos
-[Estado: Pendiente]
+{ key: "zings", label: "Zings" }
 ```
+
+Esto automaticamente agrega la fila a la tabla y al payload de persistencia (ya que `pricing` es un `Record<string, ServicePricing>` dinamico).
+
+### 2. Mover selector de moneda al lado del campo de precio
+
+Actualmente el selector de moneda esta arriba de la tabla como un campo separado. Se movera para que aparezca integrado en el header de la columna "Precio sugerido", quedando el selector compacto justo al lado del titulo de la columna.
+
+**Antes:**
+```text
+Moneda: [USD ($) v]
+---------------------------------
+| Servicio | Precio ($) | Notas |
+---------------------------------
+```
+
+**Despues:**
+```text
+-----------------------------------------------
+| Servicio | Precio sugerido [USD v] | Notas |
+-----------------------------------------------
+```
+
+### Archivo a modificar
+
+- `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`
+  - Linea 15-24: Agregar `{ key: "zings", label: "Zings" }` al array SERVICES
+  - Lineas 92-104: Eliminar el bloque del selector de moneda separado
+  - Lineas 109-111: Integrar el Select de moneda dentro del TableHead de "Precio sugerido"
+
+No se requieren cambios en `OnboardingWizard.tsx` ya que el pricing es dinamico (Record) y la nueva key "zings" se guarda automaticamente.
 
