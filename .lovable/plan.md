@@ -1,64 +1,59 @@
 
 
-## Enriquecer el Configurador de Interaccion - Step 4
+## Ajustes de Estrategia Comercial - Paso 4
 
-### Resumen
+### Analisis del estado actual
 
-Agregar 4 nuevos campos al accordion "Configuracion de Interaccion" del Step 4, debajo de la seccion existente de apodos y restricciones. Tambien actualizar el modelo de datos y la persistencia en `internal_notes`.
+La mayoria de los elementos solicitados **ya existen** en el Step 4:
+- Switch de Acompanamiento Virtual (GFE) -- ya implementado
+- Dropdown de Personalidad (Dulce, Directa, Juguetona, Dominante) -- ya implementado
+- Dropdown de Tono Emocional (Romantico, Sensual) -- ya implementado
+- Dropdown de Manejo de Limites / Estrategia de Rechazo (Humor, Firmeza, Rechazo suave) -- ya implementado
+- 4 servicios adicionales en la tabla -- ya existen con keys similares
+
+### Cambios necesarios
+
+Solo faltan **2 ajustes**:
 
 ---
 
-### Campos nuevos
+### 1. Renombrar labels de los 4 servicios existentes
 
-| Campo | Tipo UI | Opciones | Persistencia |
-|-------|---------|----------|--------------|
-| `gfeDisponible` | Switch | Si / No | `internal_notes` JSON |
-| `personalidadMarca` | Dropdown (Select) | Dulce, Directa, Juguetona, Dominante | `internal_notes` JSON |
-| `estrategiaRechazo` | Dropdown (Select) | Humor, Firmeza, Rechazo suave | `internal_notes` JSON |
-| `tonoEmocional` | Dropdown (Select) | Romantico, Sensual | `internal_notes` JSON |
+Los servicios ya estan en la tabla pero con nombres ligeramente diferentes a los solicitados. Se actualizan los labels para alinearse con la terminologia del prompt:
+
+| Key existente | Label actual | Label nuevo |
+|---|---|---|
+| `contenido_sensual_artistico` | Contenido Sensual Artistico | Material de Cortesia/Sensual |
+| `saludos_personalizados` | Saludos Personalizados | Saludos a Medida |
+| `colaboraciones_externas` | Colaboraciones Externas | Colaboraciones con Terceros |
+| `interaccion_vivo_amistosa` | Interaccion en Vivo (Amistosa) | Sesiones de Acompanamiento |
+
+Las keys se mantienen iguales para no romper datos existentes.
+
+---
+
+### 2. Agregar 2 campos de texto estrategico
+
+Nuevos campos en la interfaz `Step4Data` y en la seccion "Configuracion de Interaccion":
+
+| Campo | Tipo | Placeholder |
+|---|---|---|
+| `frasesVenta` | Textarea | "Describe tus terminos o frases favoritas para incentivar la compra de contenido (ej. Quieres ver algo especial?, Tengo una sorpresa para ti, etc.)" |
+| `usuariosVip` | Textarea | "Detalla nombres de usuarios que requieren un manejo preferencial o instrucciones especificas de atencion" |
+
+Se ubican al final de la seccion "Configuracion de Interaccion", despues del dropdown de Tono Emocional.
 
 ---
 
 ### Archivos a modificar
 
 **1. `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`**
-
-- Agregar import de `Switch` desde `@/components/ui/switch`
-- Agregar 4 campos nuevos a la interfaz `Step4Data`:
-  - `gfeDisponible: boolean`
-  - `personalidadMarca: string`
-  - `estrategiaRechazo: string`
-  - `tonoEmocional: string`
-- En la seccion "Configuracion de Interaccion" (lineas 162-195), despues del Textarea de restricciones (linea 194), agregar:
-  1. Switch con label "Disponible para modalidad de Acompanamiento Virtual (GFE)?"
-  2. Grid 2 columnas con:
-     - Dropdown "Personalidad de Marca" (Dulce, Directa, Juguetona, Dominante)
-     - Dropdown "Estrategia de Rechazo" (Humor, Firmeza, Rechazo suave)
-  3. Dropdown "Tono Emocional" (Romantico, Sensual)
+- Lineas 26-29: Renombrar labels de los 4 servicios
+- Linea 64: Agregar `frasesVenta: string` y `usuariosVip: string` a `Step4Data`
+- Despues de linea 244 (cierre del dropdown Tono Emocional): Agregar 2 bloques de Textarea
 
 **2. `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
-
-- Actualizar `initialStep4` con los 4 nuevos campos (defaults: `false`, `""`, `""`, `""`)
-- En el `useEffect` de carga (datos existentes), leer los 4 campos de `extraData` (internal_notes JSON)
-- En `buildPayload`, agregar los 4 campos al objeto `extraData` que se serializa en `internal_notes`
-
----
-
-### Layout visual de la seccion actualizada
-
-```text
---- Configuracion de Interaccion ---
-
-[Orientacion declarada v]
-
-[Preferencia de terminos de afecto - full width]
-
-[Restricciones de seguridad (textarea) - full width]
-
-[Switch: Disponible para Acompanamiento Virtual (GFE)?]
-
-[Personalidad de Marca v]    [Estrategia de Rechazo v]
-
-[Tono Emocional v]
-```
+- Linea 26: Agregar `frasesVenta: ""` y `usuariosVip: ""` a `initialStep4`
+- Linea 122: Agregar hidratacion de `frasesVenta` y `usuariosVip` desde `extraData`
+- Linea 210: Agregar serializacion de ambos campos en `buildPayload`
 
