@@ -36,7 +36,7 @@ const ProjectsListContent = () => {
         query = query.eq("company_id", profile.company_id);
       }
       const { data } = await query;
-      return (data || []).filter(p => p.id !== profile?.id);
+      return data || [];
     },
     enabled: !!profile,
   });
