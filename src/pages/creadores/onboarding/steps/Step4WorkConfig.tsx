@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import {
@@ -57,6 +58,10 @@ export interface Step4Data {
   restriccionesSeguridad: string;
   orientacionPerfil: string;
   currency: string;
+  gfeDisponible: boolean;
+  personalidadMarca: string;
+  estrategiaRechazo: string;
+  tonoEmocional: string;
 }
 
 interface Props {
@@ -191,6 +196,51 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                 placeholder="Describe restricciones..."
                 rows={3}
               />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">¿Disponible para modalidad de Acompañamiento Virtual (GFE)?</Label>
+                <p className="text-xs text-muted-foreground">Programa de acompañamiento emocional y virtual</p>
+              </div>
+              <Switch
+                checked={data.gfeDisponible || false}
+                onCheckedChange={(v) => onChange("gfeDisponible", v)}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Personalidad de Marca</Label>
+                <Select value={data.personalidadMarca} onValueChange={(v) => onChange("personalidadMarca", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dulce">Dulce</SelectItem>
+                    <SelectItem value="Directa">Directa</SelectItem>
+                    <SelectItem value="Juguetona">Juguetona</SelectItem>
+                    <SelectItem value="Dominante">Dominante</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Estrategia de Rechazo</Label>
+                <Select value={data.estrategiaRechazo} onValueChange={(v) => onChange("estrategiaRechazo", v)}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Humor">Humor</SelectItem>
+                    <SelectItem value="Firmeza">Firmeza</SelectItem>
+                    <SelectItem value="Rechazo suave">Rechazo suave</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5 max-w-sm">
+              <Label>Tono Emocional</Label>
+              <Select value={data.tonoEmocional} onValueChange={(v) => onChange("tonoEmocional", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Romántico">Romántico</SelectItem>
+                  <SelectItem value="Sensual">Sensual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </AccordionContent>
