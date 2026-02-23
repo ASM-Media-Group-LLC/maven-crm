@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { differenceInCalendarDays, setYear } from "date-fns";
-import { ArrowLeft, Phone, Cake } from "lucide-react";
+import { ArrowLeft, Phone, Cake, Download } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import DocumentosTabContent from "./DocumentosTabContent";
 import TicketsTabContent from "./TicketsTabContent";
 import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
+import { generateCreatorPdf } from "./generateCreatorPdf";
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -154,6 +155,9 @@ const CreadorProfileContent = () => {
           </div>
 
           <div className="flex flex-col items-end gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => generateCreatorPdf(c)}>
+              <Download className="h-4 w-4" /> Exportar Ficha Técnica
+            </Button>
             {c.status && (
               <Badge
                 variant={statusVariant[c.status] ?? "secondary-soft"}
