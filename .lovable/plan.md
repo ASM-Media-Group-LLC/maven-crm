@@ -1,42 +1,36 @@
 
 
-## Fix: Johanna no aparece al agregar miembros
+## Incluirse como miembro + Notificacion al asignar
 
-### Causa
+### Cambios
 
-En `ProjectsListContent.tsx` (linea 34-41), la consulta de perfiles filtra por `company_id`. Como **ningun usuario tiene `company_id` asignado** (todos son `NULL`), el codigo cae al fallback que solo retorna el perfil del usuario actual. Por eso solo aparece "Marielby Quijada" y no "Johanna Riano".
+#### 1. Incluirse a si misma en la lista de miembros
 
-### Solucion
+En `ProjectsListContent.tsx` (linea 39), actualmente se excluye al usuario actual con `.filter(p => p.id !== profile?.id)`. Se eliminara ese filtro para que el usuario actual tambien aparezca en la lista de miembros seleccionables.
 
-Modificar la consulta para que cuando no exista `company_id`, traiga **todos los perfiles** en lugar de solo el propio. Ademas, excluir al usuario actual de la lista (no tiene sentido agregarse a uno mismo como miembro).
+#### 2. Notificacion al asignar miembros a un proyecto
 
-### Cambio en `src/pages/tareas/ProjectsListContent.tsx`
+Cuando se crea o edita un proyecto y se agregan miembros, se insertara una notificacion en la tabla `notifications` para cada miembro nuevo. La tabla `notifications` ya existe con los campos necesarios (`user_id`, `type`, `title`, `message`, `reference_id`, `reference_type`).
 
-Reemplazar lineas 34-41:
+---
 
-```typescript
-// ANTES (solo trae al usuario actual si no hay company_id)
-if (profile?.company_id) {
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, full_name")
-    .eq("company_id", profile.company_id);
-  return data || [];
-}
-return profile ? [{ id: profile.id, full_name: profile.full_name }] : [];
-
-// DESPUES (trae todos los perfiles, filtra por company si existe)
-let query = supabase.from("profiles").select("id, full_name");
-if (profile?.company_id) {
-  query = query.eq("company_id", profile.company_id);
-}
-const { data } = await query;
-return (data || []).filter(p => p.id !== profile?.id);
-```
-
-### Archivos a modificar
+### Detalle tecnico
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Corregir query de perfiles para incluir todos los usuarios |
+| `src/pages/tareas/ProjectsListContent.tsx` | Quitar el `.filter(p => p.id !== profile?.id)` de la query de perfiles (linea 39) |
+| `src/pages/tareas/useProjects.ts` | En `createProject` y `updateProject`, despues de insertar miembros, insertar notificaciones en la tabla `notifications` para cada miembro agregado |
+
+#### Formato de la notificacion
+
+```
+type: "project_assignment"
+title: "Te asignaron a un proyecto"
+message: "Fuiste agregado(a) al proyecto '{nombre}'"
+reference_id: project_id
+reference_type: "project"
+user_id: id del miembro asignado
+```
+
+No se requieren migraciones de base de datos. La tabla `notifications` ya tiene una policy de INSERT permisiva para usuarios autenticados, y los usuarios pueden ver sus propias notificaciones (policy de SELECT filtra por `user_id`).
 
