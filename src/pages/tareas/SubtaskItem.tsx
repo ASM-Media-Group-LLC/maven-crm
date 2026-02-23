@@ -20,7 +20,7 @@ interface SubtaskItemProps {
   profiles: { id: string; full_name: string | null }[];
   onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
-  onUpdate: (params: { id: string; title?: string; priority?: string; due_at?: string | null; assigned_to?: string | null; start_at?: string | null; status?: string }) => void;
+  onUpdate: (params: { id: string; title?: string; priority?: string; due_at?: string | null; assignee_ids?: string[]; start_at?: string | null; status?: string }) => void;
   onDragStart: (e: React.DragEvent, index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -60,22 +60,27 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
   const [editPriority, setEditPriority] = useState(subtask.priority);
   const [editDueDate, setEditDueDate] = useState<Date | undefined>(subtask.due_at ? new Date(subtask.due_at) : undefined);
   const [editStartDate, setEditStartDate] = useState<Date | undefined>(subtask.start_at ? new Date(subtask.start_at) : undefined);
-  const [editAssignedTo, setEditAssignedTo] = useState(subtask.assigned_to || "");
+  const [editAssignedUsers, setEditAssignedUsers] = useState<string[]>(subtask.assignees || (subtask.assigned_to ? [subtask.assigned_to] : []));
   const [editAssignPopoverOpen, setEditAssignPopoverOpen] = useState(false);
 
   const priority = priorityConfig[subtask.priority] || priorityConfig.medium;
-  const assignedProfile = profiles.find(p => p.id === subtask.assigned_to);
-  const editAssignedName = profiles.find(p => p.id === editAssignedTo)?.full_name || "";
+  const assignedProfiles = profiles.filter((p) => subtask.assignees?.includes(p.id));
   const maxDepth = 3;
   const config = statusConfig[subtask.status] || statusConfig.pending;
   const transitions = getStatusTransitions(subtask.status);
+
+  const toggleEditUser = (userId: string) => {
+    setEditAssignedUsers((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   const handleStartEdit = () => {
     setEditTitle(subtask.title);
     setEditPriority(subtask.priority);
     setEditDueDate(subtask.due_at ? new Date(subtask.due_at) : undefined);
     setEditStartDate(subtask.start_at ? new Date(subtask.start_at) : undefined);
-    setEditAssignedTo(subtask.assigned_to || "");
+    setEditAssignedUsers(subtask.assignees || (subtask.assigned_to ? [subtask.assigned_to] : []));
     setEditing(true);
   };
 
@@ -86,7 +91,7 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
       priority: editPriority,
       due_at: editDueDate ? editDueDate.toISOString() : null,
       start_at: editStartDate ? editStartDate.toISOString() : null,
-      assigned_to: editAssignedTo || null,
+      assignee_ids: editAssignedUsers,
     });
     setEditing(false);
   };
@@ -117,7 +122,7 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
           </Badge>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[140px]">
-          {transitions.map(t => (
+          {transitions.map((t) => (
             <DropdownMenuItem key={t.status} onClick={() => onStatusChange(subtask.id, t.status)} className="text-xs gap-2">
               <t.icon className="h-3.5 w-3.5" />
               {t.label}
@@ -186,11 +191,27 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
             </PopoverContent>
           </Popover>
 
+          {/* Multi-select assignees for edit */}
+          {editAssignedUsers.length > 0 && (
+            <div className="flex flex-wrap gap-0.5">
+              {editAssignedUsers.map((uid) => {
+                const p = profiles.find((pr) => pr.id === uid);
+                return (
+                  <Badge key={uid} variant="secondary" className="text-[10px] gap-0.5 h-5 pr-0.5">
+                    {p?.full_name?.split(" ")[0] || "?"}
+                    <button type="button" onClick={() => toggleEditUser(uid)} className="hover:text-destructive">
+                      <X className="h-2 w-2" />
+                    </button>
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
           {profiles.length > 0 && (
             <Popover open={editAssignPopoverOpen} onOpenChange={setEditAssignPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2 w-[100px] justify-start", !editAssignedTo && "text-muted-foreground")}>
-                  <span className="truncate">{editAssignedTo ? editAssignedName || "Asignar" : "Asignar"}</span>
+                <Button variant="outline" size="sm" className={cn("h-6 text-[10px] px-2", editAssignedUsers.length === 0 && "text-muted-foreground")}>
+                  <span className="truncate">{editAssignedUsers.length > 0 ? "+Asignar" : "Asignar"}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0" align="start">
@@ -199,22 +220,15 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
                   <CommandList>
                     <CommandEmpty className="text-xs p-2">No encontrado</CommandEmpty>
                     <CommandGroup>
-                      <CommandItem
-                        value="__none__"
-                        onSelect={() => { setEditAssignedTo(""); setEditAssignPopoverOpen(false); }}
-                        className="text-xs"
-                      >
-                        Sin asignar
-                      </CommandItem>
-                      {profiles.map(p => (
+                      {profiles.map((p) => (
                         <CommandItem
                           key={p.id}
                           value={p.full_name || p.id}
-                          onSelect={() => { setEditAssignedTo(p.id); setEditAssignPopoverOpen(false); }}
+                          onSelect={() => toggleEditUser(p.id)}
                           className="text-xs"
                         >
                           {p.full_name || "Sin nombre"}
-                          {editAssignedTo === p.id && <Check className="ml-auto h-3 w-3" />}
+                          {editAssignedUsers.includes(p.id) && <Check className="ml-auto h-3 w-3" />}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -260,10 +274,11 @@ const SubtaskItem = ({ subtask, profiles, onStatusChange, onDelete, onUpdate, on
                 Fin: {format(new Date(subtask.due_at), "dd/MM/yy")}
               </span>
             )}
-            {assignedProfile && (
+            {assignedProfiles.length > 0 && (
               <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                 <User className="h-2.5 w-2.5" />
-                {assignedProfile.full_name || "Sin nombre"}
+                {assignedProfiles.slice(0, 2).map((p) => p.full_name?.split(" ")[0]).join(", ")}
+                {assignedProfiles.length > 2 && ` +${assignedProfiles.length - 2}`}
               </span>
             )}
           </div>

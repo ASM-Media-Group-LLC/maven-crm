@@ -123,7 +123,7 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
   const sorted = [...tasks].sort((a, b) => {
     let diff = 0;
     if (sortKey === "title") diff = a.title.localeCompare(b.title);
-    else if (sortKey === "assigned") diff = (profileMap.get(a.assigned_to) || "").localeCompare(profileMap.get(b.assigned_to) || "");
+    else if (sortKey === "assigned") diff = (profileMap.get(a.assignees?.[0] || a.assigned_to) || "").localeCompare(profileMap.get(b.assignees?.[0] || b.assigned_to) || "");
     else if (sortKey === "due") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     else if (sortKey === "start") diff = (a.start_at ? new Date(a.start_at).getTime() : 0) - (b.start_at ? new Date(b.start_at).getTime() : 0);
     else if (sortKey === "priority") diff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
@@ -158,7 +158,11 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                 <div className="font-medium text-sm">{task.title}</div>
                 {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
               </TableCell>
-              <TableCell className="hidden sm:table-cell text-sm">{profileMap.get(task.assigned_to) || "—"}</TableCell>
+              <TableCell className="hidden sm:table-cell text-sm">
+                {(task.assignees || []).length > 0
+                  ? task.assignees.slice(0, 2).map(uid => profileMap.get(uid) || "?").join(", ") + (task.assignees.length > 2 ? ` +${task.assignees.length - 2}` : "")
+                  : profileMap.get(task.assigned_to) || "—"}
+              </TableCell>
               <TableCell className="text-center">
                 {(() => {
                   const p = priorityConfig[task.priority] || priorityConfig.medium;
