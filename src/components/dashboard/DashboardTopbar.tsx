@@ -8,6 +8,8 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "next-themes";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -27,6 +29,7 @@ const DashboardTopbar = () => {
   const { theme, setTheme } = useTheme();
   const { t, language, setLanguage } = useLanguage();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { role } = useUserRole();
   const [mounted, setMounted] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -174,6 +177,14 @@ const DashboardTopbar = () => {
                 <span className="hidden md:inline text-sm font-medium truncate max-w-[120px]">
                   {fullName}
                 </span>
+                {role && (
+                  <Badge
+                    variant={role === "admin" || role === "manager" ? "primary-soft" : "secondary-soft"}
+                    className="hidden md:inline-flex text-[10px] px-1.5 py-0"
+                  >
+                    {{ admin: "Admin", manager: "Manager", agent: "Chatter", employee: "Empleado", closer: "Closer", supervisor: "Supervisor" }[role] ?? role}
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">

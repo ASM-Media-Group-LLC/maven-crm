@@ -13,11 +13,13 @@ import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import OnboardingTable from "./OnboardingTable";
 import OnboardingGrid from "./OnboardingGrid";
 import { useOnboarding, calculateCurrentStep, getStepLabel, type OnboardingCreator } from "./useOnboarding";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const areaTabs = ["Todas", "Atomic Agency", "Elite Models", "Kash Agency", "Trafix", "Unlok Platform", "Otra"];
 
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
+  const { isAgent } = useUserRole();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Todas");
   const [view, setView] = useState<"table" | "grid">("table");
@@ -78,7 +80,7 @@ const OnboardingContent = () => {
             <h1 className="text-2xl font-bold tracking-tight">Onboarding</h1>
             <p className="text-sm text-muted-foreground">Gestiona el onboarding de nuevos creadores</p>
           </div>
-          {!showWizard && (
+          {!showWizard && !isAgent && (
             <Button onClick={() => { setEditingCreator(null); setShowWizard(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Iniciar Onboarding
@@ -96,8 +98,8 @@ const OnboardingContent = () => {
           <DashboardMetricCard label="Completados" value={String(completed)} icon={CheckCircle2} valueColor="text-emerald-500" />
         </div>
 
-        {/* Onboardings en Curso - always visible when wizard is hidden */}
-        {!showWizard && (
+        {/* Onboardings en Curso - hidden for chatters */}
+        {!showWizard && !isAgent && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between py-4">
               <div className="flex items-center gap-2">

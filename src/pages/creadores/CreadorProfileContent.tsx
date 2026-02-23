@@ -21,6 +21,7 @@ import HistorialTabContent from "./HistorialTabContent";
 import OperacionesTabContent from "./OperacionesTabContent";
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -78,6 +79,7 @@ const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
+  const { isAgent } = useUserRole();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   if (isLoading) {
@@ -155,8 +157,8 @@ const CreadorProfileContent = () => {
             {c.status && (
               <Badge
                 variant={statusVariant[c.status] ?? "secondary-soft"}
-                className="cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setStatusModalOpen(true)}
+                className={!isAgent ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                onClick={!isAgent ? () => setStatusModalOpen(true) : undefined}
               >
                 {statusLabel[c.status] ?? c.status}
               </Badge>
@@ -171,59 +173,67 @@ const CreadorProfileContent = () => {
         </div>
       </div>
 
-      {c.status && (
+      {c.status && !isAgent && (
         <VerificationSection creatorId={id!} creatorName={c.name} currentStatus={c.status} />
       )}
 
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="operaciones">
           <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="operaciones">Operaciones</TabsTrigger>
-            <TabsTrigger value="info">Información</TabsTrigger>
-            <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
-            <TabsTrigger value="redes">Redes</TabsTrigger>
-            <TabsTrigger value="monetizacion">Monetización</TabsTrigger>
-            <TabsTrigger value="documentos">Documentos</TabsTrigger>
-            <TabsTrigger value="notas">Notas</TabsTrigger>
-            <TabsTrigger value="tickets">Tickets</TabsTrigger>
-            <TabsTrigger value="historial">Historial</TabsTrigger>
+            <TabsTrigger value="operaciones">{isAgent ? "Insights" : "Operaciones"}</TabsTrigger>
+            {!isAgent && (
+              <>
+                <TabsTrigger value="info">Información</TabsTrigger>
+                <TabsTrigger value="lineamientos">Lineamientos</TabsTrigger>
+                <TabsTrigger value="redes">Redes</TabsTrigger>
+                <TabsTrigger value="monetizacion">Monetización</TabsTrigger>
+                <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                <TabsTrigger value="notas">Notas</TabsTrigger>
+                <TabsTrigger value="tickets">Tickets</TabsTrigger>
+                <TabsTrigger value="historial">Historial</TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           <TabsContent value="operaciones">
             <OperacionesTabContent creator={c} />
           </TabsContent>
 
-          <TabsContent value="info">
-            <InfoTabContent creator={c} creatorId={id!} />
-          </TabsContent>
+          {!isAgent && (
+            <>
+              <TabsContent value="info">
+                <InfoTabContent creator={c} creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="lineamientos">
-            <LineamientosTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="lineamientos">
+                <LineamientosTabContent creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="redes">
-            <RedesTabContent creator={c} creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="redes">
+                <RedesTabContent creator={c} creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="monetizacion">
-            <MonetizacionTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="monetizacion">
+                <MonetizacionTabContent creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="documentos">
-            <DocumentosTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="documentos">
+                <DocumentosTabContent creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="notas">
-            <NotasTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="notas">
+                <NotasTabContent creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="tickets">
-            <TicketsTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="tickets">
+                <TicketsTabContent creatorId={id!} />
+              </TabsContent>
 
-          <TabsContent value="historial">
-            <HistorialTabContent creatorId={id!} />
-          </TabsContent>
+              <TabsContent value="historial">
+                <HistorialTabContent creatorId={id!} />
+              </TabsContent>
+            </>
+          )}
         </Tabs>
       </div>
       {c.status && (

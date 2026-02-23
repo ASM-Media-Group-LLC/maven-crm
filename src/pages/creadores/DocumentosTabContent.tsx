@@ -10,6 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import FileUploadModal, { type UploadedFile } from "@/components/FileUploadModal";
+import { useUserRole } from "@/hooks/useUserRole";
+
+const IDENTITY_DOC_TERMS = ["cedula", "cédula", "selfie", "identidad", "dni", "pasaporte", "documento de identidad"];
 
 interface Props {
   creatorId: string;
@@ -25,6 +28,7 @@ function fileTypeLabel(type: string): string {
 
 export default function DocumentosTabContent({ creatorId }: Props) {
   const qc = useQueryClient();
+  const { isAgent } = useUserRole();
   const [showUpload, setShowUpload] = useState(false);
 
   const { data: docs, isLoading } = useQuery({
@@ -83,12 +87,18 @@ export default function DocumentosTabContent({ creatorId }: Props) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-lg font-semibold">Documentos</CardTitle>
-          <Button size="sm" onClick={() => setShowUpload(true)}>
-            <Upload className="mr-2 h-4 w-4" /> Subir Archivo
-          </Button>
+          {!isAgent && (
+            <Button size="sm" onClick={() => setShowUpload(true)}>
+              <Upload className="mr-2 h-4 w-4" /> Subir Archivo
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {docs && docs.length > 0 ? (
+          {(() => {
+            const filteredDocs = isAgent
+              ? (docs ?? []).filter(d => !IDENTITY_DOC_TERMS.some(term => d.file_name.toLowerCase().includes(term)))
+              : docs ?? [];
+            return filteredDocs.length > 0 ? (
             <div className="max-h-[400px] overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-card">
@@ -100,7 +110,7 @@ export default function DocumentosTabContent({ creatorId }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {docs.map((d) => (
+                {filteredDocs.map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -124,7 +134,8 @@ export default function DocumentosTabContent({ creatorId }: Props) {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-12">No hay documentos</p>
-          )}
+          );
+          })()}
         </CardContent>
       </Card>
 
