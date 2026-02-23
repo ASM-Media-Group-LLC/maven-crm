@@ -20,7 +20,8 @@ const SERVICES = [
   { key: "cat_4", label: "Backdoor" },
   { key: "contenido_personalizado", label: "Contenido Personalizado" },
   { key: "valoracion_medios", label: "D-Rating" },
-  { key: "sesiones_video", label: "Videollamadas" },
+  { key: "videollamada_amistad", label: "Videollamada Amistad" },
+  { key: "videollamada_otro", label: "Videollamada Otro" },
   { key: "envio_articulos", label: "Venta de Ropa Interior" },
   { key: "zings", label: "Zings" },
   { key: "contenido_sensual_artistico", label: "Material de Cortesía/Sensual" },
@@ -146,7 +147,7 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
                         value={(data.pricing[key]?.notes) || ""}
                         onChange={(e) => updatePricing(key, "notes", e.target.value)}
                         className="h-9"
-                        placeholder="Observaciones..."
+                        placeholder={key === "contenido_personalizado" || key === "colaboraciones_externas" ? "Tiempo de entrega estimado..." : "Observaciones..."}
                       />
                     </TableCell>
                   </TableRow>
