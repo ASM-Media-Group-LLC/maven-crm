@@ -1,59 +1,38 @@
 
 
-## Ajustes de Estrategia Comercial - Paso 4
+## Ajuste de Navegacion: Estado "En Revision" al Finalizar
 
-### Analisis del estado actual
+### Resumen
 
-La mayoria de los elementos solicitados **ya existen** en el Step 4:
-- Switch de Acompanamiento Virtual (GFE) -- ya implementado
-- Dropdown de Personalidad (Dulce, Directa, Juguetona, Dominante) -- ya implementado
-- Dropdown de Tono Emocional (Romantico, Sensual) -- ya implementado
-- Dropdown de Manejo de Limites / Estrategia de Rechazo (Humor, Firmeza, Rechazo suave) -- ya implementado
-- 4 servicios adicionales en la tabla -- ya existen con keys similares
+El boton "Finalizar" ya guarda toda la informacion y establece el estado `pendiente_verificacion` en la base de datos. El unico cambio necesario es **renombrar la etiqueta visible** de "Pendiente Verificacion" a "En Revision" en todos los componentes de la interfaz.
 
-### Cambios necesarios
-
-Solo faltan **2 ajustes**:
+No se cambia el valor interno en la base de datos (`pendiente_verificacion`) para no romper logica existente (verificacion, KPIs, filtros). Solo se actualiza el texto que ve el usuario.
 
 ---
 
-### 1. Renombrar labels de los 4 servicios existentes
+### Archivos a modificar (cambio de label)
 
-Los servicios ya estan en la tabla pero con nombres ligeramente diferentes a los solicitados. Se actualizan los labels para alinearse con la terminologia del prompt:
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/creadores/CreadoresTable.tsx` | `pendiente_verificacion: "Pendiente Verificación"` → `"En Revisión"` |
+| `src/pages/creadores/CreadoresGrid.tsx` | `pendiente_verificacion: "Pendiente Verificación"` → `"En Revisión"` |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Badge text `"Pendiente verificación"` → `"En Revisión"` |
+| `src/pages/creadores/onboarding/useOnboarding.ts` | `getStepLabel`: `"Pendiente de aprobación"` → `"En Revisión"` |
 
-| Key existente | Label actual | Label nuevo |
-|---|---|---|
-| `contenido_sensual_artistico` | Contenido Sensual Artistico | Material de Cortesia/Sensual |
-| `saludos_personalizados` | Saludos Personalizados | Saludos a Medida |
-| `colaboraciones_externas` | Colaboraciones Externas | Colaboraciones con Terceros |
-| `interaccion_vivo_amistosa` | Interaccion en Vivo (Amistosa) | Sesiones de Acompanamiento |
+### Sin cambios en
 
-Las keys se mantienen iguales para no romper datos existentes.
+- Base de datos: el valor interno sigue siendo `pendiente_verificacion`
+- Logica de verificacion (`VerificationSection.tsx`): sigue funcionando igual
+- KPIs y conteos: sin cambios
+- `buildPayload` en OnboardingWizard: ya establece correctamente `status: "pendiente_verificacion"` al finalizar
 
----
+### Seccion tecnica
 
-### 2. Agregar 2 campos de texto estrategico
+El flujo actual al presionar "Finalizar":
+1. Valida Step 1 (campos requeridos)
+2. Llama `buildPayload(false)` que establece `status: "pendiente_verificacion"`
+3. Inserta/actualiza en tabla `creators` y `creator_business`
+4. Inserta notificacion de tipo `onboarding_complete`
+5. Cierra el wizard y vuelve a la lista
 
-Nuevos campos en la interfaz `Step4Data` y en la seccion "Configuracion de Interaccion":
-
-| Campo | Tipo | Placeholder |
-|---|---|---|
-| `frasesVenta` | Textarea | "Describe tus terminos o frases favoritas para incentivar la compra de contenido (ej. Quieres ver algo especial?, Tengo una sorpresa para ti, etc.)" |
-| `usuariosVip` | Textarea | "Detalla nombres de usuarios que requieren un manejo preferencial o instrucciones especificas de atencion" |
-
-Se ubican al final de la seccion "Configuracion de Interaccion", despues del dropdown de Tono Emocional.
-
----
-
-### Archivos a modificar
-
-**1. `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`**
-- Lineas 26-29: Renombrar labels de los 4 servicios
-- Linea 64: Agregar `frasesVenta: string` y `usuariosVip: string` a `Step4Data`
-- Despues de linea 244 (cierre del dropdown Tono Emocional): Agregar 2 bloques de Textarea
-
-**2. `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
-- Linea 26: Agregar `frasesVenta: ""` y `usuariosVip: ""` a `initialStep4`
-- Linea 122: Agregar hidratacion de `frasesVenta` y `usuariosVip` desde `extraData`
-- Linea 210: Agregar serializacion de ambos campos en `buildPayload`
-
+Todo esto ya funciona. Solo se renombra el label visible en 4 archivos.
