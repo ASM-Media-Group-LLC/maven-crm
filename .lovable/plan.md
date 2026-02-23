@@ -1,46 +1,43 @@
 
 
-## Fix: Creadores no visibles tras conversion desde Contactos
+## Rediseno de la seccion "Onboardings en Curso"
 
-Hay dos problemas que impiden localizar un creador recien convertido:
-
-### Problema 1: Busqueda limitada
-El buscador solo revisa `name` y `artistic_name`. No busca en `instagram_handle`, `email` ni `phone`, por lo que buscar "mariel" no encuentra a "Mari prueba 13feb" aunque su handle es "@marielby_".
-
-**Solucion**: Ampliar el filtro de busqueda en `useCreadores.ts` para incluir `instagram_handle` y `email`.
-
-### Problema 2: Estado "pendiente" no existe en el sistema de KPIs
-La conversion desde contactos inserta con `status: "pendiente"`, pero las KPI cards y filtros solo reconocen: active, onboarding, paused, leaving, terminated. El creador aparece en la lista sin filtros pero no se cuenta en ningun KPI.
-
-**Solucion**: Agregar "pendiente" y "pendiente_verificacion" al mapa de estados reconocidos en los KPI cards.
+Se reemplaza la seccion actual de "Procesos en Curso" (scroll horizontal con tarjetas pequenas) por una seccion completa con grid de cards, empty state y boton "Continuar" que abre el wizard inline.
 
 ---
 
-### Archivos a modificar
+### Cambios en `OnboardingContent.tsx`
+
+**1. Seccion "Onboardings en Curso" rediseñada (reemplaza lineas 98-136)**
+
+- Titulo "Onboardings en Curso" con icono y badge de conteo
+- Grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`)
+- Cada tarjeta (Card) incluye:
+  - Avatar circular con iniciales + nombre (o "Borrador sin nombre")
+  - Barra de progreso delgada (h-1.5) con color primary
+  - Badge con texto descriptivo del paso faltante (ej: "Falta Documentacion", "Paso 2 incompleto")
+  - Boton secundario "Continuar" que oculta el grid y abre el wizard en el paso correcto
+- La seccion se muestra siempre (no solo cuando hay datos)
+
+**2. Empty State**
+
+Cuando `inProgressCreators.length === 0`:
+- Contenedor centrado con borde fino y fondo sutil
+- Icono de carpeta (FolderOpen) en gris
+- Texto: "No hay onboardings en curso. Haz clic en + Iniciar Onboarding para registrar una nueva creadora."
+
+**3. Interaccion**
+
+- El boton "Continuar" en cada card llama a `handleCardClick(creator)` que ya existe y abre el wizard inline en el paso correcto
+- El wizard se muestra integrado en la pagina (ya funciona asi), no en modal
+
+### Archivo a modificar
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/creadores/useCreadores.ts` | Ampliar la funcion de busqueda para incluir `instagram_handle` y `email`. Agregar "pendiente" y "pendiente_verificacion" al STATUS_LIST y StatusCounts. |
-| `src/pages/creadores/CreadoresKPICards.tsx` | Agregar tarjeta o incorporar conteo para los estados pendiente/pendiente_verificacion |
+| `src/pages/creadores/onboarding/OnboardingContent.tsx` | Reemplazar seccion "Procesos en Curso" por grid de cards con avatar, progreso, badge descriptivo, boton "Continuar" y empty state con icono FolderOpen |
 
 ### Detalle tecnico
 
-**Busqueda ampliada** en `applyFilters`:
-```text
-// Antes: solo name y artistic_name
-// Despues: name, artistic_name, instagram_handle, email
-result = result.filter(c =>
-  c.name.toLowerCase().includes(q) ||
-  (c.artistic_name?.toLowerCase().includes(q)) ||
-  (c.instagram_handle?.toLowerCase().includes(q)) ||
-  (c.email?.toLowerCase().includes(q))
-);
-```
+La seccion de cards usa los datos de `inProgressCreators` (ya calculado con filtro `borrador` o `pendiente_verificacion`). Se reutilizan `calculateCurrentStep` y `getStepLabel` para determinar progreso y etiqueta. El nombre fallback es "Borrador sin nombre" cuando `creator.name` esta vacio. El boton "Continuar" invoca `handleCardClick` existente. La seccion siempre se renderiza cuando `!showWizard`, mostrando el empty state si no hay datos.
 
-**STATUS_LIST actualizado**:
-```text
-// Agregar "pendiente" y "pendiente_verificacion" al listado
-const STATUS_LIST = ["active", "onboarding", "paused", "leaving", "terminated", "pendiente", "pendiente_verificacion"] as const;
-```
-
-Esto agrega los conteos correspondientes en StatusCounts y permite filtrar por estos estados.
