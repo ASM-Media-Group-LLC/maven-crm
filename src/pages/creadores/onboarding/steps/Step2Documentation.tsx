@@ -49,7 +49,7 @@ interface Props {
 function DocUploader({
   label,
   icon: Icon,
-  files,
+  files = [],
   fieldKey,
   optional,
   onClickUpload,
