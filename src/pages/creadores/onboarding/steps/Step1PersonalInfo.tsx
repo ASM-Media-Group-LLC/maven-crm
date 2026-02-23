@@ -24,6 +24,13 @@ const COUNTRIES = [
   "Venezuela","Vietnam","Otro",
 ];
 
+function formatMedidas(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return digits.slice(0, 2) + "-" + digits.slice(2);
+  return digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4);
+}
+
 const TIMEZONES = [
   "America/Bogota (UTC-5)", "America/Mexico_City (UTC-6)", "America/Lima (UTC-5)",
   "America/Santiago (UTC-3)", "America/Buenos_Aires (UTC-3)", "America/New_York (UTC-5)",
@@ -115,7 +122,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
       <div className="space-y-1.5">
         <Label>Medidas (cm)</Label>
-        <Input value={data.medidas} onChange={(e) => onChange("medidas", e.target.value)} placeholder="90-60-90" />
+        <Input value={data.medidas} onChange={(e) => onChange("medidas", formatMedidas(e.target.value))} placeholder="90-60-90" maxLength={8} />
       </div>
       <div className="space-y-1.5">
         <Label>Talla de brasier</Label>
