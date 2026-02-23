@@ -28,6 +28,7 @@ import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
+import OnboardingWizardPage from "./pages/creadores/onboarding/OnboardingWizardPage";
 import CreadorasDashboardPage from "./pages/creadores/CreadorasDashboardPage";
 import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
@@ -119,6 +120,8 @@ const App = () => (
               <Route path="/creadores/dashboard" element={<ProtectedRoute><CreadorasDashboardPage /></ProtectedRoute>} />
               <Route path="/creadores" element={<ProtectedRoute><Creadores /></ProtectedRoute>} />
               <Route path="/creadores/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+              <Route path="/creadores/onboarding/nuevo" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
+              <Route path="/creadores/onboarding/:id" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
               <Route path="/creadores/nuevo" element={<ProtectedRoute><NuevoCreador /></ProtectedRoute>} />
               <Route path="/creadores/:id" element={<ProtectedRoute><CreadorProfile /></ProtectedRoute>} />
               <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />

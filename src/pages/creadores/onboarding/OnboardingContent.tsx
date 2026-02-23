@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, X } from "lucide-react";
-import OnboardingWizard from "./OnboardingWizard";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +16,12 @@ const agencyOptions = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Pl
 const OnboardingContent = () => {
   const { data: creators = [], isLoading } = useOnboarding();
   const { isAgent } = useUserRole();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("Todas");
   const [statusFilter, setStatusFilter] = useState<string>("Todas");
   const [stepFilter, setStepFilter] = useState("");
   const [view, setView] = useState<"table" | "grid">("table");
-  const [showWizard, setShowWizard] = useState(false);
-  const [editingCreator, setEditingCreator] = useState<{ id: string; initialStep: number } | null>(null);
 
   const statusMap: Record<string, string> = { Pendientes: "Pendiente", "En Progreso": "En Progreso", Completados: "Completado" };
 
@@ -68,14 +66,7 @@ const OnboardingContent = () => {
   ];
 
   const handleCardClick = (creator: OnboardingCreator) => {
-    const step = calculateCurrentStep(creator);
-    setEditingCreator({ id: creator.id, initialStep: step });
-    setShowWizard(true);
-  };
-
-  const handleCloseWizard = () => {
-    setShowWizard(false);
-    setEditingCreator(null);
+    navigate(`/creadores/onboarding/${creator.id}`);
   };
 
   return (
@@ -100,8 +91,8 @@ const OnboardingContent = () => {
             <h1 className="text-2xl font-bold tracking-tight">Onboarding</h1>
             <p className="text-sm text-muted-foreground">Gestiona el onboarding de nuevos creadores</p>
           </div>
-          {!showWizard && !isAgent && (
-            <Button onClick={() => { setEditingCreator(null); setShowWizard(true); }}>
+          {!isAgent && (
+            <Button onClick={() => navigate("/creadores/onboarding/nuevo")}>
               <Plus className="h-4 w-4 mr-2" />
               Iniciar Onboarding
             </Button>
@@ -110,7 +101,7 @@ const OnboardingContent = () => {
       </div>
 
       <div className="flex-1 overflow-auto px-6 pb-6 space-y-4">
-        {/* KPI Cards — clickeables como filtros maestros */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
           {kpiCards.map((kpi) => (
             <div key={kpi.label} onClick={() => setStatusFilter(kpi.filter)} className="cursor-pointer">
@@ -133,71 +124,59 @@ const OnboardingContent = () => {
           ))}
         </div>
 
-        {showWizard ? (
-          <div key="wizard" className="animate-fade-in">
-            <OnboardingWizard
-              onCancel={handleCloseWizard}
-              initialStep={editingCreator?.initialStep}
-              editCreatorId={editingCreator?.id}
+        {/* Filters */}
+        <div className="flex items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o empresa..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
             />
           </div>
+
+          <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Etapa del Proceso" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas las etapas</SelectItem>
+              <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
+              <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
+              <SelectItem value="3">Paso 3: Documentación</SelectItem>
+              <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="mr-1.5 h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          )}
+
+          <div className="ml-auto flex items-center gap-1 rounded-lg border p-1">
+            <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")}>
+              <List className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant={view === "grid" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("grid")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
         ) : (
-          <div key="list" className="animate-fade-in space-y-4">
-            {/* Barra de filtros unificada */}
-            <div className="flex items-center gap-3">
-              <div className="relative max-w-sm flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nombre o empresa..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-
-              <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Etapa del Proceso" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas las etapas</SelectItem>
-                  <SelectItem value="1">Paso 1: Datos Personales</SelectItem>
-                  <SelectItem value="2">Paso 2: Perfil Psicológico</SelectItem>
-                  <SelectItem value="3">Paso 3: Documentación</SelectItem>
-                  <SelectItem value="4">Paso 4: Config. Comercial</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="mr-1.5 h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-
-              <div className="ml-auto flex items-center gap-1 rounded-lg border p-1">
-                <Button size="icon" variant={view === "table" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("table")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant={view === "grid" ? "secondary" : "ghost"} className="h-8 w-8" onClick={() => setView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Content */}
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
+          <div key={view} className="animate-fade-in">
+            {view === "table" ? (
+              <OnboardingTable data={filtered} onManage={handleCardClick} />
             ) : (
-              <div key={view} className="animate-fade-in">
-                {view === "table" ? (
-                  <OnboardingTable data={filtered} onManage={handleCardClick} />
-                ) : (
-                  <OnboardingGrid data={filtered} onManage={handleCardClick} />
-                )}
-              </div>
+              <OnboardingGrid data={filtered} onManage={handleCardClick} />
             )}
           </div>
         )}
