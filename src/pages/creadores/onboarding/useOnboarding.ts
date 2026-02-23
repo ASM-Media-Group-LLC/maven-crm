@@ -36,6 +36,7 @@ function calculateProgress(training: any): number {
 function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "Completado" {
   if (dbStatus === "pendiente_verificacion") return "Pendiente";
   if (dbStatus === "asignado" || dbStatus === "activo") return "Completado";
+  if (dbStatus === "onboarding") return "En Progreso";
   return "En Progreso";
 }
 
@@ -71,7 +72,7 @@ export function useOnboarding() {
       const { data, error } = await supabase
         .from("creators")
         .select("*, creator_business(*), creator_training(*)")
-        .in("status", ["borrador", "pendiente_verificacion", "verificado", "asignado", "activo"]);
+        .in("status", ["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"]);
 
       if (error) throw error;
 
