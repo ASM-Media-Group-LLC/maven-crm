@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, RefreshCw } from "lucide-react";
+import { Users, Clock, Loader2, CheckCircle2, Search, List, LayoutGrid, Plus, RefreshCw, FolderOpen } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import OnboardingWizard from "./OnboardingWizard";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -95,42 +96,56 @@ const OnboardingContent = () => {
           <DashboardMetricCard label="Completados" value={String(completed)} icon={CheckCircle2} valueColor="text-emerald-500" />
         </div>
 
-        {/* Procesos en Curso */}
-        {!showWizard && inProgressCreators.length > 0 && (
+        {/* Onboardings en Curso - always visible when wizard is hidden */}
+        {!showWizard && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between py-4">
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">Procesos en Curso</CardTitle>
+                <CardTitle className="text-base">Onboardings en Curso</CardTitle>
                 <Badge variant="secondary-soft" className="text-xs">{inProgressCreators.length}</Badge>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {inProgressCreators.map((creator) => {
-                  const currentStep = calculateCurrentStep(creator);
-                  const label = getStepLabel(currentStep, creator.dbStatus);
-                  const progressValue = ((currentStep - 1) / 4) * 100;
-                  const isPending = creator.dbStatus === "pendiente_verificacion";
+              {inProgressCreators.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 border border-dashed border-border rounded-lg bg-muted/30">
+                  <FolderOpen className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm text-muted-foreground text-center max-w-xs">
+                    No hay onboardings en curso. Haz clic en <span className="font-medium text-foreground">+ Iniciar Onboarding</span> para registrar una nueva creadora.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {inProgressCreators.map((creator) => {
+                    const currentStep = calculateCurrentStep(creator);
+                    const label = getStepLabel(currentStep, creator.dbStatus);
+                    const progressValue = (currentStep / 4) * 100;
+                    const isPending = creator.dbStatus === "pendiente_verificacion";
+                    const displayName = creator.name?.trim() || "Borrador sin nombre";
+                    const initials = displayName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-                  return (
-                    <div
-                      key={creator.id}
-                      onClick={() => handleCardClick(creator)}
-                      className="min-w-[200px] max-w-[240px] rounded-lg border bg-card p-3 space-y-2 cursor-pointer transition-all hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px]"
-                    >
-                      <p className="font-medium text-sm truncate">{creator.name}</p>
-                      <Progress value={isPending ? 100 : progressValue} className="h-1.5" />
-                      <p className="text-xs text-muted-foreground">
-                        {isPending ? "Completado" : `Paso ${currentStep} de 4`}
-                      </p>
-                      <Badge variant={isPending ? "warning-soft" : "primary-soft"} className="text-[10px]">
-                        {label}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <Card key={creator.id} className="flex flex-col gap-3 p-4 transition-all hover:border-primary/40">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="text-xs bg-primary/15 text-primary">{initials}</AvatarFallback>
+                          </Avatar>
+                          <p className="font-medium text-sm truncate flex-1">{displayName}</p>
+                        </div>
+                        <Progress value={isPending ? 100 : progressValue} className="h-1.5" indicatorClassName="bg-gradient-to-r from-accent to-primary" />
+                        <div className="flex items-center justify-between">
+                          <Badge variant={isPending ? "warning-soft" : "primary-soft"} className="text-[10px]">
+                            {isPending ? "Pendiente de aprobación" : `Paso ${currentStep} de 4 — ${label}`}
+                          </Badge>
+                        </div>
+                        <Button variant="secondary" size="sm" className="w-full mt-1" onClick={() => handleCardClick(creator)}>
+                          Continuar
+                        </Button>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
