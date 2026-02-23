@@ -1,72 +1,36 @@
 
 
-## Sincronizacion y Activacion de la Vista de Onboarding
+## Enlace de la Card de Onboarding al Listado
 
-### Diagnostico
+### Cambio a realizar
 
-La base de datos confirma: **7 creadores con status "onboarding"**, 1 con "pendiente_verificacion", 1 con "pendiente". Sin embargo, la query actual en `useOnboarding` tambien incluye "verificado", "asignado" y "activo", lo que mezclaria 135+ creadores activos con los de onboarding real. El filtro debe limitarse a los estados previos a "activo".
+**Archivo**: `src/pages/creadores/CreadorasDashboardContent.tsx`
 
-### Cambios por archivo
+Se modificara unicamente la card de estado "onboarding" dentro del grid de KPIs (linea ~120) para que:
 
----
+1. **Navegue a `/creadores/onboarding`** en lugar de `/creadores?status=onboarding`
+2. **Muestre un texto "Ver listado"** con una flecha que aparece en hover, debajo del porcentaje
 
-**Archivo 1: `src/pages/creadores/onboarding/useOnboarding.ts`**
+### Detalle tecnico
 
-1. Ajustar el filtro de la query para traer solo estados de onboarding real:
-   - Antes: `["borrador", "onboarding", "pendiente_verificacion", "verificado", "asignado", "activo"]`
-   - Despues: `["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado"]`
-   - Se eliminan "asignado" y "activo" (ya pasaron onboarding) y se agrega "pendiente" (estado por defecto al convertir contacto)
+En el bloque `statusConfig.map(...)` (lineas 113-140), se agregara una condicion: cuando `key === "onboarding"`, el `onClick` apuntara a `/creadores/onboarding` y se renderizara un texto adicional.
 
-2. Actualizar `deriveStatus` para mapear correctamente:
-   - `"borrador"` y `"pendiente"` -> `"Pendiente"`
-   - `"onboarding"` -> `"En Progreso"`
-   - `"pendiente_verificacion"` -> `"Pendiente"` (se mantiene)
-   - `"verificado"` -> `"Completado"`
+```text
+// Linea ~120 - onClick condicional
+onClick={() => navigate(key === "onboarding" ? "/creadores/onboarding" : `/creadores?status=${key}`)}
 
----
+// Dentro del CardContent, despues del porcentaje (linea ~130)
+// Solo para key === "onboarding":
+<p className="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+  Ver listado ->
+</p>
+```
 
-**Archivo 2: `src/pages/creadores/onboarding/OnboardingTable.tsx`**
+Se agregara `group` a la clase del Card de onboarding para habilitar el efecto `group-hover` en el texto hijo.
 
-Redisenar las columnas de la tabla segun el requerimiento:
+### Resultado
 
-| Columna actual | Columna nueva |
-|---|---|
-| Empleado | Creadora (foto + nombre) |
-| Posicion | (se elimina) |
-| Area | (se elimina) |
-| Empresa | Agencia |
-| Fecha Inicio | Fecha Inicio |
-| Manager | (se elimina) |
-| Progreso | Progreso (barra visual) |
-| Estado | Estado (badge de color) |
-| (no existia) | Acciones (boton "Gestionar") |
-
-El boton "Gestionar" emitira un callback `onManage(creator)` que se conectara al wizard existente.
-
----
-
-**Archivo 3: `src/pages/creadores/onboarding/OnboardingGrid.tsx`**
-
-Agregar un boton "Gestionar" en cada card del grid, con el mismo callback `onManage`.
-
----
-
-**Archivo 4: `src/pages/creadores/onboarding/OnboardingContent.tsx`**
-
-1. Actualizar `inProgressCreators` para incluir `"pendiente"` en el filtro
-2. Pasar un handler `onManage` a `OnboardingTable` y `OnboardingGrid` que abra el wizard inline (reutilizando la logica existente de `handleCardClick`)
-3. Los KPIs se calculan automaticamente desde los datos filtrados -- no requieren cambio adicional
-
----
-
-### Resultado esperado
-
-| KPI Card | Contenido |
-|---|---|
-| Total | 9 (7 onboarding + 1 pendiente_verificacion + 1 pendiente) |
-| Pendientes | 2 (pendiente + pendiente_verificacion) |
-| En Progreso | 7 (onboarding) |
-| Completados | 0 (ningun verificado actualmente) |
-
-La tabla mostrara las 9 creadoras con columnas limpias y boton de accion. Los filtros por agencia funcionaran en tiempo real sobre la tabla.
+- La card de "Onboarding (7)" sera clickeable y llevara directamente a `/creadores/onboarding`
+- Al pasar el cursor aparecera el texto "Ver listado ->" en color primary
+- Las demas cards mantienen su comportamiento actual (filtro por status en `/creadores`)
 
