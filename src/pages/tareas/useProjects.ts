@@ -124,6 +124,37 @@ export const useProjects = () => {
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
+      // 1. Get all task IDs for this project
+      const { data: tasks } = await supabase
+        .from("tasks" as any)
+        .select("id")
+        .eq("project_id", projectId);
+      const taskIds = (tasks || []).map((t: any) => t.id);
+
+      // 2. Delete subtasks of those tasks
+      if (taskIds.length > 0) {
+        const { error: subtaskErr } = await supabase
+          .from("subtasks" as any)
+          .delete()
+          .in("task_id", taskIds);
+        if (subtaskErr) throw subtaskErr;
+      }
+
+      // 3. Delete tasks
+      const { error: taskErr } = await supabase
+        .from("tasks" as any)
+        .delete()
+        .eq("project_id", projectId);
+      if (taskErr) throw taskErr;
+
+      // 4. Delete project members
+      const { error: memberErr } = await supabase
+        .from("project_members" as any)
+        .delete()
+        .eq("project_id", projectId);
+      if (memberErr) throw memberErr;
+
+      // 5. Delete the project
       const { error } = await supabase
         .from("task_projects" as any)
         .delete()

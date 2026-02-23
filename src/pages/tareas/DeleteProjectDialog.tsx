@@ -24,7 +24,7 @@ const DeleteProjectDialog = ({ open, onOpenChange, projectName, onConfirm, isLoa
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar proyecto?</AlertDialogTitle>
           <AlertDialogDescription>
-            Estás a punto de eliminar el proyecto <span className="font-semibold">"{projectName}"</span>. Esta acción no se puede deshacer.
+            Estás a punto de eliminar el proyecto <span className="font-semibold">"{projectName}"</span> junto con <span className="font-semibold">todas sus tareas, subtareas y miembros</span>. Esta acción no se puede deshacer.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
