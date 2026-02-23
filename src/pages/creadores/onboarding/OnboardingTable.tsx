@@ -2,13 +2,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Clock, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, Clock, Loader2, Settings2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { OnboardingCreator } from "./useOnboarding";
 
 interface Props {
   data: OnboardingCreator[];
+  onManage?: (creator: OnboardingCreator) => void;
 }
 
 const statusConfig = {
@@ -17,25 +19,24 @@ const statusConfig = {
   "En Progreso": { icon: Loader2, className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
 };
 
-const OnboardingTable = ({ data }: Props) => {
+const OnboardingTable = ({ data, onManage }: Props) => {
   return (
     <div className="rounded-lg border bg-card overflow-auto max-h-[calc(100vh-420px)]">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
-            <TableHead>Empleado</TableHead>
-            <TableHead>Posición</TableHead>
-            <TableHead>Área</TableHead>
-            <TableHead>Empresa</TableHead>
+            <TableHead>Creadora</TableHead>
+            <TableHead>Agencia</TableHead>
             <TableHead>Fecha Inicio</TableHead>
-            <TableHead>Manager</TableHead>
             <TableHead>Progreso</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((item) => {
-            const initials = item.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+            const displayName = item.name?.trim() || "Sin nombre";
+            const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
             const sc = statusConfig[item.status];
             const StatusIcon = sc.icon;
             return (
@@ -46,20 +47,13 @@ const OnboardingTable = ({ data }: Props) => {
                       <AvatarImage src={item.profile_photo_url || undefined} />
                       <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                     </Avatar>
-                    <span className="font-medium text-sm">{item.name}</span>
+                    <span className="font-medium text-sm">{displayName}</span>
                   </div>
-                </TableCell>
-                <TableCell className="text-sm">{item.position}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
-                    {item.area}
-                  </Badge>
                 </TableCell>
                 <TableCell className="text-sm">{item.company}</TableCell>
                 <TableCell className="text-sm">
                   {item.startDate ? format(new Date(item.startDate), "dd MMM yyyy", { locale: es }) : "—"}
                 </TableCell>
-                <TableCell className="text-sm">{item.manager}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2 min-w-[120px]">
                     <Progress value={item.progress} className="h-2 flex-1" />
@@ -72,12 +66,18 @@ const OnboardingTable = ({ data }: Props) => {
                     {item.status}
                   </Badge>
                 </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="secondary" size="sm" onClick={() => onManage?.(item)}>
+                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                    Gestionar
+                  </Button>
+                </TableCell>
               </TableRow>
             );
           })}
           {data.length === 0 && (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                 No hay creadores en onboarding
               </TableCell>
             </TableRow>

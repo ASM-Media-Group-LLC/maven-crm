@@ -39,7 +39,7 @@ const OnboardingContent = () => {
   }, [creators, activeTab, search]);
 
   const inProgressCreators = useMemo(() => {
-    return creators.filter((c) => c.dbStatus === "borrador" || c.dbStatus === "onboarding" || c.dbStatus === "pendiente_verificacion");
+    return creators.filter((c) => c.dbStatus === "borrador" || c.dbStatus === "pendiente" || c.dbStatus === "onboarding" || c.dbStatus === "pendiente_verificacion");
   }, [creators]);
 
   const total = creators.length;
@@ -205,9 +205,9 @@ const OnboardingContent = () => {
             ) : (
               <div key={view} className="animate-fade-in mt-4">
                 {view === "table" ? (
-                  <OnboardingTable data={filtered} />
+                  <OnboardingTable data={filtered} onManage={handleCardClick} />
                 ) : (
-                  <OnboardingGrid data={filtered} />
+                  <OnboardingGrid data={filtered} onManage={handleCardClick} />
                 )}
               </div>
             )}
