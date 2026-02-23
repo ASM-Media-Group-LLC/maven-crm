@@ -40,6 +40,20 @@ export interface Step2PsyData {
   respuestaUsuarioGrosero: string;
   respuestaPedirDesnudos: string;
   queTeIncomoda: string;
+  horariosSueno: string;
+  deporteEquipo: string;
+  colorFavorito: string;
+  estadoCivil: string;
+  queBuscasPareja: string;
+  mejorAtributoFisico: string;
+  metasLargoPlazo: string;
+  queHacesRelajarte: string;
+  queTeHaceReir: string;
+  queTeMotivaCrear: string;
+  respuestaCuantoCobraEncuentro: string;
+  respuestaMuestraIntimas: string;
+  estrategiaMaterialGratis: string;
+  estrategiaProblemasPersonales: string;
 }
 
 interface Props {
@@ -110,6 +124,34 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Horarios de sueño</Label>
+              <Input value={data.horariosSueno} onChange={(e) => onChange("horariosSueno", e.target.value)} placeholder="Despierta 9am, duerme 1am" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Deporte / Equipo favorito</Label>
+              <Input value={data.deporteEquipo} onChange={(e) => onChange("deporteEquipo", e.target.value)} placeholder="Fútbol, Real Madrid..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Color favorito</Label>
+              <Input value={data.colorFavorito} onChange={(e) => onChange("colorFavorito", e.target.value)} placeholder="Rosa, negro..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Estado civil</Label>
+              <Input value={data.estadoCivil} onChange={(e) => onChange("estadoCivil", e.target.value)} placeholder="Soltera, en una relación..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mejor atributo físico</Label>
+              <Input value={data.mejorAtributoFisico} onChange={(e) => onChange("mejorAtributoFisico", e.target.value)} placeholder="Ojos, sonrisa, cuerpo..." />
+            </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label>¿Qué buscas en una pareja?</Label>
+              <Textarea value={data.queBuscasPareja} onChange={(e) => onChange("queBuscasPareja", e.target.value)} placeholder="Describe lo que la creadora busca en una pareja..." rows={3} />
+            </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label>Metas a largo plazo</Label>
+              <Textarea value={data.metasLargoPlazo} onChange={(e) => onChange("metasLargoPlazo", e.target.value)} placeholder="Metas personales y profesionales a largo plazo..." rows={3} />
+            </div>
             <div className="md:col-span-2 space-y-1.5">
               <Label>Rutina diaria</Label>
               <Textarea value={data.rutinaDiaria} onChange={(e) => onChange("rutinaDiaria", e.target.value)} placeholder="Describe la rutina diaria de la creadora..." rows={3} />
@@ -160,6 +202,18 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                   {TONOS_VOZ.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label>¿Qué haces para relajarte después de un día largo?</Label>
+              <Textarea value={data.queHacesRelajarte} onChange={(e) => onChange("queHacesRelajarte", e.target.value)} placeholder="Ver series, meditar, un baño caliente..." rows={3} />
+            </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label>¿Qué es lo que más te hace reír?</Label>
+              <Textarea value={data.queTeHaceReir} onChange={(e) => onChange("queTeHaceReir", e.target.value)} placeholder="Memes, comedia, situaciones absurdas..." rows={3} />
+            </div>
+            <div className="md:col-span-2 space-y-1.5">
+              <Label>¿Qué te motiva a crear contenido en esta plataforma?</Label>
+              <Textarea value={data.queTeMotivaCrear} onChange={(e) => onChange("queTeMotivaCrear", e.target.value)} placeholder="Libertad financiera, expresión personal..." rows={3} />
             </div>
           </div>
         </AccordionContent>
@@ -242,6 +296,74 @@ export default function Step2PsychologyLimits({ data, onChange }: Props) {
                 value={data.respuestaPedirDesnudos}
                 onChange={(e) => onChange("respuestaPedirDesnudos", e.target.value)}
                 placeholder="Respuesta tipo script para esta solicitud común..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label>¿Cómo respondes a "¿cuánto cobras por un encuentro?"</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={data.respuestaCuantoCobraEncuentro}
+                onChange={(e) => onChange("respuestaCuantoCobraEncuentro", e.target.value)}
+                placeholder="Respuesta tipo script para esta solicitud..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label>¿Cómo respondes a "muéstrame tus partes íntimas"?</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={data.respuestaMuestraIntimas}
+                onChange={(e) => onChange("respuestaMuestraIntimas", e.target.value)}
+                placeholder="Respuesta tipo script para esta solicitud..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label>Estrategia para usuarios que piden material gratis</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={data.estrategiaMaterialGratis}
+                onChange={(e) => onChange("estrategiaMaterialGratis", e.target.value)}
+                placeholder="Estrategia para manejar solicitudes de contenido gratis..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label>Estrategia ante usuarios con problemas personales profundos</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>Esto ayudará a nuestros chatters a hablar exactamente como tú</TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                value={data.estrategiaProblemasPersonales}
+                onChange={(e) => onChange("estrategiaProblemasPersonales", e.target.value)}
+                placeholder="Cómo manejar usuarios que confiesan problemas personales muy profundos..."
                 rows={3}
               />
             </div>
