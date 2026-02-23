@@ -125,6 +125,14 @@ const OnboardingContent = () => {
           ))}
         </div>
 
+        {/* Agency Tabs */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <Button size="sm" variant={activeTab === "Todas" ? "secondary" : "ghost"} onClick={() => setActiveTab("Todas")}>Todas</Button>
+          {agencyOptions.map((a) => (
+            <Button key={a} size="sm" variant={activeTab === a ? "secondary" : "ghost"} onClick={() => setActiveTab(a)}>{a}</Button>
+          ))}
+        </div>
+
         {showWizard ? (
           <div key="wizard" className="animate-fade-in">
             <OnboardingWizard
@@ -146,18 +154,6 @@ const OnboardingContent = () => {
                   className="pl-9"
                 />
               </div>
-
-              <Select value={activeTab === "Todas" ? undefined : activeTab} onValueChange={(v) => setActiveTab(v === "__all__" ? "Todas" : v)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Agencia" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todas las agencias</SelectItem>
-                  {agencyOptions.map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
 
               <Select value={stepFilter || undefined} onValueChange={(v) => setStepFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[220px]">
