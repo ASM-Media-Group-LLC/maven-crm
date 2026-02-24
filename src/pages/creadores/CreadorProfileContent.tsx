@@ -80,7 +80,7 @@ const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
-  const { isAgent } = useUserRole();
+  const { isAgent, isAdmin, isManager } = useUserRole();
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   if (isLoading) {
@@ -105,10 +105,22 @@ const CreadorProfileContent = () => {
   }
 
   const c = creator;
-  const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
-  const age = c.birth_date ? computeAge(c.birth_date) : c.age;
-  const birthdayDays = c.birth_date ? getDaysUntilBirthday(c.birth_date) : null;
+  
+  // Privacy logic: agents see restricted data unless privacy flags are ON
+  const canSeeAllData = isAdmin || isManager || !isAgent;
+  const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
+  const showRealAge = canSeeAllData || (c as any).permiso_edad_real === true;
+  const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
+
+  const displayName = showRealName ? c.name : (c.artistic_name || c.name);
+  const initials = displayName.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const flag = showRealLocation
+    ? getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null)
+    : "";
+  
+  const realAge = c.birth_date ? computeAge(c.birth_date) : c.age;
+  const displayAge = showRealAge ? realAge : ((c as any).edad_mostrar ?? realAge);
+  const birthdayDays = showRealAge && c.birth_date ? getDaysUntilBirthday(c.birth_date) : null;
 
   return (
     <main className="flex-1 overflow-y-auto">
@@ -128,8 +140,11 @@ const CreadorProfileContent = () => {
           </Avatar>
 
           <div className="flex-1 min-w-0 space-y-2">
-            <h1 className="text-2xl font-bold tracking-wide uppercase">{c.name}</h1>
-            {c.artistic_name && (
+            <h1 className="text-2xl font-bold tracking-wide uppercase">{displayName}</h1>
+            {showRealName && c.artistic_name && (
+              <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
+            )}
+            {!showRealName && c.artistic_name && (
               <p className="text-muted-foreground text-sm">"{c.artistic_name}"</p>
             )}
 
@@ -148,8 +163,8 @@ const CreadorProfileContent = () => {
                   </Badge>
                 </a>
               )}
-              {age != null && (
-                <Badge variant="secondary-soft">{age} años</Badge>
+              {displayAge != null && (
+                <Badge variant="secondary-soft">{displayAge} años</Badge>
               )}
             </div>
           </div>

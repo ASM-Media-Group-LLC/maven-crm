@@ -28,6 +28,7 @@ import { buildSocialUrl } from "@/lib/utils";
 import EditCreadorModal from "./EditCreadorModal";
 import ViewCreadorModal from "./ViewCreadorModal";
 import ChangeStatusModal from "./ChangeStatusModal";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -79,6 +80,8 @@ const CreadoresTable = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
+  const { isAgent, isAdmin, isManager } = useUserRole();
+  const canSeeAllData = isAdmin || isManager || !isAgent;
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -140,14 +143,17 @@ const CreadoresTable = ({ creators }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((c) => {
-          const initials = c.name
+          const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
+          const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
+          const displayName = showRealName ? c.name : (c.artistic_name || c.name);
+          const initials = displayName
             .split(" ")
             .slice(0, 2)
             .map((w) => w[0])
             .join("")
             .toUpperCase();
 
-          const flag = getFlagEmoji(c.country_code);
+          const flag = showRealLocation ? getFlagEmoji(c.country_code) : "";
           const agency = c.creator_business?.assigned_agency;
           const kashType = c.creator_business?.kash_type;
           const agencyLabel = [agency, kashType].filter(Boolean).join(" · ");
@@ -161,8 +167,8 @@ const CreadoresTable = ({ creators }: Props) => {
                     <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium leading-none">{c.artistic_name || c.name}</p>
-                    {c.artistic_name && (
+                    <p className="text-sm font-medium leading-none">{showRealName ? (c.artistic_name || c.name) : displayName}</p>
+                    {showRealName && c.artistic_name && (
                       <p className="text-xs text-muted-foreground">{c.name}</p>
                     )}
                   </div>
@@ -190,8 +196,14 @@ const CreadoresTable = ({ creators }: Props) => {
                 </button>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {flag && <span className="mr-1">{flag}</span>}
-                {c.city || c.country || "—"}
+                {showRealLocation ? (
+                  <>
+                    {flag && <span className="mr-1">{flag}</span>}
+                    {c.city || c.country || "—"}
+                  </>
+                ) : (
+                  (c as any).ubicacion_artistica || "—"
+                )}
               </TableCell>
               <TableCell className="text-sm">
                 {agencyLabel ? (

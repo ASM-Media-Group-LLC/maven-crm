@@ -844,53 +844,111 @@ export type Database = {
           assigned_manager_profile_id: string | null
           assigned_specialist_id: string | null
           assigned_specialist_profile_id: string | null
+          bebida_favorita: string | null
           bio: string | null
           birth_date: string | null
           category: string | null
           chat_url: string | null
+          cicatrices: string | null
           city: string | null
           closer_responsible_id: string | null
           closer_responsible_profile_id: string | null
+          color_favorito: string | null
           comida_favorita: string | null
+          como_eres_cuando_nadie_ve: string | null
+          como_quieres_que_te_llamen: string | null
           contenido_jamas_haria: string | null
           country: string | null
           country_code: string | null
           created_at: string | null
+          currency: string | null
+          deporte_equipo: string | null
+          dia_perfecto: string | null
+          direccion: string | null
+          edad_mostrar: number | null
           email: string | null
           emoji_frecuente: string | null
+          estado_civil: string | null
           estatura: string | null
+          estrategia_material_gratis: string | null
+          estrategia_problemas_personales: string | null
+          estrategia_rechazo: string | null
+          estrategia_recuperacion: string | null
+          etnicidad: string | null
           external_transfer: number | null
+          frases_venta: string | null
+          gfe_disponible: boolean | null
+          helado_favorito: string | null
+          hermanos: string | null
           hobbies: string | null
+          horarios_sueno: string | null
           id: string
           instagram_followers: number | null
           instagram_handle: string | null
+          interesa_dinamicas_grupales: boolean | null
           internal_notes: string | null
           languages: string[] | null
+          last_autosave_at: string | null
+          link_otras_plataformas: string | null
           linkedin_handle: string | null
           mascotas_nombres: string | null
           medidas_cm: string | null
+          mejor_atributo_fisico: string | null
+          metas_largo_plazo: string | null
+          musica_artistas: string | null
           name: string
           nivel_estudios: string | null
+          nivel_lectura: string | null
           notes: string | null
           onlyfans_url: string | null
+          orientacion_perfil: string | null
+          otras_plataformas: string | null
           palabras_prohibidas: string | null
+          peliculas_tv: string | null
+          permiso_edad_real: boolean | null
+          permiso_nombre_real: boolean | null
+          permiso_ubicacion: boolean | null
+          personalidad_marca: string | null
           phone: string | null
           phone_e164: string | null
           piclink_url: string | null
+          plataforma_videollamada: string | null
           precios_contenido: Json | null
           profile_photo_url: string | null
+          que_buscas_pareja: string | null
+          que_haces_relajarte: string | null
+          que_te_hace_reir: string | null
+          que_te_incomoda: string | null
+          que_te_motiva_crear: string | null
+          redes_sociales: string | null
           registration_date: string | null
+          respuesta_cuanto_cobra_encuentro: string | null
+          respuesta_muestra_intimas: string | null
+          respuesta_pedir_desnudos: string | null
+          respuesta_sexo_en_persona: string | null
+          respuesta_usuario_grosero: string | null
+          restricciones_seguridad: string | null
           rutina_diaria: string | null
+          schedule_config: Json | null
+          segundo_nombre: string | null
           signo_zodiacal: string | null
           source: string | null
           status: string | null
           talla_brasier: string | null
           tatuajes_piercings_detalle: string | null
+          terminos_afecto: string | null
           tiktok_handle: string | null
+          timezone: string | null
+          tono_emocional: string | null
           tono_voz: string | null
           twitter_handle: string | null
+          ubicacion_artistica: string | null
           updated_at: string | null
+          usuarios_vip: string | null
+          viajes_favoritos: string | null
+          viajes_por_visitar: string | null
           whatsapp_number: string | null
+          wishlist_amazon: string | null
           wishlist_url: string | null
           youtube_handle: string | null
         }
@@ -902,53 +960,111 @@ export type Database = {
           assigned_manager_profile_id?: string | null
           assigned_specialist_id?: string | null
           assigned_specialist_profile_id?: string | null
+          bebida_favorita?: string | null
           bio?: string | null
           birth_date?: string | null
           category?: string | null
           chat_url?: string | null
+          cicatrices?: string | null
           city?: string | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          color_favorito?: string | null
           comida_favorita?: string | null
+          como_eres_cuando_nadie_ve?: string | null
+          como_quieres_que_te_llamen?: string | null
           contenido_jamas_haria?: string | null
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          currency?: string | null
+          deporte_equipo?: string | null
+          dia_perfecto?: string | null
+          direccion?: string | null
+          edad_mostrar?: number | null
           email?: string | null
           emoji_frecuente?: string | null
+          estado_civil?: string | null
           estatura?: string | null
+          estrategia_material_gratis?: string | null
+          estrategia_problemas_personales?: string | null
+          estrategia_rechazo?: string | null
+          estrategia_recuperacion?: string | null
+          etnicidad?: string | null
           external_transfer?: number | null
+          frases_venta?: string | null
+          gfe_disponible?: boolean | null
+          helado_favorito?: string | null
+          hermanos?: string | null
           hobbies?: string | null
+          horarios_sueno?: string | null
           id?: string
           instagram_followers?: number | null
           instagram_handle?: string | null
+          interesa_dinamicas_grupales?: boolean | null
           internal_notes?: string | null
           languages?: string[] | null
+          last_autosave_at?: string | null
+          link_otras_plataformas?: string | null
           linkedin_handle?: string | null
           mascotas_nombres?: string | null
           medidas_cm?: string | null
+          mejor_atributo_fisico?: string | null
+          metas_largo_plazo?: string | null
+          musica_artistas?: string | null
           name: string
           nivel_estudios?: string | null
+          nivel_lectura?: string | null
           notes?: string | null
           onlyfans_url?: string | null
+          orientacion_perfil?: string | null
+          otras_plataformas?: string | null
           palabras_prohibidas?: string | null
+          peliculas_tv?: string | null
+          permiso_edad_real?: boolean | null
+          permiso_nombre_real?: boolean | null
+          permiso_ubicacion?: boolean | null
+          personalidad_marca?: string | null
           phone?: string | null
           phone_e164?: string | null
           piclink_url?: string | null
+          plataforma_videollamada?: string | null
           precios_contenido?: Json | null
           profile_photo_url?: string | null
+          que_buscas_pareja?: string | null
+          que_haces_relajarte?: string | null
+          que_te_hace_reir?: string | null
+          que_te_incomoda?: string | null
+          que_te_motiva_crear?: string | null
+          redes_sociales?: string | null
           registration_date?: string | null
+          respuesta_cuanto_cobra_encuentro?: string | null
+          respuesta_muestra_intimas?: string | null
+          respuesta_pedir_desnudos?: string | null
+          respuesta_sexo_en_persona?: string | null
+          respuesta_usuario_grosero?: string | null
+          restricciones_seguridad?: string | null
           rutina_diaria?: string | null
+          schedule_config?: Json | null
+          segundo_nombre?: string | null
           signo_zodiacal?: string | null
           source?: string | null
           status?: string | null
           talla_brasier?: string | null
           tatuajes_piercings_detalle?: string | null
+          terminos_afecto?: string | null
           tiktok_handle?: string | null
+          timezone?: string | null
+          tono_emocional?: string | null
           tono_voz?: string | null
           twitter_handle?: string | null
+          ubicacion_artistica?: string | null
           updated_at?: string | null
+          usuarios_vip?: string | null
+          viajes_favoritos?: string | null
+          viajes_por_visitar?: string | null
           whatsapp_number?: string | null
+          wishlist_amazon?: string | null
           wishlist_url?: string | null
           youtube_handle?: string | null
         }
@@ -960,53 +1076,111 @@ export type Database = {
           assigned_manager_profile_id?: string | null
           assigned_specialist_id?: string | null
           assigned_specialist_profile_id?: string | null
+          bebida_favorita?: string | null
           bio?: string | null
           birth_date?: string | null
           category?: string | null
           chat_url?: string | null
+          cicatrices?: string | null
           city?: string | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          color_favorito?: string | null
           comida_favorita?: string | null
+          como_eres_cuando_nadie_ve?: string | null
+          como_quieres_que_te_llamen?: string | null
           contenido_jamas_haria?: string | null
           country?: string | null
           country_code?: string | null
           created_at?: string | null
+          currency?: string | null
+          deporte_equipo?: string | null
+          dia_perfecto?: string | null
+          direccion?: string | null
+          edad_mostrar?: number | null
           email?: string | null
           emoji_frecuente?: string | null
+          estado_civil?: string | null
           estatura?: string | null
+          estrategia_material_gratis?: string | null
+          estrategia_problemas_personales?: string | null
+          estrategia_rechazo?: string | null
+          estrategia_recuperacion?: string | null
+          etnicidad?: string | null
           external_transfer?: number | null
+          frases_venta?: string | null
+          gfe_disponible?: boolean | null
+          helado_favorito?: string | null
+          hermanos?: string | null
           hobbies?: string | null
+          horarios_sueno?: string | null
           id?: string
           instagram_followers?: number | null
           instagram_handle?: string | null
+          interesa_dinamicas_grupales?: boolean | null
           internal_notes?: string | null
           languages?: string[] | null
+          last_autosave_at?: string | null
+          link_otras_plataformas?: string | null
           linkedin_handle?: string | null
           mascotas_nombres?: string | null
           medidas_cm?: string | null
+          mejor_atributo_fisico?: string | null
+          metas_largo_plazo?: string | null
+          musica_artistas?: string | null
           name?: string
           nivel_estudios?: string | null
+          nivel_lectura?: string | null
           notes?: string | null
           onlyfans_url?: string | null
+          orientacion_perfil?: string | null
+          otras_plataformas?: string | null
           palabras_prohibidas?: string | null
+          peliculas_tv?: string | null
+          permiso_edad_real?: boolean | null
+          permiso_nombre_real?: boolean | null
+          permiso_ubicacion?: boolean | null
+          personalidad_marca?: string | null
           phone?: string | null
           phone_e164?: string | null
           piclink_url?: string | null
+          plataforma_videollamada?: string | null
           precios_contenido?: Json | null
           profile_photo_url?: string | null
+          que_buscas_pareja?: string | null
+          que_haces_relajarte?: string | null
+          que_te_hace_reir?: string | null
+          que_te_incomoda?: string | null
+          que_te_motiva_crear?: string | null
+          redes_sociales?: string | null
           registration_date?: string | null
+          respuesta_cuanto_cobra_encuentro?: string | null
+          respuesta_muestra_intimas?: string | null
+          respuesta_pedir_desnudos?: string | null
+          respuesta_sexo_en_persona?: string | null
+          respuesta_usuario_grosero?: string | null
+          restricciones_seguridad?: string | null
           rutina_diaria?: string | null
+          schedule_config?: Json | null
+          segundo_nombre?: string | null
           signo_zodiacal?: string | null
           source?: string | null
           status?: string | null
           talla_brasier?: string | null
           tatuajes_piercings_detalle?: string | null
+          terminos_afecto?: string | null
           tiktok_handle?: string | null
+          timezone?: string | null
+          tono_emocional?: string | null
           tono_voz?: string | null
           twitter_handle?: string | null
+          ubicacion_artistica?: string | null
           updated_at?: string | null
+          usuarios_vip?: string | null
+          viajes_favoritos?: string | null
+          viajes_por_visitar?: string | null
           whatsapp_number?: string | null
+          wishlist_amazon?: string | null
           wishlist_url?: string | null
           youtube_handle?: string | null
         }

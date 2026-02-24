@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { Check, Loader2, ArrowLeft, Info } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { Check, Loader2, ArrowLeft, Info, CheckCircle2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
@@ -43,10 +43,166 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   const [loadingCreator, setLoadingCreator] = useState(!!editCreatorId);
   const [creatorStatus, setCreatorStatus] = useState<string | null>(null);
 
+  // Autosave state
+  const isDirty = useRef(false);
+  const autoSaveIdRef = useRef<string | null>(editCreatorId || null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isSavingAuto, setIsSavingAuto] = useState(false);
+
   const { toast } = useToast();
   const addCreador = useAddCreadorWithBusiness();
   const queryClient = useQueryClient();
   const tempId = useMemo(() => `onboarding-${Date.now()}`, []);
+
+  // Build the creator payload using direct columns (no more internal_notes serialization)
+  const buildCreatorPayload = useCallback((isDraft: boolean) => {
+    const preciosContenido: Record<string, { price: number; notes: string }> = {};
+    Object.entries(step4.pricing).forEach(([key, val]) => {
+      const price = Number(val.price);
+      if (price > 0) {
+        preciosContenido[key] = { price, notes: val.notes || "" };
+      }
+    });
+
+    const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
+
+    return {
+      name: step1.name || "Borrador",
+      email: step1.email || null,
+      phone: step1.phone || null,
+      age: step1.age ? Number(step1.age) : null,
+      country: step1.country || null,
+      city: step1.city || null,
+      artistic_name: step1.artisticName || null,
+      birth_date: step1.birthDate || null,
+      medidas_cm: step1.medidas || null,
+      talla_brasier: step1.tallaBrasier || null,
+      signo_zodiacal: step1.signoZodiacal || null,
+      tatuajes_piercings_detalle: step1.tatuajesPiercings || null,
+      languages: step1.idiomas ? step1.idiomas.split(",").map((l: string) => l.trim()).filter(Boolean) : null,
+      // Direct columns (previously in internal_notes)
+      segundo_nombre: step1.segundoNombre || null,
+      direccion: step1.direccion || null,
+      timezone: step1.timezone || null,
+      etnicidad: step1.etnicidad || null,
+      cicatrices: step1.cicatrices || null,
+      nivel_lectura: step1.nivelLectura || null,
+      permiso_nombre_real: step1.permisoNombreReal === "true",
+      permiso_edad_real: step1.permisoEdadReal === "true",
+      permiso_ubicacion: step1.permisoUbicacion === "true",
+      edad_mostrar: step1.edadMostrar ? Number(step1.edadMostrar) : null,
+      ubicacion_artistica: step1.ubicacionArtistica || null,
+      redes_sociales: step1.redesSociales || null,
+      wishlist_amazon: step1.wishlistAmazon || null,
+      // Step 2 direct columns
+      rutina_diaria: step2Psy.rutinaDiaria || null,
+      hobbies: step2Psy.hobbies || null,
+      mascotas_nombres: step2Psy.mascotasNombres || null,
+      comida_favorita: step2Psy.comidaFavorita || null,
+      nivel_estudios: step2Psy.nivelEstudios || null,
+      apodos_permitidos: step2Psy.apodosPermitidos || null,
+      palabras_prohibidas: step2Psy.palabrasProhibidas || null,
+      emoji_frecuente: step2Psy.emojiFrecuente || null,
+      tono_voz: step2Psy.tonoVoz || null,
+      contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
+      helado_favorito: step2Psy.heladoFavorito || null,
+      bebida_favorita: step2Psy.bebidaFavorita || null,
+      musica_artistas: step2Psy.musicaArtistas || null,
+      peliculas_tv: step2Psy.peliculasTV || null,
+      viajes_favoritos: step2Psy.viajesFavoritos || null,
+      viajes_por_visitar: step2Psy.viajesPorVisitar || null,
+      hermanos: step2Psy.hermanos || null,
+      dia_perfecto: step2Psy.diaPerfecto || null,
+      como_eres_cuando_nadie_ve: step2Psy.comoEresCuandoNadieVe || null,
+      como_quieres_que_te_llamen: step2Psy.comoQuieresQueTeLlamen || null,
+      respuesta_sexo_en_persona: step2Psy.respuestaSexoEnPersona || null,
+      respuesta_usuario_grosero: step2Psy.respuestaUsuarioGrosero || null,
+      respuesta_pedir_desnudos: step2Psy.respuestaPedirDesnudos || null,
+      que_te_incomoda: step2Psy.queTeIncomoda || null,
+      horarios_sueno: step2Psy.horariosSueno || null,
+      deporte_equipo: step2Psy.deporteEquipo || null,
+      color_favorito: step2Psy.colorFavorito || null,
+      estado_civil: step2Psy.estadoCivil || null,
+      que_buscas_pareja: step2Psy.queBuscasPareja || null,
+      mejor_atributo_fisico: step2Psy.mejorAtributoFisico || null,
+      metas_largo_plazo: step2Psy.metasLargoPlazo || null,
+      que_haces_relajarte: step2Psy.queHacesRelajarte || null,
+      que_te_hace_reir: step2Psy.queTeHaceReir || null,
+      que_te_motiva_crear: step2Psy.queTeMotivaCrear || null,
+      respuesta_cuanto_cobra_encuentro: step2Psy.respuestaCuantoCobraEncuentro || null,
+      respuesta_muestra_intimas: step2Psy.respuestaMuestraIntimas || null,
+      estrategia_material_gratis: step2Psy.estrategiaMaterialGratis || null,
+      estrategia_problemas_personales: step2Psy.estrategiaProblemasPersonales || null,
+      // Step 3
+      wishlist_url: step3Doc.wishlistUrl || null,
+      instagram_handle: step3Doc.instagramHandle || null,
+      tiktok_handle: step3Doc.tiktokHandle || null,
+      twitter_handle: step3Doc.twitterHandle || null,
+      onlyfans_url: step3Doc.onlyfansUrl || null,
+      otras_plataformas: step3Doc.otrasPlataformas || null,
+      link_otras_plataformas: step3Doc.linkOtrasPlataformas || null,
+      // Step 4
+      schedule_config: step4.schedule || {},
+      currency: step4.currency || "USD",
+      gfe_disponible: step4.gfeDisponible || false,
+      personalidad_marca: step4.personalidadMarca || null,
+      estrategia_rechazo: step4.estrategiaRechazo || null,
+      tono_emocional: step4.tonoEmocional || null,
+      frases_venta: step4.frasesVenta || null,
+      usuarios_vip: step4.usuariosVip || null,
+      plataforma_videollamada: step4.plataformaVideollamada || null,
+      estrategia_recuperacion: step4.estrategiaRecuperacion || null,
+      interesa_dinamicas_grupales: step4.interesaDinamicasGrupales || false,
+      terminos_afecto: step4.terminosAfecto || null,
+      restricciones_seguridad: step4.restriccionesSeguridad || null,
+      orientacion_perfil: step4.orientacionPerfil || null,
+      // Common
+      status: isDraft ? "borrador" : "pendiente_verificacion",
+      profile_photo_url: profilePhotoUrl,
+      precios_contenido: Object.keys(preciosContenido).length > 0 ? preciosContenido : null,
+      notes: step4.notes || null,
+      last_autosave_at: new Date().toISOString(),
+    };
+  }, [step1, step2Psy, step3Doc, step4]);
+
+  // Autosave function
+  const autoSave = useCallback(async () => {
+    if (!step1.name.trim()) return; // Need at least a name
+    setIsSavingAuto(true);
+    try {
+      const payload = buildCreatorPayload(true);
+      if (autoSaveIdRef.current) {
+        // Update existing
+        await supabase
+          .from("creators")
+          .update(payload as any)
+          .eq("id", autoSaveIdRef.current);
+      } else {
+        // Insert new as draft
+        const { data, error } = await supabase
+          .from("creators")
+          .insert(payload as any)
+          .select("id")
+          .single();
+        if (error) throw error;
+        if (data) autoSaveIdRef.current = data.id;
+      }
+      isDirty.current = false;
+      setLastSavedAt(new Date());
+    } catch (err) {
+      console.warn("Autosave failed:", err);
+    } finally {
+      setIsSavingAuto(false);
+    }
+  }, [buildCreatorPayload, step1.name]);
+
+  // 30-second autosave interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isDirty.current) autoSave();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [autoSave]);
 
   // Load existing creator data when editing
   useEffect(() => {
@@ -59,31 +215,33 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         .eq("id", editCreatorId)
         .maybeSingle();
       if (c) {
+        // Fallback: try to parse internal_notes for backward compat
         let extraData: any = {};
         try { extraData = c.internal_notes ? JSON.parse(c.internal_notes) : {}; } catch {}
         const biz = Array.isArray(c.creator_business) ? c.creator_business[0] : c.creator_business;
 
         setStep1({
-          name: c.name || "", segundoNombre: extraData.segundoNombre || "",
+          name: c.name || "", segundoNombre: (c as any).segundo_nombre || extraData.segundoNombre || "",
           email: c.email || "", phone: c.phone || "",
           age: c.age ? String(c.age) : "", country: c.country || "", city: c.city || "",
-          direccion: extraData.direccion || "",
-          timezone: extraData.timezone || "", artisticName: c.artistic_name || "",
+          direccion: (c as any).direccion || extraData.direccion || "",
+          timezone: (c as any).timezone || extraData.timezone || "",
+          artisticName: c.artistic_name || "",
           birthDate: c.birth_date || "", medidas: c.medidas_cm || "", tallaBrasier: c.talla_brasier || "",
           signoZodiacal: c.signo_zodiacal || "",
-          etnicidad: extraData.etnicidad || "",
+          etnicidad: (c as any).etnicidad || extraData.etnicidad || "",
           tatuajesPiercings: c.tatuajes_piercings_detalle || "",
-          cicatrices: extraData.cicatrices || "",
+          cicatrices: (c as any).cicatrices || extraData.cicatrices || "",
           idiomas: Array.isArray(c.languages) ? c.languages.join(", ") : "",
-          nivelLectura: extraData.nivelLectura || "",
-          permisoNombreReal: extraData.permisoNombreReal || "",
-          permisoEdadReal: extraData.permisoEdadReal || "",
-          permisoUbicacion: extraData.permisoUbicacion || "",
+          nivelLectura: (c as any).nivel_lectura || extraData.nivelLectura || "",
+          permisoNombreReal: String((c as any).permiso_nombre_real ?? extraData.permisoNombreReal ?? ""),
+          permisoEdadReal: String((c as any).permiso_edad_real ?? extraData.permisoEdadReal ?? ""),
+          permisoUbicacion: String((c as any).permiso_ubicacion ?? extraData.permisoUbicacion ?? ""),
           apodos: extraData.apodos || "",
-          edadMostrar: extraData.edadMostrar || "",
-          ubicacionArtistica: extraData.ubicacionArtistica || "",
-          redesSociales: extraData.redesSociales || "",
-          wishlistAmazon: extraData.wishlistAmazon || "",
+          edadMostrar: String((c as any).edad_mostrar ?? extraData.edadMostrar ?? ""),
+          ubicacionArtistica: (c as any).ubicacion_artistica || extraData.ubicacionArtistica || "",
+          redesSociales: (c as any).redes_sociales || extraData.redesSociales || "",
+          wishlistAmazon: (c as any).wishlist_amazon || extraData.wishlistAmazon || "",
         });
         setStep2Psy({
           rutinaDiaria: c.rutina_diaria || "", hobbies: c.hobbies || "",
@@ -91,34 +249,34 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           nivelEstudios: c.nivel_estudios || "", apodosPermitidos: c.apodos_permitidos || "",
           palabrasProhibidas: c.palabras_prohibidas || "", emojiFrecuente: c.emoji_frecuente || "",
           tonoVoz: c.tono_voz || "", contenidoJamasHaria: c.contenido_jamas_haria || "",
-          heladoFavorito: extraData.heladoFavorito || "",
-          bebidaFavorita: extraData.bebidaFavorita || "",
-          musicaArtistas: extraData.musicaArtistas || "",
-          peliculasTV: extraData.peliculasTV || "",
-          viajesFavoritos: extraData.viajesFavoritos || "",
-          viajesPorVisitar: extraData.viajesPorVisitar || "",
-          hermanos: extraData.hermanos || "",
-          diaPerfecto: extraData.diaPerfecto || "",
-          comoEresCuandoNadieVe: extraData.comoEresCuandoNadieVe || "",
-          comoQuieresQueTeLlamen: extraData.comoQuieresQueTeLlamen || "",
-          respuestaSexoEnPersona: extraData.respuestaSexoEnPersona || "",
-          respuestaUsuarioGrosero: extraData.respuestaUsuarioGrosero || "",
-          respuestaPedirDesnudos: extraData.respuestaPedirDesnudos || "",
-          queTeIncomoda: extraData.queTeIncomoda || "",
-          horariosSueno: extraData.horariosSueno || "",
-          deporteEquipo: extraData.deporteEquipo || "",
-          colorFavorito: extraData.colorFavorito || "",
-          estadoCivil: extraData.estadoCivil || "",
-          queBuscasPareja: extraData.queBuscasPareja || "",
-          mejorAtributoFisico: extraData.mejorAtributoFisico || "",
-          metasLargoPlazo: extraData.metasLargoPlazo || "",
-          queHacesRelajarte: extraData.queHacesRelajarte || "",
-          queTeHaceReir: extraData.queTeHaceReir || "",
-          queTeMotivaCrear: extraData.queTeMotivaCrear || "",
-          respuestaCuantoCobraEncuentro: extraData.respuestaCuantoCobraEncuentro || "",
-          respuestaMuestraIntimas: extraData.respuestaMuestraIntimas || "",
-          estrategiaMaterialGratis: extraData.estrategiaMaterialGratis || "",
-          estrategiaProblemasPersonales: extraData.estrategiaProblemasPersonales || "",
+          heladoFavorito: (c as any).helado_favorito || extraData.heladoFavorito || "",
+          bebidaFavorita: (c as any).bebida_favorita || extraData.bebidaFavorita || "",
+          musicaArtistas: (c as any).musica_artistas || extraData.musicaArtistas || "",
+          peliculasTV: (c as any).peliculas_tv || extraData.peliculasTV || "",
+          viajesFavoritos: (c as any).viajes_favoritos || extraData.viajesFavoritos || "",
+          viajesPorVisitar: (c as any).viajes_por_visitar || extraData.viajesPorVisitar || "",
+          hermanos: (c as any).hermanos || extraData.hermanos || "",
+          diaPerfecto: (c as any).dia_perfecto || extraData.diaPerfecto || "",
+          comoEresCuandoNadieVe: (c as any).como_eres_cuando_nadie_ve || extraData.comoEresCuandoNadieVe || "",
+          comoQuieresQueTeLlamen: (c as any).como_quieres_que_te_llamen || extraData.comoQuieresQueTeLlamen || "",
+          respuestaSexoEnPersona: (c as any).respuesta_sexo_en_persona || extraData.respuestaSexoEnPersona || "",
+          respuestaUsuarioGrosero: (c as any).respuesta_usuario_grosero || extraData.respuestaUsuarioGrosero || "",
+          respuestaPedirDesnudos: (c as any).respuesta_pedir_desnudos || extraData.respuestaPedirDesnudos || "",
+          queTeIncomoda: (c as any).que_te_incomoda || extraData.queTeIncomoda || "",
+          horariosSueno: (c as any).horarios_sueno || extraData.horariosSueno || "",
+          deporteEquipo: (c as any).deporte_equipo || extraData.deporteEquipo || "",
+          colorFavorito: (c as any).color_favorito || extraData.colorFavorito || "",
+          estadoCivil: (c as any).estado_civil || extraData.estadoCivil || "",
+          queBuscasPareja: (c as any).que_buscas_pareja || extraData.queBuscasPareja || "",
+          mejorAtributoFisico: (c as any).mejor_atributo_fisico || extraData.mejorAtributoFisico || "",
+          metasLargoPlazo: (c as any).metas_largo_plazo || extraData.metasLargoPlazo || "",
+          queHacesRelajarte: (c as any).que_haces_relajarte || extraData.queHacesRelajarte || "",
+          queTeHaceReir: (c as any).que_te_hace_reir || extraData.queTeHaceReir || "",
+          queTeMotivaCrear: (c as any).que_te_motiva_crear || extraData.queTeMotivaCrear || "",
+          respuestaCuantoCobraEncuentro: (c as any).respuesta_cuanto_cobra_encuentro || extraData.respuestaCuantoCobraEncuentro || "",
+          respuestaMuestraIntimas: (c as any).respuesta_muestra_intimas || extraData.respuestaMuestraIntimas || "",
+          estrategiaMaterialGratis: (c as any).estrategia_material_gratis || extraData.estrategiaMaterialGratis || "",
+          estrategiaProblemasPersonales: (c as any).estrategia_problemas_personales || extraData.estrategiaProblemasPersonales || "",
         });
         setStep3Doc(prev => ({
           ...prev,
@@ -127,27 +285,28 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           tiktokHandle: c.tiktok_handle || "",
           twitterHandle: c.twitter_handle || "",
           onlyfansUrl: c.onlyfans_url || "",
-          otrasPlataformas: extraData.otrasPlataformas || "",
-          linkOtrasPlataformas: extraData.linkOtrasPlataformas || "",
+          otrasPlataformas: (c as any).otras_plataformas || extraData.otrasPlataformas || "",
+          linkOtrasPlataformas: (c as any).link_otras_plataformas || extraData.linkOtrasPlataformas || "",
         }));
         setCreatorStatus(c.status || null);
         setStep4({
-          schedule: extraData.schedule || {}, pricing: {},
+          schedule: (c as any).schedule_config || extraData.schedule || {},
+          pricing: {},
           monthlyGoal: biz?.monthly_sales_target ? String(biz.monthly_sales_target) : "",
           notes: c.notes || "",
-          terminosAfecto: extraData.terminosAfecto || "",
-          restriccionesSeguridad: extraData.restriccionesSeguridad || "",
-          orientacionPerfil: extraData.orientacionPerfil || "",
-          currency: extraData.currency || "USD",
-          gfeDisponible: extraData.gfeDisponible || false,
-          personalidadMarca: extraData.personalidadMarca || "",
-          estrategiaRechazo: extraData.estrategiaRechazo || "",
-          tonoEmocional: extraData.tonoEmocional || "",
-          frasesVenta: extraData.frasesVenta || "",
-          usuariosVip: extraData.usuariosVip || "",
-          plataformaVideollamada: extraData.plataformaVideollamada || "",
-          estrategiaRecuperacion: extraData.estrategiaRecuperacion || "",
-          interesaDinamicasGrupales: extraData.interesaDinamicasGrupales || false,
+          terminosAfecto: (c as any).terminos_afecto || extraData.terminosAfecto || "",
+          restriccionesSeguridad: (c as any).restricciones_seguridad || extraData.restriccionesSeguridad || "",
+          orientacionPerfil: (c as any).orientacion_perfil || extraData.orientacionPerfil || "",
+          currency: (c as any).currency || extraData.currency || "USD",
+          gfeDisponible: (c as any).gfe_disponible ?? extraData.gfeDisponible ?? false,
+          personalidadMarca: (c as any).personalidad_marca || extraData.personalidadMarca || "",
+          estrategiaRechazo: (c as any).estrategia_rechazo || extraData.estrategiaRechazo || "",
+          tonoEmocional: (c as any).tono_emocional || extraData.tonoEmocional || "",
+          frasesVenta: (c as any).frases_venta || extraData.frasesVenta || "",
+          usuariosVip: (c as any).usuarios_vip || extraData.usuariosVip || "",
+          plataformaVideollamada: (c as any).plataforma_videollamada || extraData.plataformaVideollamada || "",
+          estrategiaRecuperacion: (c as any).estrategia_recuperacion || extraData.estrategiaRecuperacion || "",
+          interesaDinamicasGrupales: (c as any).interesa_dinamicas_grupales ?? extraData.interesaDinamicasGrupales ?? false,
         });
       }
       setLoadingCreator(false);
@@ -157,19 +316,23 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   const updateStep1 = useCallback((field: keyof Step1Data, value: string) => {
     setStep1((prev) => ({ ...prev, [field]: value }));
     setStep1Errors((prev) => ({ ...prev, [field]: undefined }));
+    isDirty.current = true;
   }, []);
 
   const updateStep2Psy = useCallback(<K extends keyof Step2PsyData>(field: K, value: Step2PsyData[K]) => {
     setStep2Psy((prev) => ({ ...prev, [field]: value }));
+    isDirty.current = true;
   }, []);
 
   const updateStep3Doc = useCallback(<K extends keyof Step2Data>(field: K, value: Step2Data[K]) => {
     setStep3Doc((prev) => ({ ...prev, [field]: value }));
     if (field === "dataConfirmed") setStep3DocErrors({});
+    isDirty.current = true;
   }, []);
 
   const updateStep4 = useCallback(<K extends keyof Step4Data>(field: K, value: Step4Data[K]) => {
     setStep4((prev) => ({ ...prev, [field]: value }));
+    isDirty.current = true;
   }, []);
 
   const validateCurrentStep = (): boolean => {
@@ -197,83 +360,17 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     if (!validateCurrentStep()) return;
     toast({ title: `Paso ${step} completado` });
     setStep((s) => Math.min(s + 1, 4));
+    // Autosave on step change
+    if (isDirty.current) autoSave();
   };
 
-  const handlePrev = () => setStep((s) => Math.max(s - 1, 1));
+  const handlePrev = () => {
+    setStep((s) => Math.max(s - 1, 1));
+    if (isDirty.current) autoSave();
+  };
 
   const buildPayload = (isDraft: boolean) => {
-    const preciosContenido: Record<string, { price: number; notes: string }> = {};
-    Object.entries(step4.pricing).forEach(([key, val]) => {
-      const price = Number(val.price);
-      if (price > 0) {
-        preciosContenido[key] = { price, notes: val.notes || "" };
-      }
-    });
-
-    const extraData = JSON.stringify({
-      schedule: step4.schedule,
-      monthlyGoal: step4.monthlyGoal,
-      timezone: step1.timezone,
-      currency: step4.currency || "USD",
-      terminosAfecto: step4.terminosAfecto || null,
-      restriccionesSeguridad: step4.restriccionesSeguridad || null,
-      orientacionPerfil: step4.orientacionPerfil || null,
-      etnicidad: step1.etnicidad || null,
-      cicatrices: step1.cicatrices || null,
-      nivelLectura: step1.nivelLectura || null,
-      permisoNombreReal: step1.permisoNombreReal || null,
-      permisoEdadReal: step1.permisoEdadReal || null,
-      permisoUbicacion: step1.permisoUbicacion || null,
-      segundoNombre: step1.segundoNombre || null,
-      direccion: step1.direccion || null,
-      apodos: step1.apodos || null,
-      edadMostrar: step1.edadMostrar || null,
-      ubicacionArtistica: step1.ubicacionArtistica || null,
-      redesSociales: step1.redesSociales || null,
-      wishlistAmazon: step1.wishlistAmazon || null,
-      heladoFavorito: step2Psy.heladoFavorito || null,
-      bebidaFavorita: step2Psy.bebidaFavorita || null,
-      musicaArtistas: step2Psy.musicaArtistas || null,
-      peliculasTV: step2Psy.peliculasTV || null,
-      viajesFavoritos: step2Psy.viajesFavoritos || null,
-      viajesPorVisitar: step2Psy.viajesPorVisitar || null,
-      hermanos: step2Psy.hermanos || null,
-      diaPerfecto: step2Psy.diaPerfecto || null,
-      comoEresCuandoNadieVe: step2Psy.comoEresCuandoNadieVe || null,
-      comoQuieresQueTeLlamen: step2Psy.comoQuieresQueTeLlamen || null,
-      respuestaSexoEnPersona: step2Psy.respuestaSexoEnPersona || null,
-      respuestaUsuarioGrosero: step2Psy.respuestaUsuarioGrosero || null,
-      respuestaPedirDesnudos: step2Psy.respuestaPedirDesnudos || null,
-      queTeIncomoda: step2Psy.queTeIncomoda || null,
-      horariosSueno: step2Psy.horariosSueno || null,
-      deporteEquipo: step2Psy.deporteEquipo || null,
-      colorFavorito: step2Psy.colorFavorito || null,
-      estadoCivil: step2Psy.estadoCivil || null,
-      queBuscasPareja: step2Psy.queBuscasPareja || null,
-      mejorAtributoFisico: step2Psy.mejorAtributoFisico || null,
-      metasLargoPlazo: step2Psy.metasLargoPlazo || null,
-      queHacesRelajarte: step2Psy.queHacesRelajarte || null,
-      queTeHaceReir: step2Psy.queTeHaceReir || null,
-      queTeMotivaCrear: step2Psy.queTeMotivaCrear || null,
-      respuestaCuantoCobraEncuentro: step2Psy.respuestaCuantoCobraEncuentro || null,
-      respuestaMuestraIntimas: step2Psy.respuestaMuestraIntimas || null,
-      estrategiaMaterialGratis: step2Psy.estrategiaMaterialGratis || null,
-      estrategiaProblemasPersonales: step2Psy.estrategiaProblemasPersonales || null,
-      otrasPlataformas: step3Doc.otrasPlataformas || null,
-      linkOtrasPlataformas: step3Doc.linkOtrasPlataformas || null,
-      gfeDisponible: step4.gfeDisponible || false,
-      personalidadMarca: step4.personalidadMarca || null,
-      estrategiaRechazo: step4.estrategiaRechazo || null,
-      tonoEmocional: step4.tonoEmocional || null,
-      frasesVenta: step4.frasesVenta || null,
-      usuariosVip: step4.usuariosVip || null,
-      plataformaVideollamada: step4.plataformaVideollamada || null,
-      estrategiaRecuperacion: step4.estrategiaRecuperacion || null,
-      interesaDinamicasGrupales: step4.interesaDinamicasGrupales || false,
-    });
-
-    const profilePhotoUrl = step3Doc.profilePhotos.length > 0 ? step3Doc.profilePhotos[0].url : null;
-
+    const creatorPayload = buildCreatorPayload(isDraft);
     const documents = [
       ...step3Doc.idDocumentFront.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (frente)" })),
       ...step3Doc.idDocumentBack.map((f) => ({ file_name: f.name, file_url: f.url, file_type: f.type, description: "Documento de identidad (reverso)" })),
@@ -282,41 +379,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     ];
 
     return {
-      creator: {
-        name: step1.name || "Borrador",
-        email: step1.email || null,
-        phone: step1.phone || null,
-        age: step1.age ? Number(step1.age) : null,
-        country: step1.country || null,
-        city: step1.city || null,
-        artistic_name: step1.artisticName || null,
-        birth_date: step1.birthDate || null,
-        medidas_cm: step1.medidas || null,
-        talla_brasier: step1.tallaBrasier || null,
-        signo_zodiacal: step1.signoZodiacal || null,
-        tatuajes_piercings_detalle: step1.tatuajesPiercings || null,
-        languages: step1.idiomas ? step1.idiomas.split(",").map((l: string) => l.trim()).filter(Boolean) : null,
-        rutina_diaria: step2Psy.rutinaDiaria || null,
-        hobbies: step2Psy.hobbies || null,
-        mascotas_nombres: step2Psy.mascotasNombres || null,
-        comida_favorita: step2Psy.comidaFavorita || null,
-        nivel_estudios: step2Psy.nivelEstudios || null,
-        apodos_permitidos: step2Psy.apodosPermitidos || null,
-        palabras_prohibidas: step2Psy.palabrasProhibidas || null,
-        emoji_frecuente: step2Psy.emojiFrecuente || null,
-        tono_voz: step2Psy.tonoVoz || null,
-        contenido_jamas_haria: step2Psy.contenidoJamasHaria || null,
-        wishlist_url: step3Doc.wishlistUrl || null,
-        instagram_handle: step3Doc.instagramHandle || null,
-        tiktok_handle: step3Doc.tiktokHandle || null,
-        twitter_handle: step3Doc.twitterHandle || null,
-        onlyfans_url: step3Doc.onlyfansUrl || null,
-        status: isDraft ? "borrador" : "pendiente_verificacion",
-        profile_photo_url: profilePhotoUrl,
-        precios_contenido: Object.keys(preciosContenido).length > 0 ? preciosContenido : null,
-        internal_notes: extraData,
-        notes: step4.notes || null,
-      },
+      creator: creatorPayload,
       business: {
         start_date: new Date().toISOString().split("T")[0],
         monthly_sales_target: step4.monthlyGoal ? Number(step4.monthlyGoal) : null,
@@ -343,24 +406,25 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       }
     }
 
-    // If editing, update instead of insert
-    if (editCreatorId) {
+    // If editing or autosaved, update instead of insert
+    const currentId = editCreatorId || autoSaveIdRef.current;
+    if (currentId) {
       try {
         const payload = buildPayload(isDraft);
         const { error } = await supabase
           .from("creators")
           .update(payload.creator as any)
-          .eq("id", editCreatorId);
+          .eq("id", currentId);
         if (error) throw error;
 
         // Update business record if exists
         const { data: existingBiz } = await supabase
           .from("creator_business")
           .select("id")
-          .eq("creator_id", editCreatorId)
+          .eq("creator_id", currentId)
           .maybeSingle();
         if (existingBiz) {
-          await supabase.from("creator_business").update(payload.business as any).eq("creator_id", editCreatorId);
+          await supabase.from("creator_business").update(payload.business as any).eq("creator_id", currentId);
         }
 
         queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
@@ -416,10 +480,22 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     setStep4(initialStep4);
     setStep1Errors({});
     setStep3DocErrors({});
+    isDirty.current = false;
+    autoSaveIdRef.current = null;
     onCancel();
   };
 
   const isSubmitting = addCreador.isPending;
+
+  // Autosave indicator text
+  const autoSaveText = useMemo(() => {
+    if (isSavingAuto) return "Guardando...";
+    if (!lastSavedAt) return null;
+    const seconds = Math.round((Date.now() - lastSavedAt.getTime()) / 1000);
+    if (seconds < 5) return "Guardado automáticamente";
+    if (seconds < 60) return `Guardado hace ${seconds}s`;
+    return `Guardado hace ${Math.round(seconds / 60)}m`;
+  }, [isSavingAuto, lastSavedAt, step]); // step dependency to re-render on step change
 
   if (loadingCreator) {
     return (
@@ -514,10 +590,16 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       </CardContent>
 
       <CardFooter className="flex items-center justify-between border-t pt-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => handleSubmit(true)} disabled={isSubmitting}>
             Guardar Borrador
           </Button>
+          {autoSaveText && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              {autoSaveText}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {step > 1 && (
