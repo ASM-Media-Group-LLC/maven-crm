@@ -135,8 +135,8 @@ const DashboardSidebar = () => {
       icon: Users,
       key: "organizacion",
       items: [
-        { title: "Directorio", url: "/hr/directorio" },
-        { title: "Organigrama", url: null },
+        { title: "Directorio", url: "/hr/organizacion/directorio" },
+        { title: "Organigrama", url: "/hr/organizacion/organigrama" },
       ],
     },
     {

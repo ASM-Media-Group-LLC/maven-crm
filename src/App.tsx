@@ -79,6 +79,8 @@ import HRApplicantNew from "./pages/hr/HRApplicantNew";
 import HROnboarding from "./pages/hr/HROnboarding";
 import HROnboardingNew from "./pages/hr/HROnboardingNew";
 import HRMonitoring from "./pages/hr/HRMonitoring";
+import HRDirectoryLookup from "./pages/hr/HRDirectoryLookup";
+import HROrganigrama from "./pages/hr/HROrganigrama";
 
 const queryClient = new QueryClient();
 
@@ -164,6 +166,8 @@ const App = () => (
               <Route path="/hr/horarios/banco-horas" element={<ProtectedRoute><HRLayout><HRHourBank /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/horarios-chatters" element={<ProtectedRoute><HRLayout><HRChatterSchedules /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/monitoreo" element={<ProtectedRoute><HRLayout><HRMonitoring /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/organizacion/directorio" element={<ProtectedRoute><HRLayout><HRDirectoryLookup /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/organizacion/organigrama" element={<ProtectedRoute><HRLayout><HROrganigrama /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />

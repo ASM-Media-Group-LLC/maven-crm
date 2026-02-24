@@ -1565,6 +1565,7 @@ export type Database = {
           birth_date: string | null
           caja_compensacion: string | null
           city: string | null
+          company_id: string | null
           contract_type: string | null
           country: string | null
           created_at: string
@@ -1609,6 +1610,7 @@ export type Database = {
           birth_date?: string | null
           caja_compensacion?: string | null
           city?: string | null
+          company_id?: string | null
           contract_type?: string | null
           country?: string | null
           created_at?: string
@@ -1653,6 +1655,7 @@ export type Database = {
           birth_date?: string | null
           caja_compensacion?: string | null
           city?: string | null
+          company_id?: string | null
           contract_type?: string | null
           country?: string | null
           created_at?: string
@@ -1687,6 +1690,13 @@ export type Database = {
           work_modality?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employees_department_id_fkey"
             columns: ["department_id"]
