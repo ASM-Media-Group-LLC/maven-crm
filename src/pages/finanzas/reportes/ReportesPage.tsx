@@ -7,9 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,6 +19,7 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { generateReport } from "./generateReport";
 import { format } from "date-fns";
 
 const REPORT_TABS = ["Ganancias & Comisiones", "Ventas por Creador", "Ventas Generales", "Estado de Cuenta por CC", "Comparativos Mensuales", "Por Método de Pago"] as const;
@@ -33,6 +36,7 @@ export default function ReportesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reportTab, setReportTab] = useState<ReportTab>("Ganancias & Comisiones");
+  const [showGenModal, setShowGenModal] = useState(false);
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["financial-reports"],
@@ -49,6 +53,13 @@ export default function ReportesPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [deleteItem, setDeleteItem] = useState<any>(null);
 
+  // Generate modal state
+  const [genType, setGenType] = useState("comisiones");
+  const [genFormat, setGenFormat] = useState<"csv" | "excel">("excel");
+  const [genArea, setGenArea] = useState("");
+  const [genDateFrom, setGenDateFrom] = useState<Date | undefined>();
+  const [genDateTo, setGenDateTo] = useState<Date | undefined>();
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("financial_reports").delete().eq("id", id);
@@ -60,6 +71,47 @@ export default function ReportesPage() {
       setDeleteItem(null);
     },
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      // Fetch data based on type
+      let reportData: any[] = [];
+      if (genType === "comisiones") {
+        const { data } = await supabase.from("commissions").select("period, base_amount, percentage, estimated_amount, final_amount, status, area, cost_center");
+        reportData = data || [];
+      } else if (genType === "facturacion") {
+        const { data } = await supabase.from("invoices").select("invoice_number, amount, fee_amount, net_amount, status, payment_method, due_date");
+        reportData = data || [];
+      } else if (genType === "nomina") {
+        const { data } = await supabase.from("payroll_periods").select("period_name, total_employees, gross_total, net_total, status, cost_center");
+        reportData = data || [];
+      } else {
+        const { data: inv } = await supabase.from("invoices").select("invoice_number, amount, status");
+        const { data: pay } = await supabase.from("payroll_periods").select("period_name, net_total, status");
+        reportData = [...(inv || []).map(i => ({ ...i, tipo: "Invoice" })), ...(pay || []).map(p => ({ ...p, tipo: "Nómina" }))];
+      }
+
+      // Generate file
+      generateReport(reportData, genType, genFormat);
+
+      // Save record
+      const { data: user } = await supabase.auth.getUser();
+      await supabase.from("financial_reports").insert({
+        report_type: genType,
+        format: genFormat,
+        area: genArea || null,
+        period_from: genDateFrom ? format(genDateFrom, "yyyy-MM-dd") : null,
+        period_to: genDateTo ? format(genDateTo, "yyyy-MM-dd") : null,
+        created_by: user.user?.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["financial-reports"] });
+      toast({ title: "Reporte generado y descargado" });
+      setShowGenModal(false);
+    },
+    onError: () => toast({ title: "Error al generar reporte", variant: "destructive" }),
   });
 
   const hasFilters = search || typeFilter || dateFrom || dateTo;
@@ -81,7 +133,7 @@ export default function ReportesPage() {
             <h1 className="text-xl font-semibold text-foreground">Reportes</h1>
             <p className="text-sm text-muted-foreground">Generación y descarga de reportes financieros · {reports.length} generados</p>
           </div>
-          <Button size="sm"><Plus className="h-4 w-4 mr-1" />Generar Reporte</Button>
+          <Button size="sm" onClick={() => setShowGenModal(true)}><Plus className="h-4 w-4 mr-1" />Generar Reporte</Button>
         </div>
       </header>
 
@@ -92,18 +144,12 @@ export default function ReportesPage() {
           ))}
         </div>
 
-        {reportTab !== "Ganancias & Comisiones" ? (
-          <div className="rounded-lg border border-dashed border-border p-12 text-center">
-            <p className="text-sm text-muted-foreground">Próximamente: {reportTab}</p>
-          </div>
-        ) : (
-        <>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar reporte..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Buscar reporte..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Select value={typeFilter || undefined} onValueChange={(v) => setTypeFilter(v === "__all__" ? "" : v)}>
+          <Select value={typeFilter || undefined} onValueChange={v => setTypeFilter(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
@@ -135,7 +181,7 @@ export default function ReportesPage() {
                 {isLoading ? Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                 )) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? "No hay reportes generados." : "Sin resultados."}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? "No hay reportes. Genera el primero." : "Sin resultados."}</TableCell></TableRow>
                 ) : filtered.map(r => (
                   <TableRow key={r.id} className="group hover:bg-muted/30 transition-colors">
                     <TableCell>
@@ -160,9 +206,57 @@ export default function ReportesPage() {
             </Table>
           </div>
         </div>
-        </>
-        )}
       </div>
+
+      {/* Generate Report Modal */}
+      <Dialog open={showGenModal} onOpenChange={setShowGenModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Generar Reporte</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Tipo de Reporte</Label>
+              <Select value={genType} onValueChange={setGenType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Periodo</Label>
+              <DateRangePicker from={genDateFrom} to={genDateTo} onApply={(f, t) => { setGenDateFrom(f); setGenDateTo(t); }} />
+            </div>
+            <div>
+              <Label>Área / CC</Label>
+              <Select value={genArea || undefined} onValueChange={v => setGenArea(v === "__all__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="chatters">Chatters</SelectItem>
+                  <SelectItem value="closers">Closers</SelectItem>
+                  <SelectItem value="tech">Tech</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Formato</Label>
+              <Select value={genFormat} onValueChange={v => setGenFormat(v as "csv" | "excel")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="excel">Excel (.xlsx)</SelectItem>
+                  <SelectItem value="csv">CSV</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGenModal(false)}>Cancelar</Button>
+            <Button onClick={() => generateMutation.mutate()} disabled={generateMutation.isPending}>
+              <Download className="h-4 w-4 mr-1" />Generar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
