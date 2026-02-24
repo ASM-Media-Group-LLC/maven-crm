@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, UserCheck, UserMinus, Clock, Search, Plus, LayoutGrid, LayoutList, Trash2, Eye, Pencil } from "lucide-react";
+import { Users, UserCheck, Wifi, Building2, Laptop, Search, Plus, LayoutGrid, LayoutList, Trash2, Eye, Pencil, RefreshCw } from "lucide-react";
 import { useEmployees, useDeleteEmployee, useDepartments } from "@/hooks/useEmployees";
+import { useUpdateEmployee, useCreateEmployeeHistory } from "@/hooks/useEmployee";
 import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
 import { EmployeeAreaBadge } from "@/components/hr/EmployeeAreaBadge";
 import { Button } from "@/components/ui/button";
@@ -10,19 +11,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { EMPLOYEE_STATUS_OPTIONS, CONTRACT_TYPES, WORK_MODALITIES } from "@/lib/hrConstants";
+import { useAuth } from "@/hooks/useAuth";
 
-/* ── KPI Cards (same pattern as ContactosKPICards) ── */
+/* ── KPI Cards ── */
 const kpiCards = [
-  { label: "Total Empleados", subtitle: "Registrados", icon: Users, key: "total" as const, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
-  { label: "Activos", subtitle: "En nómina", icon: UserCheck, key: "active" as const, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-  { label: "En Licencia", subtitle: "Vacaciones / Licencia", icon: Clock, key: "leave" as const, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
-  { label: "Inactivos", subtitle: "Suspendidos / Inactivos", icon: UserMinus, key: "inactive" as const, colorClass: "text-destructive", bgClass: "bg-destructive/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:to-transparent hover:border-destructive/40" },
+  { label: "Total Activos", subtitle: "En operación", icon: UserCheck, key: "active" as const, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+  { label: "Remotos", subtitle: "Trabajo remoto", icon: Wifi, key: "remote" as const, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+  { label: "Híbridos", subtitle: "Modalidad híbrida", icon: Laptop, key: "hybrid" as const, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+  { label: "Presenciales", subtitle: "En oficina", icon: Building2, key: "onsite" as const, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
+const MODALITY_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+  remoto: { label: "Remoto", variant: "default" },
+  hibrido: { label: "Híbrido", variant: "secondary" },
+  presencial: { label: "Presencial", variant: "outline" },
+};
+
 /* ── Directory Table ── */
-function DirectoryTable({ employees, isLoading, navigate, onDelete }: { employees: any[]; isLoading: boolean; navigate: any; onDelete: (id: string) => void }) {
+function DirectoryTable({ employees, isLoading, navigate, onDelete, onChangeStatus }: { employees: any[]; isLoading: boolean; navigate: any; onDelete: (id: string) => void; onChangeStatus: (emp: any) => void }) {
   return (
     <div className="border rounded-lg overflow-hidden">
       <Table>
@@ -32,64 +45,72 @@ function DirectoryTable({ employees, isLoading, navigate, onDelete }: { employee
             <TableHead>Código</TableHead>
             <TableHead>Departamento</TableHead>
             <TableHead>Cargo</TableHead>
+            <TableHead>Modalidad</TableHead>
             <TableHead>Contrato</TableHead>
             <TableHead>Ingreso</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="w-24">Acciones</TableHead>
+            <TableHead className="w-28">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
               <TableRow key={i}>
-                {Array.from({ length: 8 }).map((_, j) => (
+                {Array.from({ length: 9 }).map((_, j) => (
                   <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                 ))}
               </TableRow>
             ))
           ) : employees.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center text-muted-foreground py-12">No se encontraron empleados</TableCell>
+              <TableCell colSpan={9} className="text-center text-muted-foreground py-12">No se encontraron empleados</TableCell>
             </TableRow>
           ) : (
-            employees.map((emp) => (
-              <TableRow key={emp.id} className="cursor-pointer" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      {emp.profile_photo_url ? (
-                        <img src={emp.profile_photo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
-                      ) : (
-                        <span className="text-xs font-medium text-primary">{emp.first_name[0]}{emp.last_name[0]}</span>
-                      )}
+            employees.map((emp) => {
+              const mod = MODALITY_BADGE[emp.work_modality] ?? { label: emp.work_modality ?? "—", variant: "outline" as const };
+              return (
+                <TableRow key={emp.id} className="cursor-pointer" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        {emp.profile_photo_url ? (
+                          <img src={emp.profile_photo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-xs font-medium text-primary">{emp.first_name[0]}{emp.last_name[0]}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{emp.first_name} {emp.last_name}</p>
+                        <p className="text-xs text-muted-foreground">{emp.email ?? "—"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{emp.first_name} {emp.last_name}</p>
-                      <p className="text-xs text-muted-foreground">{emp.email ?? "—"}</p>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-muted-foreground">{emp.employee_code ?? "—"}</TableCell>
+                  <TableCell><EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} /></TableCell>
+                  <TableCell className="text-sm">{emp.positions?.name ?? "—"}</TableCell>
+                  <TableCell><Badge variant={mod.variant}>{mod.label}</Badge></TableCell>
+                  <TableCell className="text-xs capitalize">{CONTRACT_TYPES.find(c => c.value === emp.contract_type)?.label ?? emp.contract_type ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{emp.hire_date ? format(new Date(emp.hire_date), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell><EmployeeStatusBadge status={emp.status} /></TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                        <Eye className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onChangeStatus(emp)}>
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(emp.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs font-mono text-muted-foreground">{emp.employee_code ?? "—"}</TableCell>
-                <TableCell><EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} /></TableCell>
-                <TableCell className="text-sm">{emp.positions?.name ?? "—"}</TableCell>
-                <TableCell className="text-xs capitalize">{emp.contract_type ?? "—"}</TableCell>
-                <TableCell className="text-xs">{emp.hire_date ? format(new Date(emp.hire_date), "dd/MM/yyyy") : "—"}</TableCell>
-                <TableCell><EmployeeStatusBadge status={emp.status} /></TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onDelete(emp.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -108,41 +129,109 @@ function DirectoryGrid({ employees, isLoading, navigate, onDelete }: { employees
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {employees.map((emp) => (
-        <Card key={emp.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                {emp.profile_photo_url ? (
-                  <img src={emp.profile_photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                ) : (
-                  <span className="text-sm font-medium text-primary">{emp.first_name[0]}{emp.last_name[0]}</span>
-                )}
+      {employees.map((emp) => {
+        const mod = MODALITY_BADGE[emp.work_modality] ?? { label: emp.work_modality ?? "—", variant: "outline" as const };
+        return (
+          <Card key={emp.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => navigate(`/hr/empleado/${emp.id}`)}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  {emp.profile_photo_url ? (
+                    <img src={emp.profile_photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-medium text-primary">{emp.first_name[0]}{emp.last_name[0]}</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{emp.first_name} {emp.last_name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{emp.employee_code ?? "—"}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{emp.first_name} {emp.last_name}</p>
-                <p className="text-xs text-muted-foreground font-mono">{emp.employee_code ?? "—"}</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} />
+                  <Badge variant={mod.variant} className="text-xs">{mod.label}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{emp.positions?.name ?? "Sin cargo"}</p>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <EmployeeAreaBadge departmentName={emp.departments?.name} departmentCode={emp.departments?.code} />
-              <p className="text-xs text-muted-foreground">{emp.positions?.name ?? "Sin cargo"}</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <EmployeeStatusBadge status={emp.status} />
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); navigate(`/hr/empleado/${emp.id}`); }}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(emp.id); }}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+              <div className="flex items-center justify-between">
+                <EmployeeStatusBadge status={emp.status} />
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); navigate(`/hr/empleado/${emp.id}`); }}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(emp.id); }}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
+  );
+}
+
+/* ── Change Status Modal ── */
+function ChangeStatusModal({ employee, open, onClose }: { employee: any; open: boolean; onClose: () => void }) {
+  const [newStatus, setNewStatus] = useState("");
+  const [reason, setReason] = useState("");
+  const updateEmployee = useUpdateEmployee();
+  const createHistory = useCreateEmployeeHistory();
+  const { user } = useAuth();
+
+  const handleSubmit = async () => {
+    if (!newStatus || !reason.trim() || !employee) return;
+    await updateEmployee.mutateAsync({ id: employee.id, data: { status: newStatus } });
+    await createHistory.mutateAsync({
+      employee_id: employee.id,
+      change_type: "status_change",
+      field_changed: "status",
+      old_value: employee.status,
+      new_value: newStatus,
+      reason: reason.trim(),
+      created_by: user?.id ?? null,
+    });
+    setNewStatus("");
+    setReason("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Cambiar Estado</DialogTitle>
+          <DialogDescription>
+            {employee ? `${employee.first_name} ${employee.last_name}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nuevo Estado</Label>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
+              <SelectContent>
+                {EMPLOYEE_STATUS_OPTIONS.filter(s => s.value !== employee?.status).map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Motivo <span className="text-destructive">*</span></Label>
+            <Textarea placeholder="Motivo del cambio de estado..." value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={!newStatus || !reason.trim() || updateEmployee.isPending}>
+            {updateEmployee.isPending ? "Guardando..." : "Confirmar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -156,8 +245,11 @@ export default function EmployeeDirectory() {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [modalityFilter, setModalityFilter] = useState("");
+  const [contractFilter, setContractFilter] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [statusEmployee, setStatusEmployee] = useState<any>(null);
 
   const filtered = employees.filter((e) => {
     const fullName = `${e.first_name} ${e.last_name}`.toLowerCase();
@@ -166,12 +258,22 @@ export default function EmployeeDirectory() {
       (e.email?.toLowerCase().includes(search.toLowerCase()) ?? false);
     const matchDept = !deptFilter || e.department_id === deptFilter;
     const matchStatus = !statusFilter || e.status === statusFilter;
-    return matchSearch && matchDept && matchStatus;
+    const matchModality = !modalityFilter || e.work_modality === modalityFilter;
+    const matchContract = !contractFilter || e.contract_type === contractFilter;
+    return matchSearch && matchDept && matchStatus && matchModality && matchContract;
   });
 
-  const totalActive = employees.filter((e) => e.status === "activo").length;
-  const totalLeave = employees.filter((e) => e.status === "en_licencia" || e.status === "vacaciones").length;
-  const totalInactive = employees.filter((e) => e.status === "inactivo" || e.status === "suspendido").length;
+  const activeEmps = employees.filter((e) => e.status === "activo");
+  const totalRemote = activeEmps.filter((e) => e.work_modality === "remoto").length;
+  const totalHybrid = activeEmps.filter((e) => e.work_modality === "hibrido").length;
+  const totalOnsite = activeEmps.filter((e) => e.work_modality === "presencial").length;
+
+  const kpiValues: Record<string, number> = {
+    active: activeEmps.length,
+    remote: totalRemote,
+    hybrid: totalHybrid,
+    onsite: totalOnsite,
+  };
 
   const toDelete = employees.find((e) => e.id === deleteId);
 
@@ -181,8 +283,8 @@ export default function EmployeeDirectory() {
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Directorio de Empleados</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Total: {employees.length} empleados registrados</p>
+            <h1 className="text-xl font-semibold text-foreground">Empleados Activos</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Hub de gestión del equipo activo · {activeEmps.length} activos de {employees.length} total</p>
           </div>
           <Button onClick={() => navigate("/hr/empleado/nuevo")}>
             <Plus className="h-4 w-4 mr-2" />
@@ -195,43 +297,27 @@ export default function EmployeeDirectory() {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {kpiCards.map((card) => {
-            const val = card.key === "total" ? employees.length : card.key === "active" ? totalActive : card.key === "leave" ? totalLeave : totalInactive;
-            return (
-              <Card key={card.key} className={`transition-all duration-200 ${card.hoverClass}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <p className="text-sm text-muted-foreground">{card.label}</p>
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
-                      <card.icon className={`h-4 w-4 ${card.colorClass}`} />
-                    </div>
+          {kpiCards.map((card) => (
+            <Card key={card.key} className={`transition-all duration-200 ${card.hoverClass}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <p className="text-sm text-muted-foreground">{card.label}</p>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.bgClass}`}>
+                    <card.icon className={`h-4 w-4 ${card.colorClass}`} />
                   </div>
-                  <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{val}</p>
-                  <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </div>
+                <p className={`mt-2 text-2xl font-bold ${card.colorClass}`}>{kpiValues[card.key]}</p>
+                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Department tab bar */}
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-          <Button
-            variant={!deptFilter ? "secondary" : "ghost"}
-            size="sm"
-            className="text-sm"
-            onClick={() => setDeptFilter("")}
-          >
-            Todos
-          </Button>
+          <Button variant={!deptFilter ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter("")}>Todos</Button>
           {departments.map((d) => (
-            <Button
-              key={d.id}
-              variant={deptFilter === d.id ? "secondary" : "ghost"}
-              size="sm"
-              className="text-sm"
-              onClick={() => setDeptFilter(deptFilter === d.id ? "" : d.id)}
-            >
+            <Button key={d.id} variant={deptFilter === d.id ? "secondary" : "ghost"} size="sm" className="text-sm" onClick={() => setDeptFilter(deptFilter === d.id ? "" : d.id)}>
               {d.name}
             </Button>
           ))}
@@ -244,16 +330,24 @@ export default function EmployeeDirectory() {
             <Input placeholder="Buscar por nombre, código o email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
+            <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="activo">Activo</SelectItem>
-              <SelectItem value="inactivo">Inactivo</SelectItem>
-              <SelectItem value="en_licencia">En Licencia</SelectItem>
-              <SelectItem value="vacaciones">Vacaciones</SelectItem>
-              <SelectItem value="suspendido">Suspendido</SelectItem>
+              {EMPLOYEE_STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={modalityFilter || undefined} onValueChange={(v) => setModalityFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-36"><SelectValue placeholder="Modalidad" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              {WORK_MODALITIES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={contractFilter || undefined} onValueChange={(v) => setContractFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Contrato" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              {CONTRACT_TYPES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <div className="flex gap-1 border rounded-md p-0.5">
@@ -271,7 +365,7 @@ export default function EmployeeDirectory() {
 
         {/* Table / Grid */}
         {viewMode === "table"
-          ? <DirectoryTable employees={filtered} isLoading={isLoading} navigate={navigate} onDelete={setDeleteId} />
+          ? <DirectoryTable employees={filtered} isLoading={isLoading} navigate={navigate} onDelete={setDeleteId} onChangeStatus={setStatusEmployee} />
           : <DirectoryGrid employees={filtered} isLoading={isLoading} navigate={navigate} onDelete={setDeleteId} />
         }
       </div>
@@ -296,6 +390,9 @@ export default function EmployeeDirectory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Change status modal */}
+      <ChangeStatusModal employee={statusEmployee} open={!!statusEmployee} onClose={() => setStatusEmployee(null)} />
     </main>
   );
 }

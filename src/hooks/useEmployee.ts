@@ -121,3 +121,111 @@ export function useUpdateEmployee() {
     },
   });
 }
+
+/* ── Employee History ── */
+
+export function useEmployeeHistory(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-history", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_history")
+        .select("*")
+        .eq("employee_id", employeeId!)
+        .order("effective_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateEmployeeHistory() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (entry: {
+      employee_id: string;
+      change_type: string;
+      field_changed: string;
+      old_value?: string | null;
+      new_value?: string | null;
+      effective_date?: string;
+      reason?: string | null;
+      notes?: string | null;
+      created_by?: string | null;
+    }) => {
+      const { error } = await supabase.from("employee_history").insert(entry);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["employee-history", vars.employee_id] });
+      toast({ title: "Cambio registrado en historial" });
+    },
+    onError: () => {
+      toast({ title: "Error al registrar cambio", variant: "destructive" });
+    },
+  });
+}
+
+/* ── Cross-module summary hooks (read-only) ── */
+
+export function useEmployeeAttendanceSummary(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-attendance-summary", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("status")
+        .eq("employee_id", employeeId!)
+        .gte("date", thirtyDaysAgo.toISOString().split("T")[0]);
+      if (error) throw error;
+      const present = data.filter((a) => a.status === "presente").length;
+      const late = data.filter((a) => a.status === "tardanza").length;
+      const absent = data.filter((a) => a.status === "ausente").length;
+      return { present, late, absent, total: data.length };
+    },
+  });
+}
+
+export function useEmployeeHourBankBalance(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-hourbank-balance", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hour_bank")
+        .select("hours, movement_type")
+        .eq("employee_id", employeeId!);
+      if (error) throw error;
+      const balance = data.reduce((acc, r) => {
+        return acc + (r.movement_type === "deposit" ? Number(r.hours) : -Number(r.hours));
+      }, 0);
+      return { balance, movements: data.length };
+    },
+  });
+}
+
+export function useEmployeeVacationBalance(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-vacation-balance", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const currentYear = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from("absences")
+        .select("total_days")
+        .eq("employee_id", employeeId!)
+        .eq("absence_type", "vacaciones")
+        .eq("status", "approved")
+        .gte("start_date", `${currentYear}-01-01`);
+      if (error) throw error;
+      const taken = data.reduce((acc, r) => acc + (r.total_days ?? 0), 0);
+      return { taken, available: 15, total: 15 };
+    },
+  });
+}

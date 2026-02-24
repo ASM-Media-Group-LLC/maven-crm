@@ -1203,6 +1203,56 @@ export type Database = {
           },
         ]
       }
+      employee_history: {
+        Row: {
+          change_type: string
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          employee_id: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          notes: string | null
+          old_value: string | null
+          reason: string | null
+        }
+        Insert: {
+          change_type: string
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          employee_id: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          notes?: string | null
+          old_value?: string | null
+          reason?: string | null
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          employee_id?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          notes?: string | null
+          old_value?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_incidents: {
         Row: {
           category: string | null
