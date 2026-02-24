@@ -2,14 +2,12 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import HRPageHeader from "@/components/hr/HRPageHeader";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
-import { Users } from "lucide-react";
 
 const MODALITY_LABELS: Record<string, string> = {
   remoto: "Remoto",
@@ -24,9 +22,13 @@ export default function HRDirectoryLookup() {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
 
-  const filtered = useMemo(() => {
+  const activeEmployees = useMemo(() => {
     if (!employees) return [];
-    let list = employees.filter((e) => e.status === "activo");
+    return employees.filter((e) => e.status === "activo");
+  }, [employees]);
+
+  const filtered = useMemo(() => {
+    let list = activeEmployees;
     if (deptFilter !== "all") list = list.filter((e) => e.department_id === deptFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -40,38 +42,49 @@ export default function HRDirectoryLookup() {
       );
     }
     return list;
-  }, [employees, search, deptFilter]);
+  }, [activeEmployees, search, deptFilter]);
 
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
-        <HRPageHeader
-          title="Directorio"
-          subtitle="Consulta rápida de datos del equipo"
-          icon={Users}
-        />
+        {/* Header */}
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Directorio</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Consulta rápida de datos del equipo · {activeEmployees.length} empleados activos
+          </p>
+        </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[220px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre, email, teléfono, cargo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={deptFilter} onValueChange={setDeptFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los departamentos</SelectItem>
-              {departments?.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Department tab bar */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          <Button
+            variant={deptFilter === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setDeptFilter("all")}
+          >
+            Todos
+          </Button>
+          {departments?.map((d) => (
+            <Button
+              key={d.id}
+              variant={deptFilter === d.id ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setDeptFilter(d.id)}
+            >
+              {d.name}
+            </Button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, email, teléfono, cargo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
       </div>
 
