@@ -45,8 +45,10 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
                       <p className="font-medium text-sm truncate">{displayName}</p>
                       {pending && (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0" />
+                        <TooltipTrigger asChild>
+                            <span className="inline-flex shrink-0">
+                              <ShieldAlert className="h-4 w-4 text-orange-500" />
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
                         </Tooltip>

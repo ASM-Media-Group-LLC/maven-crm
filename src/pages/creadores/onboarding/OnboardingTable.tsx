@@ -56,8 +56,10 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                       <span className="font-medium text-sm">{displayName}</span>
                       {pending && (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0" />
+                        <TooltipTrigger asChild>
+                            <span className="inline-flex shrink-0">
+                              <ShieldAlert className="h-4 w-4 text-orange-500" />
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
                         </Tooltip>
@@ -84,7 +86,9 @@ const OnboardingTable = ({ data, onManage }: Props) => {
                     {pending && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <ShieldAlert className="h-4 w-4 text-orange-500" />
+                          <span className="inline-flex">
+                            <ShieldAlert className="h-4 w-4 text-orange-500" />
+                          </span>
                         </TooltipTrigger>
                         <TooltipContent>Pendiente de aprobación</TooltipContent>
                       </Tooltip>
