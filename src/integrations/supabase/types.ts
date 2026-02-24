@@ -825,6 +825,63 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_prospects: {
+        Row: {
+          agency: string | null
+          category: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          instagram: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          platform: string | null
+          source: string | null
+          status: string
+          tiktok: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          platform?: string | null
+          source?: string | null
+          status?: string
+          tiktok?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency?: string | null
+          category?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          platform?: string | null
+          source?: string | null
+          status?: string
+          tiktok?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       creator_training: {
         Row: {
           at_risk: boolean | null
