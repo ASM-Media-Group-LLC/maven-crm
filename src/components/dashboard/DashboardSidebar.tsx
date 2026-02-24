@@ -61,18 +61,56 @@ const DashboardSidebar = () => {
 
   const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
 
-  const hrGroups = [
+  type HRItem = { title: string; url: string | null };
+  type HRSubGroup = { label: string; key: string; items: HRItem[] };
+  type HRGroup = {
+    label: string;
+    icon: typeof Clock;
+    key: string;
+    items?: HRItem[];
+    subGroups?: HRSubGroup[];
+  };
+
+  const hrGroups: HRGroup[] = [
     {
-      label: "Operaciones",
-      icon: Clock,
-      key: "operacion",
+      label: "Employee Lifecycle",
+      icon: UserCheck,
+      key: "lifecycle",
       items: [
-        { title: "Asistencia", url: "/hr/asistencia" },
-        { title: "Ausencias", url: "/hr/ausencias" },
-        { title: "Vacaciones", url: "/hr/vacaciones" },
-        { title: "Permisos", url: "/hr/permisos" },
-        { title: "Horarios y Turnos", url: "/hr/horarios" },
-        { title: "Horarios Chatters", url: "/hr/horarios-chatters" },
+        { title: "Candidatos", url: "/hr/candidatos" },
+        { title: "Onboarding", url: "/hr/onboarding" },
+        { title: "Empleados Activos", url: "/hr/directorio" },
+        { title: "Offboarding", url: null },
+      ],
+    },
+    {
+      label: "Gestión Laboral",
+      icon: Clock,
+      key: "gestion",
+      subGroups: [
+        {
+          label: "Control de Tiempo",
+          key: "tiempo",
+          items: [
+            { title: "Asistencia", url: "/hr/asistencia" },
+            { title: "Horarios y Turnos", url: "/hr/horarios" },
+            { title: "Horarios Chatters", url: "/hr/horarios-chatters" },
+            { title: "Horas Extra", url: "/hr/horarios/horas-extras" },
+            { title: "Banco de Horas", url: "/hr/horarios/banco-horas" },
+          ],
+        },
+        {
+          label: "Ausencias",
+          key: "ausencias",
+          items: [
+            { title: "Vacaciones", url: "/hr/vacaciones" },
+            { title: "Permisos", url: "/hr/permisos" },
+            { title: "Incapacidades", url: null },
+          ],
+        },
+      ],
+      items: [
+        { title: "Monitoreo", url: "/hr/monitoreo" },
       ],
     },
     {
@@ -81,35 +119,24 @@ const DashboardSidebar = () => {
       key: "seguimiento",
       items: [
         { title: "Incidentes", url: "/hr/incidentes" },
-        { title: "Monitoreo", url: "/hr/monitoreo" },
       ],
     },
     {
-      label: "Desarrollo",
+      label: "Desarrollo & Performance",
       icon: GraduationCap,
       key: "desarrollo",
       items: [
-        { title: "Capacitación", url: "/hr/capacitacion" },
         { title: "Desempeño", url: "/hr/desempeno" },
+        { title: "Capacitación", url: "/hr/capacitacion" },
       ],
     },
     {
-      label: "Información",
+      label: "Organización",
       icon: Users,
-      key: "informacion",
+      key: "organizacion",
       items: [
         { title: "Directorio", url: "/hr/directorio" },
         { title: "Organigrama", url: null },
-      ],
-    },
-    {
-      label: "Reclutamiento",
-      icon: UserPlus,
-      key: "reclutamiento",
-      items: [
-        { title: "Candidatos", url: "/hr/candidatos" },
-        { title: "Onboarding", url: "/hr/onboarding" },
-        { title: "Offboarding", url: null },
       ],
     },
     {
@@ -122,8 +149,21 @@ const DashboardSidebar = () => {
     },
   ];
 
+  // Helper to get all URLs from a group (including subGroups)
+  const getGroupUrls = (group: HRGroup): string[] => {
+    const urls: string[] = [];
+    if (group.items) urls.push(...group.items.filter(i => i.url).map(i => i.url!));
+    if (group.subGroups) group.subGroups.forEach(sg => urls.push(...sg.items.filter(i => i.url).map(i => i.url!)));
+    return urls;
+  };
+
   // Flat list for collapsed dropdown
-  const hrFlatItems = hrGroups.flatMap((g) => g.items.filter((i) => i.url !== null)) as { title: string; url: string }[];
+  const hrFlatItems = hrGroups.flatMap((g) => {
+    const items: { title: string; url: string }[] = [];
+    if (g.items) items.push(...g.items.filter((i): i is { title: string; url: string } => i.url !== null));
+    if (g.subGroups) g.subGroups.forEach(sg => items.push(...sg.items.filter((i): i is { title: string; url: string } => i.url !== null)));
+    return items;
+  });
 
   const isHRActive = pathname === "/hr" || pathname.startsWith("/hr/");
 
@@ -309,44 +349,72 @@ const DashboardSidebar = () => {
                              </NavLink>
                            </SidebarMenuSubButton>
                          </SidebarMenuSubItem>
-                         {hrGroups.map((group) => (
-                           <Collapsible
-                            key={group.key}
-                            defaultOpen={group.items.some((i) => i.url && pathname.startsWith(i.url))}
-                            className={`group/hrGroup-${group.key}`}
-                          >
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger asChild>
-                                <SidebarMenuSubButton className="sidebar-glass-hover font-medium text-muted-foreground cursor-pointer w-full justify-between pr-1">
-                                  <span className="flex items-center gap-1.5">
-                                    <group.icon className="h-3.5 w-3.5 shrink-0" />
-                                    {group.label}
-                                  </span>
-                                  <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrGroup-${group.key}:rotate-90`} />
-                                </SidebarMenuSubButton>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <SidebarMenuSub>
-                                  {group.items.map((item) =>
-                                    item.url ? (
-                                      <SidebarMenuSubItem key={item.title}>
-                                        <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                                          <NavLink to={item.url}>{item.title}</NavLink>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>
-                                    ) : (
-                                      <SidebarMenuSubItem key={item.title}>
-                                        <SidebarMenuSubButton className="opacity-40 cursor-not-allowed pointer-events-none">
-                                          <span>{item.title}</span>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>
-                                    )
-                                  )}
-                                </SidebarMenuSub>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
-                        ))}
+                         {hrGroups.map((group) => {
+                           const groupUrls = getGroupUrls(group);
+                           const isGroupActive = groupUrls.some(u => pathname === u || pathname.startsWith(u + "/"));
+
+                           const renderItem = (item: HRItem) =>
+                             item.url ? (
+                               <SidebarMenuSubItem key={item.title}>
+                                 <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                   <NavLink to={item.url}>{item.title}</NavLink>
+                                 </SidebarMenuSubButton>
+                               </SidebarMenuSubItem>
+                             ) : (
+                               <SidebarMenuSubItem key={item.title}>
+                                 <SidebarMenuSubButton className="opacity-40 cursor-not-allowed pointer-events-none">
+                                   <span>{item.title}</span>
+                                 </SidebarMenuSubButton>
+                               </SidebarMenuSubItem>
+                             );
+
+                           return (
+                             <Collapsible
+                               key={group.key}
+                               defaultOpen={isGroupActive}
+                               className={`group/hrGroup-${group.key}`}
+                             >
+                               <SidebarMenuSubItem>
+                                 <CollapsibleTrigger asChild>
+                                   <SidebarMenuSubButton className="sidebar-glass-hover font-medium text-muted-foreground cursor-pointer w-full justify-between pr-1">
+                                     <span className="flex items-center gap-1.5">
+                                       <group.icon className="h-3.5 w-3.5 shrink-0" />
+                                       {group.label}
+                                     </span>
+                                     <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrGroup-${group.key}:rotate-90`} />
+                                   </SidebarMenuSubButton>
+                                 </CollapsibleTrigger>
+                                 <CollapsibleContent>
+                                   <SidebarMenuSub>
+                                     {/* Render sub-groups (nested collapsibles) */}
+                                     {group.subGroups?.map((sg) => {
+                                       const isSgActive = sg.items.some(i => i.url && (pathname === i.url || pathname.startsWith(i.url + "/")));
+                                       return (
+                                         <Collapsible key={sg.key} defaultOpen={isSgActive} className={`group/hrSub-${sg.key}`}>
+                                           <SidebarMenuSubItem>
+                                             <CollapsibleTrigger asChild>
+                                               <SidebarMenuSubButton className="sidebar-glass-hover text-muted-foreground cursor-pointer w-full justify-between pr-1 text-xs font-medium">
+                                                 <span>{sg.label}</span>
+                                                 <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrSub-${sg.key}:rotate-90`} />
+                                               </SidebarMenuSubButton>
+                                             </CollapsibleTrigger>
+                                             <CollapsibleContent>
+                                               <SidebarMenuSub>
+                                                 {sg.items.map(renderItem)}
+                                               </SidebarMenuSub>
+                                             </CollapsibleContent>
+                                           </SidebarMenuSubItem>
+                                         </Collapsible>
+                                       );
+                                     })}
+                                     {/* Render direct items */}
+                                     {group.items?.map(renderItem)}
+                                   </SidebarMenuSub>
+                                 </CollapsibleContent>
+                               </SidebarMenuSubItem>
+                             </Collapsible>
+                           );
+                         })}
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
