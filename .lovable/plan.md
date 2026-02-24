@@ -1,40 +1,92 @@
 
 
-## Dos correcciones: Tab bar debajo de las KPI cards + Fix build error
+## Integrar funcionalidades faltantes manteniendo la estructura actual
 
-### 1. Mover tab bar debajo de las KPI cards en Nomina
+La imagen muestra tabs especificas que difieren de las actuales. La estrategia es: consolidar Horas y Comisiones como tabs dentro de Nomina (eliminandolas como paginas independientes), reorganizar las tabs de Facturacion y simplificar Reportes. El sidebar y las rutas se limpian acorde.
 
-**Problema:** En `NominaPage.tsx`, el tab bar esta en la linea 345 como primer elemento del contenido. Pero las KPI cards de "Calculo de Nomina" estan dentro de `renderTabContent()` (linea 211). El usuario quiere que las KPI cards aparezcan primero y el tab bar despues.
+---
 
-**Solucion:** Extraer las KPI cards del tab "Calculo de Nomina" fuera de `renderTabContent()` y colocarlas **antes** del tab bar en el JSX principal. Solo se muestran cuando `nominaTab === "Calculo de Nomina"` (o siempre, ya que son KPIs globales de nomina).
+### Cambios en Nomina (NominaPage.tsx)
 
-**Cambio en `NominaPage.tsx` (lineas 344-350):**
+**Tabs actuales:** Calculo de Nomina | Tiempo Real | Batch | Recibos de Pago | Archivos Bancarios
 
-```text
-ANTES:
-  [Tab bar]
-  [renderTabContent() -- que incluye KPIs dentro del case default]
+**Tabs nuevas (segun imagen):** Calculo | Recibos | Mail | Horas Extra | Banco de Horas | Comisiones | Batch
 
-DESPUES:
-  [KPI cards -- siempre visibles como resumen global]
-  [Tab bar]
-  [renderTabContent() -- sin las KPI cards duplicadas]
-```
+Detalle:
+- Renombrar "Calculo de Nomina" a "Calculo"
+- Mover "Recibos de Pago" a segunda posicion, renombrar a "Recibos"
+- Agregar tab "Mail" — placeholder para envio de recibos por correo
+- Absorber contenido de `HorasPage.tsx` tab "Horas Extra" como tab interna (query de payroll_details con overtime data)
+- Absorber contenido de `HorasPage.tsx` tab "Banco de Horas" como tab interna
+- Absorber contenido de `ComisionesPage.tsx` como tab "Comisiones" (tabla de comisiones con filtros, modal NuevaComision)
+- Mantener "Batch" al final
+- Eliminar tabs "Tiempo Real" y "Archivos Bancarios" (contenido de archivos bancarios se integra en Batch)
 
-Se moveran las 4 KPI cards (lineas 211-219) fuera del `renderTabContent` al JSX principal, antes del tab bar. Se eliminaran del case default para evitar duplicacion.
+**Archivo:** Modificar `src/pages/finanzas/nomina/NominaPage.tsx`
 
-### 2. Fix build error en ControlFinancieroPage.tsx
+---
 
-**Problema:** La query en linea 65 selecciona `net_amount` que no existe en `payroll_details`. La columna correcta es `net_total`.
+### Cambios en Facturacion (FacturacionPage.tsx)
 
-**Cambios en `ControlFinancieroPage.tsx`:**
-- Linea 65: cambiar `net_amount` a `net_total` en la query `.select()`
-- Linea 89: cambiar `d.net_amount` a `d.net_total` en el reduce
+**Tabs actuales:** Invoices | Envio Masivo | Notas de Pago | Reversos | Fees & Ajustes
 
-### Archivos a modificar
+**Tabs nuevas (segun imagen):** Invoices | Notas de Pago | Mail | Archivo de PagoMundo
+
+Detalle:
+- Mantener "Invoices" como tab principal con toda la funcionalidad actual (incluyendo reversos como accion en tabla, no tab separada)
+- Mover "Notas de Pago" a segunda posicion
+- Renombrar "Envio Masivo" a "Mail" (misma funcionalidad de envio masivo de invoices/recordatorios)
+- Agregar tab "Archivo de PagoMundo" — generador de archivos de dispersion para PagoMundo (formato CSV bancario, similar a generateBankFile pero orientado a facturacion)
+- Eliminar tabs "Reversos" y "Fees & Ajustes" como tabs independientes (reversos como accion en Invoices, fees como columnas visibles)
+
+**Archivo:** Modificar `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+
+---
+
+### Cambios en Reportes (ReportesPage.tsx)
+
+**Tabs actuales:** Ganancias & Comisiones | Ventas por Creador | Ventas Generales | Estado de Cuenta por CC | Comparativos Mensuales | Por Metodo de Pago
+
+**Tabs nuevas (segun imagen):** Estado de Cuenta CC | Reportes Generales
+
+Detalle:
+- Tab "Estado de Cuenta CC" — vista dedicada filtrada por centro de costo
+- Tab "Reportes Generales" — agrupa el resto de tipos con un Select interno para elegir tipo de reporte (nomina, facturacion, comisiones, consolidado, ventas por creador, comparativos, por metodo de pago)
+
+**Archivo:** Modificar `src/pages/finanzas/reportes/ReportesPage.tsx`
+
+---
+
+### Cambios en Sidebar (DashboardSidebar.tsx)
+
+Dado que Horas y Comisiones se absorben como tabs de Nomina:
+- Eliminar "Comisiones Laborales" del grupo "Operaciones"
+- Eliminar "Horas & Banco de Horas" del grupo "Operaciones"
+- El grupo "Operaciones" queda solo con "Nomina"
+
+**Archivo:** Modificar `src/components/dashboard/DashboardSidebar.tsx` (lineas 317-321)
+
+---
+
+### Cambios en Rutas (App.tsx)
+
+- Eliminar ruta `/finanzas/comisiones`
+- Eliminar ruta `/finanzas/horas`
+- Los archivos `ComisionesPage.tsx` y `HorasPage.tsx` se mantienen en disco pero ya no se renderizan como rutas independientes (su logica se reutiliza inline en NominaPage)
+
+**Archivo:** Modificar `src/App.tsx`
+
+---
+
+### Resumen de archivos
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/finanzas/nomina/NominaPage.tsx` | Mover KPI cards antes del tab bar |
-| `src/pages/finanzas/control/ControlFinancieroPage.tsx` | Corregir `net_amount` -> `net_total` (2 ocurrencias) |
+| `NominaPage.tsx` | Tabs: Calculo, Recibos, Mail, Horas Extra, Banco de Horas, Comisiones, Batch. Integrar contenido de Horas y Comisiones |
+| `FacturacionPage.tsx` | Tabs: Invoices, Notas de Pago, Mail, Archivo de PagoMundo |
+| `ReportesPage.tsx` | Tabs: Estado de Cuenta CC, Reportes Generales |
+| `DashboardSidebar.tsx` | Eliminar Comisiones y Horas del sidebar |
+| `App.tsx` | Eliminar rutas /finanzas/horas y /finanzas/comisiones |
+
+No se crean archivos nuevos. No se requieren migraciones SQL.
 
