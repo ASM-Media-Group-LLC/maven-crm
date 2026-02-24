@@ -338,21 +338,7 @@ export default function FacturacionPage() {
         );
 
       default: // Invoices
-        return (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPendientes > 0 ? "text-warning" : undefined} />
-                  <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                  <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                </>
-              )}
-            </div>
-            {renderInvoiceTable()}
-          </>
-        );
+        return renderInvoiceTable();
     }
   };
 
@@ -374,12 +360,26 @@ export default function FacturacionPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        {/* KPIs globales */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+            <>
+              <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPendientes > 0 ? "text-warning" : undefined} />
+              <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
+              <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+            </>
+          )}
+        </div>
+
+        {/* Tab bar */}
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
           {FACTURA_TABS.map(t => (
             <Button key={t} variant={facturaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setFacturaTab(t); setBulkSelected([]); }}>{t}</Button>
           ))}
         </div>
 
+        {/* Filtros */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
