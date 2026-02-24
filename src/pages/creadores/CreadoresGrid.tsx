@@ -16,6 +16,7 @@ import {
 import ViewCreadorModal from "./ViewCreadorModal";
 import type { CreatorWithBusiness } from "./useCreadores";
 import { buildSocialUrl } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -68,20 +69,27 @@ interface Props {
 
 const CreadoresGrid = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
+  const { isAgent, isAdmin, isManager } = useUserRole();
+  const canSeeAllData = isAdmin || isManager || !isAgent;
 
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {creators.map((c) => {
-          const initials = c.name
+          const showRealName = canSeeAllData || (c as any).permiso_nombre_real === true;
+          const showRealLocation = canSeeAllData || (c as any).permiso_ubicacion === true;
+          const displayName = showRealName ? c.name : (c.artistic_name || c.name);
+          const initials = displayName
             .split(" ")
             .slice(0, 2)
             .map((w) => w[0])
             .join("")
             .toUpperCase();
 
-          const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
-          const location = [c.country, c.city].filter(Boolean).join(", ");
+          const flag = showRealLocation ? getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null) : "";
+          const location = showRealLocation
+            ? [c.country, c.city].filter(Boolean).join(", ")
+            : ((c as any).ubicacion_artistica || "");
           const agency = c.creator_business?.assigned_agency;
           const kashType = c.creator_business?.kash_type;
           const agencyLabel = [agency, kashType].filter(Boolean).join(" - ");
@@ -102,9 +110,9 @@ const CreadoresGrid = ({ creators }: Props) => {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-semibold text-primary">
-                      {c.artistic_name || c.name}
+                      {showRealName ? (c.artistic_name || c.name) : displayName}
                     </p>
-                    {c.artistic_name && (
+                    {showRealName && c.artistic_name && (
                       <p className="truncate text-xs text-muted-foreground">{c.name}</p>
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
