@@ -307,6 +307,7 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel>Recursos Humanos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Dashboard HR - top level */}
               {collapsed ? (
                 <SidebarMenuItem>
                   <DropdownMenu>
@@ -318,7 +319,7 @@ const DashboardSidebar = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
                       <DropdownMenuItem onClick={() => navigate("/hr")} className={pathname === "/hr" ? "bg-accent text-accent-foreground font-medium" : ""}>
-                        Dashboard
+                        Dashboard HR
                       </DropdownMenuItem>
                       {hrFlatItems.map((item) => (
                         <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
@@ -329,96 +330,75 @@ const DashboardSidebar = () => {
                   </DropdownMenu>
                 </SidebarMenuItem>
               ) : (
-                <Collapsible defaultOpen={isHRActive} className="group/hrCollapsible">
+                <>
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton tooltip="Empleados" className="sidebar-glass-hover">
-                        <UserCog className="h-4 w-4 shrink-0" />
-                        <span>Empleados</span>
-                        <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/hrCollapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                     <CollapsibleContent>
-                       <SidebarMenuSub>
-                         {/* Dashboard directo */}
-                         <SidebarMenuSubItem>
-                           <SidebarMenuSubButton asChild isActive={pathname === "/hr"} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                             <NavLink to="/hr">
-                               <LayoutDashboard className="h-3.5 w-3.5 mr-1.5 inline-block" />
-                               Dashboard
-                             </NavLink>
-                           </SidebarMenuSubButton>
-                         </SidebarMenuSubItem>
-                         {hrGroups.map((group) => {
-                           const groupUrls = getGroupUrls(group);
-                           const isGroupActive = groupUrls.some(u => pathname === u || pathname.startsWith(u + "/"));
-
-                           const renderItem = (item: HRItem) =>
-                             item.url ? (
-                               <SidebarMenuSubItem key={item.title}>
-                                 <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                                   <NavLink to={item.url}>{item.title}</NavLink>
-                                 </SidebarMenuSubButton>
-                               </SidebarMenuSubItem>
-                             ) : (
-                               <SidebarMenuSubItem key={item.title}>
-                                 <SidebarMenuSubButton className="opacity-40 cursor-not-allowed pointer-events-none">
-                                   <span>{item.title}</span>
-                                 </SidebarMenuSubButton>
-                               </SidebarMenuSubItem>
-                             );
-
-                           return (
-                             <Collapsible
-                               key={group.key}
-                               defaultOpen={isGroupActive}
-                               className={`group/hrGroup-${group.key}`}
-                             >
-                               <SidebarMenuSubItem>
-                                 <CollapsibleTrigger asChild>
-                                   <SidebarMenuSubButton className="sidebar-glass-hover font-medium text-muted-foreground cursor-pointer w-full justify-between pr-1">
-                                     <span className="flex items-center gap-1.5">
-                                       <group.icon className="h-3.5 w-3.5 shrink-0" />
-                                       {group.label}
-                                     </span>
-                                     <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrGroup-${group.key}:rotate-90`} />
-                                   </SidebarMenuSubButton>
-                                 </CollapsibleTrigger>
-                                 <CollapsibleContent>
-                                   <SidebarMenuSub>
-                                     {/* Render sub-groups (nested collapsibles) */}
-                                     {group.subGroups?.map((sg) => {
-                                       const isSgActive = sg.items.some(i => i.url && (pathname === i.url || pathname.startsWith(i.url + "/")));
-                                       return (
-                                         <Collapsible key={sg.key} defaultOpen={isSgActive} className={`group/hrSub-${sg.key}`}>
-                                           <SidebarMenuSubItem>
-                                             <CollapsibleTrigger asChild>
-                                               <SidebarMenuSubButton className="sidebar-glass-hover text-muted-foreground cursor-pointer w-full justify-between pr-1 text-xs font-medium">
-                                                 <span>{sg.label}</span>
-                                                 <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrSub-${sg.key}:rotate-90`} />
-                                               </SidebarMenuSubButton>
-                                             </CollapsibleTrigger>
-                                             <CollapsibleContent>
-                                               <SidebarMenuSub>
-                                                 {sg.items.map(renderItem)}
-                                               </SidebarMenuSub>
-                                             </CollapsibleContent>
-                                           </SidebarMenuSubItem>
-                                         </Collapsible>
-                                       );
-                                     })}
-                                     {/* Render direct items */}
-                                     {group.items?.map(renderItem)}
-                                   </SidebarMenuSub>
-                                 </CollapsibleContent>
-                               </SidebarMenuSubItem>
-                             </Collapsible>
-                           );
-                         })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
+                    <SidebarMenuButton asChild tooltip="Dashboard HR">
+                      <NavLink to="/hr" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                        <LayoutDashboard className="h-4 w-4 shrink-0" />
+                        <span>Dashboard HR</span>
+                      </NavLink>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
-                </Collapsible>
+
+                  {hrGroups.map((group) => {
+                    const groupUrls = getGroupUrls(group);
+                    const isGroupActive = groupUrls.some(u => pathname === u || pathname.startsWith(u + "/"));
+
+                    const renderHRItem = (item: HRItem) =>
+                      item.url ? (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                            <NavLink to={item.url}>{item.title}</NavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ) : (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton className="opacity-40 cursor-not-allowed pointer-events-none">
+                            <span>{item.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+
+                    return (
+                      <Collapsible key={group.key} defaultOpen={isGroupActive} className={`group/hr-${group.key}`}>
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton tooltip={group.label} className="sidebar-glass-hover">
+                              <group.icon className="h-4 w-4 shrink-0" />
+                              <span>{group.label}</span>
+                              <ChevronRight className={`ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/hr-${group.key}:rotate-90`} />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {group.subGroups?.map((sg) => {
+                                const isSgActive = sg.items.some(i => i.url && (pathname === i.url || pathname.startsWith(i.url + "/")));
+                                return (
+                                  <Collapsible key={sg.key} defaultOpen={isSgActive} className={`group/hrSub-${sg.key}`}>
+                                    <SidebarMenuSubItem>
+                                      <CollapsibleTrigger asChild>
+                                        <SidebarMenuSubButton className="sidebar-glass-hover text-muted-foreground cursor-pointer w-full justify-between pr-1 font-medium">
+                                          <span>{sg.label}</span>
+                                          <ChevronRight className={`h-3 w-3 shrink-0 transition-transform duration-200 group-data-[state=open]/hrSub-${sg.key}:rotate-90`} />
+                                        </SidebarMenuSubButton>
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                          {sg.items.map(renderHRItem)}
+                                        </SidebarMenuSub>
+                                      </CollapsibleContent>
+                                    </SidebarMenuSubItem>
+                                  </Collapsible>
+                                );
+                              })}
+                              {group.items?.map(renderHRItem)}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  })}
+                </>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
