@@ -511,7 +511,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   };
 
   // Handle assignment confirmation from modal
-  const handleAssignmentConfirm = async ({ managerId, chatterIds }: { managerId: string; chatterIds: string[] }) => {
+  const handleAssignmentConfirm = async ({ managerId, chatterIds }: { managerId: string | null; chatterIds: string[] }) => {
     setAssignmentSubmitting(true);
     try {
       // First, submit the creator
@@ -520,9 +520,11 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
 
       if (currentId) {
         const payload = buildPayload(false);
+        const updateData = { ...payload.creator } as any;
+        if (managerId) updateData.assigned_manager_profile_id = managerId;
         const { error } = await supabase
           .from("creators")
-          .update({ ...payload.creator, assigned_manager_profile_id: managerId } as any)
+          .update(updateData)
           .eq("id", currentId);
         if (error) throw error;
 
@@ -536,20 +538,22 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         }
       } else {
         const payload = buildPayload(false);
-        (payload.creator as any).assigned_manager_profile_id = managerId;
+        if (managerId) (payload.creator as any).assigned_manager_profile_id = managerId;
         creatorId = await addCreador.mutateAsync(payload);
       }
 
       if (!creatorId) throw new Error("No se pudo obtener el ID del creador");
 
-      // Insert creator_assignments record
-      await supabase.from("creator_assignments").upsert(
-        {
-          creator_id: creatorId,
-          manager_profile_id: managerId,
-        } as any,
-        { onConflict: "creator_id" }
-      );
+      // Insert creator_assignments record only if manager selected
+      if (managerId) {
+        await supabase.from("creator_assignments").upsert(
+          {
+            creator_id: creatorId,
+            manager_profile_id: managerId,
+          } as any,
+          { onConflict: "creator_id" }
+        );
+      }
 
       // Insert chatter assignments
       if (chatterIds.length > 0) {

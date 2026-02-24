@@ -36,7 +36,7 @@ interface UserOption {
 interface AssignmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: { managerId: string; chatterIds: string[] }) => void;
+  onConfirm: (data: { managerId: string | null; chatterIds: string[] }) => void;
   isSubmitting: boolean;
 }
 
@@ -103,7 +103,6 @@ export default function AssignmentModal({
   };
 
   const handleConfirm = () => {
-    if (!selectedManager) return;
     onConfirm({ managerId: selectedManager, chatterIds: selectedChatters });
   };
 
@@ -125,7 +124,7 @@ export default function AssignmentModal({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <UserCheck className="h-4 w-4 text-primary" />
-              Manager <span className="text-destructive">*</span>
+              Manager <span className="text-xs text-muted-foreground">(opcional)</span>
             </Label>
             <Popover open={managerOpen} onOpenChange={setManagerOpen}>
               <PopoverTrigger asChild>
@@ -260,11 +259,15 @@ export default function AssignmentModal({
           </div>
         </div>
 
+        <p className="text-xs text-muted-foreground">
+          Puedes omitir esta asignación y completarla después desde el perfil de la creadora.
+        </p>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={!selectedManager || isSubmitting}>
+          <Button onClick={handleConfirm} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Completar Onboarding
           </Button>
