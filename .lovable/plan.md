@@ -1,83 +1,64 @@
 
 
-## Modulo de Onboarding de Empleados (HR)
+## Reestructurar navegacion del modulo Empleados (RRHH)
 
 ### Objetivo
 
-Crear la seccion de Onboarding dentro de Reclutamiento en el modulo de RRHH, siguiendo la misma estructura visual de Candidatos (KPIs, tabs por departamento, tabla/grid, filtros) y con una pagina dedicada "Iniciar Onboarding" similar a la de creadores pero con datos tipicos de RRHH.
+Reorganizar los grupos del sidebar de RRHH segun la nueva jerarquia, manteniendo Finanzas y agregando Incapacidades dentro de Ausencias.
 
-### Paginas a crear
+### Nueva estructura
 
-#### 1. Pagina principal: `/hr/onboarding` (`src/pages/hr/HROnboarding.tsx`)
+```text
+Empleados (RRHH)
++-- Dashboard HR
++-- Employee Lifecycle
+|   +-- Candidatos
+|   +-- Onboarding
+|   +-- Empleados Activos (/hr/directorio)
+|   +-- Offboarding (deshabilitado)
++-- Gestion Laboral
+|   +-- Control de Tiempo
+|   |   +-- Asistencia
+|   |   +-- Horarios y Turnos
+|   |   +-- Horarios Chatters
+|   |   +-- Horas Extra (/hr/horarios/horas-extras)
+|   |   +-- Banco de Horas (/hr/horarios/banco-horas)
+|   +-- Ausencias
+|   |   +-- Vacaciones
+|   |   +-- Permisos
+|   |   +-- Incapacidades (deshabilitado - nuevo)
+|   +-- Monitoreo
++-- Seguimiento
+|   +-- Incidentes
++-- Desarrollo & Performance
+|   +-- Desempeno
+|   +-- Capacitacion
++-- Organizacion
+|   +-- Directorio
+|   +-- Organigrama (deshabilitado)
++-- Finanzas
+    +-- Deducciones (deshabilitado)
+```
 
-Estructura identica a la captura de referencia y al patron de HRApplicants:
+### Cambios
 
-**Header:**
-- Breadcrumbs: Empleados > Reclutamiento > Onboarding
-- Titulo "Onboarding" + subtitulo "Gestion de nuevos empleados en proceso de integracion"
-- Boton CTA "Iniciar Onboarding" que navega a `/hr/onboarding/nuevo`
+Solo se modifica **`src/components/dashboard/DashboardSidebar.tsx`**:
 
-**KPI Cards (4):**
-- Total Onboarding (muted)
-- Pendientes (status = pending) (primary)
-- En Progreso (status = in_progress) (warning)
-- Completados (status = completed) (success/accent)
+| Cambio | Detalle |
+|--------|---------|
+| Reemplazar array `hrGroups` | Definir los 6 nuevos grupos con la estructura descrita |
+| "Employee Lifecycle" (icono `UserCheck`) | Candidatos, Onboarding, Empleados Activos (`/hr/directorio`), Offboarding (null) |
+| "Gestion Laboral" (icono `Clock`) | Contiene 3 sub-secciones. **Control de Tiempo**: Asistencia, Horarios y Turnos, Horarios Chatters, Horas Extra, Banco de Horas. **Ausencias**: Vacaciones, Permisos, Incapacidades (null). **Monitoreo** como item directo |
+| Sub-subgrupos anidados | "Control de Tiempo" y "Ausencias" se renderizan como `Collapsible` adicionales dentro de "Gestion Laboral", con el mismo patron visual existente |
+| "Seguimiento" (icono `Eye`) | Solo Incidentes (Monitoreo se mueve a Gestion Laboral) |
+| "Desarrollo & Performance" (icono `GraduationCap`) | Desempeno + Capacitacion |
+| "Organizacion" (icono `Users`) | Directorio + Organigrama (null) |
+| "Finanzas" (icono `Wallet`) | Se mantiene con Deducciones (null) |
+| Dropdown colapsado | Se actualiza `hrFlatItems` para reflejar la nueva lista plana |
 
-**Tabs por departamento:** Todos, Ventas, LeadGen, Contenido, Marketing, Tecnologia
+### Detalle tecnico
 
-**Filtros:** Buscador + toggle List/Grid
+Se introduce un tipo `subGroups` opcional en la estructura de datos de `hrGroups` para soportar los sub-subgrupos de "Gestion Laboral". La renderizacion detecta si un grupo tiene `subGroups` y renderiza `Collapsible` anidados adicionales; si no, renderiza items directos como hasta ahora.
 
-**Vista Lista (tabla):**
-- Columnas: Empleado (avatar+nombre), Posicion, Area (badge), Empresa, Fecha Inicio, Manager, Progreso (barra), Estado (badge)
-- Acciones: Ver, Editar, Eliminar
+No se crean nuevas paginas, rutas ni dependencias. Solo reestructuracion del sidebar.
 
-**Vista Grid:** Tarjetas con la misma info
-
-**Datos:** Query a `employee_onboarding` con join a `employees` (nombre, position, department), calculando progreso desde `employee_onboarding_tasks` (completadas/total)
-
-#### 2. Pagina de creacion: `/hr/onboarding/nuevo` (`src/pages/hr/HROnboardingNew.tsx`)
-
-Pagina dedicada con layout estandar (ArrowLeft + breadcrumbs + footer fijo).
-
-**Formulario simplificado para RRHH (sin wizard largo, formulario directo):**
-
-- **Seccion 1 - Seleccion de Empleado:**
-  - Select/Combobox para elegir un empleado existente del directorio (solo los que no tengan onboarding activo)
-  - O crear uno nuevo rapidamente (nombre + apellido + email + departamento + posicion)
-
-- **Seccion 2 - Configuracion del Onboarding:**
-  - Fecha de inicio (DateInput)
-  - Buddy/Mentor asignado (Select de empleados existentes)
-  - Notas iniciales (Textarea)
-
-- **Seccion 3 - Checklist inicial (tareas predefinidas de RRHH):**
-  - Checkboxes con tareas tipicas agrupadas por categoria:
-    - **Documentacion:** Contrato firmado, Documento de identidad, Foto carnet, Afiliaciones (EPS/ARL/AFP)
-    - **Accesos:** Cuenta de correo, Acceso a herramientas, Credenciales de plataforma
-    - **Equipamiento:** Entrega de equipo, Acceso a oficina/badge
-    - **Formacion:** Induccion general, Capacitacion del area, Presentacion al equipo
-  - El usuario marca cuales aplican y se crean como `employee_onboarding_tasks`
-
-**Footer fijo:** Cancelar (outline) + Iniciar Onboarding (default)
-
-Al guardar: inserta en `employee_onboarding` + inserta las tareas seleccionadas en `employee_onboarding_tasks`, navega a `/hr/onboarding` con toast.
-
-### Archivos a modificar/crear
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/hr/HROnboarding.tsx` | **Nuevo** - Pagina principal con KPIs, tabs, filtros, tabla/grid |
-| `src/pages/hr/HROnboardingNew.tsx` | **Nuevo** - Pagina de creacion con formulario de seleccion de empleado, configuracion y checklist |
-| `src/App.tsx` | Agregar rutas `/hr/onboarding` y `/hr/onboarding/nuevo` envueltas en HRLayout + ProtectedRoute |
-| `src/components/dashboard/DashboardSidebar.tsx` | Cambiar `{ title: "Onboarding", url: null }` a `{ title: "Onboarding", url: "/hr/onboarding" }` |
-
-### Base de datos
-
-No se requieren cambios. Las tablas `employee_onboarding` y `employee_onboarding_tasks` ya existen con la estructura necesaria (employee_id, buddy_employee_id, start_date, status, notes + tasks con category, title, description, status, position).
-
-### Logica de progreso
-
-El progreso se calcula como: `(tareas completadas / total tareas) * 100`. Los estados se mapean:
-- `pending` -> "Pendiente" (badge gris)
-- `in_progress` -> "En Progreso" (badge azul/warning)
-- `completed` -> "Completado" (badge verde/success)
