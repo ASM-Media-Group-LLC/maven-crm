@@ -76,8 +76,6 @@ export interface Step1Data {
   apodos: string;
   edadMostrar: string;
   ubicacionArtistica: string;
-  redesSociales: string;
-  wishlistAmazon: string;
 }
 
 export interface Step1Errors {
@@ -248,17 +246,6 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
             {NIVELES_IDIOMA.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
           </SelectContent>
         </Select>
-      </div>
-
-      {/* ── Conectividad ── */}
-      <SectionLabel>Conectividad</SectionLabel>
-      <div className="md:col-span-2 space-y-1.5">
-        <Label>Links de Redes Sociales</Label>
-        <Textarea value={data.redesSociales} onChange={(e) => onChange("redesSociales", e.target.value)} placeholder="Instagram, X, TikTok..." rows={2} />
-      </div>
-      <div className="md:col-span-2 space-y-1.5">
-        <Label>Wishlist de Amazon</Label>
-        <Input type="url" value={data.wishlistAmazon} onChange={(e) => onChange("wishlistAmazon", e.target.value)} placeholder="https://www.amazon.com/hz/wishlist/ls/..." />
       </div>
 
       {/* ── Privacidad ── */}

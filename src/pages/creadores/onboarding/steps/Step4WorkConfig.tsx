@@ -354,26 +354,71 @@ export default function Step4WorkConfig({ data, onChange }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/50">
-                    <th className="text-left p-2 font-medium">Día</th>
-                    {SHIFTS.map((s) => (
-                      <th key={s} className="text-center p-2 font-medium">{s}</th>
-                    ))}
+                    <th className="text-left p-2 font-medium">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={DAYS.every((d) => SHIFTS.every((s) => (data.schedule[d] || []).includes(s)))}
+                          onCheckedChange={(checked) => {
+                            const newSchedule: ScheduleGrid = {};
+                            DAYS.forEach((d) => { newSchedule[d] = checked ? [...SHIFTS] : []; });
+                            onChange("schedule", newSchedule);
+                          }}
+                        />
+                        <span>Todos</span>
+                      </div>
+                    </th>
+                    {SHIFTS.map((s) => {
+                      const allChecked = DAYS.every((d) => (data.schedule[d] || []).includes(s));
+                      return (
+                        <th key={s} className="text-center p-2 font-medium">
+                          <div className="flex items-center justify-center gap-2">
+                            <Checkbox
+                              checked={allChecked}
+                              onCheckedChange={(checked) => {
+                                const newSchedule = { ...data.schedule };
+                                DAYS.forEach((d) => {
+                                  const current = newSchedule[d] || [];
+                                  newSchedule[d] = checked
+                                    ? [...new Set([...current, s])]
+                                    : current.filter((x) => x !== s);
+                                });
+                                onChange("schedule", newSchedule);
+                              }}
+                            />
+                            <span>{s}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {DAYS.map((day) => (
-                    <tr key={day} className="border-t">
-                      <td className="p-2 font-medium">{day}</td>
-                      {SHIFTS.map((shift) => (
-                        <td key={shift} className="text-center p-2">
-                          <Checkbox
-                            checked={(data.schedule[day] || []).includes(shift)}
-                            onCheckedChange={() => onChange("schedule", toggleShift(data.schedule, day, shift))}
-                          />
+                  {DAYS.map((day) => {
+                    const allShiftsChecked = SHIFTS.every((s) => (data.schedule[day] || []).includes(s));
+                    return (
+                      <tr key={day} className="border-t">
+                        <td className="p-2 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={allShiftsChecked}
+                              onCheckedChange={(checked) => {
+                                onChange("schedule", { ...data.schedule, [day]: checked ? [...SHIFTS] : [] });
+                              }}
+                            />
+                            <span>{day}</span>
+                          </div>
                         </td>
-                      ))}
-                    </tr>
-                  ))}
+                        {SHIFTS.map((shift) => (
+                          <td key={shift} className="text-center p-2">
+                            <Checkbox
+                              checked={(data.schedule[day] || []).includes(shift)}
+                              onCheckedChange={() => onChange("schedule", toggleShift(data.schedule, day, shift))}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
