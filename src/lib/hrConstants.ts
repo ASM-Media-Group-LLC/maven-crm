@@ -250,6 +250,27 @@ export const TRAINING_CONTENT_TYPES = [
   { value: "practica", label: "Práctica" },
 ];
 
+// ── Deducciones Operativas ──
+
+export const DEDUCTION_DISPLAY_TYPES = [
+  { value: "adelanto", label: "Adelanto de Nómina" },
+  { value: "infraccion", label: "Infracción" },
+];
+
+export const DEDUCTION_STATUSES = [
+  { value: "pending", label: "Pendiente" },
+  { value: "applied", label: "Aplicada" },
+  { value: "rejected", label: "Rechazada" },
+];
+
+export const INFRACTION_CATEGORIES = [
+  { value: "redes_sociales", label: "Uso de redes sociales" },
+  { value: "violacion_politicas", label: "Violación de políticas" },
+  { value: "productividad", label: "Productividad" },
+  { value: "ausencia_injustificada", label: "Ausencia injustificada" },
+  { value: "otra", label: "Otra" },
+];
+
 // ── Employee History ──
 
 export const HISTORY_CHANGE_TYPES = [

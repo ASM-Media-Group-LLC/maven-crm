@@ -81,6 +81,8 @@ import HROnboardingNew from "./pages/hr/HROnboardingNew";
 import HRMonitoring from "./pages/hr/HRMonitoring";
 import HRDirectoryLookup from "./pages/hr/HRDirectoryLookup";
 import HROrganigrama from "./pages/hr/HROrganigrama";
+import HRDeductions from "./pages/hr/HRDeductions";
+import HRDeductionNew from "./pages/hr/HRDeductionNew";
 
 const queryClient = new QueryClient();
 
@@ -168,6 +170,8 @@ const App = () => (
               <Route path="/hr/monitoreo" element={<ProtectedRoute><HRLayout><HRMonitoring /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/organizacion/directorio" element={<ProtectedRoute><HRLayout><HRDirectoryLookup /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/organizacion/organigrama" element={<ProtectedRoute><HRLayout><HROrganigrama /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/deducciones" element={<ProtectedRoute><HRLayout><HRDeductions /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/deducciones/nuevo" element={<ProtectedRoute><HRLayout><HRDeductionNew /></HRLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
