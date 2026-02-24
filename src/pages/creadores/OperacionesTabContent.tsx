@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useUserRole } from "@/hooks/useUserRole";
+import ChatterOperationalView from "./ChatterOperationalView";
 
 interface OperacionesTabContentProps {
   creator: {
@@ -37,7 +39,7 @@ interface OperacionesTabContentProps {
   };
 }
 
-const priceLabels: Record<string, string> = {
+export const priceLabels: Record<string, string> = {
   cat1: "Contenido X",
   cat2: "Contenido XX",
   cat3: "Contenido XXX",
@@ -56,12 +58,12 @@ const priceLabels: Record<string, string> = {
   material_sensual: "Material Sensual",
 };
 
-function parseCsv(value: string | null | undefined): string[] {
+export function parseCsv(value: string | null | undefined): string[] {
   if (!value) return [];
   return value.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-function parsePricing(raw: unknown): { service: string; price: number; notes: string }[] {
+export function parsePricing(raw: unknown): { service: string; price: number; notes: string }[] {
   if (!raw || typeof raw !== "object") return [];
   const entries = Object.entries(raw as Record<string, { price?: number; notes?: string }>);
   return entries
@@ -87,6 +89,12 @@ const crisisScripts: { key: string; label: string }[] = [
 ];
 
 const OperacionesTabContent = ({ creator }: OperacionesTabContentProps) => {
+  const { isAgent } = useUserRole();
+
+  if (isAgent) {
+    return <ChatterOperationalView creator={creator} />;
+  }
+
   const apodos = parseCsv(creator.apodos_permitidos);
   const prohibidas = parseCsv(creator.palabras_prohibidas);
   const pricing = parsePricing(creator.precios_contenido);
