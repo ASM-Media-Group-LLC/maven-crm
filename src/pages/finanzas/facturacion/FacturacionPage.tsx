@@ -32,6 +32,8 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
 };
 
 const PAYMENT_TABS = ["Todos", "PayPal", "Transferencia", "Crypto", "Otro"];
+const FACTURA_TABS = ["Invoices", "Envío Masivo", "Notas de Pago", "Reversos", "Fees & Ajustes"] as const;
+type FacturaTab = typeof FACTURA_TABS[number];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
@@ -51,6 +53,7 @@ export default function FacturacionPage() {
   });
 
   const [search, setSearch] = useState("");
+  const [facturaTab, setFacturaTab] = useState<FacturaTab>("Invoices");
   const [statusFilter, setStatusFilter] = useState("");
   const [paymentTab, setPaymentTab] = useState("Todos");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -101,6 +104,18 @@ export default function FacturacionPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          {FACTURA_TABS.map(t => (
+            <Button key={t} variant={facturaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setFacturaTab(t)}>{t}</Button>
+          ))}
+        </div>
+
+        {facturaTab !== "Invoices" ? (
+          <div className="rounded-lg border border-dashed border-border p-12 text-center">
+            <p className="text-sm text-muted-foreground">Próximamente: {facturaTab}</p>
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
@@ -224,6 +239,8 @@ export default function FacturacionPage() {
               );
             })}
           </div>
+        )}
+      </>
         )}
       </div>
 

@@ -34,7 +34,11 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
+  const NOMINA_TABS = ["Cálculo de Nómina", "Tiempo Real", "Batch", "Recibos de Pago", "Archivos Bancarios"] as const;
+  type NominaTab = typeof NOMINA_TABS[number];
+
 export default function NominaPage() {
+  const [nominaTab, setNominaTab] = useState<NominaTab>("Cálculo de Nómina");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -99,6 +103,18 @@ export default function NominaPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          {NOMINA_TABS.map(t => (
+            <Button key={t} variant={nominaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setNominaTab(t)}>{t}</Button>
+          ))}
+        </div>
+
+        {nominaTab !== "Cálculo de Nómina" ? (
+          <div className="rounded-lg border border-dashed border-border p-12 text-center">
+            <p className="text-sm text-muted-foreground">Próximamente: {nominaTab}</p>
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
@@ -199,6 +215,8 @@ export default function NominaPage() {
               );
             })}
           </div>
+        )}
+      </>
         )}
       </div>
 

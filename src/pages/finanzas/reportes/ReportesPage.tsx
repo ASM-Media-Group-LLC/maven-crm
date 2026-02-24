@@ -19,6 +19,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 
+const REPORT_TABS = ["Ganancias & Comisiones", "Ventas por Creador", "Ventas Generales", "Estado de Cuenta por CC", "Comparativos Mensuales", "Por Método de Pago"] as const;
+type ReportTab = typeof REPORT_TABS[number];
+
 const REPORT_TYPES: Record<string, string> = {
   nomina: "Nómina",
   facturacion: "Facturación",
@@ -29,6 +32,7 @@ const REPORT_TYPES: Record<string, string> = {
 export default function ReportesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [reportTab, setReportTab] = useState<ReportTab>("Ganancias & Comisiones");
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["financial-reports"],
@@ -82,6 +86,18 @@ export default function ReportesPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          {REPORT_TABS.map(t => (
+            <Button key={t} variant={reportTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setReportTab(t)}>{t}</Button>
+          ))}
+        </div>
+
+        {reportTab !== "Ganancias & Comisiones" ? (
+          <div className="rounded-lg border border-dashed border-border p-12 text-center">
+            <p className="text-sm text-muted-foreground">Próximamente: {reportTab}</p>
+          </div>
+        ) : (
+        <>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -144,6 +160,8 @@ export default function ReportesPage() {
             </Table>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>

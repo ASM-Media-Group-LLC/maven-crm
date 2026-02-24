@@ -1,16 +1,23 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DollarSign, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+
+const TABS = ["Ingresos vs Costos", "Costos por CC", "Productividad por Empleado", "Márgenes Operativos"] as const;
+type Tab = typeof TABS[number];
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
 export default function ControlFinancieroPage() {
+  const [activeTab, setActiveTab] = useState<Tab>("Ingresos vs Costos");
+
   const { data: payroll = [], isLoading: lp } = useQuery({
     queryKey: ["control-payroll"],
     queryFn: async () => {
@@ -59,6 +66,18 @@ export default function ControlFinancieroPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          {TABS.map(t => (
+            <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t)}>{t}</Button>
+          ))}
+        </div>
+
+        {activeTab !== "Ingresos vs Costos" ? (
+          <div className="rounded-lg border border-dashed border-border p-12 text-center">
+            <p className="text-sm text-muted-foreground">Próximamente: {activeTab}</p>
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
@@ -94,6 +113,8 @@ export default function ControlFinancieroPage() {
             </TableBody>
           </Table>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

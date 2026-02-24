@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
-  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet,
+  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -305,67 +305,123 @@ const DashboardSidebar = () => {
         </SidebarGroup>
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Finanzas</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {(() => {
-                const finanzasSubItems = [
-                  { title: "Dashboard", url: "/finanzas" },
-                  { title: "Nómina", url: "/finanzas/nomina" },
-                  { title: "Facturación", url: "/finanzas/facturacion" },
-                  { title: "Comisiones", url: "/finanzas/comisiones" },
-                  { title: "Control Financiero", url: "/finanzas/control" },
-                  { title: "Reportes", url: "/finanzas/reportes" },
-                ];
-                const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
+        {(() => {
+          type FinItem = { title: string; url: string };
+          type FinGroup = { label: string; icon: typeof Wallet; key: string; items: FinItem[] };
 
-                return collapsed ? (
-                  <SidebarMenuItem>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <SidebarMenuButton tooltip="Finanzas" className={`sidebar-glass-hover ${isFinanzasActive ? "sidebar-glass-active font-medium" : ""}`}>
-                          <Wallet className="h-4 w-4 shrink-0" />
-                          <span>Finanzas</span>
-                        </SidebarMenuButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
-                        {finanzasSubItems.map((item) => (
-                          <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
-                            {item.title}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </SidebarMenuItem>
-                ) : (
-                  <Collapsible defaultOpen={isFinanzasActive} className="group/finanzasCollapsible">
+          const finanzasGroups: FinGroup[] = [
+            {
+              label: "Operaciones",
+              icon: Calculator,
+              key: "fin-ops",
+              items: [
+                { title: "Nómina", url: "/finanzas/nomina" },
+                { title: "Comisiones Laborales", url: "/finanzas/comisiones" },
+                { title: "Horas & Banco de Horas", url: "/finanzas/horas" },
+              ],
+            },
+            {
+              label: "Facturación",
+              icon: FileText,
+              key: "fin-fact",
+              items: [
+                { title: "Invoices", url: "/finanzas/facturacion" },
+              ],
+            },
+            {
+              label: "Análisis",
+              icon: BarChart3,
+              key: "fin-analysis",
+              items: [
+                { title: "Control Financiero", url: "/finanzas/control" },
+                { title: "Reportes", url: "/finanzas/reportes" },
+              ],
+            },
+            {
+              label: "Configuración",
+              icon: Settings,
+              key: "fin-config",
+              items: [
+                { title: "Config. Financiera", url: "/finanzas/configuracion" },
+              ],
+            },
+          ];
+
+          const finFlatItems = [
+            { title: "Dashboard", url: "/finanzas" },
+            ...finanzasGroups.flatMap(g => g.items),
+          ];
+
+          const isFinanzasActive = pathname === "/finanzas" || pathname.startsWith("/finanzas/");
+
+          return (
+            <SidebarGroup>
+              <SidebarGroupLabel>Finanzas</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {collapsed ? (
                     <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton tooltip="Finanzas" className="sidebar-glass-hover">
-                          <Wallet className="h-4 w-4 shrink-0" />
-                          <span>Finanzas</span>
-                          <ChevronRight className="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/finanzasCollapsible:rotate-90" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {finanzasSubItems.map((item) => (
-                            <SidebarMenuSubItem key={item.url}>
-                              <SidebarMenuSubButton asChild isActive={pathname === item.url} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                                <NavLink to={item.url}>{item.title}</NavLink>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuButton tooltip="Finanzas" className={`sidebar-glass-hover ${isFinanzasActive ? "sidebar-glass-active font-medium" : ""}`}>
+                            <Wallet className="h-4 w-4 shrink-0" />
+                            <span>Finanzas</span>
+                          </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" className="min-w-[180px]">
+                          {finFlatItems.map((item) => (
+                            <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
+                              {item.title}
+                            </DropdownMenuItem>
                           ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })()}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  ) : (
+                    <>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Dashboard Financiero">
+                          <NavLink to="/finanzas" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                            <LayoutDashboard className="h-4 w-4 shrink-0" />
+                            <span>Dashboard Financiero</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+
+                      {finanzasGroups.map((group) => {
+                        const isGroupActive = group.items.some(i => pathname === i.url || pathname.startsWith(i.url + "/"));
+                        return (
+                          <Collapsible key={group.key} defaultOpen={isGroupActive} className={`group/fin-${group.key}`}>
+                            <SidebarMenuItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuButton tooltip={group.label} className="sidebar-glass-hover">
+                                  <group.icon className="h-4 w-4 shrink-0" />
+                                  <span>{group.label}</span>
+                                  <ChevronRight className={`ml-auto h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/fin-${group.key}:rotate-90`} />
+                                </SidebarMenuButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub>
+                                  {group.items.map((item) => (
+                                    <SidebarMenuSubItem key={item.url}>
+                                      <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                                        <NavLink to={item.url}>{item.title}</NavLink>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  ))}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </SidebarMenuItem>
+                          </Collapsible>
+                        );
+                      })}
+                    </>
+                  )}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })()}
 
         <SidebarGroup>
           <SidebarGroupLabel>Recursos Humanos</SidebarGroupLabel>
