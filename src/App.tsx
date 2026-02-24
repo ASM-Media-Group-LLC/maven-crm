@@ -91,6 +91,8 @@ import FacturacionPage from "./pages/finanzas/facturacion/FacturacionPage";
 import ControlFinancieroPage from "./pages/finanzas/control/ControlFinancieroPage";
 import ReportesPage from "./pages/finanzas/reportes/ReportesPage";
 import ConfiguracionPage from "./pages/finanzas/configuracion/ConfiguracionPage";
+import CollectionsPage from "./pages/finanzas/collections/CollectionsPage";
+import HorasVariablesPage from "./pages/finanzas/horas-variables/HorasVariablesPage";
 
 const queryClient = new QueryClient();
 
@@ -187,6 +189,8 @@ const App = () => (
               <Route path="/finanzas/facturacion" element={<ProtectedRoute><FinanzasLayout><FacturacionPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/control" element={<ProtectedRoute><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/reportes" element={<ProtectedRoute><FinanzasLayout><ReportesPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/collections" element={<ProtectedRoute><FinanzasLayout><CollectionsPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/horas-variables" element={<ProtectedRoute><FinanzasLayout><HorasVariablesPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/configuracion" element={<ProtectedRoute><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />

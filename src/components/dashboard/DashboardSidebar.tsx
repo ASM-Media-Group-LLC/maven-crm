@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
-  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3,
+  UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -311,11 +311,20 @@ const DashboardSidebar = () => {
 
           const finanzasGroups: FinGroup[] = [
             {
+              label: "Ingresos",
+              icon: DollarSign,
+              key: "fin-ingresos",
+              items: [
+                { title: "Collections", url: "/finanzas/collections" },
+              ],
+            },
+            {
               label: "Operaciones",
               icon: Calculator,
               key: "fin-ops",
               items: [
                 { title: "Nómina", url: "/finanzas/nomina" },
+                { title: "Horas & Variables", url: "/finanzas/horas-variables" },
               ],
             },
             {
@@ -332,7 +341,7 @@ const DashboardSidebar = () => {
               key: "fin-analysis",
               items: [
                 { title: "Control Financiero", url: "/finanzas/control" },
-                { title: "Reportes", url: "/finanzas/reportes" },
+                { title: "Reportes Avanzados", url: "/finanzas/reportes" },
               ],
             },
             {
