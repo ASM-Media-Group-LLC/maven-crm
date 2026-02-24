@@ -141,6 +141,7 @@ export function useStartOnboarding() {
       const { data: creator, error: creatorError } = await supabase
         .from("creators")
         .insert({
+          id: prospect.id,
           name: prospect.name,
           email: prospect.email || null,
           phone: prospect.phone || null,
@@ -149,6 +150,7 @@ export function useStartOnboarding() {
           tiktok_handle: prospect.tiktok || null,
           category: prospect.category || null,
           status: "borrador",
+          created_at: prospect.created_at,
         })
         .select("id")
         .single();
