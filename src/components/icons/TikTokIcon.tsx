@@ -14,3 +14,4 @@ const TikTokIcon = React.forwardRef<SVGSVGElement, Props>(
 TikTokIcon.displayName = "TikTokIcon";
 
 export default TikTokIcon;
+
