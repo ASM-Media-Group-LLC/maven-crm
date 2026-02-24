@@ -1,66 +1,51 @@
 
 
-## Ficha Tecnica - Vista Chatter (ChatterOperationalView)
+## Hacer opcional la asignacion de Manager y Chatters en el modal de Onboarding
 
-### Resumen
+### Problema actual
 
-Crear un nuevo componente `ChatterOperationalView` que presente la informacion clave del onboarding en un formato optimizado para chatters: alto contraste, lectura rapida y acciones directas como copiar frases de venta.
+El modal de "Asignacion Operativa" requiere obligatoriamente seleccionar un Manager para poder completar el onboarding. Si no hay managers o chatters creados en el sistema, el usuario queda bloqueado y no puede finalizar el proceso.
 
-### Arquitectura
+### Solucion
 
-El componente se integrara dentro de `OperacionesTabContent`. Cuando el usuario tiene rol `agent` (chatter), se renderizara `ChatterOperationalView` en lugar de la vista completa actual. Managers y admins veran ambas opciones o la vista completa existente.
+Hacer ambos campos (Manager y Chatters) opcionales, permitiendo completar el onboarding sin asignaciones y agregarlas despues desde el perfil de la creadora.
 
-```text
-CreadorProfileContent
-  +-- Tabs (defaultValue="operaciones")
-       +-- OperacionesTabContent
-            +-- (isAgent) ? ChatterOperationalView : vista actual completa
-```
+### Cambios
 
-### Secciones del componente
+**Archivo: `src/pages/creadores/onboarding/AssignmentModal.tsx`**
 
-**1. Personaje y Voz**
-- Apodos permitidos (badges)
-- Tono de voz y emojis frecuentes
-- Frases de venta con boton "Copiar" que copia al portapapeles y muestra toast de confirmacion
+1. Cambiar la interfaz `onConfirm` para aceptar `managerId` como `string | null` en vez de `string`
+2. Remover el asterisco rojo (*) del label de Manager
+3. Agregar texto "(opcional)" junto al label de Manager, igual que los Chatters
+4. Remover la condicion `disabled={!selectedManager}` del boton "Completar Onboarding"
+5. Actualizar `handleConfirm` para pasar `null` si no hay manager seleccionado
+6. Agregar un mensaje informativo (texto sutil) indicando que se pueden asignar despues
 
-**2. Menu de Precios**
-- Tabla compacta de 2 columnas: Servicio | Precio
-- Sin columna de notas (simplificada)
-- Badge "GFE" destacado si `gfe_disponible === true`
-- Moneda visible en el header de la columna de precio
+**Archivo: `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
 
-**3. Protocolo de Respuesta (Manual de Crisis)**
-- Alert destructivo prominente con `contenido_jamas_haria` en rojo (borde grueso)
-- Acordeones (Accordion) rapidos para los 3 scripts solicitados:
-  - "Sexo en persona" (`respuesta_sexo_en_persona`)
-  - "Peticion de desnudos gratis" (`respuesta_pedir_desnudos`)
-  - "Insultos" (`respuesta_usuario_grosero`)
-
-### Estetica
-
-- Cards con `border-2` para mayor contraste
-- Precios con tipografia `text-lg font-bold` para lectura rapida
-- Colores semanticos: destructive para limites, success para GFE, primary para personaje
-- Borde superior de 3px en las tarjetas siguiendo el patron operacional existente (`border-t-[3px]`)
-
-### Archivos a crear/modificar
-
-| Archivo | Accion |
-|---------|--------|
-| `src/pages/creadores/ChatterOperationalView.tsx` | Crear - nuevo componente |
-| `src/pages/creadores/OperacionesTabContent.tsx` | Modificar - importar y renderizar condicionalmente |
+1. Actualizar la firma de `handleAssignmentConfirm` para aceptar `managerId: string | null`
+2. Condicionar la escritura de `assigned_manager_profile_id` solo si `managerId` existe
+3. Condicionar el `upsert` en `creator_assignments` solo si `managerId` existe
+4. Mantener la logica de chatters sin cambios (ya es opcional)
 
 ### Detalle tecnico
 
-**ChatterOperationalView.tsx:**
-- Recibe las mismas props que `OperacionesTabContent` (el objeto `creator`)
-- Usa `navigator.clipboard.writeText()` + toast de sonner para el boton copiar
-- Reutiliza `parseCsv` y `parsePricing` del archivo existente (se extraeran como funciones exportadas)
-- Usa componentes existentes: `Card`, `Badge`, `Alert`, `Accordion`, `Table`, `Button`
+```text
+AssignmentModal
+  - onConfirm({ managerId: string | null, chatterIds: string[] })
+  - Boton siempre habilitado (sin disabled por manager)
+  - Label: "Manager (opcional)" sin asterisco
 
-**OperacionesTabContent.tsx:**
-- Importar `useUserRole` para detectar si es agent
-- Si `isAgent`, renderizar `ChatterOperationalView`; si no, renderizar la vista actual completa
-- Exportar las funciones utilitarias `parseCsv`, `parsePricing` y `priceLabels` para reutilizacion
+OnboardingWizard.handleAssignmentConfirm
+  - if (managerId) -> asignar manager en creator y creator_assignments
+  - if (!managerId) -> solo guardar creator sin manager
+  - Chatters: sin cambios
+```
+
+### Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/pages/creadores/onboarding/AssignmentModal.tsx` | Manager opcional, quitar asterisco, quitar disabled, actualizar tipo |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Condicionar asignacion de manager en handleAssignmentConfirm |
 
