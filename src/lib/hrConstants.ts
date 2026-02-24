@@ -249,3 +249,25 @@ export const TRAINING_CONTENT_TYPES = [
   { value: "quiz", label: "Quiz" },
   { value: "practica", label: "Práctica" },
 ];
+
+// ── Employee History ──
+
+export const HISTORY_CHANGE_TYPES = [
+  { value: "promotion", label: "Promoción" },
+  { value: "transfer", label: "Transferencia" },
+  { value: "contract_change", label: "Cambio Contractual" },
+  { value: "salary_adjustment", label: "Ajuste Salarial" },
+  { value: "status_change", label: "Cambio de Estado" },
+  { value: "modality_change", label: "Cambio de Modalidad" },
+  { value: "other", label: "Otro" },
+];
+
+export const HISTORY_FIELD_LABELS: Record<string, string> = {
+  position_id: "Cargo",
+  department_id: "Departamento",
+  contract_type: "Tipo de Contrato",
+  work_modality: "Modalidad de Trabajo",
+  status: "Estado",
+  base_salary: "Salario Base",
+  reports_to: "Supervisor",
+};
