@@ -116,11 +116,11 @@ export default function ProspectosPage() {
         <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Prospectos</h1>
-              <p className="text-sm text-muted-foreground">Gestiona prospectos y conviértelos en creadoras</p>
+              <h1 className="text-xl font-semibold text-foreground">Casting</h1>
+              <p className="text-sm text-muted-foreground">Gestiona perfiles y conviértelos en creadoras</p>
             </div>
             <Button size="sm" onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4 mr-1" />Nuevo Prospecto
+              <Plus className="h-4 w-4 mr-1" />Nuevo Perfil
             </Button>
           </div>
         </header>
@@ -133,7 +133,7 @@ export default function ProspectosPage() {
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
-                <DashboardMetricCard label="Total Prospectos" value={String(prospects.length)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
+                <DashboardMetricCard label="Total Casting" value={String(prospects.length)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
                 <DashboardMetricCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={totalLeads > 0 ? "text-primary" : undefined} />
                 <DashboardMetricCard label="En Negociación" value={String(totalNegociando)} icon={Target} subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-purple-500/15 hover:border-purple-500/40" valueColor={totalNegociando > 0 ? "text-purple-400" : undefined} />
                 <DashboardMetricCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} subtitle={`${totalConvertidos} convertidos`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalConvertidos > 0 ? "text-accent-foreground" : undefined} />
@@ -197,7 +197,7 @@ export default function ProspectosPage() {
                     ) : filtered.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                          {prospects.length === 0 ? 'No hay prospectos. Haz clic en "Nuevo Prospecto" para empezar.' : "Sin resultados para los filtros aplicados."}
+                          {prospects.length === 0 ? 'No hay perfiles. Haz clic en "Nuevo Perfil" para empezar.' : "Sin resultados para los filtros aplicados."}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -261,7 +261,7 @@ export default function ProspectosPage() {
                 Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-lg" />)
               ) : filtered.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-muted-foreground">
-                  {prospects.length === 0 ? "No hay prospectos registrados." : "Sin resultados para los filtros aplicados."}
+                  {prospects.length === 0 ? "No hay perfiles registrados." : "Sin resultados para los filtros aplicados."}
                 </div>
               ) : (
                 filtered.map((p) => {
@@ -312,7 +312,7 @@ export default function ProspectosPage() {
         {/* View Modal */}
         <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Detalle del Prospecto</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Detalle del Perfil</DialogTitle></DialogHeader>
             {viewItem && (
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-3">
@@ -346,7 +346,7 @@ export default function ProspectosPage() {
         {/* Add Modal */}
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Nuevo Prospecto</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Nuevo Perfil</DialogTitle></DialogHeader>
             <div className="space-y-4 max-h-[70vh] overflow-auto pr-1">
               <div className="space-y-1.5">
                 <Label>Nombre <span className="text-destructive">*</span></Label>
