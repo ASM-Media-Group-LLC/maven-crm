@@ -553,6 +553,41 @@ export type Database = {
           },
         ]
       }
+      creator_chatter_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          chatter_profile_id: string
+          creator_id: string
+          id: string
+          is_active: boolean | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          chatter_profile_id: string
+          creator_id: string
+          id?: string
+          is_active?: boolean | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          chatter_profile_id?: string
+          creator_id?: string
+          id?: string
+          is_active?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_chatter_assignments_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_documents: {
         Row: {
           creator_id: string

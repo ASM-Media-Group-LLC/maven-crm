@@ -12,7 +12,9 @@ import Step1PersonalInfo, { type Step1Data, type Step1Errors, validateStep1 } fr
 import Step2PsychologyLimits, { type Step2PsyData } from "./steps/Step2PsychologyLimits";
 import Step2Documentation, { type Step2Data, type Step2Errors, validateStep2 } from "./steps/Step2Documentation";
 import Step4WorkConfig, { type Step4Data } from "./steps/Step4WorkConfig";
+import AssignmentModal from "./AssignmentModal";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const STEPS = [
   { label: "Información Personal", tooltip: "Datos básicos para validar tu identidad y generar tus contratos legales de forma segura." },
@@ -42,6 +44,8 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   const [step3DocErrors, setStep3DocErrors] = useState<Step2Errors>({});
   const [loadingCreator, setLoadingCreator] = useState(!!editCreatorId);
   const [creatorStatus, setCreatorStatus] = useState<string | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [assignmentSubmitting, setAssignmentSubmitting] = useState(false);
 
   // Autosave state
   const isDirty = useRef(false);
@@ -50,6 +54,7 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
   const [isSavingAuto, setIsSavingAuto] = useState(false);
 
   const { toast } = useToast();
+  const { user } = useAuth();
   const addCreador = useAddCreadorWithBusiness();
   const queryClient = useQueryClient();
   const tempId = useMemo(() => `onboarding-${Date.now()}`, []);
@@ -485,7 +490,97 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
     onCancel();
   };
 
-  const isSubmitting = addCreador.isPending;
+  const isSubmitting = addCreador.isPending || assignmentSubmitting;
+
+  // Open the assignment modal after validating all steps
+  const handleFinalize = () => {
+    // Validate step 4 pricing
+    const hasPrice = Object.values(step4.pricing).some((p) => parseFloat(p.price) > 0);
+    if (!hasPrice) {
+      toast({ title: "Precios requeridos", description: "Define al menos un servicio con precio mayor a 0.", variant: "destructive" });
+      return;
+    }
+    // Validate step 1
+    const s1Errors = validateStep1(step1);
+    if (Object.keys(s1Errors).length > 0) {
+      setStep1Errors(s1Errors);
+      setStep(1);
+      return;
+    }
+    setShowAssignmentModal(true);
+  };
+
+  // Handle assignment confirmation from modal
+  const handleAssignmentConfirm = async ({ managerId, chatterIds }: { managerId: string; chatterIds: string[] }) => {
+    setAssignmentSubmitting(true);
+    try {
+      // First, submit the creator
+      const currentId = editCreatorId || autoSaveIdRef.current;
+      let creatorId = currentId;
+
+      if (currentId) {
+        const payload = buildPayload(false);
+        const { error } = await supabase
+          .from("creators")
+          .update({ ...payload.creator, assigned_manager_profile_id: managerId } as any)
+          .eq("id", currentId);
+        if (error) throw error;
+
+        const { data: existingBiz } = await supabase
+          .from("creator_business")
+          .select("id")
+          .eq("creator_id", currentId)
+          .maybeSingle();
+        if (existingBiz) {
+          await supabase.from("creator_business").update(payload.business as any).eq("creator_id", currentId);
+        }
+      } else {
+        const payload = buildPayload(false);
+        (payload.creator as any).assigned_manager_profile_id = managerId;
+        creatorId = await addCreador.mutateAsync(payload);
+      }
+
+      if (!creatorId) throw new Error("No se pudo obtener el ID del creador");
+
+      // Insert creator_assignments record
+      await supabase.from("creator_assignments").upsert(
+        {
+          creator_id: creatorId,
+          manager_profile_id: managerId,
+        } as any,
+        { onConflict: "creator_id" }
+      );
+
+      // Insert chatter assignments
+      if (chatterIds.length > 0) {
+        const chatterRecords = chatterIds.map((chatterId) => ({
+          creator_id: creatorId!,
+          chatter_profile_id: chatterId,
+          assigned_by: user?.id || null,
+          is_active: true,
+        }));
+        await supabase.from("creator_chatter_assignments" as any).insert(chatterRecords as any);
+      }
+
+      // Send notification
+      await supabase.from("notifications").insert({
+        type: "onboarding_complete",
+        title: "Nueva modelo ha completado el onboarding",
+        message: `${step1.name} ha completado el proceso de onboarding y está pendiente de verificación.`,
+        reference_id: creatorId,
+        reference_type: "creator",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
+      toast({ title: "Onboarding completado exitosamente" });
+      setShowAssignmentModal(false);
+      resetAndClose();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setAssignmentSubmitting(false);
+    }
+  };
 
   // Autosave indicator text
   const autoSaveText = useMemo(() => {
@@ -608,13 +703,20 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           {step < 4 ? (
             <Button onClick={handleNext}>Siguiente</Button>
           ) : (
-            <Button onClick={() => handleSubmit(false)} disabled={isSubmitting}>
+            <Button onClick={handleFinalize} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Finalizar
             </Button>
           )}
         </div>
       </CardFooter>
+
+      <AssignmentModal
+        open={showAssignmentModal}
+        onOpenChange={setShowAssignmentModal}
+        onConfirm={handleAssignmentConfirm}
+        isSubmitting={assignmentSubmitting}
+      />
     </Card>
   );
 }
