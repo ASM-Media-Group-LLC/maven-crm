@@ -311,14 +311,6 @@ const DashboardSidebar = () => {
 
           const finanzasGroups: FinGroup[] = [
             {
-              label: "Ingresos",
-              icon: DollarSign,
-              key: "fin-ingresos",
-              items: [
-                { title: "Collections", url: "/finanzas/collections" },
-              ],
-            },
-            {
               label: "Operaciones",
               icon: Calculator,
               key: "fin-ops",
@@ -356,6 +348,7 @@ const DashboardSidebar = () => {
 
           const finFlatItems = [
             { title: "Dashboard", url: "/finanzas" },
+            { title: "Collections", url: "/finanzas/collections" },
             ...finanzasGroups.flatMap(g => g.items),
           ];
 
@@ -391,6 +384,15 @@ const DashboardSidebar = () => {
                           <NavLink to="/finanzas" end className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                             <LayoutDashboard className="h-4 w-4 shrink-0" />
                             <span>Dashboard Financiero</span>
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip="Collections">
+                          <NavLink to="/finanzas/collections" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                            <DollarSign className="h-4 w-4 shrink-0" />
+                            <span>Collections</span>
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

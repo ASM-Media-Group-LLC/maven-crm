@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Download, Trash2, Plus, Search, X,
+  FileText, Download, Trash2, Plus, Search, X, LayoutGrid, List,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -19,8 +19,11 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { generateReport } from "./generateReport";
-import { format } from "date-fns";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import { generateReport, exportTableToExcel } from "./generateReport";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RTooltip, Legend } from "recharts";
 
 const REPORT_TABS = ["Estado de Cuenta CC", "Ventas por Creador", "Por Método de Pago", "Comparativos Mensuales", "Reportes Generales"] as const;
 type ReportTab = typeof REPORT_TABS[number];
@@ -35,16 +38,39 @@ const REPORT_TYPES: Record<string, string> = {
   metodo_pago: "Por Método de Pago",
 };
 
+function fmt(n: number) {
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+}
+
 export default function ReportesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reportTab, setReportTab] = useState<ReportTab>("Estado de Cuenta CC");
   const [showGenModal, setShowGenModal] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["financial-reports"],
     queryFn: async () => {
       const { data, error } = await supabase.from("financial_reports").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["reportes-invoices"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("invoices").select("*, creators(name, artistic_name)").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: payroll = [] } = useQuery({
+    queryKey: ["reportes-payroll"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("payroll_periods").select("net_total, gross_total, status, cost_center, period_name, created_at").limit(500);
       if (error) throw error;
       return data ?? [];
     },
@@ -93,14 +119,10 @@ export default function ReportesPage() {
         const { data: pay } = await supabase.from("payroll_periods").select("period_name, net_total, status");
         reportData = [...(inv || []).map(i => ({ ...i, tipo: "Invoice" })), ...(pay || []).map(p => ({ ...p, tipo: "Nómina" }))];
       }
-
       generateReport(reportData, genType, genFormat);
-
       const { data: user } = await supabase.auth.getUser();
       await supabase.from("financial_reports").insert({
-        report_type: genType,
-        format: genFormat,
-        area: genArea || null,
+        report_type: genType, format: genFormat, area: genArea || null,
         period_from: genDateFrom ? format(genDateFrom, "yyyy-MM-dd") : null,
         period_to: genDateTo ? format(genDateTo, "yyyy-MM-dd") : null,
         created_by: user.user?.id,
@@ -116,18 +138,270 @@ export default function ReportesPage() {
 
   const hasFilters = search || typeFilter || dateFrom || dateTo;
 
-  const filtered = reports.filter(r => {
-    const matchSearch = !search || (REPORT_TYPES[r.report_type] || r.report_type).toLowerCase().includes(search.toLowerCase());
-    const matchType = !typeFilter || r.report_type === typeFilter;
-    const d = new Date(r.created_at);
-    const matchFrom = !dateFrom || d >= dateFrom;
-    const matchTo = !dateTo || d <= dateTo;
-    // Tab-based filtering
-    if (reportTab === "Estado de Cuenta CC") {
-      return matchSearch && matchType && matchFrom && matchTo && r.area;
-    }
-    return matchSearch && matchType && matchFrom && matchTo;
+  // Ventas por Creador
+  const creatorSales = Object.values(invoices.reduce((acc, inv) => {
+    const cid = inv.creator_id || "sin_asignar";
+    const name = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "Sin asignar";
+    if (!acc[cid]) acc[cid] = { name, totalFacturado: 0, totalCobrado: 0, pendiente: 0 };
+    acc[cid].totalFacturado += Number(inv.amount) || 0;
+    if (inv.status === "pagada") acc[cid].totalCobrado += Number(inv.amount) || 0;
+    if (inv.status === "enviada" || inv.status === "vencida") acc[cid].pendiente += Number(inv.amount) || 0;
+    return acc;
+  }, {} as Record<string, { name: string; totalFacturado: number; totalCobrado: number; pendiente: number }>))
+    .filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()));
+
+  const grandTotal = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  // Por Método de Pago
+  const methodGroups = invoices.reduce((acc, inv) => {
+    const m = inv.payment_method || "Sin método";
+    if (!acc[m]) acc[m] = { count: 0, total: 0 };
+    acc[m].count++;
+    acc[m].total += Number(inv.amount) || 0;
+    return acc;
+  }, {} as Record<string, { count: number; total: number }>);
+
+  const methodEntries = Object.entries(methodGroups).filter(([m]) => !search || m.toLowerCase().includes(search.toLowerCase()));
+
+  // Comparativos Mensuales
+  const now = new Date();
+  const monthlyComparison = Array.from({ length: 6 }, (_, i) => {
+    const month = subMonths(now, 5 - i);
+    const mStart = startOfMonth(month);
+    const mEnd = endOfMonth(month);
+    const mInv = invoices.filter(inv => { const d = new Date(inv.created_at); return d >= mStart && d <= mEnd && inv.status === "pagada"; });
+    const mPay = payroll.filter(p => { const d = new Date(p.created_at); return d >= mStart && d <= mEnd; });
+    const ing = mInv.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const egr = mPay.reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+    return { mes: format(month, "MMM yyyy", { locale: es }), ingresos: ing, egresos: egr, margen: ing - egr };
   });
+
+  // Add % change
+  const monthlyWithChange = monthlyComparison.map((m, i) => ({
+    ...m,
+    cambio: i === 0 ? 0 : monthlyComparison[i - 1].ingresos > 0
+      ? (((m.ingresos - monthlyComparison[i - 1].ingresos) / monthlyComparison[i - 1].ingresos) * 100)
+      : 0,
+  }));
+
+  const renderTabContent = () => {
+    switch (reportTab) {
+      case "Ventas por Creador":
+        return viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+              <Table>
+                <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
+                  <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Total Facturado</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Total Cobrado</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Pendiente</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {creatorSales.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin datos.</TableCell></TableRow>
+                  ) : creatorSales.map((r, i) => (
+                    <TableRow key={i} className="hover:bg-muted/30">
+                      <TableCell className="text-sm font-medium">{r.name}</TableCell>
+                      <TableCell className="text-sm">{fmt(r.totalFacturado)}</TableCell>
+                      <TableCell className="text-sm text-accent">{fmt(r.totalCobrado)}</TableCell>
+                      <TableCell className="text-sm text-warning">{fmt(r.pendiente)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{grandTotal > 0 ? ((r.totalFacturado / grandTotal) * 100).toFixed(1) : 0}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {creatorSales.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-12">Sin datos.</div>
+            ) : creatorSales.map((r, i) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                <p className="text-sm font-medium truncate">{r.name}</p>
+                <p className="text-xl font-bold text-foreground mt-2">{fmt(r.totalFacturado)}</p>
+                <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                  <span className="text-accent">Cobrado: {fmt(r.totalCobrado)}</span>
+                  <span>{grandTotal > 0 ? ((r.totalFacturado / grandTotal) * 100).toFixed(1) : 0}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case "Por Método de Pago":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {methodEntries.map(([method, data]) => (
+                <DashboardMetricCard key={method} label={method} value={fmt(data.total)} icon={FileText} subtitle={`${data.count} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              ))}
+            </div>
+            {viewMode === "list" ? (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
+                    <TableHead className="text-xs font-medium text-muted-foreground">Método</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Invoices</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Total</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {methodEntries.map(([method, data]) => (
+                      <TableRow key={method} className="hover:bg-muted/30">
+                        <TableCell className="text-sm font-medium">{method}</TableCell>
+                        <TableCell className="text-sm">{data.count}</TableCell>
+                        <TableCell className="text-sm">{fmt(data.total)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {methodEntries.map(([method, data]) => (
+                  <div key={method} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                    <p className="text-sm font-medium">{method}</p>
+                    <p className="text-xl font-bold text-foreground mt-2">{fmt(data.total)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{data.count} invoices · {grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
+      case "Comparativos Mensuales":
+        return (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border p-4 bg-card">
+              <h3 className="text-sm font-medium text-foreground mb-4">Comparativo Mensual (6 meses)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={monthlyWithChange}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                  <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                  <Bar dataKey="ingresos" fill="hsl(var(--accent))" name="Ingresos" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="egresos" fill="hsl(var(--destructive))" name="Egresos" radius={[4, 4, 0, 0]} />
+                  <Legend />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
+                  <TableHead className="text-xs font-medium text-muted-foreground">Mes</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Ingresos</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Egresos</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Margen</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">% Cambio</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {monthlyWithChange.map((m, i) => (
+                    <TableRow key={i} className="hover:bg-muted/30">
+                      <TableCell className="text-sm font-medium capitalize">{m.mes}</TableCell>
+                      <TableCell className="text-sm text-accent">{fmt(m.ingresos)}</TableCell>
+                      <TableCell className="text-sm text-destructive">{fmt(m.egresos)}</TableCell>
+                      <TableCell className="text-sm font-medium">{fmt(m.margen)}</TableCell>
+                      <TableCell className="text-sm">
+                        {i === 0 ? "—" : (
+                          <span className={m.cambio >= 0 ? "text-accent" : "text-destructive"}>
+                            {m.cambio >= 0 ? "+" : ""}{m.cambio.toFixed(1)}%
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        );
+
+      case "Estado de Cuenta CC": {
+        const filtered = reports.filter(r => {
+          const matchSearch = !search || (REPORT_TYPES[r.report_type] || r.report_type).toLowerCase().includes(search.toLowerCase());
+          const d = new Date(r.created_at);
+          const matchFrom = !dateFrom || d >= dateFrom;
+          const matchTo = !dateTo || d <= dateTo;
+          return matchSearch && matchFrom && matchTo && r.area;
+        });
+        return renderReportsTable(filtered);
+      }
+
+      default: {
+        const filtered = reports.filter(r => {
+          const matchSearch = !search || (REPORT_TYPES[r.report_type] || r.report_type).toLowerCase().includes(search.toLowerCase());
+          const matchType = !typeFilter || r.report_type === typeFilter;
+          const d = new Date(r.created_at);
+          const matchFrom = !dateFrom || d >= dateFrom;
+          const matchTo = !dateTo || d <= dateTo;
+          return matchSearch && matchType && matchFrom && matchTo;
+        });
+        return renderReportsTable(filtered);
+      }
+    }
+  };
+
+  const renderReportsTable = (filtered: any[]) => viewMode === "list" ? (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+        <Table>
+          <TableHeader>
+            <TableRow className="sticky top-0 z-10 bg-card border-b">
+              <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Área / CC</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Formato</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+            )) : filtered.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? "No hay reportes. Genera el primero." : "Sin resultados."}</TableCell></TableRow>
+            ) : filtered.map(r => (
+              <TableRow key={r.id} className="group hover:bg-muted/30 transition-colors">
+                <TableCell><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{REPORT_TYPES[r.report_type] || r.report_type}</span></div></TableCell>
+                <TableCell className="text-sm">{r.period_from && r.period_to ? `${r.period_from} — ${r.period_to}` : "—"}</TableCell>
+                <TableCell className="text-sm">{r.area || "—"}</TableCell>
+                <TableCell><Badge variant="outline">{(r.format || "csv").toUpperCase()}</Badge></TableCell>
+                <TableCell className="text-sm whitespace-nowrap">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
+                  <div className="flex items-center gap-1">
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar</TooltipContent></Tooltip>
+                    <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {filtered.length === 0 ? (
+        <div className="col-span-full text-center text-muted-foreground py-12">Sin reportes.</div>
+      ) : filtered.map(r => (
+        <div key={r.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <Badge variant="outline" className="text-[10px]">{(r.format || "csv").toUpperCase()}</Badge>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3 w-3" /></Button>
+          </div>
+          <p className="text-sm font-medium">{REPORT_TYPES[r.report_type] || r.report_type}</p>
+          <p className="text-xs text-muted-foreground mt-1">{r.area || "Sin área"}</p>
+          <p className="text-xs text-muted-foreground mt-1">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</p>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -144,14 +418,14 @@ export default function ReportesPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
           {REPORT_TABS.map(t => (
-            <Button key={t} variant={reportTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setReportTab(t)}>{t}</Button>
+            <Button key={t} variant={reportTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setReportTab(t); setSearch(""); }}>{t}</Button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar reporte..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           {reportTab === "Reportes Generales" && (
             <Select value={typeFilter || undefined} onValueChange={v => setTypeFilter(v === "__all__" ? "" : v)}>
@@ -163,6 +437,10 @@ export default function ReportesPage() {
             </Select>
           )}
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          <div className="inline-flex items-center rounded-md border border-border">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+          </div>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setTypeFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
               <X className="h-3.5 w-3.5 mr-1" />Limpiar
@@ -170,48 +448,7 @@ export default function ReportesPage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-border overflow-hidden">
-          <div className="overflow-auto max-h-[calc(100vh-20rem)]">
-            <Table>
-              <TableHeader>
-                <TableRow className="sticky top-0 z-10 bg-card border-b">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Área / CC</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Formato</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                )) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">{reports.length === 0 ? "No hay reportes. Genera el primero." : "Sin resultados."}</TableCell></TableRow>
-                ) : filtered.map(r => (
-                  <TableRow key={r.id} className="group hover:bg-muted/30 transition-colors">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{REPORT_TYPES[r.report_type] || r.report_type}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{r.period_from && r.period_to ? `${r.period_from} — ${r.period_to}` : "—"}</TableCell>
-                    <TableCell className="text-sm">{r.area || "—"}</TableCell>
-                    <TableCell><Badge variant="outline">{(r.format || "csv").toUpperCase()}</Badge></TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{format(new Date(r.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
-                    <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
-                      <div className="flex items-center gap-1">
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar</TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(r)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+        {renderTabContent()}
       </div>
 
       {/* Generate Report Modal */}

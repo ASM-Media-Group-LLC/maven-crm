@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, TrendingUp, TrendingDown, BarChart3, Users } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, BarChart3, Users, Search, X, LayoutGrid, List } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 
@@ -21,7 +21,8 @@ export default function ControlFinancieroPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Ingresos vs Costos");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [ccFilter, setCcFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const { data: payroll = [], isLoading: lp } = useQuery({
     queryKey: ["control-payroll"],
@@ -50,7 +51,7 @@ export default function ControlFinancieroPage() {
     },
   });
 
-  const { data: employees = [], isLoading: le } = useQuery({
+  const { data: employees = [] } = useQuery({
     queryKey: ["control-employees"],
     queryFn: async () => {
       const { data, error } = await supabase.from("employees").select("id, first_name, last_name, base_salary, status").eq("status", "activo");
@@ -59,7 +60,7 @@ export default function ControlFinancieroPage() {
     },
   });
 
-  const { data: payrollDetails = [], isLoading: ld } = useQuery({
+  const { data: payrollDetails = [] } = useQuery({
     queryKey: ["control-payroll-details"],
     queryFn: async () => {
       const { data, error } = await supabase.from("payroll_details").select("employee_id, overtime_hours, overtime_amount, net_total").limit(500);
@@ -83,30 +84,35 @@ export default function ControlFinancieroPage() {
     return acc;
   }, {} as Record<string, number>);
 
+  const ccEntries = Object.entries(ccGroups).filter(([cc]) => !search || cc.toLowerCase().includes(search.toLowerCase()));
+
   // Productividad
   const empProductivity = employees.map(e => {
     const empDetails = payrollDetails.filter(d => d.employee_id === e.id);
     const totalCost = empDetails.reduce((s, d) => s + (Number(d.net_total) || 0), 0) || Number(e.base_salary) || 0;
     const totalHours = empDetails.reduce((s, d) => s + (Number(d.overtime_hours) || 0), 0);
     return { name: `${e.first_name} ${e.last_name}`, salary: Number(e.base_salary) || 0, cost: totalCost, hours: totalHours, ratio: totalHours > 0 ? totalCost / totalHours : 0 };
-  });
+  }).filter(e => !search || e.name.toLowerCase().includes(search.toLowerCase()));
+
+  const showSearch = activeTab === "Costos por CC" || activeTab === "Productividad por Empleado";
+  const showViewToggle = showSearch;
 
   const renderTab = () => {
     switch (activeTab) {
       case "Costos por CC":
-        return (
-          <div className="space-y-5">
-            <div className="rounded-lg border border-border overflow-hidden">
+        return viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
               <Table>
-                <TableHeader><TableRow className="bg-card">
+                <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
                   <TableHead className="text-xs font-medium text-muted-foreground">Centro de Costo</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Total</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {Object.entries(ccGroups).length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">Sin datos de centros de costo.</TableCell></TableRow>
-                  ) : Object.entries(ccGroups).map(([cc, total]) => (
+                  {ccEntries.length === 0 ? (
+                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">Sin datos.</TableCell></TableRow>
+                  ) : ccEntries.map(([cc, total]) => (
                     <TableRow key={cc} className="hover:bg-muted/30">
                       <TableCell className="text-sm font-medium">{cc}</TableCell>
                       <TableCell className="text-sm">{fmt(total)}</TableCell>
@@ -117,13 +123,26 @@ export default function ControlFinancieroPage() {
               </Table>
             </div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {ccEntries.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-8">Sin datos.</div>
+            ) : ccEntries.map(([cc, total]) => (
+              <div key={cc} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                <p className="text-sm font-medium truncate">{cc}</p>
+                <p className="text-xl font-bold text-foreground mt-2">{fmt(total)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{egresos > 0 ? ((total / egresos) * 100).toFixed(1) : 0}% del total</p>
+              </div>
+            ))}
+          </div>
         );
+
       case "Productividad por Empleado":
-        return (
-          <div className="space-y-5">
-            <div className="rounded-lg border border-border overflow-hidden">
+        return viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
               <Table>
-                <TableHeader><TableRow className="bg-card">
+                <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
                   <TableHead className="text-xs font-medium text-muted-foreground">Empleado</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Salario</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Horas Extra</TableHead>
@@ -146,71 +165,69 @@ export default function ControlFinancieroPage() {
               </Table>
             </div>
           </div>
-        );
-      case "Márgenes Operativos":
-        return (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <DashboardMetricCard label="Margen Bruto" value={`${margenPct}%`} icon={TrendingUp} subtitle={fmt(balance)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={balance >= 0 ? "text-accent" : "text-destructive"} />
-              <DashboardMetricCard label="Ingresos" value={fmt(ingresos)} icon={DollarSign} subtitle="Invoices pagados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Egresos" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-            </div>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader><TableRow className="bg-card">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Concepto</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">% sobre Ingresos</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  <TableRow className="hover:bg-muted/30">
-                    <TableCell className="text-sm font-medium">Nómina</TableCell>
-                    <TableCell className="text-sm">{fmt(payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{ingresos > 0 ? ((payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0) / ingresos) * 100).toFixed(1) : 0}%</TableCell>
-                  </TableRow>
-                  <TableRow className="hover:bg-muted/30">
-                    <TableCell className="text-sm font-medium">Comisiones</TableCell>
-                    <TableCell className="text-sm">{fmt(commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0))}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{ingresos > 0 ? ((commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0) / ingresos) * 100).toFixed(1) : 0}%</TableCell>
-                  </TableRow>
-                  <TableRow className="hover:bg-muted/30 font-semibold">
-                    <TableCell className="text-sm">Margen Neto</TableCell>
-                    <TableCell className="text-sm">{fmt(balance)}</TableCell>
-                    <TableCell className="text-sm">{margenPct}%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {empProductivity.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-8">Sin empleados activos.</div>
+            ) : empProductivity.map((e, i) => (
+              <div key={i} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                <p className="text-sm font-medium truncate">{e.name}</p>
+                <p className="text-xl font-bold text-foreground mt-2">{fmt(e.salary)}</p>
+                <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                  <span>{e.hours}h extra</span>
+                  <span>{e.ratio > 0 ? fmt(e.ratio) + "/h" : "—"}</span>
+                </div>
+              </div>
+            ))}
           </div>
         );
+
+      case "Márgenes Operativos":
+        return (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader><TableRow className="bg-card">
+                <TableHead className="text-xs font-medium text-muted-foreground">Concepto</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">% sobre Ingresos</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                <TableRow className="hover:bg-muted/30">
+                  <TableCell className="text-sm font-medium">Nómina</TableCell>
+                  <TableCell className="text-sm">{fmt(payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{ingresos > 0 ? ((payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0) / ingresos) * 100).toFixed(1) : 0}%</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30">
+                  <TableCell className="text-sm font-medium">Comisiones</TableCell>
+                  <TableCell className="text-sm">{fmt(commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0))}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{ingresos > 0 ? ((commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0) / ingresos) * 100).toFixed(1) : 0}%</TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 font-semibold">
+                  <TableCell className="text-sm">Margen Neto</TableCell>
+                  <TableCell className="text-sm">{fmt(balance)}</TableCell>
+                  <TableCell className="text-sm">{margenPct}%</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        );
+
       default: // Ingresos vs Costos
         return (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} subtitle="Invoices pagados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                  <DashboardMetricCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                  <DashboardMetricCard label="Balance" value={fmt(balance)} icon={DollarSign} subtitle={balance >= 0 ? "Positivo" : "Negativo"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={balance < 0 ? "text-destructive" : "text-accent"} />
-                  <DashboardMetricCard label="Margen" value={`${margenPct}%`} icon={BarChart3} subtitle="Sobre ingresos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-                </>
-              )}
-            </div>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader><TableRow className="bg-card">
-                  <TableHead className="text-xs font-medium text-muted-foreground">Concepto</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Mes Actual</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Nómina</TableCell><TableCell className="text-sm">{fmt(payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
-                  <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Facturación (Pagada)</TableCell><TableCell className="text-sm">{fmt(ingresos)}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
-                  <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Comisiones (Pagadas)</TableCell><TableCell className="text-sm">{fmt(commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0))}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader><TableRow className="bg-card">
+                <TableHead className="text-xs font-medium text-muted-foreground">Concepto</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Mes Actual</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Nómina</TableCell><TableCell className="text-sm">{fmt(payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0))}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
+                <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Facturación (Pagada)</TableCell><TableCell className="text-sm">{fmt(ingresos)}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
+                <TableRow className="hover:bg-muted/30"><TableCell className="text-sm font-medium">Comisiones (Pagadas)</TableCell><TableCell className="text-sm">{fmt(commissions.filter(c => c.status === "pagado").reduce((s, c) => s + (Number(c.final_amount) || 0), 0))}</TableCell><TableCell><Badge variant="secondary">Actual</Badge></TableCell></TableRow>
+              </TableBody>
+            </Table>
+          </div>
         );
     }
   };
@@ -223,16 +240,45 @@ export default function ControlFinancieroPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        {/* Global KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+            <>
+              <DashboardMetricCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} subtitle="Invoices pagados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
+              <DashboardMetricCard label="Balance" value={fmt(balance)} icon={DollarSign} subtitle={balance >= 0 ? "Positivo" : "Negativo"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={balance < 0 ? "text-destructive" : "text-accent"} />
+              <DashboardMetricCard label="Margen" value={`${margenPct}%`} icon={BarChart3} subtitle="Sobre ingresos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
+            </>
+          )}
+        </div>
+
         {/* Tab bar */}
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
           {TABS.map(t => (
-            <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t)}>{t}</Button>
+            <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setActiveTab(t); setSearch(""); }}>{t}</Button>
           ))}
         </div>
 
-        {/* Filtros */}
+        {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          {showSearch && (
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          )}
+          {showViewToggle && (
+            <div className="inline-flex items-center rounded-md border border-border">
+              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+            </div>
+          )}
+          {search && (
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setSearch("")}>
+              <X className="h-3.5 w-3.5 mr-1" />Limpiar
+            </Button>
+          )}
         </div>
 
         {renderTab()}
