@@ -1,26 +1,27 @@
 
 
-## Alinear "Fecha de nacimiento" con "País"
+## Alinear el campo "Fecha de nacimiento"
 
 ### Problema
 
-Actualmente el orden de campos es: Telefono | Edad | Fecha de nacimiento | Pais. Esto coloca "Fecha de nacimiento" y "Pais" en la misma fila, pero visualmente pueden verse desalineados por diferencias de altura entre el `DateInput` y el `Select`.
+El boton del `DateInput` no ocupa todo el ancho disponible de su columna. Mientras que los demas campos (Input, Select) se expanden automaticamente al 100%, el `Button` del `DateInput` tiene un ancho intrinseco, causando que se vea mas corto y desalineado visualmente respecto al campo "Pais" que esta al lado.
 
 ### Solucion
 
-Reorganizar el orden para que "Edad" y "Fecha de nacimiento" queden juntos en una fila, y "Pais" y "Ciudad" queden juntos en la siguiente fila. Esto agrupa los campos por contexto logico y resuelve la desalineacion visual.
+Agregar la clase `w-full` al componente `DateInput` en el Paso 1 para que el boton-trigger ocupe todo el ancho de la columna, igualando visualmente a los demas campos.
 
-Orden resultante:
-```text
-Telefono        | Edad
-Fecha nacimiento | Pais  (misma fila, alineados)
-Ciudad          | Zona horaria
+### Cambio
+
+**Archivo:** `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` (linea 159)
+
+Cambiar:
+```tsx
+<DateInput value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
 ```
 
-### Archivo a modificar
+Por:
+```tsx
+<DateInput className="w-full" value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
+```
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` | Mover el campo "Fecha de nacimiento" para que quede en la misma fila que "Pais", reordenando Edad antes de Fecha |
-
-El cambio es minimo: solo se reordena la posicion del bloque de "Fecha de nacimiento" (lineas 157-160) para que quede inmediatamente antes del bloque de "Pais" (lineas 161-169), manteniendo ambos en la misma fila del grid de 2 columnas.
+Esto es suficiente porque el componente `DateInput` ya acepta `className` como prop y lo aplica al `Button` trigger interno.
