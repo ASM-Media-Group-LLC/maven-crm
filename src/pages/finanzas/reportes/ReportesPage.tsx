@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { generateReport } from "./generateReport";
 import { format } from "date-fns";
 
-const REPORT_TABS = ["Ganancias & Comisiones", "Ventas por Creador", "Ventas Generales", "Estado de Cuenta por CC", "Comparativos Mensuales", "Por Método de Pago"] as const;
+const REPORT_TABS = ["Estado de Cuenta CC", "Reportes Generales"] as const;
 type ReportTab = typeof REPORT_TABS[number];
 
 const REPORT_TYPES: Record<string, string> = {
@@ -30,12 +30,15 @@ const REPORT_TYPES: Record<string, string> = {
   facturacion: "Facturación",
   comisiones: "Comisiones",
   consolidado: "Consolidado",
+  ventas_creador: "Ventas por Creador",
+  comparativos: "Comparativos Mensuales",
+  metodo_pago: "Por Método de Pago",
 };
 
 export default function ReportesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [reportTab, setReportTab] = useState<ReportTab>("Ganancias & Comisiones");
+  const [reportTab, setReportTab] = useState<ReportTab>("Estado de Cuenta CC");
   const [showGenModal, setShowGenModal] = useState(false);
 
   const { data: reports = [], isLoading } = useQuery({
@@ -75,7 +78,6 @@ export default function ReportesPage() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      // Fetch data based on type
       let reportData: any[] = [];
       if (genType === "comisiones") {
         const { data } = await supabase.from("commissions").select("period, base_amount, percentage, estimated_amount, final_amount, status, area, cost_center");
@@ -92,10 +94,8 @@ export default function ReportesPage() {
         reportData = [...(inv || []).map(i => ({ ...i, tipo: "Invoice" })), ...(pay || []).map(p => ({ ...p, tipo: "Nómina" }))];
       }
 
-      // Generate file
       generateReport(reportData, genType, genFormat);
 
-      // Save record
       const { data: user } = await supabase.auth.getUser();
       await supabase.from("financial_reports").insert({
         report_type: genType,
@@ -122,6 +122,10 @@ export default function ReportesPage() {
     const d = new Date(r.created_at);
     const matchFrom = !dateFrom || d >= dateFrom;
     const matchTo = !dateTo || d <= dateTo;
+    // Tab-based filtering
+    if (reportTab === "Estado de Cuenta CC") {
+      return matchSearch && matchType && matchFrom && matchTo && r.area;
+    }
     return matchSearch && matchType && matchFrom && matchTo;
   });
 
@@ -149,13 +153,15 @@ export default function ReportesPage() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar reporte..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Select value={typeFilter || undefined} onValueChange={v => setTypeFilter(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {reportTab === "Reportes Generales" && (
+            <Select value={typeFilter || undefined} onValueChange={v => setTypeFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {Object.entries(REPORT_TYPES).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setTypeFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
@@ -171,7 +177,7 @@ export default function ReportesPage() {
                 <TableRow className="sticky top-0 z-10 bg-card border-b">
                   <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Área</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Área / CC</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Formato</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>

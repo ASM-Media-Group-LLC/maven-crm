@@ -316,8 +316,6 @@ const DashboardSidebar = () => {
               key: "fin-ops",
               items: [
                 { title: "Nómina", url: "/finanzas/nomina" },
-                { title: "Comisiones Laborales", url: "/finanzas/comisiones" },
-                { title: "Horas & Banco de Horas", url: "/finanzas/horas" },
               ],
             },
             {

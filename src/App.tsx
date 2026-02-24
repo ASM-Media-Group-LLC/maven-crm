@@ -88,10 +88,8 @@ import FinanzasLayout from "./pages/finanzas/FinanzasLayout";
 import FinanzasDashboard from "./pages/finanzas/FinanzasDashboard";
 import NominaPage from "./pages/finanzas/nomina/NominaPage";
 import FacturacionPage from "./pages/finanzas/facturacion/FacturacionPage";
-import ComisionesPage from "./pages/finanzas/comisiones/ComisionesPage";
 import ControlFinancieroPage from "./pages/finanzas/control/ControlFinancieroPage";
 import ReportesPage from "./pages/finanzas/reportes/ReportesPage";
-import HorasPage from "./pages/finanzas/horas/HorasPage";
 import ConfiguracionPage from "./pages/finanzas/configuracion/ConfiguracionPage";
 
 const queryClient = new QueryClient();
@@ -187,10 +185,8 @@ const App = () => (
               <Route path="/finanzas" element={<ProtectedRoute><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/nomina" element={<ProtectedRoute><FinanzasLayout><NominaPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/facturacion" element={<ProtectedRoute><FinanzasLayout><FacturacionPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/comisiones" element={<ProtectedRoute><FinanzasLayout><ComisionesPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/control" element={<ProtectedRoute><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/reportes" element={<ProtectedRoute><FinanzasLayout><ReportesPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/horas" element={<ProtectedRoute><FinanzasLayout><HorasPage /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/configuracion" element={<ProtectedRoute><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />

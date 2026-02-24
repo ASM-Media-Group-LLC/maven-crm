@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Pencil, Trash2, RotateCcw, Send, Download,
-  Search, X, ListIcon, LayoutGrid,
+  FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
+  Search, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,6 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Card, CardContent } from "@/components/ui/card";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import CrearInvoiceModal from "./CrearInvoiceModal";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
@@ -36,7 +35,7 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
   reversada: { variant: "destructive", label: "Reversada" },
 };
 
-const FACTURA_TABS = ["Invoices", "Envío Masivo", "Notas de Pago", "Reversos", "Fees & Ajustes"] as const;
+const FACTURA_TABS = ["Invoices", "Notas de Pago", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
 
 function fmt(n: number) {
@@ -112,7 +111,6 @@ export default function FacturacionPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [viewItem, setViewItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -124,13 +122,10 @@ export default function FacturacionPage() {
   const totalFee = invoices.reduce((s, i) => s + (Number(i.fee_amount) || 0), 0);
   const hasFilters = search || statusFilter || dateFrom || dateTo;
 
-  // Tab-specific filtering
   const getTabFiltered = () => {
     let base = invoices;
-    if (facturaTab === "Envío Masivo") base = invoices.filter(i => i.status === "borrador");
-    else if (facturaTab === "Notas de Pago") base = invoices.filter(i => i.status === "pagada" || i.status === "parcial");
-    else if (facturaTab === "Reversos") base = invoices.filter(i => i.status === "reversada");
-    else if (facturaTab === "Fees & Ajustes") base = invoices;
+    if (facturaTab === "Notas de Pago") base = invoices.filter(i => i.status === "pagada" || i.status === "parcial");
+    else if (facturaTab === "Mail") base = invoices.filter(i => i.status === "borrador");
 
     return base.filter(inv => {
       const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "";
@@ -161,15 +156,14 @@ export default function FacturacionPage() {
               <TableHead className="text-xs font-medium text-muted-foreground">Neto</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
-              {facturaTab === "Reversos" && <TableHead className="text-xs font-medium text-muted-foreground">Razón</TableHead>}
               <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 10 : 9 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 9 : 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={showBulkCheckbox ? 10 : 9} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={showBulkCheckbox ? 9 : 8} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
             ) : filtered.map(inv => {
               const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
@@ -194,7 +188,6 @@ export default function FacturacionPage() {
                   <TableCell className="text-sm font-medium">{fmt(Number(inv.net_amount) || 0)}</TableCell>
                   <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</TableCell>
-                  {facturaTab === "Reversos" && <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{inv.reversal_reason || "—"}</TableCell>}
                   <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                     <div className="flex items-center gap-1">
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
@@ -214,6 +207,82 @@ export default function FacturacionPage() {
       </div>
     </div>
   );
+
+  const renderTabContent = () => {
+    switch (facturaTab) {
+      case "Notas de Pago":
+        return (
+          <>
+            <p className="text-sm text-muted-foreground">{filtered.length} invoices pagados o parciales</p>
+            {renderInvoiceTable()}
+          </>
+        );
+
+      case "Mail":
+        return (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{filtered.length} invoices en borrador disponibles para envío masivo</p>
+              {bulkSelected.length > 0 && (
+                <Button size="sm" onClick={() => bulkSendMutation.mutate(bulkSelected)} disabled={bulkSendMutation.isPending}>
+                  <Send className="h-4 w-4 mr-1" />Enviar ({bulkSelected.length})
+                </Button>
+              )}
+            </div>
+            {renderInvoiceTable(true)}
+          </>
+        );
+
+      case "Archivo de PagoMundo":
+        return (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-dashed border-border p-12 text-center">
+              <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+              <h3 className="text-sm font-medium text-foreground mb-1">Generador de Archivos de Dispersión</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Genera archivos CSV compatibles con PagoMundo para la dispersión de pagos a creadores. Selecciona los invoices pagados y genera el archivo de dispersión bancaria.
+              </p>
+              <Button size="sm" variant="outline" className="mt-4" onClick={() => {
+                const pagados = invoices.filter(i => i.status === "pagada");
+                if (pagados.length === 0) {
+                  toast({ title: "Sin invoices pagados para dispersión", variant: "destructive" });
+                  return;
+                }
+                exportTableToExcel(pagados.map(inv => ({
+                  Numero: inv.invoice_number,
+                  Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "",
+                  Monto: inv.amount,
+                  Fee: inv.fee_amount,
+                  Neto: inv.net_amount,
+                  Metodo: inv.payment_method,
+                  Vencimiento: inv.due_date,
+                })), "pagomundo-dispersion");
+                toast({ title: "Archivo de dispersión generado" });
+              }}>
+                <Download className="h-4 w-4 mr-1" />Generar Archivo
+              </Button>
+            </div>
+          </div>
+        );
+
+      default: // Invoices
+        return (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+                <>
+                  <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+                  <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPendientes > 0 ? "text-warning" : undefined} />
+                  <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
+                  <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+                </>
+              )}
+            </div>
+            {renderInvoiceTable()}
+          </>
+        );
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -239,21 +308,6 @@ export default function FacturacionPage() {
           ))}
         </div>
 
-        {facturaTab === "Invoices" && (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPendientes > 0 ? "text-warning" : undefined} />
-                  <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                  <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                </>
-              )}
-            </div>
-          </>
-        )}
-
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -274,11 +328,6 @@ export default function FacturacionPage() {
             </Select>
           )}
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
-          {facturaTab === "Envío Masivo" && bulkSelected.length > 0 && (
-            <Button size="sm" onClick={() => bulkSendMutation.mutate(bulkSelected)} disabled={bulkSendMutation.isPending}>
-              <Send className="h-4 w-4 mr-1" />Enviar ({bulkSelected.length})
-            </Button>
-          )}
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
               <X className="h-3.5 w-3.5 mr-1" />Limpiar
@@ -286,7 +335,7 @@ export default function FacturacionPage() {
           )}
         </div>
 
-        {renderInvoiceTable(facturaTab === "Envío Masivo")}
+        {renderTabContent()}
       </div>
 
       <CrearInvoiceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onSubmit={data => createInvoice.mutate(data)} isPending={createInvoice.isPending} />
