@@ -1,69 +1,127 @@
 
 
-## Mejorar espaciado y legibilidad del sidebar HR
+## Empleados Activos - HUB 360 del Empleado
 
-### Problema
+### Resumen
 
-El modulo de Empleados tiene 3 niveles de anidacion (Empleados > Grupo > Sub-grupo > Items) que genera un sidebar visualmente amontonado y dificil de leer, como se ve en la captura.
+Transformar la seccion actual de "Directorio de Empleados" en un HUB 360 de empleados activos, con una vista principal mejorada (filtros avanzados, columnas enriquecidas) y una ficha de empleado reestructurada en pestanas funcionales que consumen datos de otros modulos sin duplicar logica.
 
-### Solucion
+---
 
-Cambiar la estructura para que los grupos de HR sean items de primer nivel dentro de la seccion "Recursos Humanos", en lugar de estar todos anidados dentro de un unico collapsible "Empleados". Esto elimina un nivel de anidacion y da mas aire visual.
+### 1. Base de datos - Nueva tabla `employee_history`
 
-### Nueva estructura visual
+Se necesita una tabla para registrar cambios contractuales, movimientos internos y ajustes del empleado.
 
 ```text
-Recursos Humanos (SidebarGroupLabel)
-  Dashboard HR (item directo)
-  Employee Lifecycle  >  (collapsible nivel 1)
-    Candidatos
-    Onboarding
-    Empleados Activos
-    Offboarding (disabled)
-  Gestion Laboral  >  (collapsible nivel 1)
-    Control de Tiempo  >  (collapsible nivel 2)
-      Asistencia
-      Horarios y Turnos
-      Horarios Chatters
-      Horas Extra
-      Banco de Horas
-    Ausencias  >  (collapsible nivel 2)
-      Vacaciones
-      Permisos
-      Incapacidades (disabled)
-    Monitoreo (item directo)
-  Seguimiento  >  (collapsible nivel 1)
-    Incidentes
-  Desarrollo & Performance  >  (collapsible nivel 1)
-    Desempeno
-    Capacitacion
-  Organizacion  >  (collapsible nivel 1)
-    Directorio
-    Organigrama (disabled)
-  Finanzas  >  (collapsible nivel 1)
-    Deducciones (disabled)
+employee_history
+  id               uuid PK
+  employee_id      uuid FK -> employees.id
+  change_type      text (promotion, transfer, contract_change, salary_adjustment, status_change, modality_change)
+  field_changed    text (position_id, department_id, contract_type, work_modality, status, base_salary, reports_to)
+  old_value        text
+  new_value        text
+  effective_date   date
+  reason           text (nullable)
+  notes            text (nullable)
+  created_by       uuid (nullable)
+  created_at       timestamptz default now()
 ```
 
-### Cambios concretos en `DashboardSidebar.tsx`
+RLS: Permisiva para usuarios autenticados (mismo patron que el resto del modulo HR).
 
-| Cambio | Detalle |
-|--------|---------|
-| Eliminar wrapper "Empleados" collapsible | Los grupos HR pasan a ser items directos de SidebarMenu, cada uno como su propio Collapsible de primer nivel (igual que Creadores o Ventas) |
-| Dashboard HR | Pasa de sub-item a item de primer nivel con icono LayoutDashboard |
-| Cada grupo HR | Se renderiza como un Collapsible independiente con su icono y chevron, usando SidebarMenuButton (no SidebarMenuSubButton) |
-| Sub-grupos (Control de Tiempo, Ausencias) | Mantienen su collapsible anidado dentro de "Gestion Laboral" pero ahora solo es nivel 2 en vez de nivel 3 |
-| Padding/spacing | Los items de primer nivel usan `px-3 py-2` estandar. Los sub-items usan el padding normal de SidebarMenuSub. Se eliminan los `text-xs` en sub-grupo labels para que usen `text-sm` como el resto |
-| Modo colapsado | El dropdown del sidebar colapsado lista "Dashboard HR" + todos los hrFlatItems, sin necesidad del wrapper "Empleados" |
-| Grupos con un solo item | Seguimiento (solo Incidentes) y Finanzas (solo Deducciones) se renderizan como collapsible normal pero auto-cerrados por defecto si no estan activos |
+---
 
-### Resultado esperado
+### 2. Vista Principal - Empleados Activos (`EmployeeDirectory.tsx`)
 
-- Maximo 2 niveles de anidacion (grupo > items, o grupo > sub-grupo > items solo en Gestion Laboral)
-- Cada seccion HR tiene su propio icono visible, facilitando el escaneo visual
-- Mas espacio vertical entre secciones
-- Texto legible con tamano uniforme `text-sm`
+Mejoras sobre la pagina actual:
 
-### Archivo modificado
+**Header:**
+- Titulo cambia a "Empleados Activos"
+- Subtitulo: "Hub de gestion del equipo activo"
+- CTA: "Nuevo Empleado" (se mantiene)
 
-Solo `src/components/dashboard/DashboardSidebar.tsx`
+**KPIs (4):**
+- Total Activos (empleados con status=activo)
+- Remotos (work_modality=remoto)
+- Hibridos (work_modality=hibrido)
+- Presenciales (work_modality=presencial)
+
+**Filtros avanzados (nueva fila):**
+- Busqueda global (existente)
+- Filtro por Estado (existente)
+- Filtro por Modalidad (nuevo: Remoto/Hibrido/Presencial)
+- Filtro por Tipo de Contrato (nuevo: Indefinido/Fijo/etc.)
+- Toggle List/Grid (existente)
+
+**Tabs por departamento:** Se mantienen igual.
+
+**Tabla mejorada - columnas:**
+- Empleado (avatar + nombre + email) - existente
+- Codigo - existente
+- Area (badge) - existente
+- Cargo - existente
+- Modalidad (badge con icono) - nuevo
+- Contrato - existente
+- Ingreso - existente
+- Estado (badge) - existente
+- Acciones (Ver perfil, Editar, Cambiar estado) - mejorado
+
+**Accion "Cambiar Estado":** Abre un modal rapido que permite cambiar el estado del empleado (activo, en_licencia, suspendido, etc.) con motivo obligatorio. El cambio se registra automaticamente en `employee_history`.
+
+---
+
+### 3. Ficha 360 del Empleado (`EmployeeProfile.tsx`)
+
+Reestructuracion completa de las pestanas actuales:
+
+**Header:** Se mantiene el patron actual (ArrowLeft + nombre + badges).
+
+**Pestanas nuevas:**
+
+| Pestana | Contenido | Fuente de datos |
+|---------|-----------|-----------------|
+| Resumen | Cargo, Area, Supervisor, Ingreso, Contrato, Modalidad, Contacto | `employees` + joins |
+| Info Laboral | Jornada, Centro de costos (department), Contrato detallado, Seguridad social, Datos bancarios, Contacto emergencia | `employees` |
+| Control de Tiempo | Resumen asistencia (ultimos 30 dias), Saldo banco de horas, Vacaciones acumuladas - todo solo lectura con links a los modulos | `attendance`, `hour_bank`, `absences` (queries de resumen) |
+| Desempeno | Evaluaciones con score, Metas activas - solo lectura con link al modulo | `performance_evaluations` |
+| Documentos | Lista de documentos con carga | `employee_documents` |
+| Historial | Timeline de cambios: cargo, departamento, contrato, estado, movimientos internos | `employee_history` (nueva tabla) |
+| Acceso | Vinculacion con usuario de plataforma (existente) | `profiles`, `user_roles` |
+
+**Tab "Control de Tiempo" (solo lectura, consumo cruzado):**
+- Card "Asistencia Reciente": query de ultimos 30 dias de `attendance` donde employee_id = X, mostrando dias presentes, tardanzas, ausencias en mini-KPIs. Boton "Ver detalle" navega a `/hr/asistencia`.
+- Card "Banco de Horas": query de saldo actual de `hour_bank` (SUM de deposits - withdrawals). Boton "Ver detalle" navega a `/hr/horarios/banco-horas`.
+- Card "Vacaciones": query de `absences` donde absence_type='vacaciones' y status='approved' en el ano actual, mostrando dias tomados vs 15 disponibles. Boton "Ver detalle" navega a `/hr/vacaciones`.
+
+**Tab "Historial" (nueva):**
+- Timeline cronologica descendente de `employee_history`
+- Cada entrada muestra: fecha, tipo de cambio (badge), campo modificado, valor anterior -> valor nuevo, notas
+- Boton para registrar un cambio manual (modal con: tipo, campo, valores, fecha efectiva, motivo)
+
+---
+
+### 4. Archivos a crear/modificar
+
+| Archivo | Accion |
+|---------|--------|
+| **Migracion SQL** | Crear tabla `employee_history` con RLS |
+| `src/hooks/useEmployee.ts` | Agregar `useEmployeeHistory`, `useEmployeeAttendanceSummary`, `useEmployeeHourBankBalance`, `useEmployeeVacationBalance`, `useCreateEmployeeHistory` |
+| `src/lib/hrConstants.ts` | Agregar constantes `HISTORY_CHANGE_TYPES`, `HISTORY_FIELD_LABELS` |
+| `src/pages/hr/EmployeeDirectory.tsx` | Mejorar KPIs (modalidad), agregar filtros (modalidad, contrato), agregar columna modalidad, agregar accion "Cambiar Estado" con modal |
+| `src/pages/hr/EmployeeProfile.tsx` | Reestructurar pestanas: Resumen, Info Laboral, Control de Tiempo, Desempeno, Documentos, Historial, Acceso |
+
+---
+
+### 5. Logica clave
+
+**Cambio de estado con historial automatico:**
+Cuando se cambia el estado de un empleado (desde el modal en la vista principal o desde la ficha), se ejecutan 2 operaciones:
+1. UPDATE en `employees` (campo `status`)
+2. INSERT en `employee_history` (change_type='status_change', field_changed='status', old/new values)
+
+**Consumo cruzado sin duplicacion:**
+Las queries de Control de Tiempo en la ficha 360 son SELECT de solo lectura sobre tablas existentes (`attendance`, `hour_bank`, `absences`). No se crean componentes de gestion, solo cards de resumen con navegacion al modulo correspondiente.
+
+**Sin calculos de nomina:**
+Se muestra salario base como dato informativo (solo lectura), sin calculos de deducciones ni liquidaciones.
 
