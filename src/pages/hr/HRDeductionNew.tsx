@@ -97,7 +97,7 @@ export default function HRDeductionNew() {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-auto px-6 py-6">
-        <Card className="max-w-2xl">
+        <Card>
           <CardHeader><CardTitle className="text-base">Datos de la Deducción</CardTitle></CardHeader>
           <CardContent className="space-y-5">
             {/* Employee */}
