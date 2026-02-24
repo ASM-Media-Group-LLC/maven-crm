@@ -1,127 +1,119 @@
 
 
-## Empleados Activos - HUB 360 del Empleado
+## Diferenciar Empleados Activos vs Directorio + Crear Organigrama
 
-### Resumen
+### Contexto del problema
 
-Transformar la seccion actual de "Directorio de Empleados" en un HUB 360 de empleados activos, con una vista principal mejorada (filtros avanzados, columnas enriquecidas) y una ficha de empleado reestructurada en pestanas funcionales que consumen datos de otros modulos sin duplicar logica.
+Actualmente, "Empleados Activos" (en Employee Lifecycle, ruta `/hr/directorio`) y "Directorio" (en Organizacion) apuntan a la misma pagina. Son conceptos diferentes:
 
----
+- **Empleados Activos**: Gestion del empleado dentro del lifecycle (filtros avanzados, cambio de estado, acciones de gestion, ficha 360)
+- **Directorio**: Consulta rapida de datos basicos de contacto (solo lectura, sin acciones de gestion)
+- **Organigrama**: Estructura organizacional con multiples vistas (Tabla, Arbol, Grid, Por Departamento)
 
-### 1. Base de datos - Nueva tabla `employee_history`
-
-Se necesita una tabla para registrar cambios contractuales, movimientos internos y ajustes del empleado.
-
-```text
-employee_history
-  id               uuid PK
-  employee_id      uuid FK -> employees.id
-  change_type      text (promotion, transfer, contract_change, salary_adjustment, status_change, modality_change)
-  field_changed    text (position_id, department_id, contract_type, work_modality, status, base_salary, reports_to)
-  old_value        text
-  new_value        text
-  effective_date   date
-  reason           text (nullable)
-  notes            text (nullable)
-  created_by       uuid (nullable)
-  created_at       timestamptz default now()
-```
-
-RLS: Permisiva para usuarios autenticados (mismo patron que el resto del modulo HR).
+### Cambios propuestos
 
 ---
 
-### 2. Vista Principal - Empleados Activos (`EmployeeDirectory.tsx`)
+### 1. Separar rutas y paginas
 
-Mejoras sobre la pagina actual:
+| Ruta | Pagina | Proposito |
+|------|--------|-----------|
+| `/hr/directorio` | `EmployeeDirectory.tsx` (actual) | **Empleados Activos** - gestion completa del lifecycle |
+| `/hr/organizacion/directorio` | `HRDirectoryLookup.tsx` (nueva) | **Directorio** - consulta rapida solo lectura |
+| `/hr/organizacion/organigrama` | `HROrganigrama.tsx` (nueva) | **Organigrama** - estructura organizacional |
+
+### 2. Sidebar - Actualizar navegacion
+
+En `DashboardSidebar.tsx`, cambiar el grupo "Organizacion":
+
+- "Empleados Activos" en Employee Lifecycle mantiene su ruta `/hr/directorio` (sin cambios)
+- "Organizacion" pasa a tener:
+  - **Directorio** -> `/hr/organizacion/directorio`
+  - **Organigrama** -> `/hr/organizacion/organigrama` (ya no estara deshabilitado)
+
+### 3. Directorio de consulta (`HRDirectoryLookup.tsx`)
+
+Pagina de solo lectura, liviana, para buscar datos basicos de cualquier empleado:
+
+- **Header**: "Directorio", subtitulo "Consulta rapida de datos del equipo"
+- **Busqueda global** prominente (nombre, email, telefono, cargo)
+- **Filtro por departamento** (select)
+- **Vista**: Tabla simple con columnas:
+  - Avatar + Nombre completo
+  - Cargo
+  - Departamento (badge)
+  - Email
+  - Telefono / Movil
+  - Ubicacion (ciudad, pais)
+  - Modalidad
+- **Sin acciones de gestion** (no editar, no cambiar estado, no eliminar)
+- Click en un empleado navega a su ficha 360 en `/hr/empleado/:id` (solo lectura contextual)
+
+### 4. Organigrama (`HROrganigrama.tsx`)
+
+Pagina completa con estructura organizacional, inspirada en las imagenes de referencia:
 
 **Header:**
-- Titulo cambia a "Empleados Activos"
-- Subtitulo: "Hub de gestion del equipo activo"
-- CTA: "Nuevo Empleado" (se mantiene)
+- Titulo: "Organigrama"
+- Subtitulo: "Estructura organizacional y jerarquias"
+- Filtro de empresa (Select con "Todas las Empresas" por defecto, listando de la tabla `companies`)
 
-**KPIs (4):**
-- Total Activos (empleados con status=activo)
-- Remotos (work_modality=remoto)
-- Hibridos (work_modality=hibrido)
-- Presenciales (work_modality=presencial)
+**KPIs (4 cards):**
+- Total Empleados (count de employees activos)
+- Empresas (count de companies, o 1 si no hay registros)
+- Departamentos (count de departments activos)
+- Ubicaciones (count distinct de city de employees)
 
-**Filtros avanzados (nueva fila):**
-- Busqueda global (existente)
-- Filtro por Estado (existente)
-- Filtro por Modalidad (nuevo: Remoto/Hibrido/Presencial)
-- Filtro por Tipo de Contrato (nuevo: Indefinido/Fijo/etc.)
-- Toggle List/Grid (existente)
+**Leyenda de empresas:** Badges de colores con count de empleados por empresa
 
-**Tabs por departamento:** Se mantienen igual.
+**Tabs de vista (4):**
 
-**Tabla mejorada - columnas:**
-- Empleado (avatar + nombre + email) - existente
-- Codigo - existente
-- Area (badge) - existente
-- Cargo - existente
-- Modalidad (badge con icono) - nuevo
-- Contrato - existente
-- Ingreso - existente
-- Estado (badge) - existente
-- Acciones (Ver perfil, Editar, Cambiar estado) - mejorado
+a) **Tabla** (vista por defecto):
+- Columnas: Empleado (avatar+email), Posicion, Departamento (badge color), Empresa (badge), Reporta a (nombre del supervisor), Ubicacion, Reportes (count de subordinados)
+- Ordenable por cada columna
 
-**Accion "Cambiar Estado":** Abre un modal rapido que permite cambiar el estado del empleado (activo, en_licencia, suspendido, etc.) con motivo obligatorio. El cambio se registra automaticamente en `employee_history`.
+b) **Arbol** (jerarquia visual):
+- Estructura de arbol con nodos conectados por lineas
+- Cada nodo muestra: avatar, nombre, cargo
+- Expandible/colapsable por nivel
+- Raiz: empleados sin `reports_to` (CEO/Directores)
+- Implementacion con divs/flex anidados y lineas CSS (sin dependencia externa)
 
----
+c) **Grid** (tarjetas):
+- Cards con avatar, nombre, cargo, departamento, empresa
+- Layout responsive en grid
 
-### 3. Ficha 360 del Empleado (`EmployeeProfile.tsx`)
+d) **Por Departamento**:
+- Agrupacion visual por departamento
+- Cada departamento como seccion con su nombre, head (si existe), y lista de empleados
 
-Reestructuracion completa de las pestanas actuales:
+**Base de datos - Cambios necesarios:**
 
-**Header:** Se mantiene el patron actual (ArrowLeft + nombre + badges).
+La tabla `employees` ya tiene `reports_to` (uuid) para la jerarquia. La tabla `companies` existe pero esta vacia y no esta vinculada a `employees`. Para soportar multi-empresa como en las imagenes de referencia, se necesita:
 
-**Pestanas nuevas:**
+- Agregar columna `company_id` (uuid, FK a companies, nullable) en la tabla `employees`
+- Esto permite filtrar por empresa y mostrar la leyenda de colores
 
-| Pestana | Contenido | Fuente de datos |
-|---------|-----------|-----------------|
-| Resumen | Cargo, Area, Supervisor, Ingreso, Contrato, Modalidad, Contacto | `employees` + joins |
-| Info Laboral | Jornada, Centro de costos (department), Contrato detallado, Seguridad social, Datos bancarios, Contacto emergencia | `employees` |
-| Control de Tiempo | Resumen asistencia (ultimos 30 dias), Saldo banco de horas, Vacaciones acumuladas - todo solo lectura con links a los modulos | `attendance`, `hour_bank`, `absences` (queries de resumen) |
-| Desempeno | Evaluaciones con score, Metas activas - solo lectura con link al modulo | `performance_evaluations` |
-| Documentos | Lista de documentos con carga | `employee_documents` |
-| Historial | Timeline de cambios: cargo, departamento, contrato, estado, movimientos internos | `employee_history` (nueva tabla) |
-| Acceso | Vinculacion con usuario de plataforma (existente) | `profiles`, `user_roles` |
-
-**Tab "Control de Tiempo" (solo lectura, consumo cruzado):**
-- Card "Asistencia Reciente": query de ultimos 30 dias de `attendance` donde employee_id = X, mostrando dias presentes, tardanzas, ausencias en mini-KPIs. Boton "Ver detalle" navega a `/hr/asistencia`.
-- Card "Banco de Horas": query de saldo actual de `hour_bank` (SUM de deposits - withdrawals). Boton "Ver detalle" navega a `/hr/horarios/banco-horas`.
-- Card "Vacaciones": query de `absences` donde absence_type='vacaciones' y status='approved' en el ano actual, mostrando dias tomados vs 15 disponibles. Boton "Ver detalle" navega a `/hr/vacaciones`.
-
-**Tab "Historial" (nueva):**
-- Timeline cronologica descendente de `employee_history`
-- Cada entrada muestra: fecha, tipo de cambio (badge), campo modificado, valor anterior -> valor nuevo, notas
-- Boton para registrar un cambio manual (modal con: tipo, campo, valores, fecha efectiva, motivo)
-
----
-
-### 4. Archivos a crear/modificar
+### 5. Archivos a crear/modificar
 
 | Archivo | Accion |
 |---------|--------|
-| **Migracion SQL** | Crear tabla `employee_history` con RLS |
-| `src/hooks/useEmployee.ts` | Agregar `useEmployeeHistory`, `useEmployeeAttendanceSummary`, `useEmployeeHourBankBalance`, `useEmployeeVacationBalance`, `useCreateEmployeeHistory` |
-| `src/lib/hrConstants.ts` | Agregar constantes `HISTORY_CHANGE_TYPES`, `HISTORY_FIELD_LABELS` |
-| `src/pages/hr/EmployeeDirectory.tsx` | Mejorar KPIs (modalidad), agregar filtros (modalidad, contrato), agregar columna modalidad, agregar accion "Cambiar Estado" con modal |
-| `src/pages/hr/EmployeeProfile.tsx` | Reestructurar pestanas: Resumen, Info Laboral, Control de Tiempo, Desempeno, Documentos, Historial, Acceso |
+| Migracion SQL | Agregar `company_id` a `employees` con FK a `companies` |
+| `src/pages/hr/HRDirectoryLookup.tsx` | Nueva pagina - directorio de consulta |
+| `src/pages/hr/HROrganigrama.tsx` | Nueva pagina - organigrama con 4 vistas |
+| `src/components/dashboard/DashboardSidebar.tsx` | Actualizar grupo Organizacion con nuevas rutas |
+| `src/App.tsx` | Agregar rutas `/hr/organizacion/directorio` y `/hr/organizacion/organigrama` |
+| `src/hooks/useEmployees.ts` | Agregar query con join a `companies` para organigrama |
 
----
+### 6. Detalle tecnico
 
-### 5. Logica clave
+**Vista Arbol del Organigrama:**
+Se construye un arbol recursivo a partir de los datos de empleados. Los nodos raiz son empleados donde `reports_to IS NULL`. Cada nodo renderiza sus subordinados (empleados cuyo `reports_to` coincide con el id del nodo). Se usan lineas CSS (`border-left` + `before/after` pseudo-elementos) para conectar visualmente los nodos.
 
-**Cambio de estado con historial automatico:**
-Cuando se cambia el estado de un empleado (desde el modal en la vista principal o desde la ficha), se ejecutan 2 operaciones:
-1. UPDATE en `employees` (campo `status`)
-2. INSERT en `employee_history` (change_type='status_change', field_changed='status', old/new values)
+**Filtro de empresa:**
+La tabla `companies` ya existe con RLS. El select en el header filtra todos los datos (KPIs, tabla, arbol, grid) por `company_id`. "Todas las Empresas" muestra todos sin filtro.
 
-**Consumo cruzado sin duplicacion:**
-Las queries de Control de Tiempo en la ficha 360 son SELECT de solo lectura sobre tablas existentes (`attendance`, `hour_bank`, `absences`). No se crean componentes de gestion, solo cards de resumen con navegacion al modulo correspondiente.
-
-**Sin calculos de nomina:**
-Se muestra salario base como dato informativo (solo lectura), sin calculos de deducciones ni liquidaciones.
+**Diferenciacion clara Directorio vs Empleados Activos:**
+- Empleados Activos (lifecycle): Tiene KPIs de modalidad, filtros avanzados, acciones CRUD, modal de cambio de estado con historial
+- Directorio (organizacion): Solo busqueda y lectura, sin acciones de gestion, enfocado en datos de contacto
 
