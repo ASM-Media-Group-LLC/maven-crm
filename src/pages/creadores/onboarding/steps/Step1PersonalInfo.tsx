@@ -171,6 +171,15 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
         <Label>Ciudad</Label>
         <Input value={data.city} onChange={(e) => onChange("city", e.target.value)} placeholder="Ciudad" />
       </div>
+      <div className="space-y-1.5">
+        <Label>Zona horaria</Label>
+        <Select value={data.timezone} onValueChange={(v) => onChange("timezone", v)}>
+          <SelectTrigger><SelectValue placeholder="Seleccionar zona horaria" /></SelectTrigger>
+          <SelectContent>
+            {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="md:col-span-2 space-y-1.5">
         <Label>Dirección de residencia completa</Label>
         <Textarea value={data.direccion} onChange={(e) => onChange("direccion", e.target.value)} placeholder="Dirección completa..." rows={2} />
@@ -182,15 +191,6 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       <div className="space-y-1.5">
         <Label>Talla de brasier</Label>
         <Input value={data.tallaBrasier} onChange={(e) => onChange("tallaBrasier", e.target.value)} placeholder="34B" />
-      </div>
-      <div className="md:col-span-2 space-y-1.5">
-        <Label>Zona horaria</Label>
-        <Select value={data.timezone} onValueChange={(v) => onChange("timezone", v)}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar zona horaria" /></SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* ── Perfil Artístico ── */}
