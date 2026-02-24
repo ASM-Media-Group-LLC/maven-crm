@@ -12,6 +12,7 @@ export interface OnboardingCreator {
   manager: string;
   progress: number;
   status: "Pendiente" | "En Progreso" | "Completado";
+  hasTeamAssigned: boolean;
   // Raw fields for step calculation
   email: string | null;
   country: string | null;
@@ -35,14 +36,15 @@ function calculateProgress(creator: any): number {
   if (creator.profile_photo_url) count++;
   // Step 4: business config
   const biz = Array.isArray(creator.creator_business) ? creator.creator_business[0] : creator.creator_business;
-  if (biz?.main_platform || biz?.payment_method) count++;
+  const hasPrecios = creator.precios_contenido && typeof creator.precios_contenido === "object" && Object.keys(creator.precios_contenido).length > 0;
+  if (biz?.main_platform || biz?.payment_method || hasPrecios) count++;
   return Math.round((count / total) * 100);
 }
 
 function deriveStatus(dbStatus: string | null): "Pendiente" | "En Progreso" | "Completado" {
-  if (dbStatus === "borrador" || dbStatus === "pendiente" || dbStatus === "pendiente_verificacion") return "Pendiente";
-  if (dbStatus === "verificado") return "Completado";
-  if (dbStatus === "onboarding") return "En Progreso";
+  if (dbStatus === "borrador" || dbStatus === "pendiente") return "Pendiente";
+  if (dbStatus === "onboarding" || dbStatus === "pendiente_verificacion") return "En Progreso";
+  if (dbStatus === "verificado" || dbStatus === "active") return "Completado";
   return "Pendiente";
 }
 
@@ -78,13 +80,32 @@ export function useOnboarding() {
       const { data, error } = await supabase
         .from("creators")
         .select("*, creator_business(*)")
-        .in("status", ["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado"]);
+        .in("status", ["borrador", "pendiente", "onboarding", "pendiente_verificacion", "verificado", "active"]);
 
       if (error) throw error;
+
+      // Resolve manager names via auxiliary query
+      const managerIds = [...new Set(
+        (data || [])
+          .map((c: any) => c.assigned_manager_profile_id)
+          .filter(Boolean)
+      )];
+
+      let managerMap: Record<string, string> = {};
+      if (managerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", managerIds);
+        if (profiles) {
+          managerMap = Object.fromEntries(profiles.map((p) => [p.id, p.full_name || "Sin nombre"]));
+        }
+      }
 
       return (data || []).map((c: any) => {
         const biz = Array.isArray(c.creator_business) ? c.creator_business[0] : c.creator_business;
         const progress = calculateProgress(c);
+        const hasTeamAssigned = !!c.assigned_manager_profile_id;
 
         return {
           id: c.id,
@@ -94,9 +115,10 @@ export function useOnboarding() {
           area: biz?.manager_type || "Otro",
           company: biz?.assigned_agency || "Sin empresa",
           startDate: biz?.start_date || null,
-          manager: "Sin asignar",
+          manager: c.assigned_manager_profile_id ? (managerMap[c.assigned_manager_profile_id] || "Sin asignar") : "Sin asignar",
           progress,
           status: deriveStatus(c.status),
+          hasTeamAssigned,
           email: c.email,
           country: c.country,
           rutina_diaria: c.rutina_diaria,
