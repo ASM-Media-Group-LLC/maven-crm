@@ -1,79 +1,69 @@
 
 
-## Sincronizacion de Metricas del Dashboard de Onboarding
+## Manual de Operacion: Generador de Insights para Chatters
 
 ### Resumen
 
-Actualizar la logica de derivacion de estados en `useOnboarding.ts` para que las tarjetas KPI (Pendientes, En Progreso, Completados) reflejen correctamente el flujo real del onboarding, y tambien incluir datos de asignacion de equipo en la query.
+Enriquecer el componente `OperacionesTabContent` existente para incluir tres secciones nuevas: **Ficha de Personaje**, **Protocolo de Crisis** y una **Tabla de Precios** mejorada. Estos datos ya existen en la tabla `creators` (guardados desde los Pasos 2 y 4 del onboarding) y ya se traen en la query `useCreadorById`, por lo que no se necesitan cambios en la base de datos ni en el hook de datos.
 
 ---
 
-### Cambios en la logica de estados
+### Cambios en detalle
 
-**Archivo:** `src/pages/creadores/onboarding/useOnboarding.ts`
+**Archivo unico a modificar:** `src/pages/creadores/OperacionesTabContent.tsx`
 
-La funcion `deriveStatus` actual mapea estados de la base de datos a categorias de KPI de forma simplificada. Se actualizara para reflejar las nuevas reglas de negocio:
+#### Seccion 1: Ficha de Personaje (ya existe parcialmente como "Estilo de Chat")
 
-| KPI | Regla actual | Nueva regla |
-|-----|-------------|-------------|
-| **Pendientes** | `borrador`, `pendiente`, `pendiente_verificacion` | `borrador` o `pendiente` (registros que aun no completaron el wizard) |
-| **En Progreso** | `onboarding` | `pendiente_verificacion` u `onboarding` (hicieron clic en "Finalizar" pero el Manager no ha verificado aun) |
-| **Completados** | `verificado` | `verificado` o `active` (documentos aprobados y equipo asignado) |
+Se ampliara la card existente para incluir:
+- Tono de voz (ya presente)
+- Emojis frecuentes (`emoji_frecuente`)
+- Como quiere que la llamen (`como_quieres_que_te_llamen`)
+- Personalidad de marca (`personalidad_marca`)
+- Tono emocional (`tono_emocional`)
+- Terminos de afecto preferidos (`terminos_afecto`)
+- Frases de venta (`frases_venta`)
 
-**Cambios especificos en `deriveStatus()`:**
+#### Seccion 2: Protocolo de Crisis (nueva)
 
-```
-borrador       -> "Pendiente"
-pendiente      -> "Pendiente"  
-onboarding     -> "En Progreso"
-pendiente_verificacion -> "En Progreso"
-verificado     -> "Completado"
-active         -> "Completado"
-```
+Una card con icono de escudo que muestra los scripts de respuesta del Paso 2:
+- "Si pide encuentro en persona" (`respuesta_sexo_en_persona`)
+- "Si el usuario es grosero" (`respuesta_usuario_grosero`)
+- "Si pide material gratis" (`respuesta_pedir_desnudos`)
+- "Si pregunta cuanto cobra por encuentro" (`respuesta_cuanto_cobra_encuentro`)
+- "Si pide muestras intimas" (`respuesta_muestra_intimas`)
+- "Estrategia para material gratis" (`estrategia_material_gratis`)
+- "Si tiene problemas personales" (`estrategia_problemas_personales`)
+- "Estrategia de rechazo" (`estrategia_rechazo`)
 
----
+Cada script se mostrara como un bloque con titulo en negrita y respuesta en texto normal, en un layout facil de consultar durante el chat.
 
-### Mejora del calculo de progreso
+#### Seccion 3: Tabla de Precios (ya existe, se mejora)
 
-La funcion `calculateProgress` se actualizara para considerar tambien la asignacion de equipo como factor de completitud:
+Se ampliara el mapa de etiquetas `priceLabels` para cubrir los 14 servicios del Paso 4, incluyendo los nuevos tipos:
+- `zings`, `saludos`, `colaboraciones`, `sesiones_acompanamiento`, `videollamada_amistad`, `videollamada_otro`, `material_cortesia`, `material_sensual`
 
-- Paso 1 (25%): Datos personales completos (nombre, email, pais)
-- Paso 2 (25%): Al menos 2 campos de psicologia completados
-- Paso 3 (25%): Foto de perfil / documentos subidos
-- Paso 4 (25%): Plataforma principal o metodo de pago configurado
+Se agregara indicacion de moneda usando el campo `currency` del creator.
 
-El progreso se mantiene igual (no se agrega un 5to paso), pero se mejorara la precision verificando `precios_contenido` como alternativa al campo de business para el Paso 4.
+#### Seccion 4: Informacion estrategica (nueva)
 
----
-
-### Incluir datos de manager asignado
-
-Actualmente el campo `manager` siempre muestra "Sin asignar". Se actualizara la query para:
-
-1. Hacer un join con `profiles` usando `assigned_manager_profile_id` del creator
-2. Mostrar el nombre real del manager asignado en la tabla/grid
-
-**Cambio en la query:**
-```sql
-SELECT *, creator_business(*) FROM creators
-WHERE status IN (...)
-```
-Se cambiara a hacer una segunda consulta ligera para obtener los nombres de los managers asignados, o se usara un subquery con `profiles`.
-
-Dado que Supabase JS no permite joins directos entre `creators` y `profiles` (no hay FK declarada), se hara una consulta auxiliar:
-1. Extraer todos los `assigned_manager_profile_id` unicos del resultado
-2. Consultar `profiles` con esos IDs
-3. Mapear el `full_name` al campo `manager` de cada creator
+Card adicional con datos de la estrategia GFE y operativa del Paso 4:
+- Disponibilidad GFE (`gfe_disponible`)
+- Plataforma de videollamada preferida (`plataforma_videollamada`)
+- Usuarios VIP (`usuarios_vip`)
+- Estrategia de recuperacion (`estrategia_recuperacion`)
+- Restricciones de seguridad (`restricciones_seguridad`)
 
 ---
 
-### Incluir dato de equipo asignado para validar "Completado"
+### Actualizacion de la interfaz del componente
 
-Para que "Completado" sea preciso (equipo asignado), se verificara que `assigned_manager_profile_id` no sea null en el creator.
+Se ampliara la interfaz `OperacionesTabContentProps` para incluir todos los campos nuevos que se leen del creator. Dado que `CreadorProfileContent` ya pasa el objeto `c` completo (que tiene todos los campos), solo se necesita tipar correctamente la prop.
 
-**Regla final para "Completado":**
-- Status DB es `verificado` o `active`
-- O bien: status es `verificado` AND `assigned_manager_profile_id` no es null
+---
+
+### Sin cambios en base de datos
+
+Todos los campos ya existen como columnas en la tabla `creators` (agregados en la migracion anterior). La query `useCreadorById` ya los trae con `select("*, creator_business(*)")`.
 
 ---
 
@@ -81,14 +71,5 @@ Para que "Completado" sea preciso (equipo asignado), se verificara que `assigned
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/creadores/onboarding/useOnboarding.ts` | Actualizar `deriveStatus()`, mejorar query para traer nombre del manager, verificar asignacion para "Completado" |
-
-### Detalle tecnico
-
-Solo se modifica un archivo. Los cambios son:
-
-1. **`deriveStatus()`**: Reasignar `pendiente_verificacion` de "Pendiente" a "En Progreso", y agregar `active` como "Completado"
-2. **Query**: Agregar consulta auxiliar a `profiles` para resolver nombres de managers
-3. **Interfaz `OnboardingCreator`**: Agregar campo `hasTeamAssigned` (boolean) para enriquecer la informacion visible
-4. **`getStepLabel()`**: Ajustar las etiquetas para reflejar los nuevos estados (ej: "En Revision" para `pendiente_verificacion` ya existe, se mantiene)
+| `src/pages/creadores/OperacionesTabContent.tsx` | Agregar Ficha de Personaje ampliada, Protocolo de Crisis, Tabla de Precios mejorada, e Info Estrategica |
 
