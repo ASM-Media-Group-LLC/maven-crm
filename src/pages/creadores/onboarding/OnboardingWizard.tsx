@@ -23,7 +23,7 @@ const STEPS = [
   { label: "Configuración", tooltip: "Tu menú comercial. Aquí defines qué vendes y a qué precio para que tu equipo cierre tratos de alto valor." },
 ];
 
-const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "", redesSociales: "", wishlistAmazon: "" };
+const initialStep1: Step1Data = { name: "", segundoNombre: "", email: "", phone: "", age: "", country: "", city: "", direccion: "", timezone: "", artisticName: "", birthDate: "", medidas: "", tallaBrasier: "", signoZodiacal: "", etnicidad: "", tatuajesPiercings: "", cicatrices: "", idiomas: "", nivelLectura: "", permisoNombreReal: "", permisoEdadReal: "", permisoUbicacion: "", apodos: "", edadMostrar: "", ubicacionArtistica: "" };
 const initialStep2Psy: Step2PsyData = { rutinaDiaria: "", hobbies: "", mascotasNombres: "", comidaFavorita: "", nivelEstudios: "", apodosPermitidos: "", palabrasProhibidas: "", emojiFrecuente: "", tonoVoz: "", contenidoJamasHaria: "", heladoFavorito: "", bebidaFavorita: "", musicaArtistas: "", peliculasTV: "", viajesFavoritos: "", viajesPorVisitar: "", hermanos: "", diaPerfecto: "", comoEresCuandoNadieVe: "", comoQuieresQueTeLlamen: "", respuestaSexoEnPersona: "", respuestaUsuarioGrosero: "", respuestaPedirDesnudos: "", queTeIncomoda: "", horariosSueno: "", deporteEquipo: "", colorFavorito: "", estadoCivil: "", queBuscasPareja: "", mejorAtributoFisico: "", metasLargoPlazo: "", queHacesRelajarte: "", queTeHaceReir: "", queTeMotivaCrear: "", respuestaCuantoCobraEncuentro: "", respuestaMuestraIntimas: "", estrategiaMaterialGratis: "", estrategiaProblemasPersonales: "" };
 const initialStep3Doc: Step2Data = { idDocumentFront: [], idDocumentBack: [], selfieDocument: [], profilePhotos: [], dataConfirmed: false, wishlistUrl: "", instagramHandle: "", tiktokHandle: "", twitterHandle: "", onlyfansUrl: "", otrasPlataformas: "", linkOtrasPlataformas: "" };
 const initialStep4: Step4Data = { schedule: {}, pricing: {}, monthlyGoal: "", notes: "", terminosAfecto: "", restriccionesSeguridad: "", orientacionPerfil: "", currency: "USD", gfeDisponible: false, personalidadMarca: "", estrategiaRechazo: "", tonoEmocional: "", frasesVenta: "", usuariosVip: "", plataformaVideollamada: "", estrategiaRecuperacion: "", interesaDinamicasGrupales: false };
@@ -97,8 +97,6 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
       permiso_ubicacion: step1.permisoUbicacion === "true",
       edad_mostrar: step1.edadMostrar ? Number(step1.edadMostrar) : null,
       ubicacion_artistica: step1.ubicacionArtistica || null,
-      redes_sociales: step1.redesSociales || null,
-      wishlist_amazon: step1.wishlistAmazon || null,
       // Step 2 direct columns
       rutina_diaria: step2Psy.rutinaDiaria || null,
       hobbies: step2Psy.hobbies || null,
@@ -245,8 +243,6 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           apodos: extraData.apodos || "",
           edadMostrar: String((c as any).edad_mostrar ?? extraData.edadMostrar ?? ""),
           ubicacionArtistica: (c as any).ubicacion_artistica || extraData.ubicacionArtistica || "",
-          redesSociales: (c as any).redes_sociales || extraData.redesSociales || "",
-          wishlistAmazon: (c as any).wishlist_amazon || extraData.wishlistAmazon || "",
         });
         setStep2Psy({
           rutinaDiaria: c.rutina_diaria || "", hobbies: c.hobbies || "",
