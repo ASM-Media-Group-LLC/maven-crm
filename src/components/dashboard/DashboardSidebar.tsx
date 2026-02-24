@@ -140,11 +140,11 @@ const DashboardSidebar = () => {
       ],
     },
     {
-      label: "Finanzas",
+      label: "Finanzas Operativas",
       icon: Wallet,
       key: "finanzas",
       items: [
-        { title: "Deducciones", url: null },
+        { title: "Deducciones", url: "/hr/deducciones" },
       ],
     },
   ];
