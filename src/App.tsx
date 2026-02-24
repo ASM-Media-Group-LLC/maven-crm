@@ -84,6 +84,13 @@ import HRDirectoryLookup from "./pages/hr/HRDirectoryLookup";
 import HROrganigrama from "./pages/hr/HROrganigrama";
 import HRDeductions from "./pages/hr/HRDeductions";
 import HRDeductionNew from "./pages/hr/HRDeductionNew";
+import FinanzasLayout from "./pages/finanzas/FinanzasLayout";
+import FinanzasDashboard from "./pages/finanzas/FinanzasDashboard";
+import NominaPage from "./pages/finanzas/nomina/NominaPage";
+import FacturacionPage from "./pages/finanzas/facturacion/FacturacionPage";
+import ComisionesPage from "./pages/finanzas/comisiones/ComisionesPage";
+import ControlFinancieroPage from "./pages/finanzas/control/ControlFinancieroPage";
+import ReportesPage from "./pages/finanzas/reportes/ReportesPage";
 
 const queryClient = new QueryClient();
 
@@ -174,6 +181,13 @@ const App = () => (
               <Route path="/hr/organizacion/organigrama" element={<ProtectedRoute><HRLayout><HROrganigrama /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/deducciones" element={<ProtectedRoute><HRLayout><HRDeductions /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/deducciones/nuevo" element={<ProtectedRoute><HRLayout><HRDeductionNew /></HRLayout></ProtectedRoute>} />
+              {/* Finanzas routes */}
+              <Route path="/finanzas" element={<ProtectedRoute><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/nomina" element={<ProtectedRoute><FinanzasLayout><NominaPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/facturacion" element={<ProtectedRoute><FinanzasLayout><FacturacionPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/comisiones" element={<ProtectedRoute><FinanzasLayout><ComisionesPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/control" element={<ProtectedRoute><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas/reportes" element={<ProtectedRoute><FinanzasLayout><ReportesPage /></FinanzasLayout></ProtectedRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
