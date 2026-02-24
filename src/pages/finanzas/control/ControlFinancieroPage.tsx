@@ -62,7 +62,7 @@ export default function ControlFinancieroPage() {
   const { data: payrollDetails = [], isLoading: ld } = useQuery({
     queryKey: ["control-payroll-details"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payroll_details").select("employee_id, overtime_hours, overtime_amount, net_amount").limit(500);
+      const { data, error } = await supabase.from("payroll_details").select("employee_id, overtime_hours, overtime_amount, net_total").limit(500);
       if (error) throw error;
       return data ?? [];
     },
@@ -86,7 +86,7 @@ export default function ControlFinancieroPage() {
   // Productividad
   const empProductivity = employees.map(e => {
     const empDetails = payrollDetails.filter(d => d.employee_id === e.id);
-    const totalCost = empDetails.reduce((s, d) => s + (Number(d.net_amount) || 0), 0) || Number(e.base_salary) || 0;
+    const totalCost = empDetails.reduce((s, d) => s + (Number(d.net_total) || 0), 0) || Number(e.base_salary) || 0;
     const totalHours = empDetails.reduce((s, d) => s + (Number(d.overtime_hours) || 0), 0);
     return { name: `${e.first_name} ${e.last_name}`, salary: Number(e.base_salary) || 0, cost: totalCost, hours: totalHours, ratio: totalHours > 0 ? totalCost / totalHours : 0 };
   });
