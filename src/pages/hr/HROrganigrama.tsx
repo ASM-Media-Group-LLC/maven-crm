@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, Building2, MapPin, Network, ChevronDown, ChevronRight } from "lucide-react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import HRPageHeader from "@/components/hr/HRPageHeader";
+
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
 import EmployeeAreaBadge from "@/components/hr/EmployeeAreaBadge";
 import { useEmployees, useDepartments } from "@/hooks/useEmployees";
@@ -160,24 +161,10 @@ export default function HROrganigrama() {
   return (
     <div className="h-full flex flex-col">
       <div className="shrink-0 bg-background border-b px-6 pt-6 pb-4 space-y-4">
-        <HRPageHeader
-          title="Organigrama"
-          subtitle="Estructura organizacional y jerarquías"
-          icon={Network}
-          actions={
-            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las Empresas</SelectItem>
-                {companies?.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-        />
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Organigrama</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Estructura organizacional y jerarquías</p>
+        </div>
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -199,6 +186,21 @@ export default function HROrganigrama() {
               {v.label}
             </Button>
           ))}
+        </div>
+
+        {/* Company filter */}
+        <div className="flex items-center gap-3">
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las Empresas</SelectItem>
+              {companies?.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
