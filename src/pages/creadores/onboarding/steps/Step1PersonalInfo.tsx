@@ -156,7 +156,7 @@ export default function Step1PersonalInfo({ data, errors, onChange }: Props) {
       </div>
       <div className="space-y-1.5">
         <Label>Fecha de nacimiento</Label>
-        <DateInput value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
+        <DateInput className="w-full" value={data.birthDate} onChange={(v) => onChange("birthDate", v)} toYear={new Date().getFullYear()} />
       </div>
       <div className="space-y-1.5">
         <Label>País</Label>
