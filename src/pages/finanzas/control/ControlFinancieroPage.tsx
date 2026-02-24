@@ -223,14 +223,18 @@ export default function ControlFinancieroPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        {/* Tab bar */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
+          {TABS.map(t => (
+            <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t)}>{t}</Button>
+          ))}
+        </div>
+
+        {/* Filtros */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-            {TABS.map(t => (
-              <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t)}>{t}</Button>
-            ))}
-          </div>
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
         </div>
+
         {renderTab()}
       </div>
     </div>

@@ -136,16 +136,6 @@ export default function CollectionsPage() {
       case "Dashboard de Cobros":
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Total Cobrado" value={fmt(totalCobrado)} icon={DollarSign} subtitle={`${cobrados.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-                  <DashboardMetricCard label="Pendiente de Cobro" value={fmt(totalPendiente)} icon={Clock} subtitle={`${pendientes.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
-                  <DashboardMetricCard label="Vencido" value={fmt(totalVencido)} icon={AlertTriangle} subtitle={`${vencidos.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
-                  <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="Sin asignar o $0" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
-                </>
-              )}
-            </div>
             {!isLoading && pieData.length > 0 && (
               <div className="rounded-lg border border-border p-4 bg-card">
                 <h3 className="text-sm font-medium text-foreground mb-4">Distribución por Estado</h3>
@@ -269,11 +259,25 @@ export default function CollectionsPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
+        {/* KPIs globales */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+            <>
+              <DashboardMetricCard label="Total Cobrado" value={fmt(totalCobrado)} icon={DollarSign} subtitle={`${cobrados.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Pendiente de Cobro" value={fmt(totalPendiente)} icon={Clock} subtitle={`${pendientes.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
+              <DashboardMetricCard label="Vencido" value={fmt(totalVencido)} icon={AlertTriangle} subtitle={`${vencidos.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
+              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="Sin asignar o $0" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
+            </>
+          )}
+        </div>
+
+        {/* Tab bar */}
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
           {COLLECTION_TABS.map(t => (
             <Button key={t} variant={tab === t ? "secondary" : "ghost"} size="sm" onClick={() => setTab(t)}>{t}</Button>
           ))}
         </div>
+
         {renderTab()}
       </div>
 
