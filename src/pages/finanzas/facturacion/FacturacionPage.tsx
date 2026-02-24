@@ -35,7 +35,7 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
   reversada: { variant: "destructive", label: "Reversada" },
 };
 
-const FACTURA_TABS = ["Invoices", "Notas de Pago", "Mail", "Archivo de PagoMundo"] as const;
+const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Fees & Ajustes", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
 
 function fmt(n: number) {
@@ -215,6 +215,78 @@ export default function FacturacionPage() {
           <>
             <p className="text-sm text-muted-foreground">{filtered.length} invoices pagados o parciales</p>
             {renderInvoiceTable()}
+          </>
+        );
+
+      case "Reversos":
+        return (
+          <>
+            <p className="text-sm text-muted-foreground">{invoices.filter(i => i.status === "reversada").length} invoices reversados</p>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="sticky top-0 z-10 bg-card border-b">
+                      <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Razón del Reverso</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.filter(i => i.status === "reversada").length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin reversos registrados.</TableCell></TableRow>
+                    ) : invoices.filter(i => i.status === "reversada").map(inv => (
+                      <TableRow key={inv.id} className="hover:bg-muted/30">
+                        <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
+                        <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
+                        <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{inv.reversal_reason || "—"}</TableCell>
+                        <TableCell className="text-sm">{format(new Date(inv.created_at), "dd/MM/yyyy")}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </>
+        );
+
+      case "Fees & Ajustes":
+        return (
+          <>
+            <p className="text-sm text-muted-foreground">Detalle de fees aplicados a invoices</p>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="sticky top-0 z-10 bg-card border-b">
+                      <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Tipo Fee</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Fee</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Monto Neto</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.filter(i => Number(i.fee_amount) > 0).length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin fees registrados.</TableCell></TableRow>
+                    ) : invoices.filter(i => Number(i.fee_amount) > 0).map(inv => (
+                      <TableRow key={inv.id} className="hover:bg-muted/30">
+                        <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
+                        <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
+                        <TableCell className="text-sm">{inv.fee_type || "PayPal"}</TableCell>
+                        <TableCell className="text-sm font-medium text-destructive">{fmt(Number(inv.fee_amount) || 0)}</TableCell>
+                        <TableCell className="text-sm font-medium">{fmt(Number(inv.net_amount) || 0)}</TableCell>
+                        <TableCell><Badge variant={STATUS_BADGE[inv.status]?.variant || "outline"}>{STATUS_BADGE[inv.status]?.label || inv.status}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </>
         );
 

@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { generateReport } from "./generateReport";
 import { format } from "date-fns";
 
-const REPORT_TABS = ["Estado de Cuenta CC", "Reportes Generales"] as const;
+const REPORT_TABS = ["Estado de Cuenta CC", "Ventas por Creador", "Por Método de Pago", "Comparativos Mensuales", "Reportes Generales"] as const;
 type ReportTab = typeof REPORT_TABS[number];
 
 const REPORT_TYPES: Record<string, string> = {
