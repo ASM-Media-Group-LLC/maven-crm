@@ -1,51 +1,54 @@
 
 
-## Hacer opcional la asignacion de Manager y Chatters en el modal de Onboarding
+## Ajustes al Onboarding de Creadoras
 
-### Problema actual
+Se van a realizar 4 correcciones en el wizard de onboarding:
 
-El modal de "Asignacion Operativa" requiere obligatoriamente seleccionar un Manager para poder completar el onboarding. Si no hay managers o chatters creados en el sistema, el usuario queda bloqueado y no puede finalizar el proceso.
+---
 
-### Solucion
+### 1. Arreglar el selector de fecha (Paso 1)
 
-Hacer ambos campos (Manager y Chatters) opcionales, permitiendo completar el onboarding sin asignaciones y agregarlas despues desde el perfil de la creadora.
+El componente `DateInput` usa un `Popover` con un calendario (`DayPicker`). El problema es que el `PopoverContent` no tiene la clase `pointer-events-auto`, lo que hace que los clics no lleguen al calendario cuando esta dentro de ciertos contenedores. Se agregara esa clase al `PopoverContent`.
 
-### Cambios
+**Archivo:** `src/components/ui/date-input.tsx`
 
-**Archivo: `src/pages/creadores/onboarding/AssignmentModal.tsx`**
+---
 
-1. Cambiar la interfaz `onConfirm` para aceptar `managerId` como `string | null` en vez de `string`
-2. Remover el asterisco rojo (*) del label de Manager
-3. Agregar texto "(opcional)" junto al label de Manager, igual que los Chatters
-4. Remover la condicion `disabled={!selectedManager}` del boton "Completar Onboarding"
-5. Actualizar `handleConfirm` para pasar `null` si no hay manager seleccionado
-6. Agregar un mensaje informativo (texto sutil) indicando que se pueden asignar despues
+### 2. Alinear campos desiguales (Paso 1)
 
-**Archivo: `src/pages/creadores/onboarding/OnboardingWizard.tsx`**
+Varios campos en `Step1PersonalInfo` no estan correctamente alineados dentro del grid de 2 columnas. Algunos campos como "Medidas" y "Talla de brasier" estan sueltos despues de un campo `md:col-span-2`, causando desalineacion visual. Se revisara que los campos se agrupen correctamente en pares dentro del grid.
 
-1. Actualizar la firma de `handleAssignmentConfirm` para aceptar `managerId: string | null`
-2. Condicionar la escritura de `assigned_manager_profile_id` solo si `managerId` existe
-3. Condicionar el `upsert` en `creator_assignments` solo si `managerId` existe
-4. Mantener la logica de chatters sin cambios (ya es opcional)
+**Archivo:** `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx`
 
-### Detalle tecnico
+---
 
-```text
-AssignmentModal
-  - onConfirm({ managerId: string | null, chatterIds: string[] })
-  - Boton siempre habilitado (sin disabled por manager)
-  - Label: "Manager (opcional)" sin asterisco
+### 3. Quitar Wishlist y Redes Sociales del Paso 1
 
-OnboardingWizard.handleAssignmentConfirm
-  - if (managerId) -> asignar manager en creator y creator_assignments
-  - if (!managerId) -> solo guardar creator sin manager
-  - Chatters: sin cambios
-```
+El Paso 1 (Informacion Personal) tiene una seccion "Conectividad" con campos de "Links de Redes Sociales" y "Wishlist de Amazon" (lineas 253-262). Estos mismos datos ya estan en el Paso 3 (Documentacion) de forma mas completa (con campos individuales para Instagram, TikTok, Twitter, OnlyFans, etc.). Se eliminara la seccion "Conectividad" del Paso 1 y los campos `redesSociales` y `wishlistAmazon` del tipo `Step1Data`.
 
-### Archivos a modificar
+**Archivos:**
+- `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` - Quitar seccion "Conectividad" y campos del tipo
+- `src/pages/creadores/onboarding/OnboardingWizard.tsx` - Quitar los campos del `initialStep1` y del `buildCreatorPayload`
+
+---
+
+### 4. Agregar "Seleccionar Todos" en el horario (Paso 4)
+
+En la tabla de horarios del Paso 4, agregar:
+- Un checkbox "Todos" en el header de la tabla que seleccione/deseleccione todos los dias y turnos
+- Checkboxes en cada header de columna (Manana, Tarde, Noche) para seleccionar ese turno en todos los dias
+- Un checkbox por cada fila (Lunes, Martes...) para seleccionar todos los turnos de ese dia
+
+**Archivo:** `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx`
+
+---
+
+### Resumen de archivos
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/creadores/onboarding/AssignmentModal.tsx` | Manager opcional, quitar asterisco, quitar disabled, actualizar tipo |
-| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Condicionar asignacion de manager en handleAssignmentConfirm |
+| `src/components/ui/date-input.tsx` | Agregar `pointer-events-auto` al PopoverContent |
+| `src/pages/creadores/onboarding/steps/Step1PersonalInfo.tsx` | Quitar seccion Conectividad, alinear campos |
+| `src/pages/creadores/onboarding/OnboardingWizard.tsx` | Quitar `redesSociales` y `wishlistAmazon` del estado inicial y payload |
+| `src/pages/creadores/onboarding/steps/Step4WorkConfig.tsx` | Agregar checkboxes de "Seleccionar todos" en la tabla de horarios |
 
