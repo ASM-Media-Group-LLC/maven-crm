@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Clock, DollarSign, TrendingUp, Wallet, Plus, Eye, Trash2, Search, X, Download,
-  CheckCircle, Banknote, ArrowRightLeft,
+  CheckCircle, Banknote, ArrowRightLeft, LayoutGrid, List,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,7 @@ export default function HorasVariablesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<HVTab>("Horas Extra");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   // Banco de Horas modals
   const [payItem, setPayItem] = useState<any>(null);
@@ -185,20 +186,21 @@ export default function HorasVariablesPage() {
     return "Pagadas";
   };
 
+  const horasExtraFiltered = horasDetails.filter(d => Number(d.overtime_hours) > 0);
+  const bancoFiltered = horasDetails.filter(d => Number(d.hour_bank_hours) > 0 || Number(d.overtime_amount) > 0);
+
   const renderTab = () => {
     switch (tab) {
       case "Horas Extra":
         return (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {loadingHoras ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} subtitle={`${uniqueEmps} empleados`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} subtitle="Monto acumulado" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                  <DashboardMetricCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={TrendingUp} subtitle="Horas extra" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                </>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-md border border-border">
+                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              </div>
             </div>
+            {viewMode === "list" ? (
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-26rem)]">
                 <Table>
@@ -213,9 +215,9 @@ export default function HorasVariablesPage() {
                   <TableBody>
                     {loadingHoras ? Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>{Array.from({ length: 4 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : horasDetails.filter(d => Number(d.overtime_hours) > 0).length === 0 ? (
+                    )) : horasExtraFiltered.length === 0 ? (
                       <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin registros de horas extra.</TableCell></TableRow>
-                    ) : horasDetails.filter(d => Number(d.overtime_hours) > 0).map(d => (
+                    ) : horasExtraFiltered.map(d => (
                       <TableRow key={d.id} className="hover:bg-muted/30">
                         <TableCell className="text-sm">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</TableCell>
                         <TableCell className="text-sm font-medium">{Number(d.overtime_hours) || 0}h</TableCell>
@@ -227,20 +229,35 @@ export default function HorasVariablesPage() {
                 </Table>
               </div>
             </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {horasExtraFiltered.length === 0 ? (
+                  <div className="col-span-full text-center text-muted-foreground py-8">Sin registros.</div>
+                ) : horasExtraFiltered.map(d => (
+                  <div key={d.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                    <p className="text-sm font-medium">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</p>
+                    <p className="text-xl font-bold text-foreground mt-2">{Number(d.overtime_hours) || 0}h</p>
+                    <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                      <span>{fmt(Number(d.overtime_amount) || 0)}</span>
+                      <span>{(d as any).payroll_periods?.period_name || "—"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
       case "Banco de Horas":
         return (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              {loadingHoras ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} subtitle="Banco total" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} subtitle="Valoración" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                </>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-md border border-border">
+                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              </div>
             </div>
+            {viewMode === "list" ? (
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-26rem)]">
                 <Table>
@@ -257,9 +274,9 @@ export default function HorasVariablesPage() {
                   <TableBody>
                     {loadingHoras ? Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : horasDetails.filter(d => Number(d.hour_bank_hours) > 0 || Number(d.overtime_amount) > 0).length === 0 ? (
+                    )) : bancoFiltered.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin registros en banco de horas.</TableCell></TableRow>
-                    ) : horasDetails.filter(d => Number(d.hour_bank_hours) > 0 || Number(d.overtime_amount) > 0).map(d => {
+                    ) : bancoFiltered.map(d => {
                       const status = getBankStatus(d);
                       const hasHours = Number(d.hour_bank_hours) > 0;
                       return (
@@ -267,23 +284,13 @@ export default function HorasVariablesPage() {
                           <TableCell className="text-sm">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</TableCell>
                           <TableCell className="text-sm font-medium">{Number(d.hour_bank_hours) || 0}h</TableCell>
                           <TableCell className="text-sm">{fmt(Number(d.hour_bank_amount) || 0)}</TableCell>
-                          <TableCell>
-                            <Badge variant={status === "Acumuladas" ? "secondary" : status === "Pagadas" ? "default" : "outline"}>{status}</Badge>
-                          </TableCell>
+                          <TableCell><Badge variant={status === "Acumuladas" ? "secondary" : status === "Pagadas" ? "default" : "outline"}>{status}</Badge></TableCell>
                           <TableCell className="text-sm text-muted-foreground">{(d as any).payroll_periods?.period_name || "—"}</TableCell>
                           <TableCell className="sticky right-0 bg-card">
                             {hasHours && (
                               <div className="flex items-center gap-1">
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPayItem(d)}>
-                                    <Banknote className="h-3.5 w-3.5 mr-1" />Pagar
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Pagar horas acumuladas</TooltipContent></Tooltip>
-                                <Tooltip><TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setCompensateItem(d)}>
-                                    <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Compensar
-                                  </Button>
-                                </TooltipTrigger><TooltipContent>Compensar con tiempo libre</TooltipContent></Tooltip>
+                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPayItem(d)}><Banknote className="h-3.5 w-3.5 mr-1" />Pagar</Button></TooltipTrigger><TooltipContent>Pagar horas acumuladas</TooltipContent></Tooltip>
+                                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setCompensateItem(d)}><ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Compensar</Button></TooltipTrigger><TooltipContent>Compensar con tiempo libre</TooltipContent></Tooltip>
                               </div>
                             )}
                           </TableCell>
@@ -294,22 +301,38 @@ export default function HorasVariablesPage() {
                 </Table>
               </div>
             </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {bancoFiltered.length === 0 ? (
+                  <div className="col-span-full text-center text-muted-foreground py-8">Sin registros.</div>
+                ) : bancoFiltered.map(d => {
+                  const status = getBankStatus(d);
+                  const hasHours = Number(d.hour_bank_hours) > 0;
+                  return (
+                    <div key={d.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant={status === "Acumuladas" ? "secondary" : status === "Pagadas" ? "default" : "outline"} className="text-[10px]">{status}</Badge>
+                      </div>
+                      <p className="text-sm font-medium">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</p>
+                      <p className="text-xl font-bold text-foreground mt-2">{Number(d.hour_bank_hours) || 0}h</p>
+                      <p className="text-xs text-muted-foreground mt-1">{fmt(Number(d.hour_bank_amount) || 0)}</p>
+                      {hasHours && (
+                        <div className="flex items-center gap-1 mt-3">
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPayItem(d)}><Banknote className="h-3.5 w-3.5 mr-1" />Pagar</Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setCompensateItem(d)}><ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Compensar</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
 
       case "Comisiones":
         return (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {loadingCommissions ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
-                <>
-                  <DashboardMetricCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} subtitle="Todas las comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Proyectadas" value={String(commissions.filter(c => c.status === "proyectado").length)} icon={Clock} subtitle="Pendientes" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-                  <DashboardMetricCard label="Acumulada" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={CheckCircle} subtitle="Sum final_amount" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-                  <DashboardMetricCard label="Proyectada" value={fmt(commissions.reduce((s, c) => s + (Number(c.estimated_amount) || 0), 0))} icon={DollarSign} subtitle="Sum estimada" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                </>
-              )}
-            </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -323,6 +346,10 @@ export default function HorasVariablesPage() {
                   <SelectItem value="comercial">Comercial</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="inline-flex items-center rounded-md border border-border">
+                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              </div>
               <Button size="sm" onClick={() => setShowComisionModal(true)}><Plus className="h-4 w-4 mr-1" />Nueva Comisión</Button>
               <Button size="sm" variant="outline" onClick={exportQuickBooks}><Download className="h-4 w-4 mr-1" />QuickBooks</Button>
               {(comisionSearch || comisionTypeFilter) && (
@@ -331,6 +358,7 @@ export default function HorasVariablesPage() {
                 </Button>
               )}
             </div>
+            {viewMode === "list" ? (
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-30rem)]">
                 <Table>
@@ -343,17 +371,15 @@ export default function HorasVariablesPage() {
                       <TableHead className="text-xs font-medium text-muted-foreground">%</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Estimada</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Final</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Acumulada</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Proyectada</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
                       <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingCommissions ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>{Array.from({ length: 11 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                      <TableRow key={i}>{Array.from({ length: 9 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                     )) : filteredCommissions.length === 0 ? (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
                     ) : filteredCommissions.map(c => {
                       const badge = COMISION_STATUS[c.status] ?? COMISION_STATUS.proyectado;
                       const empName = c.employees ? `${(c as any).employees.first_name} ${(c as any).employees.last_name}` : "—";
@@ -367,8 +393,6 @@ export default function HorasVariablesPage() {
                           <TableCell className="text-sm">{Number(c.percentage) || 0}%</TableCell>
                           <TableCell className="text-sm">{fmt(Number(c.estimated_amount) || 0)}</TableCell>
                           <TableCell className="text-sm font-medium">{fmt(Number(c.final_amount) || 0)}</TableCell>
-                          <TableCell className="text-sm font-medium">{fmt(Number(c.final_amount) || 0)}</TableCell>
-                          <TableCell className="text-sm">{fmt(Number(c.estimated_amount) || 0)}</TableCell>
                           <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
                             <div className="flex items-center gap-1">
@@ -383,6 +407,32 @@ export default function HorasVariablesPage() {
                 </Table>
               </div>
             </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredCommissions.length === 0 ? (
+                  <div className="col-span-full text-center text-muted-foreground py-12">Sin comisiones.</div>
+                ) : filteredCommissions.map(c => {
+                  const badge = COMISION_STATUS[c.status] ?? COMISION_STATUS.proyectado;
+                  const empName = c.employees ? `${(c as any).employees.first_name} ${(c as any).employees.last_name}` : "—";
+                  const creatorName = (c as any).creators?.artistic_name || (c as any).creators?.name || "—";
+                  return (
+                    <div key={c.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="outline" className="text-[10px]">{(c as any).commission_type === "comercial" ? "Comercial" : "Laboral"}</Badge>
+                        <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
+                      </div>
+                      <p className="text-sm font-medium">{empName}</p>
+                      <p className="text-xs text-muted-foreground">{creatorName}</p>
+                      <p className="text-xl font-bold text-foreground mt-2">{fmt(Number(c.final_amount) || 0)}</p>
+                      <div className="flex items-center gap-1 mt-3">
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setComisionViewItem(c)}><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setComisionDeleteItem(c)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
     }

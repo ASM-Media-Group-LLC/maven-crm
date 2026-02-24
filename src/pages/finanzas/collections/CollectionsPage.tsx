@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign, Clock, AlertTriangle, Ban, Plus, Search, X, Download,
+  Users, CheckCircle, LayoutGrid, List, TrendingUp, BarChart3,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,38 +16,41 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
-import { format } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
-const COLLECTION_TABS = ["Dashboard de Cobros", "Gestión de Creadoras", "Registro de Cobros"] as const;
-type CollectionTab = typeof COLLECTION_TABS[number];
+const TABS = ["Dashboard", "Cobros"] as const;
+type Tab = typeof TABS[number];
 
 const STATUS_COLORS: Record<string, string> = {
-  pagada: "hsl(145, 63%, 32%)",
-  enviada: "hsl(40, 96%, 40%)",
-  vencida: "hsl(0, 84%, 60%)",
-  sin_cobro: "hsl(240, 4%, 46%)",
+  pagada: "hsl(var(--accent))",
+  enviada: "hsl(var(--warning))",
+  vencida: "hsl(var(--destructive))",
+  sin_cobro: "hsl(var(--muted-foreground))",
 };
 
 export default function CollectionsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<CollectionTab>("Dashboard de Cobros");
+  const [tab, setTab] = useState<Tab>("Dashboard");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
   // Register form
   const [regCreator, setRegCreator] = useState("");
   const [regAmount, setRegAmount] = useState("");
-  const [regMethod, setRegMethod] = useState("transferencia");
-  const [regNotes, setRegNotes] = useState("");
+  const [regType, setRegType] = useState("quincenal");
+  const [regStatus, setRegStatus] = useState("pendiente");
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["collections-invoices"],
@@ -71,16 +74,16 @@ export default function CollectionsPage() {
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       const invNum = `COB-${Date.now().toString(36).toUpperCase()}`;
+      const statusMap: Record<string, string> = { pagada: "pagada", pendiente: "enviada", vencida: "vencida", sin_cobro: "borrador" };
       const { error } = await supabase.from("invoices").insert({
         creator_id: regCreator,
         amount: Number(regAmount),
         fee_amount: 0,
         net_amount: Number(regAmount),
-        status: "pagada",
-        payment_method: regMethod,
+        status: statusMap[regStatus] || "enviada",
+        payment_method: regType,
         invoice_number: invNum,
         due_date: new Date().toISOString().split("T")[0],
-        notes: regNotes || null,
         created_by: user.user?.id,
       });
       if (error) throw error;
@@ -89,7 +92,7 @@ export default function CollectionsPage() {
       queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
       toast({ title: "Cobro registrado exitosamente" });
       setShowRegisterModal(false);
-      setRegCreator(""); setRegAmount(""); setRegNotes("");
+      setRegCreator(""); setRegAmount(""); setRegType("quincenal"); setRegStatus("pendiente");
     },
     onError: () => toast({ title: "Error al registrar cobro", variant: "destructive" }),
   });
@@ -103,146 +106,66 @@ export default function CollectionsPage() {
   const totalPendiente = pendientes.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const totalVencido = vencidos.reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
-  const pieData = [
-    { name: "Cobrado", value: totalCobrado, color: STATUS_COLORS.pagada },
-    { name: "Pendiente", value: totalPendiente, color: STATUS_COLORS.enviada },
-    { name: "Vencido", value: totalVencido, color: STATUS_COLORS.vencida },
+  // Frequency cards data
+  const quincenales = invoices.filter(i => i.payment_method === "quincenal");
+  const mensuales = invoices.filter(i => i.payment_method !== "quincenal");
+  const montoQuincenal = quincenales.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const montoMensual = mensuales.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  // Financial KPIs
+  const now = new Date();
+  const lastMonthStart = startOfMonth(subMonths(now, 1));
+  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+  const lastMonthInvoices = invoices.filter(i => { const d = new Date(i.created_at); return d >= lastMonthStart && d <= lastMonthEnd; });
+  const ventasUltimoMes = lastMonthInvoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  const sixMonthsAgo = subMonths(now, 6);
+  const last6Invoices = invoices.filter(i => new Date(i.created_at) >= sixMonthsAgo);
+  const promedio6 = last6Invoices.length > 0 ? last6Invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0) / 6 : 0;
+
+  const comisionSocios = invoices.reduce((s, i) => s + (Number(i.fee_amount) || 0), 0);
+  const facturacionNeta = invoices.reduce((s, i) => s + (Number(i.net_amount) || 0), 0);
+
+  // Charts data
+  const pieStatusData = [
+    { name: "Pagadas", value: cobrados.length, color: STATUS_COLORS.pagada },
+    { name: "Pendientes", value: pendientes.length, color: STATUS_COLORS.enviada },
+    { name: "Vencidas", value: vencidos.length, color: STATUS_COLORS.vencida },
     { name: "Sin Cobro", value: sinCobro.length, color: STATUS_COLORS.sin_cobro },
   ].filter(d => d.value > 0);
 
-  // Gestión de Creadoras: group invoices by creator
-  const creatorGroups = invoices.reduce((acc, inv) => {
-    const cid = inv.creator_id || "sin_asignar";
-    if (!acc[cid]) acc[cid] = { invoices: [], name: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "Sin asignar" };
-    acc[cid].invoices.push(inv);
-    return acc;
-  }, {} as Record<string, { invoices: any[]; name: string }>);
+  const pieMoneyData = [
+    { name: "Pagado", value: totalCobrado, color: STATUS_COLORS.pagada },
+    { name: "Pendiente", value: totalPendiente, color: STATUS_COLORS.enviada },
+    { name: "Vencido", value: totalVencido, color: STATUS_COLORS.vencida },
+  ].filter(d => d.value > 0);
 
-  const creatorRows = Object.entries(creatorGroups).map(([cid, data]) => {
-    const total = data.invoices.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
-    const paid = data.invoices.filter((i: any) => i.status === "pagada");
-    const lastPaid = paid.length > 0 ? paid.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] : null;
-    const hasPending = data.invoices.some((i: any) => i.status === "enviada");
-    const hasOverdue = data.invoices.some((i: any) => i.status === "vencida");
-    const status = hasOverdue ? "vencida" : hasPending ? "pendiente" : paid.length > 0 ? "pagada" : "sin_cobro";
-    return { id: cid, name: data.name, total, count: data.invoices.length, status, lastPaidDate: lastPaid?.created_at || null };
-  }).filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()));
+  // Monthly bar chart (6 months)
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const month = subMonths(now, 5 - i);
+    const mStart = startOfMonth(month);
+    const mEnd = endOfMonth(month);
+    const mInvoices = invoices.filter(inv => { const d = new Date(inv.created_at); return d >= mStart && d <= mEnd; });
+    return {
+      month: format(month, "MMM", { locale: es }),
+      Pagadas: mInvoices.filter(i => i.status === "pagada").reduce((s, i) => s + (Number(i.amount) || 0), 0),
+      Pendientes: mInvoices.filter(i => i.status === "enviada").reduce((s, i) => s + (Number(i.amount) || 0), 0),
+      Vencidas: mInvoices.filter(i => i.status === "vencida").reduce((s, i) => s + (Number(i.amount) || 0), 0),
+    };
+  });
 
-  const recentPaid = cobrados.slice(0, 50);
-  const hasFilters = search || dateFrom || dateTo;
-
-  const renderTab = () => {
-    switch (tab) {
-      case "Dashboard de Cobros":
-        return (
-          <div className="space-y-6">
-            {!isLoading && pieData.length > 0 && (
-              <div className="rounded-lg border border-border p-4 bg-card">
-                <h3 className="text-sm font-medium text-foreground mb-4">Distribución por Estado</h3>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3}>
-                      {pieData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
-                    </Pie>
-                    <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        );
-
-      case "Gestión de Creadoras":
-        return (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar creadora..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
-              </div>
-              <Button size="sm" variant="outline" onClick={() => exportTableToExcel(creatorRows.map(r => ({ Creadora: r.name, Total: r.total, Invoices: r.count, Estado: r.status, UltimoPago: r.lastPaidDate || "—" })), "gestion-creadoras")}>
-                <Download className="h-4 w-4 mr-1" />Exportar
-              </Button>
-            </div>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creadora</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Monto Total</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Invoices</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Estado de Cobro</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Último Pago</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>{Array.from({ length: 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : creatorRows.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin datos de creadoras.</TableCell></TableRow>
-                    ) : creatorRows.map(r => (
-                      <TableRow key={r.id} className="hover:bg-muted/30">
-                        <TableCell className="text-sm font-medium">{r.name}</TableCell>
-                        <TableCell className="text-sm">{fmt(r.total)}</TableCell>
-                        <TableCell className="text-sm">{r.count}</TableCell>
-                        <TableCell>
-                          <Badge variant={r.status === "pagada" ? "default" : r.status === "pendiente" ? "secondary" : r.status === "vencida" ? "destructive" : "outline"}>
-                            {r.status === "pagada" ? "Pagada" : r.status === "pendiente" ? "Pendiente" : r.status === "vencida" ? "Vencida" : "Sin Cobro"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{r.lastPaidDate ? format(new Date(r.lastPaidDate), "dd/MM/yyyy") : "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        );
-
-      case "Registro de Cobros":
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{recentPaid.length} cobros recientes</p>
-              <Button size="sm" onClick={() => setShowRegisterModal(true)}><Plus className="h-4 w-4 mr-1" />Registrar Cobro</Button>
-            </div>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-22rem)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Método</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>{Array.from({ length: 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : recentPaid.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-12">Sin cobros registrados.</TableCell></TableRow>
-                    ) : recentPaid.map(inv => (
-                      <TableRow key={inv.id} className="hover:bg-muted/30">
-                        <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
-                        <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
-                        <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0)}</TableCell>
-                        <TableCell className="text-sm">{inv.payment_method || "—"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{format(new Date(inv.created_at), "dd/MM/yyyy")}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        );
-    }
-  };
+  // Cobros tab filtering
+  const hasFilters = search || statusFilter || dateFrom || dateTo;
+  const filteredCobros = invoices.filter(inv => {
+    const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "";
+    const matchSearch = !search || creatorName.toLowerCase().includes(search.toLowerCase()) || inv.invoice_number.includes(search);
+    const statusMap: Record<string, string> = { pagada: "pagada", pendiente: "enviada", vencida: "vencida" };
+    const matchStatus = !statusFilter || inv.status === (statusMap[statusFilter] || statusFilter);
+    const d = new Date(inv.created_at);
+    const matchFrom = !dateFrom || d >= dateFrom;
+    const matchTo = !dateTo || d <= dateTo;
+    return matchSearch && matchStatus && matchFrom && matchTo;
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -252,39 +175,207 @@ export default function CollectionsPage() {
             <h1 className="text-xl font-semibold text-foreground">Collections</h1>
             <p className="text-sm text-muted-foreground">Gestión de cobros e ingresos · {invoices.length} registros</p>
           </div>
-          <Button size="sm" onClick={() => { setTab("Registro de Cobros"); setShowRegisterModal(true); }}>
+          <Button size="sm" onClick={() => setShowRegisterModal(true)}>
             <Plus className="h-4 w-4 mr-1" />Registrar Cobro
           </Button>
         </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* KPIs globales */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
+        {/* KPIs globales - status cards (5 cols) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Cobrado" value={fmt(totalCobrado)} icon={DollarSign} subtitle={`${cobrados.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-              <DashboardMetricCard label="Pendiente de Cobro" value={fmt(totalPendiente)} icon={Clock} subtitle={`${pendientes.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
-              <DashboardMetricCard label="Vencido" value={fmt(totalVencido)} icon={AlertTriangle} subtitle={`${vencidos.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
-              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="Sin asignar o $0" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
+              <DashboardMetricCard label="Total" value={String(invoices.length)} icon={Users} subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} subtitle={fmt(totalCobrado)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Pendientes" value={String(pendientes.length)} icon={Clock} subtitle={fmt(totalPendiente)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
+              <DashboardMetricCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} subtitle={fmt(totalVencido)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
+              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="$0" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
             </>
           )}
         </div>
 
         {/* Tab bar */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-          {COLLECTION_TABS.map(t => (
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          {TABS.map(t => (
             <Button key={t} variant={tab === t ? "secondary" : "ghost"} size="sm" onClick={() => setTab(t)}>{t}</Button>
           ))}
         </div>
 
-        {renderTab()}
+        {tab === "Dashboard" ? (
+          <div className="space-y-6">
+            {/* Frequency cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-border bg-card p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge className="bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/15">QUINCENAL</Badge>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{quincenales.length} <span className="text-sm font-normal text-muted-foreground">creadoras</span></p>
+                <p className="text-sm text-muted-foreground mt-1">{fmt(montoQuincenal)} · Cobro cada 15 días</p>
+              </div>
+              <div className="rounded-lg border border-border bg-card p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge className="bg-warning/15 text-warning border-warning/30 hover:bg-warning/15">MENSUAL</Badge>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{mensuales.length} <span className="text-sm font-normal text-muted-foreground">creadoras</span></p>
+                <p className="text-sm text-muted-foreground mt-1">{fmt(montoMensual)} · Cobro cada mes</p>
+              </div>
+            </div>
+
+            {/* Financial KPIs */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <DashboardMetricCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
+              <DashboardMetricCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-border p-4 bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-4">Estado de Cobros</h3>
+                {pieStatusData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={pieStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                        {pieStatusData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                      </Pie>
+                      <RTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : <p className="text-sm text-muted-foreground text-center py-12">Sin datos</p>}
+              </div>
+              <div className="rounded-lg border border-border p-4 bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-4">Dinero por Estado</h3>
+                {pieMoneyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={pieMoneyData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3}>
+                        {pieMoneyData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                      </Pie>
+                      <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : <p className="text-sm text-muted-foreground text-center py-12">Sin datos</p>}
+              </div>
+              <div className="rounded-lg border border-border p-4 bg-card">
+                <h3 className="text-sm font-medium text-foreground mb-4">Cobros Mensuales (6 meses)</h3>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={monthlyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                    <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                    <Bar dataKey="Pagadas" stackId="a" fill={STATUS_COLORS.pagada} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="Pendientes" stackId="a" fill={STATUS_COLORS.enviada} />
+                    <Bar dataKey="Vencidas" stackId="a" fill={STATUS_COLORS.vencida} radius={[4, 4, 0, 0]} />
+                    <Legend />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar creadora o número..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="pagada">Pagada</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="vencida">Vencida</SelectItem>
+                </SelectContent>
+              </Select>
+              <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+              <div className="inline-flex items-center rounded-md border border-border">
+                <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+                <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filteredCobros.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Estado: inv.status, Fecha: format(new Date(inv.created_at), "dd/MM/yyyy") })), "cobros")}>
+                <Download className="h-4 w-4 mr-1" />Exportar
+              </Button>
+              {hasFilters && (
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />Limpiar
+                </Button>
+              )}
+            </div>
+
+            {viewMode === "list" ? (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="sticky top-0 z-10 bg-card border-b">
+                        <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Creadora</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                        <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading ? Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                      )) : filteredCobros.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin cobros encontrados.</TableCell></TableRow>
+                      ) : filteredCobros.map(inv => (
+                        <TableRow key={inv.id} className="hover:bg-muted/30">
+                          <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
+                          <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
+                          <TableCell className="text-sm">{inv.payment_method || "—"}</TableCell>
+                          <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0)}</TableCell>
+                          <TableCell>
+                            <Badge variant={inv.status === "pagada" ? "default" : inv.status === "enviada" ? "secondary" : inv.status === "vencida" ? "destructive" : "outline"}>
+                              {inv.status === "pagada" ? "Pagada" : inv.status === "enviada" ? "Pendiente" : inv.status === "vencida" ? "Vencida" : inv.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{format(new Date(inv.created_at), "dd/MM/yyyy")}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-lg" />) : filteredCobros.length === 0 ? (
+                  <div className="col-span-full text-center text-muted-foreground py-12">Sin cobros encontrados.</div>
+                ) : filteredCobros.map(inv => (
+                  <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
+                      <Badge variant={inv.status === "pagada" ? "default" : inv.status === "enviada" ? "secondary" : inv.status === "vencida" ? "destructive" : "outline"} className="text-[10px]">
+                        {inv.status === "pagada" ? "Pagada" : inv.status === "enviada" ? "Pendiente" : inv.status === "vencida" ? "Vencida" : inv.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium truncate">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</p>
+                    <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
+                    <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                      <span>{inv.payment_method || "—"}</span>
+                      <span>{format(new Date(inv.created_at), "dd/MM/yyyy")}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Register Payment Modal */}
       <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Registrar Cobro</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Registrar Nuevo Cobro</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Creadora</Label>
@@ -296,31 +387,36 @@ export default function CollectionsPage() {
               </Select>
             </div>
             <div>
-              <Label>Monto</Label>
-              <Input type="number" placeholder="0.00" value={regAmount} onChange={e => setRegAmount(e.target.value)} />
-            </div>
-            <div>
-              <Label>Método de Pago</Label>
-              <Select value={regMethod} onValueChange={setRegMethod}>
+              <Label>Tipo de cobro</Label>
+              <Select value={regType} onValueChange={setRegType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="transferencia">Transferencia</SelectItem>
-                  <SelectItem value="paypal">PayPal</SelectItem>
-                  <SelectItem value="crypto">Crypto</SelectItem>
-                  <SelectItem value="efectivo">Efectivo</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
+                  <SelectItem value="mensual">Mensual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Notas</Label>
-              <Textarea placeholder="Notas opcionales..." value={regNotes} onChange={e => setRegNotes(e.target.value)} />
+              <Label>Monto ($)</Label>
+              <Input type="number" placeholder="0.00" value={regAmount} onChange={e => setRegAmount(e.target.value)} />
+            </div>
+            <div>
+              <Label>Estado</Label>
+              <Select value={regStatus} onValueChange={setRegStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pagada">Pagada</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="vencida">Vencida</SelectItem>
+                  <SelectItem value="sin_cobro">Sin Cobro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRegisterModal(false)}>Cancelar</Button>
-            <Button onClick={() => registerPayment.mutate()} disabled={!regCreator || !regAmount || registerPayment.isPending}>
-              <Plus className="h-4 w-4 mr-1" />Registrar
+            <Button onClick={() => registerPayment.mutate()} disabled={!regCreator || !regAmount || registerPayment.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

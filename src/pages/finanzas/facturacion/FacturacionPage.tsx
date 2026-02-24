@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
-  Search, X,
+  Search, X, LayoutGrid, List,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -116,6 +116,7 @@ export default function FacturacionPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const totalPendientes = invoices.filter(i => i.status === "enviada" || i.status === "vencida").length;
   const totalMonto = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
@@ -338,7 +339,39 @@ export default function FacturacionPage() {
         );
 
       default: // Invoices
-        return renderInvoiceTable();
+        return viewMode === "list" ? renderInvoiceTable() : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filtered.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
+            ) : filtered.map(inv => {
+              const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+              const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
+              return (
+                <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
+                    <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
+                  </div>
+                  <p className="text-sm font-medium truncate">{creatorName}</p>
+                  <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
+                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                    <span>Fee: {fmt(Number(inv.fee_amount) || 0)}</span>
+                    <span>{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-3">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
+                    {(inv.status === "borrador" || inv.status === "enviada") && (
+                      <>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
     }
   };
 
@@ -400,6 +433,10 @@ export default function FacturacionPage() {
             </Select>
           )}
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          <div className="inline-flex items-center rounded-md border border-border">
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+          </div>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
               <X className="h-3.5 w-3.5 mr-1" />Limpiar
