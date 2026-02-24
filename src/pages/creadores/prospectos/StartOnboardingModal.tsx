@@ -24,7 +24,7 @@ export default function StartOnboardingModal({ prospect, onClose }: Props) {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Prospecto</Label>
+            <Label>Perfil</Label>
             <p className="text-sm font-medium">{prospect.name}</p>
           </div>
           <div className="space-y-1.5">
