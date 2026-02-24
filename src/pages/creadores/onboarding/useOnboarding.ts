@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface OnboardingCreator {
@@ -22,6 +23,8 @@ export interface OnboardingCreator {
   emoji_frecuente: string | null;
   contenido_jamas_haria: string | null;
   dbStatus: string | null;
+  updated_at: string | null;
+  assigned_manager_profile_id: string | null;
 }
 
 function calculateProgress(creator: any): number {
@@ -73,8 +76,51 @@ export function getStepLabel(step: number, dbStatus: string | null): string {
   }
 }
 
+async function checkInactivityAlerts(creators: OnboardingCreator[]) {
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  const inactive = creators.filter((c) => {
+    if (c.dbStatus !== "onboarding") return false;
+    if (!c.assigned_manager_profile_id) return false;
+    if (!c.updated_at) return false;
+    return now - new Date(c.updated_at).getTime() > THREE_DAYS_MS;
+  });
+
+  if (inactive.length === 0) return;
+
+  // Check for existing recent notifications (last 24h) to avoid duplicates
+  const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const creatorIds = inactive.map((c) => c.id);
+
+  const { data: existing } = await supabase
+    .from("notifications")
+    .select("reference_id")
+    .eq("type", "onboarding_inactivity")
+    .in("reference_id", creatorIds)
+    .gte("created_at", oneDayAgo);
+
+  const alreadyNotified = new Set((existing ?? []).map((e) => e.reference_id));
+
+  const toNotify = inactive.filter((c) => !alreadyNotified.has(c.id));
+  if (toNotify.length === 0) return;
+
+  const notifications = toNotify.map((c) => ({
+    user_id: c.assigned_manager_profile_id,
+    type: "onboarding_inactivity",
+    title: "Creadora inactiva por 3+ días",
+    message: `${c.name} no ha actualizado su onboarding en más de 3 días.`,
+    reference_id: c.id,
+    reference_type: "creator",
+  }));
+
+  await supabase.from("notifications").insert(notifications);
+}
+
 export function useOnboarding() {
-  return useQuery({
+  const alertsChecked = useRef(false);
+
+  const query = useQuery({
     queryKey: ["onboarding-creators"],
     queryFn: async (): Promise<OnboardingCreator[]> => {
       const { data, error } = await supabase
@@ -127,8 +173,20 @@ export function useOnboarding() {
           emoji_frecuente: c.emoji_frecuente,
           contenido_jamas_haria: c.contenido_jamas_haria,
           dbStatus: c.status,
+          updated_at: c.updated_at,
+          assigned_manager_profile_id: c.assigned_manager_profile_id,
         };
       });
     },
   });
+
+  // Check inactivity alerts once after data loads
+  useEffect(() => {
+    if (query.data && query.data.length > 0 && !alertsChecked.current) {
+      alertsChecked.current = true;
+      checkInactivityAlerts(query.data);
+    }
+  }, [query.data]);
+
+  return query;
 }

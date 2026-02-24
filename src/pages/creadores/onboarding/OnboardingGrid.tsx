@@ -3,7 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Clock, Loader2, Settings2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CheckCircle2, Clock, Loader2, Settings2, ShieldAlert } from "lucide-react";
 import type { OnboardingCreator } from "./useOnboarding";
 
 interface Props {
@@ -23,46 +24,59 @@ const OnboardingGrid = ({ data, onManage }: Props) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {data.map((item) => {
-        const displayName = item.name?.trim() || "Sin nombre";
-        const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
-        const sc = statusConfig[item.status];
-        const StatusIcon = sc.icon;
-        return (
-          <Card key={item.id} className="hover:border-primary/30 transition-colors">
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={item.profile_photo_url || undefined} />
-                  <AvatarFallback>{initials}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{item.company}</p>
+    <TooltipProvider>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {data.map((item) => {
+          const displayName = item.name?.trim() || "Sin nombre";
+          const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+          const sc = statusConfig[item.status];
+          const StatusIcon = sc.icon;
+          const pending = item.dbStatus === "pendiente_verificacion";
+          return (
+            <Card key={item.id} className="hover:border-primary/30 transition-colors">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={item.profile_photo_url || undefined} />
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-medium text-sm truncate">{displayName}</p>
+                      {pending && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <ShieldAlert className="h-4 w-4 text-orange-500 shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent>Documentos del Paso 3 pendientes de aprobación</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{item.company}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className={`${sc.className} text-xs`}>
-                  <StatusIcon className="h-3 w-3 mr-1" />
-                  {item.status}
-                </Badge>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Progreso</span>
-                  <span>{item.progress}%</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={`${sc.className} text-xs ${pending ? "badge-pending-verification" : ""}`}>
+                    <StatusIcon className="h-3 w-3 mr-1" />
+                    {pending ? "En Revisión" : item.status}
+                  </Badge>
                 </div>
-                <Progress value={item.progress} className="h-2" />
-              </div>
-              <Button variant="secondary" size="icon" className="h-8 w-8 ml-auto" onClick={() => onManage?.(item)}>
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Progreso</span>
+                    <span>{item.progress}%</span>
+                  </div>
+                  <Progress value={item.progress} className="h-2" />
+                </div>
+                <Button variant="secondary" size="icon" className="h-8 w-8 ml-auto" onClick={() => onManage?.(item)}>
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </TooltipProvider>
   );
 };
 

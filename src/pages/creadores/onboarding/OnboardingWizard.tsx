@@ -562,14 +562,23 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
         await supabase.from("creator_chatter_assignments" as any).insert(chatterRecords as any);
       }
 
-      // Send notification
-      await supabase.from("notifications").insert({
-        type: "onboarding_complete",
-        title: "Nueva modelo ha completado el onboarding",
-        message: `${step1.name} ha completado el proceso de onboarding y está pendiente de verificación.`,
-        reference_id: creatorId,
-        reference_type: "creator",
-      });
+      // Send directed notifications to all admins
+      const { data: adminRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+
+      if (adminRoles && adminRoles.length > 0) {
+        const adminNotifications = adminRoles.map((ar) => ({
+          user_id: ar.user_id,
+          type: "onboarding_step4_complete",
+          title: "Onboarding Paso 4 completado",
+          message: `${step1.name} ha completado la configuración comercial y está pendiente de verificación.`,
+          reference_id: creatorId,
+          reference_type: "creator",
+        }));
+        await supabase.from("notifications").insert(adminNotifications);
+      }
 
       queryClient.invalidateQueries({ queryKey: ["onboarding-creators"] });
       toast({ title: "Onboarding completado exitosamente" });
