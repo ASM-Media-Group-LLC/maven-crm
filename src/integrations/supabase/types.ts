@@ -354,6 +354,9 @@ export type Database = {
         Row: {
           area: string | null
           base_amount: number | null
+          calculation_config: Json
+          calculation_method: string
+          commission_type: string
           cost_center: string | null
           created_at: string
           created_by: string | null
@@ -371,6 +374,9 @@ export type Database = {
         Insert: {
           area?: string | null
           base_amount?: number | null
+          calculation_config?: Json
+          calculation_method?: string
+          commission_type?: string
           cost_center?: string | null
           created_at?: string
           created_by?: string | null
@@ -388,6 +394,9 @@ export type Database = {
         Update: {
           area?: string | null
           base_amount?: number | null
+          calculation_config?: Json
+          calculation_method?: string
+          commission_type?: string
           cost_center?: string | null
           created_at?: string
           created_by?: string | null
@@ -2774,6 +2783,7 @@ export type Database = {
           notes: string | null
           paid_at: string | null
           period_name: string
+          responsible_id: string | null
           start_date: string
           status: string
           total_employees: number | null
@@ -2793,6 +2803,7 @@ export type Database = {
           notes?: string | null
           paid_at?: string | null
           period_name: string
+          responsible_id?: string | null
           start_date: string
           status?: string
           total_employees?: number | null
@@ -2812,6 +2823,7 @@ export type Database = {
           notes?: string | null
           paid_at?: string | null
           period_name?: string
+          responsible_id?: string | null
           start_date?: string
           status?: string
           total_employees?: number | null

@@ -1,71 +1,268 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, FileText, Users, TrendingUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  DollarSign, FileText, Users, TrendingUp, TrendingDown, AlertTriangle,
+  ListChecks, BarChart3, X, Wallet,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, Legend } from "recharts";
+import { startOfMonth, endOfMonth, subMonths, format, isWithinInterval } from "date-fns";
+import { es } from "date-fns/locale";
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(amount);
+function fmt(n: number) {
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+}
+
+function pctChange(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return ((current - previous) / previous) * 100;
 }
 
 export default function FinanzasDashboard() {
-  const { data: payroll = [], isLoading: loadingP } = useQuery({
-    queryKey: ["finanzas-payroll-summary"],
+  const navigate = useNavigate();
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
+  const [costCenter, setCostCenter] = useState("");
+  const [area, setArea] = useState("");
+  const [tipo, setTipo] = useState("ambos");
+  const [chartRange, setChartRange] = useState<"3M" | "6M" | "12M">("6M");
+
+  const { data: payroll = [], isLoading: lp } = useQuery({
+    queryKey: ["fin-dash-payroll"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payroll_periods").select("status, gross_total, net_total").limit(500);
+      const { data, error } = await supabase.from("payroll_periods").select("status, gross_total, net_total, cost_center, created_at").limit(1000);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const { data: invoices = [], isLoading: loadingI } = useQuery({
-    queryKey: ["finanzas-invoices-summary"],
+  const { data: invoices = [], isLoading: li } = useQuery({
+    queryKey: ["fin-dash-invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("status, amount, fee_amount, net_amount").limit(500);
+      const { data, error } = await supabase.from("invoices").select("status, amount, fee_amount, net_amount, created_at, payment_method").limit(1000);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const { data: commissions = [], isLoading: loadingC } = useQuery({
-    queryKey: ["finanzas-commissions-summary"],
+  const { data: commissions = [], isLoading: lc } = useQuery({
+    queryKey: ["fin-dash-commissions"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("commissions").select("status, estimated_amount, final_amount").limit(500);
+      const { data, error } = await supabase.from("commissions").select("status, estimated_amount, final_amount, area, cost_center, created_at").limit(1000);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const isLoading = loadingP || loadingI || loadingC;
+  const isLoading = lp || li || lc;
 
-  const totalNomina = payroll.reduce((s, p) => s + (Number(p.net_total) || 0), 0);
-  const totalInvoices = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-  const totalComisiones = commissions.reduce((s, c) => s + (Number(c.estimated_amount) || 0), 0);
-  const pendingInvoices = invoices.filter(i => i.status === "enviada" || i.status === "vencida").length;
+  const now = new Date();
+  const currentMonthStart = startOfMonth(now);
+  const currentMonthEnd = endOfMonth(now);
+  const prevMonthStart = startOfMonth(subMonths(now, 1));
+  const prevMonthEnd = endOfMonth(subMonths(now, 1));
+
+  const inRange = (d: string, from: Date, to: Date) => {
+    try { return isWithinInterval(new Date(d), { start: from, end: to }); } catch { return false; }
+  };
+
+  // Current month
+  const curInvoicesPaid = invoices.filter(i => i.status === "pagada" && inRange(i.created_at, currentMonthStart, currentMonthEnd));
+  const curIngresos = curInvoicesPaid.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const curNomina = payroll.filter(p => inRange(p.created_at, currentMonthStart, currentMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+  const curComisiones = commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).reduce((s, c) => s + (Number(c.estimated_amount) || 0), 0);
+  const curCostos = curNomina + commissions.filter(c => c.status === "pagado" && inRange(c.created_at, currentMonthStart, currentMonthEnd)).reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
+  const curMargen = curIngresos - curCostos;
+  const curMargenPct = curIngresos > 0 ? (curMargen / curIngresos) * 100 : 0;
+
+  // Previous month
+  const prevIngresos = invoices.filter(i => i.status === "pagada" && inRange(i.created_at, prevMonthStart, prevMonthEnd)).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const prevCostos = payroll.filter(p => inRange(p.created_at, prevMonthStart, prevMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+
+  const nominaProyectada = payroll.filter(p => (p.status === "borrador" || p.status === "calculado") && inRange(p.created_at, currentMonthStart, currentMonthEnd)).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+  const facturasPendientes = invoices.filter(i => i.status === "enviada").length;
+  const facturasVencidas = invoices.filter(i => i.status === "vencida").length;
+  const variacion = pctChange(curIngresos, prevIngresos);
+
+  // Alerts
+  const nominaSinCerrar = payroll.filter(p => p.status === "borrador" || p.status === "calculado").length;
+  const comisionFueraRango = commissions.filter(c => (Number(c.estimated_amount) || 0) > 50000).length;
+  const comisionesPorAprobar = commissions.filter(c => c.status === "proyectado").length;
+  const invoicesPorEnviar = invoices.filter(i => i.status === "borrador").length;
+
+  const alerts = useMemo(() => {
+    const list: { label: string; count: number; severity: "destructive" | "warning" | "default" }[] = [];
+    if (facturasVencidas > 0) list.push({ label: "Facturas vencidas", count: facturasVencidas, severity: "destructive" });
+    if (nominaSinCerrar > 0) list.push({ label: "Batch de nómina sin cerrar", count: nominaSinCerrar, severity: "warning" });
+    if (comisionFueraRango > 0) list.push({ label: "Comisión fuera de rango", count: comisionFueraRango, severity: "warning" });
+    if (facturasPendientes > 0) list.push({ label: "Pagos pendientes de ejecutar", count: facturasPendientes, severity: "default" });
+    return list;
+  }, [facturasVencidas, nominaSinCerrar, comisionFueraRango, facturasPendientes]);
+
+  // Chart data
+  const chartMonths = chartRange === "3M" ? 3 : chartRange === "6M" ? 6 : 12;
+  const chartData = useMemo(() => {
+    return Array.from({ length: chartMonths }).map((_, i) => {
+      const m = subMonths(now, chartMonths - 1 - i);
+      const ms = startOfMonth(m);
+      const me = endOfMonth(m);
+      const ing = invoices.filter(inv => inv.status === "pagada" && inRange(inv.created_at, ms, me)).reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
+      const cos = payroll.filter(p => inRange(p.created_at, ms, me)).reduce((s, p) => s + (Number(p.net_total) || 0), 0) +
+        commissions.filter(c => c.status === "pagado" && inRange(c.created_at, ms, me)).reduce((s, c) => s + (Number(c.final_amount) || 0), 0);
+      return { name: format(m, "MMM yy", { locale: es }), Ingresos: ing, Costos: cos };
+    });
+  }, [invoices, payroll, commissions, chartMonths]);
+
+  const hasFilters = costCenter || area || tipo !== "ambos";
+
+  const actions = [
+    { label: "Nómina por cerrar", count: nominaSinCerrar, path: "/finanzas/nomina" },
+    { label: "Comisiones por aprobar", count: comisionesPorAprobar, path: "/finanzas/comisiones" },
+    { label: "Invoices por enviar", count: invoicesPorEnviar, path: "/finanzas/facturacion" },
+    { label: "Archivos bancarios por generar", count: 0, path: "/finanzas/nomina" },
+  ];
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
         <h1 className="text-xl font-semibold text-foreground">Dashboard Financiero</h1>
-        <p className="text-sm text-muted-foreground">Vista consolidada de nómina, facturación y comisiones</p>
+        <p className="text-sm text-muted-foreground">Vista ejecutiva y operativa consolidada</p>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Filtros globales */}
+        <div className="flex flex-wrap items-center gap-2">
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+          <Select value={costCenter || undefined} onValueChange={v => setCostCenter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Centro de Costo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              <SelectItem value="operaciones">Operaciones</SelectItem>
+              <SelectItem value="ventas">Ventas</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={area || undefined} onValueChange={v => setArea(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="w-32"><SelectValue placeholder="Área" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              <SelectItem value="chatters">Chatters</SelectItem>
+              <SelectItem value="closers">Closers</SelectItem>
+              <SelectItem value="tech">Tech</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={tipo} onValueChange={setTipo}>
+            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ambos">Ambos</SelectItem>
+              <SelectItem value="ingresos">Ingresos</SelectItem>
+              <SelectItem value="egresos">Egresos</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setCostCenter(""); setArea(""); setTipo("ambos"); }}>
+              <X className="h-3.5 w-3.5 mr-1" />Limpiar
+            </Button>
+          )}
+        </div>
+
+        {/* 8 KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
-          ) : (
+          {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Nómina Total" value={formatCurrency(totalNomina)} icon={Users} subtitle={`${payroll.length} periodos`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Facturación Total" value={formatCurrency(totalInvoices)} icon={FileText} subtitle={`${invoices.length} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Comisiones Estimadas" value={formatCurrency(totalComisiones)} icon={TrendingUp} subtitle={`${commissions.length} registros`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-              <DashboardMetricCard label="Invoices Pendientes" value={String(pendingInvoices)} icon={DollarSign} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={pendingInvoices > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs mes anterior`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+              <DashboardMetricCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} subtitle={`${curMargenPct.toFixed(1)}% margen`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={curMargen >= 0 ? "text-accent" : "text-destructive"} />
+              <DashboardMetricCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} subtitle="Borrador + calculado" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
+              <DashboardMetricCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} subtitle={`${commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).length} registros`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} subtitle="Enviadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={facturasPendientes > 0 ? "text-warning" : undefined} />
+              <DashboardMetricCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} subtitle="Requieren atención" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={facturasVencidas > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} subtitle="Ingresos mes a mes" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={variacion >= 0 ? "text-accent" : "text-destructive"} />
             </>
           )}
         </div>
 
-        <div className="rounded-lg border border-border p-8 text-center text-muted-foreground">
-          <p className="text-sm">Selecciona un submódulo en el sidebar para gestionar Nómina, Facturación, Comisiones, Control Financiero o Reportes.</p>
+        {/* Flujo de Dinero */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />Flujo de Dinero
+              </CardTitle>
+              <div className="inline-flex items-center gap-1 rounded-md border border-border p-0.5">
+                {(["3M", "6M", "12M"] as const).map(r => (
+                  <Button key={r} variant={chartRange === r ? "secondary" : "ghost"} size="sm" className="h-6 text-xs px-2" onClick={() => setChartRange(r)}>{r}</Button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-64 w-full" /> : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={chartData} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                  <RTooltip formatter={(v: number) => fmt(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 13 }} />
+                  <Legend />
+                  <Bar dataKey="Ingresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Costos" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Alertas Operativas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-warning" />Alertas Operativas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {alerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Sin alertas activas ✓</p>
+              ) : (
+                <div className="space-y-2">
+                  {alerts.map((a, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                      <span className="text-sm">{a.label}</span>
+                      <Badge variant={a.severity === "destructive" ? "destructive" : a.severity === "warning" ? "secondary" : "outline"}>{a.count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Próximas Acciones */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <ListChecks className="h-4 w-4 text-primary" />Próximas Acciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {actions.map((a, i) => (
+                  <button key={i} onClick={() => navigate(a.path)} className="w-full flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/50 transition-colors text-left">
+                    <span className="text-sm">{a.label}</span>
+                    <Badge variant={a.count > 0 ? "default" : "outline"}>{a.count}</Badge>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
