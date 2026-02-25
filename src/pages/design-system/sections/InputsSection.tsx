@@ -179,8 +179,10 @@ export const InputsSection = () => {
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Date Input</h3>
       <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
-        Selector de fecha individual con trigger unificado, calendario con dropdowns de mes/año para navegación rápida,
-        entrada manual <code className="font-mono text-primary">dd/mm/aaaa</code> y footer con Cancelar/Aplicar.
+        Selector de fecha individual con trigger unificado y calendario interactivo. Incluye un header custom con
+        selectores estilizados de mes (grid 4×3) y año (lista scrolleable) usando popovers Shadcn, flechas de navegación
+        mes a mes, entrada manual <code className="font-mono text-primary">dd/mm/aaaa</code> y footer con Cancelar/Aplicar.
+        Totalmente consistente con el design system — sin dropdowns nativos del navegador.
         Ideal para fechas de nacimiento, fechas de inicio, vencimientos, etc.
       </p>
       <div className="space-y-4 max-w-2xl">
@@ -216,6 +218,7 @@ export const InputsSection = () => {
           <p><code className="font-mono text-foreground">disabled?</code>: <code className="font-mono">boolean</code></p>
           <p><code className="font-mono text-foreground">fromYear?</code>: <code className="font-mono">number</code> (default: 1940)</p>
           <p><code className="font-mono text-foreground">toYear?</code>: <code className="font-mono">number</code> (default: año actual + 5)</p>
+          <p className="mt-2"><strong className="text-foreground">Navegación:</strong> Header custom con flechas ◂/▸, popover de meses (grid 4×3) y popover de años (ScrollArea). Sin <code className="font-mono text-foreground">&lt;select&gt;</code> nativos.</p>
           <p className="mt-2"><strong className="text-foreground">Cuándo usar:</strong> Fechas individuales (nacimiento, inicio, vencimiento). Para rangos usar <code className="font-mono text-foreground">DateRangePicker</code>.</p>
         </div>
       </div>

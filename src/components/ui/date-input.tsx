@@ -1,13 +1,19 @@
 import * as React from "react";
-import { format, parse, isValid } from "date-fns";
+import { format, parse, isValid, setMonth, setYear, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
-import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const MONTH_NAMES_SHORT = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
 
 interface DateInputProps {
   value: string; // yyyy-MM-dd
@@ -31,6 +37,10 @@ export function DateInput({
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<Date | undefined>(undefined);
   const [textValue, setTextValue] = React.useState("");
+  const [displayMonth, setDisplayMonth] = React.useState(new Date());
+  const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
+  const [yearPickerOpen, setYearPickerOpen] = React.useState(false);
+  const yearScrollRef = React.useRef<HTMLDivElement>(null);
 
   // Sync internal state when popover opens
   React.useEffect(() => {
@@ -40,13 +50,25 @@ export function DateInput({
         if (isValid(parsed)) {
           setDraft(parsed);
           setTextValue(format(parsed, "dd/MM/yyyy"));
+          setDisplayMonth(parsed);
           return;
         }
       }
       setDraft(undefined);
       setTextValue("");
+      setDisplayMonth(new Date());
     }
   }, [open, value]);
+
+  // Scroll to current year when year picker opens
+  React.useEffect(() => {
+    if (yearPickerOpen && yearScrollRef.current) {
+      const activeEl = yearScrollRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: "center" });
+      }
+    }
+  }, [yearPickerOpen]);
 
   const handleCalendarSelect = (date: Date | undefined) => {
     setDraft(date);
@@ -69,6 +91,7 @@ export function DateInput({
       const parsed = parse(raw, "dd/MM/yyyy", new Date());
       if (isValid(parsed)) {
         setDraft(parsed);
+        setDisplayMonth(parsed);
       }
     }
   };
@@ -81,7 +104,6 @@ export function DateInput({
         return;
       }
     }
-    // Reset text to match draft
     setTextValue(draft ? format(draft, "dd/MM/yyyy") : "");
   };
 
@@ -104,7 +126,14 @@ export function DateInput({
     ? format(selectedDate, "d MMM yyyy", { locale: es })
     : placeholder;
 
-  const defaultMonth = draft || selectedDate || new Date();
+  const currentMonthLabel = format(displayMonth, "MMMM", { locale: es });
+  const currentYear = displayMonth.getFullYear();
+
+  const years = React.useMemo(() => {
+    const arr: number[] = [];
+    for (let y = fromYear; y <= toYear; y++) arr.push(y);
+    return arr;
+  }, [fromYear, toYear]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -125,30 +154,103 @@ export function DateInput({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 pointer-events-auto" align="start" side="bottom" sideOffset={4} collisionPadding={16}>
         <div className="p-3">
+          {/* Custom navigation header */}
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setDisplayMonth(prev => subMonths(prev, 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center gap-1">
+              {/* Month picker */}
+              <Popover open={monthPickerOpen} onOpenChange={setMonthPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-sm font-medium capitalize gap-1">
+                    {currentMonthLabel}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-2 pointer-events-auto z-[60]" align="center" sideOffset={4}>
+                  <div className="grid grid-cols-4 gap-1">
+                    {MONTH_NAMES_SHORT.map((name, idx) => (
+                      <Button
+                        key={idx}
+                        variant={displayMonth.getMonth() === idx ? "default" : "ghost"}
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setDisplayMonth(prev => setMonth(prev, idx));
+                          setMonthPickerOpen(false);
+                        }}
+                      >
+                        {name}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Year picker */}
+              <Popover open={yearPickerOpen} onOpenChange={setYearPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-sm font-medium gap-1">
+                    {currentYear}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[140px] p-1 pointer-events-auto z-[60]" align="center" sideOffset={4}>
+                  <ScrollArea className="h-[200px]">
+                    <div ref={yearScrollRef} className="flex flex-col gap-0.5 p-1">
+                      {years.map(y => (
+                        <Button
+                          key={y}
+                          variant={currentYear === y ? "default" : "ghost"}
+                          size="sm"
+                          className="h-8 text-sm justify-center"
+                          data-active={currentYear === y}
+                          onClick={() => {
+                            setDisplayMonth(prev => setYear(prev, y));
+                            setYearPickerOpen(false);
+                          }}
+                        >
+                          {y}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setDisplayMonth(prev => addMonths(prev, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Calendar */}
           <DayPicker
             mode="single"
             selected={draft}
             onSelect={handleCalendarSelect}
-            defaultMonth={defaultMonth}
-            captionLayout="dropdown-buttons"
-            fromYear={fromYear}
-            toYear={toYear}
+            month={displayMonth}
+            onMonthChange={setDisplayMonth}
             locale={es}
             showOutsideDays
             className="pointer-events-auto"
             classNames={{
-              months: "flex flex-col space-y-4",
-              month: "space-y-4",
-              caption: "flex justify-center pt-1 relative items-center",
-              caption_label: "text-sm font-medium capitalize",
-              caption_dropdowns: "flex gap-1",
-              nav: "space-x-1 flex items-center",
-              nav_button: cn(
-                buttonVariants({ variant: "outline" }),
-                "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-              ),
-              nav_button_previous: "absolute left-1",
-              nav_button_next: "absolute right-1",
+              months: "flex flex-col",
+              month: "space-y-2",
+              caption: "hidden",
+              nav: "hidden",
               table: "w-full border-collapse space-y-1",
               head_row: "flex",
               head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
@@ -161,15 +263,6 @@ export function DateInput({
               day_outside: "day-outside text-muted-foreground opacity-50",
               day_disabled: "text-muted-foreground opacity-50",
               day_hidden: "invisible",
-              vhidden: "sr-only",
-              dropdown: "bg-background border border-border rounded-md px-2 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 cursor-pointer hover:bg-muted transition-colors",
-              dropdown_month: "mr-1",
-              dropdown_year: "",
-              dropdown_icon: "hidden",
-            }}
-            components={{
-              IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-              IconRight: () => <ChevronRight className="h-4 w-4" />,
             }}
           />
 
