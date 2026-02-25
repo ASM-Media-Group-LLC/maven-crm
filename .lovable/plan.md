@@ -1,31 +1,41 @@
 
 
-## Plan: Agregar badge de miembros en cards y columna de miembros en tabla
+## Plan: Hacer todos los proyectos visibles para los 4 usuarios
 
-### Análisis actual
+### Situación actual
 
-Las cards ya muestran avatares de miembros en la parte inferior (líneas 299-325 de `ProjectsListContent.tsx`), pero el usuario quiere un **badge en la esquina** de la card con hover para ver los miembros. La tabla (`ProjectsTable.tsx`) no tiene ninguna columna de miembros.
+La política RLS de SELECT en `task_projects` solo permite ver proyectos si:
+- Eres el creador (`created_by = auth.uid()`)
+- Tienes tareas en el proyecto (`user_has_tasks_in_project`)
+- Eres miembro del proyecto (`is_project_member`)
 
-### Cambios
+Por eso, si un admin crea un proyecto y no agrega a los otros como miembros, estos no lo ven.
 
-#### 1. Cards — Badge de miembros en la esquina (`ProjectsListContent.tsx`)
+### Problema adicional
 
-- Mover los avatares de miembros de la parte inferior a la **esquina superior derecha** de la card (junto al botón de acciones).
-- Envolver los avatares en un `HoverCard` que al hacer hover muestre una lista completa de los miembros del proyecto con sus nombres.
-- Si no hay miembros, no mostrar nada (como está ahora).
-- Eliminar los avatares de la sección inferior de task counts.
+Los 4 usuarios tienen `company_id = null`, por lo que no se puede filtrar por compañía de forma confiable ahora mismo.
 
-#### 2. Tabla — Columna de miembros (`ProjectsTable.tsx`)
+### Solución propuesta
 
-- Agregar una nueva prop `getMembersForProject` que retorne los perfiles de miembros para un proyecto.
-- Agregar una columna "Miembros" en la tabla después de "Líder".
-- Mostrar avatares apilados (máx 3) con `+N` si hay más, usando `Tooltip` para mostrar el nombre de cada uno.
-- Actualizar la llamada en `ProjectsListContent.tsx` para pasar la función `getMembersForProject`.
+Dado que los 4 son el equipo completo y todos son admins, la solución mas simple y escalable es actualizar la política RLS de SELECT para que **todos los usuarios autenticados** puedan ver todos los proyectos:
+
+```sql
+DROP POLICY IF EXISTS "Users can view relevant projects" ON task_projects;
+CREATE POLICY "Users can view relevant projects"
+  ON task_projects FOR SELECT
+  USING (true);
+```
+
+Esto es seguro porque:
+1. La tabla ya tiene RLS habilitado (solo usuarios autenticados pasan)
+2. Las políticas de UPDATE y DELETE siguen restringidas al creador/miembros
+3. Es consistente con cómo funcionan otras tablas del sistema (contactos, agencias, etc.)
 
 ### Archivos a modificar
 
-| Archivo | Cambio |
+| Recurso | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Mover avatares de miembros a esquina superior de card con HoverCard; pasar `getMembersForProject` a ProjectsTable |
-| `src/pages/tareas/ProjectsTable.tsx` | Agregar columna "Miembros" con avatares + tooltip, nueva prop `getMembersForProject` |
+| Migración SQL | Reemplazar la política SELECT de `task_projects` con `USING (true)` |
+
+No se requieren cambios en el frontend.
 
