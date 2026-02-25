@@ -3478,6 +3478,7 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
+          leader_id: string | null
           name: string
           position: number
           share_token: string | null
@@ -3490,6 +3491,7 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
+          leader_id?: string | null
           name: string
           position?: number
           share_token?: string | null
@@ -3502,13 +3504,22 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
+          leader_id?: string | null
           name?: string
           position?: number
           share_token?: string | null
           status?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "task_projects_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
@@ -4027,6 +4038,7 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
+          leader_id: string | null
           name: string
           position: number
           share_token: string | null

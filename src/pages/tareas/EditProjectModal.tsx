@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +17,7 @@ interface EditProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: TaskProject | null;
-  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[] }) => void;
+  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
   currentMemberIds?: string[];
@@ -27,6 +28,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [leaderId, setLeaderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   useEffect(() => {
@@ -34,6 +36,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       setName(project.name);
       setDescription(project.description || "");
       setSelectedMembers(currentMemberIds);
+      setLeaderId((project as any).leader_id || "");
     }
   }, [project, currentMemberIds]);
 
@@ -54,6 +57,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       name: name.trim(),
       description: description.trim() || undefined,
       memberIds: selectedMembers,
+      leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
     });
     onOpenChange(false);
   };
@@ -73,6 +77,24 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
             <Label htmlFor="edit-project-desc">Descripción</Label>
             <Textarea id="edit-project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          {/* Leader select */}
+          {profiles.length > 0 && (
+            <div>
+              <Label>Líder del proyecto</Label>
+              <Select value={leaderId} onValueChange={setLeaderId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar líder (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin líder</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {profiles.length > 0 && (
             <div>

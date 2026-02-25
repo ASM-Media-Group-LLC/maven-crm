@@ -1,23 +1,26 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Share2, Archive, RotateCcw } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Share2, Archive, RotateCcw, Shield } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Progress } from "@/components/ui/progress";
 import type { TaskProject } from "./useProjects";
 
-type SortKey = "name" | "status" | "pending" | "in_progress" | "overdue" | "completed";
+type SortKey = "name" | "status" | "pending" | "in_progress" | "overdue" | "completed" | "progress";
 
 interface ProjectsTableProps {
   projects: TaskProject[];
   getProjectTaskCounts: (id: string) => { pending: number; in_progress: number; paused: number; overdue: number; completed: number };
+  getProjectProgress: (id: string) => number;
+  profiles?: { id: string; full_name: string | null }[];
   onEdit: (project: TaskProject) => void;
   onDelete: (project: TaskProject) => void;
   onShare: (project: TaskProject) => void;
   onArchive: (project: TaskProject) => void;
 }
 
-const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete, onShare, onArchive }: ProjectsTableProps) => {
+const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, profiles = [], onEdit, onDelete, onShare, onArchive }: ProjectsTableProps) => {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
@@ -33,6 +36,7 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete, onSha
     let diff = 0;
     if (sortKey === "name") diff = a.name.localeCompare(b.name);
     else if (sortKey === "status") diff = a.status.localeCompare(b.status);
+    else if (sortKey === "progress") diff = getProjectProgress(a.id) - getProjectProgress(b.id);
     else if (sortKey === "pending") diff = ca.pending - cb.pending;
     else if (sortKey === "in_progress") diff = ca.in_progress - cb.in_progress;
     else if (sortKey === "overdue") diff = ca.overdue - cb.overdue;
@@ -53,21 +57,33 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete, onSha
           <TableRow>
             <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
             <TableHead className="hidden sm:table-cell">Descripción</TableHead>
+            <TableHead>Líder</TableHead>
             <TableHead><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Pendientes" col="pending" /></TableHead>
             <TableHead className="text-center"><SortHeader label="En curso" col="in_progress" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Vencidas" col="overdue" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Completadas" col="completed" /></TableHead>
+            <TableHead className="w-32"><SortHeader label="Progreso" col="progress" /></TableHead>
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {sorted.map((project) => {
             const counts = getProjectTaskCounts(project.id);
+            const progress = getProjectProgress(project.id);
+            const leader = project.leader_id ? profiles.find(p => p.id === project.leader_id) : null;
             return (
               <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/tareas/${project.id}`)}>
                 <TableCell className="font-medium">{project.name}</TableCell>
                 <TableCell className="hidden sm:table-cell text-muted-foreground text-sm truncate max-w-[200px]">{project.description || "—"}</TableCell>
+                <TableCell>
+                  {leader ? (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <Shield className="h-3 w-3 text-primary" />
+                      <span>{leader.full_name || "—"}</span>
+                    </div>
+                  ) : <span className="text-muted-foreground text-xs">—</span>}
+                </TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded ${project.status === "archived" ? "bg-muted text-muted-foreground" : "bg-primary/20 text-primary"}`}>
                     {project.status === "archived" ? "Archivado" : "Activo"}
@@ -77,6 +93,12 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, onEdit, onDelete, onSha
                 <TableCell className="text-center">{counts.in_progress}</TableCell>
                 <TableCell className="text-center text-destructive">{counts.overdue}</TableCell>
                 <TableCell className="text-center text-emerald-400">{counts.completed}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Progress value={progress} className="h-1.5 flex-1" />
+                    <span className="text-[10px] text-muted-foreground w-8 text-right">{progress}%</span>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

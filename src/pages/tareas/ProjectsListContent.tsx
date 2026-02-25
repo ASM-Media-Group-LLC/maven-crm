@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +27,7 @@ const ProjectsListContent = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { projects, allTasks, isLoading, profile, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, reorderProjects } = useProjects();
+  const { projects, allTasks, isLoading, profile, createProject, updateProject, deleteProject, archiveProject, getProjectTaskCounts, getProjectProgress, reorderProjects } = useProjects();
 
   const { data: companyProfiles = [] } = useQuery({
     queryKey: ["company-profiles", profile?.company_id],
@@ -228,6 +229,8 @@ const ProjectsListContent = () => {
           <ProjectsTable
             projects={filteredProjects}
             getProjectTaskCounts={getProjectTaskCounts}
+            getProjectProgress={getProjectProgress}
+            profiles={companyProfiles}
             onEdit={setEditProject}
             onDelete={setDeleteTarget}
             onShare={handleShare}
@@ -239,6 +242,8 @@ const ProjectsListContent = () => {
             onReorder={(ids) => reorderProjects.mutate(ids)}
             renderItem={(project) => {
               const counts = getProjectTaskCounts(project.id);
+              const progress = getProjectProgress(project.id);
+              const leader = project.leader_id ? companyProfiles.find(p => p.id === project.leader_id) : null;
               return (
                 <Card
                   className={cn("cursor-pointer transition-colors hover:bg-muted/50", project.status === "archived" && "opacity-60")}
@@ -251,13 +256,24 @@ const ProjectsListContent = () => {
                           <h3 className="font-semibold text-base truncate">{project.name}</h3>
                           {project.status === "archived" && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Archivado</span>
-                          )}
-                        </div>
-                        {project.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
                         )}
                       </div>
+                      {leader && (
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                          <Shield className="h-3 w-3 text-primary" />
+                          <span>{leader.full_name || "Sin nombre"}</span>
+                        </div>
+                      )}
+                      {project.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
+                      )}
+                      </div>
                       {renderProjectActions(project)}
+                    </div>
+                    {/* Progress bar */}
+                    <div className="flex items-center gap-2">
+                      <Progress value={progress} className="h-1.5 flex-1" />
+                      <span className="text-[10px] text-muted-foreground w-8 text-right">{progress}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">

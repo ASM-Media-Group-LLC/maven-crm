@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -14,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 interface CreateProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { name: string; description?: string; memberIds?: string[] }) => void;
+  onSubmit: (data: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
 }
@@ -24,6 +25,7 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [leaderId, setLeaderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const toggleMember = (id: string) => {
@@ -42,10 +44,12 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
       name: name.trim(),
       description: description.trim() || undefined,
       memberIds: selectedMembers.length > 0 ? selectedMembers : undefined,
+      leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
     });
     setName("");
     setDescription("");
     setSelectedMembers([]);
+    setLeaderId("");
     onOpenChange(false);
   };
 
@@ -64,6 +68,24 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
             <Label htmlFor="project-desc">Descripción</Label>
             <Textarea id="project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          {/* Leader select */}
+          {profiles.length > 0 && (
+            <div>
+              <Label>Líder del proyecto</Label>
+              <Select value={leaderId} onValueChange={setLeaderId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar líder (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin líder</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || "Sin nombre"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Multi-select members */}
           {profiles.length > 0 && (
