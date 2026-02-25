@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Shield, UserCog, User, Headphones, DollarSign, Eye } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import type { AdminUser } from "./useAdminUsers";
 import type { AppRole } from "@/hooks/useUserRole";
 
@@ -15,17 +17,41 @@ interface ChangeRoleModalProps {
   isLoading: boolean;
 }
 
-const roleConfig: Record<AppRole, { label: string; icon: React.ReactNode; color: string }> = {
-  admin: { label: "Admin", icon: <Shield className="h-4 w-4" />, color: "text-red-500" },
-  manager: { label: "Manager", icon: <UserCog className="h-4 w-4" />, color: "text-amber-500" },
-  employee: { label: "Employee", icon: <User className="h-4 w-4" />, color: "text-blue-500" },
-  agent: { label: "Agent", icon: <Headphones className="h-4 w-4" />, color: "text-green-500" },
-  closer: { label: "Closer", icon: <DollarSign className="h-4 w-4" />, color: "text-purple-500" },
-  supervisor: { label: "Supervisor", icon: <Eye className="h-4 w-4" />, color: "text-cyan-500" },
+const iconMap: Record<string, React.ReactNode> = {
+  admin: <Shield className="h-4 w-4" />,
+  manager: <UserCog className="h-4 w-4" />,
+  employee: <User className="h-4 w-4" />,
+  agent: <Headphones className="h-4 w-4" />,
+  closer: <DollarSign className="h-4 w-4" />,
+  supervisor: <Eye className="h-4 w-4" />,
+};
+
+const colorMap: Record<string, string> = {
+  admin: "text-red-500",
+  manager: "text-amber-500",
+  employee: "text-blue-500",
+  agent: "text-green-500",
+  closer: "text-purple-500",
+  supervisor: "text-cyan-500",
 };
 
 const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: ChangeRoleModalProps) => {
   const [selectedRole, setSelectedRole] = useState<AppRole>(user?.role ?? "employee");
+
+  // Fetch roles dynamically from roles_config
+  const { data: activeRoles = [] } = useQuery({
+    queryKey: ["roles-config-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("roles_config")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   const handleConfirm = () => {
     if (user) onConfirm(user.id, selectedRole);
@@ -63,11 +89,13 @@ const ChangeRoleModal = ({ user, open, onOpenChange, onConfirm, isLoading }: Cha
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(roleConfig) as AppRole[]).map((role) => (
-                    <SelectItem key={role} value={role}>
+                  {activeRoles.map((r) => (
+                    <SelectItem key={r.name} value={r.name}>
                       <div className="flex items-center gap-2">
-                        <span className={roleConfig[role].color}>{roleConfig[role].icon}</span>
-                        <span>{roleConfig[role].label}</span>
+                        <span className={colorMap[r.name] || "text-muted-foreground"}>
+                          {iconMap[r.name] || <User className="h-4 w-4" />}
+                        </span>
+                        <span className="capitalize">{r.name}</span>
                       </div>
                     </SelectItem>
                   ))}

@@ -20,14 +20,14 @@ export const useAdminUsers = () => {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Fetch profiles (admin can see all via RLS policy)
+      // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, created_at");
 
       if (profilesError) throw profilesError;
 
-      // Fetch all roles (admin can see all via RLS policy)
+      // Fetch all roles
       const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id, role");
@@ -39,6 +39,21 @@ export const useAdminUsers = () => {
         .from("employees")
         .select("id, first_name, last_name, profile_id")
         .not("profile_id", "is", null);
+
+      // Fetch emails via edge function (uses auth.admin.listUsers)
+      let emailsMap = new Map<string, string>();
+      try {
+        const { data: emailsData } = await supabase.functions.invoke("admin-user-actions", {
+          body: { action: "list_users" },
+        });
+        if (emailsData?.users) {
+          emailsData.users.forEach((u: { id: string; email: string }) => {
+            emailsMap.set(u.id, u.email || "");
+          });
+        }
+      } catch {
+        // If the edge function fails, emails stay empty
+      }
 
       const rolesMap = new Map<string, AppRole>();
       roles?.forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
@@ -52,7 +67,7 @@ export const useAdminUsers = () => {
         id: p.id,
         full_name: p.full_name,
         avatar_url: p.avatar_url,
-        email: "", // email comes from auth.users, not accessible from client
+        email: emailsMap.get(p.id) || "",
         created_at: p.created_at || "",
         role: rolesMap.get(p.id) ?? null,
         linked_employee: employeeByProfileId.get(p.id) ?? null,

@@ -29,27 +29,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const anonClient = createClient(
+    const token = authHeader.replace("Bearer ", "");
+
+    const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    // Verify caller identity using getUser with token
+    const { data: { user: caller }, error: userError } = await adminClient.auth.getUser(token);
+    if (userError || !caller) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const callerId = claimsData.claims.sub as string;
-
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const callerId = caller.id;
 
     // Verify caller is admin
     const { data: callerRole } = await adminClient
@@ -69,16 +65,32 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, user_id, full_name, email, first_name, last_name, role } = body;
 
-    // create_user doesn't need user_id
-    if (action !== "create_user" && (!user_id || !action)) {
-      return new Response(JSON.stringify({ error: "user_id and action are required" }), {
+    if (!action) {
+      return new Response(JSON.stringify({ error: "action is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!action) {
-      return new Response(JSON.stringify({ error: "action is required" }), {
+    // === LIST USERS (returns emails from auth.users) ===
+    if (action === "list_users") {
+      const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      if (listError) {
+        return new Response(JSON.stringify({ error: listError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        users: (users || []).map((u) => ({ id: u.id, email: u.email })),
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // For actions other than create_user and list_users, user_id is required
+    if (action !== "create_user" && !user_id) {
+      return new Response(JSON.stringify({ error: "user_id is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
