@@ -8,7 +8,7 @@ const HRLayout = ({ children }: { children: React.ReactNode }) => (
       <DashboardSidebar />
       <div className="flex flex-1 flex-col min-w-0">
         <DashboardTopbar />
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden">
           {children}
         </div>
       </div>

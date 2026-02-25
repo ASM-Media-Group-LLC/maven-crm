@@ -72,7 +72,7 @@ export default function HRApplicantNew() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 border-b bg-background px-6 py-4">
         <Button variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground hover:text-foreground" onClick={() => navigate("/hr/candidatos")}>
