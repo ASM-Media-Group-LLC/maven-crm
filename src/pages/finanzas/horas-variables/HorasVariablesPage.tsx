@@ -49,6 +49,14 @@ export default function HorasVariablesPage() {
   const [compHours, setCompHours] = useState("");
   const [compReason, setCompReason] = useState("");
 
+  // Horas Extra filters
+  const [horasSearch, setHorasSearch] = useState("");
+  const [horasPeriodFilter, setHorasPeriodFilter] = useState("");
+
+  // Banco de Horas filters
+  const [bancoSearch, setBancoSearch] = useState("");
+  const [bancoStatusFilter, setBancoStatusFilter] = useState("");
+
   // Comisiones state
   const [showComisionModal, setShowComisionModal] = useState(false);
   const [comisionSearch, setComisionSearch] = useState("");
@@ -186,21 +194,73 @@ export default function HorasVariablesPage() {
     return "Pagadas";
   };
 
-  const horasExtraFiltered = horasDetails.filter(d => Number(d.overtime_hours) > 0);
-  const bancoFiltered = horasDetails.filter(d => Number(d.hour_bank_hours) > 0 || Number(d.overtime_amount) > 0);
+  // Get unique periods for filter
+  const uniquePeriods = Array.from(new Set(horasDetails.map(d => (d as any).payroll_periods?.period_name).filter(Boolean)));
+
+  const horasExtraFiltered = horasDetails.filter(d => {
+    if (Number(d.overtime_hours) <= 0) return false;
+    const empName = d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "";
+    const matchSearch = !horasSearch || empName.toLowerCase().includes(horasSearch.toLowerCase());
+    const matchPeriod = !horasPeriodFilter || (d as any).payroll_periods?.period_name === horasPeriodFilter;
+    return matchSearch && matchPeriod;
+  });
+
+  const bancoFiltered = horasDetails.filter(d => {
+    if (Number(d.hour_bank_hours) <= 0 && Number(d.overtime_amount) <= 0) return false;
+    const empName = d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "";
+    const matchSearch = !bancoSearch || empName.toLowerCase().includes(bancoSearch.toLowerCase());
+    const status = getBankStatus(d);
+    const matchStatus = !bancoStatusFilter || status === bancoStatusFilter;
+    return matchSearch && matchStatus;
+  });
 
   const renderTab = () => {
     switch (tab) {
       case "Horas Extra":
         return (
           <div className="space-y-5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar empleado..." className="pl-8" value={horasSearch} onChange={e => setHorasSearch(e.target.value)} />
+              </div>
+              <Select value={horasPeriodFilter || undefined} onValueChange={v => setHorasPeriodFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Periodo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {uniquePeriods.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <div className="inline-flex items-center rounded-md border border-border">
                 <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
                 <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
               </div>
+              <Button size="sm" variant="outline" onClick={() => {
+                const rows = horasExtraFiltered.map(d => ({
+                  Empleado: d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—",
+                  Horas: Number(d.overtime_hours) || 0,
+                  Monto: Number(d.overtime_amount) || 0,
+                  Periodo: (d as any).payroll_periods?.period_name || "—",
+                }));
+                if (rows.length === 0) { toast({ title: "Sin registros para exportar", variant: "destructive" }); return; }
+                exportTableToExcel(rows, "horas-extra");
+                toast({ title: "Archivo exportado" });
+              }}><Download className="h-4 w-4 mr-1" />Exportar</Button>
+              {(horasSearch || horasPeriodFilter) && (
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setHorasSearch(""); setHorasPeriodFilter(""); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />Limpiar
+                </Button>
+              )}
             </div>
-            {viewMode === "list" ? (
+            {loadingHoras ? (
+              <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+            ) : horasExtraFiltered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="rounded-full bg-muted p-4 mb-4"><Clock className="h-8 w-8 text-muted-foreground" /></div>
+                <h3 className="text-sm font-medium text-foreground mb-1">Sin registros de horas extra</h3>
+                <p className="text-xs text-muted-foreground max-w-xs">Las horas extra aparecerán aquí cuando se registren en la nómina de cada periodo.</p>
+              </div>
+            ) : viewMode === "list" ? (
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-26rem)]">
                 <Table>
@@ -213,11 +273,7 @@ export default function HorasVariablesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loadingHoras ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>{Array.from({ length: 4 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : horasExtraFiltered.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin registros de horas extra.</TableCell></TableRow>
-                    ) : horasExtraFiltered.map(d => (
+                    {horasExtraFiltered.map(d => (
                       <TableRow key={d.id} className="hover:bg-muted/30">
                         <TableCell className="text-sm">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</TableCell>
                         <TableCell className="text-sm font-medium">{Number(d.overtime_hours) || 0}h</TableCell>
@@ -231,9 +287,7 @@ export default function HorasVariablesPage() {
             </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {horasExtraFiltered.length === 0 ? (
-                  <div className="col-span-full text-center text-muted-foreground py-8">Sin registros.</div>
-                ) : horasExtraFiltered.map(d => (
+                {horasExtraFiltered.map(d => (
                   <div key={d.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
                     <p className="text-sm font-medium">{d.employees ? `${(d as any).employees.first_name} ${(d as any).employees.last_name}` : "—"}</p>
                     <p className="text-xl font-bold text-foreground mt-2">{Number(d.overtime_hours) || 0}h</p>
@@ -251,13 +305,39 @@ export default function HorasVariablesPage() {
       case "Banco de Horas":
         return (
           <div className="space-y-5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar empleado..." className="pl-8" value={bancoSearch} onChange={e => setBancoSearch(e.target.value)} />
+              </div>
+              <Select value={bancoStatusFilter || undefined} onValueChange={v => setBancoStatusFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  <SelectItem value="Acumuladas">Acumuladas</SelectItem>
+                  <SelectItem value="Pagadas">Pagadas</SelectItem>
+                  <SelectItem value="Compensadas">Compensadas</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="inline-flex items-center rounded-md border border-border">
                 <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
                 <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
               </div>
+              {(bancoSearch || bancoStatusFilter) && (
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setBancoSearch(""); setBancoStatusFilter(""); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />Limpiar
+                </Button>
+              )}
             </div>
-            {viewMode === "list" ? (
+            {loadingHoras ? (
+              <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+            ) : bancoFiltered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="rounded-full bg-muted p-4 mb-4"><Wallet className="h-8 w-8 text-muted-foreground" /></div>
+                <h3 className="text-sm font-medium text-foreground mb-1">Sin registros en banco de horas</h3>
+                <p className="text-xs text-muted-foreground max-w-xs">El banco de horas acumula horas extra que pueden ser pagadas o compensadas con tiempo libre.</p>
+              </div>
+            ) : viewMode === "list" ? (
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-26rem)]">
                 <Table>
@@ -272,11 +352,7 @@ export default function HorasVariablesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loadingHoras ? Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    )) : bancoFiltered.length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin registros en banco de horas.</TableCell></TableRow>
-                    ) : bancoFiltered.map(d => {
+                    {bancoFiltered.map(d => {
                       const status = getBankStatus(d);
                       const hasHours = Number(d.hour_bank_hours) > 0;
                       return (
@@ -303,9 +379,7 @@ export default function HorasVariablesPage() {
             </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {bancoFiltered.length === 0 ? (
-                  <div className="col-span-full text-center text-muted-foreground py-8">Sin registros.</div>
-                ) : bancoFiltered.map(d => {
+                {bancoFiltered.map(d => {
                   const status = getBankStatus(d);
                   const hasHours = Number(d.hour_bank_hours) > 0;
                   return (
