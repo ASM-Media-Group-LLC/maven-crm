@@ -1,68 +1,78 @@
 
 
-## Diagnóstico: Tareas asignadas no visibles
+## Plan: Corregir modales de tareas — scroll interno, datepicker auto-cierre y input de hora
 
-### Causa raíz identificada
+### Problemas identificados
 
-Las políticas RLS de la tabla `tasks` y la función `user_has_tasks_in_project` solo verifican las columnas `assigned_to` y `created_by` — **ignoran completamente la tabla `task_assignees`** (junction table de asignación múltiple).
+1. **Sin scroll interno**: `DialogContent` usa `space-y-4` en el form pero no tiene contenedor scrollable. En pantallas pequeñas o con muchos campos, el contenido se desborda sin scroll.
 
-Cuando alguien te asigna una tarea, tu `user_id` se inserta en `task_assignees`, pero si no eres el **primer asignado** (que se guarda en `assigned_to`) ni el creador, la política RLS te bloquea la lectura.
+2. **DatePicker no se cierra al seleccionar fecha**: Los `Popover` de calendario no tienen estado controlado — al seleccionar un día, el popover permanece abierto porque no hay `open/onOpenChange` controlados que cierren tras la selección.
 
-```text
-Flujo actual (roto):
+3. **Input de hora nativo (`<input type="time">`)**: No coincide con el design system. Debe reemplazarse con un Select de hora (dropdown con opciones cada 30 min) usando el componente `Select` de Shadcn.
 
-  Crear tarea → assigned_to = usuario1 (primer asignado)
-                → task_assignees: [usuario1, usuario2, usuario3]
+---
 
-  RLS SELECT en tasks:
-    auth.uid() = assigned_to   → solo usuario1 ✓
-    auth.uid() = created_by    → solo creador ✓
-    usuario2, usuario3         → ✗ BLOQUEADOS
+### Correcciones
+
+#### 1. Scroll interno en DialogContent
+
+Aplicar el patrón documentado en memoria (`form-layout-sticky`):
+
+- `DialogContent`: agregar `!flex !flex-col gap-0 max-h-[85vh]`
+- `DialogHeader`: mantener como `shrink-0`
+- Form body: envolver en `<div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1">`
+- Footer (botones): mover fuera del div scrollable como `shrink-0 pt-4`
+
+Aplicar en: `CreateTaskModal`, `EditTaskModal`
+
+#### 2. DatePicker auto-cierre al seleccionar
+
+Convertir cada `Popover` de calendario a estado controlado:
+
+```tsx
+const [startCalOpen, setStartCalOpen] = useState(false);
+
+<Popover open={startCalOpen} onOpenChange={setStartCalOpen}>
+  ...
+  <Calendar
+    onSelect={(date) => {
+      setStartDate(date);
+      setStartCalOpen(false); // cierra al seleccionar
+    }}
+  />
+</Popover>
 ```
 
-### Políticas afectadas
+Aplicar en todos los calendarios de: `CreateTaskModal` (2 calendarios), `EditTaskModal` (2 calendarios), `SubtasksPanel` (2 calendarios).
 
-| Tabla/Función | Política | Problema |
-|---|---|---|
-| `tasks` SELECT | `auth.uid() = assigned_to OR auth.uid() = created_by` | No revisa `task_assignees` |
-| `tasks` UPDATE | `auth.uid() = assigned_to OR auth.uid() = created_by` | Mismo problema |
-| `tasks` DELETE | `auth.uid() = assigned_to OR auth.uid() = created_by` | Mismo problema |
-| `user_has_tasks_in_project()` | Solo revisa `assigned_to` y `created_by` | No revisa `task_assignees`, afecta visibilidad de proyectos |
+#### 3. Reemplazar `<input type="time">` con Select de hora
 
-### Solución
+Crear un selector de hora con `Select` de Shadcn, con opciones cada 30 minutos (00:00, 00:30, 01:00, ..., 23:30):
 
-Una migración SQL que:
+```tsx
+<Select value={startTime} onValueChange={setStartTime}>
+  <SelectTrigger className="w-28">
+    <SelectValue placeholder="Hora" />
+  </SelectTrigger>
+  <SelectContent>
+    {timeOptions.map(t => (
+      <SelectItem key={t} value={t}>{t}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
 
-1. **Actualiza la función `user_has_tasks_in_project`** para incluir un check adicional contra `task_assignees`:
-   ```sql
-   SELECT EXISTS (
-     SELECT 1 FROM public.tasks
-     WHERE project_id = _project_id
-     AND (assigned_to = _user_id OR created_by = _user_id)
-   ) OR EXISTS (
-     SELECT 1 FROM public.task_assignees ta
-     JOIN public.tasks t ON ta.task_id = t.id
-     WHERE t.project_id = _project_id AND ta.user_id = _user_id
-   )
-   ```
+Constante `timeOptions` generada: `["00:00", "00:30", "01:00", ...]` (48 opciones).
 
-2. **Reemplaza las 3 políticas RLS de `tasks`** (SELECT, UPDATE, DELETE) para agregar la condición:
-   ```sql
-   ... OR EXISTS (
-     SELECT 1 FROM public.task_assignees
-     WHERE task_id = id AND user_id = auth.uid()
-   )
-   ```
+Aplicar en: `CreateTaskModal` (2 inputs time), `EditTaskModal` (2 inputs time).
 
-### Impacto
+---
 
-- Usuarios asignados vía `task_assignees` podrán ver, editar y eliminar las tareas donde están asignados
-- Los proyectos que contienen esas tareas también serán visibles (por la función `user_has_tasks_in_project` corregida)
-- No se modifica código de aplicación — solo SQL
+### Archivos a modificar
 
-### Archivos
-
-| Archivo | Acción |
-|---|---|
-| `supabase/migrations/...fix_task_rls_assignees.sql` | Nuevo — migración con DROP/CREATE de políticas + OR REPLACE de función |
+| Archivo | Cambios |
+|---------|---------|
+| `src/pages/tareas/CreateTaskModal.tsx` | Scroll interno, 2 calendarios controlados con auto-cierre, 2 inputs time → Select hora |
+| `src/pages/tareas/EditTaskModal.tsx` | Scroll interno, 2 calendarios controlados con auto-cierre, 2 inputs time → Select hora |
+| `src/pages/tareas/SubtasksPanel.tsx` | 2 calendarios controlados con auto-cierre (no tiene inputs time ni modal, solo popover fix) |
 
