@@ -1,36 +1,34 @@
 
 
-## Plan: Mejorar visibilidad en cards de proyectos y header interno
+## Plan: Simplificar cards de proyecto y rediseñar header interno
 
-### Problemas identificados
+### Cambios en cards de proyecto (`ProjectsListContent.tsx`)
 
-**Cards de proyectos (grid):**
-- Los conteos de tareas pendientes/completadas son muy pequeños (`text-xs`) y se muestran condicionalmente (si hay 0 no aparecen), lo que los hace difíciles de leer.
-- El líder usa `text-sm` pero sigue siendo discreto entre otros elementos.
+**Conteos de tareas**: Mostrar solo iconos + número (sin texto), formato compacto:
+- `🕐 1` `▶ 0` `✅ 0` — iconos con contador, sin labels como "pendientes", "en curso", etc.
+- Mantener el icono de vencidas solo si > 0.
 
-**Header interno del proyecto:**
-- La descripción se muestra en una sola línea larga (`line-clamp-2`) pegada al título, ocupando todo el ancho y viéndose alargada.
-- La barra de progreso está en una fila secundaria con `max-w-md`, se pierde visualmente.
-- El líder del proyecto no se distingue bien — aparece como texto plano en la misma fila que el progreso.
+**Líder de equipo**: Mostrar con icono `Crown` (corona) + nombre completo en `text-sm font-semibold`, sin el prefijo "Líder:". Usar un estilo más integrado (no badge con fondo) sino como línea dedicada con icono + nombre.
 
-### Cambios propuestos
+**Progress bar**: Mantener como está (h-2.5), ya es razonable.
 
-#### 1. `src/pages/tareas/ProjectsListContent.tsx` — Cards de proyecto más legibles
+### Cambios en header interno del proyecto (`TareasContent.tsx`)
 
-- **Conteos de tareas**: Mostrar siempre pendientes y completadas (no condicionalmente), con texto más grande (`text-sm` en vez de `text-xs`), y usar formato legible como `⏳ 1 pendiente · ✓ 0 completadas`.
-- **Líder**: Moverlo a una posición más prominente debajo del nombre del proyecto, con un avatar pequeño + nombre en `text-sm font-semibold`.
-- **Progress bar**: Mantener el grosor actual (`h-2.5`) que ya es razonable.
+**Descripción**: Sacarla de la card/banner y colocarla como texto simple debajo del título `h1`, como un subtítulo normal (`text-sm text-muted-foreground max-w-2xl`), similar a como se hacía antes pero con ancho limitado.
 
-#### 2. `src/pages/tareas/TareasContent.tsx` — Rediseñar header interno
+**Líder del proyecto**: Sacarlo del banner y mostrarlo también debajo de la descripción con icono `Crown` + nombre, como línea independiente, visible y prominente.
 
-- **Descripción**: Limitar el ancho con `max-w-2xl` y usar `line-clamp-2` para que no se vea alargada a todo el ancho de la pantalla.
-- **Líder**: Mostrarlo con un avatar + nombre más destacado, usando `text-base font-semibold` y un badge/chip visual en vez de texto plano.
-- **Progress bar**: Integrarla en una card resumen compacta debajo del título (estilo banner) que contenga el líder + progreso + conteo rápido de tareas, en vez de tenerla suelta en una fila genérica.
+**Progress bar**: Eliminar la barra lineal del banner. En su lugar, agregar una card de progreso circular antes de las KPI cards. La card mostrará:
+- Un indicador circular (SVG donut) con el porcentaje en el centro.
+- Los conteos de tareas debajo como referencia compacta.
+- Título "Progreso del proyecto".
+
+**Eliminar el banner `bg-card` completo** — la info se redistribuye: descripción y líder van al header, progreso va a una card dedicada.
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Conteos siempre visibles y más grandes, líder más prominente |
-| `src/pages/tareas/TareasContent.tsx` | Descripción con ancho limitado, líder con chip/badge, progreso en banner compacto |
+| `src/pages/tareas/ProjectsListContent.tsx` | Conteos solo icono+número, líder con Crown+nombre sin badge |
+| `src/pages/tareas/TareasContent.tsx` | Descripción como subtítulo, líder debajo, eliminar banner, card circular de progreso antes de KPIs |
 
