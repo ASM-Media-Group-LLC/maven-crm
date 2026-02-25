@@ -5,6 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { TaskProject } from "./useProjects";
 
 type SortKey = "name" | "status" | "pending" | "in_progress" | "overdue" | "completed" | "progress";
@@ -14,13 +16,14 @@ interface ProjectsTableProps {
   getProjectTaskCounts: (id: string) => { pending: number; in_progress: number; paused: number; overdue: number; completed: number };
   getProjectProgress: (id: string) => number;
   profiles?: { id: string; full_name: string | null }[];
+  getMembersForProject?: (projectId: string) => { id: string; full_name: string | null }[];
   onEdit: (project: TaskProject) => void;
   onDelete: (project: TaskProject) => void;
   onShare: (project: TaskProject) => void;
   onArchive: (project: TaskProject) => void;
 }
 
-const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, profiles = [], onEdit, onDelete, onShare, onArchive }: ProjectsTableProps) => {
+const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, profiles = [], getMembersForProject, onEdit, onDelete, onShare, onArchive }: ProjectsTableProps) => {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
@@ -58,6 +61,7 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
             <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
             <TableHead className="hidden sm:table-cell">Descripción</TableHead>
             <TableHead>Líder</TableHead>
+            <TableHead>Miembros</TableHead>
             <TableHead><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Pendientes" col="pending" /></TableHead>
             <TableHead className="text-center"><SortHeader label="En curso" col="in_progress" /></TableHead>
@@ -83,6 +87,35 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
                       <span>{leader.full_name || "—"}</span>
                     </div>
                   ) : <span className="text-muted-foreground text-xs">—</span>}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const members = getMembersForProject?.(project.id) || [];
+                    if (members.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+                    return (
+                      <TooltipProvider>
+                        <div className="flex -space-x-1.5">
+                          {members.slice(0, 3).map(m => (
+                            <Tooltip key={m.id}>
+                              <TooltipTrigger asChild>
+                                <Avatar className="h-6 w-6 border-2 border-background">
+                                  <AvatarFallback className="text-[9px] bg-muted">
+                                    {(m.full_name || "?").charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="text-xs">{m.full_name || "Sin nombre"}</TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {members.length > 3 && (
+                            <Avatar className="h-6 w-6 border-2 border-background">
+                              <AvatarFallback className="text-[9px] bg-muted">+{members.length - 3}</AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      </TooltipProvider>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>
                   <span className={`text-xs px-2 py-0.5 rounded ${project.status === "archived" ? "bg-muted text-muted-foreground" : "bg-primary/20 text-primary"}`}>

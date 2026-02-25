@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -231,6 +232,7 @@ const ProjectsListContent = () => {
             getProjectTaskCounts={getProjectTaskCounts}
             getProjectProgress={getProjectProgress}
             profiles={companyProfiles}
+            getMembersForProject={getMembersForProject}
             onEdit={setEditProject}
             onDelete={setDeleteTarget}
             onShare={handleShare}
@@ -262,7 +264,48 @@ const ProjectsListContent = () => {
                         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{project.description}</p>
                       )}
                       </div>
-                      {renderProjectActions(project)}
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const projectMembers = getMembersForProject(project.id);
+                          if (projectMembers.length === 0) return null;
+                          return (
+                            <HoverCard>
+                              <HoverCardTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <div className="flex -space-x-1.5 cursor-pointer">
+                                  {projectMembers.slice(0, 3).map(m => (
+                                    <Avatar key={m.id} className="h-6 w-6 border-2 border-background">
+                                      <AvatarFallback className="text-[9px] bg-muted">
+                                        {(m.full_name || "?").charAt(0).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  ))}
+                                  {projectMembers.length > 3 && (
+                                    <Avatar className="h-6 w-6 border-2 border-background">
+                                      <AvatarFallback className="text-[9px] bg-muted">+{projectMembers.length - 3}</AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                </div>
+                              </HoverCardTrigger>
+                              <HoverCardContent side="bottom" align="end" className="w-48 p-3" onClick={(e) => e.stopPropagation()}>
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Miembros ({projectMembers.length})</p>
+                                <div className="space-y-1.5">
+                                  {projectMembers.map(m => (
+                                    <div key={m.id} className="flex items-center gap-2">
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-[8px] bg-muted">
+                                          {(m.full_name || "?").charAt(0).toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-xs truncate">{m.full_name || "Sin nombre"}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          );
+                        })()}
+                        {renderProjectActions(project)}
+                      </div>
                     </div>
                     {/* Leader */}
                     <div className="flex items-center gap-2">
@@ -296,33 +339,6 @@ const ProjectsListContent = () => {
                           <CheckSquare className="h-3.5 w-3.5" /> {counts.completed}
                         </span>
                       </div>
-                      {(() => {
-                        const projectMembers = getMembersForProject(project.id);
-                        if (projectMembers.length === 0) return null;
-                        return (
-                          <TooltipProvider>
-                            <div className="flex -space-x-1.5">
-                              {projectMembers.slice(0, 3).map(m => (
-                                <Tooltip key={m.id}>
-                                  <TooltipTrigger asChild>
-                                    <Avatar className="h-5 w-5 border border-background">
-                                      <AvatarFallback className="text-[8px] bg-muted">
-                                        {(m.full_name || "?").charAt(0).toUpperCase()}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="bottom" className="text-xs">{m.full_name || "Sin nombre"}</TooltipContent>
-                                </Tooltip>
-                              ))}
-                              {projectMembers.length > 3 && (
-                                <Avatar className="h-5 w-5 border border-background">
-                                  <AvatarFallback className="text-[8px] bg-muted">+{projectMembers.length - 3}</AvatarFallback>
-                                </Avatar>
-                              )}
-                            </div>
-                          </TooltipProvider>
-                        );
-                      })()}
                     </div>
                   </CardContent>
                 </Card>
