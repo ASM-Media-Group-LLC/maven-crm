@@ -1,91 +1,68 @@
 
 
-## Plan: Rediseño de ConfiguracionPage — Vista de Cards con detalle al hacer click
+## Diagnóstico: Tareas asignadas no visibles
 
-### Concepto
+### Causa raíz identificada
 
-Transformar la página de configuración financiera de un layout de tabs plano a un patrón de dos niveles:
+Las políticas RLS de la tabla `tasks` y la función `user_has_tasks_in_project` solo verifican las columnas `assigned_to` y `created_by` — **ignoran completamente la tabla `task_assignees`** (junction table de asignación múltiple).
 
-1. **Vista principal (cards)**: Header con título + KPI cards de resumen (siguiendo el patrón de `DashboardMetricCard`) + grid de 5 cards clickeables, cada una representando una sección de configuración
-2. **Vista de detalle**: Al hacer click en una card, se muestra la vista de edición a pantalla completa con `ArrowLeft` para volver (patrón de vista interna condicional, sin cambio de ruta)
+Cuando alguien te asigna una tarea, tu `user_id` se inserta en `task_assignees`, pero si no eres el **primer asignado** (que se guarda en `assigned_to`) ni el creador, la política RLS te bloquea la lectura.
 
----
+```text
+Flujo actual (roto):
 
-### Estructura
+  Crear tarea → assigned_to = usuario1 (primer asignado)
+                → task_assignees: [usuario1, usuario2, usuario3]
 
-**Estado:** `activeSection: string | null` — `null` = vista principal, `"quickbooks" | "payment_methods" | ...` = vista de detalle
-
-**Vista principal (activeSection === null):**
-
-```
-┌─ Header ──────────────────────────────────────────┐
-│ Configuración Financiera                          │
-│ Parámetros y plantillas del módulo de finanzas    │
-├───────────────────────────────────────────────────┤
-│ 5 KPI summary cards (DashboardMetricCard pattern) │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ...       │
-│ │ Mapeos   │ │ Métodos  │ │ Centros  │           │
-│ │ QB: 0    │ │ Pago: 3  │ │ Costo: 3 │           │
-│ └──────────┘ └──────────┘ └──────────┘           │
-├───────────────────────────────────────────────────┤
-│ 5 Config cards (clickeable, icon + desc + badge)  │
-│ ┌─────────────────┐  ┌─────────────────┐         │
-│ │ 📋 QuickBooks   │  │ 💳 Métodos Pago │         │
-│ │ Mapeo categorías│  │ Comisiones      │         │
-│ │ 0 mapeos conf.  │  │ 3 métodos act.  │         │
-│ └─────────────────┘  └─────────────────┘         │
-│ etc.                                              │
-└───────────────────────────────────────────────────┘
+  RLS SELECT en tasks:
+    auth.uid() = assigned_to   → solo usuario1 ✓
+    auth.uid() = created_by    → solo creador ✓
+    usuario2, usuario3         → ✗ BLOQUEADOS
 ```
 
-**Vista detalle (activeSection !== null):**
+### Políticas afectadas
 
-```
-┌─ Header ──────────────────────────────────────────┐
-│ ← Configuración Financiera > Templates QuickBooks │
-├───────────────────────────────────────────────────┤
-│ [Contenido actual del tab correspondiente]        │
-└───────────────────────────────────────────────────┘
-```
+| Tabla/Función | Política | Problema |
+|---|---|---|
+| `tasks` SELECT | `auth.uid() = assigned_to OR auth.uid() = created_by` | No revisa `task_assignees` |
+| `tasks` UPDATE | `auth.uid() = assigned_to OR auth.uid() = created_by` | Mismo problema |
+| `tasks` DELETE | `auth.uid() = assigned_to OR auth.uid() = created_by` | Mismo problema |
+| `user_has_tasks_in_project()` | Solo revisa `assigned_to` y `created_by` | No revisa `task_assignees`, afecta visibilidad de proyectos |
 
----
+### Solución
 
-### KPI Summary Cards (fila superior)
+Una migración SQL que:
 
-5 cards usando el patrón `DashboardMetricCard` con hover gradient:
+1. **Actualiza la función `user_has_tasks_in_project`** para incluir un check adicional contra `task_assignees`:
+   ```sql
+   SELECT EXISTS (
+     SELECT 1 FROM public.tasks
+     WHERE project_id = _project_id
+     AND (assigned_to = _user_id OR created_by = _user_id)
+   ) OR EXISTS (
+     SELECT 1 FROM public.task_assignees ta
+     JOIN public.tasks t ON ta.task_id = t.id
+     WHERE t.project_id = _project_id AND ta.user_id = _user_id
+   )
+   ```
 
-| Card | Label | Value | Icon | Subtitle | Color |
-|------|-------|-------|------|----------|-------|
-| QB Templates | Mapeos QB | `{mappings.length}` | FileText | "cuentas configuradas" | primary |
-| Métodos Pago | Métodos de Pago | `{methods.filter(m=>m.active).length}` | CreditCard | "métodos activos" | accent |
-| Centros Costo | Centros de Costo | `{centers.length}` | Building2 | presupuesto total formateado | warning |
-| Comisiones | Comisiones | `{defaults.creator_pct}%` | Percent | `{exceptions.length} excepciones` | primary |
-| Nómina | Parámetros Nómina | `$${params.hour_bank.hour_value}/h` | Calculator | multiplicadores resumidos | accent |
+2. **Reemplaza las 3 políticas RLS de `tasks`** (SELECT, UPDATE, DELETE) para agregar la condición:
+   ```sql
+   ... OR EXISTS (
+     SELECT 1 FROM public.task_assignees
+     WHERE task_id = id AND user_id = auth.uid()
+   )
+   ```
 
----
+### Impacto
 
-### Config Section Cards (grid clickeable)
+- Usuarios asignados vía `task_assignees` podrán ver, editar y eliminar las tareas donde están asignados
+- Los proyectos que contienen esas tareas también serán visibles (por la función `user_has_tasks_in_project` corregida)
+- No se modifica código de aplicación — solo SQL
 
-Grid de 5 cards (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3`) con:
-- Icono + título en `CardHeader`
-- Descripción breve + badge de conteo en `CardContent`
-- `cursor-pointer` + hover con gradiente temático (patrón KPI)
-- Click ejecuta `setActiveSection("key")`
-
----
-
-### Detalle técnico
-
-- **Sin rutas nuevas**: Se usa estado interno `activeSection` para alternar entre vista cards y vista detalle
-- **Header en detalle**: Usa `ArrowLeft` ghost button para volver (`setActiveSection(null)`) + breadcrumb textual
-- **Los 5 componentes de tab existentes** (`QuickBooksTab`, `PaymentMethodsTab`, etc.) se reutilizan sin cambios como contenido del detalle
-- **Datos para KPIs**: Se consumen los mismos hooks (`useQuickBooksTemplates`, `usePaymentMethods`, etc.) en el componente principal para mostrar conteos
-
----
-
-### Archivo modificado
+### Archivos
 
 | Archivo | Acción |
-|---------|--------|
-| `src/pages/finanzas/configuracion/ConfiguracionPage.tsx` | Reescribir sección `ConfiguracionPage` (líneas 353-385) y agregar imports de iconos y DashboardMetricCard. Los 5 componentes de tab internos se mantienen intactos. |
+|---|---|
+| `supabase/migrations/...fix_task_rls_assignees.sql` | Nuevo — migración con DROP/CREATE de políticas + OR REPLACE de función |
 
