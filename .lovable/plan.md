@@ -1,41 +1,46 @@
 
 
-## Diagnóstico: El líder con Crown ya está implementado
+## Diagnóstico: Por qué no se guarda el líder de Trafix
 
-Revisé el código y el cambio **ya existe** en ambos archivos:
+### Problema 1: RLS bloquea la actualización (PRINCIPAL)
 
-**`ProjectsListContent.tsx` (líneas 267-273):**
-```tsx
-{leader && (
-  <div className="flex items-center gap-2">
-    <Crown className="h-4 w-4 text-amber-500" />
-    <span className="text-sm font-semibold">{leader.full_name || "Sin nombre"}</span>
-  </div>
-)}
+La política RLS de UPDATE en `task_projects` es:
+```sql
+auth.uid() = created_by
 ```
 
-**`TareasContent.tsx` (líneas 139-145):**
-```tsx
-{projectLeader && (
-  <div className="flex items-center gap-2 mt-2 ml-11">
-    <Crown className="h-4 w-4 text-amber-500" />
-    <span className="text-sm font-semibold">{projectLeader.full_name}</span>
-  </div>
-)}
+El proyecto Trafix fue creado por **Daniel Botero** (`b9646617-...`), pero la usuaria actual es **Marielby Quijada** (`471666b6-...`). Como Marielby no es la creadora del proyecto, el UPDATE se ejecuta pero **no afecta ninguna fila** (Supabase retorna 204 silenciosamente). El request de red confirma esto: el PATCH retorna 204 pero el `leader_id` sigue en `null` en la base de datos.
+
+### Problema 2: El código no detecta el fallo silencioso
+
+El mutation en `useProjects.ts` no verifica si el UPDATE realmente modificó alguna fila. Como Supabase no lanza error cuando RLS bloquea un update (simplemente no modifica nada), el toast "Proyecto actualizado" aparece aunque no se guardó nada.
+
+### Solución
+
+#### 1. Corregir la política RLS de UPDATE
+
+Actualizar la política para permitir que **miembros del proyecto** también puedan actualizar (no solo el creador):
+
+```sql
+DROP POLICY "Creators can update projects" ON task_projects;
+CREATE POLICY "Project members and creators can update projects"
+  ON task_projects FOR UPDATE
+  USING (
+    auth.uid() = created_by
+    OR is_project_member(auth.uid(), id)
+  );
 ```
 
-### Por qué no lo ves
+Esto permite que Marielby (y cualquier miembro asignado al proyecto) pueda editar el proyecto, incluyendo asignar líder.
 
-El líder **solo se muestra si el proyecto tiene un `leader_id` asignado**. Si el proyecto no tiene líder, la sección se oculta completamente. Esto explica por qué no ves el cambio.
+#### 2. (Opcional) Agregar verificación de filas afectadas
 
-### Propuesta: Mostrar siempre la línea de líder
+En `useProjects.ts`, cambiar el update para usar `.select()` y verificar que se retornó una fila, mostrando un error descriptivo si RLS bloqueó el cambio.
 
-Para que sea siempre visible, cambiar la lógica para mostrar un placeholder cuando no hay líder asignado:
+### Archivos a modificar
 
-| Archivo | Cambio |
+| Recurso | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Eliminar el condicional `{leader && ...}` y mostrar siempre: si hay líder → Crown + nombre, si no → Crown + "Sin líder asignado" en texto muted |
-| `src/pages/tareas/TareasContent.tsx` | Mismo cambio: mostrar siempre la línea de líder con un fallback "Sin líder asignado" |
-
-Esto hará que la sección de líder sea siempre visible independientemente de si el proyecto tiene un líder configurado.
+| Migración SQL | Actualizar política RLS de UPDATE en `task_projects` |
+| `src/pages/tareas/useProjects.ts` | (Opcional) Agregar `.select()` al update para detectar fallos silenciosos |
 
