@@ -295,7 +295,7 @@ export default function ReportesPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {methodEntries.map(([method, data]) => (
-                <DashboardMetricCard key={method} label={method} value={fmt(data.total)} icon={FileText} subtitle={`${data.count} invoices`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+                <DashboardMetricCard key={method} label={method} value={fmt(data.total)} icon={FileText} subtitle={`${data.count} invoices`} color="primary" />
               ))}
             </div>
             {viewMode === "list" ? (

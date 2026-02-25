@@ -221,10 +221,10 @@ const HRHourBank = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} />
-          <DashboardMetricCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} />
-          <DashboardMetricCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} />
-          <DashboardMetricCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} />
+          <DashboardMetricCard label="Total Acumulado" value={`${totalAccumulated.toFixed(1)}h`} icon={Banknote} color="primary" />
+          <DashboardMetricCard label="Promedio/Empleado" value={`${avgPerEmployee.toFixed(1)}h`} icon={Users} color="accent" />
+          <DashboardMetricCard label="Balance Alto (+30h)" value={String(highBalance)} icon={TrendingUp} color="success" />
+          <DashboardMetricCard label="Balance Bajo (<10h)" value={String(lowBalance)} icon={TrendingDown} color="warning" />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

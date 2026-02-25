@@ -515,10 +515,10 @@ export default function HRAttendance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Registros" value={String(total)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Presentes" value={String(presentes)} icon={UserCheck} subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40" valueColor={presentes > 0 ? "text-success" : undefined} />
-              <DashboardMetricCard label="Tardanzas" value={String(tardanzas)} icon={Clock} subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={tardanzas > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Ausentes" value={String(ausentes)} icon={UserX} subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={ausentes > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Total Registros" value={String(total)} icon={Users} subtitle="Todos los registros" color="primary" />
+              <DashboardMetricCard label="Presentes" value={String(presentes)} icon={UserCheck} subtitle={total > 0 ? `${((presentes / total) * 100).toFixed(0)}% del total` : "—"} color="success" />
+              <DashboardMetricCard label="Tardanzas" value={String(tardanzas)} icon={Clock} subtitle={total > 0 ? `${((tardanzas / total) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Ausentes" value={String(ausentes)} icon={UserX} subtitle={total > 0 ? `${((ausentes / total) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
             </>
           )}
         </div>

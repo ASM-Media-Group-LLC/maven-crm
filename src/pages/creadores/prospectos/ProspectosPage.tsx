@@ -133,10 +133,10 @@ export default function ProspectosPage() {
               Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
             ) : (
               <>
-                <DashboardMetricCard label="Total Casting" value={String(prospects.length)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
-                <DashboardMetricCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={totalLeads > 0 ? "text-primary" : undefined} />
-                <DashboardMetricCard label="En Negociación" value={String(totalNegociando)} icon={Target} subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-purple-500/15 hover:border-purple-500/40" valueColor={totalNegociando > 0 ? "text-purple-400" : undefined} />
-                <DashboardMetricCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} subtitle={`${totalConvertidos} convertidos`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalConvertidos > 0 ? "text-accent-foreground" : undefined} />
+                <DashboardMetricCard label="Total Casting" value={String(prospects.length)} icon={Users} subtitle="Todos los registros" color="muted" />
+                <DashboardMetricCard label="Pendientes de Contacto" value={String(totalLeads)} icon={Clock} subtitle={prospects.length > 0 ? `${((totalLeads / prospects.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
+                <DashboardMetricCard label="En Negociación" value={String(totalNegociando)} icon={Target} subtitle={prospects.length > 0 ? `${((totalNegociando / prospects.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+                <DashboardMetricCard label="Tasa de Conversión" value={`${conversionRate}%`} icon={TrendingUp} subtitle={`${totalConvertidos} convertidos`} color="success" />
               </>
             )}
           </div>

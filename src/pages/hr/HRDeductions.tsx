@@ -187,10 +187,10 @@ export default function HRDeductions() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPending > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} subtitle="Suma de todas las deducciones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+              <DashboardMetricCard label="Total Deducciones" value={String(deductions.length)} icon={DollarSign} subtitle="Todos los registros" color="primary" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={deductions.length > 0 ? `${((totalPending / deductions.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Aplicadas" value={String(totalApplied)} icon={CheckCircle} subtitle={deductions.length > 0 ? `${((totalApplied / deductions.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <DashboardMetricCard label="Monto Total" value={formatAmount(totalAmount)} icon={Wallet} subtitle="Suma de todas las deducciones" color="destructive" />
             </>
           )}
         </div>

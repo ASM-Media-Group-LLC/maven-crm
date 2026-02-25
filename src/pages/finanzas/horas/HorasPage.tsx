@@ -55,9 +55,9 @@ export default function HorasPage() {
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {isLoading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
-                  <DashboardMetricCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} subtitle={`${uniqueEmps} empleados`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} subtitle="Monto acumulado" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-                  <DashboardMetricCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} subtitle="Horas extra" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
+                  <DashboardMetricCard label="Total Horas Extra" value={String(totalOvertimeHours)} icon={Clock} subtitle={`${uniqueEmps} empleados`} color="primary" />
+                  <DashboardMetricCard label="Costo Total" value={fmt(totalOvertimeAmount)} icon={DollarSign} subtitle="Monto acumulado" color="destructive" />
+                  <DashboardMetricCard label="Promedio por Empleado" value={uniqueEmps > 0 ? (totalOvertimeHours / uniqueEmps).toFixed(1) + "h" : "0h"} icon={Users} subtitle="Horas extra" color="accent" />
                 </>
               )}
             </div>
@@ -93,8 +93,8 @@ export default function HorasPage() {
             <div className="grid grid-cols-2 gap-4">
               {isLoading ? Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
                 <>
-                  <DashboardMetricCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} subtitle="Banco total" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-                  <DashboardMetricCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} subtitle="Valoración" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
+                  <DashboardMetricCard label="Horas Acumuladas" value={String(totalBankHours)} icon={Wallet} subtitle="Banco total" color="primary" />
+                  <DashboardMetricCard label="Valor Total" value={fmt(totalBankAmount)} icon={DollarSign} subtitle="Valoración" color="accent" />
                 </>
               )}
             </div>

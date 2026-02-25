@@ -435,10 +435,10 @@ export default function HRPermisos() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total" value={String(total)} icon={FileText} />
-              <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} valueColor={pendientes > 0 ? "text-warning" : undefined} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-              <DashboardMetricCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} valueColor="text-success" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40" />
-              <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} />
+              <DashboardMetricCard label="Total" value={String(total)} icon={FileText} color="primary" />
+              <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} color="warning" />
+              <DashboardMetricCard label="Aprobados" value={String(aprobados)} icon={CheckCircle2} color="success" />
+              <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="muted" />
             </>
           )}
         </div>

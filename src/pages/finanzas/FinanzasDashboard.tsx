@@ -75,7 +75,7 @@ function HRPersonnelCards() {
               value={c.value}
               icon={c.icon}
               subtitle={c.sub}
-              hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40 cursor-pointer"
+              color="primary"
             />
           ))}
         </div>
@@ -236,14 +236,14 @@ export default function FinanzasDashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs mes anterior`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-              <DashboardMetricCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
-              <DashboardMetricCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} subtitle={`${curMargenPct.toFixed(1)}% margen`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={curMargen >= 0 ? "text-accent" : "text-destructive"} />
-              <DashboardMetricCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} subtitle="Borrador + calculado" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-              <DashboardMetricCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} subtitle={`${commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).length} registros`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} subtitle="Enviadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={facturasPendientes > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} subtitle="Requieren atención" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={facturasVencidas > 0 ? "text-destructive" : undefined} />
-              <DashboardMetricCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} subtitle="Ingresos mes a mes" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={variacion >= 0 ? "text-accent" : "text-destructive"} />
+              <DashboardMetricCard label="Ingresos del Mes" value={fmt(curIngresos)} icon={TrendingUp} subtitle={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}% vs mes anterior`} color="accent" />
+              <DashboardMetricCard label="Costos del Mes" value={fmt(curCostos)} icon={TrendingDown} subtitle={`${pctChange(curCostos, prevCostos) >= 0 ? "+" : ""}${pctChange(curCostos, prevCostos).toFixed(1)}% vs anterior`} color="destructive" />
+              <DashboardMetricCard label="Margen Operativo" value={fmt(curMargen)} icon={BarChart3} subtitle={`${curMargenPct.toFixed(1)}% margen`} color={curMargen >= 0 ? "accent" : "destructive"} />
+              <DashboardMetricCard label="Nómina Proyectada" value={fmt(nominaProyectada)} icon={Users} subtitle="Borrador + calculado" color="warning" />
+              <DashboardMetricCard label="Comisiones Acumuladas" value={fmt(curComisiones)} icon={DollarSign} subtitle={`${commissions.filter(c => inRange(c.created_at, currentMonthStart, currentMonthEnd)).length} registros`} color="primary" />
+              <DashboardMetricCard label="Facturas Pendientes" value={String(facturasPendientes)} icon={FileText} subtitle="Enviadas" color="warning" />
+              <DashboardMetricCard label="Facturas Vencidas" value={String(facturasVencidas)} icon={AlertTriangle} subtitle="Requieren atención" color="destructive" />
+              <DashboardMetricCard label="Variación vs Anterior" value={`${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`} icon={TrendingUp} subtitle="Ingresos mes a mes" color={variacion >= 0 ? "accent" : "destructive"} />
             </>
           )}
         </div>

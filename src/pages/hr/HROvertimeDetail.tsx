@@ -186,10 +186,10 @@ const HROvertimeDetail = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <DashboardMetricCard label="Total Horas" value={`${totalHours}h`} icon={Timer} />
-          <DashboardMetricCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} />
-          <DashboardMetricCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} />
-          <DashboardMetricCard label="Pagadas" value={String(paidCount)} icon={Banknote} />
+          <DashboardMetricCard label="Total Horas" value={`${totalHours}h`} icon={Timer} color="primary" />
+          <DashboardMetricCard label="Pendientes" value={String(pendingCount)} icon={AlertCircle} color="warning" />
+          <DashboardMetricCard label="Aprobadas" value={String(approvedCount)} icon={CheckCircle2} color="success" />
+          <DashboardMetricCard label="Pagadas" value={String(paidCount)} icon={Banknote} color="accent" />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

@@ -237,10 +237,10 @@ export default function HROffboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} subtitle="Todos los procesos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
-              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalInProgress > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalCompleted > 0 ? "text-accent-foreground" : undefined} />
-              <DashboardMetricCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={totalPendingPayment > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Total Offboarding" value={String(offboardings.length)} icon={Users} subtitle="Todos los procesos" color="muted" />
+              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={offboardings.length > 0 ? `${((totalInProgress / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={offboardings.length > 0 ? `${((totalCompleted / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <DashboardMetricCard label="Pago Pendiente" value={String(totalPendingPayment)} icon={DollarSign} subtitle={offboardings.length > 0 ? `${((totalPendingPayment / offboardings.length) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
             </>
           )}
         </div>

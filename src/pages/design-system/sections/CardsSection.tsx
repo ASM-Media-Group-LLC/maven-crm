@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import { Users, TrendingUp, Clock, AlertTriangle, DollarSign, BarChart3 } from "lucide-react";
 
 export const CardsSection = () => (
   <section id="cards" className="space-y-8">
@@ -57,32 +59,71 @@ export const CardsSection = () => (
       </Card>
     </div>
 
-    {/* KPI / Metric Cards */}
+    {/* DashboardMetricCard */}
     <div>
-      <h3 className="text-xl font-medium mb-2 text-muted-foreground">KPI / Metric Cards</h3>
+      <h3 className="text-xl font-medium mb-2 text-muted-foreground">DashboardMetricCard</h3>
       <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
-        Cards de métricas con hover de escala y gradiente temático. Cada card tiene un color asociado
-        que se refleja en el gradiente al hacer hover.
+        Componente estándar para KPIs y métricas. Incluye <strong className="text-foreground">hover obligatorio</strong> con escala y gradiente 
+        basado en el prop <code className="font-mono text-primary">color</code>. El icono y el valor toman automáticamente 
+        el color semántico. <strong className="text-foreground">Nunca usar divs manuales para KPI cards.</strong>
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: "Activas", value: "24", color: "success", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
-          { label: "Onboarding", value: "8", color: "primary", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
-          { label: "Pausadas", value: "3", color: "warning", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
-        ].map((card) => (
-          <div
-            key={card.label}
-            className={`rounded-lg border border-border bg-card p-4 cursor-pointer transition-all duration-200 ${card.hoverClass}`}
-          >
-            <p className="text-xs text-muted-foreground">{card.label}</p>
-            <p className="text-2xl font-bold mt-1">{card.value}</p>
-          </div>
-        ))}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <DashboardMetricCard label="Primary" value="24" icon={Users} subtitle="Total activas" color="primary" />
+        <DashboardMetricCard label="Accent" value="$12,450" icon={DollarSign} subtitle="Facturación neta" color="accent" />
+        <DashboardMetricCard label="Success" value="98%" icon={TrendingUp} subtitle="Tasa de éxito" color="success" />
+        <DashboardMetricCard label="Warning" value="8" icon={Clock} subtitle="Pendientes" color="warning" />
+        <DashboardMetricCard label="Destructive" value="3" icon={AlertTriangle} subtitle="Críticos" color="destructive" />
+        <DashboardMetricCard label="Muted (default)" value="42" icon={BarChart3} subtitle="Sin color especial" color="muted" />
       </div>
-      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-1">
-        <p><strong className="text-foreground">Estructura:</strong> icono + label + valor + subtítulo</p>
-        <p><strong className="text-foreground">Hover:</strong> <code className="font-mono text-foreground">hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</code></p>
-        <p><strong className="text-foreground">Transición:</strong> <code className="font-mono text-foreground">transition-all duration-200</code></p>
+
+      <div className="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground space-y-2">
+        <p><strong className="text-foreground">Props:</strong></p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-1.5 pr-4 font-medium text-foreground">Prop</th>
+                <th className="text-left py-1.5 pr-4 font-medium text-foreground">Tipo</th>
+                <th className="text-left py-1.5 font-medium text-foreground">Descripción</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-4"><code className="text-foreground">label</code></td>
+                <td className="py-1.5 pr-4">string</td>
+                <td className="py-1.5">Título de la métrica</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-4"><code className="text-foreground">value</code></td>
+                <td className="py-1.5 pr-4">string</td>
+                <td className="py-1.5">Valor principal (siempre string formateado)</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-4"><code className="text-foreground">icon</code></td>
+                <td className="py-1.5 pr-4">LucideIcon</td>
+                <td className="py-1.5">Icono del indicador</td>
+              </tr>
+              <tr className="border-b border-border/50">
+                <td className="py-1.5 pr-4"><code className="text-foreground">subtitle</code></td>
+                <td className="py-1.5 pr-4">string?</td>
+                <td className="py-1.5">Texto secundario debajo del valor</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 pr-4"><code className="text-foreground">color</code></td>
+                <td className="py-1.5 pr-4">"primary" | "accent" | "success" | "warning" | "destructive" | "muted"</td>
+                <td className="py-1.5">Color semántico. Controla hover, icono y valor. Default: "muted"</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="pt-1"><strong className="text-foreground">Hover automático:</strong> <code className="font-mono text-foreground">hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40</code></p>
+        <p><strong className="text-foreground">Reglas:</strong></p>
+        <ul className="list-disc list-inside space-y-0.5 text-xs">
+          <li>Siempre usar <code className="font-mono text-foreground">DashboardMetricCard</code> para KPIs — nunca divs manuales</li>
+          <li>Elegir el <code className="font-mono text-foreground">color</code> según la semántica: success para positivos, warning para pendientes, destructive para críticos</li>
+          <li>El valor formateado es responsabilidad del consumidor (ej: <code className="font-mono text-foreground">fmt(amount)</code>, <code className="font-mono text-foreground">{`\${hours}h`}</code>)</li>
+        </ul>
       </div>
     </div>
 
@@ -123,7 +164,7 @@ export const CardsSection = () => (
         <li>Footer con acciones: Primary a la derecha, Secondary/Cancel a la izquierda</li>
         <li>No anidar Cards dentro de Cards</li>
         <li>Padding estándar: <code className="font-mono text-foreground">p-6</code> (ya incluido en los sub-componentes)</li>
-        <li>KPI Cards: siempre asociar un color temático y aplicar el hover con gradiente correspondiente</li>
+        <li>KPI Cards: siempre usar <code className="font-mono text-foreground">DashboardMetricCard</code> con prop <code className="font-mono text-foreground">color</code> semántico</li>
         <li>Glass Cards: solo sobre fondos oscuros, usar <code className="font-mono text-foreground">.glass-card</code> o <code className="font-mono text-foreground">.glass-card-subtle</code></li>
       </ul>
     </div>

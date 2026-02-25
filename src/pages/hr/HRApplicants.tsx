@@ -181,10 +181,10 @@ export default function HRApplicants() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Candidatos" value={String(applicants.length)} icon={Users} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={totalPending > 0 ? "text-primary" : undefined} />
-              <DashboardMetricCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalInterview > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Contratados" value={String(totalHired)} icon={CheckCircle} subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalHired > 0 ? "text-accent-foreground" : undefined} />
+              <DashboardMetricCard label="Total Candidatos" value={String(applicants.length)} icon={Users} subtitle="Todos los registros" color="muted" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={applicants.length > 0 ? `${((totalPending / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
+              <DashboardMetricCard label="En Entrevista" value={String(totalInterview)} icon={UserCheck} subtitle={applicants.length > 0 ? `${((totalInterview / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Contratados" value={String(totalHired)} icon={CheckCircle} subtitle={applicants.length > 0 ? `${((totalHired / applicants.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
             </>
           )}
         </div>

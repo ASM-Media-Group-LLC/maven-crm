@@ -411,10 +411,10 @@ export default function FacturacionPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalPendientes > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+              <DashboardMetricCard label="Total Invoices" value={String(invoices.length)} icon={FileText} subtitle="Todos" color="primary" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPendientes)} icon={Clock} subtitle="Enviadas + vencidas" color="warning" />
+              <DashboardMetricCard label="Monto Total" value={fmt(totalMonto)} icon={DollarSign} subtitle="Suma" color="accent" />
+              <DashboardMetricCard label="Fee Total" value={fmt(totalFee)} icon={DollarSign} subtitle="Fees cobrados" color="destructive" />
             </>
           )}
         </div>

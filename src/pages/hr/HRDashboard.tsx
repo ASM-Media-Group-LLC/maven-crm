@@ -270,29 +270,28 @@ export default function HRDashboard() {
                 value={String(total)}
                 icon={Users}
                 subtitle="En nómina"
-                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40"
+                color="primary"
               />
               <DashboardMetricCard
                 label="Check-ins Hoy"
                 value="0"
                 icon={UserCheck}
                 subtitle="Sin sistema de asistencia"
-                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40"
+                color="success"
               />
               <DashboardMetricCard
                 label="Ausencias Pend."
                 value={String(pendingAbsences.length)}
                 icon={AlertTriangle}
                 subtitle="Pendientes de revisión"
-                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40"
-                valueColor={pendingAbsences.length > 0 ? "text-warning" : undefined}
+                color="warning"
               />
               <DashboardMetricCard
                 label="En Onboarding"
                 value={String(nuevos30d)}
                 icon={UserPlus}
                 subtitle="Ingresos últimos 30d"
-                hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/10 hover:border-primary/30"
+                color="primary"
               />
             </>
           )}
