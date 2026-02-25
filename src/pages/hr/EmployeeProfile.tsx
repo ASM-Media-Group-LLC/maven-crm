@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { User, ArrowLeft, FileText, AlertTriangle, GraduationCap, TrendingUp, Calendar, Building2, Phone, Mail, CreditCard, Link2, Link2Off, CheckCircle2, XCircle, Search, Clock, History, ExternalLink, Wifi, Laptop } from "lucide-react";
-import { useEmployee, useEmployeeAbsences, useEmployeeIncidents, useEmployeeDocuments, useEmployeeTraining, useEmployeePerformance, useEmployeeHistory, useEmployeeAttendanceSummary, useEmployeeHourBankBalance, useEmployeeVacationBalance, useCreateEmployeeHistory } from "@/hooks/useEmployee";
+import { User, ArrowLeft, FileText, AlertTriangle, GraduationCap, TrendingUp, Calendar, Building2, Phone, Mail, CreditCard, Link2, Link2Off, CheckCircle2, XCircle, Search, Clock, History, ExternalLink, Wifi, Laptop, DollarSign, Wallet, Receipt } from "lucide-react";
+import { useEmployee, useEmployeeAbsences, useEmployeeIncidents, useEmployeeDocuments, useEmployeeTraining, useEmployeePerformance, useEmployeeHistory, useEmployeeAttendanceSummary, useEmployeeHourBankBalance, useEmployeeVacationBalance, useCreateEmployeeHistory, useEmployeePayrollHistory, useEmployeeCommissions, useEmployeeDeductions } from "@/hooks/useEmployee";
 import { useAllProfiles, useLinkedProfile, useLinkEmployeeProfile, useUnlinkEmployeeProfile } from "@/hooks/useEmployees";
 
 import { EmployeeStatusBadge } from "@/components/hr/EmployeeStatusBadge";
@@ -48,6 +48,9 @@ export default function EmployeeProfile() {
   const { data: attendanceSummary } = useEmployeeAttendanceSummary(id);
   const { data: hourBankBalance } = useEmployeeHourBankBalance(id);
   const { data: vacationBalance } = useEmployeeVacationBalance(id);
+  const { data: payrollHistory = [] } = useEmployeePayrollHistory(id);
+  const { data: empCommissions = [] } = useEmployeeCommissions(id);
+  const { data: empDeductions = [] } = useEmployeeDeductions(id);
 
   // Access tab state
   const [linkOpen, setLinkOpen] = useState(false);
@@ -112,6 +115,10 @@ export default function EmployeeProfile() {
             <TabsTrigger value="tiempo">Control de Tiempo</TabsTrigger>
             <TabsTrigger value="desempeno">Desempeño ({performance.length})</TabsTrigger>
             <TabsTrigger value="documentos">Documentos ({documents.length})</TabsTrigger>
+            <TabsTrigger value="finanzas">
+              <DollarSign className="h-3.5 w-3.5 mr-1" />
+              Finanzas
+            </TabsTrigger>
             <TabsTrigger value="historial">
               <History className="h-3.5 w-3.5 mr-1" />
               Historial ({history.length})
@@ -284,6 +291,86 @@ export default function EmployeeProfile() {
                     <Skeleton className="h-16" />
                   )}
                   <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/vacaciones")}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* ── Tab: Finanzas ── */}
+          <TabsContent value="finanzas" className="mt-4 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Nómina */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" />Historial de Nómina</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {payrollHistory.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Sin registros de nómina</p>
+                  ) : (
+                    payrollHistory.slice(0, 5).map((pd: any) => (
+                      <div key={pd.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{pd.payroll_periods?.period_name ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">Bruto: ${Number(pd.gross_salary || 0).toLocaleString("es-CO")} · Neto: ${Number(pd.net_total || 0).toLocaleString("es-CO")}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">{pd.payroll_periods?.status ?? "—"}</Badge>
+                      </div>
+                    ))
+                  )}
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/finanzas/nomina")}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Comisiones */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" />Comisiones</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {empCommissions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Sin comisiones registradas</p>
+                  ) : (
+                    empCommissions.slice(0, 5).map((c: any) => (
+                      <div key={c.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{c.period}</p>
+                          <p className="text-xs text-muted-foreground">{c.commission_type} · Est: ${Number(c.estimated_amount || 0).toLocaleString("es-CO")}</p>
+                        </div>
+                        <Badge variant={c.status === "pagado" ? "default" : "secondary"} className="text-xs">{c.status}</Badge>
+                      </div>
+                    ))
+                  )}
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/finanzas/horas-variables")}>
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Deducciones */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2"><Wallet className="h-4 w-4" />Deducciones</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {empDeductions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Sin deducciones registradas</p>
+                  ) : (
+                    empDeductions.slice(0, 5).map((d: any) => (
+                      <div key={d.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                        <div>
+                          <p className="font-medium">{d.deduction_type}</p>
+                          <p className="text-xs text-muted-foreground">{d.month_year} · ${Number(d.amount || 0).toLocaleString("es-CO")}</p>
+                        </div>
+                        <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-xs">{d.status}</Badge>
+                      </div>
+                    ))
+                  )}
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate("/hr/deducciones")}>
                     <ExternalLink className="h-3.5 w-3.5 mr-2" />Ver detalle
                   </Button>
                 </CardContent>

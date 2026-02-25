@@ -38,6 +38,62 @@ function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
 }
 
+function PeriodDetailContent({ item }: { item: any }) {
+  const { data: deductions = [], isLoading } = useQuery({
+    queryKey: ["nomina-deductions", item.period_name],
+    queryFn: async () => {
+      // Try matching month_year from period_name (e.g. "2025-02" or contains it)
+      const { data, error } = await supabase
+        .from("employee_deductions")
+        .select("*, employees(first_name, last_name)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      // Filter client-side by period match
+      return (data ?? []).filter(d => item.period_name?.includes(d.month_year) || d.month_year?.includes(item.period_name?.slice(0, 7)));
+    },
+  });
+
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="space-y-2">
+        <p><span className="text-muted-foreground">Periodo:</span> {item.period_name}</p>
+        <p><span className="text-muted-foreground">Estado:</span> <Badge variant={STATUS_BADGE[item.status]?.variant || "outline"}>{STATUS_BADGE[item.status]?.label || item.status}</Badge></p>
+        <p><span className="text-muted-foreground">Empleados:</span> {item.total_employees}</p>
+        <p><span className="text-muted-foreground">Total Bruto:</span> {fmt(Number(item.gross_total) || 0)}</p>
+        <p><span className="text-muted-foreground">Total Neto:</span> {fmt(Number(item.net_total) || 0)}</p>
+        <p><span className="text-muted-foreground">Centro de Costo:</span> {item.cost_center || "—"}</p>
+        {item.notes && <p><span className="text-muted-foreground">Notas:</span> {item.notes}</p>}
+      </div>
+
+      {/* Deducciones de HR */}
+      <div className="border-t pt-3">
+        <p className="text-sm font-medium mb-2">Deducciones Aplicadas (HR)</p>
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Cargando...</p>
+        ) : deductions.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sin deducciones asociadas a este periodo.</p>
+        ) : (
+          <div className="space-y-1.5 max-h-40 overflow-auto">
+            {deductions.map((d: any) => (
+              <div key={d.id} className="flex items-center justify-between rounded border border-border px-2 py-1.5">
+                <div>
+                  <span className="text-xs font-medium">{d.employees?.first_name} {d.employees?.last_name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{d.deduction_type}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">${Number(d.amount).toLocaleString("es-CO")}</span>
+                  <Badge variant={d.status === "applied" ? "default" : "secondary"} className="text-[10px]">{d.status}</Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const NOMINA_TABS = ["Cálculo", "Recibos", "Mail", "Batch"] as const;
 type NominaTab = typeof NOMINA_TABS[number];
 
@@ -381,19 +437,9 @@ export default function NominaPage() {
 
       {/* Periodo detail dialog */}
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Detalle de Periodo</DialogTitle></DialogHeader>
-          {viewItem && (
-            <div className="space-y-3 text-sm">
-              <p><span className="text-muted-foreground">Periodo:</span> {viewItem.period_name}</p>
-              <p><span className="text-muted-foreground">Estado:</span> <Badge variant={STATUS_BADGE[viewItem.status]?.variant || "outline"}>{STATUS_BADGE[viewItem.status]?.label || viewItem.status}</Badge></p>
-              <p><span className="text-muted-foreground">Empleados:</span> {viewItem.total_employees}</p>
-              <p><span className="text-muted-foreground">Total Bruto:</span> {fmt(Number(viewItem.gross_total) || 0)}</p>
-              <p><span className="text-muted-foreground">Total Neto:</span> {fmt(Number(viewItem.net_total) || 0)}</p>
-              <p><span className="text-muted-foreground">Centro de Costo:</span> {viewItem.cost_center || "—"}</p>
-              {viewItem.notes && <p><span className="text-muted-foreground">Notas:</span> {viewItem.notes}</p>}
-            </div>
-          )}
+          {viewItem && <PeriodDetailContent item={viewItem} />}
         </DialogContent>
       </Dialog>
 

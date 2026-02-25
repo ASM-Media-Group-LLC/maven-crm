@@ -229,3 +229,56 @@ export function useEmployeeVacationBalance(employeeId: string | undefined) {
     },
   });
 }
+
+/* ── Finance integration hooks ── */
+
+export function useEmployeePayrollHistory(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-payroll-history", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payroll_details")
+        .select("*, payroll_periods(id, period_name, status, created_at)")
+        .eq("employee_id", employeeId!)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useEmployeeCommissions(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-commissions", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("commissions")
+        .select("*")
+        .eq("employee_id", employeeId!)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useEmployeeDeductions(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-deductions", employeeId],
+    enabled: !!employeeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_deductions")
+        .select("*")
+        .eq("employee_id", employeeId!)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+}

@@ -26,6 +26,64 @@ function pctChange(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
+function HRPersonnelCards() {
+  const navigate = useNavigate();
+
+  const { data: hrData } = useQuery({
+    queryKey: ["fin-hr-personnel"],
+    queryFn: async () => {
+      const { data: emps, error: e1 } = await supabase.from("employees").select("id, status, department_id, base_salary");
+      if (e1) throw e1;
+      const activos = (emps ?? []).filter(e => e.status === "activo");
+      const depts = new Set(activos.map(e => e.department_id).filter(Boolean));
+
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const { data: deductions, error: e2 } = await supabase.from("employee_deductions").select("amount").ilike("month_year", `%${monthYear}%`);
+      if (e2) throw e2;
+      const dedTotal = (deductions ?? []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+
+      const { data: payroll, error: e3 } = await supabase.from("payroll_periods").select("net_total").ilike("period_name", `%${monthYear}%`);
+      if (e3) throw e3;
+      const netTotal = (payroll ?? []).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+      const costPerEmp = activos.length > 0 ? netTotal / activos.length : 0;
+
+      return { headcount: activos.length, costPerEmp, dedTotal, deptCount: depts.size };
+    },
+  });
+
+  const cards = [
+    { label: "Empleados Activos", value: String(hrData?.headcount ?? 0), icon: Users, sub: "Headcount", path: "/hr" },
+    { label: "Costo Prom/Emp", value: fmt(hrData?.costPerEmp ?? 0), icon: Users, sub: "Nómina / headcount", path: "/finanzas/nomina" },
+    { label: "Deducciones Mes", value: fmt(hrData?.dedTotal ?? 0), icon: TrendingDown, sub: "Acumuladas", path: "/hr/deducciones" },
+    { label: "Departamentos", value: String(hrData?.deptCount ?? 0), icon: Users, sub: "Con empleados activos", path: "/hr/organigrama" },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />Headcount y Costos de Personal
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {cards.map(c => (
+            <DashboardMetricCard
+              key={c.label}
+              label={c.label}
+              value={c.value}
+              icon={c.icon}
+              subtitle={c.sub}
+              hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40 cursor-pointer"
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function FinanzasDashboard() {
   const navigate = useNavigate();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
@@ -189,6 +247,9 @@ export default function FinanzasDashboard() {
             </>
           )}
         </div>
+
+        {/* Headcount y Costos de Personal */}
+        <HRPersonnelCards />
 
         {/* Flujo de Dinero */}
         <Card>

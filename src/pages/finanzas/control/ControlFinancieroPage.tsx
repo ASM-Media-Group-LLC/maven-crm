@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 
-const TABS = ["Ingresos vs Costos", "Costos por CC", "Productividad por Empleado", "Márgenes Operativos"] as const;
+const TABS = ["Ingresos vs Costos", "Costos por CC", "Costos por Departamento", "Productividad por Empleado", "Márgenes Operativos"] as const;
 type Tab = typeof TABS[number];
 
 function fmt(n: number) {
@@ -54,7 +54,7 @@ export default function ControlFinancieroPage() {
   const { data: employees = [] } = useQuery({
     queryKey: ["control-employees"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("employees").select("id, first_name, last_name, base_salary, status").eq("status", "activo");
+      const { data, error } = await supabase.from("employees").select("id, first_name, last_name, base_salary, status, department_id, departments(id, name)").eq("status", "activo");
       if (error) throw error;
       return data ?? [];
     },
@@ -94,7 +94,19 @@ export default function ControlFinancieroPage() {
     return { name: `${e.first_name} ${e.last_name}`, salary: Number(e.base_salary) || 0, cost: totalCost, hours: totalHours, ratio: totalHours > 0 ? totalCost / totalHours : 0 };
   }).filter(e => !search || e.name.toLowerCase().includes(search.toLowerCase()));
 
-  const showSearch = activeTab === "Costos por CC" || activeTab === "Productividad por Empleado";
+  // Costos por Departamento
+  const deptGroups = employees.reduce((acc, e) => {
+    const deptName = (e as any).departments?.name || "Sin Departamento";
+    if (!acc[deptName]) acc[deptName] = { count: 0, totalSalary: 0 };
+    acc[deptName].count++;
+    acc[deptName].totalSalary += Number(e.base_salary) || 0;
+    return acc;
+  }, {} as Record<string, { count: number; totalSalary: number }>);
+
+  const totalSalaries = Object.values(deptGroups).reduce((s, d) => s + d.totalSalary, 0);
+  const deptEntries = Object.entries(deptGroups).filter(([d]) => !search || d.toLowerCase().includes(search.toLowerCase()));
+
+  const showSearch = activeTab === "Costos por CC" || activeTab === "Productividad por Empleado" || activeTab === "Costos por Departamento";
   const showViewToggle = showSearch;
 
   const renderTab = () => {
@@ -132,6 +144,46 @@ export default function ControlFinancieroPage() {
                 <p className="text-sm font-medium truncate">{cc}</p>
                 <p className="text-xl font-bold text-foreground mt-2">{fmt(total)}</p>
                 <p className="text-xs text-muted-foreground mt-1">{egresos > 0 ? ((total / egresos) * 100).toFixed(1) : 0}% del total</p>
+              </div>
+            ))}
+          </div>
+        );
+
+      case "Costos por Departamento":
+        return viewMode === "list" ? (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
+              <Table>
+                <TableHeader><TableRow className="sticky top-0 z-10 bg-card">
+                  <TableHead className="text-xs font-medium text-muted-foreground">Departamento</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground"># Empleados</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Costo Salarial</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {deptEntries.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin datos.</TableCell></TableRow>
+                  ) : deptEntries.map(([dept, data]) => (
+                    <TableRow key={dept} className="hover:bg-muted/30">
+                      <TableCell className="text-sm font-medium">{dept}</TableCell>
+                      <TableCell className="text-sm">{data.count}</TableCell>
+                      <TableCell className="text-sm">{fmt(data.totalSalary)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{totalSalaries > 0 ? ((data.totalSalary / totalSalaries) * 100).toFixed(1) : 0}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {deptEntries.length === 0 ? (
+              <div className="col-span-full text-center text-muted-foreground py-8">Sin datos.</div>
+            ) : deptEntries.map(([dept, data]) => (
+              <div key={dept} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+                <p className="text-sm font-medium truncate">{dept}</p>
+                <p className="text-xl font-bold text-foreground mt-2">{fmt(data.totalSalary)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{data.count} empleados · {totalSalaries > 0 ? ((data.totalSalary / totalSalaries) * 100).toFixed(1) : 0}%</p>
               </div>
             ))}
           </div>

@@ -4,7 +4,7 @@ import {
   CalendarDays, AlertTriangle, TrendingDown, TrendingUp,
   BookOpen, Briefcase, ChevronRight, Zap, Activity,
   Percent, Timer, RotateCcw, Settings2, Check, UserMinus,
-  ShieldAlert, ClipboardCheck,
+  ShieldAlert, ClipboardCheck, DollarSign as DollarSignIcon, Wallet,
 } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { HRMetricCard } from "@/components/hr/HRMetricCard";
@@ -86,6 +86,71 @@ const absenceTypeLabel: Record<string, string> = {
   permiso: "Permiso",
   otro: "Otro",
 };
+
+// ─── Financial Summary from Finanzas ─────────────────────────────────────────
+function FinancialSummaryCards() {
+  const navigate = useNavigate();
+  const { data: employees = [] } = useEmployees();
+
+  const { data: payrollTotal } = useQuery({
+    queryKey: ["hr-fin-payroll-total"],
+    queryFn: async () => {
+      const now = new Date();
+      const monthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const { data, error } = await supabase.from("payroll_periods").select("net_total").ilike("period_name", `%${monthYear}%`);
+      if (error) throw error;
+      return (data ?? []).reduce((s, p) => s + (Number(p.net_total) || 0), 0);
+    },
+  });
+
+  const { data: pendingDeductions } = useQuery({
+    queryKey: ["hr-fin-pending-deductions"],
+    queryFn: async () => {
+      const { count, error } = await supabase.from("employee_deductions").select("id", { count: "exact", head: true }).eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const { data: overtimeHours } = useQuery({
+    queryKey: ["hr-fin-overtime-hours"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("hour_bank").select("hours").eq("movement_type", "deposit");
+      if (error) throw error;
+      return (data ?? []).reduce((s, r) => s + (Number(r.hours) || 0), 0);
+    },
+  });
+
+  const activos = employees.filter(e => e.status === "activo");
+  const avgSalary = activos.length > 0
+    ? activos.reduce((s, e) => s + (Number(e.base_salary) || 0), 0) / activos.length
+    : 0;
+
+  const cards = [
+    { label: "Costo Nómina (mes)", value: `$${(payrollTotal ?? 0).toLocaleString("es-CO")}`, icon: DollarSignIcon, color: "bg-primary/10 border-primary/20", textColor: "text-primary", path: "/finanzas/nomina" },
+    { label: "Salario Promedio", value: `$${Math.round(avgSalary).toLocaleString("es-CO")}`, icon: Wallet, color: "bg-accent/10 border-accent/20", textColor: "text-accent", path: "/finanzas/control" },
+    { label: "Deducciones Pend.", value: String(pendingDeductions ?? 0), icon: AlertTriangle, color: "bg-warning/10 border-warning/20", textColor: "text-warning", path: "/hr/deducciones" },
+    { label: "Horas Extra Acum.", value: `${(overtimeHours ?? 0).toFixed(1)}h`, icon: Clock, color: "bg-muted border-border", textColor: "text-muted-foreground", path: "/finanzas/horas-variables" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {cards.map(c => (
+        <div
+          key={c.label}
+          className={cn("rounded-lg border p-3 flex flex-col gap-1 cursor-pointer hover:opacity-80 transition-opacity", c.color)}
+          onClick={() => navigate(c.path)}
+        >
+          <div className="flex items-center gap-1.5">
+            <c.icon className={cn("h-3.5 w-3.5", c.textColor)} />
+            <span className="text-xs text-muted-foreground">{c.label}</span>
+          </div>
+          <span className={cn("text-xl font-bold", c.textColor)}>{c.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HRDashboard() {
@@ -367,6 +432,19 @@ export default function HRDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Resumen Financiero de Personal */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
+              Resumen Financiero de Personal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FinancialSummaryCards />
+          </CardContent>
+        </Card>
 
         {/* Estado Actual de la Plantilla */}
         <div>
