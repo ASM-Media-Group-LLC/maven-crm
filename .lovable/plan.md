@@ -1,46 +1,31 @@
 
 
-## Diagnóstico: Por qué no se guarda el líder de Trafix
+## Plan: Agregar badge de miembros en cards y columna de miembros en tabla
 
-### Problema 1: RLS bloquea la actualización (PRINCIPAL)
+### Análisis actual
 
-La política RLS de UPDATE en `task_projects` es:
-```sql
-auth.uid() = created_by
-```
+Las cards ya muestran avatares de miembros en la parte inferior (líneas 299-325 de `ProjectsListContent.tsx`), pero el usuario quiere un **badge en la esquina** de la card con hover para ver los miembros. La tabla (`ProjectsTable.tsx`) no tiene ninguna columna de miembros.
 
-El proyecto Trafix fue creado por **Daniel Botero** (`b9646617-...`), pero la usuaria actual es **Marielby Quijada** (`471666b6-...`). Como Marielby no es la creadora del proyecto, el UPDATE se ejecuta pero **no afecta ninguna fila** (Supabase retorna 204 silenciosamente). El request de red confirma esto: el PATCH retorna 204 pero el `leader_id` sigue en `null` en la base de datos.
+### Cambios
 
-### Problema 2: El código no detecta el fallo silencioso
+#### 1. Cards — Badge de miembros en la esquina (`ProjectsListContent.tsx`)
 
-El mutation en `useProjects.ts` no verifica si el UPDATE realmente modificó alguna fila. Como Supabase no lanza error cuando RLS bloquea un update (simplemente no modifica nada), el toast "Proyecto actualizado" aparece aunque no se guardó nada.
+- Mover los avatares de miembros de la parte inferior a la **esquina superior derecha** de la card (junto al botón de acciones).
+- Envolver los avatares en un `HoverCard` que al hacer hover muestre una lista completa de los miembros del proyecto con sus nombres.
+- Si no hay miembros, no mostrar nada (como está ahora).
+- Eliminar los avatares de la sección inferior de task counts.
 
-### Solución
+#### 2. Tabla — Columna de miembros (`ProjectsTable.tsx`)
 
-#### 1. Corregir la política RLS de UPDATE
-
-Actualizar la política para permitir que **miembros del proyecto** también puedan actualizar (no solo el creador):
-
-```sql
-DROP POLICY "Creators can update projects" ON task_projects;
-CREATE POLICY "Project members and creators can update projects"
-  ON task_projects FOR UPDATE
-  USING (
-    auth.uid() = created_by
-    OR is_project_member(auth.uid(), id)
-  );
-```
-
-Esto permite que Marielby (y cualquier miembro asignado al proyecto) pueda editar el proyecto, incluyendo asignar líder.
-
-#### 2. (Opcional) Agregar verificación de filas afectadas
-
-En `useProjects.ts`, cambiar el update para usar `.select()` y verificar que se retornó una fila, mostrando un error descriptivo si RLS bloqueó el cambio.
+- Agregar una nueva prop `getMembersForProject` que retorne los perfiles de miembros para un proyecto.
+- Agregar una columna "Miembros" en la tabla después de "Líder".
+- Mostrar avatares apilados (máx 3) con `+N` si hay más, usando `Tooltip` para mostrar el nombre de cada uno.
+- Actualizar la llamada en `ProjectsListContent.tsx` para pasar la función `getMembersForProject`.
 
 ### Archivos a modificar
 
-| Recurso | Cambio |
+| Archivo | Cambio |
 |---------|--------|
-| Migración SQL | Actualizar política RLS de UPDATE en `task_projects` |
-| `src/pages/tareas/useProjects.ts` | (Opcional) Agregar `.select()` al update para detectar fallos silenciosos |
+| `src/pages/tareas/ProjectsListContent.tsx` | Mover avatares de miembros a esquina superior de card con HoverCard; pasar `getMembersForProject` a ProjectsTable |
+| `src/pages/tareas/ProjectsTable.tsx` | Agregar columna "Miembros" con avatares + tooltip, nueva prop `getMembersForProject` |
 
