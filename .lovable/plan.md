@@ -1,41 +1,32 @@
 
 
-## Plan: Hacer todos los proyectos visibles para los 4 usuarios
+## Diagnóstico: Por qué no puedes actualizar Trafix
 
-### Situación actual
+El proyecto Trafix fue creado por **Daniel Botero**. La política RLS de UPDATE que aplicamos permite editar si eres el creador **o** si eres miembro del proyecto. Pero nadie fue agregado como miembro de Trafix, así que Marielby no tiene permisos de UPDATE.
 
-La política RLS de SELECT en `task_projects` solo permite ver proyectos si:
-- Eres el creador (`created_by = auth.uid()`)
-- Tienes tareas en el proyecto (`user_has_tasks_in_project`)
-- Eres miembro del proyecto (`is_project_member`)
+Es el mismo problema que tuvimos con SELECT: la restricción por creador/miembro no funciona bien cuando todos deberían tener acceso.
 
-Por eso, si un admin crea un proyecto y no agrega a los otros como miembros, estos no lo ven.
+### Solución
 
-### Problema adicional
-
-Los 4 usuarios tienen `company_id = null`, por lo que no se puede filtrar por compañía de forma confiable ahora mismo.
-
-### Solución propuesta
-
-Dado que los 4 son el equipo completo y todos son admins, la solución mas simple y escalable es actualizar la política RLS de SELECT para que **todos los usuarios autenticados** puedan ver todos los proyectos:
+Actualizar la política RLS de UPDATE (y también DELETE para consistencia) para permitir que todos los usuarios autenticados puedan editar y eliminar proyectos:
 
 ```sql
-DROP POLICY IF EXISTS "Users can view relevant projects" ON task_projects;
-CREATE POLICY "Users can view relevant projects"
-  ON task_projects FOR SELECT
+DROP POLICY IF EXISTS "Project members and creators can update projects" ON task_projects;
+CREATE POLICY "Authenticated users can update projects"
+  ON task_projects FOR UPDATE
+  USING (true);
+
+DROP POLICY IF EXISTS "Creators can delete projects" ON task_projects;
+CREATE POLICY "Authenticated users can delete projects"
+  ON task_projects FOR DELETE
   USING (true);
 ```
-
-Esto es seguro porque:
-1. La tabla ya tiene RLS habilitado (solo usuarios autenticados pasan)
-2. Las políticas de UPDATE y DELETE siguen restringidas al creador/miembros
-3. Es consistente con cómo funcionan otras tablas del sistema (contactos, agencias, etc.)
 
 ### Archivos a modificar
 
 | Recurso | Cambio |
 |---------|--------|
-| Migración SQL | Reemplazar la política SELECT de `task_projects` con `USING (true)` |
+| Migración SQL | Abrir políticas de UPDATE y DELETE en `task_projects` a `USING (true)` |
 
 No se requieren cambios en el frontend.
 
