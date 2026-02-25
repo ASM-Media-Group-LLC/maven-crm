@@ -81,7 +81,7 @@ const DashboardSidebar = () => {
         { title: "Candidatos", url: "/hr/candidatos" },
         { title: "Onboarding", url: "/hr/onboarding" },
         { title: "Empleados Activos", url: "/hr/directorio" },
-        { title: "Offboarding", url: null },
+        { title: "Offboarding", url: "/hr/offboarding" },
       ],
     },
     {

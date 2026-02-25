@@ -1736,6 +1736,56 @@ export type Database = {
           },
         ]
       }
+      employee_offboarding_tasks: {
+        Row: {
+          category: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          offboarding_id: string
+          position: number
+          status: string
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          offboarding_id: string
+          position?: number
+          status?: string
+          title: string
+        }
+        Update: {
+          category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          offboarding_id?: string
+          position?: number
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_offboarding_tasks_offboarding_id_fkey"
+            columns: ["offboarding_id"]
+            isOneToOne: false
+            referencedRelation: "employee_offboarding"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_onboarding: {
         Row: {
           buddy_employee_id: string | null
