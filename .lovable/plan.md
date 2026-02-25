@@ -1,78 +1,60 @@
 
 
-## Plan: Corregir modales de tareas — scroll interno, datepicker auto-cierre y input de hora
+## Plan: Miembros de proyecto deben ver todas las tareas y subtareas del proyecto
 
-### Problemas identificados
+### Problema actual
 
-1. **Sin scroll interno**: `DialogContent` usa `space-y-4` en el form pero no tiene contenedor scrollable. En pantallas pequeñas o con muchos campos, el contenido se desborda sin scroll.
+Las politicas RLS de `tasks` solo permiten ver tareas donde el usuario es:
+- `assigned_to` (asignado principal)
+- `created_by` (creador)
+- presente en `task_assignees` (asignado via junction table)
 
-2. **DatePicker no se cierra al seleccionar fecha**: Los `Popover` de calendario no tienen estado controlado — al seleccionar un día, el popover permanece abierto porque no hay `open/onOpenChange` controlados que cierren tras la selección.
+Un usuario que fue agregado como **miembro del proyecto** (`project_members`) pero no esta asignado a ninguna tarea especifica **no puede ver ninguna tarea** dentro de ese proyecto. Esto contradice la logica esperada: si te agregan a un proyecto, deberias ver todo su contenido.
 
-3. **Input de hora nativo (`<input type="time">`)**: No coincide con el design system. Debe reemplazarse con un Select de hora (dropdown con opciones cada 30 min) usando el componente `Select` de Shadcn.
+El mismo problema afecta a `subtasks`, cuyas politicas RLS dependen de la visibilidad del parent task (solo revisan `assigned_to` y `created_by`, ni siquiera `task_assignees`).
 
----
+### Solucion
 
-### Correcciones
+Una migracion SQL que actualiza las politicas RLS de `tasks` y `subtasks` para agregar la verificacion de membresia de proyecto.
 
-#### 1. Scroll interno en DialogContent
+#### 1. Politicas de `tasks` (SELECT, UPDATE, DELETE)
 
-Aplicar el patrón documentado en memoria (`form-layout-sticky`):
+Agregar condicion `is_project_member(auth.uid(), project_id)`:
 
-- `DialogContent`: agregar `!flex !flex-col gap-0 max-h-[85vh]`
-- `DialogHeader`: mantener como `shrink-0`
-- Form body: envolver en `<div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1">`
-- Footer (botones): mover fuera del div scrollable como `shrink-0 pt-4`
-
-Aplicar en: `CreateTaskModal`, `EditTaskModal`
-
-#### 2. DatePicker auto-cierre al seleccionar
-
-Convertir cada `Popover` de calendario a estado controlado:
-
-```tsx
-const [startCalOpen, setStartCalOpen] = useState(false);
-
-<Popover open={startCalOpen} onOpenChange={setStartCalOpen}>
-  ...
-  <Calendar
-    onSelect={(date) => {
-      setStartDate(date);
-      setStartCalOpen(false); // cierra al seleccionar
-    }}
-  />
-</Popover>
+```sql
+auth.uid() = assigned_to
+OR auth.uid() = created_by
+OR EXISTS (SELECT 1 FROM task_assignees WHERE task_id = id AND user_id = auth.uid())
+OR is_project_member(auth.uid(), project_id)  -- NUEVO
 ```
 
-Aplicar en todos los calendarios de: `CreateTaskModal` (2 calendarios), `EditTaskModal` (2 calendarios), `SubtasksPanel` (2 calendarios).
+#### 2. Politicas de `subtasks` (SELECT, INSERT, UPDATE, DELETE)
 
-#### 3. Reemplazar `<input type="time">` con Select de hora
+Reemplazar la verificacion del parent task para incluir membresia de proyecto y task_assignees:
 
-Crear un selector de hora con `Select` de Shadcn, con opciones cada 30 minutos (00:00, 00:30, 01:00, ..., 23:30):
-
-```tsx
-<Select value={startTime} onValueChange={setStartTime}>
-  <SelectTrigger className="w-28">
-    <SelectValue placeholder="Hora" />
-  </SelectTrigger>
-  <SelectContent>
-    {timeOptions.map(t => (
-      <SelectItem key={t} value={t}>{t}</SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+```sql
+EXISTS (
+  SELECT 1 FROM public.tasks
+  WHERE tasks.id = subtasks.task_id
+  AND (
+    tasks.assigned_to = auth.uid()
+    OR tasks.created_by = auth.uid()
+    OR EXISTS (SELECT 1 FROM task_assignees WHERE task_id = tasks.id AND user_id = auth.uid())
+    OR is_project_member(auth.uid(), tasks.project_id)  -- NUEVO
+  )
+)
 ```
 
-Constante `timeOptions` generada: `["00:00", "00:30", "01:00", ...]` (48 opciones).
+### Impacto
 
-Aplicar en: `CreateTaskModal` (2 inputs time), `EditTaskModal` (2 inputs time).
+- Miembros de proyecto veran todas las tareas y subtareas del proyecto, sin necesidad de ser asignados individualmente
+- El creador del proyecto y los asignados a tareas mantienen su acceso actual
+- No se modifica codigo de aplicacion, solo SQL
+- La funcion `is_project_member` ya existe como SECURITY DEFINER, evitando recursion RLS
 
----
+### Archivo
 
-### Archivos a modificar
-
-| Archivo | Cambios |
-|---------|---------|
-| `src/pages/tareas/CreateTaskModal.tsx` | Scroll interno, 2 calendarios controlados con auto-cierre, 2 inputs time → Select hora |
-| `src/pages/tareas/EditTaskModal.tsx` | Scroll interno, 2 calendarios controlados con auto-cierre, 2 inputs time → Select hora |
-| `src/pages/tareas/SubtasksPanel.tsx` | 2 calendarios controlados con auto-cierre (no tiene inputs time ni modal, solo popover fix) |
+| Archivo | Accion |
+|---------|--------|
+| Nueva migracion SQL | DROP/CREATE de 3 politicas en `tasks` + 4 politicas en `subtasks` |
 
