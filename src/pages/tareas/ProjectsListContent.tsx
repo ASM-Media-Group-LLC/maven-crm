@@ -265,12 +265,14 @@ const ProjectsListContent = () => {
                       {renderProjectActions(project)}
                     </div>
                     {/* Leader */}
-                    {leader && (
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4 text-amber-500" />
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-amber-500" />
+                      {leader ? (
                         <span className="text-sm font-semibold">{leader.full_name || "Sin nombre"}</span>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Sin líder asignado</span>
+                      )}
+                    </div>
                     {/* Progress bar */}
                     <div className="flex items-center gap-2">
                       <Progress value={progress} className="h-2.5 flex-1" />

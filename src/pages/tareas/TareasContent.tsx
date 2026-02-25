@@ -137,12 +137,14 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
           <p className="text-sm text-muted-foreground max-w-2xl line-clamp-2 mt-1 ml-11">{projectDescription}</p>
         )}
         {/* Leader */}
-        {projectLeader && (
-          <div className="flex items-center gap-2 mt-2 ml-11">
-            <Crown className="h-4 w-4 text-amber-500" />
+        <div className="flex items-center gap-2 mt-2 ml-11">
+          <Crown className="h-4 w-4 text-amber-500" />
+          {projectLeader ? (
             <span className="text-sm font-semibold">{projectLeader.full_name}</span>
-          </div>
-        )}
+          ) : (
+            <span className="text-sm text-muted-foreground">Sin líder asignado</span>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
