@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, projectDescription, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, projectDescription, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees, updateProjectInline } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -33,6 +33,19 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [assignedFilter, setAssignedFilter] = useState<string>("");
   const [priorityFilter, setPriorityFilter] = useState<string>("");
+
+  // Inline editing states
+  const [editingName, setEditingName] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [editingLeader, setEditingLeader] = useState(false);
+  const [nameValue, setNameValue] = useState(projectName || "");
+  const [descValue, setDescValue] = useState(projectDescription || "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const descInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync local state when project data changes
+  useEffect(() => { setNameValue(projectName || ""); }, [projectName]);
+  useEffect(() => { setDescValue(projectDescription || ""); }, [projectDescription]);
 
   const now = Date.now();
 
@@ -126,23 +139,127 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-bold">{projectName || "Tareas"}</h1>
+            {editingName ? (
+              <Input
+                ref={nameInputRef}
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                className="text-2xl font-bold h-auto py-0 px-1 border-primary"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const trimmed = nameValue.trim();
+                    if (trimmed && trimmed !== projectName) {
+                      updateProjectInline.mutate({ name: trimmed });
+                    } else {
+                      setNameValue(projectName || "");
+                    }
+                    setEditingName(false);
+                  }
+                  if (e.key === "Escape") {
+                    setNameValue(projectName || "");
+                    setEditingName(false);
+                  }
+                }}
+                onBlur={() => {
+                  const trimmed = nameValue.trim();
+                  if (trimmed && trimmed !== projectName) {
+                    updateProjectInline.mutate({ name: trimmed });
+                  } else {
+                    setNameValue(projectName || "");
+                  }
+                  setEditingName(false);
+                }}
+              />
+            ) : (
+              <h1
+                className="text-2xl font-bold cursor-pointer group/name flex items-center gap-2 hover:text-primary transition-colors"
+                onClick={() => setEditingName(true)}
+              >
+                {projectName || "Tareas"}
+                <Pencil className="h-3.5 w-3.5 opacity-0 group-hover/name:opacity-60 transition-opacity" />
+              </h1>
+            )}
           </div>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
           </Button>
         </div>
-        {/* Description as subtitle */}
-        {projectDescription && (
-          <p className="text-sm text-muted-foreground max-w-2xl line-clamp-2 mt-1 ml-11">{projectDescription}</p>
-        )}
-        {/* Leader */}
+        {/* Description inline */}
+        <div className="ml-11 mt-1">
+          {editingDesc ? (
+            <Input
+              ref={descInputRef}
+              value={descValue}
+              onChange={(e) => setDescValue(e.target.value)}
+              placeholder="Agregar descripción..."
+              className="text-sm max-w-2xl h-auto py-0.5 px-1 border-primary"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const val = descValue.trim() || null;
+                  if (val !== (projectDescription || null)) {
+                    updateProjectInline.mutate({ description: val });
+                  }
+                  setEditingDesc(false);
+                }
+                if (e.key === "Escape") {
+                  setDescValue(projectDescription || "");
+                  setEditingDesc(false);
+                }
+              }}
+              onBlur={() => {
+                const val = descValue.trim() || null;
+                if (val !== (projectDescription || null)) {
+                  updateProjectInline.mutate({ description: val });
+                }
+                setEditingDesc(false);
+              }}
+            />
+          ) : (
+            <p
+              className="text-sm text-muted-foreground max-w-2xl line-clamp-2 cursor-pointer group/desc flex items-center gap-2 hover:text-foreground transition-colors"
+              onClick={() => setEditingDesc(true)}
+            >
+              {projectDescription || "Agregar descripción..."}
+              <Pencil className="h-3 w-3 opacity-0 group-hover/desc:opacity-60 transition-opacity" />
+            </p>
+          )}
+        </div>
+        {/* Leader inline */}
         <div className="flex items-center gap-2 mt-2 ml-11">
           <Crown className="h-4 w-4 text-amber-500" />
-          {projectLeader ? (
-            <span className="text-sm font-semibold">{projectLeader.full_name}</span>
+          {editingLeader ? (
+            <Select
+              value={projectLeaderId || "__none__"}
+              onValueChange={(v) => {
+                const newLeader = v === "__none__" ? null : v;
+                if (newLeader !== projectLeaderId) {
+                  updateProjectInline.mutate({ leader_id: newLeader });
+                }
+                setEditingLeader(false);
+              }}
+            >
+              <SelectTrigger className="w-[200px] h-7 text-sm" autoFocus onBlur={() => setEditingLeader(false)}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin líder</SelectItem>
+                {companyProfiles.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.full_name || p.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
-            <span className="text-sm text-muted-foreground">Sin líder asignado</span>
+            <span
+              className="text-sm font-semibold cursor-pointer group/leader flex items-center gap-2 hover:text-primary transition-colors"
+              onClick={() => setEditingLeader(true)}
+            >
+              {projectLeader ? projectLeader.full_name : "Sin líder asignado"}
+              <Pencil className="h-3 w-3 opacity-0 group-hover/leader:opacity-60 transition-opacity" />
+            </span>
           )}
         </div>
       </header>
