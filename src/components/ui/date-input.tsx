@@ -114,7 +114,7 @@ export function DateInput({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "justify-start text-left font-normal",
+            "w-full justify-start text-left font-normal",
             !selectedDate && "text-muted-foreground",
             className
           )}
@@ -123,7 +123,7 @@ export function DateInput({
           {triggerLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start" sideOffset={4} collisionPadding={16}>
+      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start" side="bottom" sideOffset={4} collisionPadding={16}>
         <div className="p-3">
           <DayPicker
             mode="single"
