@@ -1,7 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Download, Trash2, Plus, Search, X, LayoutGrid, List,
+  FileText, Download, Trash2, Plus, Search, X, LayoutGrid, List, Building2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +40,65 @@ const REPORT_TYPES: Record<string, string> = {
 
 function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
+}
+
+function DepartmentCostSection() {
+  const { data: employees = [] } = useQuery({
+    queryKey: ["reportes-dept-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("employees").select("base_salary, status, departments(name)").eq("status", "activo");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const deptGroups = employees.reduce((acc, e: any) => {
+    const dept = e.departments?.name || "Sin Departamento";
+    if (!acc[dept]) acc[dept] = { count: 0, total: 0 };
+    acc[dept].count++;
+    acc[dept].total += Number(e.base_salary) || 0;
+    return acc;
+  }, {} as Record<string, { count: number; total: number }>);
+
+  const entries = Object.entries(deptGroups).sort((a, b) => b[1].total - a[1].total);
+  const grandTotal = entries.reduce((s, [, d]) => s + d.total, 0);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-medium">Costo Salarial por Departamento</h3>
+      </div>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <Table>
+          <TableHeader><TableRow className="bg-card">
+            <TableHead className="text-xs font-medium text-muted-foreground">Departamento</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground"># Empleados</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">Costo Salarial</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">% del Total</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {entries.map(([dept, data]) => (
+              <TableRow key={dept} className="hover:bg-muted/30">
+                <TableCell className="text-sm font-medium">{dept}</TableCell>
+                <TableCell className="text-sm">{data.count}</TableCell>
+                <TableCell className="text-sm">{fmt(data.total)}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{grandTotal > 0 ? ((data.total / grandTotal) * 100).toFixed(1) : 0}%</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="font-semibold bg-muted/30">
+              <TableCell className="text-sm">Total</TableCell>
+              <TableCell className="text-sm">{entries.reduce((s, [, d]) => s + d.count, 0)}</TableCell>
+              <TableCell className="text-sm">{fmt(grandTotal)}</TableCell>
+              <TableCell className="text-sm">100%</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
 }
 
 export default function ReportesPage() {
@@ -330,7 +389,12 @@ export default function ReportesPage() {
           const matchTo = !dateTo || d <= dateTo;
           return matchSearch && matchFrom && matchTo && r.area;
         });
-        return renderReportsTable(filtered);
+        return (
+          <div className="space-y-6">
+            {renderReportsTable(filtered)}
+            <DepartmentCostSection />
+          </div>
+        );
       }
 
       default: {
@@ -347,7 +411,7 @@ export default function ReportesPage() {
     }
   };
 
-  const renderReportsTable = (filtered: any[]) => viewMode === "list" ? (
+  const renderReportsTable = (filtered: any[]): React.ReactNode => viewMode === "list" ? (
     <div className="rounded-lg border border-border overflow-hidden">
       <div className="overflow-auto max-h-[calc(100vh-24rem)]">
         <Table>
