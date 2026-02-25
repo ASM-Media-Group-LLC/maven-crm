@@ -23,7 +23,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, projectDescription, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -126,27 +126,29 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-bold">{projectName || "Tareas"}</h1>
-              <div className="flex items-center gap-3 mt-0.5">
-                <p className="text-sm text-muted-foreground">Tareas del proyecto</p>
-                {projectLeader && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Shield className="h-3 w-3 text-primary" />
-                    {projectLeader.full_name}
-                  </span>
-                )}
-              </div>
+              {projectDescription && (
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{projectDescription}</p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 min-w-[120px]">
-              <Progress value={projectProgress} className="h-2 flex-1" />
-              <span className="text-xs text-muted-foreground">{projectProgress}%</span>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+          </Button>
+        </div>
+        {/* Project leader + progress summary */}
+        <div className="flex items-center gap-6 mt-3 ml-11">
+          {projectLeader && (
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Líder: {projectLeader.full_name}</span>
             </div>
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-            </Button>
+          )}
+          <div className="flex items-center gap-2 min-w-[220px] flex-1 max-w-md">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Progreso</span>
+            <Progress value={projectProgress} className="h-3 flex-1" />
+            <span className="text-sm font-semibold">{projectProgress}%</span>
           </div>
         </div>
       </header>
