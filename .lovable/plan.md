@@ -1,34 +1,41 @@
 
 
-## Plan: Simplificar cards de proyecto y rediseñar header interno
+## Diagnóstico: El líder con Crown ya está implementado
 
-### Cambios en cards de proyecto (`ProjectsListContent.tsx`)
+Revisé el código y el cambio **ya existe** en ambos archivos:
 
-**Conteos de tareas**: Mostrar solo iconos + número (sin texto), formato compacto:
-- `🕐 1` `▶ 0` `✅ 0` — iconos con contador, sin labels como "pendientes", "en curso", etc.
-- Mantener el icono de vencidas solo si > 0.
+**`ProjectsListContent.tsx` (líneas 267-273):**
+```tsx
+{leader && (
+  <div className="flex items-center gap-2">
+    <Crown className="h-4 w-4 text-amber-500" />
+    <span className="text-sm font-semibold">{leader.full_name || "Sin nombre"}</span>
+  </div>
+)}
+```
 
-**Líder de equipo**: Mostrar con icono `Crown` (corona) + nombre completo en `text-sm font-semibold`, sin el prefijo "Líder:". Usar un estilo más integrado (no badge con fondo) sino como línea dedicada con icono + nombre.
+**`TareasContent.tsx` (líneas 139-145):**
+```tsx
+{projectLeader && (
+  <div className="flex items-center gap-2 mt-2 ml-11">
+    <Crown className="h-4 w-4 text-amber-500" />
+    <span className="text-sm font-semibold">{projectLeader.full_name}</span>
+  </div>
+)}
+```
 
-**Progress bar**: Mantener como está (h-2.5), ya es razonable.
+### Por qué no lo ves
 
-### Cambios en header interno del proyecto (`TareasContent.tsx`)
+El líder **solo se muestra si el proyecto tiene un `leader_id` asignado**. Si el proyecto no tiene líder, la sección se oculta completamente. Esto explica por qué no ves el cambio.
 
-**Descripción**: Sacarla de la card/banner y colocarla como texto simple debajo del título `h1`, como un subtítulo normal (`text-sm text-muted-foreground max-w-2xl`), similar a como se hacía antes pero con ancho limitado.
+### Propuesta: Mostrar siempre la línea de líder
 
-**Líder del proyecto**: Sacarlo del banner y mostrarlo también debajo de la descripción con icono `Crown` + nombre, como línea independiente, visible y prominente.
-
-**Progress bar**: Eliminar la barra lineal del banner. En su lugar, agregar una card de progreso circular antes de las KPI cards. La card mostrará:
-- Un indicador circular (SVG donut) con el porcentaje en el centro.
-- Los conteos de tareas debajo como referencia compacta.
-- Título "Progreso del proyecto".
-
-**Eliminar el banner `bg-card` completo** — la info se redistribuye: descripción y líder van al header, progreso va a una card dedicada.
-
-### Archivos a modificar
+Para que sea siempre visible, cambiar la lógica para mostrar un placeholder cuando no hay líder asignado:
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/ProjectsListContent.tsx` | Conteos solo icono+número, líder con Crown+nombre sin badge |
-| `src/pages/tareas/TareasContent.tsx` | Descripción como subtítulo, líder debajo, eliminar banner, card circular de progreso antes de KPIs |
+| `src/pages/tareas/ProjectsListContent.tsx` | Eliminar el condicional `{leader && ...}` y mostrar siempre: si hay líder → Crown + nombre, si no → Crown + "Sin líder asignado" en texto muted |
+| `src/pages/tareas/TareasContent.tsx` | Mismo cambio: mostrar siempre la línea de líder con un fallback "Sin líder asignado" |
+
+Esto hará que la sección de líder sea siempre visible independientemente de si el proyecto tiene un líder configurado.
 
