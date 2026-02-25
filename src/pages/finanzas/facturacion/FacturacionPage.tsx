@@ -4,6 +4,7 @@ import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
   Search, X, LayoutGrid, List,
 } from "lucide-react";
+import { usePaymentMethods } from "@/hooks/useFinancialConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ function fmt(n: number) {
 export default function FacturacionPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { methods: configuredPaymentMethods } = usePaymentMethods();
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -257,6 +259,18 @@ export default function FacturacionPage() {
       case "Fees & Ajustes":
         return (
           <>
+            {configuredPaymentMethods.length > 0 && (
+              <div className="rounded-lg border border-border p-4 mb-4 space-y-2">
+                <p className="text-sm font-medium">Métodos de Pago Configurados</p>
+                <div className="flex flex-wrap gap-2">
+                  {configuredPaymentMethods.filter(m => m.active).map(m => (
+                    <Badge key={m.name} variant="secondary" className="text-xs">
+                      {m.name} · {m.commission_pct}%
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">Detalle de fees aplicados a invoices</p>
             <div className="rounded-lg border border-border overflow-hidden">
               <div className="overflow-auto max-h-[calc(100vh-24rem)]">

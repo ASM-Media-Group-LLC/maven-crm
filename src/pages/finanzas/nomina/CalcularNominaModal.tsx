@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format } from "date-fns";
+import { useCostCenters, usePayrollParams } from "@/hooks/useFinancialConfig";
 
 interface Props {
   open: boolean;
@@ -26,6 +27,8 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [costCenter, setCostCenter] = useState("");
   const [notes, setNotes] = useState("");
+  const { centers } = useCostCenters();
+  const { params: payrollParams } = usePayrollParams();
 
   const totalBase = employees.reduce((s, e) => s + (Number(e.base_salary) || 0), 0);
 
@@ -65,9 +68,9 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
               <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Ninguno</SelectItem>
-                <SelectItem value="operaciones">Operaciones</SelectItem>
-                <SelectItem value="ventas">Ventas</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                {centers.map(c => (
+                  <SelectItem key={c.code} value={c.code}>{c.name} ({c.code})</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -79,6 +82,12 @@ export default function CalcularNominaModal({ open, onClose, employees, onSubmit
             <p className="text-sm font-medium">Preview del Cálculo</p>
             <p className="text-sm text-muted-foreground">Empleados activos: <strong>{employees.length}</strong></p>
             <p className="text-sm text-muted-foreground">Total salarios base: <strong>{fmt(totalBase)}</strong></p>
+            {payrollParams && (
+              <div className="text-xs text-muted-foreground space-y-0.5 mt-2 pt-2 border-t border-border">
+                <p>Salud: {payrollParams.deductions.health_pct}% · Pensión: {payrollParams.deductions.pension_pct}%{payrollParams.deductions.tax_pct > 0 ? ` · Impuestos: ${payrollParams.deductions.tax_pct}%` : ""}</p>
+                <p>HE Diurno: {payrollParams.overtime_multipliers.daytime}x · Nocturno: {payrollParams.overtime_multipliers.nighttime}x · Festivo: {payrollParams.overtime_multipliers.holiday}x</p>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">El monto final incluirá horas extra, comisiones y deducciones aplicadas.</p>
           </div>
         </div>
