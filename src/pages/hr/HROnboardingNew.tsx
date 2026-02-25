@@ -230,7 +230,7 @@ export default function HROnboardingNew() {
 
       {/* Stepper */}
       <div className="shrink-0 border-b bg-background px-6 py-4">
-        <div className="max-w-3xl mx-auto">
+        <div>
           <div className="flex items-center justify-between mb-3">
             {STEPS.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -255,7 +255,7 @@ export default function HROnboardingNew() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto px-6 py-6">
-        <div className="max-w-3xl mx-auto">
+        <div>
 
           {/* Step 1: Employee & Config */}
           {step === 0 && (
