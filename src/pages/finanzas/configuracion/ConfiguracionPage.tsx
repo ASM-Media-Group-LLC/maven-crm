@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save, ArrowLeft, FileText, CreditCard, Building2, Percent, Calculator } from "lucide-react";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -350,20 +352,71 @@ function PayrollParamsTab() {
   );
 }
 
+// ─── Section definitions ──────────────────────────────────────
+const SECTIONS = [
+  { key: "quickbooks", title: "Templates QuickBooks", icon: FileText, description: "Mapeo de categorías a cuentas contables de QuickBooks" },
+  { key: "payment_methods", title: "Métodos de Pago", icon: CreditCard, description: "Métodos de pago y comisiones aplicadas a invoices" },
+  { key: "cost_centers", title: "Centros de Costo", icon: Building2, description: "Centros de costo para segmentar nómina y gastos" },
+  { key: "commissions", title: "Config. Comisiones", icon: Percent, description: "Porcentajes de comisión por defecto y excepciones" },
+  { key: "payroll", title: "Parámetros de Nómina", icon: Calculator, description: "Cálculo de nómina, horas extra y banco de horas" },
+] as const;
+
+type SectionKey = typeof SECTIONS[number]["key"];
+
 // ─── Main Page ────────────────────────────────────────────────
 export default function ConfiguracionPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("Templates QuickBooks");
+  const [activeSection, setActiveSection] = useState<SectionKey | null>(null);
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case "Templates QuickBooks": return <QuickBooksTab />;
-      case "Métodos de Pago": return <PaymentMethodsTab />;
-      case "Centros de Costo": return <CostCentersTab />;
-      case "Config. Comisiones": return <CommissionsTab />;
-      case "Parámetros de Nómina": return <PayrollParamsTab />;
+  const { mappings } = useQuickBooksTemplates();
+  const { methods } = usePaymentMethods();
+  const { centers } = useCostCenters();
+  const { defaults } = useCommissionDefaults();
+  const { params } = usePayrollParams();
+
+  const activeMethods = methods.filter(m => m.active).length;
+  const totalBudget = centers.reduce((s, c) => s + c.monthly_budget, 0);
+  const exceptionsCount = defaults?.exceptions?.length ?? 0;
+
+  const renderDetail = () => {
+    switch (activeSection) {
+      case "quickbooks": return <QuickBooksTab />;
+      case "payment_methods": return <PaymentMethodsTab />;
+      case "cost_centers": return <CostCentersTab />;
+      case "commissions": return <CommissionsTab />;
+      case "payroll": return <PayrollParamsTab />;
+      default: return null;
     }
   };
 
+  const activeTitle = SECTIONS.find(s => s.key === activeSection)?.title;
+
+  // ── Detail view ──
+  if (activeSection) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setActiveSection(null)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Configuración Financiera</span>
+                <span>/</span>
+                <span className="text-foreground font-medium">{activeTitle}</span>
+              </div>
+              <h1 className="text-xl font-semibold text-foreground">{activeTitle}</h1>
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 overflow-auto p-6">
+          {renderDetail()}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main cards view ──
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
@@ -371,14 +424,48 @@ export default function ConfiguracionPage() {
         <p className="text-sm text-muted-foreground">Parámetros y plantillas del módulo de finanzas</p>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-5">
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-          {TABS.map(t => (
-            <Button key={t} variant={activeTab === t ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(t)}>{t}</Button>
-          ))}
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* KPI Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <DashboardMetricCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} subtitle="cuentas configuradas" hoverClass="hover:border-primary/30" />
+          <DashboardMetricCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} subtitle="métodos activos" hoverClass="hover:border-accent/30" />
+          <DashboardMetricCard label="Centros de Costo" value={String(centers.length)} icon={Building2} subtitle={fmt(totalBudget) + " presupuesto"} hoverClass="hover:border-primary/30" />
+          <DashboardMetricCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} subtitle={`${exceptionsCount} excepciones`} hoverClass="hover:border-accent/30" />
+          <DashboardMetricCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} hoverClass="hover:border-primary/30" />
         </div>
 
-        {renderTab()}
+        {/* Section Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {SECTIONS.map(s => {
+            const count =
+              s.key === "quickbooks" ? `${mappings.length} mapeos` :
+              s.key === "payment_methods" ? `${activeMethods} activos` :
+              s.key === "cost_centers" ? `${centers.length} centros` :
+              s.key === "commissions" ? `${exceptionsCount} excepciones` :
+              `${params?.hour_bank?.validity_months ?? 0} meses vigencia`;
+
+            return (
+              <Card
+                key={s.key}
+                className="cursor-pointer transition-all duration-200 hover:translate-y-[-2px] hover:border-primary/30 hover:shadow-md"
+                onClick={() => setActiveSection(s.key)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <s.icon className="h-4.5 w-4.5 text-muted-foreground" />
+                    </div>
+                    <CardTitle className="text-base">{s.title}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-2">{s.description}</p>
+                  <Badge variant="secondary" className="text-xs">{count}</Badge>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
