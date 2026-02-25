@@ -108,11 +108,14 @@ export const useProjects = () => {
 
   const updateProject = useMutation({
     mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("task_projects" as any)
         .update({ name: project.name, description: project.description || null, leader_id: project.leaderId || null } as any)
-        .eq("id", project.id);
+        .eq("id", project.id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!updated) throw new Error("No tienes permisos para editar este proyecto.");
 
       if (project.memberIds !== undefined) {
         // Get existing members before deleting
