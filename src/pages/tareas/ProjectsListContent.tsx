@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Shield } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -266,9 +266,9 @@ const ProjectsListContent = () => {
                     </div>
                     {/* Leader */}
                     {leader && (
-                      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-primary/10 border border-primary/20 w-fit">
-                        <Shield className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-semibold text-primary">Líder: {leader.full_name || "Sin nombre"}</span>
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm font-semibold">{leader.full_name || "Sin nombre"}</span>
                       </div>
                     )}
                     {/* Progress bar */}
@@ -276,22 +276,22 @@ const ProjectsListContent = () => {
                       <Progress value={progress} className="h-2.5 flex-1" />
                       <span className="text-xs font-medium text-muted-foreground w-9 text-right">{progress}%</span>
                     </div>
-                    {/* Task counts - always visible */}
+                    {/* Task counts - icon + number only */}
                     <div className="flex items-center justify-between">
-                      <div className="flex gap-4 text-sm flex-wrap">
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <Clock className="h-3.5 w-3.5 text-primary" /> {counts.pending} pendientes
+                      <div className="flex gap-3 text-sm">
+                        <span className="flex items-center gap-1 text-muted-foreground" title="Pendientes">
+                          <Clock className="h-3.5 w-3.5 text-primary" /> {counts.pending}
                         </span>
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <Play className="h-3.5 w-3.5 text-blue-400" /> {counts.in_progress} en curso
+                        <span className="flex items-center gap-1 text-muted-foreground" title="En curso">
+                          <Play className="h-3.5 w-3.5 text-blue-400" /> {counts.in_progress}
                         </span>
                         {counts.overdue > 0 && (
-                          <span className="flex items-center gap-1.5 font-medium text-destructive">
-                            <AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue} vencidas
+                          <span className="flex items-center gap-1 font-medium text-destructive" title="Vencidas">
+                            <AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue}
                           </span>
                         )}
-                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-                          <CheckSquare className="h-3.5 w-3.5" /> {counts.completed} completadas
+                        <span className="flex items-center gap-1 text-emerald-400 font-medium" title="Completadas">
+                          <CheckSquare className="h-3.5 w-3.5" /> {counts.completed}
                         </span>
                       </div>
                       {(() => {

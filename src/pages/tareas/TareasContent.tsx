@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Shield } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
+// Progress removed - using circular SVG instead
 import { useTareas, type Task } from "./useTareas";
 import TaskCard from "./TaskCard";
 import DraggableGrid from "./DraggableGrid";
@@ -132,34 +132,41 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
           </Button>
         </div>
-        {/* Project summary banner */}
-        <div className="mt-3 ml-11 rounded-lg border border-border bg-card p-4 space-y-3">
-          {projectDescription && (
-            <p className="text-sm text-muted-foreground max-w-2xl line-clamp-2">{projectDescription}</p>
-          )}
-          <div className="flex items-center gap-6 flex-wrap">
-            {projectLeader && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
-                <Shield className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold text-primary">Líder: {projectLeader.full_name}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-sm">
-              <Progress value={projectProgress} className="h-3 flex-1" />
-              <span className="text-sm font-bold">{projectProgress}%</span>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-primary" /> {counts.pending} pendientes</span>
-              <span className="flex items-center gap-1.5"><Play className="h-3.5 w-3.5 text-blue-400" /> {counts.in_progress} en curso</span>
-              {counts.overdue > 0 && <span className="flex items-center gap-1.5 text-destructive font-medium"><AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue} vencidas</span>}
-              <span className="flex items-center gap-1.5 text-emerald-400 font-medium"><CheckSquare className="h-3.5 w-3.5" /> {counts.completed} completadas</span>
-            </div>
+        {/* Description as subtitle */}
+        {projectDescription && (
+          <p className="text-sm text-muted-foreground max-w-2xl line-clamp-2 mt-1 ml-11">{projectDescription}</p>
+        )}
+        {/* Leader */}
+        {projectLeader && (
+          <div className="flex items-center gap-2 mt-2 ml-11">
+            <Crown className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-semibold">{projectLeader.full_name}</span>
           </div>
-        </div>
+        )}
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {/* Circular progress card + KPI cards in one row */}
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
+          {/* Circular progress */}
+          <Card className="col-span-2 sm:col-span-1">
+            <CardContent className="flex flex-col items-center justify-center p-4 gap-2">
+              <div className="relative h-20 w-20">
+                <svg viewBox="0 0 36 36" className="h-20 w-20 -rotate-90">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--muted))" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="15.9" fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="3"
+                    strokeDasharray={`${projectProgress} ${100 - projectProgress}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-lg font-bold">{projectProgress}%</span>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">Progreso</p>
+            </CardContent>
+          </Card>
           {kpis.map((kpi) => (
             <Card key={kpi.label} className={cn("transition-all duration-200 cursor-default", kpi.hoverClass)}>
               <CardContent className="flex items-center gap-3 p-4">
