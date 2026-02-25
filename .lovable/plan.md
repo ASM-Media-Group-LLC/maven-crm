@@ -1,27 +1,75 @@
 
 
-## Plan: Corregir layout de header/footer fijos en Candidatos, Onboarding y Offboarding
+## Plan: Rediseñar el selector de mes/año del DateInput y documentar en Design System
 
-### Problema raíz
+### Problema actual
 
-Las tres páginas están envueltas por `HRLayout`, que proporciona sidebar + topbar y envuelve los children en un `<div className="flex-1 overflow-auto">`. Las páginas usan `h-screen` (100vh) como contenedor raíz, pero 100vh incluye la altura del topbar y sidebar, por lo que el contenido es más alto que el espacio disponible. Esto hace que el wrapper de HRLayout haga scroll de **toda** la página — incluyendo header y footer — en vez de mantenerlos fijos.
+El `DateInput` usa `captionLayout="dropdown-buttons"` de `react-day-picker`, que renderiza `<select>` nativos del navegador para mes y año. Estos selectores se ven inconsistentes con el design system (sin estilo, sin bordes redondeados adecuados, sin hover states) y el estilo aplicado via `classNames.dropdown` tiene limitaciones porque sigue siendo un `<select>` nativo.
 
 ### Solución
 
-Dos cambios coordinados:
+Reemplazar los dropdowns nativos por un header custom con:
+1. **Flechas de navegación** (izquierda/derecha) para cambiar mes a mes
+2. **Selector de mes**: botón que abre un grid de 12 meses (ene-dic) en un popover interno
+3. **Selector de año**: botón que abre una lista scrolleable de años en un popover interno
+4. Todo usando componentes Shadcn (Button, Popover, ScrollArea) para consistencia total
 
-1. **`HRLayout.tsx` (línea 11)**: Cambiar `overflow-auto` → `overflow-hidden` en el wrapper de children. Esto evita que el layout padre haga scroll y delega el control de scroll a cada página individual. Las demás páginas HR (Dashboard, Directorio, etc.) ya usan `h-full overflow-hidden` con su propio scroll interno, así que no se ven afectadas.
+### Diseño visual del header
 
-2. **Las tres páginas**: Cambiar `h-screen` → `h-full` para que su altura sea el 100% del espacio disponible (después del topbar), no el 100% del viewport.
+```text
+┌─────────────────────────────────────┐
+│  ◂   [ Febrero ▾ ] [ 2026 ▾ ]   ▸  │
+├─────────────────────────────────────┤
+│  lu  ma  mi  ju  vi  sá  do        │
+│  ...calendario...                   │
+├─────────────────────────────────────┤
+│  [ dd/mm/aaaa ]                     │
+│  ─────────────────────────────────  │
+│               Cancelar   Aplicar    │
+└─────────────────────────────────────┘
+```
+
+Al hacer click en "Febrero":
+```text
+┌───────────────────┐
+│ Ene  Feb  Mar  Abr│
+│ May  Jun  Jul  Ago│
+│ Sep  Oct  Nov  Dic│
+└───────────────────┘
+```
+
+Al hacer click en "2026":
+```text
+┌─────────────┐
+│ 2020        │
+│ 2021        │
+│ 2022        │
+│ ...scroll...│
+│ 2030        │
+└─────────────┘
+```
 
 ### Cambios
 
-| Archivo | Línea | Cambio |
-|---------|-------|--------|
-| `src/pages/hr/HRLayout.tsx` | 11 | `overflow-auto` → `overflow-hidden` |
-| `src/pages/hr/HROnboardingNew.tsx` | 221 | `h-screen overflow-hidden` → `h-full overflow-hidden` |
-| `src/pages/hr/HROffboardingNew.tsx` | 278 | `h-screen overflow-hidden` → `h-full overflow-hidden` |
-| `src/pages/hr/HRApplicantNew.tsx` | 75 | `h-full` (ya correcto) — verificar que tenga `overflow-hidden` |
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/ui/date-input.tsx` | Reescribir: quitar `captionLayout="dropdown-buttons"`, usar `captionLayout="buttons"` con componente custom `Caption` que renderiza popovers estilizados para mes y año |
+| `src/pages/design-system/sections/InputsSection.tsx` | Actualizar la documentación del DateInput para reflejar el nuevo diseño del selector de mes/año |
 
-Esto hace que el header (con botón "Volver" y título), el stepper y el footer (con botones Anterior/Siguiente/Cancelar) permanezcan siempre visibles, mientras que solo el área de contenido central hace scroll.
+### Detalle técnico
+
+**`date-input.tsx`**:
+- Quitar `captionLayout="dropdown-buttons"`, `fromYear`, `toYear` del DayPicker
+- Controlar el mes mostrado con state (`displayMonth`) via `month` + `onMonthChange` props del DayPicker
+- Renderizar un header custom encima del DayPicker con:
+  - Botón `◂` para retroceder un mes
+  - Popover con grid 4x3 para selección de mes (nombres cortos en español)
+  - Popover con ScrollArea para selección de año (rango fromYear-toYear)
+  - Botón `▸` para avanzar un mes
+- Eliminar los classNames de `dropdown`, `dropdown_month`, `dropdown_year`, `dropdown_icon`, `caption_dropdowns`
+- Ocultar la navegación nativa de DayPicker (`nav: "hidden"`, `caption: "hidden"`) ya que el header custom la reemplaza
+
+**`InputsSection.tsx`**:
+- Actualizar el texto descriptivo para mencionar "selectores estilizados de mes y año" en vez de "dropdowns"
+- Agregar nota sobre la consistencia con el design system
 
