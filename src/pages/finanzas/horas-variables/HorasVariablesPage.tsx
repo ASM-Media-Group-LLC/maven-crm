@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { usePayrollParams } from "@/hooks/useFinancialConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,8 @@ export default function HorasVariablesPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<HVTab>("Horas Extra");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const { params: payrollParams } = usePayrollParams();
+  const hourValue = payrollParams?.hour_bank?.hour_value ?? 15;
 
   // Banco de Horas modals
   const [payItem, setPayItem] = useState<any>(null);
@@ -118,7 +121,7 @@ export default function HorasVariablesPage() {
   // Pay hours mutation
   const payHoursMutation = useMutation({
     mutationFn: async (detail: any) => {
-      const amount = Number(detail.hour_bank_amount) || (Number(detail.hour_bank_hours) * 15);
+      const amount = Number(detail.hour_bank_amount) || (Number(detail.hour_bank_hours) * hourValue);
       const { error } = await supabase.from("payroll_details").update({
         hour_bank_hours: 0,
         hour_bank_amount: 0,
@@ -560,7 +563,7 @@ export default function HorasVariablesPage() {
               Horas: <span className="font-medium text-foreground">{Number(payItem?.hour_bank_hours) || 0}h</span>
             </p>
             <p className="text-sm text-muted-foreground">
-              Monto a pagar: <span className="font-medium text-foreground">{fmt(Number(payItem?.hour_bank_amount) || (Number(payItem?.hour_bank_hours) * 15) || 0)}</span>
+              Monto a pagar: <span className="font-medium text-foreground">{fmt(Number(payItem?.hour_bank_amount) || (Number(payItem?.hour_bank_hours) * hourValue) || 0)}</span> <span className="text-muted-foreground">({fmt(hourValue)}/h)</span>
             </p>
             <p className="text-xs text-muted-foreground">Al confirmar, las horas se marcarán como pagadas y el monto se sumará a overtime_amount.</p>
           </div>
