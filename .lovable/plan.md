@@ -1,92 +1,82 @@
 
 
-## Implementación: Configuración Financiera + Banco de Horas Avanzado
+## Plan de Implementación: Configuración Financiera + Banco de Horas Avanzado
 
-Este plan cubre tres áreas: (1) tabla de configuración financiera en la base de datos, (2) implementación completa de las 5 tabs de ConfiguracionPage, y (3) mejora del Banco de Horas con historial de movimientos y consumo dinámico de parámetros.
-
----
-
-### Estado actual
-
-- **ConfiguracionPage**: Solo muestra tabs con placeholder "Próximamente".
-- **Banco de Horas en Finanzas** (`HorasVariablesPage.tsx`): Opera sobre `payroll_details.hour_bank_hours/hour_bank_amount` con un valor fijo de $15/hora hardcodeado. No usa la tabla `hour_bank` real ni consume configuración dinámica.
-- **Banco de Horas en HR** (`HRHourBank.tsx`): Opera sobre la tabla `hour_bank` (movimientos deposit/withdrawal por empleado). Es la fuente real de movimientos.
-- **No existe tabla de configuración financiera** en la base de datos.
-- **Sidebar**: Ya tiene todos los enlaces correctos (Dashboard, Collections, Nómina, Horas & Variables, Invoices, Control Financiero, Reportes, Configuración).
+He analizado en detalle todos los archivos involucrados. El plan se divide en 5 entregables que se implementarán en una sola pasada.
 
 ---
 
-### 1. Nueva tabla: `financial_config`
+### Contexto Técnico
 
-Tabla clave-valor para almacenar todos los parámetros configurables:
-
-```sql
-CREATE TABLE financial_config (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  config_key TEXT NOT NULL UNIQUE,
-  config_value JSONB NOT NULL DEFAULT '{}',
-  category TEXT NOT NULL,
-  label TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_by UUID
-);
-ALTER TABLE financial_config ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can manage financial_config"
-  ON financial_config FOR ALL USING (true) WITH CHECK (true);
-```
-
-Se insertarán registros iniciales (seed) para cada categoría:
-
-- **quickbooks_templates**: `{ mappings: [] }` — array de `{ category, account_code, account_name, type: "ingreso"|"egreso" }`
-- **payment_methods**: `{ methods: [] }` — array de `{ name, commission_pct, is_active }`
-- **cost_centers**: `{ centers: [] }` — array de `{ name, code, monthly_budget }`
-- **commission_defaults**: `{ creator_pct, partner_pct, exceptions: [] }` — exceptions: `{ creator_id, custom_pct }`
-- **payroll_params**: `{ health_pct, pension_pct, tax_pct, overtime_day_mult, overtime_night_mult, overtime_holiday_mult, hour_bank_expiry_months, hour_value }`
+**Estado actual identificado:**
+- `ConfiguracionPage.tsx` (30 líneas): Placeholder con 5 tabs vacíos mostrando "Próximamente"
+- `HorasVariablesPage.tsx` (639 líneas): Banco de Horas opera sobre `payroll_details.hour_bank_hours/hour_bank_amount` con valor fijo `$15/hora`. No usa la tabla real `hour_bank` (que tiene movimientos deposit/withdrawal por empleado)
+- `NominaPage.tsx` (461 líneas): Deducciones hardcodeadas, no consume configuración dinámica
+- `FacturacionPage.tsx` (486 líneas): Fee hardcodeado como "PayPal", no consume métodos de pago configurables
+- No existe tabla `financial_config` en la base de datos
+- La tabla `hour_bank` ya existe con columnas: `employee_id`, `hours`, `movement_type` (deposit/withdrawal), `reason`, `reference_date`, `created_by`
 
 ---
 
-### 2. Hook: `useFinancialConfig`
+### 1. Migración SQL: tabla `financial_config` + seed
 
-Nuevo hook en `src/hooks/useFinancialConfig.ts`:
+Crear tabla clave-valor con JSONB para almacenar todos los parámetros configurables. Incluye seed con valores iniciales para las 5 categorías:
 
-- `useFinancialConfig(category)` — query de `financial_config` filtrado por `category`
-- `useUpdateFinancialConfig()` — mutation para upsert por `config_key`
-- Funciones helper: `getPayrollParams()`, `getPaymentMethods()`, `getCostCenters()`, `getCommissionDefaults()`, `getQuickBooksTemplates()`
+- `quickbooks_templates`: mappings vacíos
+- `payment_methods`: PayPal (5.4%), PagoMundo (2.5%), Transferencia (0%)
+- `cost_centers`: centros vacíos
+- `commission_defaults`: creator_pct 50%, partner_pct 20%
+- `payroll_params`: deducciones (salud 4%, pensión 4%), multiplicadores (1.25x, 1.75x, 2.0x), hour_value $15, vigencia 6 meses
+
+RLS: política permisiva para usuarios autenticados.
 
 ---
 
-### 3. ConfiguracionPage — 5 tabs implementadas
+### 2. Nuevo hook: `useFinancialConfig.ts`
 
-**Tab 1: Templates QuickBooks**
-- Tabla editable con columnas: Categoría, Tipo (Ingreso/Egreso), Código Cuenta, Nombre Cuenta
-- Botón "Agregar Mapeo" abre inline row
-- Acciones: Editar inline, Eliminar
-- Guarda en `financial_config` con `config_key = "quickbooks_templates"`
+Archivo nuevo en `src/hooks/useFinancialConfig.ts` con:
 
-**Tab 2: Métodos de Pago**
-- Tabla CRUD: Nombre, Comisión (%), Activo (switch)
+- `useFinancialConfig(configKey?)` — query genérico a `financial_config`
+- `useUpdateFinancialConfig()` — mutation upsert por `config_key`
+- Hooks especializados: `usePayrollParams()`, `usePaymentMethods()`, `useCostCenters()`, `useCommissionDefaults()`, `useQuickBooksTemplates()`
+- Interfaces TypeScript para cada tipo de configuración
+
+---
+
+### 3. ConfiguracionPage — 5 tabs completos
+
+Reescritura completa del archivo (actualmente 30 líneas placeholder). Cada tab:
+
+**Tab 1 — Templates QuickBooks:**
+- Tabla editable: Categoría, Tipo (Ingreso/Egreso via Select), Código Cuenta, Nombre Cuenta
+- Botón "Agregar Mapeo" añade fila inline editable
+- Acciones por fila: Guardar/Eliminar
+- Persiste en `financial_config` key `quickbooks_templates`
+
+**Tab 2 — Métodos de Pago:**
+- Tabla CRUD: Nombre (Input), Comisión % (Input number), Activo (Switch)
 - Botón "Agregar Método"
-- Al cambiar comisión, se usa en cálculos de Facturación Neta en invoices
-- Guarda en `financial_config` con `config_key = "payment_methods"`
+- Toggle activo/inactivo inmediato
+- Persiste en key `payment_methods`
 
-**Tab 3: Centros de Costo**
-- Tabla: Nombre, Código, Presupuesto Mensual
-- Botón "Agregar CC"
-- Badge de alerta si CC excede presupuesto (comparando con `payroll_periods` + `commissions` del mes)
-- Guarda en `financial_config` con `config_key = "cost_centers"`
+**Tab 3 — Centros de Costo:**
+- Tabla: Nombre, Código, Presupuesto Mensual ($)
+- Botón "Agregar Centro de Costo"
+- Badge de alerta visual si presupuesto = 0 (configuración incompleta)
+- Persiste en key `cost_centers`
 
-**Tab 4: Config. Comisiones**
-- Dos campos principales: % Creadoras, % Socios
-- Tabla de excepciones: Creadora (select de `creators`), % Custom
+**Tab 4 — Config. Comisiones:**
+- Dos campos numéricos: % Creadoras, % Socios
+- Tabla de excepciones: Creadora (Select de `creators`), % Custom
 - Botón "Agregar Excepción"
-- Guarda en `financial_config` con `config_key = "commission_defaults"`
+- Persiste en key `commission_defaults`
 
-**Tab 5: Parámetros de Nómina**
-- Sección "Deducciones": Salud %, Pensión %, Impuestos %
+**Tab 5 — Parámetros de Nómina:**
+- Sección "Deducciones Legales": Salud %, Pensión %, Impuestos %
 - Sección "Multiplicadores Horas Extra": Diurno (x), Nocturno (x), Festivo (x)
 - Sección "Banco de Horas": Vigencia (meses), Valor por Hora ($)
 - Botón "Guardar Cambios" con toast de confirmación
-- Guarda en `financial_config` con `config_key = "payroll_params"`
+- Persiste en key `payroll_params`
 
 ---
 
@@ -94,48 +84,52 @@ Nuevo hook en `src/hooks/useFinancialConfig.ts`:
 
 Cambios en la tab "Banco de Horas":
 
-**a) Usar tabla `hour_bank` como fuente real** (en vez de `payroll_details`):
-- Query: `hour_bank` con join a `employees`, agrupando por `employee_id` para calcular balance (sum deposits - sum withdrawals)
-- Mostrar balance por empleado con desglose
+**a) Fuente de datos real — tabla `hour_bank`:**
+- Nueva query: `hour_bank` con join a `employees`, sin filtrar por `payroll_details`
+- Agrupación client-side por `employee_id` para calcular balance (sum deposits - sum withdrawals)
+- Mostrar balance neto por empleado
 
-**b) Acción "Liquidación en Nómina"**:
-- Modal donde el usuario selecciona cuántas horas liquidar (con input numérico, max = balance)
-- Multiplica por `hour_value` de `payroll_params` (consumido dinámicamente)
+**b) Liquidación en Nómina mejorada:**
+- Modal con input numérico de horas a liquidar (max = balance disponible)
+- Multiplicación dinámica por `hour_value` de `payroll_params` (via `usePayrollParams()`)
 - Inserta un registro `withdrawal` en `hour_bank` con `reason: "Liquidación en nómina"`
-- El monto calculado se muestra como referencia para sumarse al próximo periodo de nómina
+- Muestra preview del monto calculado antes de confirmar
 
-**c) Acción "Compensar con Tiempo"**:
-- Modal con input de horas/días a compensar
-- Campo de motivo obligatorio
-- Inserta un registro `withdrawal` en `hour_bank` con `reason` del usuario
+**c) Compensar con Tiempo mejorado:**
+- Modal con input de horas + motivo obligatorio
+- Inserta `withdrawal` en `hour_bank` con el `reason` del usuario
 - No afecta nómina
 
-**d) Historial de movimientos**:
-- Agregar una sub-tab o sección expandible "Historial" dentro de Banco de Horas
-- Muestra todos los movimientos de `hour_bank` en tabla cronológica: Fecha, Empleado, Tipo (Depósito/Retiro), Horas, Motivo
-- Filtrable por empleado y tipo
+**d) Nueva sección "Historial de Movimientos":**
+- Sub-tab o sección expandible dentro de "Banco de Horas"
+- Tabla cronológica: Fecha, Empleado, Tipo (Depósito/Retiro con badge), Horas, Motivo
+- Filtrable por empleado y tipo de movimiento
+- Exportable a Excel
 
 ---
 
-### 5. Consumo dinámico de configuración
+### 5. Consumo dinámico en otros módulos
 
-- **NominaPage**: Al calcular nómina, leer `payroll_params` para deducciones (%) y multiplicadores de horas extra
-- **HorasVariablesPage**: Leer `hour_value` para cálculos de pago de banco de horas
-- **FacturacionPage**: Leer `payment_methods` para calcular comisión y facturación neta
-- **ReportesPage**: Leer `cost_centers` para mostrar alerta si presupuesto excedido
+**NominaPage.tsx — CalcularNominaModal:**
+- Al crear periodo, leer `payroll_params` para mostrar info de deducciones (%) y multiplicadores
+- Los valores se muestran como referencia en el modal de cálculo
+
+**FacturacionPage.tsx:**
+- En la tab "Fees & Ajustes", mostrar los métodos de pago configurados con sus comisiones
+- Al crear invoice, sugerir el fee_type basado en métodos activos
 
 ---
 
 ### Resumen de archivos
 
-| Archivo | Acción |
-|---------|--------|
-| Migración SQL | Crear tabla `financial_config` + seed de valores iniciales |
-| `src/hooks/useFinancialConfig.ts` | **Nuevo** — Hook para leer/escribir configuración financiera |
-| `src/pages/finanzas/configuracion/ConfiguracionPage.tsx` | **Reescribir** — Implementar las 5 tabs con formularios CRUD |
-| `src/pages/finanzas/horas-variables/HorasVariablesPage.tsx` | **Modificar** — Banco de Horas usa `hour_bank` real + historial + config dinámica |
-| `src/pages/finanzas/nomina/NominaPage.tsx` | **Modificar** — Consumir `payroll_params` para deducciones y multiplicadores |
-| `src/integrations/supabase/types.ts` | **Actualizar** — Agregar tipo `financial_config` |
+| Archivo | Acción | Líneas aprox. |
+|---------|--------|---------------|
+| `supabase/migrations/20260225_financial_config.sql` | **Nuevo** — Tabla + seed | ~25 |
+| `src/hooks/useFinancialConfig.ts` | **Nuevo** — Hook + interfaces | ~120 |
+| `src/pages/finanzas/configuracion/ConfiguracionPage.tsx` | **Reescribir** — 5 tabs CRUD completos | ~650 |
+| `src/pages/finanzas/horas-variables/HorasVariablesPage.tsx` | **Modificar** — Banco de Horas usa `hour_bank` real + historial + config dinámica | ~750 |
+| `src/pages/finanzas/nomina/NominaPage.tsx` | **Modificar** — Consumir `payroll_params` en PeriodDetailContent | ~470 |
+| `src/pages/finanzas/facturacion/FacturacionPage.tsx` | **Modificar** — Mostrar métodos de pago en Fees tab | ~500 |
 
-No se crean rutas nuevas. No se modifica el sidebar (ya está completo).
+No se crean rutas nuevas. No se modifica el sidebar (ya está completo). Todos los componentes siguen el Design System existente (badges, tables, cards, dialogs, toasts).
 
