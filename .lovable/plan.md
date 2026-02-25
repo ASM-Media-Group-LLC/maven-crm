@@ -1,75 +1,67 @@
 
 
-## Plan: Rediseñar el selector de mes/año del DateInput y documentar en Design System
+## Plan: Estandarizar DashboardMetricCard con hover obligatorio y documentar patrones en Design System
 
-### Problema actual
+### Problema
 
-El `DateInput` usa `captionLayout="dropdown-buttons"` de `react-day-picker`, que renderiza `<select>` nativos del navegador para mes y año. Estos selectores se ven inconsistentes con el design system (sin estilo, sin bordes redondeados adecuados, sin hover states) y el estilo aplicado via `classNames.dropdown` tiene limitaciones porque sigue siendo un `<select>` nativo.
+1. **DashboardMetricCard** acepta `hoverClass` como prop opcional, lo que permite que cada página pase hovers inconsistentes. ConfiguracionPage usa `hover:border-primary/30` (sin escala ni gradiente), mientras que ControlFinanciero y Prospectos usan el patrón completo (`hover:scale-[1.03] hover:bg-gradient-to-br ...`).
 
-### Solución
+2. El **Design System** documenta el hover de KPI Cards en CardsSection como un div manual, pero no documenta el componente `DashboardMetricCard` que es el que realmente se usa en toda la app.
 
-Reemplazar los dropdowns nativos por un header custom con:
-1. **Flechas de navegación** (izquierda/derecha) para cambiar mes a mes
-2. **Selector de mes**: botón que abre un grid de 12 meses (ene-dic) en un popover interno
-3. **Selector de año**: botón que abre una lista scrolleable de años en un popover interno
-4. Todo usando componentes Shadcn (Button, Popover, ScrollArea) para consistencia total
-
-### Diseño visual del header
-
-```text
-┌─────────────────────────────────────┐
-│  ◂   [ Febrero ▾ ] [ 2026 ▾ ]   ▸  │
-├─────────────────────────────────────┤
-│  lu  ma  mi  ju  vi  sá  do        │
-│  ...calendario...                   │
-├─────────────────────────────────────┤
-│  [ dd/mm/aaaa ]                     │
-│  ─────────────────────────────────  │
-│               Cancelar   Aplicar    │
-└─────────────────────────────────────┘
-```
-
-Al hacer click en "Febrero":
-```text
-┌───────────────────┐
-│ Ene  Feb  Mar  Abr│
-│ May  Jun  Jul  Ago│
-│ Sep  Oct  Nov  Dic│
-└───────────────────┘
-```
-
-Al hacer click en "2026":
-```text
-┌─────────────┐
-│ 2020        │
-│ 2021        │
-│ 2022        │
-│ ...scroll...│
-│ 2030        │
-└─────────────┘
-```
+3. La **LayoutPatternsSection** no documenta el patrón principal de la plataforma: layout de pantalla completa con header fijo, contenido scrolleable y footer fijo (para wizards).
 
 ### Cambios
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/ui/date-input.tsx` | Reescribir: quitar `captionLayout="dropdown-buttons"`, usar `captionLayout="buttons"` con componente custom `Caption` que renderiza popovers estilizados para mes y año |
-| `src/pages/design-system/sections/InputsSection.tsx` | Actualizar la documentación del DateInput para reflejar el nuevo diseño del selector de mes/año |
+#### 1. `src/components/dashboard/DashboardMetricCard.tsx`
+- Incorporar el hover estándar directamente en el componente, haciéndolo obligatorio
+- Reemplazar el prop `hoverClass` por un prop semántico `color` que determine automáticamente el gradiente y borde de hover
+- Colores soportados: `primary`, `accent`, `success`, `warning`, `destructive`, `muted` (default)
+- Cada color aplica: `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40`
+- El icono también usa el color correspondiente en lugar de `text-muted-foreground`
 
-### Detalle técnico
+```text
+Props actuales:           Props nuevos:
+─────────────            ─────────────
+label: string            label: string
+value: string            value: string
+icon: LucideIcon         icon: LucideIcon
+subtitle?: string        subtitle?: string
+valueColor?: string      color?: "primary" | "accent" | "success" | "warning" | "destructive" | "muted"
+hoverClass?: string      (eliminado hoverClass)
+```
 
-**`date-input.tsx`**:
-- Quitar `captionLayout="dropdown-buttons"`, `fromYear`, `toYear` del DayPicker
-- Controlar el mes mostrado con state (`displayMonth`) via `month` + `onMonthChange` props del DayPicker
-- Renderizar un header custom encima del DayPicker con:
-  - Botón `◂` para retroceder un mes
-  - Popover con grid 4x3 para selección de mes (nombres cortos en español)
-  - Popover con ScrollArea para selección de año (rango fromYear-toYear)
-  - Botón `▸` para avanzar un mes
-- Eliminar los classNames de `dropdown`, `dropdown_month`, `dropdown_year`, `dropdown_icon`, `caption_dropdowns`
-- Ocultar la navegación nativa de DayPicker (`nav: "hidden"`, `caption: "hidden"`) ya que el header custom la reemplaza
+#### 2. `src/pages/finanzas/configuracion/ConfiguracionPage.tsx`
+- Actualizar las 5 instancias de `DashboardMetricCard` para usar el nuevo prop `color` en vez de `hoverClass`/`valueColor`
 
-**`InputsSection.tsx`**:
-- Actualizar el texto descriptivo para mencionar "selectores estilizados de mes y año" en vez de "dropdowns"
-- Agregar nota sobre la consistencia con el design system
+#### 3. Actualizar todas las demás páginas que usan `DashboardMetricCard`
+- `ControlFinancieroPage.tsx` — 4 instancias
+- `ProspectosPage.tsx` — instancias con hoverClass
+- Cualquier otra página que use el componente: migrar de `hoverClass` + `valueColor` a `color`
+- Búsqueda encontró 29 archivos — se actualizarán todos
+
+#### 4. `src/pages/design-system/sections/CardsSection.tsx`
+- Agregar subsección "DashboardMetricCard" después de "KPI / Metric Cards"
+- Mostrar el componente real renderizado con cada variante de color (primary, accent, success, warning, destructive, muted)
+- Documentar los props, el hover automático y las reglas de uso
+- Reemplazar el ejemplo manual de KPI cards por el componente real
+
+#### 5. `src/pages/design-system/sections/LayoutPatternsSection.tsx`
+- Agregar nuevo patrón "Dashboard Page (Standard)" como primer patrón, documentando:
+  - `h-full overflow-hidden` en el contenedor raíz
+  - Header fijo: `shrink-0 bg-background border-b px-6 pt-6 pb-4`
+  - Contenido scrolleable: `flex-1 overflow-auto p-6`
+  - Título: `text-xl font-semibold` (sin icon box)
+  - Jerarquía: Header → KPIs → Tabs → Filtros → Contenido
+- Agregar patrón "Wizard / Form Page" documentando:
+  - Header fijo + stepper fijo + contenido scrolleable + footer fijo
+  - `h-full overflow-hidden` + `shrink-0` para header/stepper/footer
+  - `flex-1 overflow-auto` para contenido
+- Agregar diagrama visual ASCII para cada patrón
+- Marcar como obsoleto el patrón "Centrado con max-width" para dashboards
+
+### Resultado
+
+- El hover de KPI es obligatorio y consistente en toda la plataforma sin depender de que cada dev pase la clase correcta
+- El Design System sirve como referencia real con el componente `DashboardMetricCard` documentado
+- Los patrones de layout quedan documentados para evitar errores recurrentes de header/footer scrolleando
 
