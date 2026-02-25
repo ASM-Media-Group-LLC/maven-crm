@@ -258,47 +258,40 @@ const ProjectsListContent = () => {
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Archivado</span>
                         )}
                       </div>
-                      {leader && (
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                          <Shield className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-sm font-medium">{leader.full_name || "Sin nombre"}</span>
-                        </div>
-                      )}
                       {project.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{project.description}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{project.description}</p>
                       )}
                       </div>
                       {renderProjectActions(project)}
                     </div>
+                    {/* Leader */}
+                    {leader && (
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-primary/10 border border-primary/20 w-fit">
+                        <Shield className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">Líder: {leader.full_name || "Sin nombre"}</span>
+                      </div>
+                    )}
                     {/* Progress bar */}
                     <div className="flex items-center gap-2">
                       <Progress value={progress} className="h-2.5 flex-1" />
                       <span className="text-xs font-medium text-muted-foreground w-9 text-right">{progress}%</span>
                     </div>
+                    {/* Task counts - always visible */}
                     <div className="flex items-center justify-between">
-                      <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">
-                        {counts.pending > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-primary" /> {counts.pending}
-                          </span>
-                        )}
-                        {counts.in_progress > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Play className="h-3 w-3 text-blue-400" /> {counts.in_progress}
-                          </span>
-                        )}
-                        {counts.paused > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Pause className="h-3 w-3 text-yellow-400" /> {counts.paused}
-                          </span>
-                        )}
+                      <div className="flex gap-4 text-sm flex-wrap">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5 text-primary" /> {counts.pending} pendientes
+                        </span>
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Play className="h-3.5 w-3.5 text-blue-400" /> {counts.in_progress} en curso
+                        </span>
                         {counts.overdue > 0 && (
-                          <span className="flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3 text-destructive" /> {counts.overdue}
+                          <span className="flex items-center gap-1.5 font-medium text-destructive">
+                            <AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue} vencidas
                           </span>
                         )}
-                        <span className="flex items-center gap-1 text-emerald-400">
-                          ✓ {counts.completed}
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                          <CheckSquare className="h-3.5 w-3.5" /> {counts.completed} completadas
                         </span>
                       </div>
                       {(() => {

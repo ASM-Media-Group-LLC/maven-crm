@@ -126,29 +126,34 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             <Button variant="ghost" size="icon" onClick={() => navigate("/tareas")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold">{projectName || "Tareas"}</h1>
-              {projectDescription && (
-                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{projectDescription}</p>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold">{projectName || "Tareas"}</h1>
           </div>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
           </Button>
         </div>
-        {/* Project leader + progress summary */}
-        <div className="flex items-center gap-6 mt-3 ml-11">
-          {projectLeader && (
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Líder: {projectLeader.full_name}</span>
-            </div>
+        {/* Project summary banner */}
+        <div className="mt-3 ml-11 rounded-lg border border-border bg-card p-4 space-y-3">
+          {projectDescription && (
+            <p className="text-sm text-muted-foreground max-w-2xl line-clamp-2">{projectDescription}</p>
           )}
-          <div className="flex items-center gap-2 min-w-[220px] flex-1 max-w-md">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Progreso</span>
-            <Progress value={projectProgress} className="h-3 flex-1" />
-            <span className="text-sm font-semibold">{projectProgress}%</span>
+          <div className="flex items-center gap-6 flex-wrap">
+            {projectLeader && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-primary">Líder: {projectLeader.full_name}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3 flex-1 min-w-[200px] max-w-sm">
+              <Progress value={projectProgress} className="h-3 flex-1" />
+              <span className="text-sm font-bold">{projectProgress}%</span>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-primary" /> {counts.pending} pendientes</span>
+              <span className="flex items-center gap-1.5"><Play className="h-3.5 w-3.5 text-blue-400" /> {counts.in_progress} en curso</span>
+              {counts.overdue > 0 && <span className="flex items-center gap-1.5 text-destructive font-medium"><AlertTriangle className="h-3.5 w-3.5" /> {counts.overdue} vencidas</span>}
+              <span className="flex items-center gap-1.5 text-emerald-400 font-medium"><CheckSquare className="h-3.5 w-3.5" /> {counts.completed} completadas</span>
+            </div>
           </div>
         </div>
       </header>
