@@ -11,9 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import PrioritySelect from "./PrioritySelect";
+import { TIME_OPTIONS } from "./timeOptions";
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -48,6 +50,8 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [startCalOpen, setStartCalOpen] = useState(false);
+  const [endCalOpen, setEndCalOpen] = useState(false);
 
   const toggleUser = (userId: string) => {
     setAssignedUsers((prev) =>
@@ -145,139 +149,159 @@ const CreateTaskModal = ({ open, onOpenChange, profiles, projectId, onSubmit, is
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="pr-8">
+      <DialogContent className="sm:max-w-md !flex !flex-col gap-0 max-h-[85vh]">
+        <DialogHeader className="pr-8 shrink-0">
           <DialogTitle>Nueva Tarea</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Título</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nombre de la tarea" />
-          </div>
-          <div>
-            <Label htmlFor="description">Descripción</Label>
-            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 px-1 py-2">
+            <div>
+              <Label htmlFor="title">Título</Label>
+              <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nombre de la tarea" />
+            </div>
+            <div>
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
+            </div>
 
-          <PrioritySelect value={priority} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
 
-          {/* Multi-select de usuarios */}
-          <div>
-            <Label>Asignar a</Label>
-            {assignedUsers.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-2">
-                {assignedUsers.map((uid) => {
-                  const p = profiles.find((pr) => pr.id === uid);
-                  return (
-                    <Badge key={uid} variant="secondary" className="text-xs gap-1 pr-1">
-                      {p?.full_name || "Sin nombre"}
-                      <button type="button" onClick={() => toggleUser(uid)} className="ml-0.5 hover:text-destructive">
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  );
-                })}
-              </div>
-            )}
-            <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={comboboxOpen}
-                  className="w-full justify-between font-normal"
-                >
-                  {assignedUsers.length === 0 ? "Seleccionar usuarios" : `${assignedUsers.length} seleccionado(s)`}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar usuario..." />
-                  <CommandList>
-                    <CommandEmpty>No se encontraron usuarios</CommandEmpty>
-                    <CommandGroup>
-                      {profiles.map((p) => (
-                        <CommandItem
-                          key={p.id}
-                          value={p.full_name || "Sin nombre"}
-                          onSelect={() => toggleUser(p.id)}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", assignedUsers.includes(p.id) ? "opacity-100" : "opacity-0")} />
-                          {p.full_name || "Sin nombre"}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Tabs de duración / fecha */}
-          <div>
-            <Label>Plazo</Label>
-            <Tabs value={timeMode} onValueChange={(v) => setTimeMode(v as "duration" | "date")} className="mt-1">
-              <TabsList className="w-full">
-                <TabsTrigger value="duration" className="flex-1">Duración</TabsTrigger>
-                <TabsTrigger value="date" className="flex-1">Fecha</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="duration" className="mt-3">
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <Label htmlFor="hours">Horas</Label>
-                    <Input id="hours" type="number" min={0} max={999} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="minutes">Minutos</Label>
-                    <Input id="minutes" type="number" min={0} max={59} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
-                  </div>
+            {/* Multi-select de usuarios */}
+            <div>
+              <Label>Asignar a</Label>
+              {assignedUsers.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {assignedUsers.map((uid) => {
+                    const p = profiles.find((pr) => pr.id === uid);
+                    return (
+                      <Badge key={uid} variant="secondary" className="text-xs gap-1 pr-1">
+                        {p?.full_name || "Sin nombre"}
+                        <button type="button" onClick={() => toggleUser(uid)} className="ml-0.5 hover:text-destructive">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
                 </div>
-              </TabsContent>
+              )}
+              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comboboxOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {assignedUsers.length === 0 ? "Seleccionar usuarios" : `${assignedUsers.length} seleccionado(s)`}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar usuario..." />
+                    <CommandList>
+                      <CommandEmpty>No se encontraron usuarios</CommandEmpty>
+                      <CommandGroup>
+                        {profiles.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.full_name || "Sin nombre"}
+                            onSelect={() => toggleUser(p.id)}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", assignedUsers.includes(p.id) ? "opacity-100" : "opacity-0")} />
+                            {p.full_name || "Sin nombre"}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
 
-              <TabsContent value="date" className="mt-3 space-y-3">
-                <div>
-                  <Label>Fecha inicio (opcional)</Label>
-                  <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("flex-1 justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {startDate ? format(startDate, "dd/MM/yyyy") : "Ahora"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-28" placeholder="--:--" />
-                  </div>
-                </div>
+            {/* Tabs de duración / fecha */}
+            <div>
+              <Label>Plazo</Label>
+              <Tabs value={timeMode} onValueChange={(v) => setTimeMode(v as "duration" | "date")} className="mt-1">
+                <TabsList className="w-full">
+                  <TabsTrigger value="duration" className="flex-1">Duración</TabsTrigger>
+                  <TabsTrigger value="date" className="flex-1">Fecha</TabsTrigger>
+                </TabsList>
 
-                <div>
-                  <Label>Fecha fin *</Label>
-                  <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("flex-1 justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {endDate ? format(endDate, "dd/MM/yyyy") : "Seleccionar fecha"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
-                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-28" placeholder="--:--" />
+                <TabsContent value="duration" className="mt-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <Label htmlFor="hours">Horas</Label>
+                      <Input id="hours" type="number" min={0} max={999} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="minutes">Minutos</Label>
+                      <Input id="minutes" type="number" min={0} max={59} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} />
+                    </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Si no se indica hora, se usará 23:59</p>
-                </div>
-              </TabsContent>
-            </Tabs>
+                </TabsContent>
+
+                <TabsContent value="date" className="mt-3 space-y-3">
+                  <div>
+                    <Label>Fecha inicio (opcional)</Label>
+                    <div className="flex gap-2">
+                      <Popover open={startCalOpen} onOpenChange={setStartCalOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("flex-1 justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "dd/MM/yyyy") : "Ahora"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                      <Select value={startTime || undefined} onValueChange={setStartTime}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue placeholder="Hora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Fecha fin *</Label>
+                    <div className="flex gap-2">
+                      <Popover open={endCalOpen} onOpenChange={setEndCalOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("flex-1 justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "dd/MM/yyyy") : "Seleccionar fecha"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                      <Select value={endTime || undefined} onValueChange={setEndTime}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue placeholder="Hora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Si no se indica hora, se usará 23:59</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 shrink-0 pt-4 px-1">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={isLoading}>{isLoading ? "Creando..." : "Crear Tarea"}</Button>
           </div>
