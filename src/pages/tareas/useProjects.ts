@@ -12,6 +12,7 @@ export interface TaskProject {
   created_by: string;
   status: string;
   share_token: string | null;
+  leader_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -63,13 +64,14 @@ export const useProjects = () => {
   });
 
   const createProject = useMutation({
-    mutationFn: async (project: { name: string; description?: string; memberIds?: string[] }) => {
+    mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
       if (!user || !profile) throw new Error("Not authenticated");
       const { data, error } = await supabase.from("task_projects" as any).insert({
         name: project.name,
         description: project.description || null,
         created_by: user.id,
         company_id: profile.company_id,
+        leader_id: project.leaderId || null,
       } as any).select("id").single();
       if (error) throw error;
       
@@ -105,10 +107,10 @@ export const useProjects = () => {
   });
 
   const updateProject = useMutation({
-    mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[] }) => {
+    mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
       const { error } = await supabase
         .from("task_projects" as any)
-        .update({ name: project.name, description: project.description || null } as any)
+        .update({ name: project.name, description: project.description || null, leader_id: project.leaderId || null } as any)
         .eq("id", project.id);
       if (error) throw error;
 
@@ -223,6 +225,12 @@ export const useProjects = () => {
     return { pending, in_progress, paused, overdue, completed };
   };
 
+  const getProjectProgress = (projectId: string) => {
+    const counts = getProjectTaskCounts(projectId);
+    const total = counts.pending + counts.in_progress + counts.paused + counts.overdue + counts.completed;
+    return total > 0 ? Math.round((counts.completed / total) * 100) : 0;
+  };
+
   const archiveProject = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase
@@ -267,6 +275,7 @@ export const useProjects = () => {
     deleteProject,
     archiveProject,
     getProjectTaskCounts,
+    getProjectProgress,
     reorderProjects,
   };
 };

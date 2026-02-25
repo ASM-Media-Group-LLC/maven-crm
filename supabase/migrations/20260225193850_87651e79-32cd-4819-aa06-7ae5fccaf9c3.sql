@@ -1,0 +1,1 @@
+ALTER TABLE task_projects ADD COLUMN leader_id uuid REFERENCES profiles(id) ON DELETE SET NULL;

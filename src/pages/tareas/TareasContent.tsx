@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause } from "lucide-react";
+import { Plus, CheckSquare, AlertTriangle, Clock, ArrowLeft, LayoutGrid, List, Search, AlignJustify, Play, Pause, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { useTareas, type Task } from "./useTareas";
 import TaskCard from "./TaskCard";
 import DraggableGrid from "./DraggableGrid";
@@ -22,7 +23,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, projectLeaderId, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -86,6 +87,10 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
     return { pending, in_progress, paused, overdue, completed };
   }, [tasks, now]);
 
+  const totalTasks = tasks.length;
+  const projectProgress = totalTasks > 0 ? Math.round((counts.completed / totalTasks) * 100) : 0;
+  const projectLeader = projectLeaderId ? companyProfiles.find(p => p.id === projectLeaderId) : null;
+
   const handleComplete = (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
@@ -123,12 +128,26 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">{projectName || "Tareas"}</h1>
-              <p className="text-sm text-muted-foreground">Tareas del proyecto</p>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-sm text-muted-foreground">Tareas del proyecto</p>
+                {projectLeader && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Shield className="h-3 w-3 text-primary" />
+                    {projectLeader.full_name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 min-w-[120px]">
+              <Progress value={projectProgress} className="h-2 flex-1" />
+              <span className="text-xs text-muted-foreground">{projectProgress}%</span>
+            </div>
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva Tarea
+            </Button>
+          </div>
         </div>
       </header>
 
