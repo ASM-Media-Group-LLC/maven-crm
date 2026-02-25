@@ -259,9 +259,9 @@ const ProjectsListContent = () => {
                         )}
                       </div>
                       {leader && (
-                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                          <Shield className="h-3 w-3 text-primary" />
-                          <span>{leader.full_name || "Sin nombre"}</span>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <Shield className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-sm font-medium">{leader.full_name || "Sin nombre"}</span>
                         </div>
                       )}
                       {project.description && (
@@ -272,8 +272,8 @@ const ProjectsListContent = () => {
                     </div>
                     {/* Progress bar */}
                     <div className="flex items-center gap-2">
-                      <Progress value={progress} className="h-1.5 flex-1" />
-                      <span className="text-[10px] text-muted-foreground w-8 text-right">{progress}%</span>
+                      <Progress value={progress} className="h-2.5 flex-1" />
+                      <span className="text-xs font-medium text-muted-foreground w-9 text-right">{progress}%</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex gap-3 text-xs text-muted-foreground flex-wrap">

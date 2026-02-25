@@ -93,10 +93,10 @@ export const useTareas = (projectId?: string) => {
       if (!projectId) return null;
       const { data } = await supabase
         .from("task_projects" as any)
-        .select("name, leader_id")
+        .select("name, description, leader_id")
         .eq("id", projectId)
         .single();
-      return data as unknown as { name: string; leader_id: string | null } | null;
+      return data as unknown as { name: string; description: string | null; leader_id: string | null } | null;
     },
     enabled: !!projectId,
   });
@@ -415,6 +415,7 @@ export const useTareas = (projectId?: string) => {
     isLoading,
     profile,
     projectName: projectData?.name || null,
+    projectDescription: projectData?.description || null,
     projectLeaderId: projectData?.leader_id || null,
     companyProfiles,
     createTask,
