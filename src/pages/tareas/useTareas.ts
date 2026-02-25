@@ -125,6 +125,16 @@ export const useTareas = (projectId?: string) => {
   const updateProjectInline = useMutation({
     mutationFn: async (fields: { name?: string; description?: string | null; leader_id?: string | null }) => {
       if (!projectId) throw new Error("No project ID");
+      if (fields.name) {
+        const trimmedName = fields.name.trim();
+        const { data: existing } = await supabase
+          .from("task_projects" as any)
+          .select("id")
+          .ilike("name", trimmedName)
+          .neq("id", projectId)
+          .limit(1);
+        if (existing && existing.length > 0) throw new Error("DUPLICATE");
+      }
       const { error } = await supabase
         .from("task_projects" as any)
         .update(fields as any)
@@ -135,8 +145,12 @@ export const useTareas = (projectId?: string) => {
       invalidateAll();
       toast({ title: "Proyecto actualizado", description: "Los cambios fueron guardados." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "No se pudo actualizar el proyecto.", variant: "destructive" });
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err?.message === "DUPLICATE" ? "Ya existe un proyecto con ese nombre." : "No se pudo actualizar el proyecto.",
+        variant: "destructive",
+      });
     },
   });
 

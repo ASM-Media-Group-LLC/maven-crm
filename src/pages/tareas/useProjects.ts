@@ -66,6 +66,13 @@ export const useProjects = () => {
   const createProject = useMutation({
     mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
       if (!user || !profile) throw new Error("Not authenticated");
+      const trimmedName = project.name.trim();
+      const { data: existing } = await supabase
+        .from("task_projects" as any)
+        .select("id")
+        .ilike("name", trimmedName)
+        .limit(1);
+      if (existing && existing.length > 0) throw new Error("DUPLICATE");
       const { data, error } = await supabase.from("task_projects" as any).insert({
         name: project.name,
         description: project.description || null,
@@ -101,13 +108,25 @@ export const useProjects = () => {
       queryClient.invalidateQueries({ queryKey: ["project-members"] });
       toast({ title: "Proyecto creado", description: "El proyecto fue creado exitosamente." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "No se pudo crear el proyecto.", variant: "destructive" });
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err?.message === "DUPLICATE" ? "Ya existe un proyecto con ese nombre." : "No se pudo crear el proyecto.",
+        variant: "destructive",
+      });
     },
   });
 
   const updateProject = useMutation({
     mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
+      const trimmedName = project.name.trim();
+      const { data: existing } = await supabase
+        .from("task_projects" as any)
+        .select("id")
+        .ilike("name", trimmedName)
+        .neq("id", project.id)
+        .limit(1);
+      if (existing && existing.length > 0) throw new Error("DUPLICATE");
       const { data: updated, error } = await supabase
         .from("task_projects" as any)
         .update({ name: project.name, description: project.description || null, leader_id: project.leaderId || null } as any)
@@ -155,8 +174,12 @@ export const useProjects = () => {
       queryClient.invalidateQueries({ queryKey: ["project-members"] });
       toast({ title: "Proyecto actualizado", description: "El proyecto fue actualizado exitosamente." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "No se pudo actualizar el proyecto.", variant: "destructive" });
+    onError: (err: any) => {
+      toast({
+        title: "Error",
+        description: err?.message === "DUPLICATE" ? "Ya existe un proyecto con ese nombre." : "No se pudo actualizar el proyecto.",
+        variant: "destructive",
+      });
     },
   });
 
