@@ -1,37 +1,44 @@
 
 
-## Diagnóstico: Los miembros no se guardan por políticas RLS en `project_members`
+## Plan: Edición inline del nombre, descripción y líder del proyecto
 
-### Problema encontrado
+### Contexto actual
 
-En las network requests se ve claramente:
+En `TareasContent.tsx` (la vista interna del proyecto), el header muestra:
+- **Nombre** del proyecto como `<h1>` estático (línea 129)
+- **Descripción** como `<p>` estático (línea 137)
+- **Líder** como texto estático con icono de corona (líneas 140-147)
 
-1. `DELETE project_members?project_id=eq.3f257a06...` → **204 OK** (borra los existentes)
-2. `POST project_members` → **403 Forbidden** (no puede insertar los nuevos)
+Los datos vienen de `useTareas` que expone `projectName`, `projectDescription` y `projectLeaderId`. No existe actualmente una mutación para actualizar el proyecto desde `useTareas`.
 
-Esto significa que la tabla `project_members` tiene una política RLS que permite DELETE pero bloquea INSERT. Los miembros se borran pero nunca se re-insertan, por lo que se pierden cada vez que editas un proyecto.
+### Cambios propuestos
 
-### Solución
+**1. `src/pages/tareas/useTareas.ts`** — Agregar mutación `updateProjectInline`
+- Nueva mutación que hace UPDATE a `task_projects` para los campos `name`, `description` y `leader_id`
+- Invalida las queries relevantes (`task-project-detail`, `task-projects`)
 
-Actualizar las políticas RLS de `project_members` para permitir todas las operaciones a usuarios autenticados, igual que hicimos con `task_projects`:
+**2. `src/pages/tareas/TareasContent.tsx`** — Hacer editables los 3 campos del header
 
-```sql
--- Drop existing restrictive policies
-DROP POLICY IF EXISTS "Project creators and members can manage membership" ON project_members;
-DROP POLICY IF EXISTS "Project members can view other members" ON project_members;
+| Campo | Comportamiento inline |
+|-------|----------------------|
+| **Nombre** | Click en el `<h1>` lo convierte en `<Input>`. Se guarda con Enter o blur. Escape cancela. |
+| **Descripción** | Click en el `<p>` lo convierte en `<Input>` (o muestra placeholder "Agregar descripción..." si está vacío). Se guarda con Enter o blur. |
+| **Líder** | Click en el nombre/texto del líder abre un `<Select>` inline con la lista de `companyProfiles`. Seleccionar guarda inmediatamente. |
 
--- Allow all authenticated users full access
-CREATE POLICY "Authenticated users can manage project_members"
-  ON project_members FOR ALL
-  USING (true)
-  WITH CHECK (true);
-```
+Cada campo usará un estado local (`editingName`, `editingDescription`, `editingLeader`) para controlar cuándo está en modo edición. Al guardar, se llama a `updateProjectInline.mutate()` con solo el campo modificado.
+
+### Detalles de UX
+- Hover sobre cada campo mostrará un cursor de edición y un sutil ícono de lápiz
+- El nombre no puede quedar vacío (validación antes de guardar)
+- La descripción puede quedar vacía (se borra)
+- El líder puede ser "Sin líder" (se guarda como `null`)
 
 ### Archivos a modificar
 
-| Recurso | Cambio |
+| Archivo | Cambio |
 |---------|--------|
-| Migración SQL | Reemplazar políticas RLS de `project_members` con `USING (true)` para ALL |
+| `src/pages/tareas/useTareas.ts` | Agregar mutación `updateProjectInline` y exponerla en el return |
+| `src/pages/tareas/TareasContent.tsx` | Reemplazar header estático con componentes editables inline |
 
-No se requieren cambios en el frontend.
+No se requieren cambios en la base de datos.
 
