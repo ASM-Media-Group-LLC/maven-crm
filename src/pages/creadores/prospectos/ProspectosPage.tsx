@@ -83,7 +83,7 @@ export default function ProspectosPage() {
   });
 
   // Agency tabs from data
-  const agencyTabs = AGENCY_ORDER.filter((a) => prospects.some((p) => p.agency === a));
+  const agencyTabs = AGENCY_ORDER;
 
   function openEdit(item: ProspectRecord) {
     setEditForm({
