@@ -61,11 +61,13 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
       setStatus(task.status || "active");
       const due = new Date(task.due_at);
       setEndDate(due);
-      setEndTime(format(due, "HH:mm"));
+      const endHH = format(due, "HH:mm");
+      setEndTime(endHH === "23:59" ? "" : endHH);
       if (task.start_at) {
         const start = new Date(task.start_at);
         setStartDate(start);
-        setStartTime(format(start, "HH:mm"));
+        const startHH = format(start, "HH:mm");
+        setStartTime(startHH === "00:00" ? "" : startHH);
       } else {
         setStartDate(undefined);
         setStartTime("");
@@ -231,16 +233,23 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
                     <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); setStartCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
-                <Select value={startTime || undefined} onValueChange={setStartTime}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue placeholder="Hora" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_OPTIONS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Select value={startTime || undefined} onValueChange={setStartTime}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue placeholder="Sin hora" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_OPTIONS.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {startTime && (
+                    <button type="button" onClick={() => setStartTime("")} className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -259,18 +268,25 @@ const EditTaskModal = ({ open, onOpenChange, task, profiles, onSubmit, isLoading
                     <Calendar mode="single" selected={endDate} onSelect={(d) => { setEndDate(d); setEndCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
                   </PopoverContent>
                 </Popover>
-                <Select value={endTime || undefined} onValueChange={setEndTime}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue placeholder="Hora" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_OPTIONS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Select value={endTime || undefined} onValueChange={setEndTime}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue placeholder="Sin hora" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIME_OPTIONS.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {endTime && (
+                    <button type="button" onClick={() => setEndTime("")} className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">Si no se indica hora, se usará 23:59</p>
+              <p className="text-[10px] text-muted-foreground mt-1">Hora opcional — sin hora se usa fin de día</p>
             </div>
           </div>
 
