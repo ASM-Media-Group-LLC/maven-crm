@@ -118,7 +118,27 @@ export const useTareas = (projectId?: string) => {
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
     queryClient.invalidateQueries({ queryKey: ["task-assignees"] });
     queryClient.invalidateQueries({ queryKey: ["all-tasks-for-projects"] });
+    queryClient.invalidateQueries({ queryKey: ["task-project-detail"] });
+    queryClient.invalidateQueries({ queryKey: ["task-projects"] });
   };
+
+  const updateProjectInline = useMutation({
+    mutationFn: async (fields: { name?: string; description?: string | null; leader_id?: string | null }) => {
+      if (!projectId) throw new Error("No project ID");
+      const { error } = await supabase
+        .from("task_projects" as any)
+        .update(fields as any)
+        .eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Proyecto actualizado", description: "Los cambios fueron guardados." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el proyecto.", variant: "destructive" });
+    },
+  });
 
   const createTask = useMutation({
     mutationFn: async (task: {
@@ -427,5 +447,6 @@ export const useTareas = (projectId?: string) => {
     reorderTasks,
     patchTask,
     updateTaskAssignees,
+    updateProjectInline,
   };
 };
