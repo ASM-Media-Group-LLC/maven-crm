@@ -31,6 +31,8 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
   const [newStartDate, setNewStartDate] = useState<Date | undefined>(undefined);
   const [newAssignedUsers, setNewAssignedUsers] = useState<string[]>([]);
   const [assignPopoverOpen, setAssignPopoverOpen] = useState(false);
+  const [startCalOpen, setStartCalOpen] = useState(false);
+  const [endCalOpen, setEndCalOpen] = useState(false);
   const dragIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -166,7 +168,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
           </SelectContent>
         </Select>
 
-        <Popover>
+        <Popover open={startCalOpen} onOpenChange={setStartCalOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", !newStartDate && "text-muted-foreground")}>
               <CalendarIcon className="h-3 w-3 mr-1" />
@@ -174,11 +176,11 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={newStartDate} onSelect={setNewStartDate} initialFocus className="p-3 pointer-events-auto" />
+            <Calendar mode="single" selected={newStartDate} onSelect={(d) => { setNewStartDate(d); setStartCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover open={endCalOpen} onOpenChange={setEndCalOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className={cn("h-8 text-xs px-2 shrink-0", !newDueDate && "text-muted-foreground")}>
               <CalendarIcon className="h-3 w-3 mr-1" />
@@ -186,7 +188,7 @@ const SubtasksPanel = ({ taskId, parentSubtaskId, profiles: externalProfiles, de
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={newDueDate} onSelect={setNewDueDate} initialFocus className="p-3 pointer-events-auto" />
+            <Calendar mode="single" selected={newDueDate} onSelect={(d) => { setNewDueDate(d); setEndCalOpen(false); }} initialFocus className="p-3 pointer-events-auto" />
           </PopoverContent>
         </Popover>
 
