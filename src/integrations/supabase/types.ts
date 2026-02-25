@@ -1961,6 +1961,7 @@ export type Database = {
           city: string | null
           company_id: string | null
           contract_type: string | null
+          cost_center: string | null
           country: string | null
           created_at: string
           created_by: string | null
@@ -1974,6 +1975,7 @@ export type Database = {
           first_name: string
           gender: string | null
           hire_date: string | null
+          hour_bank_enabled: boolean | null
           id: string
           internal_notes: string | null
           last_name: string
@@ -2006,6 +2008,7 @@ export type Database = {
           city?: string | null
           company_id?: string | null
           contract_type?: string | null
+          cost_center?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -2019,6 +2022,7 @@ export type Database = {
           first_name: string
           gender?: string | null
           hire_date?: string | null
+          hour_bank_enabled?: boolean | null
           id?: string
           internal_notes?: string | null
           last_name: string
@@ -2051,6 +2055,7 @@ export type Database = {
           city?: string | null
           company_id?: string | null
           contract_type?: string | null
+          cost_center?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -2064,6 +2069,7 @@ export type Database = {
           first_name?: string
           gender?: string | null
           hire_date?: string | null
+          hour_bank_enabled?: boolean | null
           id?: string
           internal_notes?: string | null
           last_name?: string
