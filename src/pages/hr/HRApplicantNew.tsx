@@ -86,7 +86,7 @@ export default function HRApplicantNew() {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-auto px-6 py-6">
-        <Card className="max-w-3xl">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base">Información del Candidato</CardTitle>
           </CardHeader>
