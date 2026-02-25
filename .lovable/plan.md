@@ -1,83 +1,45 @@
 
 
-## Plan: Edicion inline en tabla y vista ClickUp — Asignar, Prioridad, Fechas
+## Plan: Hacer la hora opcional en todos los selectores de fecha de tareas
 
-### Objetivo
+### Problema actual
 
-Permitir editar directamente desde las celdas de la tabla (`TasksTable`) y la vista ClickUp (`TaskListRow`) las siguientes propiedades sin abrir el modal completo de edicion:
+En los modales de crear y editar tareas, el selector de hora (`Select` con `TIME_OPTIONS`) aparece siempre junto al calendario, dando la impresion de que es obligatorio. Lo mismo en el componente inline `InlineDateTimeEdit`. La prioridad debe ser seleccionar la fecha; la hora solo aplica para tareas de corta duracion.
 
-1. **Asignados** — Popover con checkboxes multi-select para agregar/quitar asignados
-2. **Prioridad** — DropdownMenu para cambiar prioridad con un clic
-3. **Fechas (inicio y limite)** — Popover con calendario + selector de hora
+### Cambios propuestos
 
-### Cambios en el hook
+#### 1. `CreateTaskModal.tsx` — Hora opcional con placeholder claro
 
-**`useTareas.ts`** — Agregar 2 mutaciones ligeras:
+- Mantener el `Select` de hora junto al calendario, pero cambiar el placeholder de `"Hora"` a `"Sin hora"`
+- Agregar un boton pequeno de limpiar (X) dentro del trigger cuando hay hora seleccionada, para poder quitar la hora
+- En la logica de submit: si no hay hora seleccionada, usar `23:59` para fecha fin y `00:00` para fecha inicio (ya funciona asi)
+- Cambiar el hint de `"Si no se indica hora, se usará 23:59"` a algo mas claro como `"Hora opcional — sin hora se usa fin de día"`
 
-- `patchTask(taskId, fields)`: actualiza columnas parciales directamente (`priority`, `start_at`, `due_at`, etc.) sin requerir todos los campos como `updateTask`
-- `updateTaskAssignees(taskId, assigneeIds[])`: sincroniza la junction table `task_assignees` y actualiza `assigned_to` con el primer asignado. Envia notificaciones a nuevos asignados
+#### 2. `EditTaskModal.tsx` — Mismo tratamiento
 
-### Componentes inline nuevos
+- Mismo cambio de placeholder `"Sin hora"` en ambos selects de hora
+- Agregar boton de limpiar hora en cada select
+- Inicializar `endTime` como `""` en lugar de `"18:00"` si la hora almacenada es `23:59` (indicando que no se especifico hora)
+- Inicializar `startTime` como `""` si la hora es `00:00`
 
-Se crearan 3 componentes reutilizables en `src/pages/tareas/`:
+#### 3. `InlineDateTimeEdit.tsx` — Hora opcional con boton limpiar
 
-#### `InlineAssigneeSelect.tsx`
-- Trigger: celda actual de asignados (nombres o "Sin asignar")
-- Popover con lista de perfiles del proyecto, cada uno con checkbox
-- Al marcar/desmarcar, llama `updateTaskAssignees` inmediatamente
-- Muestra avatares/nombres resumidos como trigger
+- Cambiar el default de `selectedTime` de `"12:00"` a `""` cuando no hay valor previo
+- Agregar opcion `"Sin hora"` como primer item del Select o un boton de limpiar
+- Cuando se aplica sin hora: usar `23:59` para `due_at` y `00:00` para `start_at`
+- En el trigger, mostrar solo la fecha sin hora cuando no se especifico hora (`dd/MM/yy` en vez de `dd/MM/yy HH:mm`)
 
-#### `InlinePrioritySelect.tsx`
-- Trigger: Badge de prioridad actual
-- DropdownMenu con las 4 opciones (Baja, Media, Alta, Urgente) usando los mismos iconos y colores de `priorityConfig`
-- Al seleccionar, llama `patchTask(taskId, { priority: newValue })`
+#### 4. Display en tablas y vistas
 
-#### `InlineDateTimeEdit.tsx`
-- Trigger: texto de fecha actual (o "—" si no hay fecha)
-- Popover controlado con Calendar + Select de hora (usando `TIME_OPTIONS`)
-- Parametro `field` para indicar si edita `start_at` o `due_at`
-- Al seleccionar fecha+hora, llama `patchTask(taskId, { [field]: isoString })`
-- Calendario se cierra al confirmar
+- En `TasksTable.tsx` y `TaskListRow.tsx`: cuando la hora almacenada sea `23:59:xx` (due_at) o `00:00:xx` (start_at), mostrar solo la fecha sin hora, indicando visualmente que no se especifico hora
 
-### Integracion en vistas existentes
+### Archivos a modificar
 
-#### `TasksTable.tsx`
-- Celda "Asignado": reemplazar texto estatico con `<InlineAssigneeSelect>`
-- Celda "Prioridad": reemplazar Badge estatico con `<InlinePrioritySelect>`
-- Celda "Inicio": reemplazar texto estatico con `<InlineDateTimeEdit field="start_at">`
-- Celda "Countdown": mantener countdown como display, pero agregar `<InlineDateTimeEdit field="due_at">` al hacer clic en la fecha
-- Nuevas props: `onPatchTask`, `onUpdateAssignees`
-
-#### `TaskListRow.tsx`
-- Columna "Asignado": reemplazar con `<InlineAssigneeSelect>`
-- Columna "Prioridad": reemplazar con `<InlinePrioritySelect>`
-- Columna "Fecha limite": reemplazar con `<InlineDateTimeEdit>`
-- Mismas nuevas props
-
-#### `TareasContent.tsx`
-- Pasar `patchTask` y `updateTaskAssignees` como props a `TasksTable`, `TaskListView` y luego a `TaskListRow`
-
-#### `TaskListView.tsx`
-- Propagar las nuevas props hacia cada `TaskListRow`
-
-### Interface de props actualizada
-
-```text
-TasksTableProps / TaskListRowProps:
-  + onPatchTask: (taskId: string, fields: Record<string, any>) => void
-  + onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void
-```
-
-### Archivos
-
-| Archivo | Accion |
-|---------|--------|
-| `src/pages/tareas/useTareas.ts` | Agregar `patchTask` y `updateTaskAssignees` mutations |
-| `src/pages/tareas/InlineAssigneeSelect.tsx` | Nuevo componente |
-| `src/pages/tareas/InlinePrioritySelect.tsx` | Nuevo componente |
-| `src/pages/tareas/InlineDateTimeEdit.tsx` | Nuevo componente |
-| `src/pages/tareas/TasksTable.tsx` | Integrar los 3 componentes inline |
-| `src/pages/tareas/TaskListRow.tsx` | Integrar los 3 componentes inline |
-| `src/pages/tareas/TaskListView.tsx` | Propagar nuevas props |
-| `src/pages/tareas/TareasContent.tsx` | Conectar nuevas mutations como props |
+| Archivo | Cambios |
+|---------|---------|
+| `src/pages/tareas/CreateTaskModal.tsx` | Placeholder "Sin hora", boton limpiar hora, hint actualizado |
+| `src/pages/tareas/EditTaskModal.tsx` | Placeholder "Sin hora", boton limpiar hora, init inteligente de hora |
+| `src/pages/tareas/InlineDateTimeEdit.tsx` | Default sin hora, opcion limpiar, display condicional fecha/hora |
+| `src/pages/tareas/TasksTable.tsx` | Display condicional: solo fecha si hora es default |
+| `src/pages/tareas/TaskListRow.tsx` | Display condicional: solo fecha si hora es default |
 
