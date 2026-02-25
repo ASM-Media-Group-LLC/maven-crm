@@ -296,10 +296,10 @@ export default function ControlFinancieroPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} subtitle="Invoices pagados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-              <DashboardMetricCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
-              <DashboardMetricCard label="Balance" value={fmt(balance)} icon={DollarSign} subtitle={balance >= 0 ? "Positivo" : "Negativo"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={balance < 0 ? "text-destructive" : "text-accent"} />
-              <DashboardMetricCard label="Margen" value={`${margenPct}%`} icon={BarChart3} subtitle="Sobre ingresos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
+              <DashboardMetricCard label="Ingresos Totales" value={fmt(ingresos)} icon={TrendingUp} subtitle="Invoices pagados" color="accent" />
+              <DashboardMetricCard label="Egresos Totales" value={fmt(egresos)} icon={TrendingDown} subtitle="Nómina + comisiones" color="destructive" />
+              <DashboardMetricCard label="Balance" value={fmt(balance)} icon={DollarSign} subtitle={balance >= 0 ? "Positivo" : "Negativo"} color={balance < 0 ? "destructive" : "accent"} />
+              <DashboardMetricCard label="Margen" value={`${margenPct}%`} icon={BarChart3} subtitle="Sobre ingresos" color="warning" />
             </>
           )}
         </div>

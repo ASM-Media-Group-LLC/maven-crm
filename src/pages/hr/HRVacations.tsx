@@ -368,19 +368,19 @@ export default function HRVacations() {
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : activeType === "vacaciones" ? (
             <>
-              <DashboardMetricCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} subtitle={`${currentYear}`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={pending > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} subtitle="Confirmadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40" valueColor="text-success" />
-              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={rejected > 0 ? "text-destructive" : undefined} />
-              <DashboardMetricCard label="Próximas" value={String(upcoming)} icon={CalendarClock} subtitle="Programadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/10 hover:border-primary/30" />
+              <DashboardMetricCard label="Total Solicitudes" value={String(totalRequests)} icon={CalendarDays} subtitle={`${currentYear}`} color="primary" />
+              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" color="warning" />
+              <DashboardMetricCard label="Aprobadas" value={String(approved)} icon={CheckCircle2} subtitle="Confirmadas" color="success" />
+              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" color="destructive" />
+              <DashboardMetricCard label="Próximas" value={String(upcoming)} icon={CalendarClock} subtitle="Programadas" color="primary" />
             </>
           ) : (
             <>
-              <DashboardMetricCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} subtitle={`De ${maxDays} anuales`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} subtitle="Restantes" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:border-success/40" valueColor="text-success" />
-              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={pending > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} subtitle={format(new Date(), "MMMM yyyy", { locale: es })} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/10 hover:border-primary/30" />
-              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={rejected > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Días Usados" value={String(approvedThisYear)} icon={CalendarDays} subtitle={`De ${maxDays} anuales`} color="primary" />
+              <DashboardMetricCard label="Disponibles" value={String(availableDays)} icon={CheckCircle2} subtitle="Restantes" color="success" />
+              <DashboardMetricCard label="Pendientes" value={String(pending)} icon={Clock} subtitle="Por aprobar" color="warning" />
+              <DashboardMetricCard label="Este Mes" value={String(approvedThisMonth)} icon={CalendarClock} subtitle={format(new Date(), "MMMM yyyy", { locale: es })} color="primary" />
+              <DashboardMetricCard label="Rechazadas" value={String(rejected)} icon={XCircle} subtitle="Denegadas" color="destructive" />
             </>
           )}
         </div>

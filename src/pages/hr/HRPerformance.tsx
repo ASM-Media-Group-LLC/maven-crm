@@ -270,10 +270,10 @@ export default function HRPerformance() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} subtitle="Score general" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-amber-500/15 hover:border-amber-500/40" />
-              <DashboardMetricCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} subtitle="Total registradas" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Con Objetivos" value={String(withGoals)} icon={Target} subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
+              <DashboardMetricCard label="Calif. Promedio" value={avgScore ? avgScore.toFixed(1) : "—"} icon={Star} subtitle="Score general" color="warning" />
+              <DashboardMetricCard label="Evaluaciones" value={String(evals.length)} icon={TrendingUp} subtitle="Total registradas" color="primary" />
+              <DashboardMetricCard label="Completadas" value={String(completedCount)} icon={CheckCircle2} subtitle={evals.length > 0 ? `${((completedCount / evals.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <DashboardMetricCard label="Con Objetivos" value={String(withGoals)} icon={Target} subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
             </>
           )}
         </div>

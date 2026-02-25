@@ -492,9 +492,9 @@ export default function HRAbsences() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <DashboardMetricCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} />
-          <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} valueColor="text-yellow-600" />
-          <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} />
+          <DashboardMetricCard label="Total Faltas" value={String(totalFaltas)} icon={AlertTriangle} color="primary" />
+          <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} color="warning" />
+          <DashboardMetricCard label="Este Mes" value={String(esteMes)} icon={CalendarDays} color="muted" />
         </div>
 
         {/* Department Tabs */}

@@ -186,11 +186,11 @@ export default function CollectionsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {isLoading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total" value={String(invoices.length)} icon={Users} subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} subtitle={fmt(totalCobrado)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-              <DashboardMetricCard label="Pendientes" value={String(pendientes.length)} icon={Clock} subtitle={fmt(totalPendiente)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
-              <DashboardMetricCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} subtitle={fmt(totalVencido)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor="text-destructive" />
-              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="$0" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
+              <DashboardMetricCard label="Total" value={String(invoices.length)} icon={Users} subtitle={`Bruto: ${fmt(totalCobrado + totalPendiente + totalVencido)}`} color="primary" />
+              <DashboardMetricCard label="Pagadas" value={String(cobrados.length)} icon={CheckCircle} subtitle={fmt(totalCobrado)} color="accent" />
+              <DashboardMetricCard label="Pendientes" value={String(pendientes.length)} icon={Clock} subtitle={fmt(totalPendiente)} color="warning" />
+              <DashboardMetricCard label="Vencidas" value={String(vencidos.length)} icon={AlertTriangle} subtitle={fmt(totalVencido)} color="destructive" />
+              <DashboardMetricCard label="Sin Cobro" value={String(sinCobro.length)} icon={Ban} subtitle="$0" color="muted" />
             </>
           )}
         </div>
@@ -224,10 +224,10 @@ export default function CollectionsPage() {
 
             {/* Financial KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <DashboardMetricCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
-              <DashboardMetricCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor="text-warning" />
-              <DashboardMetricCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor="text-accent" />
+              <DashboardMetricCard label="Ventas Último Mes" value={fmt(ventasUltimoMes)} icon={TrendingUp} subtitle="Total invoices" color="accent" />
+              <DashboardMetricCard label="Promedio 6 Meses" value={fmt(promedio6)} icon={BarChart3} subtitle="Promedio histórico" color="primary" />
+              <DashboardMetricCard label="Comisión Socios" value={fmt(comisionSocios)} icon={DollarSign} subtitle="Fees acumulados" color="warning" />
+              <DashboardMetricCard label="Facturación Neta" value={fmt(facturacionNeta)} icon={DollarSign} subtitle="Neto real" color="accent" />
             </div>
 
             {/* Charts */}

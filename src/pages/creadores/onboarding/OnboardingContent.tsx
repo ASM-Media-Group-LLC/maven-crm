@@ -59,10 +59,10 @@ const OnboardingContent = () => {
   };
 
   const kpiCards = [
-    { label: "Total", value: total, icon: Users, filter: "Todas", valueColor: undefined },
-    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", valueColor: "text-amber-500" },
-    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", valueColor: "text-blue-500" },
-    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", valueColor: "text-emerald-500" },
+    { label: "Total", value: total, icon: Users, filter: "Todas", color: "muted" as const },
+    { label: "Pendientes", value: pending, icon: Clock, filter: "Pendientes", color: "warning" as const },
+    { label: "En Progreso", value: inProgress, icon: Loader2, filter: "En Progreso", color: "primary" as const },
+    { label: "Completados", value: completed, icon: CheckCircle2, filter: "Completados", color: "success" as const },
   ];
 
   const handleCardClick = (creator: OnboardingCreator) => {
@@ -109,8 +109,7 @@ const OnboardingContent = () => {
                 label={kpi.label}
                 value={String(kpi.value)}
                 icon={kpi.icon}
-                valueColor={kpi.valueColor}
-                hoverClass={statusFilter === kpi.filter ? "ring-2 ring-primary" : "hover:shadow-md"}
+                color={kpi.color}
               />
             </div>
           ))}

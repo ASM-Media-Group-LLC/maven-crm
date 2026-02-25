@@ -309,8 +309,8 @@ const HRChatterSchedules = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-primary/10 hover:to-transparent" />
-          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} hoverClass="hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-accent/10 hover:to-transparent" />
+          <DashboardMetricCard label="Turnos Esta Semana" value={String(turnosThisWeek)} icon={CalendarDays} color="primary" />
+          <DashboardMetricCard label="Turnos Hoy" value={String(turnosToday)} icon={Clock} color="accent" />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

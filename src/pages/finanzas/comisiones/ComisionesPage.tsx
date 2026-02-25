@@ -175,10 +175,10 @@ export default function ComisionesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} subtitle="Todas las comisiones" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} subtitle="Pendientes" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalProyectadas > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} subtitle="Listas para pago" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} subtitle="Suma estimada" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+              <DashboardMetricCard label="Total Registros" value={String(commissions.length)} icon={TrendingUp} subtitle="Todas las comisiones" color="primary" />
+              <DashboardMetricCard label="Proyectadas" value={String(totalProyectadas)} icon={Clock} subtitle="Pendientes" color="warning" />
+              <DashboardMetricCard label="Confirmadas" value={String(totalConfirmadas)} icon={CheckCircle} subtitle="Listas para pago" color="accent" />
+              <DashboardMetricCard label="Monto Estimado" value={fmt(totalEstimado)} icon={DollarSign} subtitle="Suma estimada" color="destructive" />
             </>
           )}
         </div>

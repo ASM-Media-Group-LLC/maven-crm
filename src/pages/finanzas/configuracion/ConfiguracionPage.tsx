@@ -427,11 +427,11 @@ export default function ConfiguracionPage() {
       <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <DashboardMetricCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} subtitle="cuentas configuradas" hoverClass="hover:border-primary/30" />
-          <DashboardMetricCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} subtitle="métodos activos" hoverClass="hover:border-accent/30" />
-          <DashboardMetricCard label="Centros de Costo" value={String(centers.length)} icon={Building2} subtitle={fmt(totalBudget) + " presupuesto"} hoverClass="hover:border-primary/30" />
-          <DashboardMetricCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} subtitle={`${exceptionsCount} excepciones`} hoverClass="hover:border-accent/30" />
-          <DashboardMetricCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} hoverClass="hover:border-primary/30" />
+          <DashboardMetricCard label="Mapeos QB" value={String(mappings.length)} icon={FileText} subtitle="cuentas configuradas" color="primary" />
+          <DashboardMetricCard label="Métodos de Pago" value={String(activeMethods)} icon={CreditCard} subtitle="métodos activos" color="accent" />
+          <DashboardMetricCard label="Centros de Costo" value={String(centers.length)} icon={Building2} subtitle={fmt(totalBudget) + " presupuesto"} color="primary" />
+          <DashboardMetricCard label="Comisiones" value={`${defaults?.creator_pct ?? 0}%`} icon={Percent} subtitle={`${exceptionsCount} excepciones`} color="accent" />
+          <DashboardMetricCard label="Parámetros Nómina" value={`$${params?.hour_bank?.hour_value ?? 0}/h`} icon={Calculator} subtitle={`HE: ${params?.overtime_multipliers?.daytime ?? 0}x / ${params?.overtime_multipliers?.nighttime ?? 0}x / ${params?.overtime_multipliers?.holiday ?? 0}x`} color="primary" />
         </div>
 
         {/* Section Cards */}

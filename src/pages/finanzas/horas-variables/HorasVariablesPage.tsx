@@ -531,10 +531,10 @@ export default function HorasVariablesPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {(loadingHoras || loadingCommissions) ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={Clock} subtitle={`${uniqueEmps} empleados`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Banco de Horas" value={`${totalBankHours}h`} icon={Wallet} subtitle={fmt(totalBankAmount)} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={DollarSign} subtitle={`${commissions.length} registros`} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" />
-              <DashboardMetricCard label="Empleados Activos" value={String(uniqueEmps)} icon={TrendingUp} subtitle="Con registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/30 hover:border-muted-foreground/40" />
+              <DashboardMetricCard label="Total Horas Extra" value={`${totalOvertimeHours}h`} icon={Clock} subtitle={`${uniqueEmps} empleados`} color="primary" />
+              <DashboardMetricCard label="Banco de Horas" value={`${totalBankHours}h`} icon={Wallet} subtitle={fmt(totalBankAmount)} color="accent" />
+              <DashboardMetricCard label="Total Comisiones" value={fmt(commissions.reduce((s, c) => s + (Number(c.final_amount) || 0), 0))} icon={DollarSign} subtitle={`${commissions.length} registros`} color="warning" />
+              <DashboardMetricCard label="Empleados Activos" value={String(uniqueEmps)} icon={TrendingUp} subtitle="Con registros" color="muted" />
             </>
           )}
         </div>

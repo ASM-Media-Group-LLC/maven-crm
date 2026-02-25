@@ -193,10 +193,10 @@ export default function HRIncidents() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalOpen > 0 ? "text-accent-foreground" : undefined} />
-              <DashboardMetricCard label="En Proceso" value={String(totalInProgress)} icon={Clock} subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalInProgress > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" valueColor={totalCritical > 0 ? "text-destructive" : undefined} />
+              <DashboardMetricCard label="Total Incidentes" value={String(incidents.length)} icon={AlertTriangle} subtitle="Todos los registros" color="primary" />
+              <DashboardMetricCard label="Abiertos" value={String(totalOpen)} icon={AlertCircle} subtitle={incidents.length > 0 ? `${((totalOpen / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
+              <DashboardMetricCard label="En Proceso" value={String(totalInProgress)} icon={Clock} subtitle={incidents.length > 0 ? `${((totalInProgress / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Críticos" value={String(totalCritical)} icon={ShieldAlert} subtitle={incidents.length > 0 ? `${((totalCritical / incidents.length) * 100).toFixed(0)}% del total` : "—"} color="destructive" />
             </>
           )}
         </div>

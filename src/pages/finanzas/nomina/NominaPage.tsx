@@ -394,10 +394,10 @@ export default function NominaPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {loadingPeriods ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />) : (
             <>
-              <DashboardMetricCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} subtitle="Todos los registros" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" />
-              <DashboardMetricCard label="Borradores" value={String(totalBorradores)} icon={Clock} subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalBorradores > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} subtitle="Suma bruta" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" />
-              <DashboardMetricCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} subtitle="Suma neta" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-destructive/15 hover:border-destructive/40" />
+              <DashboardMetricCard label="Total Periodos" value={String(periods.length)} icon={DollarSign} subtitle="Todos los registros" color="primary" />
+              <DashboardMetricCard label="Borradores" value={String(totalBorradores)} icon={Clock} subtitle={periods.length > 0 ? `${((totalBorradores / periods.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Monto Bruto Total" value={fmt(totalBruto)} icon={DollarSign} subtitle="Suma bruta" color="accent" />
+              <DashboardMetricCard label="Monto Neto Total" value={fmt(totalNeto)} icon={CheckCircle} subtitle="Suma neta" color="destructive" />
             </>
           )}
         </div>

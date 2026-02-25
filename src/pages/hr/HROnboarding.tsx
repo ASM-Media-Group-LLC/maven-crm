@@ -216,10 +216,10 @@ export default function HROnboarding() {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)
           ) : (
             <>
-              <DashboardMetricCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} subtitle="Todos los procesos" hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted/15 hover:border-muted-foreground/40" />
-              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:border-primary/40" valueColor={totalPending > 0 ? "text-primary" : undefined} />
-              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:border-warning/40" valueColor={totalInProgress > 0 ? "text-warning" : undefined} />
-              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} hoverClass="hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:border-accent/40" valueColor={totalCompleted > 0 ? "text-accent-foreground" : undefined} />
+              <DashboardMetricCard label="Total Onboarding" value={String(onboardings.length)} icon={Users} subtitle="Todos los procesos" color="muted" />
+              <DashboardMetricCard label="Pendientes" value={String(totalPending)} icon={Clock} subtitle={onboardings.length > 0 ? `${((totalPending / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
+              <DashboardMetricCard label="En Progreso" value={String(totalInProgress)} icon={Loader2} subtitle={onboardings.length > 0 ? `${((totalInProgress / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="warning" />
+              <DashboardMetricCard label="Completados" value={String(totalCompleted)} icon={CheckCircle} subtitle={onboardings.length > 0 ? `${((totalCompleted / onboardings.length) * 100).toFixed(0)}% del total` : "—"} color="accent" />
             </>
           )}
         </div>
