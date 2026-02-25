@@ -1,44 +1,37 @@
 
 
-## Plan: Edición inline del nombre, descripción y líder del proyecto
+## Plan: Prevenir duplicado de nombres de proyectos
 
-### Contexto actual
+### Problema
+Actualmente no hay validación que impida crear dos proyectos con el mismo nombre. Tampoco se valida al renombrar un proyecto (edición inline o modal de edición).
 
-En `TareasContent.tsx` (la vista interna del proyecto), el header muestra:
-- **Nombre** del proyecto como `<h1>` estático (línea 129)
-- **Descripción** como `<p>` estático (línea 137)
-- **Líder** como texto estático con icono de corona (líneas 140-147)
-
-Los datos vienen de `useTareas` que expone `projectName`, `projectDescription` y `projectLeaderId`. No existe actualmente una mutación para actualizar el proyecto desde `useTareas`.
-
-### Cambios propuestos
-
-**1. `src/pages/tareas/useTareas.ts`** — Agregar mutación `updateProjectInline`
-- Nueva mutación que hace UPDATE a `task_projects` para los campos `name`, `description` y `leader_id`
-- Invalida las queries relevantes (`task-project-detail`, `task-projects`)
-
-**2. `src/pages/tareas/TareasContent.tsx`** — Hacer editables los 3 campos del header
-
-| Campo | Comportamiento inline |
-|-------|----------------------|
-| **Nombre** | Click en el `<h1>` lo convierte en `<Input>`. Se guarda con Enter o blur. Escape cancela. |
-| **Descripción** | Click en el `<p>` lo convierte en `<Input>` (o muestra placeholder "Agregar descripción..." si está vacío). Se guarda con Enter o blur. |
-| **Líder** | Click en el nombre/texto del líder abre un `<Select>` inline con la lista de `companyProfiles`. Seleccionar guarda inmediatamente. |
-
-Cada campo usará un estado local (`editingName`, `editingDescription`, `editingLeader`) para controlar cuándo está en modo edición. Al guardar, se llama a `updateProjectInline.mutate()` con solo el campo modificado.
-
-### Detalles de UX
-- Hover sobre cada campo mostrará un cursor de edición y un sutil ícono de lápiz
-- El nombre no puede quedar vacío (validación antes de guardar)
-- La descripción puede quedar vacía (se borra)
-- El líder puede ser "Sin líder" (se guarda como `null`)
+### Solución
+Agregar validación pre-inserción/pre-actualización en el hook `useProjects.ts` y en `useTareas.ts` (para la edición inline), comparando el nombre normalizado (trim + lowercase) contra los proyectos existentes.
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/pages/tareas/useTareas.ts` | Agregar mutación `updateProjectInline` y exponerla en el return |
-| `src/pages/tareas/TareasContent.tsx` | Reemplazar header estático con componentes editables inline |
+| `src/pages/tareas/useProjects.ts` | En `createProject.mutationFn`: antes de insertar, consultar si ya existe un proyecto con el mismo nombre (case-insensitive via `.ilike`). Si existe, lanzar error con mensaje descriptivo. En `updateProject.mutationFn`: misma validación excluyendo el proyecto actual por ID. |
+| `src/pages/tareas/useTareas.ts` | En `updateProjectInline.mutationFn`: si se actualiza el `name`, validar que no exista otro proyecto con ese nombre antes de hacer el UPDATE. |
+
+### Detalle de implementación
+
+En cada punto de creación/actualización:
+```
+const trimmedName = name.trim();
+const { data: existing } = await supabase
+  .from("task_projects")
+  .select("id")
+  .ilike("name", trimmedName)
+  .neq("id", currentProjectId) // solo en update
+  .limit(1);
+if (existing && existing.length > 0) {
+  throw new Error("DUPLICATE");
+}
+```
+
+En los `onError` correspondientes, detectar el mensaje "DUPLICATE" para mostrar un toast específico: "Ya existe un proyecto con ese nombre."
 
 No se requieren cambios en la base de datos.
 
