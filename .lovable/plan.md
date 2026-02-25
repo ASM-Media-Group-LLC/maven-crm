@@ -1,60 +1,83 @@
 
 
-## Plan: Miembros de proyecto deben ver todas las tareas y subtareas del proyecto
+## Plan: Edicion inline en tabla y vista ClickUp — Asignar, Prioridad, Fechas
 
-### Problema actual
+### Objetivo
 
-Las politicas RLS de `tasks` solo permiten ver tareas donde el usuario es:
-- `assigned_to` (asignado principal)
-- `created_by` (creador)
-- presente en `task_assignees` (asignado via junction table)
+Permitir editar directamente desde las celdas de la tabla (`TasksTable`) y la vista ClickUp (`TaskListRow`) las siguientes propiedades sin abrir el modal completo de edicion:
 
-Un usuario que fue agregado como **miembro del proyecto** (`project_members`) pero no esta asignado a ninguna tarea especifica **no puede ver ninguna tarea** dentro de ese proyecto. Esto contradice la logica esperada: si te agregan a un proyecto, deberias ver todo su contenido.
+1. **Asignados** — Popover con checkboxes multi-select para agregar/quitar asignados
+2. **Prioridad** — DropdownMenu para cambiar prioridad con un clic
+3. **Fechas (inicio y limite)** — Popover con calendario + selector de hora
 
-El mismo problema afecta a `subtasks`, cuyas politicas RLS dependen de la visibilidad del parent task (solo revisan `assigned_to` y `created_by`, ni siquiera `task_assignees`).
+### Cambios en el hook
 
-### Solucion
+**`useTareas.ts`** — Agregar 2 mutaciones ligeras:
 
-Una migracion SQL que actualiza las politicas RLS de `tasks` y `subtasks` para agregar la verificacion de membresia de proyecto.
+- `patchTask(taskId, fields)`: actualiza columnas parciales directamente (`priority`, `start_at`, `due_at`, etc.) sin requerir todos los campos como `updateTask`
+- `updateTaskAssignees(taskId, assigneeIds[])`: sincroniza la junction table `task_assignees` y actualiza `assigned_to` con el primer asignado. Envia notificaciones a nuevos asignados
 
-#### 1. Politicas de `tasks` (SELECT, UPDATE, DELETE)
+### Componentes inline nuevos
 
-Agregar condicion `is_project_member(auth.uid(), project_id)`:
+Se crearan 3 componentes reutilizables en `src/pages/tareas/`:
 
-```sql
-auth.uid() = assigned_to
-OR auth.uid() = created_by
-OR EXISTS (SELECT 1 FROM task_assignees WHERE task_id = id AND user_id = auth.uid())
-OR is_project_member(auth.uid(), project_id)  -- NUEVO
+#### `InlineAssigneeSelect.tsx`
+- Trigger: celda actual de asignados (nombres o "Sin asignar")
+- Popover con lista de perfiles del proyecto, cada uno con checkbox
+- Al marcar/desmarcar, llama `updateTaskAssignees` inmediatamente
+- Muestra avatares/nombres resumidos como trigger
+
+#### `InlinePrioritySelect.tsx`
+- Trigger: Badge de prioridad actual
+- DropdownMenu con las 4 opciones (Baja, Media, Alta, Urgente) usando los mismos iconos y colores de `priorityConfig`
+- Al seleccionar, llama `patchTask(taskId, { priority: newValue })`
+
+#### `InlineDateTimeEdit.tsx`
+- Trigger: texto de fecha actual (o "—" si no hay fecha)
+- Popover controlado con Calendar + Select de hora (usando `TIME_OPTIONS`)
+- Parametro `field` para indicar si edita `start_at` o `due_at`
+- Al seleccionar fecha+hora, llama `patchTask(taskId, { [field]: isoString })`
+- Calendario se cierra al confirmar
+
+### Integracion en vistas existentes
+
+#### `TasksTable.tsx`
+- Celda "Asignado": reemplazar texto estatico con `<InlineAssigneeSelect>`
+- Celda "Prioridad": reemplazar Badge estatico con `<InlinePrioritySelect>`
+- Celda "Inicio": reemplazar texto estatico con `<InlineDateTimeEdit field="start_at">`
+- Celda "Countdown": mantener countdown como display, pero agregar `<InlineDateTimeEdit field="due_at">` al hacer clic en la fecha
+- Nuevas props: `onPatchTask`, `onUpdateAssignees`
+
+#### `TaskListRow.tsx`
+- Columna "Asignado": reemplazar con `<InlineAssigneeSelect>`
+- Columna "Prioridad": reemplazar con `<InlinePrioritySelect>`
+- Columna "Fecha limite": reemplazar con `<InlineDateTimeEdit>`
+- Mismas nuevas props
+
+#### `TareasContent.tsx`
+- Pasar `patchTask` y `updateTaskAssignees` como props a `TasksTable`, `TaskListView` y luego a `TaskListRow`
+
+#### `TaskListView.tsx`
+- Propagar las nuevas props hacia cada `TaskListRow`
+
+### Interface de props actualizada
+
+```text
+TasksTableProps / TaskListRowProps:
+  + onPatchTask: (taskId: string, fields: Record<string, any>) => void
+  + onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void
 ```
 
-#### 2. Politicas de `subtasks` (SELECT, INSERT, UPDATE, DELETE)
-
-Reemplazar la verificacion del parent task para incluir membresia de proyecto y task_assignees:
-
-```sql
-EXISTS (
-  SELECT 1 FROM public.tasks
-  WHERE tasks.id = subtasks.task_id
-  AND (
-    tasks.assigned_to = auth.uid()
-    OR tasks.created_by = auth.uid()
-    OR EXISTS (SELECT 1 FROM task_assignees WHERE task_id = tasks.id AND user_id = auth.uid())
-    OR is_project_member(auth.uid(), tasks.project_id)  -- NUEVO
-  )
-)
-```
-
-### Impacto
-
-- Miembros de proyecto veran todas las tareas y subtareas del proyecto, sin necesidad de ser asignados individualmente
-- El creador del proyecto y los asignados a tareas mantienen su acceso actual
-- No se modifica codigo de aplicacion, solo SQL
-- La funcion `is_project_member` ya existe como SECURITY DEFINER, evitando recursion RLS
-
-### Archivo
+### Archivos
 
 | Archivo | Accion |
 |---------|--------|
-| Nueva migracion SQL | DROP/CREATE de 3 politicas en `tasks` + 4 politicas en `subtasks` |
+| `src/pages/tareas/useTareas.ts` | Agregar `patchTask` y `updateTaskAssignees` mutations |
+| `src/pages/tareas/InlineAssigneeSelect.tsx` | Nuevo componente |
+| `src/pages/tareas/InlinePrioritySelect.tsx` | Nuevo componente |
+| `src/pages/tareas/InlineDateTimeEdit.tsx` | Nuevo componente |
+| `src/pages/tareas/TasksTable.tsx` | Integrar los 3 componentes inline |
+| `src/pages/tareas/TaskListRow.tsx` | Integrar los 3 componentes inline |
+| `src/pages/tareas/TaskListView.tsx` | Propagar nuevas props |
+| `src/pages/tareas/TareasContent.tsx` | Conectar nuevas mutations como props |
 
