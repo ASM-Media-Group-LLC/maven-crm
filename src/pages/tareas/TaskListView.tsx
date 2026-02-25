@@ -15,6 +15,8 @@ interface TaskListViewProps {
   onDelete: (task: Task) => void;
   onCreateNew: () => void;
   onStatusChange?: (taskId: string, status: string) => void;
+  onPatchTask: (taskId: string, fields: Record<string, any>) => void;
+  onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void;
 }
 
 interface StatusGroup {
@@ -25,7 +27,7 @@ interface StatusGroup {
   tasks: Task[];
 }
 
-const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onCreateNew, onStatusChange }: TaskListViewProps) => {
+const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onCreateNew, onStatusChange, onPatchTask, onUpdateAssignees }: TaskListViewProps) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     overdue: true,
     pending: true,
@@ -156,6 +158,8 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onStatusChange={onStatusChange}
+                onPatchTask={onPatchTask}
+                onUpdateAssignees={onUpdateAssignees}
               />
             ))}
           </CollapsibleContent>

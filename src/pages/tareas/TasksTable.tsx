@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Flag, Play, Pause, CheckCircle2, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, Pause, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCountdown } from "./useCountdown";
-import { priorityConfig } from "./PrioritySelect";
+import InlineAssigneeSelect from "./InlineAssigneeSelect";
+import InlinePrioritySelect from "./InlinePrioritySelect";
+import InlineDateTimeEdit from "./InlineDateTimeEdit";
 import type { Task } from "./useTareas";
 
 type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start";
@@ -19,6 +20,8 @@ interface TasksTableProps {
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   onStatusChange?: (taskId: string, status: string) => void;
+  onPatchTask: (taskId: string, fields: Record<string, any>) => void;
+  onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void;
 }
 
 const statusConfig: Record<string, { label: string; badgeClass: string }> = {
@@ -107,7 +110,7 @@ const StatusCell = ({ task, onComplete, onJustify, onStatusChange }: {
   );
 };
 
-const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange }: TasksTableProps) => {
+const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees }: TasksTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("due");
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -158,24 +161,28 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                 <div className="font-medium text-sm">{task.title}</div>
                 {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
               </TableCell>
-              <TableCell className="hidden sm:table-cell text-sm">
-                {(task.assignees || []).length > 0
-                  ? task.assignees.slice(0, 2).map(uid => profileMap.get(uid) || "?").join(", ") + (task.assignees.length > 2 ? ` +${task.assignees.length - 2}` : "")
-                  : profileMap.get(task.assigned_to) || "—"}
+              <TableCell className="hidden sm:table-cell">
+                <InlineAssigneeSelect
+                  taskId={task.id}
+                  currentAssignees={task.assignees || []}
+                  profiles={profiles}
+                  onUpdateAssignees={onUpdateAssignees}
+                />
               </TableCell>
               <TableCell className="text-center">
-                {(() => {
-                  const p = priorityConfig[task.priority] || priorityConfig.medium;
-                  return (
-                    <Badge className={`${p.badgeClass} text-[10px]`}>
-                      <Flag className={`h-2.5 w-2.5 mr-1 ${p.color}`} />
-                      {p.label}
-                    </Badge>
-                  );
-                })()}
+                <InlinePrioritySelect
+                  taskId={task.id}
+                  currentPriority={task.priority}
+                  onPatch={onPatchTask}
+                />
               </TableCell>
-              <TableCell className="text-center text-xs text-muted-foreground">
-                {task.start_at ? format(new Date(task.start_at), "dd/MM/yy") : "—"}
+              <TableCell className="text-center">
+                <InlineDateTimeEdit
+                  taskId={task.id}
+                  field="start_at"
+                  currentValue={task.start_at}
+                  onPatch={onPatchTask}
+                />
               </TableCell>
               <TableCell className="text-center"><CountdownCell dueAt={task.due_at} status={task.status} /></TableCell>
               <TableCell className="text-center">

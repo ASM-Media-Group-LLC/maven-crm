@@ -354,6 +354,62 @@ export const useTareas = (projectId?: string) => {
     },
   });
 
+  const patchTask = useMutation({
+    mutationFn: async ({ taskId, fields }: { taskId: string; fields: Record<string, any> }) => {
+      const { error } = await supabase
+        .from("tasks" as any)
+        .update(fields as any)
+        .eq("id", taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar la tarea.", variant: "destructive" });
+    },
+  });
+
+  const updateTaskAssignees = useMutation({
+    mutationFn: async ({ taskId, assigneeIds }: { taskId: string; assigneeIds: string[] }) => {
+      if (!user) throw new Error("Not authenticated");
+      const primaryAssignee = assigneeIds[0] || user.id;
+
+      // Update primary assignee
+      await supabase.from("tasks" as any).update({ assigned_to: primaryAssignee } as any).eq("id", taskId);
+
+      // Sync junction table
+      await supabase.from("task_assignees" as any).delete().eq("task_id", taskId);
+      if (assigneeIds.length > 0) {
+        const rows = assigneeIds.map((uid) => ({ task_id: taskId, user_id: uid }));
+        await supabase.from("task_assignees" as any).insert(rows as any);
+      }
+
+      // Notify new assignees
+      const existingTask = tasks.find((t) => t.id === taskId);
+      const prevAssignees = existingTask?.assignees || [];
+      const newAssignees = assigneeIds.filter((uid) => !prevAssignees.includes(uid));
+      for (const uid of newAssignees) {
+        if (uid !== user.id) {
+          await supabase.from("notifications").insert({
+            user_id: uid,
+            type: "task_assignment",
+            title: "Te asignaron una tarea",
+            message: `Fuiste asignado(a) a la tarea '${existingTask?.title || ""}'`,
+            reference_id: taskId,
+            reference_type: "task",
+          });
+        }
+      }
+    },
+    onSuccess: () => {
+      invalidateAll();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar los asignados.", variant: "destructive" });
+    },
+  });
+
   return {
     tasks,
     isLoading,
@@ -367,5 +423,7 @@ export const useTareas = (projectId?: string) => {
     updateTask,
     deleteTask,
     reorderTasks,
+    patchTask,
+    updateTaskAssignees,
   };
 };

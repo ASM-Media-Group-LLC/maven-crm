@@ -22,7 +22,7 @@ interface TareasContentProps {
 
 const TareasContent = ({ projectId }: TareasContentProps) => {
   const navigate = useNavigate();
-  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks } = useTareas(projectId);
+  const { tasks, isLoading, companyProfiles, projectName, createTask, completeTask, updateTaskStatus, submitOverdueReason, updateTask, deleteTask, reorderTasks, patchTask, updateTaskAssignees } = useTareas(projectId);
   const [createOpen, setCreateOpen] = useState(false);
   const [justifyTask, setJustifyTask] = useState<Task | null>(null);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
@@ -215,6 +215,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onDelete={setDeleteTarget}
             onCreateNew={() => setCreateOpen(true)}
             onStatusChange={handleStatusChange}
+            onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
+            onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
           />
         ) : viewMode === "list" ? (
           <TasksTable
@@ -225,6 +227,8 @@ const TareasContent = ({ projectId }: TareasContentProps) => {
             onEdit={setEditTarget}
             onDelete={setDeleteTarget}
             onStatusChange={handleStatusChange}
+            onPatchTask={(id, fields) => patchTask.mutate({ taskId: id, fields })}
+            onUpdateAssignees={(id, ids) => updateTaskAssignees.mutate({ taskId: id, assigneeIds: ids })}
           />
         ) : (
           <DraggableGrid

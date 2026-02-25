@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Flag, MoreHorizontal, Pencil, Trash2, Share2, Check, AlertTriangle, CalendarIcon, User, Play, Pause, CheckCircle2 } from "lucide-react";
-import { format } from "date-fns";
+import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2, Share2, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,8 +7,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useCountdown } from "./useCountdown";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { priorityConfig } from "./PrioritySelect";
 import SubtasksPanel from "./SubtasksPanel";
+import InlineAssigneeSelect from "./InlineAssigneeSelect";
+import InlinePrioritySelect from "./InlinePrioritySelect";
+import InlineDateTimeEdit from "./InlineDateTimeEdit";
 import type { Task } from "./useTareas";
 
 interface TaskListRowProps {
@@ -20,6 +21,8 @@ interface TaskListRowProps {
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onStatusChange?: (taskId: string, status: string) => void;
+  onPatchTask: (taskId: string, fields: Record<string, any>) => void;
+  onUpdateAssignees: (taskId: string, assigneeIds: string[]) => void;
 }
 
 const statusConfig: Record<string, { label: string; badgeClass: string }> = {
@@ -63,19 +66,15 @@ const getStatusTransitions = (status: string, isOverdue: boolean, hasOverdueReas
   }
 };
 
-const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange }: TaskListRowProps) => {
+const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees }: TaskListRowProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { display, isOverdue, isWarning } = useCountdown(task.due_at);
   const [expanded, setExpanded] = useState(false);
 
-  const isAssigned = user?.id === task.assigned_to;
   const isCompleted = task.status === "completed";
   const effectiveStatus = isCompleted ? "completed" : isOverdue && task.status !== "overdue" ? "overdue" : task.status;
-  const needsJustification = isOverdue && !isCompleted && !task.overdue_reason;
 
-  const priority = priorityConfig[task.priority] || priorityConfig.medium;
-  const assignedProfiles = profiles.filter(p => (task.assignees || []).includes(p.id));
   const currentStatusConfig = statusConfig[effectiveStatus] || statusConfig.active;
 
   const transitions = getStatusTransitions(task.status, isOverdue, !!task.overdue_reason);
@@ -149,47 +148,36 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
           </div>
 
           {/* Assignee column */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <div className="flex flex-wrap gap-0.5 min-w-0">
-              {assignedProfiles.length > 0 ? (
-                <>
-                  {assignedProfiles.slice(0, 2).map((p) => (
-                    <span key={p.id} className="text-xs text-muted-foreground">{p.full_name?.split(" ")[0]}</span>
-                  ))}
-                  {assignedProfiles.length > 2 && <span className="text-xs text-muted-foreground">+{assignedProfiles.length - 2}</span>}
-                </>
-              ) : (
-                <span className="text-xs text-muted-foreground">Sin asignar</span>
-              )}
-            </div>
-          </div>
+          <InlineAssigneeSelect
+            taskId={task.id}
+            currentAssignees={task.assignees || []}
+            profiles={profiles}
+            onUpdateAssignees={onUpdateAssignees}
+          />
 
           {/* Due date column */}
           <div className="flex flex-col gap-0.5 min-w-0">
-            {task.start_at && (
-              <div className="flex items-center gap-1">
-                <CalendarIcon className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="text-[10px] text-muted-foreground">
-                  {format(new Date(task.start_at), "dd/MM/yy")}
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-1">
-              <CalendarIcon className={`h-3.5 w-3.5 shrink-0 ${countdownColor}`} />
-              <span className={`text-xs ${countdownColor}`}>
-                {format(new Date(task.due_at), "dd/MM/yy HH:mm")}
-              </span>
-            </div>
+            <InlineDateTimeEdit
+              taskId={task.id}
+              field="start_at"
+              currentValue={task.start_at}
+              onPatch={onPatchTask}
+            />
+            <InlineDateTimeEdit
+              taskId={task.id}
+              field="due_at"
+              currentValue={task.due_at}
+              onPatch={onPatchTask}
+              colorClass={countdownColor}
+            />
           </div>
 
           {/* Priority column */}
-          <div className="flex items-center gap-1">
-            <Flag className={`h-3 w-3 ${priority.color} shrink-0`} />
-            <Badge className={`${priority.badgeClass} text-[10px] px-1.5 py-0`}>
-              {priority.label}
-            </Badge>
-          </div>
+          <InlinePrioritySelect
+            taskId={task.id}
+            currentPriority={task.priority}
+            onPatch={onPatchTask}
+          />
 
           {/* Countdown column */}
           <div className="text-right">
