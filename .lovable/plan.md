@@ -1,67 +1,110 @@
 
 
-## Plan: Estandarizar DashboardMetricCard con hover obligatorio y documentar patrones en Design System
+## Plan: Mejoras de escalabilidad y robustez en gestión de roles y usuarios
 
-### Problema
+### Problemas identificados
 
-1. **DashboardMetricCard** acepta `hoverClass` como prop opcional, lo que permite que cada página pase hovers inconsistentes. ConfiguracionPage usa `hover:border-primary/30` (sin escala ni gradiente), mientras que ControlFinanciero y Prospectos usan el patrón completo (`hover:scale-[1.03] hover:bg-gradient-to-br ...`).
+#### 1. Permisos configurados pero nunca aplicados
+El sistema tiene `roles_config` + `role_permissions` con UI completa para configurar permisos granulares por módulo, pero **ningún componente los lee para controlar acceso**. El sidebar usa `isAdmin` hardcodeado, las rutas usan `AdminRoute` con check directo a `user_roles`. Los permisos guardados en `role_permissions` son decorativos.
 
-2. El **Design System** documenta el hover de KPI Cards en CardsSection como un div manual, pero no documenta el componente `DashboardMetricCard` que es el que realmente se usa en toda la app.
+#### 2. Dos sistemas de roles desconectados
+- `user_roles.role` es un texto libre (`app_role` enum en el tipo, pero text en DB)
+- `roles_config` es una tabla dinámica con `name`, `is_active`, permisos, etc.
+- No hay FK entre ambas — un usuario puede tener rol "agent" en `user_roles` pero no existir "agent" en `roles_config`
+- La UI de "Cambiar Rol" en ChangeRoleModal tiene roles hardcodeados, no lee de `roles_config`
 
-3. La **LayoutPatternsSection** no documenta el patrón principal de la plataforma: layout de pantalla completa con header fijo, contenido scrolleable y footer fijo (para wizards).
+#### 3. `manage-user-roles` edge function tiene roles hardcodeados
+La validación `["admin", "manager", "employee"]` ignora agent, closer y supervisor. Si se asigna uno de estos roles via esa función, falla.
 
-### Cambios
+#### 4. Emails no visibles en la gestión de usuarios
+`useAdminUsers` pone `email: ""` porque `auth.users` no es accesible desde el cliente. El edge function `admin-user-actions` sí tiene acceso via service role pero no expone un action para listar usuarios con emails.
 
-#### 1. `src/components/dashboard/DashboardMetricCard.tsx`
-- Incorporar el hover estándar directamente en el componente, haciéndolo obligatorio
-- Reemplazar el prop `hoverClass` por un prop semántico `color` que determine automáticamente el gradiente y borde de hover
-- Colores soportados: `primary`, `accent`, `success`, `warning`, `destructive`, `muted` (default)
-- Cada color aplica: `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-[color]/15 hover:to-transparent hover:border-[color]/40`
-- El icono también usa el color correspondiente en lugar de `text-muted-foreground`
+#### 5. `getClaims` puede no existir en versiones recientes de Supabase
+Ambas edge functions (`admin-user-actions`, `manage-user-roles`) usan `anonClient.auth.getClaims(token)` que no es un método estándar del SDK. Debería usarse `adminClient.auth.getUser(token)` o `anonClient.auth.getUser()`.
 
+#### 6. KPI cards en AdminUsuarios no usan DashboardMetricCard
+Usan divs manuales sin el hover estándar que acabamos de estandarizar.
+
+### Cambios propuestos
+
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 1 | `src/hooks/usePermissions.ts` | **Nuevo**: Hook que lee `role_permissions` del rol actual del usuario y expone `canAccess(module, submodule?)` |
+| 2 | `src/components/dashboard/DashboardSidebar.tsx` | Usar `usePermissions` para mostrar/ocultar secciones del menú en vez de `isAdmin` hardcodeado |
+| 3 | `src/components/AdminRoute.tsx` | Renombrar a `ProtectedModuleRoute` y usar `usePermissions` para validar acceso al módulo, no solo `isAdmin` |
+| 4 | `src/pages/admin/ChangeRoleModal.tsx` | Leer roles dinámicamente de `roles_config` (solo los activos) en vez de lista hardcodeada |
+| 5 | `supabase/functions/manage-user-roles/index.ts` | Validar roles contra `roles_config` en DB en vez de array hardcodeado; usar `getUser` en vez de `getClaims` |
+| 6 | `supabase/functions/admin-user-actions/index.ts` | Agregar action `list_users` que retorna perfiles + emails desde `auth.admin.listUsers()`; usar `getUser` en vez de `getClaims` |
+| 7 | `src/pages/admin/useAdminUsers.ts` | Llamar al nuevo action `list_users` del edge function para obtener emails reales |
+| 8 | `src/pages/admin/AdminUsuarios.tsx` | Reemplazar divs de KPI por `DashboardMetricCard` con prop `color` |
+
+### Detalle técnico
+
+**Hook `usePermissions`**:
 ```text
-Props actuales:           Props nuevos:
-─────────────            ─────────────
-label: string            label: string
-value: string            value: string
-icon: LucideIcon         icon: LucideIcon
-subtitle?: string        subtitle?: string
-valueColor?: string      color?: "primary" | "accent" | "success" | "warning" | "destructive" | "muted"
-hoverClass?: string      (eliminado hoverClass)
+usePermissions() → {
+  canAccess(module: string, submodule?: string): boolean
+  dataScope(module: string): "all" | "subordinates" | "self"
+  isLoading: boolean
+}
+```
+- Lee el rol del usuario via `useUserRole`
+- Busca el `roles_config.id` que coincida con el nombre del rol
+- Consulta `role_permissions` filtrado por ese `role_id`
+- Admin sin permisos configurados → acceso total (fallback)
+- Cache con staleTime largo (5 min)
+
+**Edge functions — auth fix**:
+```typescript
+// Antes (puede fallar):
+const { data: claimsData } = await anonClient.auth.getClaims(token);
+const callerId = claimsData.claims.sub;
+
+// Después (estándar):
+const { data: { user }, error } = await adminClient.auth.getUser(token);
+const callerId = user.id;
 ```
 
-#### 2. `src/pages/finanzas/configuracion/ConfiguracionPage.tsx`
-- Actualizar las 5 instancias de `DashboardMetricCard` para usar el nuevo prop `color` en vez de `hoverClass`/`valueColor`
+**Validación dinámica de roles en edge function**:
+```typescript
+// Antes:
+if (!["admin", "manager", "employee"].includes(role)) { ... }
 
-#### 3. Actualizar todas las demás páginas que usan `DashboardMetricCard`
-- `ControlFinancieroPage.tsx` — 4 instancias
-- `ProspectosPage.tsx` — instancias con hoverClass
-- Cualquier otra página que use el componente: migrar de `hoverClass` + `valueColor` a `color`
-- Búsqueda encontró 29 archivos — se actualizarán todos
+// Después:
+const { data: validRole } = await adminClient
+  .from("roles_config")
+  .select("id")
+  .eq("name", role)
+  .eq("is_active", true)
+  .maybeSingle();
+if (!validRole) { return error("Invalid or inactive role"); }
+```
 
-#### 4. `src/pages/design-system/sections/CardsSection.tsx`
-- Agregar subsección "DashboardMetricCard" después de "KPI / Metric Cards"
-- Mostrar el componente real renderizado con cada variante de color (primary, accent, success, warning, destructive, muted)
-- Documentar los props, el hover automático y las reglas de uso
-- Reemplazar el ejemplo manual de KPI cards por el componente real
+**Action `list_users`**:
+```typescript
+if (action === "list_users") {
+  const { data: { users } } = await adminClient.auth.admin.listUsers();
+  // Retorna id + email de cada user
+  return Response(JSON.stringify({
+    users: users.map(u => ({ id: u.id, email: u.email }))
+  }));
+}
+```
 
-#### 5. `src/pages/design-system/sections/LayoutPatternsSection.tsx`
-- Agregar nuevo patrón "Dashboard Page (Standard)" como primer patrón, documentando:
-  - `h-full overflow-hidden` en el contenedor raíz
-  - Header fijo: `shrink-0 bg-background border-b px-6 pt-6 pb-4`
-  - Contenido scrolleable: `flex-1 overflow-auto p-6`
-  - Título: `text-xl font-semibold` (sin icon box)
-  - Jerarquía: Header → KPIs → Tabs → Filtros → Contenido
-- Agregar patrón "Wizard / Form Page" documentando:
-  - Header fijo + stepper fijo + contenido scrolleable + footer fijo
-  - `h-full overflow-hidden` + `shrink-0` para header/stepper/footer
-  - `flex-1 overflow-auto` para contenido
-- Agregar diagrama visual ASCII para cada patrón
-- Marcar como obsoleto el patrón "Centrado con max-width" para dashboards
+### Orden de implementación
 
-### Resultado
+1. Fix de `getClaims` → `getUser` en ambas edge functions (crítico — puede estar fallando)
+2. Validación dinámica de roles en `manage-user-roles`
+3. Action `list_users` en `admin-user-actions` + actualizar `useAdminUsers`
+4. Hook `usePermissions` + integración en sidebar
+5. `ChangeRoleModal` dinámico desde `roles_config`
+6. KPI cards con `DashboardMetricCard`
 
-- El hover de KPI es obligatorio y consistente en toda la plataforma sin depender de que cada dev pase la clase correcta
-- El Design System sirve como referencia real con el componente `DashboardMetricCard` documentado
-- Los patrones de layout quedan documentados para evitar errores recurrentes de header/footer scrolleando
+### Impacto
+
+- Los permisos configurados en la UI empiezan a funcionar realmente
+- El sidebar se adapta dinámicamente al rol del usuario
+- Los roles son extensibles sin cambiar código (se gestionan desde `roles_config`)
+- Los emails son visibles en la gestión de usuarios
+- Las edge functions usan autenticación estándar y robusta
 
