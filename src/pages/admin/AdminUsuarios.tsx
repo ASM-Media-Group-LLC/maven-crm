@@ -5,6 +5,7 @@ import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, LayoutGrid, List, Shield, UserCog, Users, User, Plus } from "lucide-react";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { useAdminUsers, type AdminUser } from "./useAdminUsers";
 import UsersTable from "./UsersTable";
 import UsersGrid from "./UsersGrid";
@@ -73,10 +74,10 @@ const AdminUsuarios = () => {
   };
 
   const kpis = [
-    { label: "Total", value: stats.total, icon: Users, color: "text-primary" },
-    { label: "Admins", value: stats.admins, icon: Shield, color: "text-red-500" },
-    { label: "Managers", value: stats.managers, icon: UserCog, color: "text-amber-500" },
-    { label: "Employees", value: stats.employees, icon: User, color: "text-blue-500" },
+    { label: "Total", value: String(stats.total), icon: Users, color: "primary" as const },
+    { label: "Admins", value: String(stats.admins), icon: Shield, color: "destructive" as const },
+    { label: "Managers", value: String(stats.managers), icon: UserCog, color: "warning" as const },
+    { label: "Employees", value: String(stats.employees), icon: User, color: "accent" as const },
   ];
 
   const tabs = [
@@ -117,15 +118,13 @@ const AdminUsuarios = () => {
               {/* KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {kpis.map((kpi) => (
-                  <div key={kpi.label} className="rounded-lg border bg-card p-4 flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${kpi.color}`}>
-                      <kpi.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{kpi.value}</p>
-                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                    </div>
-                  </div>
+                  <DashboardMetricCard
+                    key={kpi.label}
+                    label={kpi.label}
+                    value={kpi.value}
+                    icon={kpi.icon}
+                    color={kpi.color}
+                  />
                 ))}
               </div>
 

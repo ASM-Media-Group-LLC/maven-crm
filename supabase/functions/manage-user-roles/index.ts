@@ -20,29 +20,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify caller identity
-    const anonClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const callerId = claimsData.claims.sub as string;
 
     // Use service role client for privileged operations
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Verify caller identity using getUser with token
+    const { data: { user: caller }, error: userError } = await adminClient.auth.getUser(token);
+    if (userError || !caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const callerId = caller.id;
 
     // Verify caller is admin
     const { data: callerRole } = await adminClient
@@ -69,41 +64,39 @@ Deno.serve(async (req) => {
     }
 
     if (action === "assign_role") {
-      if (!role || !["admin", "manager", "employee"].includes(role)) {
-        return new Response(JSON.stringify({ error: "Invalid role" }), {
+      if (!role) {
+        return new Response(JSON.stringify({ error: "role is required" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Upsert: update existing role or insert new one
-      const { error: upsertError } = await adminClient
-        .from("user_roles")
-        .upsert({ user_id, role }, { onConflict: "user_id,role" });
+      // Validate role against roles_config (dynamic, not hardcoded)
+      const { data: validRole } = await adminClient
+        .from("roles_config")
+        .select("id")
+        .eq("name", role)
+        .eq("is_active", true)
+        .maybeSingle();
 
-      // If the user already has a different role, delete it first then insert
-      if (!upsertError) {
-        // Remove other roles for this user (one role per user)
-        await adminClient
-          .from("user_roles")
-          .delete()
-          .eq("user_id", user_id)
-          .neq("role", role);
+      if (!validRole) {
+        return new Response(JSON.stringify({ error: `Invalid or inactive role: ${role}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      if (upsertError) {
-        // Try delete + insert approach
-        await adminClient.from("user_roles").delete().eq("user_id", user_id);
-        const { error: insertError } = await adminClient
-          .from("user_roles")
-          .insert({ user_id, role });
+      // Delete existing roles for this user then insert new one (one role per user)
+      await adminClient.from("user_roles").delete().eq("user_id", user_id);
+      const { error: insertError } = await adminClient
+        .from("user_roles")
+        .insert({ user_id, role });
 
-        if (insertError) {
-          return new Response(JSON.stringify({ error: insertError.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      if (insertError) {
+        return new Response(JSON.stringify({ error: insertError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify({ success: true, user_id, role }), {
