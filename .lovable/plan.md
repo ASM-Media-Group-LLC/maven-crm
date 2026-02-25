@@ -1,84 +1,128 @@
 
 
-## Módulo de Offboarding — Gestión de Salida de Empleados
+## Implementación: Configuración Financiera + Banco de Horas Avanzado
 
-Se construirán dos páginas nuevas siguiendo exactamente el patrón de Onboarding (KPIs, department tabs, filtros, list/grid, modales Ver/Editar/Eliminar) + una tabla de tareas de offboarding en la base de datos.
+Este plan cubre tres áreas: (1) tabla de configuración financiera en la base de datos, (2) implementación completa de las 5 tabs de ConfiguracionPage, y (3) mejora del Banco de Horas con historial de movimientos y consumo dinámico de parámetros.
 
 ---
 
-### 1. Nueva tabla: `employee_offboarding_tasks`
+### Estado actual
 
-La tabla `employee_offboarding` ya existe pero no tiene una tabla de tareas asociada (como `employee_onboarding_tasks`). Se creará una migración para:
+- **ConfiguracionPage**: Solo muestra tabs con placeholder "Próximamente".
+- **Banco de Horas en Finanzas** (`HorasVariablesPage.tsx`): Opera sobre `payroll_details.hour_bank_hours/hour_bank_amount` con un valor fijo de $15/hora hardcodeado. No usa la tabla `hour_bank` real ni consume configuración dinámica.
+- **Banco de Horas en HR** (`HRHourBank.tsx`): Opera sobre la tabla `hour_bank` (movimientos deposit/withdrawal por empleado). Es la fuente real de movimientos.
+- **No existe tabla de configuración financiera** en la base de datos.
+- **Sidebar**: Ya tiene todos los enlaces correctos (Dashboard, Collections, Nómina, Horas & Variables, Invoices, Control Financiero, Reportes, Configuración).
+
+---
+
+### 1. Nueva tabla: `financial_config`
+
+Tabla clave-valor para almacenar todos los parámetros configurables:
 
 ```sql
-CREATE TABLE employee_offboarding_tasks (
+CREATE TABLE financial_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  offboarding_id UUID NOT NULL REFERENCES employee_offboarding(id) ON DELETE CASCADE,
-  category TEXT,
-  title TEXT NOT NULL,
-  description TEXT,
-  position INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending',
-  completed_by UUID,
-  completed_at TIMESTAMPTZ,
-  due_date DATE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  config_key TEXT NOT NULL UNIQUE,
+  config_value JSONB NOT NULL DEFAULT '{}',
+  category TEXT NOT NULL,
+  label TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by UUID
 );
-ALTER TABLE employee_offboarding_tasks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated users can manage employee_offboarding_tasks"
-  ON employee_offboarding_tasks FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE financial_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can manage financial_config"
+  ON financial_config FOR ALL USING (true) WITH CHECK (true);
 ```
 
----
+Se insertarán registros iniciales (seed) para cada categoría:
 
-### 2. Página de listado: `HROffboarding.tsx`
-
-Misma estructura que `HROnboarding.tsx`:
-
-- **Header:** Titulo "Offboarding", subtitulo, boton "Iniciar Offboarding" que navega a `/hr/offboarding/nuevo`
-- **KPIs (4 cards):** Total, En Progreso, Completados, Pago Pendiente
-- **Department Tabs:** Tabs de departamento
-- **Filtros:** Search, Select status (in_progress/completed), toggle list/grid
-- **Table columns:** Empleado, Tipo Salida, Fecha Terminación, Accesos Revocados, Equipo Devuelto, Pago Final, Progreso (barra de tareas), Estado, Acciones (Ver/Editar/Eliminar)
-- **Grid cards:** Avatar+nombre, badges de tipo/status, barra de progreso, checkmarks de accesos/equipo
-- **Modal Ver:** Detalle completo con checklist de tareas, notas de entrevista de salida
-- **Modal Editar:** Cambiar status, access_revoked, equipment_returned, final_payment_status, exit_interview_notes
-- **Dialog Eliminar:** Confirmación con borrado de tareas asociadas
+- **quickbooks_templates**: `{ mappings: [] }` — array de `{ category, account_code, account_name, type: "ingreso"|"egreso" }`
+- **payment_methods**: `{ methods: [] }` — array de `{ name, commission_pct, is_active }`
+- **cost_centers**: `{ centers: [] }` — array de `{ name, code, monthly_budget }`
+- **commission_defaults**: `{ creator_pct, partner_pct, exceptions: [] }` — exceptions: `{ creator_id, custom_pct }`
+- **payroll_params**: `{ health_pct, pension_pct, tax_pct, overtime_day_mult, overtime_night_mult, overtime_holiday_mult, hour_bank_expiry_months, hour_value }`
 
 ---
 
-### 3. Página de inicio: `HROffboardingNew.tsx`
+### 2. Hook: `useFinancialConfig`
 
-Misma estructura que `HROnboardingNew.tsx`:
+Nuevo hook en `src/hooks/useFinancialConfig.ts`:
 
-- **Header:** "Iniciar Offboarding" con botón volver
-- **Card 1 — Selección de Empleado:** Select con empleados activos (excluyendo los que ya tienen offboarding activo)
-- **Card 2 — Configuración:**
-  - Tipo de Terminación (Select: Voluntaria, Involuntaria, Fin de Contrato, Mutuo Acuerdo)
-  - Fecha de Terminación (DateInput, requerido)
-  - Motivo de Salida (Textarea)
-  - Fecha Entrevista de Salida (DateInput, opcional)
-- **Card 3 — Checklist de Offboarding:** Checklist categorizado con selección masiva por categoría:
-  - **Accesos:** Revocar correo corporativo, Revocar acceso a plataformas, Revocar VPN/sistemas, Desactivar badge/tarjeta
-  - **Equipamiento:** Devolución de laptop/PC, Devolución de badge/llaves, Devolución de otros equipos
-  - **Documentación:** Carta de terminación, Paz y salvo, Certificado laboral, Liquidación calculada
-  - **Transferencia:** Transferencia de responsabilidades, Documentación de procesos, Entrega de archivos/proyectos
-  - **Administrativo:** Notificación al equipo, Desvinculación de seguridad social, Cierre de nómina
-- **Footer:** Cancelar + "Iniciar Offboarding" (inserta en `employee_offboarding` + `employee_offboarding_tasks`)
+- `useFinancialConfig(category)` — query de `financial_config` filtrado por `category`
+- `useUpdateFinancialConfig()` — mutation para upsert por `config_key`
+- Funciones helper: `getPayrollParams()`, `getPaymentMethods()`, `getCostCenters()`, `getCommissionDefaults()`, `getQuickBooksTemplates()`
 
 ---
 
-### 4. Sidebar — Activar enlace
+### 3. ConfiguracionPage — 5 tabs implementadas
 
-En `DashboardSidebar.tsx`, cambiar `{ title: "Offboarding", url: null }` a `{ title: "Offboarding", url: "/hr/offboarding" }`.
+**Tab 1: Templates QuickBooks**
+- Tabla editable con columnas: Categoría, Tipo (Ingreso/Egreso), Código Cuenta, Nombre Cuenta
+- Botón "Agregar Mapeo" abre inline row
+- Acciones: Editar inline, Eliminar
+- Guarda en `financial_config` con `config_key = "quickbooks_templates"`
+
+**Tab 2: Métodos de Pago**
+- Tabla CRUD: Nombre, Comisión (%), Activo (switch)
+- Botón "Agregar Método"
+- Al cambiar comisión, se usa en cálculos de Facturación Neta en invoices
+- Guarda en `financial_config` con `config_key = "payment_methods"`
+
+**Tab 3: Centros de Costo**
+- Tabla: Nombre, Código, Presupuesto Mensual
+- Botón "Agregar CC"
+- Badge de alerta si CC excede presupuesto (comparando con `payroll_periods` + `commissions` del mes)
+- Guarda en `financial_config` con `config_key = "cost_centers"`
+
+**Tab 4: Config. Comisiones**
+- Dos campos principales: % Creadoras, % Socios
+- Tabla de excepciones: Creadora (select de `creators`), % Custom
+- Botón "Agregar Excepción"
+- Guarda en `financial_config` con `config_key = "commission_defaults"`
+
+**Tab 5: Parámetros de Nómina**
+- Sección "Deducciones": Salud %, Pensión %, Impuestos %
+- Sección "Multiplicadores Horas Extra": Diurno (x), Nocturno (x), Festivo (x)
+- Sección "Banco de Horas": Vigencia (meses), Valor por Hora ($)
+- Botón "Guardar Cambios" con toast de confirmación
+- Guarda en `financial_config` con `config_key = "payroll_params"`
 
 ---
 
-### 5. Rutas en App.tsx
+### 4. Banco de Horas mejorado (HorasVariablesPage.tsx)
 
-Agregar dos rutas:
-- `/hr/offboarding` → `HROffboarding` envuelto en `HRLayout`
-- `/hr/offboarding/nuevo` → `HROffboardingNew` envuelto en `HRLayout`
+Cambios en la tab "Banco de Horas":
+
+**a) Usar tabla `hour_bank` como fuente real** (en vez de `payroll_details`):
+- Query: `hour_bank` con join a `employees`, agrupando por `employee_id` para calcular balance (sum deposits - sum withdrawals)
+- Mostrar balance por empleado con desglose
+
+**b) Acción "Liquidación en Nómina"**:
+- Modal donde el usuario selecciona cuántas horas liquidar (con input numérico, max = balance)
+- Multiplica por `hour_value` de `payroll_params` (consumido dinámicamente)
+- Inserta un registro `withdrawal` en `hour_bank` con `reason: "Liquidación en nómina"`
+- El monto calculado se muestra como referencia para sumarse al próximo periodo de nómina
+
+**c) Acción "Compensar con Tiempo"**:
+- Modal con input de horas/días a compensar
+- Campo de motivo obligatorio
+- Inserta un registro `withdrawal` en `hour_bank` con `reason` del usuario
+- No afecta nómina
+
+**d) Historial de movimientos**:
+- Agregar una sub-tab o sección expandible "Historial" dentro de Banco de Horas
+- Muestra todos los movimientos de `hour_bank` en tabla cronológica: Fecha, Empleado, Tipo (Depósito/Retiro), Horas, Motivo
+- Filtrable por empleado y tipo
+
+---
+
+### 5. Consumo dinámico de configuración
+
+- **NominaPage**: Al calcular nómina, leer `payroll_params` para deducciones (%) y multiplicadores de horas extra
+- **HorasVariablesPage**: Leer `hour_value` para cálculos de pago de banco de horas
+- **FacturacionPage**: Leer `payment_methods` para calcular comisión y facturación neta
+- **ReportesPage**: Leer `cost_centers` para mostrar alerta si presupuesto excedido
 
 ---
 
@@ -86,9 +130,12 @@ Agregar dos rutas:
 
 | Archivo | Acción |
 |---------|--------|
-| Migración SQL | Crear tabla `employee_offboarding_tasks` |
-| `src/pages/hr/HROffboarding.tsx` | **Nuevo** — Listado con KPIs, filtros, list/grid, modales |
-| `src/pages/hr/HROffboardingNew.tsx` | **Nuevo** — Formulario de inicio con checklist categorizado |
-| `src/components/dashboard/DashboardSidebar.tsx` | Activar URL de Offboarding |
-| `src/App.tsx` | Agregar 2 rutas + imports |
+| Migración SQL | Crear tabla `financial_config` + seed de valores iniciales |
+| `src/hooks/useFinancialConfig.ts` | **Nuevo** — Hook para leer/escribir configuración financiera |
+| `src/pages/finanzas/configuracion/ConfiguracionPage.tsx` | **Reescribir** — Implementar las 5 tabs con formularios CRUD |
+| `src/pages/finanzas/horas-variables/HorasVariablesPage.tsx` | **Modificar** — Banco de Horas usa `hour_bank` real + historial + config dinámica |
+| `src/pages/finanzas/nomina/NominaPage.tsx` | **Modificar** — Consumir `payroll_params` para deducciones y multiplicadores |
+| `src/integrations/supabase/types.ts` | **Actualizar** — Agregar tipo `financial_config` |
+
+No se crean rutas nuevas. No se modifica el sidebar (ya está completo).
 
