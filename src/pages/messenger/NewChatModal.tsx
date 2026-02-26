@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { UserStatus } from "@/hooks/useOnlinePresence";
+import { getStatusColor, getStatusLabel } from "./components/StatusPicker";
 
 interface NewChatModalProps {
   open: boolean;
@@ -18,15 +20,17 @@ interface NewChatModalProps {
   isGroup?: boolean;
   onCreateGroup?: (name: string, memberIds: string[]) => void;
   isOnlineFn?: (userId: string) => boolean;
+  getStatusFn?: (userId: string) => UserStatus | null;
 }
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn }: NewChatModalProps) {
+export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn }: NewChatModalProps) {
   const { user } = useAuth();
   const isOnline = isOnlineFn || (() => false);
+  const getStatus = getStatusFn || (() => null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
@@ -116,14 +120,14 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
                   <span
                     className={cn(
                       "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",
-                      online ? "bg-green-500" : "bg-muted-foreground/40"
+                      getStatusColor(getStatus(profile.id), online)
                     )}
                   />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{profile.full_name || "Sin nombre"}</p>
-                  <p className={cn("text-xs", online ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
-                    {online ? "En línea" : "Desconectado"}
+                  <p className="text-xs text-muted-foreground">
+                    {getStatusLabel(getStatus(profile.id), online)}
                   </p>
                 </div>
               </button>
