@@ -1,21 +1,24 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import VideoCallView from "./VideoCallView";
 import NewChatModal from "./NewChatModal";
-import { ConversationWithDetails, VideoRoom } from "./types";
+import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat } = useChat();
   const { isOnline, onlineUsers } = useOnlinePresence();
+  useNotificationPermission();
+  const { notify } = useBrowserNotifications();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
@@ -24,10 +27,19 @@ export default function MessengerPage() {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
+
+  const handleNewMessage = useCallback((msg: ChatMessage) => {
+    const senderName = profiles[msg.sender_id]?.full_name || "Nuevo mensaje";
+    notify(senderName, msg.content || "📎 Archivo", () => {
+      // Focus the conversation on click
+      setActiveChatId(msg.conversation_id);
+    });
+  }, [profiles, notify]);
+
   const {
     messages, loading: msgsLoading, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage,
-  } = useMessages(activeChatId);
+  } = useMessages(activeChatId, handleNewMessage);
 
   const { toggleReaction, getReactionsForMessage } = useReactions(activeChatId);
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
