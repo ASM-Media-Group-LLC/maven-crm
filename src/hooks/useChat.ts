@@ -188,25 +188,28 @@ export function useChat() {
         .eq("user_id", user.id);
 
       if (myConvs) {
-        for (const mc of myConvs) {
-          const { data: conv } = await supabase
-            .from("chat_conversations")
-            .select("*")
-            .eq("id", mc.conversation_id)
-            .eq("type", "direct")
-            .single();
+        const convIds = myConvs.map((mc: any) => mc.conversation_id);
+        
+        // Get only direct conversations in a single query
+        const { data: directConvs } = await supabase
+          .from("chat_conversations")
+          .select("id")
+          .in("id", convIds)
+          .eq("type", "direct");
 
-          if (conv) {
-            const { data: otherP } = await supabase
-              .from("chat_participants")
-              .select("user_id")
-              .eq("conversation_id", conv.id)
-              .eq("user_id", otherUserId)
-              .single();
+        if (directConvs) {
+          const directIds = directConvs.map((c: any) => c.id);
+          
+          // Check if the other user is a participant in any of these
+          const { data: otherP } = await supabase
+            .from("chat_participants")
+            .select("conversation_id")
+            .in("conversation_id", directIds)
+            .eq("user_id", otherUserId)
+            .limit(1);
 
-            if (otherP) {
-              return conv.id;
-            }
+          if (otherP && otherP.length > 0) {
+            return otherP[0].conversation_id;
           }
         }
       }
