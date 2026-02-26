@@ -4,7 +4,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import SalesOverviewHeader from "./sales-overview/SalesOverviewHeader";
-import SalesOverviewFilters from "./sales-overview/SalesOverviewFilters";
 import SalesKPICards from "./sales-overview/SalesKPICards";
 import SalesOperationalCards from "./sales-overview/SalesOperationalCards";
 import CardDetailModal from "./sales-overview/CardDetailModal";
@@ -81,21 +80,23 @@ const SalesOverview = () => {
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
-          <main className="flex-1 overflow-auto p-6 space-y-6">
+           {!isLoading && (
+            <div className="shrink-0 px-6 pt-6 pb-4 border-b bg-background">
+              <SalesOverviewHeader
+                totalEarnings={comparison.totalCurrent}
+                changePercent={comparison.totalChangePercent}
+                activeCreators={comparison.activeCreators}
+                from={dateFrom}
+                to={dateTo}
+                onDateChange={handleDateChange}
+              />
+            </div>
+           )}
+           <main className="flex-1 overflow-auto p-6 space-y-6">
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : (
               <>
-                <SalesOverviewHeader
-                  totalEarnings={comparison.totalCurrent}
-                  changePercent={comparison.totalChangePercent}
-                  activeCreators={comparison.activeCreators}
-                />
-                <SalesOverviewFilters
-                  from={dateFrom}
-                  to={dateTo}
-                  onDateChange={handleDateChange}
-                />
                 <SalesKPICards data={comparison} onCardClick={setModalType} />
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   <EarningsTrendChart rows={filteredRows} earningsMode="net" />
