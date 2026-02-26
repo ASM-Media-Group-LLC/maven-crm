@@ -226,9 +226,13 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                           <span className="text-xs text-muted-foreground">
                             {DATA_SCOPE_LABELS[dataScope] || "All data"}
                           </span>
-                          <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </CollapsibleTrigger>
+                          {hasSubmodules ? (
+                            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </CollapsibleTrigger>
+                          ) : (
+                            <span className="ml-2 w-4" />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -253,7 +257,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                 );
                               })
                             ) : (
-                              <p className="text-sm text-muted-foreground italic">No functions available</p>
+                              <p className="text-xs text-muted-foreground">Permiso global — sin subfunciones</p>
                             )}
                           </div>
                           {/* Right: data scope radio */}
