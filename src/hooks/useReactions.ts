@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -20,20 +20,21 @@ export interface ReactionGroup {
 export function useReactions(conversationId: string | null) {
   const { user } = useAuth();
   const [reactions, setReactions] = useState<Reaction[]>([]);
+  const messageIdsRef = useRef<Set<string>>(new Set());
 
   const loadReactions = useCallback(async () => {
-    if (!conversationId) { setReactions([]); return; }
+    if (!conversationId) { setReactions([]); messageIdsRef.current = new Set(); return; }
 
-    // Get all message IDs for this conversation, then reactions
     const { data: msgs } = await supabase
       .from("chat_messages")
       .select("id")
       .eq("conversation_id", conversationId);
 
-    if (!msgs || msgs.length === 0) { setReactions([]); return; }
+    if (!msgs || msgs.length === 0) { setReactions([]); messageIdsRef.current = new Set(); return; }
 
     const msgIds = msgs.map((m: any) => m.id);
-    // Batch in chunks of 100
+    messageIdsRef.current = new Set(msgIds);
+
     const allReactions: Reaction[] = [];
     for (let i = 0; i < msgIds.length; i += 100) {
       const chunk = msgIds.slice(i, i + 100);
@@ -48,18 +49,22 @@ export function useReactions(conversationId: string | null) {
 
   useEffect(() => { loadReactions(); }, [loadReactions]);
 
-  // Realtime
+  // Realtime - validate reactions belong to current conversation
   useEffect(() => {
     if (!conversationId) return;
     const channel = supabase
       .channel(`reactions-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (payload) => {
         const r = payload.new as Reaction;
+        // Only add if this reaction's message belongs to the current conversation
+        if (!messageIdsRef.current.has(r.message_id)) return;
         setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, (payload) => {
-        const id = (payload.old as any).id;
-        setReactions(prev => prev.filter(x => x.id !== id));
+        const old = payload.old as Partial<Reaction>;
+        if (old.id) {
+          setReactions(prev => prev.filter(x => x.id !== old.id));
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -69,17 +74,41 @@ export function useReactions(conversationId: string | null) {
     if (!user) return;
     const existing = reactions.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
     if (existing) {
-      await supabase.from("chat_reactions").delete().eq("id", existing.id);
+      // Optimistic delete
       setReactions(prev => prev.filter(r => r.id !== existing.id));
+      await supabase.from("chat_reactions").delete().eq("id", existing.id);
     } else {
+      // Optimistic insert with temp id
+      const tempId = crypto.randomUUID();
+      const tempReaction: Reaction = {
+        id: tempId,
+        message_id: messageId,
+        user_id: user.id,
+        emoji,
+        created_at: new Date().toISOString(),
+      };
+      setReactions(prev => [...prev, tempReaction]);
+      
       const { data, error } = await supabase.from("chat_reactions").insert({
         message_id: messageId,
         user_id: user.id,
         emoji,
       }).select().single();
-      if (data) setReactions(prev => [...prev, data as Reaction]);
+      
+      if (data) {
+        // Replace temp with real
+        setReactions(prev => prev.map(r => r.id === tempId ? (data as Reaction) : r));
+      } else if (error) {
+        // Rollback
+        setReactions(prev => prev.filter(r => r.id !== tempId));
+      }
     }
   }, [user, reactions]);
+
+  // Track new messages added to the conversation
+  const addMessageId = useCallback((msgId: string) => {
+    messageIdsRef.current.add(msgId);
+  }, []);
 
   const getReactionsForMessage = useCallback((messageId: string): ReactionGroup[] => {
     const msgReactions = reactions.filter(r => r.message_id === messageId);
@@ -93,5 +122,5 @@ export function useReactions(conversationId: string | null) {
     return Object.entries(grouped).map(([emoji, data]) => ({ emoji, ...data }));
   }, [reactions, user]);
 
-  return { toggleReaction, getReactionsForMessage };
+  return { toggleReaction, getReactionsForMessage, addMessageId };
 }
