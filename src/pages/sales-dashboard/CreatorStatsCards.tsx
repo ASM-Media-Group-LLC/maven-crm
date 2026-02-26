@@ -2,16 +2,21 @@ import { useMemo } from "react";
 import { Users, MessageCircle, DollarSign, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface Props {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
 const fmt = (v: number) =>
   `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const calcStats = (rows: EarningsRow[]) => {
+const NET_FACTOR = 0.80;
+
+const calcStats = (rows: EarningsRow[], mode: EarningsMode) => {
+  const factor = mode === "net" ? NET_FACTOR : 1;
   const creatorSet = new Set<string>();
   let messageEarnings = 0;
   let totalEarnings = 0;
@@ -19,8 +24,8 @@ const calcStats = (rows: EarningsRow[]) => {
   for (const r of rows) {
     const key = r.creator_id || r.pending_creator || r.id;
     creatorSet.add(key);
-    messageEarnings += r.message_gross ?? 0;
-    totalEarnings += r.total_earnings_gross ?? 0;
+    messageEarnings += (r.message_gross ?? 0) * factor;
+    totalEarnings += (r.total_earnings_gross ?? 0) * factor;
   }
 
   return { creators: creatorSet.size, messageEarnings, totalEarnings };
@@ -32,9 +37,9 @@ const calcVariation = (a: number, b: number) => {
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
 };
 
-const CreatorStatsCards = ({ rows, comparedRows }: Props) => {
-  const current = useMemo(() => calcStats(rows), [rows]);
-  const compared = useMemo(() => comparedRows ? calcStats(comparedRows) : null, [comparedRows]);
+const CreatorStatsCards = ({ rows, comparedRows, earningsMode }: Props) => {
+  const current = useMemo(() => calcStats(rows, earningsMode), [rows, earningsMode]);
+  const compared = useMemo(() => comparedRows ? calcStats(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
 
   const stats = [
     { label: "Creadoras", value: String(current.creators), raw: current.creators, compRaw: compared?.creators, icon: Users, color: "text-success" },

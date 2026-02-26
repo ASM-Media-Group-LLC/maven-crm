@@ -13,10 +13,12 @@ import {
 import { TrendingUp, Crown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface Props {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
 const filterTabs = [
@@ -27,13 +29,17 @@ const filterTabs = [
 
 type FilterKey = (typeof filterTabs)[number]["key"];
 
-const buildLorenz = (rows: EarningsRow[]) => {
+const NET_FACTOR = 0.80;
+
+const buildLorenz = (rows: EarningsRow[], mode: EarningsMode) => {
+  const factor = mode === "net" ? NET_FACTOR : 1;
   const grouped = new Map<string, number>();
   let total = 0;
   for (const r of rows) {
     const key = r.creator_id || r.pending_creator || r.id;
-    grouped.set(key, (grouped.get(key) ?? 0) + (r.total_earnings_gross ?? 0));
-    total += r.total_earnings_gross ?? 0;
+    const val = (r.total_earnings_gross ?? 0) * factor;
+    grouped.set(key, (grouped.get(key) ?? 0) + val);
+    total += val;
   }
   if (total === 0 || grouped.size === 0) return { points: [] as { percent: string; revenue: number }[], top20Pct: 0 };
 
@@ -50,11 +56,11 @@ const buildLorenz = (rows: EarningsRow[]) => {
   return { points, top20Pct: Math.round((top20Revenue / total) * 100) };
 };
 
-const ConcentrationChart = ({ rows, comparedRows }: Props) => {
+const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
 
-  const currentLorenz = useMemo(() => buildLorenz(rows), [rows]);
-  const compLorenz = useMemo(() => comparedRows ? buildLorenz(comparedRows) : null, [comparedRows]);
+  const currentLorenz = useMemo(() => buildLorenz(rows, earningsMode), [rows, earningsMode]);
+  const compLorenz = useMemo(() => comparedRows ? buildLorenz(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
 
   const hasComparison = compLorenz && compLorenz.points.length > 0;
 

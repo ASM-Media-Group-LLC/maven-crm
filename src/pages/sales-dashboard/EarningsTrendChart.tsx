@@ -11,17 +11,22 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface Props {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
-const groupByDay = (rows: EarningsRow[]) => {
+const NET_FACTOR = 0.80;
+
+const groupByDay = (rows: EarningsRow[], mode: EarningsMode) => {
+  const factor = mode === "net" ? NET_FACTOR : 1;
   const grouped = new Map<string, number>();
   for (const r of rows) {
     const day = r.effective_date;
-    grouped.set(day, (grouped.get(day) ?? 0) + (r.total_earnings_gross ?? 0));
+    grouped.set(day, (grouped.get(day) ?? 0) + (r.total_earnings_gross ?? 0) * factor);
   }
   return Array.from(grouped.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -33,15 +38,15 @@ const groupByDay = (rows: EarningsRow[]) => {
     }));
 };
 
-const EarningsTrendChart = ({ rows, comparedRows }: Props) => {
+const EarningsTrendChart = ({ rows, comparedRows, earningsMode }: Props) => {
   const data = useMemo(() => {
-    const currentData = groupByDay(rows);
+    const currentData = groupByDay(rows, earningsMode);
 
     if (!comparedRows || comparedRows.length === 0) {
       return currentData.map((d) => ({ label: d.label, "Periodo A": d.earnings }));
     }
 
-    const compData = groupByDay(comparedRows);
+    const compData = groupByDay(comparedRows, earningsMode);
     const maxLen = Math.max(currentData.length, compData.length);
     const merged = [];
 
@@ -54,7 +59,7 @@ const EarningsTrendChart = ({ rows, comparedRows }: Props) => {
     }
 
     return merged;
-  }, [rows, comparedRows]);
+  }, [rows, comparedRows, earningsMode]);
 
   const hasComparison = comparedRows && comparedRows.length > 0;
 

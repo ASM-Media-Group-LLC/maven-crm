@@ -1,12 +1,15 @@
 import { Calendar, GitCompareArrows, X } from "lucide-react";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const viewTabs = ["Vista General", "Rendimiento por Creadora"] as const;
 const timePeriods = ["Ayer", "Hoy", "Esta semana", "Este mes"] as const;
 
 type ViewTab = (typeof viewTabs)[number];
 type TimePeriod = (typeof timePeriods)[number];
+
+export type EarningsMode = "net" | "gross";
 
 interface DashboardFiltersProps {
   activeView: ViewTab;
@@ -20,6 +23,8 @@ interface DashboardFiltersProps {
   compareDateFrom?: Date;
   compareDateTo?: Date;
   onCompareDateChange?: (from: Date | undefined, to: Date | undefined) => void;
+  earningsMode: EarningsMode;
+  onEarningsModeChange: (mode: EarningsMode) => void;
 }
 
 const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -39,6 +44,8 @@ const DashboardFilters = ({
   compareDateFrom,
   compareDateTo,
   onCompareDateChange,
+  earningsMode,
+  onEarningsModeChange,
 }: DashboardFiltersProps) => {
   const handleViewChange = (tab: ViewTab) => {
     onViewChange(tab);
@@ -110,10 +117,15 @@ const DashboardFilters = ({
               <span>{dateLabel}</span>
             </div>
           )}
-          <select className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-foreground outline-none">
-            <option>Net Earnings</option>
-            <option>Gross Earnings</option>
-          </select>
+          <Select value={earningsMode} onValueChange={(v) => onEarningsModeChange(v as EarningsMode)}>
+            <SelectTrigger className="h-9 w-[160px] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="net">Net Earnings</SelectItem>
+              <SelectItem value="gross">Gross Earnings</SelectItem>
+            </SelectContent>
+          </Select>
           {onToggleCompare && (
             <Button
               variant={compareMode ? "destructive" : "outline"}

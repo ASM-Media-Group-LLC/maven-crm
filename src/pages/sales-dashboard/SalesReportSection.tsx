@@ -7,13 +7,15 @@ import EarningsTable from "../sales-performance/EarningsTable";
 import EarningsPagination from "../sales-performance/EarningsPagination";
 import CustomMetrics from "../sales-performance/CustomMetrics";
 import { ALL_COLUMNS, type SortField, type SortDirection, type EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface SalesReportSectionProps {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
-const SalesReportSection = ({ rows, comparedRows }: SalesReportSectionProps) => {
+const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSectionProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -54,8 +56,9 @@ const SalesReportSection = ({ rows, comparedRows }: SalesReportSectionProps) => 
 
     const enriched = result.map((r) => {
       const gross = r.total_earnings_gross ?? 0;
+      const netFactor = earningsMode === "net" ? 0.80 : 1;
       const net_earnings = gross * 0.80;
-      const total_earnings = gross;
+      const total_earnings = gross * netFactor;
       const participation_percent = grandTotal > 0 ? (gross / grandTotal) * 100 : 0;
 
       const creatorKey = r.pending_creator || r.artistic_name || "";
