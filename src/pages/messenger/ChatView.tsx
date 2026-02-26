@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
+import { ReactionGroup } from "@/hooks/useReactions";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import ChatHeader from "./components/ChatHeader";
@@ -18,11 +19,15 @@ interface ChatViewProps {
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   loading: boolean;
+  getReactionsForMessage: (messageId: string) => ReactionGroup[];
+  onToggleReaction: (messageId: string, emoji: string) => void;
+  getReadByUsers: (messageId: string) => string[];
 }
 
 export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
+  getReactionsForMessage, onToggleReaction, getReadByUsers,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -54,6 +59,10 @@ export default function ChatView({
         onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
         onEdit={onEditMessage}
         onDelete={onDeleteMessage}
+        getReactionsForMessage={getReactionsForMessage}
+        onToggleReaction={onToggleReaction}
+        getReadByUsers={getReadByUsers}
+        totalParticipants={conversation.participants.length}
       />
 
       <MessageInput

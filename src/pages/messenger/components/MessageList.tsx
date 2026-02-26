@@ -1,8 +1,8 @@
 import { useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ChatMessage, UserProfile } from "../types";
+import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
-import { cn } from "@/lib/utils";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -15,6 +15,10 @@ interface MessageListProps {
   onCopy: (content: string) => void;
   onEdit: (id: string, content: string) => void;
   onDelete: (id: string) => void;
+  getReactionsForMessage: (messageId: string) => ReactionGroup[];
+  onToggleReaction: (messageId: string, emoji: string) => void;
+  getReadByUsers: (messageId: string) => string[];
+  totalParticipants: number;
 }
 
 function formatDateSeparator(dateStr: string): string {
@@ -22,16 +26,13 @@ function formatDateSeparator(dateStr: string): string {
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-
   if (date.toDateString() === now.toDateString()) return "Hoy";
   if (date.toDateString() === yesterday.toDateString()) return "Ayer";
   return date.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
 }
 
-/** Group messages by date, then compute consecutive message grouping (same sender within 2min) */
 function groupMessages(messages: ChatMessage[]) {
   const groups: { date: string; messages: ChatMessage[] }[] = [];
-
   messages.forEach(msg => {
     const dateKey = new Date(msg.created_at).toDateString();
     const last = groups[groups.length - 1];
@@ -41,19 +42,19 @@ function groupMessages(messages: ChatMessage[]) {
       groups.push({ date: msg.created_at, messages: [msg] });
     }
   });
-
   return groups;
 }
 
 function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
   if (a.sender_id !== b.sender_id) return false;
   const diff = Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  return diff < 120000; // 2 minutes
+  return diff < 120000;
 }
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
   loading, onReply, onCopy, onEdit, onDelete,
+  getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -91,19 +92,16 @@ export default function MessageList({
       <div className="max-w-2xl mx-auto py-4 px-2 md:px-4 space-y-1">
         {groups.map((group, gi) => (
           <div key={gi}>
-            {/* Date separator */}
             <div className="flex justify-center my-4">
               <span className="text-[11px] text-muted-foreground bg-muted/60 backdrop-blur-sm px-3 py-1 rounded-full font-medium select-none">
                 {formatDateSeparator(group.date)}
               </span>
             </div>
 
-            {/* Messages */}
             {group.messages.map((msg, mi) => {
               const isMe = msg.sender_id === currentUserId;
               const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
               const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
-
               const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
               const isLastInGroup = !nextMsg || !isSameGroup(msg, nextMsg);
 
@@ -123,6 +121,10 @@ export default function MessageList({
                   showAvatar={isLastInGroup && !isMe}
                   showSender={isFirstInGroup && !isMe}
                   isLastInGroup={isLastInGroup}
+                  reactions={getReactionsForMessage(msg.id)}
+                  onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
+                  readByUsers={getReadByUsers(msg.id)}
+                  totalParticipants={totalParticipants}
                 />
               );
             })}
