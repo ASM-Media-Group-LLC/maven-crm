@@ -20,9 +20,46 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
       .select("message_id, user_id, read_at")
       .in("message_id", last50);
     if (data) setReceipts(data as ReadReceipt[]);
-  }, [conversationId, messageIds.length]);
+  }, [conversationId, messageIds]);
 
   useEffect(() => { loadReceipts(); }, [loadReceipts]);
+
+  // Realtime sync for read receipts in active conversation
+  useEffect(() => {
+    if (!conversationId || messageIds.length === 0) return;
+
+    const trackedMessageIds = new Set(messageIds);
+
+    const channel = supabase
+      .channel(`read-receipts-${conversationId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_read_receipts" },
+        (payload) => {
+          const receipt = payload.new as ReadReceipt;
+          if (!trackedMessageIds.has(receipt.message_id)) return;
+
+          setReceipts((prev) =>
+            prev.some(
+              (r) =>
+                r.message_id === receipt.message_id &&
+                r.user_id === receipt.user_id
+            )
+              ? prev
+              : [...prev, receipt]
+          );
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          void loadReceipts();
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, messageIds, loadReceipts]);
 
   // Mark messages as read by inserting read receipts
   const markAsRead = useCallback(async (msgIds: string[]) => {
