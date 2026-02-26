@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation } = useChat();
-  const { isOnline, onlineUsers } = useOnlinePresence();
+  const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -181,6 +181,7 @@ export default function MessengerPage() {
         profiles={profiles}
         onSelectUser={handleSelectUser}
         isOnlineFn={isOnline}
+        getStatusFn={getStatus}
       />
       <NewChatModal
         open={newGroupOpen}
@@ -190,6 +191,7 @@ export default function MessengerPage() {
         isGroup
         onCreateGroup={handleCreateGroup}
         isOnlineFn={isOnline}
+        getStatusFn={getStatus}
       />
     </div>
   );
