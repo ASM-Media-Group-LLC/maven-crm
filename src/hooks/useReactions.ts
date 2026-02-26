@@ -49,64 +49,99 @@ export function useReactions(conversationId: string | null) {
 
   useEffect(() => { loadReactions(); }, [loadReactions]);
 
-  // Realtime - validate reactions belong to current conversation
+  const isMessageInActiveConversation = useCallback(async (messageId: string) => {
+    if (!conversationId) return false;
+    if (messageIdsRef.current.has(messageId)) return true;
+
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("id")
+      .eq("id", messageId)
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+
+    if (error || !data) return false;
+    messageIdsRef.current.add(messageId);
+    return true;
+  }, [conversationId]);
+
+  // Realtime - validate reactions belong to current conversation (race-safe)
   useEffect(() => {
     if (!conversationId) return;
+
     const channel = supabase
       .channel(`reactions-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (payload) => {
         const r = payload.new as Reaction;
-        // Only add if this reaction's message belongs to the current conversation
-        if (!messageIdsRef.current.has(r.message_id)) return;
-        setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
+
+        if (messageIdsRef.current.has(r.message_id)) {
+          setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
+          return;
+        }
+
+        void (async () => {
+          const belongs = await isMessageInActiveConversation(r.message_id);
+          if (!belongs) return;
+          setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
+        })();
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, (payload) => {
         const old = payload.old as Partial<Reaction>;
-        if (old.id) {
-          setReactions(prev => prev.filter(x => x.id !== old.id));
-        }
+        if (old.id) setReactions(prev => prev.filter(x => x.id !== old.id));
       })
       .subscribe();
+
     return () => { supabase.removeChannel(channel); };
-  }, [conversationId]);
+  }, [conversationId, isMessageInActiveConversation]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
-    // Use functional update to avoid stale closure on reactions
+
+    let removedReaction: Reaction | null = null;
     let existingId: string | null = null;
+
     setReactions(prev => {
       const found = prev.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
-      if (found) {
-        existingId = found.id;
-        return prev.filter(r => r.id !== found.id);
-      }
-      return prev;
+      if (!found) return prev;
+      removedReaction = found;
+      existingId = found.id;
+      return prev.filter(r => r.id !== found.id);
     });
 
     if (existingId) {
-      await supabase.from("chat_reactions").delete().eq("id", existingId);
-    } else {
-      const tempId = crypto.randomUUID();
-      const tempReaction: Reaction = {
-        id: tempId,
-        message_id: messageId,
-        user_id: user.id,
-        emoji,
-        created_at: new Date().toISOString(),
-      };
-      setReactions(prev => [...prev, tempReaction]);
-      
-      const { data, error } = await supabase.from("chat_reactions").insert({
-        message_id: messageId,
-        user_id: user.id,
-        emoji,
-      }).select().single();
-      
-      if (data) {
-        setReactions(prev => prev.map(r => r.id === tempId ? (data as Reaction) : r));
-      } else if (error) {
-        setReactions(prev => prev.filter(r => r.id !== tempId));
+      const { error } = await supabase.from("chat_reactions").delete().eq("id", existingId);
+      if (error && removedReaction) {
+        setReactions(prev => prev.find(r => r.id === removedReaction!.id) ? prev : [...prev, removedReaction!]);
       }
+      return;
+    }
+
+    const tempId = crypto.randomUUID();
+    const tempReaction: Reaction = {
+      id: tempId,
+      message_id: messageId,
+      user_id: user.id,
+      emoji,
+      created_at: new Date().toISOString(),
+    };
+
+    setReactions(prev => [...prev, tempReaction]);
+
+    const { data, error } = await supabase.from("chat_reactions").insert({
+      message_id: messageId,
+      user_id: user.id,
+      emoji,
+    }).select().single();
+
+    if (data) {
+      setReactions(prev => {
+        const withoutTemp = prev.filter(r => r.id !== tempId);
+        return withoutTemp.some(r => r.id === (data as Reaction).id)
+          ? withoutTemp
+          : [...withoutTemp, data as Reaction];
+      });
+    } else if (error) {
+      setReactions(prev => prev.filter(r => r.id !== tempId));
     }
   }, [user]);
 
