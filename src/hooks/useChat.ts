@@ -16,6 +16,8 @@ export function useChat() {
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const delayedRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   profilesRef.current = profiles;
 
   // Load all profiles once
@@ -148,9 +150,23 @@ export function useChat() {
     loadProfiles().then(() => loadConversations());
   }, [loadProfiles, loadConversations]);
 
-  // Realtime subscription for new messages
+  // Realtime subscription for conversation sync
   useEffect(() => {
     if (!user) return;
+
+    const scheduleConversationsReload = (isDeleteEvent = false) => {
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+      refreshTimeoutRef.current = setTimeout(() => {
+        void loadConversations();
+      }, 180);
+
+      if (isDeleteEvent) {
+        if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+        delayedRefreshTimeoutRef.current = setTimeout(() => {
+          void loadConversations();
+        }, 900);
+      }
+    };
 
     const channel = supabase
       .channel("chat-realtime")
@@ -158,20 +174,28 @@ export function useChat() {
         "postgres_changes",
         { event: "*", schema: "public", table: "chat_messages" },
         () => {
-          // Reload conversations to update last message and unread counts
-          loadConversations();
+          scheduleConversationsReload();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chat_participants" },
-        () => {
-          loadConversations();
+        (payload) => {
+          scheduleConversationsReload(payload.eventType === "DELETE");
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_conversations" },
+        (payload) => {
+          scheduleConversationsReload(payload.eventType === "DELETE");
         }
       )
       .subscribe();
 
     return () => {
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
       supabase.removeChannel(channel);
     };
   }, [user, loadConversations]);
