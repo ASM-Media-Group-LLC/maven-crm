@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateInput } from "@/components/ui/date-input";
 import { useUpdateAnnouncement, type AnnouncementRow } from "./useAnnouncementsAdmin";
 
 const TYPES = [
@@ -41,8 +42,8 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
       setMessage(announcement.message ?? "");
       setType(announcement.announcement_type);
       setPriority(announcement.priority);
-      setStartsAt(announcement.starts_at.slice(0, 16));
-      setExpiresAt(announcement.expires_at?.slice(0, 16) ?? "");
+      setStartsAt(announcement.starts_at.slice(0, 10));
+      setExpiresAt(announcement.expires_at?.slice(0, 10) ?? "");
     }
   }, [announcement]);
 
@@ -54,8 +55,8 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
       message: message.trim() || null,
       announcement_type: type,
       priority,
-      starts_at: new Date(startsAt).toISOString(),
-      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+      starts_at: startsAt ? new Date(startsAt + "T00:00:00").toISOString() : new Date().toISOString(),
+      expires_at: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
     }, {
       onSuccess: () => onOpenChange(false),
     });
@@ -99,11 +100,11 @@ const EditAnnouncementModal = ({ open, onOpenChange, announcement }: Props) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha inicio</Label>
-              <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <DateInput value={startsAt} onChange={setStartsAt} placeholder="Fecha inicio" />
             </div>
             <div className="space-y-2">
               <Label>Expiración (opcional)</Label>
-              <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <DateInput value={expiresAt} onChange={setExpiresAt} placeholder="Sin expiración" />
             </div>
           </div>
         </div>
