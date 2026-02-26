@@ -1,0 +1,172 @@
+import { useState } from "react";
+import { Video, Plus, Copy, Link2, Users, Clock, X, Phone, PhoneOff, Mic, MicOff, Monitor, MonitorOff, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { VideoRoom } from "./types";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface VideoRoomsPanelProps {
+  rooms: VideoRoom[];
+  onCreateRoom: (name: string) => void;
+  onJoinRoom: (room: VideoRoom) => void;
+  onClose: () => void;
+}
+
+export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [roomName, setRoomName] = useState("");
+  const [joinLink, setJoinLink] = useState("");
+
+  const handleCreate = () => {
+    if (!roomName.trim()) return;
+    onCreateRoom(roomName.trim());
+    setRoomName("");
+    setShowCreate(false);
+  };
+
+  const handleJoinByLink = () => {
+    if (!joinLink.trim()) return;
+    const roomId = joinLink.split("room=")[1] || joinLink;
+    const room = rooms.find(r => r.id === roomId);
+    if (room) {
+      onJoinRoom(room);
+    } else {
+      toast.info("Uniéndose a la sala... (demo)");
+    }
+    setJoinLink("");
+  };
+
+  const copyLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    toast.success("Enlace copiado al portapapeles");
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-card border-r border-border">
+      <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Video className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-foreground">Video Rooms</h2>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="shrink-0 p-4 space-y-3">
+        {/* Quick actions */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={() => setShowCreate(true)} className="h-auto py-3 flex-col gap-1">
+            <Plus className="h-5 w-5" />
+            <span className="text-xs">Nueva sala</span>
+          </Button>
+          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1">
+            <Link2 className="h-5 w-5" />
+            <span className="text-xs">Unirse</span>
+          </Button>
+        </div>
+
+        {/* Join by link */}
+        <div className="flex gap-2">
+          <Input
+            id="join-link-input"
+            placeholder="Pegar enlace de la sala..."
+            className="h-9 bg-muted/50 text-xs"
+            value={joinLink}
+            onChange={e => setJoinLink(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleJoinByLink()}
+          />
+          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()}>
+            Unirse
+          </Button>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 px-4 pb-4">
+        <div className="space-y-3">
+          {rooms.map(room => (
+            <Card key={room.id} className={cn("transition-colors", room.isActive && "border-primary/40 bg-primary/5")}>
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "h-8 w-8 rounded-lg flex items-center justify-center",
+                      room.isActive ? "bg-primary/20" : "bg-muted"
+                    )}>
+                      <Video className={cn("h-4 w-4", room.isActive ? "text-primary" : "text-muted-foreground")} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{room.name}</p>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <Users className="h-3 w-3" /> {room.participants.length}
+                        {room.isActive && (
+                          <Badge className="h-4 px-1.5 text-[9px] bg-emerald-500/20 text-emerald-500 border-0">
+                            EN VIVO
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Participants avatars */}
+                <div className="flex items-center gap-1">
+                  {room.participants.slice(0, 4).map(p => (
+                    <Avatar key={p.id} className="h-6 w-6 border-2 border-card -ml-1 first:ml-0">
+                      <AvatarFallback className="text-[9px] bg-muted">
+                        {p.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {room.participants.length > 4 && (
+                    <span className="text-[10px] text-muted-foreground ml-1">+{room.participants.length - 4}</span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => onJoinRoom(room)}>
+                    {room.isActive ? "Unirse ahora" : "Iniciar"}
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => copyLink(room.shareLink)}>
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* Create room dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear nueva sala de video</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Nombre de la sala</Label>
+              <Input
+                placeholder="Ej: Standup diario, Revisión de sprint..."
+                value={roomName}
+                onChange={e => setRoomName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleCreate()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={!roomName.trim()}>Crear sala</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -54,6 +54,7 @@ import AdminUsuarios from "./pages/admin/AdminUsuarios";
 import AuditoriaRoles from "./pages/admin/AuditoriaRoles";
 import AdminRoute from "./components/AdminRoute";
 import Roadmap from "./pages/Roadmap";
+import Messenger from "./pages/Messenger";
 import NotFound from "./pages/NotFound";
 import HRDashboard from "./pages/hr/HRDashboard";
 import EmployeeDirectory from "./pages/hr/EmployeeDirectory";
@@ -157,6 +158,7 @@ const App = () => (
               <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
+              <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
               {/* HR routes */}
               <Route path="/hr" element={<ProtectedRoute><HRLayout><HRDashboard /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/directorio" element={<ProtectedRoute><HRLayout><EmployeeDirectory /></HRLayout></ProtectedRoute>} />
