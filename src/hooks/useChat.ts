@@ -362,6 +362,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const [loading, setLoading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
+  const typingChannelRef = useRef<any>(null);
   onNewMessageRef.current = onNewMessage;
 
   const loadMessages = useCallback(async () => {
@@ -450,7 +451,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     // Typing indicator via presence
     const presenceChannel = supabase
-      .channel(`typing-${conversationId}`)
+      .channel(`typing-${conversationId}`, {
+        config: { presence: { key: user?.id ?? `anon-${conversationId}` } },
+      })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
@@ -462,12 +465,21 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
           });
         });
         setTypingUsers(typing);
-      })
-      .subscribe();
+      });
+
+    typingChannelRef.current = presenceChannel;
+    presenceChannel.subscribe((status) => {
+      if (status === "SUBSCRIBED" && user) {
+        void presenceChannel.track({ user_id: user.id, typing: false });
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
+      if (typingChannelRef.current === presenceChannel) {
+        typingChannelRef.current = null;
+      }
     };
   }, [conversationId, user]);
 
@@ -507,7 +519,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const sendTyping = useCallback(
     async (isTyping: boolean) => {
       if (!conversationId || !user) return;
-      const channel = supabase.channel(`typing-${conversationId}`);
+      const channel = typingChannelRef.current;
+      if (!channel) return;
       await channel.track({ user_id: user.id, typing: isTyping });
     },
     [conversationId, user]

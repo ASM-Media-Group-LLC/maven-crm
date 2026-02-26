@@ -49,50 +49,28 @@ export function useReactions(conversationId: string | null) {
 
   useEffect(() => { loadReactions(); }, [loadReactions]);
 
-  const isMessageInActiveConversation = useCallback(async (messageId: string) => {
-    if (!conversationId) return false;
-    if (messageIdsRef.current.has(messageId)) return true;
-
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .select("id")
-      .eq("id", messageId)
-      .eq("conversation_id", conversationId)
-      .maybeSingle();
-
-    if (error || !data) return false;
-    messageIdsRef.current.add(messageId);
-    return true;
-  }, [conversationId]);
-
-  // Realtime - validate reactions belong to current conversation (race-safe)
+  // Realtime: always re-sync from DB on reaction changes to avoid stale/race conditions
   useEffect(() => {
     if (!conversationId) return;
 
     const channel = supabase
       .channel(`reactions-${conversationId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (payload) => {
-        const r = payload.new as Reaction;
-
-        if (messageIdsRef.current.has(r.message_id)) {
-          setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
-          return;
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, () => {
+        void loadReactions();
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, () => {
+        void loadReactions();
+      })
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          void loadReactions();
         }
+      });
 
-        void (async () => {
-          const belongs = await isMessageInActiveConversation(r.message_id);
-          if (!belongs) return;
-          setReactions(prev => prev.find(x => x.id === r.id) ? prev : [...prev, r]);
-        })();
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, (payload) => {
-        const old = payload.old as Partial<Reaction>;
-        if (old.id) setReactions(prev => prev.filter(x => x.id !== old.id));
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [conversationId, isMessageInActiveConversation]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId, loadReactions]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
