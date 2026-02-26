@@ -1,26 +1,33 @@
-import { useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Users, Ticket, CalendarCheck, MessageSquare, Phone,
   Headphones, CheckSquare, AlertCircle, RefreshCw, Clock,
-  UserMinus, Calendar, ListTodo,
+  UserMinus, Calendar, ListTodo, Zap, Settings2, Check,
+  ChevronRight, UserPlus, Briefcase, DollarSign, Megaphone,
+  TrendingUp, Settings, Cake, Bell,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell,
-  BarChart, Bar,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardMetricCard from "./DashboardMetricCard";
 import { useEarningsData } from "@/pages/sales-performance/useEarningsData";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useWeeklyStats, useOperationalKPIs, useRecentActivity, usePendingTasks } from "@/hooks/useDashboardData";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useAnnouncements, useUpcomingBirthdays } from "@/hooks/useAnnouncements";
+import { useQuery } from "@tanstack/react-query";
 
 /* ── Existing data hooks ─────────────────────────────── */
 
@@ -93,6 +100,46 @@ const ACTIVITY_CONFIG = {
   event: { icon: Calendar, bg: "bg-accent/10", text: "text-accent-foreground", label: "Evento" },
 };
 
+/* ── Quick Actions ────────────────────────────────── */
+
+interface QuickAction {
+  id: string;
+  label: string;
+  icon: typeof Users;
+  url: string;
+  module?: string; // for permission filtering
+}
+
+const ALL_ACTIONS: QuickAction[] = [
+  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "contactos" },
+  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "tareas" },
+  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "eventos" },
+  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "creadores" },
+  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "leadgen" },
+  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "closers" },
+  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "tickets" },
+  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "hr" },
+  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "finanzas" },
+  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "promolog" },
+  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "sales" },
+  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "admin" },
+];
+
+const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos", "creadores", "tickets", "hr"];
+const MAX_SHORTCUTS = 6;
+const LS_KEY = "dashboard_quick_actions";
+
+function loadShortcuts(): string[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return DEFAULT_ACTION_IDS;
+}
+
 /* ── Component ────────────────────────────────────── */
 
 const DashboardContent = () => {
@@ -100,6 +147,38 @@ const DashboardContent = () => {
   const queryClient = useQueryClient();
   const { canAccess } = usePermissions();
 
+  // Quick Actions state
+  const [selectedIds, setSelectedIds] = useState<string[]>(loadShortcuts);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[]>([]);
+
+  const availableActions = useMemo(
+    () => ALL_ACTIONS.filter((a) => !a.module || canAccess(a.module)),
+    [canAccess]
+  );
+
+  const activeActions = selectedIds
+    .map((id) => availableActions.find((a) => a.id === id))
+    .filter(Boolean) as QuickAction[];
+
+  function openConfig() {
+    setDraftIds([...selectedIds]);
+    setConfigOpen(true);
+  }
+  function toggleDraft(id: string) {
+    setDraftIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_SHORTCUTS) return prev;
+      return [...prev, id];
+    });
+  }
+  function saveConfig() {
+    setSelectedIds(draftIds);
+    localStorage.setItem(LS_KEY, JSON.stringify(draftIds));
+    setConfigOpen(false);
+  }
+
+  // Data hooks
   const { data: creatorsData, isLoading: creatorsLoading } = useCreatorsCount();
   const { data: ticketsData, isLoading: ticketsLoading } = useTicketsData();
   const { data: leadsData, isLoading: leadsLoading } = useLeadsData();
@@ -108,6 +187,8 @@ const DashboardContent = () => {
   const { data: opKPIs } = useOperationalKPIs();
   const { data: recentActivity = [], isLoading: activityLoading } = useRecentActivity();
   const { data: pendingTasks = [] } = usePendingTasks();
+  const { data: announcements = [] } = useAnnouncements();
+  const { data: birthdays = [] } = useUpcomingBirthdays();
 
   const top5 = useMemo(() => {
     const map = new Map<string, { name: string; total: number }>();
@@ -139,7 +220,6 @@ const DashboardContent = () => {
     queryClient.invalidateQueries();
   };
 
-  // Build KPIs based on permissions
   const kpis = [
     {
       label: "Total Creators",
@@ -155,7 +235,7 @@ const DashboardContent = () => {
       icon: Ticket,
       color: "destructive" as const,
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
-      show: true, // tickets visible for all
+      show: true,
     },
     {
       label: "New Leads Today",
@@ -183,306 +263,466 @@ const DashboardContent = () => {
     },
   ].filter((k) => k.show);
 
+  const hasBirthdaysOrAnnouncements = birthdays.length > 0 || announcements.length > 0;
+
   return (
-    <main className="flex-1 overflow-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Vista general de toda la operación en tiempo real</p>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Fixed Header */}
+      <header className="shrink-0 bg-background border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Vista general de toda la operación en tiempo real</p>
+          </div>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
+            <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+          </Button>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
-          <RefreshCw className="h-3.5 w-3.5" /> Actualizar
-        </Button>
-      </div>
+      </header>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {kpis.map((k) => (
-          <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
-        ))}
-      </div>
+      {/* Scrollable Content */}
+      <main className="flex-1 overflow-auto p-6 space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {kpis.map((k) => (
+            <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
+          ))}
+        </div>
 
-      {/* Row 2: Weekly Performance + Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {canAccess("leadgen") && (
-          <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary shrink-0" />
+                <div>
+                  <p className="text-base font-semibold leading-none">Acciones Rápidas</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Accesos directos a los módulos que más utilizas</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0" onClick={openConfig}>
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              {activeActions.map((action) => (
+                <div
+                  key={action.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 cursor-pointer hover:border-primary/40 hover:bg-primary/5 hover:-translate-y-[1px] transition-all duration-200 group"
+                  onClick={() => navigate(action.url)}
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <action.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="flex-1 text-sm font-medium">{action.label}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              ))}
+              {activeActions.length === 0 && (
+                <p className="col-span-6 text-sm text-muted-foreground text-center py-4">
+                  No hay accesos configurados. Haz clic en el engranaje para agregar.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Row 2: Weekly Performance + Avisos/Actividad */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {canAccess("leadgen") && (
+            <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
+                <CardDescription>Leads y Deals esta semana (datos reales)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weeklyData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
+                      <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="leads" stroke="hsl(211,100%,50%)" strokeWidth={2} name="Leads" dot={false} />
+                      <Line type="monotone" dataKey="deals" stroke="hsl(145,63%,32%)" strokeWidth={2} name="Deals" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Avisos y Celebraciones */}
+          {hasBirthdaysOrAnnouncements ? (
+            <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Avisos y Celebraciones
+                </CardTitle>
+                <CardDescription>Cumpleaños y anuncios internos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-60 overflow-auto">
+                  {/* Birthdays */}
+                  {birthdays.map((b) => (
+                    <div key={b.id} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/10">
+                        <Cake className="h-3.5 w-3.5 text-warning" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{b.first_name} {b.last_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.isToday
+                            ? "🎉 ¡Cumple años hoy!"
+                            : `Cumple el ${format(new Date(b.birth_date + "T12:00:00"), "d 'de' MMMM", { locale: es })}`}
+                        </p>
+                      </div>
+                      {b.isToday && (
+                        <Badge className="bg-warning/10 text-warning hover:bg-warning/20 text-[10px]">Hoy</Badge>
+                      )}
+                    </div>
+                  ))}
+                  {/* Announcements */}
+                  {announcements.map((a) => (
+                    <div key={a.id} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                        <Megaphone className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{a.title}</p>
+                          {a.priority === "high" && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Urgente</Badge>
+                          )}
+                        </div>
+                        {a.message && <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Actividad Reciente</CardTitle>
+                <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {activityLoading ? (
+                    <p className="text-sm text-muted-foreground">Cargando…</p>
+                  ) : recentActivity.length > 0 ? (
+                    recentActivity.map((item) => {
+                      const config = ACTIVITY_CONFIG[item.type];
+                      const Icon = config.icon;
+                      return (
+                        <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
+                            <Icon className={`h-3.5 w-3.5 ${config.text}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">{item.title}</p>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                                {config.label}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {item.date
+                                ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
+                                : ""}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Row 2b: Actividad Reciente (when announcements card is shown) */}
+        {hasBirthdaysOrAnnouncements && (
+          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
-              <CardDescription>Leads y Deals esta semana (datos reales)</CardDescription>
+              <CardTitle className="text-base">Actividad Reciente</CardTitle>
+              <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={weeklyData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                    <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="leads" stroke="hsl(211,100%,50%)" strokeWidth={2} name="Leads" dot={false} />
-                    <Line type="monotone" dataKey="deals" stroke="hsl(145,63%,32%)" strokeWidth={2} name="Deals" dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+                {activityLoading ? (
+                  <p className="text-sm text-muted-foreground">Cargando…</p>
+                ) : recentActivity.length > 0 ? (
+                  recentActivity.map((item) => {
+                    const config = ACTIVITY_CONFIG[item.type];
+                    const Icon = config.icon;
+                    return (
+                      <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
+                        <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
+                          <Icon className={`h-3.5 w-3.5 ${config.text}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{item.title}</p>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                              {config.label}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {item.date
+                              ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
+                )}
               </div>
             </CardContent>
           </Card>
         )}
 
-        <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Actividad Reciente</CardTitle>
-            <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {activityLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando…</p>
-              ) : recentActivity.length > 0 ? (
-                recentActivity.map((item) => {
-                  const config = ACTIVITY_CONFIG[item.type];
-                  const Icon = config.icon;
-                  return (
-                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
-                      <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
-                        <Icon className={`h-3.5 w-3.5 ${config.text}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{item.title}</p>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                            {config.label}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {item.date
-                            ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
-                            : ""}
-                        </p>
-                      </div>
+        {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {canAccess("leadgen") && (
+            <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Distribución Pipeline</CardTitle>
+                <CardDescription>Leads por estado</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pipelineData.length > 0 ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-48 w-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={pipelineData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                            {pipelineData.map((_, i) => (
+                              <Cell key={i} fill={PIPELINE_COLORS[i % PIPELINE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 3: Pipeline + Top 5 + Deals/Pending Tasks */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Pipeline Donut */}
-        {canAccess("leadgen") && (
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Distribución Pipeline</CardTitle>
-              <CardDescription>Leads por estado</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pipelineData.length > 0 ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-48 w-48">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pipelineData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={75}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {pipelineData.map((_, i) => (
-                            <Cell key={i} fill={PIPELINE_COLORS[i % PIPELINE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                      {pipelineData.map((d, i) => (
+                        <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length] }} />
+                          <span className="text-muted-foreground">{d.name}</span>
+                          <span className="font-medium">{d.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-                    {pipelineData.map((d, i) => (
-                      <div key={d.name} className="flex items-center gap-1.5 text-xs">
-                        <span
-                          className="inline-block h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length] }}
-                        />
-                        <span className="text-muted-foreground">{d.name}</span>
-                        <span className="font-medium">{d.value}</span>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Sin datos de pipeline</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {canAccess("creadores") && (
+            <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
+                <CardDescription>Por ingresos totales</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {earningsLoading ? (
+                  <p className="text-sm text-muted-foreground">Cargando…</p>
+                ) : top5.length > 0 ? (
+                  <div className="space-y-3">
+                    {top5.map((c, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{c.name}</p>
+                          <p className="text-xs text-muted-foreground">{fmt(c.total)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Sin datos de pipeline</p>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Top 5 Creators */}
-        {canAccess("creadores") && (
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-warning/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
-              <CardDescription>Por ingresos totales</CardDescription>
+              <CardTitle className="text-base">Tareas Pendientes</CardTitle>
+              <CardDescription>Próximas a vencer</CardDescription>
             </CardHeader>
             <CardContent>
-              {earningsLoading ? (
-                <p className="text-sm text-muted-foreground">Cargando…</p>
-              ) : top5.length > 0 ? (
+              {pendingTasks.length > 0 ? (
                 <div className="space-y-3">
-                  {top5.map((c, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        {i + 1}
-                      </span>
+                  {pendingTasks.map((t) => (
+                    <div key={t.id} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/10">
+                        <ListTodo className="h-3.5 w-3.5 text-warning" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{fmt(c.total)}</p>
+                        <p className="text-sm font-medium truncate">{t.title}</p>
+                        <div className="flex items-center gap-2">
+                          {t.due_at && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(t.due_at), { addSuffix: true, locale: es })}
+                            </p>
+                          )}
+                          {t.priority && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t.priority}</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+                <p className="text-sm text-muted-foreground text-center py-8">Sin tareas pendientes</p>
               )}
             </CardContent>
           </Card>
-        )}
+        </div>
 
-        {/* Pending Tasks (replaces Scripts and Tools) */}
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-warning/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Tareas Pendientes</CardTitle>
-            <CardDescription>Próximas a vencer</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pendingTasks.length > 0 ? (
-              <div className="space-y-3">
-                {pendingTasks.map((t) => (
-                  <div key={t.id} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/10">
-                      <ListTodo className="h-3.5 w-3.5 text-warning" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.title}</p>
-                      <div className="flex items-center gap-2">
-                        {t.due_at && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(t.due_at), { addSuffix: true, locale: es })}
-                          </p>
-                        )}
-                        {t.priority && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {t.priority}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+        {/* Row 4: Operational Cards */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Headphones className="h-5 w-5 text-destructive" />
+                <div>
+                  <CardTitle className="text-base">Customer Service</CardTitle>
+                  <CardDescription>Tickets de soporte</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Urgentes</span>
+                <Badge variant="destructive">{ticketsData?.urgent ?? 0}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Resueltos</span>
+                <Badge variant="secondary">{ticketsData?.resolved ?? 0}</Badge>
+              </div>
+              <div className="border-t border-border pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Tasa Resolución:{" "}
+                  <span className="font-medium text-foreground">
+                    {ticketsData && ticketsData.total > 0
+                      ? `${Math.round((ticketsData.resolved / ticketsData.total) * 100)}%`
+                      : "--"}
+                  </span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {canAccess("closers") && (
+            <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-primary" />
+                  <div>
+                    <CardTitle className="text-base">Closers</CardTitle>
+                    <CardDescription>Actividad de ventas</CardDescription>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin tareas pendientes</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Row 4: Operational Cards */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Customer Service */}
-        <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Headphones className="h-5 w-5 text-destructive" />
-              <div>
-                <CardTitle className="text-base">Customer Service</CardTitle>
-                <CardDescription>Tickets de soporte</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Urgentes</span>
-              <Badge variant="destructive">{ticketsData?.urgent ?? 0}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Resueltos</span>
-              <Badge variant="secondary">{ticketsData?.resolved ?? 0}</Badge>
-            </div>
-            <div className="border-t border-border pt-2">
-              <p className="text-xs text-muted-foreground">
-                Tasa Resolución:{" "}
-                <span className="font-medium text-foreground">
-                  {ticketsData && ticketsData.total > 0
-                    ? `${Math.round((ticketsData.resolved / ticketsData.total) * 100)}%`
-                    : "--"}
-                </span>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Closers */}
-        {canAccess("closers") && (
-          <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Phone className="h-5 w-5 text-primary" />
-                <div>
-                  <CardTitle className="text-base">Closers</CardTitle>
-                  <CardDescription>Actividad de ventas</CardDescription>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Cerrados</span>
-                <Badge className="bg-success/10 text-success hover:bg-success/20">{leadsData?.closedCount ?? 0}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Pipeline</span>
-                <Badge variant="secondary">{leadsData?.inProgressCount ?? 0}</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* HR Summary */}
-        {canAccess("hr") && (
-          <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-accent-foreground" />
-                <div>
-                  <CardTitle className="text-base">Recursos Humanos</CardTitle>
-                  <CardDescription>Resumen operacional</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Cerrados</span>
+                  <Badge className="bg-success/10 text-success hover:bg-success/20">{leadsData?.closedCount ?? 0}</Badge>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Empleados activos</span>
-                <Badge className="bg-success/10 text-success hover:bg-success/20">{opKPIs?.totalEmployees ?? 0}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Ausencias hoy</span>
-                <Badge variant="secondary">{opKPIs?.absencesToday ?? 0}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Eventos hoy</span>
-                <Badge variant="outline">{opKPIs?.eventsToday ?? 0}</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </main>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Pipeline</span>
+                  <Badge variant="secondary">{leadsData?.inProgressCount ?? 0}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canAccess("hr") && (
+            <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-accent-foreground" />
+                  <div>
+                    <CardTitle className="text-base">Recursos Humanos</CardTitle>
+                    <CardDescription>Resumen operacional</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Empleados activos</span>
+                  <Badge className="bg-success/10 text-success hover:bg-success/20">{opKPIs?.totalEmployees ?? 0}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Ausencias hoy</span>
+                  <Badge variant="secondary">{opKPIs?.absencesToday ?? 0}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Eventos hoy</span>
+                  <Badge variant="outline">{opKPIs?.eventsToday ?? 0}</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </main>
+
+      {/* Quick Actions Config Dialog */}
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configurar Accesos Rápidos</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Selecciona hasta {MAX_SHORTCUTS} módulos para mostrar en el dashboard.</p>
+          <div className="space-y-2 max-h-72 overflow-auto py-2">
+            {availableActions.map((action) => {
+              const checked = draftIds.includes(action.id);
+              const disabled = !checked && draftIds.length >= MAX_SHORTCUTS;
+              return (
+                <label
+                  key={action.id}
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    checked ? "border-primary/40 bg-primary/5" : "border-border"
+                  } ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/50"}`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    disabled={disabled}
+                    onCheckedChange={() => toggleDraft(action.id)}
+                  />
+                  <action.icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{action.label}</span>
+                  {checked && <Check className="h-4 w-4 text-primary ml-auto" />}
+                </label>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancelar</Button>
+            <Button onClick={saveConfig}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
