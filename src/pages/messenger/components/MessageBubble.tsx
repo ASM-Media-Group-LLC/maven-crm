@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +32,8 @@ interface MessageBubbleProps {
   onToggleReaction: (emoji: string) => void;
   readByUsers: string[];
   totalParticipants: number;
+  threadCount?: number;
+  onOpenThread?: () => void;
 }
 
 function getInitials(name: string) {
@@ -46,6 +48,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, totalParticipants,
+  threadCount = 0, onOpenThread,
 }, ref) => {
   const senderName = profiles[message.sender_id]?.full_name || "Usuario";
 
@@ -118,6 +121,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               <DropdownMenuItem onClick={onReply}>
                 <Reply className="h-3.5 w-3.5 mr-2" /> Responder
               </DropdownMenuItem>
+              {onOpenThread && (
+                <DropdownMenuItem onClick={onOpenThread}>
+                  <MessageSquareText className="h-3.5 w-3.5 mr-2" /> Abrir hilo
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onCopy}>
                 <Copy className="h-3.5 w-3.5 mr-2" /> Copiar
               </DropdownMenuItem>
@@ -200,6 +208,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           isMe={isMe}
           onToggle={onToggleReaction}
         />
+
+        {/* Thread indicator */}
+        {threadCount > 0 && (
+          <button
+            onClick={onOpenThread}
+            className={cn(
+              "flex items-center gap-1 mt-1 text-xs text-primary hover:underline",
+              isMe ? "justify-end" : "justify-start"
+            )}
+          >
+            <MessageSquareText className="h-3 w-3" />
+            <span>{threadCount} {threadCount === 1 ? "respuesta" : "respuestas"}</span>
+          </button>
+        )}
       </div>
 
       {isMe && <div className="w-0 shrink-0" />}
