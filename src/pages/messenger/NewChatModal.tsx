@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 
 interface NewChatModalProps {
   open: boolean;
@@ -18,15 +17,16 @@ interface NewChatModalProps {
   onSelectUser: (userId: string) => void;
   isGroup?: boolean;
   onCreateGroup?: (name: string, memberIds: string[]) => void;
+  isOnlineFn?: (userId: string) => boolean;
 }
 
 function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup }: NewChatModalProps) {
+export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn }: NewChatModalProps) {
   const { user } = useAuth();
-  const { isOnline } = useOnlinePresence();
+  const isOnline = isOnlineFn || (() => false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
