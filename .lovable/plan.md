@@ -1,91 +1,31 @@
 
 
-## Plan: Tarjeta de Avisos siempre visible + Módulo de Gestión de Anuncios
+## Plan: Reemplazar date pickers nativos por DateInput del sistema de diseño
 
-### Diagnóstico
+### Problema
 
-**Problema 1 — Cumpleaños/Avisos no se muestran**: La tarjeta "Avisos y Celebraciones" en `DashboardContent.tsx` (línea 359) está envuelta en una condición `hasBirthdaysOrAnnouncements` que la oculta completamente cuando no hay datos. Si no hay cumpleaños próximos ni anuncios creados, la tarjeta desaparece por completo. Esto hace que el usuario no sepa que existe.
+Los modales `CreateAnnouncementModal.tsx` y `EditAnnouncementModal.tsx` usan `<Input type="datetime-local" />` para los campos "Fecha inicio" y "Expiración". Esto viola la regla del sistema de diseño que prohíbe inputs de fecha nativos HTML y requiere usar el componente `DateInput` con Popover + Calendar + localización en español.
 
-**Problema 2 — No existe UI para crear anuncios**: La tabla `internal_announcements` existe en la base de datos, y el hook `useAnnouncements` la consulta, pero no hay ninguna pantalla, modal ni formulario en toda la plataforma para crear, editar o eliminar anuncios. Solo se podría hacer directamente en la consola de Supabase.
-
-### Cambios propuestos
+### Archivos afectados
 
 | # | Archivo | Cambio |
 |---|---------|--------|
-| 1 | `DashboardContent.tsx` | Mostrar la tarjeta "Avisos y Celebraciones" siempre (eliminar condición `hasBirthdaysOrAnnouncements`). Cuando no haya datos, mostrar estado vacío con texto "Sin avisos por el momento" |
-| 2 | `src/pages/hr/HRAnnouncements.tsx` | Crear página completa de gestión de anuncios internos dentro del módulo HR, con tabla, filtros, y acciones CRUD |
-| 3 | `src/pages/hr/announcements/CreateAnnouncementModal.tsx` | Modal para crear nuevo anuncio (título, mensaje, tipo, prioridad, fecha inicio, fecha expiración) |
-| 4 | `src/pages/hr/announcements/EditAnnouncementModal.tsx` | Modal para editar anuncio existente |
-| 5 | `src/pages/hr/announcements/DeleteAnnouncementDialog.tsx` | Diálogo de confirmación para eliminar/desactivar anuncio |
-| 6 | `src/pages/hr/announcements/useAnnouncements.ts` | Hook con queries CRUD (crear, editar, desactivar, listar todos incluyendo inactivos y expirados) |
-| 7 | `src/App.tsx` | Agregar ruta `/hr/anuncios` |
-| 8 | `DashboardSidebar.tsx` o `HRLayout.tsx` | Agregar link de navegación al módulo de anuncios dentro de HR |
+| 1 | `CreateAnnouncementModal.tsx` | Reemplazar los 2 `<Input type="datetime-local">` por `<DateInput>`. Ajustar estado de `startsAt`/`expiresAt` para usar formato `yyyy-MM-dd` (que es lo que `DateInput` espera). Adaptar `handleSubmit` para construir el ISO timestamp desde la fecha |
+| 2 | `EditAnnouncementModal.tsx` | Mismo cambio. Adaptar el `useEffect` que inicializa los valores para extraer solo la fecha (`yyyy-MM-dd`) del timestamp |
 
-### Detalle técnico
+### Detalle
 
-**Fix de la tarjeta en el Dashboard** — Cambio mínimo:
+Ambos modales importarán `DateInput` de `@/components/ui/date-input` y lo usarán así:
+
 ```typescript
-// Antes (línea 359):
-{hasBirthdaysOrAnnouncements ? (
-  <Card>...</Card>
-) : null}
+// Antes:
+<Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
 
 // Después:
-<Card>
-  {birthdays.length === 0 && announcements.length === 0 ? (
-    <div className="text-center text-sm text-muted-foreground py-8">
-      Sin avisos por el momento
-    </div>
-  ) : (
-    // ... contenido actual de cumpleaños y anuncios
-  )}
-</Card>
+<DateInput value={startsAt} onChange={setStartsAt} placeholder="Fecha inicio" />
 ```
 
-**Página de Gestión de Anuncios** (`/hr/anuncios`):
-- Layout estándar: header fijo (`text-xl font-semibold`), KPIs (activos, expirados, alta prioridad), tabla con columnas: Título, Tipo, Prioridad, Inicio, Expiración, Estado
-- Filtros por tipo (`general`, `policy`, `celebration`, `holiday`) y prioridad
-- Botón "Nuevo Anuncio" que abre modal con formulario
-- Acciones por fila: Editar, Desactivar/Activar, Eliminar
-- Acceso restringido por permisos (admin y managers vía `usePermissions`)
+Los estados `startsAt` y `expiresAt` pasarán de almacenar strings `datetime-local` (`2026-02-26T10:00`) a almacenar solo fechas `yyyy-MM-dd` (`2026-02-26`), que es el formato que `DateInput` maneja. En `handleSubmit`, se construirá el timestamp completo agregando `T00:00:00` antes de convertir a ISO.
 
-**Modal de Creación**:
-```typescript
-// Campos del formulario:
-- title: text (requerido)
-- message: textarea (opcional, para detalles)
-- announcement_type: select ['general', 'policy', 'celebration', 'holiday']
-- priority: select ['low', 'normal', 'high']
-- starts_at: datetime (default: ahora)
-- expires_at: datetime (opcional, null = sin expiración)
-```
-
-**Hook CRUD**:
-```typescript
-// useAnnouncementsAdmin — para la página de gestión
-const useAnnouncementsAdmin = () => useQuery({
-  queryKey: ["admin-announcements"],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("internal_announcements")
-      .select("*")
-      .order("created_at", { ascending: false });
-    return data;
-  },
-});
-
-// Mutations: insert, update (is_active toggle), delete
-```
-
-### Ubicación en la navegación
-
-El módulo de anuncios se ubicará dentro de HR como un submódulo. En el sidebar de HR se agregará un enlace "Anuncios Internos" con icono `Megaphone`. También se puede acceder desde el dashboard si se incluye en las Quick Actions.
-
-### Orden de implementación
-
-1. Fix tarjeta dashboard — mostrar siempre con estado vacío
-2. Hook CRUD para gestión de anuncios (`useAnnouncementsAdmin`)
-3. Página `/hr/anuncios` con tabla y filtros
-4. Modales de crear, editar y eliminar
-5. Ruta en `App.tsx` + link en navegación HR
+En `EditAnnouncementModal`, el `useEffect` cortará el ISO timestamp a solo los primeros 10 caracteres (`slice(0, 10)`) en vez de 16.
 
