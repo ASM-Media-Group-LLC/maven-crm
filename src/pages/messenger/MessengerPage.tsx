@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat } = useChat();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation } = useChat();
   const { isOnline, onlineUsers } = useOnlinePresence();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
@@ -91,6 +91,14 @@ export default function MessengerPage() {
     setActiveCall(room);
   };
 
+  const handleDeleteChat = async (chatId: string) => {
+    const success = await deleteConversation(chatId);
+    if (success && activeChatId === chatId) {
+      setActiveChatId(null);
+    }
+    return success;
+  };
+
   if (activeCall) {
     return (
       <div className="h-full w-full">
@@ -120,6 +128,7 @@ export default function MessengerPage() {
             onNewChat={() => setNewChatOpen(true)}
             onNewGroup={() => setNewGroupOpen(true)}
             onOpenVideoRooms={() => setShowVideoRooms(true)}
+            onDeleteChat={handleDeleteChat}
             loading={loading}
           />
         )}

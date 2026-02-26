@@ -301,12 +301,57 @@ export function useChat() {
     [user, loadConversations]
   );
 
+  // Delete conversation (and all related data)
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      if (!user) return false;
+
+      // Delete messages, reactions, read receipts, participants, then conversation
+      // Order matters due to foreign keys
+      const { error: msgError } = await supabase
+        .from("chat_messages")
+        .delete()
+        .eq("conversation_id", conversationId);
+
+      if (msgError) {
+        toast.error("Error al eliminar mensajes");
+        return false;
+      }
+
+      const { error: partError } = await supabase
+        .from("chat_participants")
+        .delete()
+        .eq("conversation_id", conversationId);
+
+      if (partError) {
+        toast.error("Error al eliminar participantes");
+        return false;
+      }
+
+      const { error: convError } = await supabase
+        .from("chat_conversations")
+        .delete()
+        .eq("id", conversationId);
+
+      if (convError) {
+        toast.error("Error al eliminar conversación");
+        return false;
+      }
+
+      setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      toast.success("Conversación eliminada");
+      return true;
+    },
+    [user]
+  );
+
   return {
     conversations,
     loading,
     profiles,
     createDirectChat,
     createGroupChat,
+    deleteConversation,
     loadConversations,
   };
 }
