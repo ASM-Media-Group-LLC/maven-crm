@@ -47,6 +47,21 @@ const translations = {
   "search.noResults": { es: "No se encontraron resultados.", en: "No results found." },
   "search.changeTheme": { es: "Cambiar tema", en: "Toggle theme" },
   "search.shortcut": { es: "Buscar...", en: "Search..." },
+
+  // Permissions modal
+  "permissions.title": { es: "Configurar permisos para", en: "Set permissions for" },
+  "permissions.description": { es: "Configura los permisos granulares para este rol", en: "Configure granular permissions for this role" },
+  "permissions.menus": { es: "Menús", en: "Menus" },
+  "permissions.functions": { es: "Permisos de función", en: "Function permissions" },
+  "permissions.data": { es: "Permisos de datos", en: "Data permissions" },
+  "permissions.allData": { es: "Todos los datos", en: "All data" },
+  "permissions.subordinates": { es: "Propios y subordinados", en: "Self and subordinates" },
+  "permissions.selfOnly": { es: "Solo datos propios", en: "Data about self" },
+  "permissions.noSubfunctions": { es: "Permiso global — sin subfunciones", en: "Global permission — no sub-functions" },
+  "permissions.functionsCount": { es: "funciones", en: "functions" },
+  "permissions.save": { es: "Guardar Permisos", en: "Save Permissions" },
+  "permissions.saving": { es: "Guardando...", en: "Saving..." },
+  "common.cancel": { es: "Cancelar", en: "Cancel" },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

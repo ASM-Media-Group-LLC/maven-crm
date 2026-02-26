@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useRolePermissions, MODULES_CONFIG, type RolePermission } from "./useRoles";
+import { useLanguage } from "@/hooks/useLanguage";
 
 interface SetPermissionsModalProps {
   open: boolean;
@@ -20,19 +21,20 @@ type PermState = Record<string, { can_access: boolean; data_scope: string }>;
 
 const getKey = (mod: string, sub: string | null) => sub ? `${mod}::${sub}` : mod;
 
-const DATA_SCOPE_LABELS: Record<string, string> = {
-  all: "All data",
-  subordinates: "Self and subordinates",
-  self: "Data about self",
-};
+const getDataScopeLabels = (t: (key: any) => string): Record<string, string> => ({
+  all: t("permissions.allData"),
+  subordinates: t("permissions.subordinates"),
+  self: t("permissions.selfOnly"),
+});
 
-const DATA_SCOPE_OPTIONS = [
-  { value: "all", label: "All data" },
-  { value: "subordinates", label: "Self and subordinates" },
-  { value: "self", label: "Data about self" },
+const getDataScopeOptions = (t: (key: any) => string) => [
+  { value: "all", label: t("permissions.allData") },
+  { value: "subordinates", label: t("permissions.subordinates") },
+  { value: "self", label: t("permissions.selfOnly") },
 ];
 
 const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermissionsModalProps) => {
+  const { t } = useLanguage();
   const { permissions, isLoading, savePermissions, isSaving } = useRolePermissions(roleId);
   const [state, setState] = useState<PermState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -159,9 +161,9 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
       <DialogContent className="sm:max-w-3xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>
-            Set permissions for <span className="font-bold capitalize">{roleName}</span>
+            {t("permissions.title")} <span className="font-bold capitalize">{roleName}</span>
           </DialogTitle>
-          <DialogDescription>Configure granular permissions for this role</DialogDescription>
+          <DialogDescription>{t("permissions.description")}</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="h-[58vh] pr-2">
@@ -169,20 +171,20 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
           <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 pb-3 border-b border-border mb-4 px-1">
             <div className="flex items-center gap-2">
               <Checkbox checked={allMenusChecked} onCheckedChange={(c) => toggleAllMenus(!!c)} />
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Menus</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.menus")}</Label>
             </div>
             <div className="flex items-center gap-2">
               <Checkbox checked={allFunctionsChecked} onCheckedChange={(c) => toggleAllFunctions(!!c)} />
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Function permissions</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.functions")}</Label>
             </div>
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data permissions</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("permissions.data")}</Label>
               <RadioGroup
                 value=""
                 onValueChange={(v) => setGlobalDataScope(v)}
                 className="flex flex-col gap-1.5 mt-1.5"
               >
-                {DATA_SCOPE_OPTIONS.map((o) => (
+                {getDataScopeOptions(t).map((o) => (
                   <div key={o.value} className="flex items-center gap-1">
                     <RadioGroupItem value={o.value} id={`global-${o.value}`} className="h-3 w-3" />
                     <Label htmlFor={`global-${o.value}`} className="text-xs text-muted-foreground">{o.label}</Label>
@@ -220,11 +222,11 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                           <span className="text-sm font-semibold">{mod.module}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">
-                          {hasSubmodules ? `${enabledCount}/${totalSubs} funciones` : "—"}
+                          {hasSubmodules ? `${enabledCount}/${totalSubs} ${t("permissions.functionsCount")}` : "—"}
                         </span>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">
-                            {DATA_SCOPE_LABELS[dataScope] || "All data"}
+                            {getDataScopeLabels(t)[dataScope] || t("permissions.allData")}
                           </span>
                           {hasSubmodules ? (
                             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 cursor-pointer ml-2">
@@ -257,7 +259,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                                 );
                               })
                             ) : (
-                              <p className="text-xs text-muted-foreground">Permiso global — sin subfunciones</p>
+                              <p className="text-xs text-muted-foreground">{t("permissions.noSubfunctions")}</p>
                             )}
                           </div>
                           {/* Right: data scope radio */}
@@ -267,7 +269,7 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
                               onValueChange={(v) => setModuleDataScope(mod.module, v)}
                               className="space-y-2"
                             >
-                              {DATA_SCOPE_OPTIONS.map((o) => (
+                              {getDataScopeOptions(t).map((o) => (
                                 <div key={o.value} className="flex items-center gap-2">
                                   <RadioGroupItem value={o.value} id={`${mod.module}-${o.value}`} className="h-3.5 w-3.5" />
                                   <Label htmlFor={`${mod.module}-${o.value}`} className="text-sm">{o.label}</Label>
@@ -286,9 +288,9 @@ const SetPermissionsModal = ({ open, onOpenChange, roleId, roleName }: SetPermis
         </ScrollArea>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button onClick={handleSave} disabled={isSaving || isLoading}>
-            {isSaving ? "Guardando..." : "Guardar Permisos"}
+            {isSaving ? t("permissions.saving") : t("permissions.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
