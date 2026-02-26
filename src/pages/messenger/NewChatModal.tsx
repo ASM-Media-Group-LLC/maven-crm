@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Search, Users } from "lucide-react";
+import { useState } from "react";
+import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 
 interface NewChatModalProps {
   open: boolean;
@@ -25,12 +26,23 @@ function getInitials(name: string) {
 
 export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup }: NewChatModalProps) {
   const { user } = useAuth();
+  const { isOnline } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [groupName, setGroupName] = useState("");
 
   const allUsers = Object.values(profiles).filter(p => p.id !== user?.id);
-  const filtered = allUsers.filter(p =>
+
+  // Sort: online users first, then alphabetically
+  const sorted = [...allUsers].sort((a, b) => {
+    const aOnline = isOnline(a.id);
+    const bOnline = isOnline(b.id);
+    if (aOnline && !bOnline) return -1;
+    if (!aOnline && bOnline) return 1;
+    return (a.full_name || "").localeCompare(b.full_name || "");
+  });
+
+  const filtered = sorted.filter(p =>
     (p.full_name || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -53,11 +65,16 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
     setGroupName("");
   };
 
+  const onlineCount = allUsers.filter(p => isOnline(p.id)).length;
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isGroup ? "Nuevo grupo" : "Nuevo chat"}</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {onlineCount} usuario{onlineCount !== 1 ? "s" : ""} en línea
+          </p>
         </DialogHeader>
 
         {isGroup && (
@@ -76,28 +93,42 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
           {filtered.length === 0 && (
             <p className="text-center text-sm text-muted-foreground py-4">No se encontraron usuarios</p>
           )}
-          {filtered.map(profile => (
-            <button
-              key={profile.id}
-              onClick={() => isGroup ? toggleSelect(profile.id) : onSelectUser(profile.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-muted/50 transition-colors",
-                isGroup && selected.includes(profile.id) && "bg-primary/10"
-              )}
-            >
-              {isGroup && (
-                <Checkbox checked={selected.includes(profile.id)} className="shrink-0" />
-              )}
-              <Avatar className="h-9 w-9 shrink-0">
-                <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                  {getInitials(profile.full_name || "?")}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-sm font-medium text-foreground">{profile.full_name || "Sin nombre"}</p>
-              </div>
-            </button>
-          ))}
+          {filtered.map(profile => {
+            const online = isOnline(profile.id);
+            return (
+              <button
+                key={profile.id}
+                onClick={() => isGroup ? toggleSelect(profile.id) : onSelectUser(profile.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-muted/50 transition-colors",
+                  isGroup && selected.includes(profile.id) && "bg-primary/10"
+                )}
+              >
+                {isGroup && (
+                  <Checkbox checked={selected.includes(profile.id)} className="shrink-0" />
+                )}
+                <div className="relative">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                      {getInitials(profile.full_name || "?")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span
+                    className={cn(
+                      "absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background",
+                      online ? "bg-green-500" : "bg-muted-foreground/40"
+                    )}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{profile.full_name || "Sin nombre"}</p>
+                  <p className={cn("text-xs", online ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
+                    {online ? "En línea" : "Desconectado"}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {isGroup && (
