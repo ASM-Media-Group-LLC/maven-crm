@@ -121,7 +121,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
                   {room.participants.slice(0, 4).map(p => (
                     <Avatar key={p.id} className="h-6 w-6 border-2 border-card -ml-1 first:ml-0">
                       <AvatarFallback className="text-[9px] bg-muted">
-                        {p.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                        {(p.full_name || "?").split(" ").map(w => w[0]).join("").slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                   ))}

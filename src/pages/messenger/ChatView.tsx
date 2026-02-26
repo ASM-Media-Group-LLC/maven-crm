@@ -1,24 +1,33 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, ArrowLeft,
-  Check, CheckCheck, File, Image, Reply, Copy, Trash2, Forward, X,
+  Phone, Video, Search, MoreVertical, Smile, Paperclip, Send, ArrowLeft,
+  Check, CheckCheck, File, Reply, Copy, Trash2, Forward, X, Edit2, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Chat, Message, Contact } from "./types";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatViewProps {
-  chat: Chat;
-  messages: Message[];
-  onSendMessage: (content: string, type: Message["type"]) => void;
+  conversation: ConversationWithDetails;
+  messages: ChatMessage[];
+  profiles: Record<string, UserProfile>;
+  typingUsers: string[];
+  onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string) => void;
+  onSendTyping: (isTyping: boolean) => void;
+  onEditMessage: (id: string, content: string) => void;
+  onDeleteMessage: (id: string) => void;
   onBack: () => void;
-  onStartVideoCall: (chat: Chat) => void;
+  onStartVideoCall: (conv: ConversationWithDetails) => void;
+  loading: boolean;
 }
 
 const EMOJIS = ["😀","😂","😍","🥰","😎","🤔","👍","👋","🎉","🔥","❤️","💯","🚀","✅","⭐","💪","🙏","😊","🤩","👏"];
@@ -27,26 +36,24 @@ function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-function formatMsgTime(d: Date) {
-  return d.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+function formatMsgTime(d: string) {
+  return new Date(d).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 }
 
-function StatusIcon({ status }: { status: Message["status"] }) {
-  if (status === "sent") return <Check className="h-3 w-3 text-muted-foreground" />;
-  if (status === "delivered") return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-  return <CheckCheck className="h-3 w-3 text-primary" />;
-}
-
-export default function ChatView({ chat, messages, onSendMessage, onBack, onStartVideoCall }: ChatViewProps) {
+export default function ChatView({
+  conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
+  onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
+}: ChatViewProps) {
+  const { user } = useAuth();
   const [text, setText] = useState("");
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const contact = chat.participants[0];
-  const isOnline = contact?.status === "online";
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -56,9 +63,10 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
 
   const handleSend = () => {
     if (!text.trim()) return;
-    onSendMessage(text.trim(), "text");
+    onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id);
     setText("");
     setReplyTo(null);
+    onSendTyping(false);
     inputRef.current?.focus();
   };
 
@@ -69,10 +77,35 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
     }
   };
 
+  const handleTextChange = (val: string) => {
+    setText(val);
+    onSendTyping(true);
+    clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploading(true);
+    const path = `${user.id}/${Date.now()}-${file.name}`;
+    const { data, error } = await supabase.storage.from("chat-files").upload(path, file);
+    if (error) {
+      toast.error("Error al subir archivo");
+      setUploading(false);
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+    const type = file.type.startsWith("image/") ? "image" : "file";
+    onSendMessage(file.name, type as ChatMessage["type"], urlData.publicUrl, file.name);
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   // Group messages by date
-  const groupedMessages: { date: string; messages: Message[] }[] = [];
+  const groupedMessages: { date: string; messages: ChatMessage[] }[] = [];
   messages.forEach(msg => {
-    const dateStr = msg.timestamp.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+    const dateStr = new Date(msg.created_at).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
     const last = groupedMessages[groupedMessages.length - 1];
     if (last && last.date === dateStr) {
       last.messages.push(msg);
@@ -81,34 +114,35 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
     }
   });
 
-  const filteredHighlight = searchQuery.toLowerCase();
+  const typingNames = typingUsers
+    .map(id => profiles[id]?.full_name || "Alguien")
+    .join(", ");
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Chat header */}
+      {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
         <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Avatar className="h-10 w-10 shrink-0">
           <AvatarFallback className="bg-primary/20 text-primary text-sm font-medium">
-            {getInitials(chat.name)}
+            {getInitials(conversation.displayName)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm text-foreground truncate">{chat.name}</p>
+          <p className="font-medium text-sm text-foreground truncate">{conversation.displayName}</p>
           <p className="text-xs text-muted-foreground">
-            {chat.type === "group"
-              ? `${chat.participants.length} participantes`
-              : isOnline ? "En línea" : contact?.lastSeen ? `Últ. vez ${contact.lastSeen}` : "Desconectado"}
+            {typingNames
+              ? `${typingNames} está escribiendo...`
+              : conversation.type === "group"
+                ? `${conversation.participants.length} participantes`
+                : ""}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => onStartVideoCall(chat)} title="Videollamada">
+          <Button variant="ghost" size="icon" onClick={() => onStartVideoCall(conversation)} title="Videollamada">
             <Video className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" title="Llamada de voz">
-            <Phone className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setSearchOpen(!searchOpen)} title="Buscar">
             <Search className="h-4 w-4" />
@@ -121,7 +155,6 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
               <DropdownMenuItem>Info del contacto</DropdownMenuItem>
               <DropdownMenuItem>Archivos compartidos</DropdownMenuItem>
               <DropdownMenuItem>Silenciar</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Eliminar chat</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -144,33 +177,42 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
         </div>
       )}
 
-      {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4" style={{ backgroundImage: "radial-gradient(ellipse at 50% 0%, hsl(var(--accent) / 0.03) 0%, transparent 50%)" }}>
-        <div className="max-w-3xl mx-auto space-y-4">
-          {groupedMessages.map(group => (
-            <div key={group.date}>
-              <div className="flex justify-center my-4">
-                <span className="text-[11px] text-muted-foreground bg-muted/60 px-3 py-1 rounded-full">
-                  {group.date}
-                </span>
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto space-y-4">
+            {groupedMessages.map(group => (
+              <div key={group.date}>
+                <div className="flex justify-center my-4">
+                  <span className="text-[11px] text-muted-foreground bg-muted/60 px-3 py-1 rounded-full">
+                    {group.date}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {group.messages.map(msg => (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isMe={msg.sender_id === user?.id}
+                      chatType={conversation.type}
+                      profiles={profiles}
+                      highlight={searchQuery.toLowerCase()}
+                      onReply={() => setReplyTo(msg)}
+                      onCopy={() => { navigator.clipboard.writeText(msg.content || ""); toast.success("Copiado"); }}
+                      onEdit={(content) => onEditMessage(msg.id, content)}
+                      onDelete={() => onDeleteMessage(msg.id)}
+                      replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1">
-                {group.messages.map(msg => (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isMe={msg.senderId === "me"}
-                    chatType={chat.type}
-                    participants={chat.participants}
-                    highlight={filteredHighlight}
-                    onReply={() => setReplyTo(msg)}
-                    onCopy={() => { navigator.clipboard.writeText(msg.content); toast.success("Copiado"); }}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Reply bar */}
@@ -178,7 +220,9 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
         <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/30">
           <Reply className="h-4 w-4 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-primary">{replyTo.senderId === "me" ? "Tú" : chat.name}</p>
+            <p className="text-xs font-medium text-primary">
+              {replyTo.sender_id === user?.id ? "Tú" : profiles[replyTo.sender_id]?.full_name || "Usuario"}
+            </p>
             <p className="text-xs text-muted-foreground truncate">{replyTo.content}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setReplyTo(null)}>
@@ -187,54 +231,62 @@ export default function ChatView({ chat, messages, onSendMessage, onBack, onStar
         </div>
       )}
 
-      {/* Input area */}
-      <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-border bg-card">
+      {/* Input */}
+      <div className="shrink-0 flex items-end gap-2 px-4 py-3 border-t border-border bg-card">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0"><Smile className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" className="shrink-0 mb-0.5"><Smile className="h-5 w-5" /></Button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" side="top">
             <div className="grid grid-cols-10 gap-1">
               {EMOJIS.map(e => (
-                <button key={e} className="text-lg hover:bg-muted rounded p-0.5" onClick={() => setText(t => t + e)}>
+                <button key={e} className="text-lg hover:bg-muted rounded p-0.5" onClick={() => handleTextChange(text + e)}>
                   {e}
                 </button>
               ))}
             </div>
           </PopoverContent>
         </Popover>
-        <Button variant="ghost" size="icon" className="shrink-0" onClick={() => toast.info("Adjuntar archivo (demo)")}>
-          <Paperclip className="h-5 w-5" />
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+        <Button variant="ghost" size="icon" className="shrink-0 mb-0.5" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
         </Button>
-        <Input
+        <Textarea
           ref={inputRef}
           placeholder="Escribe un mensaje..."
-          className="flex-1 bg-muted/50"
+          className="flex-1 min-h-[40px] max-h-[120px] resize-none bg-muted/50"
+          rows={1}
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={e => handleTextChange(e.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {text.trim() ? (
-          <Button size="icon" onClick={handleSend} className="shrink-0">
-            <Send className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => toast.info("Nota de voz (demo)")}>
-            <Mic className="h-5 w-5" />
-          </Button>
-        )}
+        <Button size="icon" onClick={handleSend} className="shrink-0 mb-0.5" disabled={!text.trim()}>
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
 }
 
 function MessageBubble({
-  message, isMe, chatType, participants, highlight, onReply, onCopy,
+  message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete, replyMessage,
 }: {
-  message: Message; isMe: boolean; chatType: Chat["type"]; participants: Contact[];
+  message: ChatMessage; isMe: boolean; chatType: string; profiles: Record<string, UserProfile>;
   highlight: string; onReply: () => void; onCopy: () => void;
+  onEdit: (content: string) => void; onDelete: () => void;
+  replyMessage?: ChatMessage;
 }) {
-  const sender = participants.find(p => p.id === message.senderId);
+  const senderName = profiles[message.sender_id]?.full_name || "Usuario";
+
+  if (message.is_deleted) {
+    return (
+      <div className={cn("flex", isMe ? "justify-end" : "justify-start")}>
+        <div className="max-w-[75%] rounded-2xl px-3.5 py-2 bg-muted/50 border border-border">
+          <p className="text-xs text-muted-foreground italic">Mensaje eliminado</p>
+        </div>
+      </div>
+    );
+  }
 
   const highlightText = (text: string) => {
     if (!highlight) return text;
@@ -243,7 +295,7 @@ function MessageBubble({
     return (
       <>
         {text.slice(0, idx)}
-        <mark className="bg-warning/30 text-foreground rounded px-0.5">{text.slice(idx, idx + highlight.length)}</mark>
+        <mark className="bg-accent/30 text-foreground rounded px-0.5">{text.slice(idx, idx + highlight.length)}</mark>
         {text.slice(idx + highlight.length)}
       </>
     );
@@ -257,30 +309,52 @@ function MessageBubble({
           ? "bg-primary text-primary-foreground rounded-br-md"
           : "bg-card border border-border rounded-bl-md"
       )}>
+        {/* Reply reference */}
+        {replyMessage && (
+          <div className={cn(
+            "text-[11px] mb-1 px-2 py-1 rounded border-l-2",
+            isMe ? "bg-primary-foreground/10 border-primary-foreground/30" : "bg-muted/50 border-primary/30"
+          )}>
+            <p className="font-medium">{profiles[replyMessage.sender_id]?.full_name || "Usuario"}</p>
+            <p className="truncate">{replyMessage.content}</p>
+          </div>
+        )}
+
         {/* Group sender name */}
-        {chatType === "group" && !isMe && sender && (
-          <p className="text-[11px] font-semibold text-accent mb-0.5">{sender.name}</p>
+        {chatType === "group" && !isMe && (
+          <p className="text-[11px] font-semibold text-accent-foreground mb-0.5">{senderName}</p>
         )}
 
         {/* Content */}
-        {message.type === "file" ? (
-          <div className="flex items-center gap-2">
-            <File className="h-4 w-4 shrink-0" />
-            <span className="text-sm underline">{message.fileName}</span>
-          </div>
+        {message.type === "file" || message.type === "image" ? (
+          message.type === "image" && message.file_url ? (
+            <div>
+              <img src={message.file_url} alt={message.file_name || "image"} className="rounded-lg max-w-full max-h-64 object-cover" />
+              {message.content && message.content !== message.file_name && (
+                <p className="text-sm mt-1">{highlightText(message.content)}</p>
+              )}
+            </div>
+          ) : (
+            <a href={message.file_url || "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+              <File className="h-4 w-4 shrink-0" />
+              <span className="text-sm">{message.file_name || "Archivo"}</span>
+            </a>
+          )
         ) : (
-          <p className="text-sm whitespace-pre-wrap break-words">{highlightText(message.content)}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{highlightText(message.content || "")}</p>
         )}
 
-        {/* Time and status */}
-        <div className={cn("flex items-center gap-1 mt-1", isMe ? "justify-end" : "justify-end")}>
+        {/* Time and edited indicator */}
+        <div className={cn("flex items-center gap-1 mt-1", "justify-end")}>
+          {message.is_edited && (
+            <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>editado</span>
+          )}
           <span className={cn("text-[10px]", isMe ? "text-primary-foreground/70" : "text-muted-foreground")}>
-            {formatMsgTime(message.timestamp)}
+            {formatMsgTime(message.created_at)}
           </span>
-          {isMe && <StatusIcon status={message.status} />}
         </div>
 
-        {/* Context menu on hover */}
+        {/* Context menu */}
         <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -291,8 +365,17 @@ function MessageBubble({
             <DropdownMenuContent align={isMe ? "end" : "start"}>
               <DropdownMenuItem onClick={onReply}><Reply className="h-3 w-3 mr-2" /> Responder</DropdownMenuItem>
               <DropdownMenuItem onClick={onCopy}><Copy className="h-3 w-3 mr-2" /> Copiar</DropdownMenuItem>
-              <DropdownMenuItem><Forward className="h-3 w-3 mr-2" /> Reenviar</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive"><Trash2 className="h-3 w-3 mr-2" /> Eliminar</DropdownMenuItem>
+              {isMe && (
+                <>
+                  <DropdownMenuItem onClick={() => {
+                    const newContent = prompt("Editar mensaje:", message.content || "");
+                    if (newContent && newContent !== message.content) onEdit(newContent);
+                  }}><Edit2 className="h-3 w-3 mr-2" /> Editar</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3 mr-2" /> Eliminar
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
