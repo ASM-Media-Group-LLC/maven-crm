@@ -311,11 +311,13 @@ export function useChat() {
   };
 }
 
-export function useMessages(conversationId: string | null) {
+export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const onNewMessageRef = useRef(onNewMessage);
+  onNewMessageRef.current = onNewMessage;
 
   const loadMessages = useCallback(async () => {
     if (!conversationId) {
@@ -367,6 +369,11 @@ export function useMessages(conversationId: string | null) {
             if (prev.find((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
+
+          // Notify via callback for browser notifications
+          if (user && newMsg.sender_id !== user.id) {
+            onNewMessageRef.current?.(newMsg);
+          }
 
           // Mark as read if we're viewing this conversation
           if (user && newMsg.sender_id !== user.id) {
