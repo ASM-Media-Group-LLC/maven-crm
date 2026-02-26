@@ -27,14 +27,16 @@ export const MODULES_CONFIG = [
   { module: "Dashboard", submodules: [] },
   { module: "Creator Sales", submodules: ["Dashboard", "Sales Report", "Sales Report V1", "AI Sales", "AI Config"] },
   { module: "Contactos", submodules: ["Contactos", "Agencias"] },
-  { module: "Creadores", submodules: ["Lista", "Perfil", "Nuevo"] },
+  { module: "Creadores", submodules: ["Lista", "Perfil", "Nuevo", "Prospectos", "Onboarding", "Dashboard"] },
   { module: "Eventos", submodules: ["Lista", "Detalle", "Nuevo", "Editar"] },
   { module: "Promolog", submodules: [] },
-  { module: "LeadGen", submodules: [] },
+  { module: "LeadGen", submodules: ["Lista", "Base de Datos"] },
   { module: "Closers", submodules: [] },
   { module: "Tickets", submodules: [] },
   { module: "Tareas", submodules: ["Proyectos", "Tareas"] },
-  { module: "Administración", submodules: ["Usuarios", "Roles"] },
+  { module: "HR", submodules: ["Dashboard", "Directorio", "Empleados", "Ausencias", "Incidentes", "Candidatos", "Onboarding", "Offboarding", "Capacitación", "Desempeño", "Asistencia", "Vacaciones", "Permisos", "Horarios", "Monitoreo", "Organización", "Deducciones"] },
+  { module: "Finanzas", submodules: ["Dashboard", "Nómina", "Facturación", "Control", "Reportes", "Collections", "Horas Variables", "Configuración"] },
+  { module: "Administración", submodules: ["Usuarios", "Auditoría"] },
 ];
 
 export const useRoles = () => {
