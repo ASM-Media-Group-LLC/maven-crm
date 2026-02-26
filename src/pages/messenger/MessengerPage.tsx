@@ -1,18 +1,17 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import VideoCallView from "./VideoCallView";
 import NewChatModal from "./NewChatModal";
-import { Chat, Message, VideoRoom, Contact } from "./types";
-import { mockContacts } from "./mockData";
+import { ConversationWithDetails, VideoRoom } from "./types";
+import { useChat, useMessages } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function MessengerPage() {
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const { conversations, loading, profiles, createDirectChat, createGroupChat } = useChat();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
@@ -20,37 +19,23 @@ export default function MessengerPage() {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
-  const activeChat = chats.find(c => c.id === activeChatId) || null;
-  const activeMsgs = activeChatId ? (messages[activeChatId] || []) : [];
+  const activeConv = conversations.find(c => c.id === activeChatId) || null;
+  const {
+    messages, loading: msgsLoading, typingUsers,
+    sendMessage, sendTyping, editMessage, deleteMessage,
+  } = useMessages(activeChatId);
 
-  const handleSendMessage = useCallback((content: string, type: Message["type"]) => {
-    if (!activeChatId) return;
-    const newMsg: Message = {
-      id: `msg-${Date.now()}`,
-      senderId: "me",
-      content,
-      timestamp: new Date(),
-      status: "sent",
-      type,
-    };
-    setMessages(prev => ({
-      ...prev,
-      [activeChatId]: [...(prev[activeChatId] || []), newMsg],
-    }));
-    // Update last message in chat list
-    setChats(prev => prev.map(c =>
-      c.id === activeChatId ? { ...c, lastMessage: newMsg } : c
-    ));
-    // Simulate delivery after 1s
-    setTimeout(() => {
-      setMessages(prev => ({
-        ...prev,
-        [activeChatId]: (prev[activeChatId] || []).map(m =>
-          m.id === newMsg.id ? { ...m, status: "delivered" as const } : m
-        ),
-      }));
-    }, 1000);
-  }, [activeChatId]);
+  const handleSelectUser = async (userId: string) => {
+    const convId = await createDirectChat(userId);
+    if (convId) setActiveChatId(convId);
+    setNewChatOpen(false);
+  };
+
+  const handleCreateGroup = async (name: string, memberIds: string[]) => {
+    const convId = await createGroupChat(name, memberIds);
+    if (convId) setActiveChatId(convId);
+    setNewGroupOpen(false);
+  };
 
   const handleCreateRoom = (name: string) => {
     const newRoom: VideoRoom = {
@@ -69,64 +54,26 @@ export default function MessengerPage() {
   const handleJoinRoom = (room: VideoRoom) => {
     setActiveCall({ ...room, isActive: true });
     setShowVideoRooms(false);
-    toast.success(`Conectado a "${room.name}"`);
   };
 
-  const handleSelectContact = (contact: Contact) => {
-    // Check if chat already exists
-    const existing = chats.find(c => c.type === "individual" && c.participants[0]?.id === contact.id);
-    if (existing) {
-      setActiveChatId(existing.id);
-    } else {
-      const newChat: Chat = {
-        id: `chat-${Date.now()}`,
-        type: "individual",
-        name: contact.name,
-        participants: [contact],
-        unreadCount: 0,
-        isPinned: false,
-        isMuted: false,
-      };
-      setChats(prev => [newChat, ...prev]);
-      setMessages(prev => ({ ...prev, [newChat.id]: [] }));
-      setActiveChatId(newChat.id);
-    }
-    setNewChatOpen(false);
-  };
-
-  const handleCreateGroup = (name: string, members: Contact[]) => {
-    const newChat: Chat = {
-      id: `chat-group-${Date.now()}`,
-      type: "group",
-      name,
-      participants: members,
-      unreadCount: 0,
-      isPinned: false,
-      isMuted: false,
-    };
-    setChats(prev => [newChat, ...prev]);
-    setMessages(prev => ({ ...prev, [newChat.id]: [] }));
-    setActiveChatId(newChat.id);
-    toast.success(`Grupo "${name}" creado`);
-  };
-
-  const handleStartVideoCall = (chat: Chat) => {
+  const handleStartVideoCall = (conv: ConversationWithDetails) => {
     const room: VideoRoom = {
       id: `call-${Date.now()}`,
-      name: `Llamada - ${chat.name}`,
+      name: `Llamada - ${conv.displayName}`,
       createdBy: "me",
       createdAt: new Date(),
-      participants: chat.participants,
+      participants: conv.participants
+        .filter(p => p.profile)
+        .map(p => p.profile!),
       isActive: true,
       shareLink: `${window.location.origin}/messenger?room=call-${Date.now()}`,
     };
     setActiveCall(room);
   };
 
-  // Full screen video call
   if (activeCall) {
     return (
-      <div className="h-screen w-full">
+      <div className="h-full w-full">
         <VideoCallView room={activeCall} onLeave={() => { setActiveCall(null); toast.info("Llamada finalizada"); }} />
       </div>
     );
@@ -134,7 +81,6 @@ export default function MessengerPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
-      {/* Chat sidebar - always visible on desktop, toggled on mobile */}
       <div className={cn(
         "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
         activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
@@ -148,29 +94,35 @@ export default function MessengerPage() {
           />
         ) : (
           <ChatSidebar
-            chats={chats}
+            conversations={conversations}
             activeChatId={activeChatId}
             onSelectChat={setActiveChatId}
             onNewChat={() => setNewChatOpen(true)}
             onNewGroup={() => setNewGroupOpen(true)}
             onOpenVideoRooms={() => setShowVideoRooms(true)}
+            loading={loading}
           />
         )}
       </div>
 
-      {/* Chat view or empty state */}
       <div className={cn(
         "flex-1 min-w-0",
         !activeChatId ? "hidden md:flex" : "flex"
       )}>
-        {activeChat ? (
+        {activeConv ? (
           <div className="flex-1">
             <ChatView
-              chat={activeChat}
-              messages={activeMsgs}
-              onSendMessage={handleSendMessage}
+              conversation={activeConv}
+              messages={messages}
+              profiles={profiles}
+              typingUsers={typingUsers}
+              onSendMessage={sendMessage}
+              onSendTyping={sendTyping}
+              onEditMessage={editMessage}
+              onDeleteMessage={deleteMessage}
               onBack={() => setActiveChatId(null)}
               onStartVideoCall={handleStartVideoCall}
+              loading={msgsLoading}
             />
           </div>
         ) : (
@@ -188,18 +140,17 @@ export default function MessengerPage() {
         )}
       </div>
 
-      {/* Modals */}
       <NewChatModal
         open={newChatOpen}
         onClose={() => setNewChatOpen(false)}
-        contacts={mockContacts}
-        onSelectContact={handleSelectContact}
+        profiles={profiles}
+        onSelectUser={handleSelectUser}
       />
       <NewChatModal
         open={newGroupOpen}
         onClose={() => setNewGroupOpen(false)}
-        contacts={mockContacts}
-        onSelectContact={() => {}}
+        profiles={profiles}
+        onSelectUser={() => {}}
         isGroup
         onCreateGroup={handleCreateGroup}
       />

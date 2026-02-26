@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { VideoRoom, Contact } from "./types";
+import { VideoRoom, UserProfile } from "./types";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -40,8 +40,8 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
     return `${m}:${s}`;
   };
 
-  const allParticipants: (Contact & { isMe?: boolean })[] = [
-    { id: "me", name: "Tú", status: "online", isMe: true },
+  const allParticipants: (UserProfile & { isMe?: boolean })[] = [
+    { id: "me", full_name: "Tú", avatar_url: null, isMe: true },
     ...room.participants,
   ];
 
@@ -88,9 +88,9 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
                 {allParticipants.map(p => (
                   <div key={p.id} className="flex items-center gap-2">
                     <Avatar className="h-7 w-7">
-                      <AvatarFallback className="text-[10px] bg-primary/20 text-primary">{getInitials(p.name)}</AvatarFallback>
+                      <AvatarFallback className="text-[10px] bg-primary/20 text-primary">{getInitials(p.full_name || "?")}</AvatarFallback>
                     </Avatar>
-                    <span className="text-sm">{p.name}</span>
+                    <span className="text-sm">{p.full_name || "?"}</span>
                     {(p as any).isMe && <Badge variant="secondary" className="text-[9px] h-4">Tú</Badge>}
                   </div>
                 ))}
@@ -107,7 +107,7 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
             {allParticipants.map(p => (
               <ParticipantTile
                 key={p.id}
-                name={p.name}
+                name={p.full_name || "?"}
                 isMe={(p as any).isMe}
                 micOn={!(p as any).isMe || micOn}
                 camOn={!(p as any).isMe || camOn}
@@ -119,7 +119,7 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
           <div className="flex flex-col h-full gap-2">
             <div className="flex-1">
               <ParticipantTile
-                name={allParticipants[0]?.name || ""}
+                name={allParticipants[0]?.full_name || ""}
                 isMe
                 micOn={micOn}
                 camOn={camOn}
@@ -130,7 +130,7 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
             <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
               {allParticipants.slice(1).map(p => (
                 <div key={p.id} className="w-40 shrink-0">
-                  <ParticipantTile name={p.name} micOn camOn={false} />
+                  <ParticipantTile name={p.full_name || "?"} micOn camOn={false} />
                 </div>
               ))}
             </div>

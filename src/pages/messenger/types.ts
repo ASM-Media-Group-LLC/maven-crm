@@ -1,34 +1,68 @@
-export interface Contact {
+export interface ChatConversation {
   id: string;
-  name: string;
-  avatar?: string;
-  status: "online" | "offline" | "away";
-  lastSeen?: string;
-  phone?: string;
+  type: "direct" | "group";
+  name: string | null;
+  description: string | null;
+  avatar_url: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface Message {
+export interface ChatParticipant {
   id: string;
-  senderId: string;
-  content: string;
-  timestamp: Date;
-  status: "sent" | "delivered" | "read";
-  type: "text" | "image" | "file" | "audio" | "video";
-  fileUrl?: string;
-  fileName?: string;
-  replyTo?: string;
+  conversation_id: string;
+  user_id: string;
+  role: "admin" | "member";
+  joined_at: string;
+  last_read_at: string | null;
+  is_muted: boolean;
+  notifications_mode: "all" | "mentions" | "none";
 }
 
-export interface Chat {
+export interface ChatMessage {
   id: string;
-  type: "individual" | "group";
-  name: string;
-  avatar?: string;
-  participants: Contact[];
-  lastMessage?: Message;
+  conversation_id: string;
+  sender_id: string;
+  content: string | null;
+  type: "text" | "image" | "file" | "system";
+  file_url: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  reply_to_id: string | null;
+  is_edited: boolean;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatReadReceipt {
+  id: string;
+  message_id: string;
+  user_id: string;
+  read_at: string;
+}
+
+export interface ChatReaction {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
+export interface UserProfile {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+// Enriched conversation for UI
+export interface ConversationWithDetails extends ChatConversation {
+  participants: (ChatParticipant & { profile?: UserProfile })[];
+  lastMessage?: ChatMessage;
   unreadCount: number;
-  isPinned: boolean;
-  isMuted: boolean;
+  displayName: string;
 }
 
 export interface VideoRoom {
@@ -36,7 +70,7 @@ export interface VideoRoom {
   name: string;
   createdBy: string;
   createdAt: Date;
-  participants: Contact[];
+  participants: UserProfile[];
   isActive: boolean;
   shareLink: string;
 }
