@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Pin, BellOff, Users, Video, MessageSquarePlus, Loader2 } from "lucide-react";
+import { Search, Users, Video, MessageSquarePlus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -52,35 +53,38 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
 
   return (
     <div className="flex flex-col h-full border-r border-border bg-card">
-      <div className="shrink-0 p-4 space-y-3">
+      {/* Header */}
+      <div className="shrink-0 p-4 pb-3 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Chats</h2>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={onOpenVideoRooms} title="Video Rooms">
+          <h2 className="text-lg font-bold text-foreground tracking-tight">Chats</h2>
+          <div className="flex gap-0.5">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onNewGroup} title="Nuevo grupo">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNewGroup} title="Nuevo grupo">
               <Users className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onNewChat} title="Nuevo chat">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={onNewChat} title="Nuevo chat">
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
           </div>
         </div>
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar o iniciar chat..."
-            className="pl-9 h-9 bg-muted/50"
+            placeholder="Buscar chats..."
+            className="pl-9 h-9 bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-xl"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full grid grid-cols-3 h-8">
-            <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
-            <TabsTrigger value="unread" className="text-xs">No leídos</TabsTrigger>
-            <TabsTrigger value="groups" className="text-xs">Grupos</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-3 h-8 bg-muted/40 rounded-lg">
+            <TabsTrigger value="all" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">Todos</TabsTrigger>
+            <TabsTrigger value="unread" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">No leídos</TabsTrigger>
+            <TabsTrigger value="groups" className="text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">Grupos</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -89,12 +93,17 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
         <div className="px-2 pb-2">
           {loading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
-              {search ? "No se encontraron chats" : "No tienes conversaciones aún"}
-            </p>
+            <div className="text-center py-12 space-y-2">
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mx-auto">
+                <MessageSquarePlus className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {search ? "Sin resultados" : "Inicia una conversación"}
+              </p>
+            </div>
           ) : (
             filtered.map(conv => (
               <ConversationItem
@@ -117,49 +126,77 @@ function ConversationItem({ conversation, isActive, onClick }: {
   onClick: () => void;
 }) {
   const isGroup = conversation.type === "group";
+  const { isOnline } = useOnlinePresence();
+
+  const otherParticipant = !isGroup
+    ? conversation.participants.find(p => p.user_id !== conversation.created_by)
+    : null;
+  const online = otherParticipant ? isOnline(otherParticipant.user_id) : false;
+  const hasUnread = conversation.unreadCount > 0;
+
+  const lastMsgPreview = conversation.lastMessage
+    ? conversation.lastMessage.type === "file"
+      ? `📎 ${conversation.lastMessage.file_name}`
+      : conversation.lastMessage.type === "image"
+        ? "📷 Foto"
+        : conversation.lastMessage.content || ""
+    : "Sin mensajes";
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-left transition-colors",
-        isActive ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150",
+        isActive
+          ? "bg-primary/10"
+          : "hover:bg-muted/50",
+        hasUnread && !isActive && "bg-muted/30"
       )}
     >
+      {/* Avatar with status */}
       <div className="relative shrink-0">
-        <Avatar className="h-11 w-11">
+        <Avatar className={cn("h-11 w-11", isActive && "ring-2 ring-primary/30")}>
           <AvatarFallback className={cn(
-            "text-sm font-medium",
-            isGroup ? "bg-accent/20 text-accent-foreground" : "bg-primary/20 text-primary"
+            "text-sm font-semibold",
+            isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
           )}>
             {isGroup ? <Users className="h-5 w-5" /> : getInitials(conversation.displayName)}
           </AvatarFallback>
         </Avatar>
+        {!isGroup && (
+          <span className={cn(
+            "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card",
+            online ? "bg-success" : "bg-muted-foreground/30"
+          )} />
+        )}
       </div>
 
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          <span className="font-medium text-sm text-foreground truncate">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className={cn(
+            "text-sm truncate",
+            hasUnread ? "font-bold text-foreground" : "font-medium text-foreground"
+          )}>
             {conversation.displayName}
           </span>
-          <span className="text-[11px] text-muted-foreground shrink-0">
+          <span className={cn(
+            "text-[11px] shrink-0 ml-2",
+            hasUnread ? "text-primary font-semibold" : "text-muted-foreground"
+          )}>
             {formatTime(conversation.lastMessage?.created_at)}
           </span>
         </div>
-        <div className="flex items-center justify-between mt-0.5">
-          <p className="text-xs text-muted-foreground truncate">
-            {conversation.lastMessage
-              ? truncate(
-                  conversation.lastMessage.type === "file"
-                    ? `📎 ${conversation.lastMessage.file_name}`
-                    : conversation.lastMessage.content || "",
-                  40
-                )
-              : "Sin mensajes"}
+        <div className="flex items-center justify-between">
+          <p className={cn(
+            "text-xs truncate",
+            hasUnread ? "text-foreground font-medium" : "text-muted-foreground"
+          )}>
+            {truncate(lastMsgPreview, 45)}
           </p>
-          {conversation.unreadCount > 0 && (
-            <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full shrink-0">
-              {conversation.unreadCount}
+          {hasUnread && (
+            <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full shrink-0 ml-2 font-bold">
+              {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
             </Badge>
           )}
         </div>
