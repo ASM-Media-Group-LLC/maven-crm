@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2, Check, CheckCheck,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,7 +8,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChatMessage, UserProfile } from "../types";
+import { ReactionGroup } from "@/hooks/useReactions";
 import { cn } from "@/lib/utils";
+import ReactionPicker from "./ReactionPicker";
+import ReactionsDisplay from "./ReactionsDisplay";
+import ReadReceiptIndicator from "./ReadReceiptIndicator";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -24,6 +28,10 @@ interface MessageBubbleProps {
   showAvatar: boolean;
   showSender: boolean;
   isLastInGroup: boolean;
+  reactions: ReactionGroup[];
+  onToggleReaction: (emoji: string) => void;
+  readByUsers: string[];
+  totalParticipants: number;
 }
 
 function getInitials(name: string) {
@@ -37,6 +45,7 @@ function formatMsgTime(d: string) {
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
   replyMessage, showAvatar, showSender, isLastInGroup,
+  reactions, onToggleReaction, readByUsers, totalParticipants,
 }, ref) => {
   const senderName = profiles[message.sender_id]?.full_name || "Usuario";
 
@@ -64,16 +73,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     );
   };
 
-  // Bubble shape based on position in group
   const bubbleRadius = isMe
-    ? cn(
-        "rounded-2xl rounded-tr-lg",
-        isLastInGroup ? "rounded-br-md" : "rounded-br-2xl"
-      )
-    : cn(
-        "rounded-2xl rounded-tl-lg",
-        isLastInGroup ? "rounded-bl-md" : "rounded-bl-2xl"
-      );
+    ? cn("rounded-2xl rounded-tr-lg", isLastInGroup ? "rounded-br-md" : "rounded-br-2xl")
+    : cn("rounded-2xl rounded-tl-lg", isLastInGroup ? "rounded-bl-md" : "rounded-bl-2xl");
 
   return (
     <div
@@ -84,7 +86,6 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         isLastInGroup ? "mb-2" : "mb-0.5"
       )}
     >
-      {/* Avatar slot (left side, only for others) */}
       {!isMe && (
         <div className="w-8 shrink-0 flex justify-center">
           {showAvatar ? (
@@ -98,11 +99,15 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       )}
 
       <div className={cn("relative max-w-[70%]", isMe ? "order-first" : "")}>
-        {/* Context menu - hover */}
+        {/* Hover actions: reaction picker + context menu */}
         <div className={cn(
-          "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10",
-          isMe ? "-left-8" : "-right-8"
+          "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-0.5",
+          isMe ? "-left-16" : "-right-16"
         )}>
+          <ReactionPicker
+            onSelect={onToggleReaction}
+            className="bg-card shadow-sm border border-border"
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full bg-card shadow-sm border border-border">
@@ -136,51 +141,32 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         <div className={cn(
           "px-3 py-2 shadow-sm",
           bubbleRadius,
-          isMe
-            ? "bg-primary text-primary-foreground"
-            : "bg-card border border-border"
+          isMe ? "bg-primary text-primary-foreground" : "bg-card border border-border"
         )}>
-          {/* Reply reference */}
           {replyMessage && (
             <div className={cn(
               "text-[11px] mb-1.5 px-2 py-1 rounded-lg border-l-2",
-              isMe
-                ? "bg-primary-foreground/10 border-primary-foreground/40"
-                : "bg-muted/50 border-primary/40"
+              isMe ? "bg-primary-foreground/10 border-primary-foreground/40" : "bg-muted/50 border-primary/40"
             )}>
               <p className="font-semibold opacity-80">{profiles[replyMessage.sender_id]?.full_name || "Usuario"}</p>
               <p className="truncate opacity-70">{replyMessage.content}</p>
             </div>
           )}
 
-          {/* Group sender name */}
           {chatType === "group" && !isMe && showSender && (
             <p className="text-[11px] font-semibold text-primary mb-0.5">{senderName}</p>
           )}
 
-          {/* Content */}
           {message.type === "image" && message.file_url ? (
             <div>
-              <img
-                src={message.file_url}
-                alt={message.file_name || "image"}
-                className="rounded-lg max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-              />
+              <img src={message.file_url} alt={message.file_name || "image"} className="rounded-lg max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity" />
               {message.content && message.content !== message.file_name && (
                 <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
               )}
             </div>
           ) : message.type === "file" ? (
-            <a
-              href={message.file_url || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 hover:underline"
-            >
-              <div className={cn(
-                "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-                isMe ? "bg-primary-foreground/15" : "bg-muted"
-              )}>
+            <a href={message.file_url || "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
+              <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-muted")}>
                 <File className="h-4 w-4" />
               </div>
               <span className="text-[13px] truncate">{message.file_name || "Archivo"}</span>
@@ -191,24 +177,31 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             </p>
           )}
 
-          {/* Time and status */}
           <div className="flex items-center gap-1 mt-1 justify-end">
             {message.is_edited && (
-              <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>
-                editado
-              </span>
+              <span className={cn("text-[10px]", isMe ? "text-primary-foreground/50" : "text-muted-foreground")}>editado</span>
             )}
             <span className={cn("text-[10px]", isMe ? "text-primary-foreground/60" : "text-muted-foreground")}>
               {formatMsgTime(message.created_at)}
             </span>
-            {isMe && (
-              <CheckCheck className={cn("h-3 w-3", isMe ? "text-primary-foreground/50" : "text-muted-foreground")} />
-            )}
+            <ReadReceiptIndicator
+              isMe={isMe}
+              readByUsers={readByUsers}
+              profiles={profiles}
+              totalParticipants={totalParticipants}
+            />
           </div>
         </div>
+
+        {/* Reactions below bubble */}
+        <ReactionsDisplay
+          reactions={reactions}
+          profiles={profiles}
+          isMe={isMe}
+          onToggle={onToggleReaction}
+        />
       </div>
 
-      {/* Avatar slot (right side, for self — hidden, just for alignment) */}
       {isMe && <div className="w-0 shrink-0" />}
     </div>
   );

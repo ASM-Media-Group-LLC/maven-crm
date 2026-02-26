@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
@@ -7,6 +7,8 @@ import VideoCallView from "./VideoCallView";
 import NewChatModal from "./NewChatModal";
 import { ConversationWithDetails, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
+import { useReactions } from "@/hooks/useReactions";
+import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -26,6 +28,10 @@ export default function MessengerPage() {
     messages, loading: msgsLoading, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage,
   } = useMessages(activeChatId);
+
+  const { toggleReaction, getReactionsForMessage } = useReactions(activeChatId);
+  const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
+  const { getReadBy } = useReadReceipts(activeChatId, messageIds);
 
   const handleSelectUser = async (userId: string) => {
     const convId = await createDirectChat(userId);
@@ -125,6 +131,9 @@ export default function MessengerPage() {
               onBack={() => setActiveChatId(null)}
               onStartVideoCall={handleStartVideoCall}
               loading={msgsLoading}
+              getReactionsForMessage={getReactionsForMessage}
+              onToggleReaction={toggleReaction}
+              getReadByUsers={getReadBy}
             />
           </div>
         ) : (
