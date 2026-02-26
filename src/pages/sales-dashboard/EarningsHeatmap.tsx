@@ -2,9 +2,13 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
+
+const NET_FACTOR = 0.80;
 
 interface Props {
   rows: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -14,8 +18,9 @@ const hourLabel = (h: number) => {
   return h < 12 ? `${h} AM` : `${h - 12} PM`;
 };
 
-const EarningsHeatmap = ({ rows }: Props) => {
+const EarningsHeatmap = ({ rows, earningsMode }: Props) => {
   const [hover, setHover] = useState<{ date: string; hour: number } | null>(null);
+  const factor = earningsMode === "net" ? NET_FACTOR : 1;
 
   const { grid, dates, maxVal } = useMemo(() => {
     const map = new Map<string, number>();
@@ -26,7 +31,7 @@ const EarningsHeatmap = ({ rows }: Props) => {
       dateSet.add(date);
       const hour = r.report_time ? parseInt(r.report_time.split(":")[0], 10) : 0;
       const key = `${date}_${hour}`;
-      map.set(key, (map.get(key) ?? 0) + (r.total_earnings_gross ?? 0));
+      map.set(key, (map.get(key) ?? 0) + (r.total_earnings_gross ?? 0) * factor);
     }
 
     const dates = Array.from(dateSet).sort();
@@ -34,7 +39,7 @@ const EarningsHeatmap = ({ rows }: Props) => {
     map.forEach((v) => { if (v > maxVal) maxVal = v; });
 
     return { grid: map, dates, maxVal };
-  }, [rows]);
+  }, [rows, factor]);
 
   const getColor = (val: number) => {
     if (maxVal === 0 || val === 0) return "hsl(var(--muted))";
@@ -54,7 +59,7 @@ const EarningsHeatmap = ({ rows }: Props) => {
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-      <h3 className="text-sm font-semibold text-foreground">Earnings heatmap</h3>
+      <h3 className="text-sm font-semibold text-foreground">Earnings heatmap ({earningsMode === "net" ? "Net" : "Gross"})</h3>
       <div className="overflow-x-auto">
         <div className="inline-block">
           {/* Hour headers */}

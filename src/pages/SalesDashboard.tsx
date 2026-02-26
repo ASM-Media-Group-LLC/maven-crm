@@ -141,7 +141,7 @@ const SalesDashboard = () => {
                 <SalesReportSection rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
               </>
             ) : (
-              <CreatorPerformanceView rows={filteredRows} />
+              <CreatorPerformanceView rows={filteredRows} earningsMode={earningsMode} />
             )}
           </main>
         </div>

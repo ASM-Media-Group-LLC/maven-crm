@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
+
+const NET_FACTOR = 0.80;
 
 const SEGMENTS = [
   { key: "subscription_gross", label: "Subscriptions", color: "hsl(25, 95%, 53%)" },
@@ -13,17 +16,20 @@ const SEGMENTS = [
 
 interface Props {
   rows: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
-const EarningsBreakdownChart = ({ rows }: Props) => {
+const EarningsBreakdownChart = ({ rows, earningsMode }: Props) => {
+  const factor = earningsMode === "net" ? NET_FACTOR : 1;
+
   const { data, total } = useMemo(() => {
     const sums: Record<string, number> = {};
     for (const seg of SEGMENTS) sums[seg.key] = 0;
 
     for (const r of rows) {
-      sums["subscription_gross"] += r.subscription_gross ?? 0;
-      sums["tips_gross"] += r.tips_gross ?? 0;
-      sums["message_gross"] += r.message_gross ?? 0;
+      sums["subscription_gross"] += (r.subscription_gross ?? 0) * factor;
+      sums["tips_gross"] += (r.tips_gross ?? 0) * factor;
+      sums["message_gross"] += (r.message_gross ?? 0) * factor;
     }
 
     const total = Object.values(sums).reduce((a, b) => a + b, 0);
@@ -34,11 +40,11 @@ const EarningsBreakdownChart = ({ rows }: Props) => {
     })).filter((d) => d.value > 0);
 
     return { data, total };
-  }, [rows]);
+  }, [rows, factor]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-      <h3 className="text-sm font-semibold text-foreground">Earnings breakdown</h3>
+      <h3 className="text-sm font-semibold text-foreground">Earnings breakdown ({earningsMode === "net" ? "Net" : "Gross"})</h3>
       <div className="flex items-start gap-6">
         <div className="h-48 w-48 shrink-0">
           {data.length === 0 ? (
