@@ -1,37 +1,47 @@
 
 
-## Issues Found
+## Diagnostic: Sales Dashboard Filter Functionality
 
-1. **Native `<select>` instead of Shadcn `Select`**: `DashboardFilters.tsx` line 113 uses a raw HTML `<select>` for Net/Gross toggle. This violates the design system which requires Shadcn `Select` components.
+### Fully Functional Filters
+- **Time Period buttons** (Ayer/Hoy/Esta semana/Este mes): Working correctly, filters `filteredRows` by `effective_date`
+- **Net/Gross Select**: Working correctly on `EarningsTrendChart`, `EarningsByChannelChart`, `ConcentrationChart`, `CreatorStatsCards`
+- **Compare mode**: Working on `EarningsTrendChart`, `EarningsByChannelChart`, `ConcentrationChart`, `CreatorStatsCards`, `SalesReportSection`
+- **View tabs** (Vista General / Rendimiento por Creadora): Working correctly
+- **SalesReportSection search**: Working correctly
 
-2. **Net/Gross filter is decorative only**: The `<select>` has no `onChange`, no state, and no prop to propagate the selection. It doesn't filter or transform any data. All charts and tables always show `total_earnings_gross` regardless of the selection.
+### Issues Found
 
-3. **Compare mode works structurally** but the compare data only flows into some components (`EarningsTrendChart`, `ConcentrationChart`, `CreatorStatsCards`, `SalesReportSection`). The `EarningsByChannelChart` does NOT accept `comparedRows`. This is a gap.
+#### Issue 1: `EarningsSummary` is NOT rendered anywhere
+`EarningsSummary.tsx` exists but is **never imported or used** in `SalesDashboard.tsx`. It also lacks `earningsMode` support — it always shows gross values. This component is dead code.
+
+#### Issue 2: `CreatorPerformanceView` ignores `earningsMode`
+The "Rendimiento por Creadora" tab (line 144) passes only `rows` but does NOT pass `earningsMode`. The child components (`CreatorEarningsChart`, `EarningsBreakdownChart`, `EarningsHeatmap`, `ChargebacksChart`) all use raw gross values and never apply the net factor.
+
+#### Issue 3: `ConcentrationChart` internal filter tabs are decorative
+The "Ver Top 20%" and "Ver Bottom 80%" buttons (`activeFilter` state at line 60) are rendered but **never applied** to the data. The `buildLorenz` function ignores `activeFilter` entirely.
+
+#### Issue 4: `SalesReportSection` earningsMode partially broken
+The `earningsMode` is used inside the `useMemo` (line 59-61) but it's **not listed in the dependency array** (line 87). Changing Net/Gross won't re-compute the enriched data.
+
+---
 
 ## Plan
 
-### Step 1: Add `earningsMode` state to `SalesDashboard.tsx`
-- Add state: `const [earningsMode, setEarningsMode] = useState<"net" | "gross">("net")`
-- Pass `earningsMode` and `onEarningsModeChange` to `DashboardFilters`
-- Pass `earningsMode` down to all chart/table components
+### Step 1: Fix `SalesReportSection` missing dependency
+Add `earningsMode` to the `useMemo` dependency array on line 87.
 
-### Step 2: Replace native `<select>` with Shadcn `Select` in `DashboardFilters.tsx`
-- Replace the HTML `<select>` (line 113-116) with a `Select`/`SelectTrigger`/`SelectContent`/`SelectItem` from `@/components/ui/select`
-- Wire it to `earningsMode` prop and `onEarningsModeChange` callback
-- Options: "Net Earnings" (value `net`) and "Gross Earnings" (value `gross`)
+### Step 2: Wire `earningsMode` into `CreatorPerformanceView`
+- Update `CreatorPerformanceView` props to accept `earningsMode`
+- Pass it from `SalesDashboard.tsx` line 144
+- Propagate to `CreatorEarningsChart`, `EarningsBreakdownChart`, `EarningsHeatmap`, `ChargebacksChart`
+- Apply `NET_FACTOR` in each component's data calculation
 
-### Step 3: Apply `earningsMode` filtering in data pipeline
-- In `SalesDashboard.tsx`, create a helper that maps `earningsMode` to the correct field (`total_earnings_gross` for gross, computed `total_earnings_gross * 0.80` for net)
-- In `EarningsTrendChart.tsx`: use the mode to pick gross or net values in `groupByDay`
-- In `EarningsSummary.tsx`: use the mode for totals display
-- In `CreatorStatsCards.tsx`: use the mode for card values
-- In `ConcentrationChart.tsx`: use the mode for concentration calculation
-- In `SalesReportSection.tsx`: already computes both, just needs to sort/highlight based on mode
-- In `EarningsByChannelChart.tsx`: use the mode for channel breakdown values
+### Step 3: Make `ConcentrationChart` filter tabs functional
+- Filter the Lorenz curve data based on `activeFilter`:
+  - `top20`: show only the top 20% of creators
+  - `bottom80`: show only the bottom 80% of creators
+  - `all`: show all (current behavior)
 
-### Step 4: Add `comparedRows` to `EarningsByChannelChart`
-- Update `EarningsByChannelChart` to accept and display `comparedRows` for consistency with compare mode
-
-### Step 5: Pass `earningsMode` as prop type
-- Add `earningsMode: "net" | "gross"` to `DashboardFiltersProps` interface and all downstream component props
+### Step 4: Remove dead `EarningsSummary` or integrate it
+- Since it's unused, remove the import reference or integrate it into the dashboard if intended. Will remove since `CreatorStatsCards` already covers this.
 
