@@ -1,108 +1,116 @@
 
 
-## Plan: Mejoras al Dashboard Principal
+## Plan: Header fijo, Quick Actions configurables y Sistema de Avisos Internos
 
-### Problemas identificados
+### 1. Problema del header
 
-1. **Datos falsos hardcodeados**: El gráfico "Rendimiento Semanal" usa `weeklyData` y `dealsWeekly` estáticos (líneas 85-103) — nunca consulta la DB. "Promotion Compliance" está fijo en "39%". La tarjeta "Scripts and Tools" muestra "--" en todo. "Closers > En llamada" muestra "--".
+Actualmente el header del dashboard (título + botón Actualizar) está dentro del `<main>` scrolleable (línea 187-197 de `DashboardContent.tsx`). No es fijo — se desplaza con el contenido. Debe extraerse fuera del scroll, siguiendo el patrón estándar `shrink-0` + `flex-1 overflow-auto`.
 
-2. **Header no sigue el estándar**: Usa `text-2xl font-bold` en vez de `text-xl font-semibold`. Los botones "Actualizar" y "Exportar" no hacen nada (sin onClick handler funcional).
+### 2. Quick Actions configurables
 
-3. **Sin adaptación por rol**: El dashboard muestra lo mismo para admin, manager, agent, closer y supervisor. Un closer no necesita ver pipeline de leads; un agente no necesita ver deals.
+El HR Dashboard ya tiene un sistema de Quick Actions configurables con localStorage que funciona bien (líneas 27-64, 323-361 de `HRDashboard.tsx`). Necesitamos replicar este mismo patrón en el Dashboard principal, pero con accesos a todos los módulos de la plataforma (no solo HR).
 
-4. **Sin datos de HR ni Finanzas**: El dashboard no refleja dos módulos completos de la plataforma — no hay KPIs de empleados, ausencias, nómina, ni ingresos totales de la empresa.
+### 3. Sistema de Avisos y Eventos Internos
 
-5. **Sin datos de Tareas/Eventos pendientes**: No muestra tareas próximas a vencer ni eventos del día, que son módulos activos de la plataforma.
+Necesitamos una infraestructura nueva para anuncios internos (cumpleaños, comunicados de HR, etc.) que se muestre en el dashboard.
 
-6. **La tarjeta "Actividad Reciente" solo muestra tickets**: Debería ser un feed multi-fuente (tickets + tareas + eventos + cambios de rol).
-
-7. **No usa el layout estándar `h-screen overflow-hidden`**: Usa `flex-1 overflow-auto` directamente sin el wrapper de pantalla completa del `Dashboard.tsx`.
+---
 
 ### Cambios propuestos
 
-| # | Cambio | Detalle |
-|---|--------|---------|
-| 1 | **Eliminar datos fake** | Reemplazar `weeklyData`/`dealsWeekly` por queries reales a `leads` y `deals` agrupados por día de la semana actual. Calcular compliance real desde `eventos` o eliminar si no hay fuente |
-| 2 | **Fix header** | `text-xl font-semibold`, botón Actualizar con `queryClient.invalidateQueries()`, eliminar botón Exportar (no tiene sentido en dashboard) |
-| 3 | **Agregar KPIs de HR y Finanzas** | Nueva fila de KPIs: Total Empleados (desde `employees`), Ausencias Hoy (desde `absences`), Tareas Vencidas (desde `tasks`), Eventos Hoy (desde `events`) |
-| 4 | **Actividad Reciente multi-fuente** | Fusionar últimos tickets, tareas completadas y eventos recientes en un timeline unificado ordenado por fecha, con iconos diferenciados por tipo |
-| 5 | **Gráfico semanal con datos reales** | Query de `leads` y `deals` de la semana actual agrupados por `day_of_week(created_at)` |
-| 6 | **Reemplazar tarjeta "Scripts and Tools"** | No tiene datos reales. Sustituir por "Tareas Pendientes" o "Eventos Próximos" con datos de `tasks`/`events` |
-| 7 | **Dashboard adaptativo por rol** | Usar `usePermissions` para mostrar solo las secciones a las que el usuario tiene acceso. Si no tiene acceso a LeadGen, ocultar pipeline y leads KPI |
+| # | Archivo | Cambio |
+|---|---------|--------|
+| 1 | `DashboardContent.tsx` | Extraer header fuera del `<main>` scrolleable, envolverlo en un `<header>` con `shrink-0 border-b` |
+| 2 | `DashboardContent.tsx` | Agregar sección Quick Actions configurable (mismo patrón que HR: catálogo, localStorage, modal de config con checkboxes, máximo 6 atajos) |
+| 3 | Migración SQL | Crear tabla `internal_announcements` para avisos de HR/admin |
+| 4 | `DashboardContent.tsx` | Agregar tarjeta "Avisos y Celebraciones" que muestre: cumpleaños del día/semana (desde `employees.birth_date`) + anuncios activos (desde `internal_announcements`) |
+| 5 | Hook nuevo | `useAnnouncements.ts` — queries para cumpleaños próximos y anuncios activos |
 
 ### Detalle técnico
 
-**Datos reales para gráfico semanal**:
-```typescript
-const useWeeklyStats = () => useQuery({
-  queryKey: ["dashboard-weekly"],
-  queryFn: async () => {
-    const startOfWeek = // lunes de esta semana
-    const { data: leads } = await supabase
-      .from("leads")
-      .select("created_at")
-      .gte("created_at", startOfWeek.toISOString());
-    const { data: deals } = await supabase
-      .from("deals")
-      .select("created_at")
-      .gte("created_at", startOfWeek.toISOString());
-    // Agrupar por día → [{day: "Lun", leads: 5, deals: 2}, ...]
-  },
-});
+**Header fijo** — Cambio de estructura:
+```text
+Actual:
+  <main className="flex-1 overflow-auto p-6">
+    <div> ← Header (se scrollea)
+    <div> ← KPIs
+    ...
+
+Propuesto:
+  <header className="shrink-0 border-b px-6 py-4">
+    ← Header FIJO
+  </header>
+  <main className="flex-1 overflow-auto p-6">
+    <div> ← KPIs
+    ...
 ```
 
-**KPIs adicionales (HR + Tareas + Eventos)**:
+**Quick Actions** — Catálogo completo de la plataforma:
 ```typescript
-const useOperationalKPIs = () => useQuery({
-  queryKey: ["dashboard-operational"],
-  queryFn: async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const [employees, absences, overdueTasks, todayEvents] = await Promise.all([
-      supabase.from("employees").select("id", { count: "exact", head: true }),
-      supabase.from("absences").select("id", { count: "exact", head: true })
-        .eq("date", today),
-      supabase.from("tasks").select("id", { count: "exact", head: true })
-        .lt("due_date", today).neq("status", "done"),
-      supabase.from("events").select("id", { count: "exact", head: true })
-        .eq("event_date", today),
-    ]);
-    return { employees, absences, overdueTasks, todayEvents };
-  },
-});
+const ALL_ACTIONS = [
+  { id: "contactos",    label: "Contactos",        icon: UserPlus,     url: "/contactos" },
+  { id: "tareas",       label: "Tareas",           icon: CheckSquare,  url: "/tareas" },
+  { id: "eventos",      label: "Eventos",          icon: CalendarDays, url: "/eventos" },
+  { id: "creadores",    label: "Creadoras",        icon: Users,        url: "/creadores" },
+  { id: "leadgen",      label: "Lead Gen",         icon: MessageSquare,url: "/leadgen" },
+  { id: "closers",      label: "Closers",          icon: Phone,        url: "/closers" },
+  { id: "tickets",      label: "Tickets",          icon: Ticket,       url: "/tickets" },
+  { id: "hr",           label: "Recursos Humanos", icon: Briefcase,    url: "/hr" },
+  { id: "finanzas",     label: "Finanzas",         icon: DollarSign,   url: "/finanzas" },
+  { id: "promolog",     label: "Promolog",         icon: Megaphone,    url: "/promolog" },
+  { id: "sales",        label: "Sales Dashboard",  icon: TrendingUp,   url: "/sales" },
+  { id: "admin",        label: "Administración",   icon: Settings,     url: "/admin/usuarios" },
+];
+```
+Se filtran con `usePermissions().canAccess()` para solo mostrar módulos accesibles. Se persiste en `localStorage` con key `dashboard_quick_actions`. Máximo 6 atajos. Modal de configuración idéntico al de HR.
+
+**Tabla `internal_announcements`**:
+```sql
+create table public.internal_announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  message text,
+  announcement_type text not null default 'general',
+    -- tipos: 'general', 'birthday', 'holiday', 'policy', 'celebration'
+  priority text not null default 'normal',
+    -- 'low', 'normal', 'high'
+  is_active boolean not null default true,
+  starts_at timestamptz not null default now(),
+  expires_at timestamptz,
+  created_by uuid not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.internal_announcements enable row level security;
+
+create policy "Authenticated users can read announcements"
+  on public.internal_announcements for select
+  to authenticated using (true);
+
+create policy "Admins and managers can manage announcements"
+  on public.internal_announcements for all
+  to authenticated using (true) with check (true);
 ```
 
-**Actividad reciente multi-fuente**:
+**Hook `useAnnouncements`**:
 ```typescript
-// Merge tickets + tareas + eventos recientes
-const recentActivity = [
-  ...tickets.map(t => ({ type: 'ticket', title: t.title, date: t.created_at, icon: Ticket })),
-  ...tasks.map(t => ({ type: 'task', title: t.title, date: t.updated_at, icon: CheckSquare })),
-  ...events.map(e => ({ type: 'event', title: e.name, date: e.created_at, icon: Calendar })),
-].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+// Cumpleaños: consulta employees donde birth_date día/mes coincida con hoy o próximos 7 días
+// Anuncios: consulta internal_announcements donde is_active=true, starts_at <= now, (expires_at is null OR expires_at > now)
 ```
 
-**Dashboard adaptativo**:
-```typescript
-const { canAccess } = usePermissions();
-// Solo mostrar secciones según permisos
-{canAccess("leadgen") && <PipelineCard />}
-{canAccess("closers") && <ClosersCard />}
-{canAccess("hr") && <HRKPIs />}
-```
+**Tarjeta "Avisos y Celebraciones"** en el dashboard:
+- Icono de pastel para cumpleaños, megáfono para anuncios generales
+- Muestra nombre del empleado + "¡Cumple años hoy!" o "Cumple el [fecha]"
+- Anuncios con badge de prioridad (high = destructive, normal = secondary)
+- Si no hay avisos: "Sin avisos por el momento"
+- Se ubica en Row 2, reemplazando o compartiendo espacio con Actividad Reciente
 
 ### Orden de implementación
 
-1. Fix header (estándar + botón Actualizar funcional)
-2. Reemplazar datos fake por queries reales (leads/deals semanales)
-3. Agregar KPIs operacionales (empleados, ausencias, tareas vencidas, eventos hoy)
-4. Actividad reciente multi-fuente
-5. Reemplazar "Scripts and Tools" por "Tareas Pendientes"
-6. Integrar `usePermissions` para secciones adaptativas por rol
-
-### Impacto
-
-- Dashboard pasa de ser 40% datos fake a 100% datos reales
-- Refleja toda la plataforma (HR, Finanzas, Tareas, Eventos) en vez de solo Sales + Tickets
-- Se adapta al rol del usuario mostrando solo lo relevante
-- Header y layout siguen el estándar de la plataforma
+1. Migración SQL: tabla `internal_announcements`
+2. Fix header fijo en `DashboardContent.tsx`
+3. Quick Actions configurables (catálogo, localStorage, modal)
+4. Hook `useAnnouncements.ts` (cumpleaños + anuncios)
+5. Tarjeta "Avisos y Celebraciones" en el dashboard
 
