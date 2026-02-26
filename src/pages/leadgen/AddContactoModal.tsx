@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 const contactoSchema = z.object({
@@ -68,7 +69,6 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
     setIsSubmitting(true);
     try {
       // Duplicate check by instagram handle
-      const { normalizeHandle } = await import("@/lib/handle-utils");
       const normalizedIg = normalizeHandle(data.instagram);
       if (normalizedIg) {
         const { data: existing } = await supabase

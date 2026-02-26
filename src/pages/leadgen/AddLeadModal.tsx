@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 const leadSchema = z.object({
@@ -70,7 +71,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
     setIsSubmitting(true);
     try {
       // Duplicate check by url_perfil
-      const { normalizeHandle } = await import("@/lib/handle-utils");
       const normalizedUrl = normalizeHandle(data.url_perfil);
       if (normalizedUrl) {
         const { data: existing } = await supabase
