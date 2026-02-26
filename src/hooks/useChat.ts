@@ -212,28 +212,39 @@ export function useChat() {
       }
 
       // Create new conversation
-      const { data: newConv, error } = await supabase
+      const newConvId = crypto.randomUUID();
+      const { error: createConvError } = await supabase
         .from("chat_conversations")
-        .insert({ type: "direct", created_by: user.id })
-        .select()
-        .single();
+        .insert({ id: newConvId, type: "direct", created_by: user.id });
 
-      if (error || !newConv) {
+      if (createConvError) {
         toast.error("Error al crear conversación");
         return null;
       }
 
       // Add creator first (so RLS recognizes them as participant)
-      await supabase.from("chat_participants").insert(
-        { conversation_id: newConv.id, user_id: user.id, role: "admin" }
-      );
-      // Then add the other user
-      await supabase.from("chat_participants").insert(
-        { conversation_id: newConv.id, user_id: otherUserId, role: "member" }
+      const { error: addCreatorError } = await supabase.from("chat_participants").insert(
+        { conversation_id: newConvId, user_id: user.id, role: "admin" }
       );
 
+      if (addCreatorError) {
+        await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        toast.error("Error al crear conversación");
+        return null;
+      }
+
+      const { error: addOtherError } = await supabase.from("chat_participants").insert(
+        { conversation_id: newConvId, user_id: otherUserId, role: "member" }
+      );
+
+      if (addOtherError) {
+        await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        toast.error("Error al crear conversación");
+        return null;
+      }
+
       await loadConversations();
-      return newConv.id;
+      return newConvId;
     },
     [user, loadConversations]
   );
@@ -243,34 +254,46 @@ export function useChat() {
     async (name: string, memberIds: string[]) => {
       if (!user) return null;
 
-      const { data: newConv, error } = await supabase
+      const newConvId = crypto.randomUUID();
+      const { error: createConvError } = await supabase
         .from("chat_conversations")
-        .insert({ type: "group", name, created_by: user.id })
-        .select()
-        .single();
+        .insert({ id: newConvId, type: "group", name, created_by: user.id });
 
-      if (error || !newConv) {
+      if (createConvError) {
         toast.error("Error al crear grupo");
         return null;
       }
 
       // Add creator first (so RLS recognizes them as participant)
-      await supabase.from("chat_participants").insert(
-        { conversation_id: newConv.id, user_id: user.id, role: "admin" }
+      const { error: addCreatorError } = await supabase.from("chat_participants").insert(
+        { conversation_id: newConvId, user_id: user.id, role: "admin" }
       );
-      // Then add members
+
+      if (addCreatorError) {
+        await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        toast.error("Error al crear grupo");
+        return null;
+      }
+
       if (memberIds.length > 0) {
-        await supabase.from("chat_participants").insert(
+        const { error: addMembersError } = await supabase.from("chat_participants").insert(
           memberIds.map((id) => ({
-            conversation_id: newConv.id,
+            conversation_id: newConvId,
             user_id: id,
             role: "member" as const,
           }))
         );
+
+        if (addMembersError) {
+          await supabase.from("chat_conversations").delete().eq("id", newConvId);
+          toast.error("Error al crear grupo");
+          return null;
+        }
       }
+
       await loadConversations();
       toast.success(`Grupo "${name}" creado`);
-      return newConv.id;
+      return newConvId;
     },
     [user, loadConversations]
   );
