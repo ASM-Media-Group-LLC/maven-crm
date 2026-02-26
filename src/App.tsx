@@ -86,6 +86,7 @@ import HRDirectoryLookup from "./pages/hr/HRDirectoryLookup";
 import HROrganigrama from "./pages/hr/HROrganigrama";
 import HRDeductions from "./pages/hr/HRDeductions";
 import HRDeductionNew from "./pages/hr/HRDeductionNew";
+import HRAnnouncements from "./pages/hr/HRAnnouncements";
 import FinanzasLayout from "./pages/finanzas/FinanzasLayout";
 import FinanzasDashboard from "./pages/finanzas/FinanzasDashboard";
 import NominaPage from "./pages/finanzas/nomina/NominaPage";
@@ -187,6 +188,7 @@ const App = () => (
               <Route path="/hr/organizacion/organigrama" element={<ProtectedRoute><HRLayout><HROrganigrama /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/deducciones" element={<ProtectedRoute><HRLayout><HRDeductions /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/deducciones/nuevo" element={<ProtectedRoute><HRLayout><HRDeductionNew /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr/anuncios" element={<ProtectedRoute><HRLayout><HRAnnouncements /></HRLayout></ProtectedRoute>} />
               {/* Finanzas routes */}
               <Route path="/finanzas" element={<ProtectedRoute><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></ProtectedRoute>} />
               <Route path="/finanzas/nomina" element={<ProtectedRoute><FinanzasLayout><NominaPage /></FinanzasLayout></ProtectedRoute>} />

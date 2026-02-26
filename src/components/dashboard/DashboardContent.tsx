@@ -263,7 +263,7 @@ const DashboardContent = () => {
     },
   ].filter((k) => k.show);
 
-  const hasBirthdaysOrAnnouncements = birthdays.length > 0 || announcements.length > 0;
+  
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -356,16 +356,20 @@ const DashboardContent = () => {
           )}
 
           {/* Avisos y Celebraciones */}
-          {hasBirthdaysOrAnnouncements ? (
-            <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  Avisos y Celebraciones
-                </CardTitle>
-                <CardDescription>Cumpleaños y anuncios internos</CardDescription>
-              </CardHeader>
-              <CardContent>
+          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Avisos y Celebraciones
+              </CardTitle>
+              <CardDescription>Cumpleaños y anuncios internos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {birthdays.length === 0 && announcements.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-8">
+                  Sin avisos por el momento
+                </div>
+              ) : (
                 <div className="space-y-3 max-h-60 overflow-auto">
                   {/* Birthdays */}
                   {birthdays.map((b) => (
@@ -404,95 +408,52 @@ const DashboardContent = () => {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Actividad Reciente</CardTitle>
-                <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {activityLoading ? (
-                    <p className="text-sm text-muted-foreground">Cargando…</p>
-                  ) : recentActivity.length > 0 ? (
-                    recentActivity.map((item) => {
-                      const config = ACTIVITY_CONFIG[item.type];
-                      const Icon = config.icon;
-                      return (
-                        <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
-                          <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
-                            <Icon className={`h-3.5 w-3.5 ${config.text}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium truncate">{item.title}</p>
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                                {config.label}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {item.date
-                                ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Row 2b: Actividad Reciente (when announcements card is shown) */}
-        {hasBirthdaysOrAnnouncements && (
-          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Actividad Reciente</CardTitle>
-              <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
-                {activityLoading ? (
-                  <p className="text-sm text-muted-foreground">Cargando…</p>
-                ) : recentActivity.length > 0 ? (
-                  recentActivity.map((item) => {
-                    const config = ACTIVITY_CONFIG[item.type];
-                    const Icon = config.icon;
-                    return (
-                      <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
-                        <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
-                          <Icon className={`h-3.5 w-3.5 ${config.text}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate">{item.title}</p>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                              {config.label}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {item.date
-                              ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
-        )}
+        </div>
+
+        {/* Row 2b: Actividad Reciente */}
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Actividad Reciente</CardTitle>
+            <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-3">
+              {activityLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando…</p>
+              ) : recentActivity.length > 0 ? (
+                recentActivity.map((item) => {
+                  const config = ACTIVITY_CONFIG[item.type];
+                  const Icon = config.icon;
+                  return (
+                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
+                        <Icon className={`h-3.5 w-3.5 ${config.text}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{item.title}</p>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                            {config.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {item.date
+                            ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

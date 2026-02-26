@@ -150,6 +150,14 @@ const DashboardSidebar = () => {
         { title: "Deducciones", url: "/hr/deducciones" },
       ],
     },
+    {
+      label: "Comunicación",
+      icon: Megaphone,
+      key: "comunicacion",
+      items: [
+        { title: "Anuncios Internos", url: "/hr/anuncios" },
+      ],
+    },
   ];
 
   // Helper to get all URLs from a group (including subGroups)
