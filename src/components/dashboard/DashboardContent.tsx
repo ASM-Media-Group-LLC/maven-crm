@@ -1,9 +1,10 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Users, Ticket, CalendarCheck, MessageSquare, Phone,
-  Headphones, FileCode, AlertCircle, RefreshCw, Download,
+  Headphones, CheckSquare, AlertCircle, RefreshCw, Clock,
+  UserMinus, Calendar, ListTodo,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +17,12 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import DashboardMetricCard from "./DashboardMetricCard";
 import { useEarningsData } from "@/pages/sales-performance/useEarningsData";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { useWeeklyStats, useOperationalKPIs, useRecentActivity, usePendingTasks } from "@/hooks/useDashboardData";
+import { usePermissions } from "@/hooks/usePermissions";
 
-/* ── Data hooks ─────────────────────────────────────── */
+/* ── Existing data hooks ─────────────────────────────── */
 
 const useCreatorsCount = () =>
   useQuery({
@@ -47,8 +50,7 @@ const useTicketsData = () =>
       const activeTickets = all.filter((t) => t.status !== "resolved");
       const resolved = all.filter((t) => t.status === "resolved");
       const urgent = all.filter((t) => t.priority === "high" || t.priority === "urgent");
-      const recent = all.slice(0, 5);
-      return { active: activeTickets.length, resolved: resolved.length, urgent: urgent.length, recent, total: all.length };
+      return { active: activeTickets.length, resolved: resolved.length, urgent: urgent.length, total: all.length };
     },
   });
 
@@ -63,13 +65,10 @@ const useLeadsData = () =>
       const todayLeads = all.filter((l) => l.created_at.slice(0, 10) === today);
       const interested = all.filter((l) => l.status === "interesado" || l.status === "contactado");
       const inProgress = all.filter((l) => l.status !== "cerrado" && l.status !== "descartado");
-
-      // Group by status for pipeline
       const statusMap: Record<string, number> = {};
       for (const l of all) {
         statusMap[l.status] = (statusMap[l.status] || 0) + 1;
       }
-
       return {
         todayCount: todayLeads.length,
         interestedCount: interested.length,
@@ -80,46 +79,36 @@ const useLeadsData = () =>
     },
   });
 
-/* ── Placeholder data ─────────────────────────────── */
-
-const weeklyData = [
-  { day: "Lun", leads: 12, deals: 3, compliance: 85 },
-  { day: "Mar", leads: 19, deals: 5, compliance: 78 },
-  { day: "Mié", leads: 15, deals: 4, compliance: 92 },
-  { day: "Jue", leads: 22, deals: 7, compliance: 88 },
-  { day: "Vie", leads: 18, deals: 6, compliance: 75 },
-  { day: "Sáb", leads: 8, deals: 2, compliance: 90 },
-  { day: "Dom", leads: 5, deals: 1, compliance: 95 },
-];
-
-const dealsWeekly = [
-  { day: "Lun", deals: 3 },
-  { day: "Mar", deals: 5 },
-  { day: "Mié", deals: 4 },
-  { day: "Jue", deals: 7 },
-  { day: "Vie", deals: 6 },
-  { day: "Sáb", deals: 2 },
-  { day: "Dom", deals: 1 },
-];
-
 const PIPELINE_COLORS = [
-  "hsl(211, 100%, 50%)",  // primary
-  "hsl(271, 91%, 50%)",   // accent
-  "hsl(40, 96%, 40%)",    // warning
-  "hsl(145, 63%, 32%)",   // success
-  "hsl(0, 84%, 60%)",     // destructive
+  "hsl(211, 100%, 50%)",
+  "hsl(271, 91%, 50%)",
+  "hsl(40, 96%, 40%)",
+  "hsl(145, 63%, 32%)",
+  "hsl(0, 84%, 60%)",
 ];
+
+const ACTIVITY_CONFIG = {
+  ticket: { icon: Ticket, bg: "bg-destructive/10", text: "text-destructive", label: "Ticket" },
+  task: { icon: CheckSquare, bg: "bg-primary/10", text: "text-primary", label: "Tarea" },
+  event: { icon: Calendar, bg: "bg-accent/10", text: "text-accent-foreground", label: "Evento" },
+};
 
 /* ── Component ────────────────────────────────────── */
 
 const DashboardContent = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { canAccess } = usePermissions();
+
   const { data: creatorsData, isLoading: creatorsLoading } = useCreatorsCount();
   const { data: ticketsData, isLoading: ticketsLoading } = useTicketsData();
   const { data: leadsData, isLoading: leadsLoading } = useLeadsData();
   const { data: earningsRows = [], isLoading: earningsLoading } = useEarningsData();
+  const { data: weeklyData = [] } = useWeeklyStats();
+  const { data: opKPIs } = useOperationalKPIs();
+  const { data: recentActivity = [], isLoading: activityLoading } = useRecentActivity();
+  const { data: pendingTasks = [] } = usePendingTasks();
 
-  // Top 5 creators by earnings
   const top5 = useMemo(() => {
     const map = new Map<string, { name: string; total: number }>();
     for (const r of earningsRows) {
@@ -137,14 +126,20 @@ const DashboardContent = () => {
       .slice(0, 5);
   }, [earningsRows]);
 
-  // Pipeline donut data
   const pipelineData = useMemo(() => {
     if (!leadsData?.pipeline) return [];
     return Object.entries(leadsData.pipeline).map(([name, value]) => ({ name, value }));
   }, [leadsData]);
 
   const loading = "…";
+  const fmt = (v: number) =>
+    `$${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries();
+  };
+
+  // Build KPIs based on permissions
   const kpis = [
     {
       label: "Total Creators",
@@ -152,6 +147,7 @@ const DashboardContent = () => {
       icon: Users,
       color: "primary" as const,
       subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
+      show: canAccess("creadores"),
     },
     {
       label: "Active Tickets",
@@ -159,13 +155,7 @@ const DashboardContent = () => {
       icon: Ticket,
       color: "destructive" as const,
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
-    },
-    {
-      label: "Promotion Compliance",
-      value: "39%",
-      icon: CalendarCheck,
-      color: "warning" as const,
-      subtitle: "Weekly average",
+      show: true, // tickets visible for all
     },
     {
       label: "New Leads Today",
@@ -173,94 +163,106 @@ const DashboardContent = () => {
       icon: MessageSquare,
       color: "accent" as const,
       subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
+      show: canAccess("leadgen"),
     },
     {
-      label: "Deals in Progress",
-      value: leadsLoading ? loading : String(leadsData?.inProgressCount ?? 0),
-      icon: Phone,
+      label: "Empleados Activos",
+      value: String(opKPIs?.totalEmployees ?? 0),
+      icon: Users,
       color: "success" as const,
-      subtitle: leadsLoading ? "" : `${leadsData?.closedCount ?? 0} cerrados`,
+      subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
+      show: canAccess("hr"),
     },
-  ];
-
-  const fmt = (v: number) =>
-    `$${v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    {
+      label: "Tareas Vencidas",
+      value: String(opKPIs?.overdueTasks ?? 0),
+      icon: Clock,
+      color: "warning" as const,
+      subtitle: `${opKPIs?.eventsToday ?? 0} eventos hoy`,
+      show: true,
+    },
+  ].filter((k) => k.show);
 
   return (
     <main className="flex-1 overflow-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+          <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Vista general de toda la operación en tiempo real</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <RefreshCw className="h-3.5 w-3.5" /> Actualizar
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Exportar
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRefresh}>
+          <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+        </Button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map((k) => (
-          <DashboardMetricCard key={k.label} {...k} />
+          <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
         ))}
       </div>
 
       {/* Row 2: Weekly Performance + Recent Activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
-            <CardDescription>Leads, Deals y Compliance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                  <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="leads" stroke="hsl(211,100%,50%)" strokeWidth={2} name="Leads" dot={false} />
-                  <Line type="monotone" dataKey="deals" stroke="hsl(145,63%,32%)" strokeWidth={2} name="Deals" dot={false} />
-                  <Line type="monotone" dataKey="compliance" stroke="hsl(271,91%,50%)" strokeWidth={2} name="Compliance %" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+        {canAccess("leadgen") && (
+          <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
+              <CardDescription>Leads y Deals esta semana (datos reales)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
+                    <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="leads" stroke="hsl(211,100%,50%)" strokeWidth={2} name="Leads" dot={false} />
+                    <Line type="monotone" dataKey="deals" stroke="hsl(145,63%,32%)" strokeWidth={2} name="Deals" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30">
+        <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-destructive/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Actividad Reciente</CardTitle>
-            <CardDescription>Últimas acciones del sistema</CardDescription>
+            <CardDescription>Tickets, tareas y eventos recientes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {ticketsLoading ? (
+              {activityLoading ? (
                 <p className="text-sm text-muted-foreground">Cargando…</p>
-              ) : ticketsData?.recent && ticketsData.recent.length > 0 ? (
-                ticketsData.recent.map((t) => (
-                  <div key={t.id} className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-                      <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+              ) : recentActivity.length > 0 ? (
+                recentActivity.map((item) => {
+                  const config = ACTIVITY_CONFIG[item.type];
+                  const Icon = config.icon;
+                  return (
+                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bg}`}>
+                        <Icon className={`h-3.5 w-3.5 ${config.text}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{item.title}</p>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                            {config.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {item.date
+                            ? formatDistanceToNow(new Date(item.date), { addSuffix: true, locale: es })
+                            : ""}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{t.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t.created_at
-                          ? formatDistanceToNow(new Date(t.created_at), { addSuffix: true, locale: es })
-                          : ""}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted-foreground">Sin actividad reciente</p>
               )}
@@ -269,103 +271,124 @@ const DashboardContent = () => {
         </Card>
       </div>
 
-      {/* Row 3: Pipeline + Top 5 + Deals Semanales */}
+      {/* Row 3: Pipeline + Top 5 + Deals/Pending Tasks */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Pipeline Donut */}
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Distribución Pipeline</CardTitle>
-            <CardDescription>Leads por estado</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pipelineData.length > 0 ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-48 w-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pipelineData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={75}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {pipelineData.map((_, i) => (
-                          <Cell key={i} fill={PIPELINE_COLORS[i % PIPELINE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+        {canAccess("leadgen") && (
+          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Distribución Pipeline</CardTitle>
+              <CardDescription>Leads por estado</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pipelineData.length > 0 ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-48 w-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pipelineData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {pipelineData.map((_, i) => (
+                            <Cell key={i} fill={PIPELINE_COLORS[i % PIPELINE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                    {pipelineData.map((d, i) => (
+                      <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length] }}
+                        />
+                        <span className="text-muted-foreground">{d.name}</span>
+                        <span className="font-medium">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-                  {pipelineData.map((d, i) => (
-                    <div key={d.name} className="flex items-center gap-1.5 text-xs">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length] }}
-                      />
-                      <span className="text-muted-foreground">{d.name}</span>
-                      <span className="font-medium">{d.value}</span>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin datos de pipeline</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Top 5 Creators */}
+        {canAccess("creadores") && (
+          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
+              <CardDescription>Por ingresos totales</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {earningsLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando…</p>
+              ) : top5.length > 0 ? (
+                <div className="space-y-3">
+                  {top5.map((c, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{fmt(c.total)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin datos de pipeline</p>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Top 5 Creators */}
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
+        {/* Pending Tasks (replaces Scripts and Tools) */}
+        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-warning/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
-            <CardDescription>Por ingresos totales</CardDescription>
+            <CardTitle className="text-base">Tareas Pendientes</CardTitle>
+            <CardDescription>Próximas a vencer</CardDescription>
           </CardHeader>
           <CardContent>
-            {earningsLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando…</p>
-            ) : top5.length > 0 ? (
+            {pendingTasks.length > 0 ? (
               <div className="space-y-3">
-                {top5.map((c, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {i + 1}
-                    </span>
+                {pendingTasks.map((t) => (
+                  <div key={t.id} className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/10">
+                      <ListTodo className="h-3.5 w-3.5 text-warning" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">{fmt(c.total)}</p>
+                      <p className="text-sm font-medium truncate">{t.title}</p>
+                      <div className="flex items-center gap-2">
+                        {t.due_at && (
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(t.due_at), { addSuffix: true, locale: es })}
+                          </p>
+                        )}
+                        {t.priority && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {t.priority}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
+              <p className="text-sm text-muted-foreground text-center py-8">Sin tareas pendientes</p>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Deals Semanales */}
-        <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-success/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Deals Semanales</CardTitle>
-            <CardDescription>Deals cerrados por día</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dealsWeekly}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="day" className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                  <YAxis className="text-xs" tick={{ fill: "hsl(240,4%,46%)" }} />
-                  <Tooltip />
-                  <Bar dataKey="deals" fill="hsl(145,63%,32%)" radius={[4, 4, 0, 0]} name="Deals" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -406,58 +429,58 @@ const DashboardContent = () => {
         </Card>
 
         {/* Closers */}
-        <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-primary" />
-              <div>
-                <CardTitle className="text-base">Closers</CardTitle>
-                <CardDescription>Actividad de ventas</CardDescription>
+        {canAccess("closers") && (
+          <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Phone className="h-5 w-5 text-primary" />
+                <div>
+                  <CardTitle className="text-base">Closers</CardTitle>
+                  <CardDescription>Actividad de ventas</CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">En llamada</span>
-              <Badge className="bg-primary/10 text-primary hover:bg-primary/20">--</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Cerrados</span>
-              <Badge className="bg-success/10 text-success hover:bg-success/20">{leadsData?.closedCount ?? 0}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Pipeline</span>
-              <Badge variant="secondary">{leadsData?.inProgressCount ?? 0}</Badge>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Cerrados</span>
+                <Badge className="bg-success/10 text-success hover:bg-success/20">{leadsData?.closedCount ?? 0}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Pipeline</span>
+                <Badge variant="secondary">{leadsData?.inProgressCount ?? 0}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Scripts and Tools */}
-        <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <FileCode className="h-5 w-5 text-accent" />
-              <div>
-                <CardTitle className="text-base">Scripts and Tools</CardTitle>
-                <CardDescription>Recursos del equipo</CardDescription>
+        {/* HR Summary */}
+        {canAccess("hr") && (
+          <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-accent-foreground" />
+                <div>
+                  <CardTitle className="text-base">Recursos Humanos</CardTitle>
+                  <CardDescription>Resumen operacional</CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Scripts activos</span>
-              <Badge className="bg-accent/10 text-accent hover:bg-accent/20">--</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Templates</span>
-              <Badge variant="secondary">--</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Objetivos</span>
-              <Badge variant="secondary">--</Badge>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Empleados activos</span>
+                <Badge className="bg-success/10 text-success hover:bg-success/20">{opKPIs?.totalEmployees ?? 0}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Ausencias hoy</span>
+                <Badge variant="secondary">{opKPIs?.absencesToday ?? 0}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Eventos hoy</span>
+                <Badge variant="outline">{opKPIs?.eventsToday ?? 0}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </main>
   );
