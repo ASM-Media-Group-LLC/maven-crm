@@ -66,18 +66,39 @@ const ConcentrationChart = ({ rows, comparedRows, earningsMode }: Props) => {
 
   // Merge points for dual display
   const mergedPoints = useMemo(() => {
-    if (!hasComparison) return currentLorenz.points.map((p) => ({ ...p, revenueB: undefined as number | undefined }));
-    const maxLen = Math.max(currentLorenz.points.length, compLorenz.points.length);
+    let points = currentLorenz.points;
+
+    // Apply filter: top20 shows first 20% of creators, bottom80 shows last 80%
+    if (activeFilter === "top20") {
+      const cutoff = Math.max(1, Math.ceil(points.length * 0.2));
+      points = points.slice(0, cutoff);
+    } else if (activeFilter === "bottom80") {
+      const cutoff = Math.max(1, Math.ceil(points.length * 0.2));
+      points = points.slice(cutoff);
+    }
+
+    if (!hasComparison) return points.map((p) => ({ ...p, revenueB: undefined as number | undefined }));
+
+    let compPoints = compLorenz.points;
+    if (activeFilter === "top20") {
+      const cutoff = Math.max(1, Math.ceil(compPoints.length * 0.2));
+      compPoints = compPoints.slice(0, cutoff);
+    } else if (activeFilter === "bottom80") {
+      const cutoff = Math.max(1, Math.ceil(compPoints.length * 0.2));
+      compPoints = compPoints.slice(cutoff);
+    }
+
+    const maxLen = Math.max(points.length, compPoints.length);
     const merged = [];
     for (let i = 0; i < maxLen; i++) {
       merged.push({
-        percent: currentLorenz.points[i]?.percent ?? compLorenz.points[i]?.percent ?? `${i}%`,
-        revenue: currentLorenz.points[i]?.revenue ?? 0,
-        revenueB: compLorenz.points[i]?.revenue ?? 0,
+        percent: points[i]?.percent ?? compPoints[i]?.percent ?? `${i}%`,
+        revenue: points[i]?.revenue ?? 0,
+        revenueB: compPoints[i]?.revenue ?? 0,
       });
     }
     return merged;
-  }, [currentLorenz, compLorenz, hasComparison]);
+  }, [currentLorenz, compLorenz, hasComparison, activeFilter]);
 
   const insight = currentLorenz.points.length > 0
     ? `El 20% de las creadoras genera el ${currentLorenz.top20Pct}% de los ingresos`

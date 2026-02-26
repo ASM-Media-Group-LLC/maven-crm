@@ -5,6 +5,9 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
+
+const NET_FACTOR = 0.80;
 
 const categories = [
   { key: "all", label: "All", field: "total_earnings_gross" },
@@ -20,10 +23,12 @@ type CategoryKey = (typeof categories)[number]["key"];
 
 interface Props {
   rows: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
-const CreatorEarningsChart = ({ rows }: Props) => {
+const CreatorEarningsChart = ({ rows, earningsMode }: Props) => {
   const [active, setActive] = useState<CategoryKey>("all");
+  const factor = earningsMode === "net" ? NET_FACTOR : 1;
 
   const data = useMemo(() => {
     const cat = categories.find((c) => c.key === active)!;
@@ -32,7 +37,7 @@ const CreatorEarningsChart = ({ rows }: Props) => {
     const grouped = new Map<string, number>();
     for (const r of rows) {
       const day = r.effective_date;
-      const val = field ? (r[field] as number | null) ?? 0 : 0;
+      const val = field ? ((r[field] as number | null) ?? 0) * factor : 0;
       grouped.set(day, (grouped.get(day) ?? 0) + val);
     }
 
@@ -42,12 +47,12 @@ const CreatorEarningsChart = ({ rows }: Props) => {
         label: format(new Date(date + "T12:00:00"), "MMM d"),
         earnings: Math.round(earnings * 100) / 100,
       }));
-  }, [rows, active]);
+  }, [rows, active, factor]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Earnings</h3>
+        <h3 className="text-sm font-semibold text-foreground">Earnings ({earningsMode === "net" ? "Net" : "Gross"})</h3>
       </div>
       <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 w-fit">
         {categories.map((cat) => (
@@ -67,9 +72,7 @@ const CreatorEarningsChart = ({ rows }: Props) => {
       </div>
       <div className="h-64">
         {data.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Sin datos
-          </div>
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Sin datos</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} barSize={32}>

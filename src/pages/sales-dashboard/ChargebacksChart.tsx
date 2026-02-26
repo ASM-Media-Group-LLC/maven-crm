@@ -4,12 +4,14 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface Props {
   rows: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
-const ChargebacksChart = ({ rows }: Props) => {
+const ChargebacksChart = ({ rows, earningsMode }: Props) => {
   const data = useMemo(() => {
     const dates = new Set<string>();
     for (const r of rows) dates.add(r.effective_date);

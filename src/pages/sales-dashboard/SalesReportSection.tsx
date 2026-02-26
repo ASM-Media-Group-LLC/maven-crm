@@ -84,7 +84,7 @@ const SalesReportSection = ({ rows, comparedRows, earningsMode }: SalesReportSec
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
       return String(va).localeCompare(String(vb)) * dir;
     });
-  }, [rows, searchQuery, sortField, sortDirection, comparedRows]);
+  }, [rows, searchQuery, sortField, sortDirection, comparedRows, earningsMode]);
 
   const effectivePageSize = pageSize === "all" ? filtered.length : pageSize;
   const totalPages = Math.max(1, Math.ceil(filtered.length / effectivePageSize));
