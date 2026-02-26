@@ -1,12 +1,22 @@
-import { useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import React from "react";
 
-export function useOnlinePresence() {
+interface OnlinePresenceContextType {
+  onlineUsers: Set<string>;
+  isOnline: (userId: string) => boolean;
+}
+
+const OnlinePresenceContext = createContext<OnlinePresenceContextType>({
+  onlineUsers: new Set(),
+  isOnline: () => false,
+});
+
+export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -31,8 +41,6 @@ export function useOnlinePresence() {
         }
       });
 
-    setChannel(presenceChannel);
-
     return () => {
       supabase.removeChannel(presenceChannel);
     };
@@ -43,5 +51,13 @@ export function useOnlinePresence() {
     [onlineUsers]
   );
 
-  return { onlineUsers, isOnline };
+  return React.createElement(
+    OnlinePresenceContext.Provider,
+    { value: { onlineUsers, isOnline } },
+    children
+  );
+}
+
+export function useOnlinePresence() {
+  return useContext(OnlinePresenceContext);
 }

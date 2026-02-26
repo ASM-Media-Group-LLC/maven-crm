@@ -1,12 +1,10 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import { Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  // Track online presence globally for all authenticated users
-  useOnlinePresence();
 
   if (loading) {
     return (
@@ -20,7 +18,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <OnlinePresenceProvider>
+      {children}
+    </OnlinePresenceProvider>
+  );
 };
 
 export default ProtectedRoute;
