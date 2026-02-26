@@ -8,6 +8,8 @@ import MessageList from "./components/MessageList";
 import MessageInput from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import SearchResultsBar from "./components/SearchResultsBar";
+import NotificationSettings from "./components/NotificationSettings";
+import SharedFilesGallery from "./components/SharedFilesGallery";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
@@ -38,6 +40,8 @@ export default function ChatView({
   const [searchIndex, setSearchIndex] = useState(0);
   const [threadParent, setThreadParent] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [showSharedFiles, setShowSharedFiles] = useState(false);
 
   // Search results
   const searchResults = useMemo(() => {
@@ -82,7 +86,7 @@ export default function ChatView({
   }, [messages]);
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full bg-background relative">
       <div className="flex flex-col flex-1 min-w-0">
         <ChatHeader
           conversation={conversation}
@@ -94,6 +98,8 @@ export default function ChatView({
           onSearchChange={setSearchQuery}
           onBack={onBack}
           onStartVideoCall={onStartVideoCall}
+          onOpenNotificationSettings={() => setShowNotifSettings(true)}
+          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); }}
         />
 
         {searchOpen && searchQuery && (
@@ -136,8 +142,8 @@ export default function ChatView({
         />
       </div>
 
-      {/* Thread panel */}
-      {threadParent && (
+      {/* Side panels */}
+      {threadParent && !showSharedFiles && (
         <ThreadPanel
           parentMessage={threadParent}
           replies={threadReplies}
@@ -146,6 +152,24 @@ export default function ChatView({
           onSendReply={handleSendThreadReply}
           onClose={() => setThreadParent(null)}
         />
+      )}
+
+      {showSharedFiles && (
+        <SharedFilesGallery
+          conversationId={conversation.id}
+          profiles={profiles}
+          onClose={() => setShowSharedFiles(false)}
+        />
+      )}
+
+      {/* Notification settings popover */}
+      {showNotifSettings && (
+        <div className="absolute right-4 top-16 z-50 w-72 bg-card border border-border rounded-xl shadow-lg">
+          <NotificationSettings
+            conversation={conversation}
+            onClose={() => setShowNotifSettings(false)}
+          />
+        </div>
       )}
     </div>
   );

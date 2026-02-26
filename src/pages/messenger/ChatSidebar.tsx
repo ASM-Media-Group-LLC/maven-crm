@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -56,7 +57,10 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
       {/* Header */}
       <div className="shrink-0 p-4 pb-3 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground tracking-tight">Chats</h2>
+          <div>
+            <h2 className="text-lg font-bold text-foreground tracking-tight">Chats</h2>
+            <StatusPicker />
+          </div>
           <div className="flex gap-0.5">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
@@ -126,12 +130,13 @@ function ConversationItem({ conversation, isActive, onClick }: {
   onClick: () => void;
 }) {
   const isGroup = conversation.type === "group";
-  const { isOnline } = useOnlinePresence();
+  const { isOnline, getStatus } = useOnlinePresence();
 
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== conversation.created_by)
     : null;
   const online = otherParticipant ? isOnline(otherParticipant.user_id) : false;
+  const status = otherParticipant ? getStatus(otherParticipant.user_id) : null;
   const hasUnread = conversation.unreadCount > 0;
 
   const lastMsgPreview = conversation.lastMessage
@@ -166,7 +171,7 @@ function ConversationItem({ conversation, isActive, onClick }: {
         {!isGroup && (
           <span className={cn(
             "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card",
-            online ? "bg-success" : "bg-muted-foreground/30"
+            getStatusColor(status, online)
           )} />
         )}
       </div>
