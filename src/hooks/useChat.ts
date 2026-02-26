@@ -223,11 +223,14 @@ export function useChat() {
         return null;
       }
 
-      // Add both participants
-      await supabase.from("chat_participants").insert([
-        { conversation_id: newConv.id, user_id: user.id, role: "admin" },
-        { conversation_id: newConv.id, user_id: otherUserId, role: "member" },
-      ]);
+      // Add creator first (so RLS recognizes them as participant)
+      await supabase.from("chat_participants").insert(
+        { conversation_id: newConv.id, user_id: user.id, role: "admin" }
+      );
+      // Then add the other user
+      await supabase.from("chat_participants").insert(
+        { conversation_id: newConv.id, user_id: otherUserId, role: "member" }
+      );
 
       await loadConversations();
       return newConv.id;
@@ -251,16 +254,20 @@ export function useChat() {
         return null;
       }
 
-      const participants = [
-        { conversation_id: newConv.id, user_id: user.id, role: "admin" as const },
-        ...memberIds.map((id) => ({
-          conversation_id: newConv.id,
-          user_id: id,
-          role: "member" as const,
-        })),
-      ];
-
-      await supabase.from("chat_participants").insert(participants);
+      // Add creator first (so RLS recognizes them as participant)
+      await supabase.from("chat_participants").insert(
+        { conversation_id: newConv.id, user_id: user.id, role: "admin" }
+      );
+      // Then add members
+      if (memberIds.length > 0) {
+        await supabase.from("chat_participants").insert(
+          memberIds.map((id) => ({
+            conversation_id: newConv.id,
+            user_id: id,
+            role: "member" as const,
+          }))
+        );
+      }
       await loadConversations();
       toast.success(`Grupo "${name}" creado`);
       return newConv.id;
