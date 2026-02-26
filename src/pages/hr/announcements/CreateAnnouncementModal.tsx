@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateInput } from "@/components/ui/date-input";
 import { useCreateAnnouncement } from "./useAnnouncementsAdmin";
 
 const TYPES = [
@@ -31,12 +32,12 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
   const [message, setMessage] = useState("");
   const [type, setType] = useState("general");
   const [priority, setPriority] = useState("normal");
-  const [startsAt, setStartsAt] = useState(new Date().toISOString().slice(0, 16));
+  const [startsAt, setStartsAt] = useState(new Date().toISOString().slice(0, 10));
   const [expiresAt, setExpiresAt] = useState("");
 
   const reset = () => {
     setTitle(""); setMessage(""); setType("general"); setPriority("normal");
-    setStartsAt(new Date().toISOString().slice(0, 16)); setExpiresAt("");
+    setStartsAt(new Date().toISOString().slice(0, 10)); setExpiresAt("");
   };
 
   const handleSubmit = () => {
@@ -46,8 +47,8 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
       message: message.trim() || undefined,
       announcement_type: type,
       priority,
-      starts_at: new Date(startsAt).toISOString(),
-      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+      starts_at: startsAt ? new Date(startsAt + "T00:00:00").toISOString() : new Date().toISOString(),
+      expires_at: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
     }, {
       onSuccess: () => { reset(); onOpenChange(false); },
     });
@@ -91,11 +92,11 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha inicio</Label>
-              <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+              <DateInput value={startsAt} onChange={setStartsAt} placeholder="Fecha inicio" />
             </div>
             <div className="space-y-2">
               <Label>Expiración (opcional)</Label>
-              <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <DateInput value={expiresAt} onChange={setExpiresAt} placeholder="Sin expiración" />
             </div>
           </div>
         </div>
