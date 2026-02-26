@@ -7,11 +7,13 @@ import VideoCallView from "./VideoCallView";
 import NewChatModal from "./NewChatModal";
 import { ConversationWithDetails, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat } = useChat();
+  const { isOnline, onlineUsers } = useOnlinePresence();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
@@ -145,6 +147,7 @@ export default function MessengerPage() {
         onClose={() => setNewChatOpen(false)}
         profiles={profiles}
         onSelectUser={handleSelectUser}
+        isOnlineFn={isOnline}
       />
       <NewChatModal
         open={newGroupOpen}
@@ -153,6 +156,7 @@ export default function MessengerPage() {
         onSelectUser={() => {}}
         isGroup
         onCreateGroup={handleCreateGroup}
+        isOnlineFn={isOnline}
       />
     </div>
   );
