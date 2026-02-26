@@ -72,13 +72,20 @@ export function useReactions(conversationId: string | null) {
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
-    const existing = reactions.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
-    if (existing) {
-      // Optimistic delete
-      setReactions(prev => prev.filter(r => r.id !== existing.id));
-      await supabase.from("chat_reactions").delete().eq("id", existing.id);
+    // Use functional update to avoid stale closure on reactions
+    let existingId: string | null = null;
+    setReactions(prev => {
+      const found = prev.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+      if (found) {
+        existingId = found.id;
+        return prev.filter(r => r.id !== found.id);
+      }
+      return prev;
+    });
+
+    if (existingId) {
+      await supabase.from("chat_reactions").delete().eq("id", existingId);
     } else {
-      // Optimistic insert with temp id
       const tempId = crypto.randomUUID();
       const tempReaction: Reaction = {
         id: tempId,
@@ -96,14 +103,12 @@ export function useReactions(conversationId: string | null) {
       }).select().single();
       
       if (data) {
-        // Replace temp with real
         setReactions(prev => prev.map(r => r.id === tempId ? (data as Reaction) : r));
       } else if (error) {
-        // Rollback
         setReactions(prev => prev.filter(r => r.id !== tempId));
       }
     }
-  }, [user, reactions]);
+  }, [user]);
 
   // Track new messages added to the conversation
   const addMessageId = useCallback((msgId: string) => {

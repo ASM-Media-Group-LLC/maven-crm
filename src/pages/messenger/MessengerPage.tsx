@@ -41,7 +41,11 @@ export default function MessengerPage() {
     sendMessage, sendTyping, editMessage, deleteMessage,
   } = useMessages(activeChatId, handleNewMessage);
 
-  const { toggleReaction, getReactionsForMessage } = useReactions(activeChatId);
+  const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
+
+  // Keep messageIdsRef in sync with loaded messages
+  useMemo(() => { messages.forEach(m => addMessageId(m.id)); }, [messages, addMessageId]);
+
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
   const { getReadBy } = useReadReceipts(activeChatId, messageIds);
 
