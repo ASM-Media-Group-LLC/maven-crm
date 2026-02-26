@@ -6,15 +6,15 @@ import VideoRoomsPanel from "./VideoRoomsPanel";
 import VideoCallView from "./VideoCallView";
 import NewChatModal from "./NewChatModal";
 import { Chat, Message, VideoRoom, Contact } from "./types";
-import { mockChats, mockMessages, mockContacts, mockVideoRooms } from "./mockData";
+import { mockContacts } from "./mockData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function MessengerPage() {
-  const [chats, setChats] = useState<Chat[]>(mockChats);
-  const [messages, setMessages] = useState<Record<string, Message[]>>(mockMessages);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [videoRooms, setVideoRooms] = useState<VideoRoom[]>(mockVideoRooms);
+  const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [activeCall, setActiveCall] = useState<VideoRoom | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
