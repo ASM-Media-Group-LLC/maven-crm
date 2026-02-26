@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Users, UserPlus, Settings, TrendingUp, ChevronRight,
   Bot, CalendarDays, Activity, Megaphone, CheckSquare, Phone, Ticket, Palette, FileText, Shield, ClipboardCheck, Map,
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
+  MessageCircle,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
@@ -33,6 +34,7 @@ const DashboardSidebar = () => {
 
   const mainMenu = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: "Messenger", url: "/messenger", icon: MessageCircle },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays },
