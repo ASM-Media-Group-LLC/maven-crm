@@ -1,116 +1,91 @@
 
 
-## Plan: Header fijo, Quick Actions configurables y Sistema de Avisos Internos
+## Plan: Tarjeta de Avisos siempre visible + Módulo de Gestión de Anuncios
 
-### 1. Problema del header
+### Diagnóstico
 
-Actualmente el header del dashboard (título + botón Actualizar) está dentro del `<main>` scrolleable (línea 187-197 de `DashboardContent.tsx`). No es fijo — se desplaza con el contenido. Debe extraerse fuera del scroll, siguiendo el patrón estándar `shrink-0` + `flex-1 overflow-auto`.
+**Problema 1 — Cumpleaños/Avisos no se muestran**: La tarjeta "Avisos y Celebraciones" en `DashboardContent.tsx` (línea 359) está envuelta en una condición `hasBirthdaysOrAnnouncements` que la oculta completamente cuando no hay datos. Si no hay cumpleaños próximos ni anuncios creados, la tarjeta desaparece por completo. Esto hace que el usuario no sepa que existe.
 
-### 2. Quick Actions configurables
-
-El HR Dashboard ya tiene un sistema de Quick Actions configurables con localStorage que funciona bien (líneas 27-64, 323-361 de `HRDashboard.tsx`). Necesitamos replicar este mismo patrón en el Dashboard principal, pero con accesos a todos los módulos de la plataforma (no solo HR).
-
-### 3. Sistema de Avisos y Eventos Internos
-
-Necesitamos una infraestructura nueva para anuncios internos (cumpleaños, comunicados de HR, etc.) que se muestre en el dashboard.
-
----
+**Problema 2 — No existe UI para crear anuncios**: La tabla `internal_announcements` existe en la base de datos, y el hook `useAnnouncements` la consulta, pero no hay ninguna pantalla, modal ni formulario en toda la plataforma para crear, editar o eliminar anuncios. Solo se podría hacer directamente en la consola de Supabase.
 
 ### Cambios propuestos
 
 | # | Archivo | Cambio |
 |---|---------|--------|
-| 1 | `DashboardContent.tsx` | Extraer header fuera del `<main>` scrolleable, envolverlo en un `<header>` con `shrink-0 border-b` |
-| 2 | `DashboardContent.tsx` | Agregar sección Quick Actions configurable (mismo patrón que HR: catálogo, localStorage, modal de config con checkboxes, máximo 6 atajos) |
-| 3 | Migración SQL | Crear tabla `internal_announcements` para avisos de HR/admin |
-| 4 | `DashboardContent.tsx` | Agregar tarjeta "Avisos y Celebraciones" que muestre: cumpleaños del día/semana (desde `employees.birth_date`) + anuncios activos (desde `internal_announcements`) |
-| 5 | Hook nuevo | `useAnnouncements.ts` — queries para cumpleaños próximos y anuncios activos |
+| 1 | `DashboardContent.tsx` | Mostrar la tarjeta "Avisos y Celebraciones" siempre (eliminar condición `hasBirthdaysOrAnnouncements`). Cuando no haya datos, mostrar estado vacío con texto "Sin avisos por el momento" |
+| 2 | `src/pages/hr/HRAnnouncements.tsx` | Crear página completa de gestión de anuncios internos dentro del módulo HR, con tabla, filtros, y acciones CRUD |
+| 3 | `src/pages/hr/announcements/CreateAnnouncementModal.tsx` | Modal para crear nuevo anuncio (título, mensaje, tipo, prioridad, fecha inicio, fecha expiración) |
+| 4 | `src/pages/hr/announcements/EditAnnouncementModal.tsx` | Modal para editar anuncio existente |
+| 5 | `src/pages/hr/announcements/DeleteAnnouncementDialog.tsx` | Diálogo de confirmación para eliminar/desactivar anuncio |
+| 6 | `src/pages/hr/announcements/useAnnouncements.ts` | Hook con queries CRUD (crear, editar, desactivar, listar todos incluyendo inactivos y expirados) |
+| 7 | `src/App.tsx` | Agregar ruta `/hr/anuncios` |
+| 8 | `DashboardSidebar.tsx` o `HRLayout.tsx` | Agregar link de navegación al módulo de anuncios dentro de HR |
 
 ### Detalle técnico
 
-**Header fijo** — Cambio de estructura:
-```text
-Actual:
-  <main className="flex-1 overflow-auto p-6">
-    <div> ← Header (se scrollea)
-    <div> ← KPIs
-    ...
-
-Propuesto:
-  <header className="shrink-0 border-b px-6 py-4">
-    ← Header FIJO
-  </header>
-  <main className="flex-1 overflow-auto p-6">
-    <div> ← KPIs
-    ...
-```
-
-**Quick Actions** — Catálogo completo de la plataforma:
+**Fix de la tarjeta en el Dashboard** — Cambio mínimo:
 ```typescript
-const ALL_ACTIONS = [
-  { id: "contactos",    label: "Contactos",        icon: UserPlus,     url: "/contactos" },
-  { id: "tareas",       label: "Tareas",           icon: CheckSquare,  url: "/tareas" },
-  { id: "eventos",      label: "Eventos",          icon: CalendarDays, url: "/eventos" },
-  { id: "creadores",    label: "Creadoras",        icon: Users,        url: "/creadores" },
-  { id: "leadgen",      label: "Lead Gen",         icon: MessageSquare,url: "/leadgen" },
-  { id: "closers",      label: "Closers",          icon: Phone,        url: "/closers" },
-  { id: "tickets",      label: "Tickets",          icon: Ticket,       url: "/tickets" },
-  { id: "hr",           label: "Recursos Humanos", icon: Briefcase,    url: "/hr" },
-  { id: "finanzas",     label: "Finanzas",         icon: DollarSign,   url: "/finanzas" },
-  { id: "promolog",     label: "Promolog",         icon: Megaphone,    url: "/promolog" },
-  { id: "sales",        label: "Sales Dashboard",  icon: TrendingUp,   url: "/sales" },
-  { id: "admin",        label: "Administración",   icon: Settings,     url: "/admin/usuarios" },
-];
-```
-Se filtran con `usePermissions().canAccess()` para solo mostrar módulos accesibles. Se persiste en `localStorage` con key `dashboard_quick_actions`. Máximo 6 atajos. Modal de configuración idéntico al de HR.
+// Antes (línea 359):
+{hasBirthdaysOrAnnouncements ? (
+  <Card>...</Card>
+) : null}
 
-**Tabla `internal_announcements`**:
-```sql
-create table public.internal_announcements (
-  id uuid primary key default gen_random_uuid(),
-  title text not null,
-  message text,
-  announcement_type text not null default 'general',
-    -- tipos: 'general', 'birthday', 'holiday', 'policy', 'celebration'
-  priority text not null default 'normal',
-    -- 'low', 'normal', 'high'
-  is_active boolean not null default true,
-  starts_at timestamptz not null default now(),
-  expires_at timestamptz,
-  created_by uuid not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.internal_announcements enable row level security;
-
-create policy "Authenticated users can read announcements"
-  on public.internal_announcements for select
-  to authenticated using (true);
-
-create policy "Admins and managers can manage announcements"
-  on public.internal_announcements for all
-  to authenticated using (true) with check (true);
+// Después:
+<Card>
+  {birthdays.length === 0 && announcements.length === 0 ? (
+    <div className="text-center text-sm text-muted-foreground py-8">
+      Sin avisos por el momento
+    </div>
+  ) : (
+    // ... contenido actual de cumpleaños y anuncios
+  )}
+</Card>
 ```
 
-**Hook `useAnnouncements`**:
+**Página de Gestión de Anuncios** (`/hr/anuncios`):
+- Layout estándar: header fijo (`text-xl font-semibold`), KPIs (activos, expirados, alta prioridad), tabla con columnas: Título, Tipo, Prioridad, Inicio, Expiración, Estado
+- Filtros por tipo (`general`, `policy`, `celebration`, `holiday`) y prioridad
+- Botón "Nuevo Anuncio" que abre modal con formulario
+- Acciones por fila: Editar, Desactivar/Activar, Eliminar
+- Acceso restringido por permisos (admin y managers vía `usePermissions`)
+
+**Modal de Creación**:
 ```typescript
-// Cumpleaños: consulta employees donde birth_date día/mes coincida con hoy o próximos 7 días
-// Anuncios: consulta internal_announcements donde is_active=true, starts_at <= now, (expires_at is null OR expires_at > now)
+// Campos del formulario:
+- title: text (requerido)
+- message: textarea (opcional, para detalles)
+- announcement_type: select ['general', 'policy', 'celebration', 'holiday']
+- priority: select ['low', 'normal', 'high']
+- starts_at: datetime (default: ahora)
+- expires_at: datetime (opcional, null = sin expiración)
 ```
 
-**Tarjeta "Avisos y Celebraciones"** en el dashboard:
-- Icono de pastel para cumpleaños, megáfono para anuncios generales
-- Muestra nombre del empleado + "¡Cumple años hoy!" o "Cumple el [fecha]"
-- Anuncios con badge de prioridad (high = destructive, normal = secondary)
-- Si no hay avisos: "Sin avisos por el momento"
-- Se ubica en Row 2, reemplazando o compartiendo espacio con Actividad Reciente
+**Hook CRUD**:
+```typescript
+// useAnnouncementsAdmin — para la página de gestión
+const useAnnouncementsAdmin = () => useQuery({
+  queryKey: ["admin-announcements"],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from("internal_announcements")
+      .select("*")
+      .order("created_at", { ascending: false });
+    return data;
+  },
+});
+
+// Mutations: insert, update (is_active toggle), delete
+```
+
+### Ubicación en la navegación
+
+El módulo de anuncios se ubicará dentro de HR como un submódulo. En el sidebar de HR se agregará un enlace "Anuncios Internos" con icono `Megaphone`. También se puede acceder desde el dashboard si se incluye en las Quick Actions.
 
 ### Orden de implementación
 
-1. Migración SQL: tabla `internal_announcements`
-2. Fix header fijo en `DashboardContent.tsx`
-3. Quick Actions configurables (catálogo, localStorage, modal)
-4. Hook `useAnnouncements.ts` (cumpleaños + anuncios)
-5. Tarjeta "Avisos y Celebraciones" en el dashboard
+1. Fix tarjeta dashboard — mostrar siempre con estado vacío
+2. Hook CRUD para gestión de anuncios (`useAnnouncementsAdmin`)
+3. Página `/hr/anuncios` con tabla y filtros
+4. Modales de crear, editar y eliminar
+5. Ruta en `App.tsx` + link en navegación HR
 
