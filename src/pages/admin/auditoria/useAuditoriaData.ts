@@ -27,7 +27,17 @@ export interface AuditoriaSummary {
 
 export interface RoleMatrixEntry {
   role_name: string;
-  modules: Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>;
+  modules: Record<string, { can_view: boolean; data_scope: string }>;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id: string;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface AuditoriaData {
@@ -35,27 +45,34 @@ export interface AuditoriaData {
   health_checks: { critical: number; high: number; medium: number; low: number; details: HealthCheckDetail[] };
   users: AuditoriaUser[];
   role_matrix: Record<string, RoleMatrixEntry>;
+  audit_entries: AuditLogEntry[];
+  profilesMap: Record<string, string>;
 }
 
 export const useAuditoriaData = () => {
   return useQuery({
     queryKey: ["auditoria-roles"],
     queryFn: async (): Promise<AuditoriaData> => {
-      // Fetch all data in parallel
-      const [profilesRes, userRolesRes, rolesRes, permissionsRes] = await Promise.all([
+      const [profilesRes, userRolesRes, rolesRes, permissionsRes, auditRes] = await Promise.all([
         supabase.from("profiles").select("id, full_name"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("roles_config").select("*"),
         supabase.from("role_permissions").select("*"),
+        supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(100),
       ]);
 
       const profiles = profilesRes.data || [];
       const userRoles = userRolesRes.data || [];
       const roles = rolesRes.data || [];
       const permissions = permissionsRes.data || [];
+      const auditEntries = (auditRes.data || []) as AuditLogEntry[];
 
-      // Build role id -> name map
-      const roleIdToName = new Map(roles.map((r) => [r.id, r.name]));
+      // Build profiles map for activity log
+      const profilesMap: Record<string, string> = {};
+      for (const p of profiles) {
+        profilesMap[p.id] = p.full_name || "Sin nombre";
+      }
+
       const validRoleIds = new Set(roles.map((r) => r.id));
 
       // Build users with roles
@@ -87,7 +104,6 @@ export const useAuditoriaData = () => {
         });
       }
 
-      // Orphan permissions
       const orphanPerms = permissions.filter((p) => !validRoleIds.has(p.role_id));
       for (const op of orphanPerms) {
         details.push({
@@ -102,24 +118,22 @@ export const useAuditoriaData = () => {
       const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
       for (const d of details) severityCounts[d.priority]++;
 
-      // Role matrix from valid permissions
+      // Role matrix - correctly map can_access and data_scope
       const activeRoles = roles.filter((r) => r.is_active);
       const roleMatrix: Record<string, RoleMatrixEntry> = {};
 
       for (const role of activeRoles) {
         const rolePerms = permissions.filter((p) => p.role_id === role.id);
-        const modules: Record<string, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }> = {};
+        const modules: Record<string, { can_view: boolean; data_scope: string }> = {};
 
         for (const perm of rolePerms) {
           if (!perm.module) continue;
-          // The role_permissions table uses can_access and data_scope
-          // We'll map submodule patterns to permissions
-          const key = perm.submodule ? `${perm.module}.${perm.submodule}` : perm.module;
           if (!modules[perm.module]) {
-            modules[perm.module] = { can_view: false, can_create: false, can_edit: false, can_delete: false };
+            modules[perm.module] = { can_view: false, data_scope: "all" };
           }
           if (perm.can_access) {
             modules[perm.module].can_view = true;
+            modules[perm.module].data_scope = perm.data_scope || "all";
           }
         }
 
@@ -138,6 +152,8 @@ export const useAuditoriaData = () => {
         health_checks: { ...severityCounts, details },
         users,
         role_matrix: roleMatrix,
+        audit_entries: auditEntries,
+        profilesMap,
       };
     },
   });

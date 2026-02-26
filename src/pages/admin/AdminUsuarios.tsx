@@ -87,16 +87,16 @@ const AdminUsuarios = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="flex h-screen w-full overflow-hidden">
         <DashboardSidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <DashboardTopbar />
           <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
             {/* Fixed Header */}
             <header className="bg-background px-6 pt-6 pb-4 border-b shrink-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
+                  <h1 className="text-xl font-semibold">Gestión de Usuarios</h1>
                   <p className="text-muted-foreground">Administra los usuarios y roles de la plataforma</p>
                 </div>
                 {activeTab === "usuarios" ? (
