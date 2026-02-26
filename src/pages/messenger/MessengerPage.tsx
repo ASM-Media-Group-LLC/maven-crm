@@ -133,7 +133,7 @@ export default function MessengerPage() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background">
+    <div className="h-full flex overflow-hidden bg-background">
       {/* Chat sidebar - always visible on desktop, toggled on mobile */}
       <div className={cn(
         "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
