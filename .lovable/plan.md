@@ -1,109 +1,108 @@
 
 
-## Plan: Estandarizar Auditoría de Roles y completar funcionalidades de gestión RBAC
+## Plan: Mejoras al Dashboard Principal
 
-### Problemas de layout/estructura identificados
+### Problemas identificados
 
-1. **AuditoriaSummaryCards usa divs manuales** en vez de `DashboardMetricCard` — sin hover estándar
-2. **Inconsistencia de header entre AdminUsuarios y AuditoriaRoles**:
-   - AdminUsuarios: `text-2xl font-bold` (incorrecto según estándar)
-   - AuditoriaRoles: `text-xl font-semibold` (correcto)
-   - Ambas deberían usar `text-xl font-semibold`
-3. **Tabs en posición diferente**: En Auditoría están en el header fijo; en AdminUsuarios están en el área scrolleable. Según el estándar (Header → KPIs → Tabs → Filtros), los tabs van después de los KPIs en el área scrolleable
-4. **Sin navegación de retorno**: Auditoría no tiene breadcrumb ni ArrowLeft para volver a AdminUsuarios
-5. **AdminUsuarios usa `min-h-screen`** en vez del estándar `h-screen overflow-hidden`
+1. **Datos falsos hardcodeados**: El gráfico "Rendimiento Semanal" usa `weeklyData` y `dealsWeekly` estáticos (líneas 85-103) — nunca consulta la DB. "Promotion Compliance" está fijo en "39%". La tarjeta "Scripts and Tools" muestra "--" en todo. "Closers > En llamada" muestra "--".
 
-### Funcionalidades faltantes para RBAC robusto
+2. **Header no sigue el estándar**: Usa `text-2xl font-bold` en vez de `text-xl font-semibold`. Los botones "Actualizar" y "Exportar" no hacen nada (sin onClick handler funcional).
 
-6. **Sin log de auditoría de cambios**: Cuando se cambia un rol, se elimina un usuario o se modifican permisos, no queda registro. Se necesita una tabla `audit_log` y mostrar el historial en la pestaña de auditoría
-7. **La matriz de permisos solo muestra `can_view`**: El `useAuditoriaData` solo mapea `can_access` → `can_view`, dejando `can_create/can_edit/can_delete` siempre en false. La matriz es incorrecta
-8. **Sin filtro por rol en la tabla de usuarios de auditoría**: Solo hay búsqueda por nombre, falta filtrar por rol o por estado (con/sin rol)
-9. **Sin exportación del reporte de auditoría**: No hay forma de descargar el estado actual de roles/permisos
+3. **Sin adaptación por rol**: El dashboard muestra lo mismo para admin, manager, agent, closer y supervisor. Un closer no necesita ver pipeline de leads; un agente no necesita ver deals.
+
+4. **Sin datos de HR ni Finanzas**: El dashboard no refleja dos módulos completos de la plataforma — no hay KPIs de empleados, ausencias, nómina, ni ingresos totales de la empresa.
+
+5. **Sin datos de Tareas/Eventos pendientes**: No muestra tareas próximas a vencer ni eventos del día, que son módulos activos de la plataforma.
+
+6. **La tarjeta "Actividad Reciente" solo muestra tickets**: Debería ser un feed multi-fuente (tickets + tareas + eventos + cambios de rol).
+
+7. **No usa el layout estándar `h-screen overflow-hidden`**: Usa `flex-1 overflow-auto` directamente sin el wrapper de pantalla completa del `Dashboard.tsx`.
 
 ### Cambios propuestos
 
-| # | Archivo | Cambio |
-|---|---------|--------|
-| 1 | `src/pages/admin/auditoria/AuditoriaSummaryCards.tsx` | Reemplazar divs manuales por `DashboardMetricCard` con prop `color` |
-| 2 | `src/pages/admin/AuditoriaRoles.tsx` | Mover tabs al área scrolleable (después de KPIs), agregar breadcrumb de retorno a Admin, ajustar layout a `h-screen overflow-hidden` |
-| 3 | `src/pages/admin/AdminUsuarios.tsx` | Fix header: `text-xl font-semibold`, fix container: `h-screen overflow-hidden` |
-| 4 | `src/pages/admin/auditoria/useAuditoriaData.ts` | Fix matriz: mapear `can_access` a los 4 permisos granulares según el `data_scope` real, o al menos reflejar correctamente que solo hay `can_access` |
-| 5 | `src/pages/admin/AuditoriaRoles.tsx` | Agregar filtro por rol y por estado (con/sin rol) en la pestaña Resumen |
-| 6 | Migración SQL | Crear tabla `audit_log` (user_id, action, target_type, target_id, details jsonb, created_at) con trigger en `user_roles` para registrar cambios automáticamente |
-| 7 | `src/pages/admin/auditoria/useAuditoriaData.ts` | Agregar query de `audit_log` al fetch de datos |
-| 8 | `src/pages/admin/auditoria/AuditoriaActivityLog.tsx` | Nuevo componente: timeline de cambios recientes (quién cambió qué rol, cuándo) |
-| 9 | `src/pages/admin/AuditoriaRoles.tsx` | Agregar pestaña "Actividad" con el log de cambios |
+| # | Cambio | Detalle |
+|---|--------|---------|
+| 1 | **Eliminar datos fake** | Reemplazar `weeklyData`/`dealsWeekly` por queries reales a `leads` y `deals` agrupados por día de la semana actual. Calcular compliance real desde `eventos` o eliminar si no hay fuente |
+| 2 | **Fix header** | `text-xl font-semibold`, botón Actualizar con `queryClient.invalidateQueries()`, eliminar botón Exportar (no tiene sentido en dashboard) |
+| 3 | **Agregar KPIs de HR y Finanzas** | Nueva fila de KPIs: Total Empleados (desde `employees`), Ausencias Hoy (desde `absences`), Tareas Vencidas (desde `tasks`), Eventos Hoy (desde `events`) |
+| 4 | **Actividad Reciente multi-fuente** | Fusionar últimos tickets, tareas completadas y eventos recientes en un timeline unificado ordenado por fecha, con iconos diferenciados por tipo |
+| 5 | **Gráfico semanal con datos reales** | Query de `leads` y `deals` de la semana actual agrupados por `day_of_week(created_at)` |
+| 6 | **Reemplazar tarjeta "Scripts and Tools"** | No tiene datos reales. Sustituir por "Tareas Pendientes" o "Eventos Próximos" con datos de `tasks`/`events` |
+| 7 | **Dashboard adaptativo por rol** | Usar `usePermissions` para mostrar solo las secciones a las que el usuario tiene acceso. Si no tiene acceso a LeadGen, ocultar pipeline y leads KPI |
 
 ### Detalle técnico
 
-**Tabla `audit_log`**:
-```sql
-create table public.audit_log (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  action text not null,           -- 'role_assigned', 'role_removed', 'permission_changed', 'user_created', 'user_deleted'
-  target_type text not null,      -- 'user', 'role', 'permission'
-  target_id text,
-  details jsonb default '{}',
-  created_at timestamptz default now()
-);
-
--- Trigger en user_roles para auto-log
-create or replace function log_role_change() returns trigger as $$
-begin
-  if TG_OP = 'INSERT' then
-    insert into audit_log (user_id, action, target_type, target_id, details)
-    values (NEW.user_id, 'role_assigned', 'user', NEW.user_id::text,
-            jsonb_build_object('role', NEW.role));
-  elsif TG_OP = 'DELETE' then
-    insert into audit_log (user_id, action, target_type, target_id, details)
-    values (OLD.user_id, 'role_removed', 'user', OLD.user_id::text,
-            jsonb_build_object('role', OLD.role));
-  end if;
-  return coalesce(NEW, OLD);
-end;
-$$ language plpgsql security definer;
-```
-
-**Fix de la matriz**: El sistema actual de `role_permissions` solo tiene `can_access` y `data_scope`, no tiene `can_create/can_edit/can_delete` como columnas separadas. La matriz debería mostrar solo "Acceso" (sí/no) y "Alcance" (all/subordinates/self) por módulo, en vez de fingir 4 columnas CRUD que siempre son falsas.
-
-**AuditoriaSummaryCards → DashboardMetricCard**:
+**Datos reales para gráfico semanal**:
 ```typescript
-// De:
-<div className="rounded-lg border bg-card p-4 flex items-center gap-3">...
-
-// A:
-<DashboardMetricCard
-  label="Total Usuarios"
-  value={String(summary.total_users)}
-  icon={Users}
-  color="primary"
-/>
+const useWeeklyStats = () => useQuery({
+  queryKey: ["dashboard-weekly"],
+  queryFn: async () => {
+    const startOfWeek = // lunes de esta semana
+    const { data: leads } = await supabase
+      .from("leads")
+      .select("created_at")
+      .gte("created_at", startOfWeek.toISOString());
+    const { data: deals } = await supabase
+      .from("deals")
+      .select("created_at")
+      .gte("created_at", startOfWeek.toISOString());
+    // Agrupar por día → [{day: "Lun", leads: 5, deals: 2}, ...]
+  },
+});
 ```
 
-**Layout de Auditoría estandarizado**:
-```text
-┌─────────────────────────────────┐
-│ Header fijo (shrink-0)          │
-│ ← Breadcrumb: Admin > Auditoría│
-│ Auditoría de Roles              │
-│ Descripción                     │
-├─────────────────────────────────┤
-│ Área scrolleable (flex-1)       │
-│ ┌─ KPIs (DashboardMetricCard) ─┐│
-│ ├─ Tabs [Resumen|Matriz|Log]  ─┤│
-│ ├─ Filtros + Search           ─┤│
-│ ├─ Contenido                  ─┤│
-│ └──────────────────────────────┘│
-└─────────────────────────────────┘
+**KPIs adicionales (HR + Tareas + Eventos)**:
+```typescript
+const useOperationalKPIs = () => useQuery({
+  queryKey: ["dashboard-operational"],
+  queryFn: async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const [employees, absences, overdueTasks, todayEvents] = await Promise.all([
+      supabase.from("employees").select("id", { count: "exact", head: true }),
+      supabase.from("absences").select("id", { count: "exact", head: true })
+        .eq("date", today),
+      supabase.from("tasks").select("id", { count: "exact", head: true })
+        .lt("due_date", today).neq("status", "done"),
+      supabase.from("events").select("id", { count: "exact", head: true })
+        .eq("event_date", today),
+    ]);
+    return { employees, absences, overdueTasks, todayEvents };
+  },
+});
+```
+
+**Actividad reciente multi-fuente**:
+```typescript
+// Merge tickets + tareas + eventos recientes
+const recentActivity = [
+  ...tickets.map(t => ({ type: 'ticket', title: t.title, date: t.created_at, icon: Ticket })),
+  ...tasks.map(t => ({ type: 'task', title: t.title, date: t.updated_at, icon: CheckSquare })),
+  ...events.map(e => ({ type: 'event', title: e.name, date: e.created_at, icon: Calendar })),
+].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+```
+
+**Dashboard adaptativo**:
+```typescript
+const { canAccess } = usePermissions();
+// Solo mostrar secciones según permisos
+{canAccess("leadgen") && <PipelineCard />}
+{canAccess("closers") && <ClosersCard />}
+{canAccess("hr") && <HRKPIs />}
 ```
 
 ### Orden de implementación
 
-1. Migración SQL: tabla `audit_log` + trigger en `user_roles`
-2. Fix layouts: AuditoriaRoles y AdminUsuarios (header, container, tabs position)
-3. AuditoriaSummaryCards → DashboardMetricCard
-4. Fix matriz de permisos (mostrar acceso + alcance en vez de CRUD falso)
-5. Agregar filtros por rol/estado en tabla de usuarios
-6. Componente AuditoriaActivityLog + pestaña "Actividad"
+1. Fix header (estándar + botón Actualizar funcional)
+2. Reemplazar datos fake por queries reales (leads/deals semanales)
+3. Agregar KPIs operacionales (empleados, ausencias, tareas vencidas, eventos hoy)
+4. Actividad reciente multi-fuente
+5. Reemplazar "Scripts and Tools" por "Tareas Pendientes"
+6. Integrar `usePermissions` para secciones adaptativas por rol
+
+### Impacto
+
+- Dashboard pasa de ser 40% datos fake a 100% datos reales
+- Refleja toda la plataforma (HR, Finanzas, Tareas, Eventos) en vez de solo Sales + Tickets
+- Se adapta al rol del usuario mostrando solo lo relevante
+- Header y layout siguen el estándar de la plataforma
 
