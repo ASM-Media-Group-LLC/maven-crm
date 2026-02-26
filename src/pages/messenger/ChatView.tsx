@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
 import MessageInput from "./components/MessageInput";
+import ThreadPanel from "./components/ThreadPanel";
+import SearchResultsBar from "./components/SearchResultsBar";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
@@ -33,45 +35,118 @@ export default function ChatView({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchIndex, setSearchIndex] = useState(0);
+  const [threadParent, setThreadParent] = useState<ChatMessage | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return messages.filter(m => m.content?.toLowerCase().includes(q) && !m.is_deleted);
+  }, [messages, searchQuery]);
+
+  // Reset search index when query changes
+  useEffect(() => { setSearchIndex(0); }, [searchQuery]);
+
+  // Navigate to search result
+  const handleSearchNavigate = useCallback((index: number) => {
+    setSearchIndex(index);
+    const msg = searchResults[index];
+    if (msg) setHighlightedMsgId(msg.id);
+  }, [searchResults]);
+
+  // Thread replies
+  const threadReplies = useMemo(() => {
+    if (!threadParent) return [];
+    return messages.filter(m => m.reply_to_id === threadParent.id);
+  }, [threadParent, messages]);
+
+  const handleSendThreadReply = useCallback((content: string) => {
+    if (!threadParent) return;
+    onSendMessage(content, "text", undefined, undefined, threadParent.id);
+  }, [threadParent, onSendMessage]);
+
+  // Get thread reply count for a message
+  const getThreadCount = useCallback((messageId: string) => {
+    return messages.filter(m => m.reply_to_id === messageId).length;
+  }, [messages]);
+
+  const handleOpenThread = useCallback((msg: ChatMessage) => {
+    // If msg is a reply, open the parent thread
+    if (msg.reply_to_id) {
+      const parent = messages.find(m => m.id === msg.reply_to_id);
+      if (parent) { setThreadParent(parent); return; }
+    }
+    setThreadParent(msg);
+  }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <ChatHeader
-        conversation={conversation}
-        profiles={profiles}
-        typingUsers={typingUsers}
-        searchOpen={searchOpen}
-        searchQuery={searchQuery}
-        onSearchToggle={() => { setSearchOpen(!searchOpen); setSearchQuery(""); }}
-        onSearchChange={setSearchQuery}
-        onBack={onBack}
-        onStartVideoCall={onStartVideoCall}
-      />
+    <div className="flex h-full bg-background">
+      <div className="flex flex-col flex-1 min-w-0">
+        <ChatHeader
+          conversation={conversation}
+          profiles={profiles}
+          typingUsers={typingUsers}
+          searchOpen={searchOpen}
+          searchQuery={searchQuery}
+          onSearchToggle={() => { setSearchOpen(!searchOpen); setSearchQuery(""); setHighlightedMsgId(null); }}
+          onSearchChange={setSearchQuery}
+          onBack={onBack}
+          onStartVideoCall={onStartVideoCall}
+        />
 
-      <MessageList
-        messages={messages}
-        profiles={profiles}
-        chatType={conversation.type}
-        currentUserId={user?.id}
-        searchQuery={searchQuery}
-        loading={loading}
-        onReply={setReplyTo}
-        onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
-        onEdit={onEditMessage}
-        onDelete={onDeleteMessage}
-        getReactionsForMessage={getReactionsForMessage}
-        onToggleReaction={onToggleReaction}
-        getReadByUsers={getReadByUsers}
-        totalParticipants={conversation.participants.length}
-      />
+        {searchOpen && searchQuery && (
+          <SearchResultsBar
+            results={searchResults}
+            currentIndex={searchIndex}
+            query={searchQuery}
+            profiles={profiles}
+            onNavigate={handleSearchNavigate}
+            onClose={() => { setSearchOpen(false); setSearchQuery(""); setHighlightedMsgId(null); }}
+          />
+        )}
 
-      <MessageInput
-        onSendMessage={onSendMessage}
-        onSendTyping={onSendTyping}
-        replyTo={replyTo}
-        profiles={profiles}
-        onCancelReply={() => setReplyTo(null)}
-      />
+        <MessageList
+          messages={messages}
+          profiles={profiles}
+          chatType={conversation.type}
+          currentUserId={user?.id}
+          searchQuery={searchQuery}
+          loading={loading}
+          onReply={setReplyTo}
+          onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
+          onEdit={onEditMessage}
+          onDelete={onDeleteMessage}
+          getReactionsForMessage={getReactionsForMessage}
+          onToggleReaction={onToggleReaction}
+          getReadByUsers={getReadByUsers}
+          totalParticipants={conversation.participants.length}
+          highlightedMsgId={highlightedMsgId}
+          onOpenThread={handleOpenThread}
+          getThreadCount={getThreadCount}
+        />
+
+        <MessageInput
+          onSendMessage={onSendMessage}
+          onSendTyping={onSendTyping}
+          replyTo={replyTo}
+          profiles={profiles}
+          onCancelReply={() => setReplyTo(null)}
+        />
+      </div>
+
+      {/* Thread panel */}
+      {threadParent && (
+        <ThreadPanel
+          parentMessage={threadParent}
+          replies={threadReplies}
+          profiles={profiles}
+          currentUserId={user?.id}
+          onSendReply={handleSendThreadReply}
+          onClose={() => setThreadParent(null)}
+        />
+      )}
     </div>
   );
 }

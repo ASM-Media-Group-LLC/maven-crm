@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
+import { cn } from "@/lib/utils";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -19,6 +20,9 @@ interface MessageListProps {
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
   totalParticipants: number;
+  highlightedMsgId?: string | null;
+  onOpenThread: (msg: ChatMessage) => void;
+  getThreadCount: (messageId: string) => number;
 }
 
 function formatDateSeparator(dateStr: string): string {
@@ -47,22 +51,30 @@ function groupMessages(messages: ChatMessage[]) {
 
 function isSameGroup(a: ChatMessage, b: ChatMessage): boolean {
   if (a.sender_id !== b.sender_id) return false;
-  const diff = Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  return diff < 120000;
+  return Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 120000;
 }
 
 export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
   loading, onReply, onCopy, onEdit, onDelete,
   getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
+  highlightedMsgId, onOpenThread, getThreadCount,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Scroll to highlighted message
+  useEffect(() => {
+    if (highlightedMsgId && msgRefs.current[highlightedMsgId]) {
+      msgRefs.current[highlightedMsgId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightedMsgId]);
 
   const groups = groupMessages(messages);
 
@@ -104,28 +116,40 @@ export default function MessageList({
               const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
               const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
               const isLastInGroup = !nextMsg || !isSameGroup(msg, nextMsg);
+              const isHighlighted = highlightedMsgId === msg.id;
+              const threadCount = getThreadCount(msg.id);
 
               return (
-                <MessageBubble
+                <div
                   key={msg.id}
-                  message={msg}
-                  isMe={isMe}
-                  chatType={chatType}
-                  profiles={profiles}
-                  highlight={searchQuery.toLowerCase()}
-                  onReply={() => onReply(msg)}
-                  onCopy={() => onCopy(msg.content || "")}
-                  onEdit={(content) => onEdit(msg.id, content)}
-                  onDelete={() => onDelete(msg.id)}
-                  replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
-                  showAvatar={isLastInGroup && !isMe}
-                  showSender={isFirstInGroup && !isMe}
-                  isLastInGroup={isLastInGroup}
-                  reactions={getReactionsForMessage(msg.id)}
-                  onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
-                  readByUsers={getReadByUsers(msg.id)}
-                  totalParticipants={totalParticipants}
-                />
+                  ref={el => { msgRefs.current[msg.id] = el; }}
+                  className={cn(
+                    "transition-colors duration-700",
+                    isHighlighted && "bg-primary/10 rounded-lg"
+                  )}
+                >
+                  <MessageBubble
+                    message={msg}
+                    isMe={isMe}
+                    chatType={chatType}
+                    profiles={profiles}
+                    highlight={searchQuery.toLowerCase()}
+                    onReply={() => onReply(msg)}
+                    onCopy={() => onCopy(msg.content || "")}
+                    onEdit={(content) => onEdit(msg.id, content)}
+                    onDelete={() => onDelete(msg.id)}
+                    replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
+                    showAvatar={isLastInGroup && !isMe}
+                    showSender={isFirstInGroup && !isMe}
+                    isLastInGroup={isLastInGroup}
+                    reactions={getReactionsForMessage(msg.id)}
+                    onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
+                    readByUsers={getReadByUsers(msg.id)}
+                    totalParticipants={totalParticipants}
+                    threadCount={threadCount}
+                    onOpenThread={() => onOpenThread(msg)}
+                  />
+                </div>
               );
             })}
           </div>
