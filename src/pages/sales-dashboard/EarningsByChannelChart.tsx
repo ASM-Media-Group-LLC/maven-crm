@@ -10,10 +10,12 @@ import {
 } from "recharts";
 import { format } from "date-fns";
 import type { EarningsRow } from "../sales-performance/types";
+import type { EarningsMode } from "./DashboardFilters";
 
 interface Props {
   rows: EarningsRow[];
   comparedRows?: EarningsRow[];
+  earningsMode: EarningsMode;
 }
 
 const CHANNELS = [
@@ -25,50 +27,56 @@ const CHANNELS = [
 
 type ChannelKey = (typeof CHANNELS)[number]["key"];
 
-const EarningsByChannelChart = ({ rows }: Props) => {
-  const { chartData, channelTotals, grandTotal } = useMemo(() => {
-    const dailyMap = new Map<string, Record<ChannelKey, number>>();
-    const totals: Record<ChannelKey, number> = {
-      subscription_gross: 0,
-      tips_gross: 0,
-      message_gross: 0,
-      other: 0,
-    };
+const NET_FACTOR = 0.80;
 
-    for (const r of rows) {
-      const day = r.effective_date;
-      if (!dailyMap.has(day)) {
-        dailyMap.set(day, { subscription_gross: 0, tips_gross: 0, message_gross: 0, other: 0 });
-      }
-      const entry = dailyMap.get(day)!;
-      const sub = r.subscription_gross ?? 0;
-      const tips = r.tips_gross ?? 0;
-      const msg = r.message_gross ?? 0;
-      const total = r.total_earnings_gross ?? 0;
-      const other = Math.max(0, total - sub - tips - msg);
+const buildChannelData = (rows: EarningsRow[], mode: EarningsMode) => {
+  const factor = mode === "net" ? NET_FACTOR : 1;
+  const dailyMap = new Map<string, Record<ChannelKey, number>>();
+  const totals: Record<ChannelKey, number> = {
+    subscription_gross: 0,
+    tips_gross: 0,
+    message_gross: 0,
+    other: 0,
+  };
 
-      entry.subscription_gross += sub;
-      entry.tips_gross += tips;
-      entry.message_gross += msg;
-      entry.other += other;
-
-      totals.subscription_gross += sub;
-      totals.tips_gross += tips;
-      totals.message_gross += msg;
-      totals.other += other;
+  for (const r of rows) {
+    const day = r.effective_date;
+    if (!dailyMap.has(day)) {
+      dailyMap.set(day, { subscription_gross: 0, tips_gross: 0, message_gross: 0, other: 0 });
     }
+    const entry = dailyMap.get(day)!;
+    const sub = (r.subscription_gross ?? 0) * factor;
+    const tips = (r.tips_gross ?? 0) * factor;
+    const msg = (r.message_gross ?? 0) * factor;
+    const total = (r.total_earnings_gross ?? 0) * factor;
+    const other = Math.max(0, total - sub - tips - msg);
 
-    const sorted = Array.from(dailyMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, vals]) => ({
-        label: format(new Date(date + "T12:00:00"), "MMM d"),
-        ...vals,
-      }));
+    entry.subscription_gross += sub;
+    entry.tips_gross += tips;
+    entry.message_gross += msg;
+    entry.other += other;
 
-    const gt = totals.subscription_gross + totals.tips_gross + totals.message_gross + totals.other;
+    totals.subscription_gross += sub;
+    totals.tips_gross += tips;
+    totals.message_gross += msg;
+    totals.other += other;
+  }
 
-    return { chartData: sorted, channelTotals: totals, grandTotal: gt };
-  }, [rows]);
+  const sorted = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, vals]) => ({
+      label: format(new Date(date + "T12:00:00"), "MMM d"),
+      ...vals,
+    }));
+
+  const gt = totals.subscription_gross + totals.tips_gross + totals.message_gross + totals.other;
+
+  return { chartData: sorted, channelTotals: totals, grandTotal: gt };
+};
+
+const EarningsByChannelChart = ({ rows, comparedRows, earningsMode }: Props) => {
+  const { chartData, channelTotals, grandTotal } = useMemo(() => buildChannelData(rows, earningsMode), [rows, earningsMode]);
+  const compData = useMemo(() => comparedRows ? buildChannelData(comparedRows, earningsMode) : null, [comparedRows, earningsMode]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-6 space-y-4">
@@ -132,16 +140,26 @@ const EarningsByChannelChart = ({ rows }: Props) => {
             const total = channelTotals[ch.key];
             const pct = grandTotal > 0 ? (total / grandTotal) * 100 : 0;
             return (
-              <div key={ch.key} className="flex items-center gap-2 text-xs">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: ch.color }}
-                />
-                <span className="text-muted-foreground flex-1 truncate">{ch.label}</span>
-                <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
-                <span className="font-medium text-foreground tabular-nums">
-                  ${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </span>
+              <div key={ch.key} className="space-y-0.5">
+                <div className="flex items-center gap-2 text-xs">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: ch.color }}
+                  />
+                  <span className="text-muted-foreground flex-1 truncate">{ch.label}</span>
+                  <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                  <span className="font-medium text-foreground tabular-nums">
+                    ${total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+                {compData && (
+                  <div className="flex items-center gap-2 text-[10px] pl-[18px]">
+                    <span className="text-muted-foreground">B:</span>
+                    <span className="text-muted-foreground tabular-nums">
+                      ${compData.channelTotals[ch.key].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}

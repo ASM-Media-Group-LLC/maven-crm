@@ -15,7 +15,7 @@ import { useEarningsData } from "./sales-performance/useEarningsData";
 import { ALL_COLUMNS } from "./sales-performance/types";
 import { Button } from "@/components/ui/button";
 import ClariAiFab from "@/components/ClariAiFab";
-import type { ViewTab, TimePeriod } from "./sales-dashboard/DashboardFilters";
+import type { ViewTab, TimePeriod, EarningsMode } from "./sales-dashboard/DashboardFilters";
 import type { EarningsRow } from "./sales-performance/types";
 
 const getDateRange = (period: TimePeriod): { from: Date; to: Date } => {
@@ -38,6 +38,7 @@ const SalesDashboard = () => {
   const [activePeriod, setActivePeriod] = useState<TimePeriod>("Esta semana");
   const [compareMode, setCompareMode] = useState(false);
   const [compareRange, setCompareRange] = useState<{ from?: Date; to?: Date }>({});
+  const [earningsMode, setEarningsMode] = useState<EarningsMode>("net");
   const { data: allRows = [], isLoading } = useEarningsData();
 
   const dateRange = useMemo(() => getDateRange(activePeriod), [activePeriod]);
@@ -126,16 +127,18 @@ const SalesDashboard = () => {
               compareDateFrom={compareRange.from}
               compareDateTo={compareRange.to}
               onCompareDateChange={handleCompareDateChange}
+              earningsMode={earningsMode}
+              onEarningsModeChange={setEarningsMode}
             />
             {isLoading ? (
               <div className="p-8 text-center text-sm text-muted-foreground">Cargando datos…</div>
             ) : activeView === "Vista General" ? (
               <>
-                <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} />
-                <EarningsByChannelChart rows={filteredRows} />
-                <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} />
-                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} />
-                <SalesReportSection rows={filteredRows} comparedRows={comparedRows} />
+                <EarningsTrendChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
+                <EarningsByChannelChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
+                <ConcentrationChart rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
+                <CreatorStatsCards rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
+                <SalesReportSection rows={filteredRows} comparedRows={comparedRows} earningsMode={earningsMode} />
               </>
             ) : (
               <CreatorPerformanceView rows={filteredRows} />
