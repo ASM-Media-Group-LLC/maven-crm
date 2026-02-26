@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Phone,
+  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +11,7 @@ import {
 import { ConversationWithDetails, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { getStatusColor, getStatusLabel } from "./StatusPicker";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -22,6 +23,8 @@ interface ChatHeaderProps {
   onSearchChange: (q: string) => void;
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
+  onOpenNotificationSettings: () => void;
+  onOpenSharedFiles: () => void;
 }
 
 function getInitials(name: string) {
@@ -31,14 +34,16 @@ function getInitials(name: string) {
 export default function ChatHeader({
   conversation, profiles, typingUsers, searchOpen, searchQuery,
   onSearchToggle, onSearchChange, onBack, onStartVideoCall,
+  onOpenNotificationSettings, onOpenSharedFiles,
 }: ChatHeaderProps) {
-  const { isOnline } = useOnlinePresence();
+  const { isOnline, getStatus } = useOnlinePresence();
 
   const otherParticipant = conversation.type === "direct"
     ? conversation.participants.find(p => p.profile && p.user_id !== conversation.created_by)
     : null;
   const otherUserId = otherParticipant?.user_id;
   const online = otherUserId ? isOnline(otherUserId) : false;
+  const status = otherUserId ? getStatus(otherUserId) : null;
 
   const typingNames = typingUsers
     .map(id => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
@@ -49,7 +54,7 @@ export default function ChatHeader({
     : conversation.type === "group"
       ? `${conversation.participants.length} miembros`
       : online
-        ? "En línea"
+        ? getStatusLabel(status, online)
         : "";
 
   return (
@@ -68,7 +73,7 @@ export default function ChatHeader({
           {conversation.type === "direct" && (
             <span className={cn(
               "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card",
-              online ? "bg-success" : "bg-muted-foreground/30"
+              getStatusColor(status, online)
             )} />
           )}
         </div>
@@ -105,9 +110,12 @@ export default function ChatHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Info del contacto</DropdownMenuItem>
-              <DropdownMenuItem>Archivos compartidos</DropdownMenuItem>
-              <DropdownMenuItem>Silenciar</DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenSharedFiles}>
+                <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenNotificationSettings}>
+                <Bell className="h-3.5 w-3.5 mr-2" /> Notificaciones
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
