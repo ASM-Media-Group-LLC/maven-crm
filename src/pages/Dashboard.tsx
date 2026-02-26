@@ -7,9 +7,9 @@ import ClariAiFab from "@/components/ClariAiFab";
 const Dashboard = () => {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+      <div className="flex h-screen w-full overflow-hidden">
         <DashboardSidebar />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0">
           <DashboardTopbar />
           <DashboardContent />
         </div>
