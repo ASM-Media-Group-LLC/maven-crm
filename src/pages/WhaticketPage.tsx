@@ -1,5 +1,6 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, MessageCircle, UserX } from "lucide-react";
+import { ExternalLink, MessageCircle, UserX, Search } from "lucide-react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
@@ -7,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
@@ -17,6 +26,13 @@ interface CreatorWhaticket {
   artistic_name: string | null;
   status: string | null;
   profile_photo_url: string | null;
+}
+
+interface CreatorNoLink {
+  id: string;
+  name: string;
+  artistic_name: string | null;
+  status: string | null;
 }
 
 function useWhaticketData() {
@@ -34,7 +50,7 @@ function useWhaticketData() {
       const creatorsArr = creators ?? [];
 
       const withLink: CreatorWhaticket[] = [];
-      const withoutLink: { id: string; name: string; artistic_name: string | null; status: string | null }[] = [];
+      const withoutLink: CreatorNoLink[] = [];
 
       for (const c of creatorsArr) {
         const url = linkMap.get(c.id);
@@ -73,9 +89,47 @@ const statusVariant: Record<string, "success-soft" | "primary-soft" | "warning-s
   paused: "secondary-soft",
 };
 
+const ALL_STATUSES = ["active", "onboarding", "leaving", "terminated", "paused"];
+
 const WhaticketPage = () => {
   const { data, isLoading } = useWhaticketData();
   const navigate = useNavigate();
+
+  const [searchWith, setSearchWith] = useState("");
+  const [statusWith, setStatusWith] = useState("all");
+  const [searchWithout, setSearchWithout] = useState("");
+  const [statusWithout, setStatusWithout] = useState("all");
+
+  const filteredWith = useMemo(() => {
+    if (!data) return [];
+    let list = data.withLink;
+    if (statusWith !== "all") list = list.filter((c) => c.status === statusWith);
+    if (searchWith) {
+      const q = searchWith.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.creator_name.toLowerCase().includes(q) ||
+          (c.artistic_name && c.artistic_name.toLowerCase().includes(q)) ||
+          c.whaticket_url.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [data, statusWith, searchWith]);
+
+  const filteredWithout = useMemo(() => {
+    if (!data) return [];
+    let list = data.withoutLink;
+    if (statusWithout !== "all") list = list.filter((c) => c.status === statusWithout);
+    if (searchWithout) {
+      const q = searchWithout.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.artistic_name && c.artistic_name.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [data, statusWithout, searchWithout]);
 
   return (
     <SidebarProvider>
@@ -138,8 +192,30 @@ const WhaticketPage = () => {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <MessageCircle className="h-4 w-4 text-primary" />
-                      Creadoras con Whaticket ({data?.withLink.length})
+                      Creadoras con Whaticket ({filteredWith.length})
                     </CardTitle>
+                    <div className="flex gap-2 mt-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar modelo o link…"
+                          value={searchWith}
+                          onChange={(e) => setSearchWith(e.target.value)}
+                          className="pl-9 h-9 text-sm"
+                        />
+                      </div>
+                      <Select value={statusWith} onValueChange={setStatusWith}>
+                        <SelectTrigger className="w-[140px] h-9 text-sm">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {ALL_STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>{statusLabel[s] ?? s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="max-h-[500px] overflow-auto">
@@ -152,7 +228,7 @@ const WhaticketPage = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {data?.withLink.map((c) => (
+                          {filteredWith.map((c) => (
                             <TableRow
                               key={c.creator_id}
                               className="cursor-pointer hover:bg-muted/50"
@@ -184,10 +260,10 @@ const WhaticketPage = () => {
                               </TableCell>
                             </TableRow>
                           ))}
-                          {data?.withLink.length === 0 && (
+                          {filteredWith.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                                Sin registros
+                                Sin resultados
                               </TableCell>
                             </TableRow>
                           )}
@@ -202,8 +278,30 @@ const WhaticketPage = () => {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <UserX className="h-4 w-4 text-destructive" />
-                      Creadoras sin Whaticket ({data?.withoutLink.length})
+                      Creadoras sin Whaticket ({filteredWithout.length})
                     </CardTitle>
+                    <div className="flex gap-2 mt-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar modelo…"
+                          value={searchWithout}
+                          onChange={(e) => setSearchWithout(e.target.value)}
+                          className="pl-9 h-9 text-sm"
+                        />
+                      </div>
+                      <Select value={statusWithout} onValueChange={setStatusWithout}>
+                        <SelectTrigger className="w-[140px] h-9 text-sm">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {ALL_STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}>{statusLabel[s] ?? s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="max-h-[500px] overflow-auto">
@@ -215,7 +313,7 @@ const WhaticketPage = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {data?.withoutLink.map((c) => (
+                          {filteredWithout.map((c) => (
                             <TableRow
                               key={c.id}
                               className="cursor-pointer hover:bg-muted/50"
@@ -236,10 +334,10 @@ const WhaticketPage = () => {
                               </TableCell>
                             </TableRow>
                           ))}
-                          {data?.withoutLink.length === 0 && (
+                          {filteredWithout.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
-                                Todas las creadoras tienen Whaticket
+                                Sin resultados
                               </TableCell>
                             </TableRow>
                           )}
