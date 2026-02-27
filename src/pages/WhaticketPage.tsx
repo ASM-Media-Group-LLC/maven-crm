@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, MessageCircle, UserX, Search, Link2 } from "lucide-react";
+import { ExternalLink, MessageCircle, UserX, Search, Link2, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
@@ -25,6 +25,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -113,29 +127,36 @@ const WhaticketPage = () => {
 
   // Link modal state
   const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [linkCreator, setLinkCreator] = useState<CreatorNoLink | null>(null);
+  const [linkCreatorId, setLinkCreatorId] = useState<string>("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linking, setLinking] = useState(false);
+  const [creatorPopoverOpen, setCreatorPopoverOpen] = useState(false);
 
-  const openLinkModal = (creator: CreatorNoLink) => {
-    setLinkCreator(creator);
+  const openLinkModal = (preselectedId?: string) => {
+    setLinkCreatorId(preselectedId ?? "");
     setLinkUrl("");
     setLinkModalOpen(true);
   };
 
+  const selectedCreator = useMemo(() => {
+    if (!linkCreatorId || !data) return null;
+    return data.withoutLink.find((c) => c.id === linkCreatorId) ?? null;
+  }, [linkCreatorId, data]);
+
   const handleLink = async () => {
-    if (!linkCreator || !linkUrl.trim()) return;
+    if (!linkCreatorId || !linkUrl.trim()) return;
     setLinking(true);
     try {
       const { error } = await supabase.from("whaticket_links").insert({
-        creator_id: linkCreator.id,
+        creator_id: linkCreatorId,
         whaticket_url: linkUrl.trim(),
       });
       if (error) throw error;
-      toast.success(`Whaticket vinculado a ${linkCreator.artistic_name || linkCreator.name}`);
+      const name = selectedCreator?.artistic_name || selectedCreator?.name || "Creadora";
+      toast.success(`Whaticket vinculado a ${name}`);
       setLinkModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["whaticket-page"] });
-      queryClient.invalidateQueries({ queryKey: ["whaticket_link", linkCreator.id] });
+      queryClient.invalidateQueries({ queryKey: ["whaticket_link", linkCreatorId] });
     } catch (err: any) {
       toast.error(err.message || "Error al vincular");
     } finally {
@@ -181,9 +202,14 @@ const WhaticketPage = () => {
         <div className="flex flex-1 flex-col">
           <DashboardTopbar />
           <main className="flex-1 overflow-auto p-6 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold">Whaticket</h1>
-              <p className="text-muted-foreground text-sm mt-1">Gestión de enlaces de Whaticket por creadora</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Whaticket</h1>
+                <p className="text-muted-foreground text-sm mt-1">Gestión de enlaces de Whaticket por creadora</p>
+              </div>
+              <Button className="gap-1.5" onClick={() => openLinkModal()}>
+                <Plus className="h-4 w-4" /> Vincular Whaticket
+              </Button>
             </div>
 
             {/* KPI cards */}
@@ -380,7 +406,7 @@ const WhaticketPage = () => {
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 gap-1 text-xs text-primary"
-                                  onClick={() => openLinkModal(c)}
+                                  onClick={() => openLinkModal(c.id)}
                                 >
                                   <Link2 className="h-3 w-3" /> Vincular
                                 </Button>
@@ -413,13 +439,50 @@ const WhaticketPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <Label className="text-xs text-muted-foreground">Creadora</Label>
-              <p className="text-sm font-medium mt-0.5">
-                {linkCreator?.artistic_name || linkCreator?.name}
-                {linkCreator?.artistic_name && (
-                  <span className="text-muted-foreground ml-1.5 font-normal">{linkCreator.name}</span>
-                )}
-              </p>
+              <Label>Creadora</Label>
+              <Popover open={creatorPopoverOpen} onOpenChange={setCreatorPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={creatorPopoverOpen}
+                    className="w-full justify-between mt-1.5 h-9 text-sm font-normal"
+                  >
+                    {selectedCreator
+                      ? (selectedCreator.artistic_name || selectedCreator.name)
+                      : "Buscar creadora…"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nombre…" />
+                    <CommandList>
+                      <CommandEmpty>Sin resultados</CommandEmpty>
+                      <CommandGroup className="max-h-[200px] overflow-auto">
+                        {(data?.withoutLink ?? []).map((c) => (
+                          <CommandItem
+                            key={c.id}
+                            value={`${c.artistic_name ?? ""} ${c.name}`}
+                            onSelect={() => {
+                              setLinkCreatorId(c.id);
+                              setCreatorPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", linkCreatorId === c.id ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">
+                              {c.artistic_name || c.name}
+                              {c.artistic_name && (
+                                <span className="text-muted-foreground ml-1.5 text-xs">{c.name}</span>
+                              )}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label htmlFor="whaticket-url">URL de Whaticket</Label>
@@ -436,7 +499,7 @@ const WhaticketPage = () => {
             <Button variant="outline" onClick={() => setLinkModalOpen(false)} disabled={linking}>
               Cancelar
             </Button>
-            <Button onClick={handleLink} disabled={linking || !linkUrl.trim()} className="gap-1.5">
+            <Button onClick={handleLink} disabled={linking || !linkCreatorId || !linkUrl.trim()} className="gap-1.5">
               <Link2 className="h-3.5 w-3.5" />
               {linking ? "Vinculando…" : "Vincular"}
             </Button>
