@@ -100,8 +100,15 @@ export function useLiveKit() {
         body: { roomName, participantName, isAdmin },
       });
 
+      console.log("LiveKit token response:", { data, fnErr });
+
       if (fnErr || !data?.token) {
-        throw new Error(fnErr?.message || "Failed to get token");
+        throw new Error(fnErr?.message || data?.error || "Failed to get token");
+      }
+
+      const livekitUrl = data.url;
+      if (!livekitUrl || typeof livekitUrl !== "string" || (!livekitUrl.startsWith("wss://") && !livekitUrl.startsWith("ws://"))) {
+        throw new Error(`Invalid LiveKit URL received: "${livekitUrl}". Ensure the LIVEKIT_URL secret is set correctly (e.g., wss://your-livekit-server.com)`);
       }
 
       const room = new Room({
@@ -179,7 +186,7 @@ export function useLiveKit() {
         setParticipants([]);
       });
 
-      await room.connect(data.url, data.token);
+      await room.connect(livekitUrl, data.token);
       await room.localParticipant.enableCameraAndMicrophone();
 
       setIsMicOn(true);
