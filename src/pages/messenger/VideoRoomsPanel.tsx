@@ -31,15 +31,43 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
     setShowCreate(false);
   };
 
+  const extractRoomId = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    const roomParamMatch = trimmed.match(/[?&]room=([^&#]+)/i);
+    if (roomParamMatch?.[1]) {
+      return decodeURIComponent(roomParamMatch[1]).trim();
+    }
+
+    const afterRoom = trimmed.split("room=")[1];
+    if (afterRoom) {
+      return decodeURIComponent(afterRoom.split("&")[0].split("#")[0]).trim();
+    }
+
+    return trimmed.replace(/^\/+|\/+$/g, "");
+  };
+
   const handleJoinByLink = () => {
-    if (!joinLink.trim()) return;
-    const roomId = joinLink.split("room=")[1] || joinLink;
-    const room = rooms.find(r => r.id === roomId);
+    const roomId = extractRoomId(joinLink);
+    if (!roomId) return;
+
+    const room = rooms.find((r) => r.id === roomId);
     if (room) {
       onJoinRoom(room);
     } else {
-      toast.info("Uniéndose a la sala... (demo)");
+      onJoinRoom({
+        id: roomId,
+        name: roomId,
+        createdBy: "link",
+        createdAt: new Date(),
+        participants: [],
+        isActive: true,
+        shareLink: `${window.location.origin}/messenger?room=${encodeURIComponent(roomId)}`,
+      });
+      toast.success("Uniéndote por enlace...");
     }
+
     setJoinLink("");
   };
 

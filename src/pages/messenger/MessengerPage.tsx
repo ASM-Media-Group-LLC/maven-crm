@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
@@ -25,6 +25,7 @@ export default function MessengerPage() {
   const [activeCallRoom, setActiveCallRoom] = useState<{ roomName: string; displayName: string; isAdmin: boolean } | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const joinedFromLinkRef = useRef(false);
 
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
 
@@ -61,14 +62,15 @@ export default function MessengerPage() {
   };
 
   const handleCreateRoom = (name: string) => {
+    const roomId = `room-${Date.now()}`;
     const newRoom: VideoRoom = {
-      id: `room-${Date.now()}`,
+      id: roomId,
       name,
       createdBy: "me",
       createdAt: new Date(),
       participants: [],
       isActive: false,
-      shareLink: `${window.location.origin}/messenger?room=room-${Date.now()}`,
+      shareLink: `${window.location.origin}/messenger?room=${encodeURIComponent(roomId)}`,
     };
     setVideoRooms(prev => [newRoom, ...prev]);
     toast.success(`Sala "${name}" creada`);
@@ -101,6 +103,27 @@ export default function MessengerPage() {
     }
     return success;
   };
+
+  useEffect(() => {
+    if (joinedFromLinkRef.current || activeCallRoom) return;
+
+    const roomParam = new URLSearchParams(window.location.search).get("room");
+    if (!roomParam) return;
+
+    const roomName = decodeURIComponent(roomParam).trim();
+    if (!roomName) return;
+
+    const currentUser = Object.values(profiles).find(p => p.id);
+    setActiveCallRoom({
+      roomName,
+      displayName: currentUser?.full_name || "Usuario",
+      isAdmin: false,
+    });
+    setShowVideoRooms(false);
+    joinedFromLinkRef.current = true;
+    window.history.replaceState({}, "", window.location.pathname);
+    toast.success("Uniéndote a la sala...");
+  }, [profiles, activeCallRoom]);
 
   if (activeCallRoom) {
     return (
