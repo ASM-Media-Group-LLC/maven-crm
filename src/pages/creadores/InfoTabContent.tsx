@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useWhaticketLink } from "@/hooks/useWhaticketLink";
+import { ExternalLink } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
   active: "Activa",
@@ -90,6 +92,7 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
   const queryClient = useQueryClient();
   const c = creator;
   const biz = c.creator_business;
+  const { data: whaticketUrl } = useWhaticketLink(creatorId);
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -282,6 +285,15 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
 
         {/* Porcentaje con Agencia (read-only always) */}
         <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
+
+        {/* Whaticket (read-only always) */}
+        <InfoField label="Whaticket" value={
+          whaticketUrl ? (
+            <a href={whaticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Abrir Whaticket <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : null
+        } />
 
         {/* Notas Internas */}
         {isEditing ? (
