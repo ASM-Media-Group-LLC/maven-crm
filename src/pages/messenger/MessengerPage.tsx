@@ -3,7 +3,7 @@ import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
-import VideoCallView from "./VideoCallView";
+import LiveKitCallView from "./videocall/LiveKitCallView";
 import NewChatModal from "./NewChatModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
@@ -22,7 +22,7 @@ export default function MessengerPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
-  const [activeCall, setActiveCall] = useState<VideoRoom | null>(null);
+  const [activeCallRoom, setActiveCallRoom] = useState<{ roomName: string; displayName: string; isAdmin: boolean } | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
@@ -75,23 +75,23 @@ export default function MessengerPage() {
   };
 
   const handleJoinRoom = (room: VideoRoom) => {
-    setActiveCall({ ...room, isActive: true });
+    const currentUser = Object.values(profiles).find(p => p.id);
+    setActiveCallRoom({
+      roomName: room.id,
+      displayName: currentUser?.full_name || "Usuario",
+      isAdmin: room.createdBy === "me",
+    });
     setShowVideoRooms(false);
   };
 
   const handleStartVideoCall = (conv: ConversationWithDetails) => {
-    const room: VideoRoom = {
-      id: `call-${Date.now()}`,
-      name: `Llamada - ${conv.displayName}`,
-      createdBy: "me",
-      createdAt: new Date(),
-      participants: conv.participants
-        .filter(p => p.profile)
-        .map(p => p.profile!),
-      isActive: true,
-      shareLink: `${window.location.origin}/messenger?room=call-${Date.now()}`,
-    };
-    setActiveCall(room);
+    const roomName = `call-${conv.id}`;
+    const currentUser = Object.values(profiles).find(p => p.id);
+    setActiveCallRoom({
+      roomName,
+      displayName: currentUser?.full_name || "Usuario",
+      isAdmin: true,
+    });
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -102,10 +102,15 @@ export default function MessengerPage() {
     return success;
   };
 
-  if (activeCall) {
+  if (activeCallRoom) {
     return (
       <div className="h-full w-full">
-        <VideoCallView room={activeCall} onLeave={() => { setActiveCall(null); toast.info("Llamada finalizada"); }} />
+        <LiveKitCallView
+          roomName={activeCallRoom.roomName}
+          displayName={activeCallRoom.displayName}
+          isAdmin={activeCallRoom.isAdmin}
+          onLeave={() => setActiveCallRoom(null)}
+        />
       </div>
     );
   }
