@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, MessageCircle, UserX, Search } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, MessageCircle, UserX, Search, Link2 } from "lucide-react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
@@ -9,6 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -18,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface CreatorWhaticket {
   creator_id: string;
@@ -93,12 +103,45 @@ const ALL_STATUSES = ["active", "onboarding", "leaving", "terminated", "paused"]
 
 const WhaticketPage = () => {
   const { data, isLoading } = useWhaticketData();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [searchWith, setSearchWith] = useState("");
   const [statusWith, setStatusWith] = useState("all");
   const [searchWithout, setSearchWithout] = useState("");
   const [statusWithout, setStatusWithout] = useState("all");
+
+  // Link modal state
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [linkCreator, setLinkCreator] = useState<CreatorNoLink | null>(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linking, setLinking] = useState(false);
+
+  const openLinkModal = (creator: CreatorNoLink) => {
+    setLinkCreator(creator);
+    setLinkUrl("");
+    setLinkModalOpen(true);
+  };
+
+  const handleLink = async () => {
+    if (!linkCreator || !linkUrl.trim()) return;
+    setLinking(true);
+    try {
+      const { error } = await supabase.from("whaticket_links").insert({
+        creator_id: linkCreator.id,
+        whaticket_url: linkUrl.trim(),
+      });
+      if (error) throw error;
+      toast.success(`Whaticket vinculado a ${linkCreator.artistic_name || linkCreator.name}`);
+      setLinkModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["whaticket-page"] });
+      queryClient.invalidateQueries({ queryKey: ["whaticket_link", linkCreator.id] });
+    } catch (err: any) {
+      toast.error(err.message || "Error al vincular");
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const filteredWith = useMemo(() => {
     if (!data) return [];
@@ -310,16 +353,16 @@ const WhaticketPage = () => {
                           <TableRow>
                             <TableHead>Creadora</TableHead>
                             <TableHead>Estado</TableHead>
+                            <TableHead className="text-right w-[80px]">Acción</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredWithout.map((c) => (
-                            <TableRow
-                              key={c.id}
-                              className="cursor-pointer hover:bg-muted/50"
-                              onClick={() => navigate(`/creadores/${c.id}`)}
-                            >
-                              <TableCell className="font-medium">
+                            <TableRow key={c.id} className="hover:bg-muted/50">
+                              <TableCell
+                                className="font-medium cursor-pointer"
+                                onClick={() => navigate(`/creadores/${c.id}`)}
+                              >
                                 {c.artistic_name || c.name}
                                 {c.artistic_name && (
                                   <span className="text-xs text-muted-foreground ml-1.5">{c.name}</span>
@@ -332,11 +375,21 @@ const WhaticketPage = () => {
                                   </Badge>
                                 )}
                               </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 gap-1 text-xs text-primary"
+                                  onClick={() => openLinkModal(c)}
+                                >
+                                  <Link2 className="h-3 w-3" /> Vincular
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ))}
                           {filteredWithout.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                                 Sin resultados
                               </TableCell>
                             </TableRow>
@@ -351,6 +404,45 @@ const WhaticketPage = () => {
           </main>
         </div>
       </div>
+
+      {/* Link modal */}
+      <Dialog open={linkModalOpen} onOpenChange={setLinkModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular Whaticket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Creadora</Label>
+              <p className="text-sm font-medium mt-0.5">
+                {linkCreator?.artistic_name || linkCreator?.name}
+                {linkCreator?.artistic_name && (
+                  <span className="text-muted-foreground ml-1.5 font-normal">{linkCreator.name}</span>
+                )}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="whaticket-url">URL de Whaticket</Label>
+              <Input
+                id="whaticket-url"
+                placeholder="https://app.whaticket.com/tickets/..."
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkModalOpen(false)} disabled={linking}>
+              Cancelar
+            </Button>
+            <Button onClick={handleLink} disabled={linking || !linkUrl.trim()} className="gap-1.5">
+              <Link2 className="h-3.5 w-3.5" />
+              {linking ? "Vinculando…" : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 };
