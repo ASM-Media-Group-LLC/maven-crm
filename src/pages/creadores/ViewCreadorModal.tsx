@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe } from "lucide-react";
+import { ExternalLink, MapPin, Building2, Mail, Phone, UserCog, CalendarDays, Globe, MessageCircle } from "lucide-react";
+import { useWhaticketLink } from "@/hooks/useWhaticketLink";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -96,6 +97,7 @@ const SocialLink = ({ icon, handle, url, rawHandle }: { icon: React.ReactNode; h
 const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
   const navigate = useNavigate();
   const c = creator;
+  const { data: whaticketUrl } = useWhaticketLink(c.id);
   const initials = c.name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const flag = getFlagEmoji(c.country_code || countryToCode[c.country ?? ""] || null);
   const regDate = c.registration_date ? format(new Date(c.registration_date), "dd MMM yyyy", { locale: es }) : null;
@@ -153,6 +155,13 @@ const ViewCreadorModal = ({ open, onOpenChange, creator }: Props) => {
                 <InfoField icon={Phone} label="Teléfono" value={c.phone} />
                 <InfoField icon={UserCog} label="Tipo de Manager" value={c.creator_business?.manager_type} />
                 <InfoField icon={CalendarDays} label="Fecha de Registro" value={regDate} />
+                <InfoField icon={MessageCircle} label="Whaticket" value={
+                  whaticketUrl ? (
+                    <a href={whaticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      Abrir Whaticket <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null
+                } />
               </div>
               {c.languages && c.languages.length > 0 && (
                 <div className="mt-3">
