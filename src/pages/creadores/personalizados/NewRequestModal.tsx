@@ -37,7 +37,6 @@ const PRIORITIES = [
 
 const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const { createRequest } = useCustomRequests();
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [contentType, setContentType] = useState("foto");
   const [priority, setPriority] = useState("normal");
@@ -76,11 +75,13 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   });
 
   const handleSubmit = () => {
-    if (!title.trim()) return;
     const isBuster = category === "buster";
+    const contentLabel = CONTENT_TYPES.find((t) => t.value === contentType)?.label || contentType;
+    const creatorName = selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Sin asignar";
+    const autoTitle = `${contentLabel} - ${creatorName}`;
     createRequest.mutate(
       {
-        title: title.trim(),
+        title: autoTitle,
         description: description.trim() || undefined,
         content_type: contentType,
         creator_id: creatorId,
@@ -97,7 +98,6 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
       {
         onSuccess: () => {
           onOpenChange(false);
-          setTitle("");
           setDescription("");
           setContentType("foto");
           setPriority("normal");
@@ -125,11 +125,6 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           <DialogTitle>Nueva Solicitud de Contenido</DialogTitle>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pt-2 pr-1">
-          <div className="space-y-2">
-            <Label>Título *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Describe brevemente la solicitud" />
-          </div>
-
           <div className="space-y-2">
             <Label>Descripción</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalles adicionales..." rows={3} />
@@ -291,7 +286,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
 
         <div className="shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!title.trim() || createRequest.isPending}>
+          <Button onClick={handleSubmit} disabled={createRequest.isPending}>
             {createRequest.isPending ? "Creando..." : "Crear Solicitud"}
           </Button>
         </div>
