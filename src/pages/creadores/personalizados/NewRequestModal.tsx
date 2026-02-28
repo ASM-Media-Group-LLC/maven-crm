@@ -126,6 +126,38 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pt-2 pr-1">
           <div className="space-y-2">
+            <Label>Creadora</Label>
+            <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Seleccionar creadora..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar creadora..." />
+                  <CommandList>
+                    <CommandEmpty>Sin resultados</CommandEmpty>
+                    <CommandGroup>
+                      {creators.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={c.artistic_name || c.name}
+                          onSelect={() => { setCreatorId(c.id); setCreatorOpen(false); }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", creatorId === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.artistic_name || c.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
             <Label>Descripción</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalles adicionales..." rows={3} />
           </div>
@@ -196,38 +228,6 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Creadora</Label>
-            <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                  {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Seleccionar creadora..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar creadora..." />
-                  <CommandList>
-                    <CommandEmpty>Sin resultados</CommandEmpty>
-                    <CommandGroup>
-                      {creators.map((c) => (
-                        <CommandItem
-                          key={c.id}
-                          value={c.artistic_name || c.name}
-                          onSelect={() => { setCreatorId(c.id); setCreatorOpen(false); }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", creatorId === c.id ? "opacity-100" : "opacity-0")} />
-                          {c.artistic_name || c.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
           </div>
 
           <div className="space-y-2">
