@@ -1,0 +1,1 @@
+ALTER TABLE custom_content_requests ADD COLUMN quantity_or_duration TEXT;

@@ -1600,6 +1600,7 @@ export type Database = {
           notes: string | null
           paid_amount: number | null
           priority: string
+          quantity_or_duration: string | null
           request_date: string | null
           requested_by: string | null
           status: string
@@ -1621,6 +1622,7 @@ export type Database = {
           notes?: string | null
           paid_amount?: number | null
           priority?: string
+          quantity_or_duration?: string | null
           request_date?: string | null
           requested_by?: string | null
           status?: string
@@ -1642,6 +1644,7 @@ export type Database = {
           notes?: string | null
           paid_amount?: number | null
           priority?: string
+          quantity_or_duration?: string | null
           request_date?: string | null
           requested_by?: string | null
           status?: string

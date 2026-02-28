@@ -51,6 +51,8 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const [fanUsername, setFanUsername] = useState("");
   const [fanSpentAmount, setFanSpentAmount] = useState("");
   const [category, setCategory] = useState("normal");
+  const [quantityOrDuration, setQuantityOrDuration] = useState("");
+  const [notes, setNotes] = useState("");
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-list-simple"],
@@ -94,6 +96,8 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         fan_username: fanUsername.trim() || undefined,
         fan_spent_amount: parseFloat(fanSpentAmount) || undefined,
         category,
+        quantity_or_duration: quantityOrDuration.trim() || undefined,
+        notes: notes.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -110,6 +114,8 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           setFanUsername("");
           setFanSpentAmount("");
           setCategory("normal");
+          setQuantityOrDuration("");
+          setNotes("");
         },
       }
     );
@@ -227,6 +233,17 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tiempo o Cantidad</Label>
+              <Input value={quantityOrDuration} onChange={(e) => setQuantityOrDuration(e.target.value)} placeholder="Ej: 5 min, 3 fotos..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Notas</Label>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones adicionales..." rows={2} />
             </div>
           </div>
 
