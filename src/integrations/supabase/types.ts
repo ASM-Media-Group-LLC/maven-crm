@@ -1593,10 +1593,13 @@ export type Database = {
           creator_id: string | null
           description: string | null
           due_date: string | null
+          fan_spent_amount: number | null
+          fan_username: string | null
           id: string
           notes: string | null
           paid_amount: number | null
           priority: string
+          request_date: string | null
           requested_by: string | null
           status: string
           title: string
@@ -1610,10 +1613,13 @@ export type Database = {
           creator_id?: string | null
           description?: string | null
           due_date?: string | null
+          fan_spent_amount?: number | null
+          fan_username?: string | null
           id?: string
           notes?: string | null
           paid_amount?: number | null
           priority?: string
+          request_date?: string | null
           requested_by?: string | null
           status?: string
           title: string
@@ -1627,10 +1633,13 @@ export type Database = {
           creator_id?: string | null
           description?: string | null
           due_date?: string | null
+          fan_spent_amount?: number | null
+          fan_username?: string | null
           id?: string
           notes?: string | null
           paid_amount?: number | null
           priority?: string
+          request_date?: string | null
           requested_by?: string | null
           status?: string
           title?: string

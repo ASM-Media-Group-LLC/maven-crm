@@ -45,6 +45,10 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const [chatterId, setChatterId] = useState<string | null>(null);
   const [chatterOpen, setChatterOpen] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
+  const [requestDate, setRequestDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [status, setStatus] = useState("pendiente");
+  const [fanUsername, setFanUsername] = useState("");
+  const [fanSpentAmount, setFanSpentAmount] = useState("");
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-list-simple"],
@@ -80,6 +84,10 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         due_date: dueDate || null,
         assigned_chatter_id: chatterId,
         paid_amount: parseFloat(paidAmount) || undefined,
+        status,
+        request_date: requestDate || null,
+        fan_username: fanUsername.trim() || undefined,
+        fan_spent_amount: parseFloat(fanSpentAmount) || undefined,
       },
       {
         onSuccess: () => {
@@ -92,6 +100,10 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           setDueDate("");
           setChatterId(null);
           setPaidAmount("");
+          setRequestDate(new Date().toISOString().slice(0, 10));
+          setStatus("pendiente");
+          setFanUsername("");
+          setFanSpentAmount("");
         },
       }
     );
@@ -115,6 +127,36 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           <div className="space-y-2">
             <Label>Descripción</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalles adicionales..." rows={3} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Fecha de Solicitud</Label>
+              <Input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Estado</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="en_progreso">En Progreso</SelectItem>
+                  <SelectItem value="completado">Completado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Usuario (Fan)</Label>
+              <Input value={fanUsername} onChange={(e) => setFanUsername(e.target.value)} placeholder="Nombre del fan/suscriptor" />
+            </div>
+            <div className="space-y-2">
+              <Label>Cuánto ha Gastado</Label>
+              <Input type="number" step="0.01" min="0" value={fanSpentAmount} onChange={(e) => setFanSpentAmount(e.target.value)} placeholder="$0.00" />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -175,7 +217,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Chatter / Usuario Asignado</Label>
+            <Label>Chatter Asignado</Label>
             <Popover open={chatterOpen} onOpenChange={setChatterOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
