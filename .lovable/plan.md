@@ -1,65 +1,21 @@
 
+## Quitar campo "Título" del modal de Nueva Solicitud
 
-## Agregar campo "Categoria" (Normal/Buster) con reactividad al modal
+### Cambio principal
 
-### Resumen
+Eliminar el campo de texto "Título" del formulario y auto-generar el título al momento de crear la solicitud, usando el tipo de contenido y la creadora seleccionada.
 
-Se agrega un nuevo campo "Categoria" al formulario de Nueva Solicitud con dos opciones (Normal / Buster). Seleccionar "Buster" produce efectos reactivos en otros campos del formulario y modifica el payload enviado al backend.
-
----
-
-### 1. Migracion de base de datos
-
-Agregar columna `category` a `custom_content_requests`:
-
-```sql
-ALTER TABLE public.custom_content_requests
-  ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'normal';
-```
-
----
-
-### 2. Actualizar tipos y hook (`useCustomRequests.ts`)
-
-- Agregar `category: string` al tipo `CustomContentRequest`
-- Agregar `category?: string` a los parametros de `createRequest.mutationFn`
-
----
-
-### 3. Actualizar el modal (`NewRequestModal.tsx`)
-
-**Nuevo estado:**
-- `category` (string, default `"normal"`)
-
-**Nuevo campo en el formulario:**
-- Agregar un Select "Categoria" con opciones "Normal" y "Buster", ubicado en la fila junto a "Estado" (reorganizar a una fila de 3 columnas: Fecha de Solicitud | Estado | Categoria) o como fila independiente antes de "Usuario (Fan)"
-
-**Reactividad cuando `category === "buster"`:**
-
-1. **Helper text en "Cuanto ha Gastado"**: Mostrar debajo del input un texto sutil (`text-xs text-amber-500`) que diga: "Aplicar tarifa Buster (Sugerido: +20% o cuota fija)"
-
-2. **Resaltado visual en "Fecha Limite"**: Agregar un borde sutil rojo/amber al input (`border-red-400`) y un icono de rayo al lado del label de "Fecha Limite"
-
-3. **Override del payload en handleSubmit**: Cuando `category === "buster"`, forzar `priority: "alta"` en el objeto enviado al backend (independientemente de lo que el usuario haya seleccionado en el campo Prioridad), e incluir `category: "buster"` en el payload
-
-**Reset en onSuccess:**
-- Resetear `category` a `"normal"`
-
----
-
-### 4. Contenido adicional de la imagen de referencia
-
-La imagen muestra tipos de contenido adicionales ("Articulo", "Prenda") que no estan en la lista actual. Se agregaran al array `CONTENT_TYPES` para mantener consistencia con el sistema real:
-- `{ value: "articulo", label: "Articulo" }`
-- `{ value: "prenda", label: "Prenda" }`
+**Formato auto-generado:** `"Video - NombreCreadora"` o `"Foto - Sin asignar"` si no hay creadora.
 
 ---
 
 ### Archivos a modificar
 
-| Archivo | Cambio |
-|---|---|
-| Nueva migracion SQL | Agregar columna `category` |
-| `useCustomRequests.ts` | Agregar `category` al tipo y mutacion |
-| `NewRequestModal.tsx` | Nuevo campo Categoria, reactividad visual, override de payload |
+**1. `NewRequestModal.tsx`**
+- Eliminar el estado `title` y su `setTitle`
+- Eliminar el bloque JSX del campo "Título" (Label + Input)
+- En `handleSubmit`: construir el título automaticamente con `contentType` + nombre de la creadora seleccionada
+- Eliminar `setTitle("")` del reset en `onSuccess`
+- Quitar la validacion `disabled={!title.trim()}` del boton (ya no depende de titulo)
 
+**2. Sin cambios en otros archivos** - El campo `title` sigue existiendo en la base de datos y se sigue mostrando en la tabla, tracking drawer y modal de vista. Solo se deja de pedir manualmente.
