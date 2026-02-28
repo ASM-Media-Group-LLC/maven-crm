@@ -1,27 +1,24 @@
 
 
-## Ajustar layout de KPI cards en Personalizados
+## Fix: Modal "Nueva Solicitud de Contenido" cortado
 
 ### Problema
 
-Las 5 tarjetas de metricas usan `grid-cols-2 md:grid-cols-5`, lo que causa que en pantallas medianas las columnas sean demasiado estrechas y el contenido se corte visualmente. Ademas, con 5 tarjetas en `grid-cols-2`, la quinta queda sola en una fila.
+El modal tiene demasiado contenido vertical (titulo, descripcion, tipo, prioridad, creadora, chatter, valor pagado, fecha limite, botones) y no tiene scroll interno, por lo que se corta en pantallas normales.
 
 ### Solucion
 
-**Archivo:** `src/pages/creadores/personalizados/PersonalizadosPage.tsx` (linea 113)
+**Archivo:** `src/pages/creadores/personalizados/NewRequestModal.tsx`
 
-1. Cambiar el grid de `grid-cols-2 md:grid-cols-5` a `grid-cols-2 md:grid-cols-3 xl:grid-cols-5` para que las tarjetas tengan mas espacio en pantallas medianas (3 columnas) y solo colapsen a 5 columnas en pantallas grandes.
+Aplicar el patron estandar del proyecto para modales con contenido largo:
 
-2. Reducir el gap de `gap-4` a `gap-3` para aprovechar mejor el espacio disponible.
+1. Agregar `!flex !flex-col gap-0 max-h-[85vh]` al `DialogContent` para forzar layout flex y limitar la altura maxima.
+2. Envolver el contenido del formulario (entre el header y los botones) en un `div` con `flex-1 min-h-0 overflow-y-auto` para que sea desplazable.
+3. Mover los botones de accion fuera del contenedor scrollable, como un footer fijo con `shrink-0` y un borde superior sutil.
 
-**Archivo:** `src/components/dashboard/DashboardMetricCard.tsx`
+### Resultado
 
-3. Agregar `min-w-0` y `overflow-hidden` al Card para evitar desbordamientos, y `truncate` al label para que textos largos no rompan el layout. Reducir el valor de `text-2xl` a `text-xl` para que encaje mejor en columnas estrechas.
-
-### Cambios puntuales
-
-- Grid container: `grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3`
-- Card: agregar `min-w-0`
-- Texto del valor: `text-xl` en lugar de `text-2xl`
-- Label: agregar `truncate`
+- El header y los botones siempre visibles
+- El contenido del formulario hace scroll cuando excede el espacio disponible
+- Consistente con el patron de modales del proyecto
 
