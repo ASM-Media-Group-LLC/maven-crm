@@ -1587,6 +1587,7 @@ export type Database = {
       custom_content_requests: {
         Row: {
           assigned_chatter_id: string | null
+          attachment_url: string | null
           category: string
           completed_at: string | null
           content_type: string
@@ -1609,6 +1610,7 @@ export type Database = {
         }
         Insert: {
           assigned_chatter_id?: string | null
+          attachment_url?: string | null
           category?: string
           completed_at?: string | null
           content_type?: string
@@ -1631,6 +1633,7 @@ export type Database = {
         }
         Update: {
           assigned_chatter_id?: string | null
+          attachment_url?: string | null
           category?: string
           completed_at?: string | null
           content_type?: string
