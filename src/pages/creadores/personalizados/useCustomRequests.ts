@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 export type CustomContentRequest = {
   id: string;
@@ -12,6 +12,8 @@ export type CustomContentRequest = {
   status: string;
   priority: string;
   requested_by: string | null;
+  assigned_chatter_id: string | null;
+  paid_amount: number | null;
   notes: string | null;
   due_date: string | null;
   completed_at: string | null;
@@ -19,11 +21,13 @@ export type CustomContentRequest = {
   updated_at: string;
   creators?: { id: string; name: string; artistic_name: string | null; profile_photo_url: string | null } | null;
   profiles?: { id: string; full_name: string | null } | null;
+  assigned_chatter?: { id: string; full_name: string | null } | null;
 };
 
 export const useCustomRequests = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["custom-content-requests"],
@@ -45,18 +49,23 @@ export const useCustomRequests = () => {
       creator_id?: string | null;
       priority?: string;
       due_date?: string | null;
+      assigned_chatter_id?: string | null;
+      paid_amount?: number;
     }) => {
       const { error } = await supabase.from("custom_content_requests").insert({
         ...values,
         requested_by: user?.id,
-      });
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom-content-requests"] });
-      toast.success("Solicitud creada exitosamente");
+      toast({
+        title: "Solicitud creada exitosamente",
+        description: "Correos automáticos enviados a Creadora y Manager",
+      });
     },
-    onError: () => toast.error("Error al crear la solicitud"),
+    onError: () => toast({ title: "Error al crear la solicitud", variant: "destructive" }),
   });
 
   const updateRequest = useMutation({
@@ -69,9 +78,9 @@ export const useCustomRequests = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom-content-requests"] });
-      toast.success("Solicitud actualizada");
+      toast({ title: "Solicitud actualizada" });
     },
-    onError: () => toast.error("Error al actualizar"),
+    onError: () => toast({ title: "Error al actualizar", variant: "destructive" }),
   });
 
   const deleteRequest = useMutation({
@@ -81,9 +90,9 @@ export const useCustomRequests = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custom-content-requests"] });
-      toast.success("Solicitud eliminada");
+      toast({ title: "Solicitud eliminada" });
     },
-    onError: () => toast.error("Error al eliminar"),
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
   return { requests, isLoading, createRequest, updateRequest, deleteRequest };
