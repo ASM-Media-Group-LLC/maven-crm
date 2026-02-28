@@ -8,13 +8,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle, MessageSquare, XCircle, ImageIcon } from "lucide-react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
 import NewRequestModal from "./NewRequestModal";
 import ViewRequestModal from "./ViewRequestModal";
+
+const TYPE_COLORS: Record<string, string> = {
+  foto: "bg-purple-500/15 text-purple-400 border-purple-500/20",
+  video: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
+  audio: "bg-pink-500/15 text-pink-400 border-pink-500/20",
+  texto: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
+  otro: "bg-muted text-muted-foreground",
+};
+
+const getAlertIcon = (r: CustomContentRequest) => {
+  if (r.status === "completado") return <CheckCircle2 className="h-4 w-4 text-green-400" />;
+  if (!r.due_date) return <span className="text-muted-foreground">—</span>;
+  const overdue = new Date(r.due_date) < new Date();
+  if (overdue) return <XCircle className="h-4 w-4 text-red-400" />;
+  return <Clock className="h-4 w-4 text-yellow-400" />;
+};
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -118,42 +135,68 @@ const PersonalizadosPage = () => {
               </Select>
             </div>
 
-            <div className="rounded-lg border bg-card">
+            <div className="rounded-lg border bg-card overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Creadora</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Prioridad</TableHead>
-                    <TableHead>Fecha Límite</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="text-xs">Creadora</TableHead>
+                    <TableHead className="text-xs">Tipo de Contenido</TableHead>
+                    <TableHead className="text-xs">Fecha Límite</TableHead>
+                    <TableHead className="text-xs">Chatter/Usuario</TableHead>
+                    <TableHead className="text-xs">Estado</TableHead>
+                    <TableHead className="text-xs">Notas</TableHead>
+                    <TableHead className="text-xs text-center">Alerta de Envío</TableHead>
+                    <TableHead className="text-xs text-right sticky right-0 bg-card">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay solicitudes</TableCell>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay solicitudes</TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((r) => (
                       <TableRow key={r.id} className="cursor-pointer" onClick={() => setViewRequest(r)}>
-                        <TableCell className="font-medium">{r.title}</TableCell>
-                        <TableCell>{r.creators?.artistic_name || r.creators?.name || "—"}</TableCell>
-                        <TableCell><Badge variant="secondary" className="capitalize">{r.content_type}</Badge></TableCell>
+                        <TableCell className="font-medium">{r.creators?.artistic_name || r.creators?.name || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`capitalize ${TYPE_COLORS[r.content_type] || TYPE_COLORS.otro}`}>{r.content_type}</Badge>
+                        </TableCell>
+                        <TableCell>{r.due_date ? format(new Date(r.due_date), "dd MMM yyyy", { locale: es }) : "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.profiles?.full_name || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={STATUS_COLORS[r.status] || ""}>{STATUS_LABELS[r.status] || r.status}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={PRIORITY_COLORS[r.priority] || ""}>{r.priority}</Badge>
+                          <Popover>
+                            <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7">
+                                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 bg-card border p-4 space-y-3" side="left" onClick={(e) => e.stopPropagation()}>
+                              <p className="text-sm font-semibold">{r.title}</p>
+                              {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+                              {r.notes && (
+                                <div className="border-t pt-2">
+                                  <p className="text-xs font-medium mb-1">Notas / Detalles de pago</p>
+                                  <p className="text-xs text-muted-foreground">{r.notes}</p>
+                                </div>
+                              )}
+                              <div className="border-t pt-2">
+                                <p className="text-xs font-medium mb-1">Fotos de referencia</p>
+                                <div className="flex items-center justify-center h-16 rounded-md border border-dashed">
+                                  <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </TableCell>
-                        <TableCell>{r.due_date ? format(new Date(r.due_date), "dd MMM yyyy", { locale: es }) : "—"}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">{getAlertIcon(r)}</TableCell>
+                        <TableCell className="text-right sticky right-0 bg-card">
                           <div className="flex justify-end gap-1">
                             <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewRequest(r); }}>
                               <Eye className="h-4 w-4" />
