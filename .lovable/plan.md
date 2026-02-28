@@ -1,52 +1,57 @@
 
 
-## Agregar campos al modal de Nueva Solicitud y renombrar label
+## Agregar campo "Categoria" (Normal/Buster) con reactividad al modal
 
 ### Resumen
 
-Se agregaran 4 campos nuevos al formulario y se renombrara el label del chatter. Dos de los campos nuevos requieren columnas adicionales en la base de datos.
+Se agrega un nuevo campo "Categoria" al formulario de Nueva Solicitud con dos opciones (Normal / Buster). Seleccionar "Buster" produce efectos reactivos en otros campos del formulario y modifica el payload enviado al backend.
 
 ---
 
 ### 1. Migracion de base de datos
 
-Agregar 3 columnas a `custom_content_requests`:
+Agregar columna `category` a `custom_content_requests`:
 
-- `request_date DATE DEFAULT CURRENT_DATE` -- fecha de solicitud (con valor por defecto hoy)
-- `fan_username TEXT` -- nombre del fan/suscriptor externo
-- `fan_spent_amount NUMERIC` -- cuanto ha gastado el fan
-
-El campo "Estado" ya existe en la tabla como `status` (default `'pendiente'`).
-
----
-
-### 2. Actualizar useCustomRequests.ts
-
-- Agregar `request_date`, `fan_username`, `fan_spent_amount` al tipo `CustomContentRequest`
-- Ampliar los parametros de `createRequest.mutationFn` para aceptar los nuevos campos
+```sql
+ALTER TABLE public.custom_content_requests
+  ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'normal';
+```
 
 ---
 
-### 3. Actualizar NewRequestModal.tsx
+### 2. Actualizar tipos y hook (`useCustomRequests.ts`)
 
-**Renombrar label:**
-- "Chatter / Usuario Asignado" pasa a ser "Chatter Asignado"
+- Agregar `category: string` al tipo `CustomContentRequest`
+- Agregar `category?: string` a los parametros de `createRequest.mutationFn`
 
-**Nuevos estados:**
-- `requestDate` (string) -- inicializado con la fecha de hoy
-- `status` (string) -- inicializado en "pendiente"
-- `fanUsername` (string) -- nombre del fan
-- `fanSpentAmount` (string) -- monto gastado por el fan
+---
 
-**Nuevos campos en el formulario (despues de Descripcion, antes de Tipo de Contenido):**
+### 3. Actualizar el modal (`NewRequestModal.tsx`)
 
-1. **Fecha de Solicitud + Estado**: Fila de 2 columnas. La fecha usa un input date con valor por defecto hoy. El estado usa un Select con opciones: Pendiente, En Progreso, Completado, Cancelado.
+**Nuevo estado:**
+- `category` (string, default `"normal"`)
 
-2. **Usuario (Fan) + Cuanto ha Gastado**: Fila de 2 columnas. El usuario es un input de texto libre. El monto es un input numerico con placeholder "$0.00".
+**Nuevo campo en el formulario:**
+- Agregar un Select "Categoria" con opciones "Normal" y "Buster", ubicado en la fila junto a "Estado" (reorganizar a una fila de 3 columnas: Fecha de Solicitud | Estado | Categoria) o como fila independiente antes de "Usuario (Fan)"
 
-**Actualizacion del handleSubmit:**
-- Pasar `request_date`, `status`, `fan_username`, `fan_spent_amount` al mutate
-- Resetear los nuevos campos en onSuccess
+**Reactividad cuando `category === "buster"`:**
+
+1. **Helper text en "Cuanto ha Gastado"**: Mostrar debajo del input un texto sutil (`text-xs text-amber-500`) que diga: "Aplicar tarifa Buster (Sugerido: +20% o cuota fija)"
+
+2. **Resaltado visual en "Fecha Limite"**: Agregar un borde sutil rojo/amber al input (`border-red-400`) y un icono de rayo al lado del label de "Fecha Limite"
+
+3. **Override del payload en handleSubmit**: Cuando `category === "buster"`, forzar `priority: "alta"` en el objeto enviado al backend (independientemente de lo que el usuario haya seleccionado en el campo Prioridad), e incluir `category: "buster"` en el payload
+
+**Reset en onSuccess:**
+- Resetear `category` a `"normal"`
+
+---
+
+### 4. Contenido adicional de la imagen de referencia
+
+La imagen muestra tipos de contenido adicionales ("Articulo", "Prenda") que no estan en la lista actual. Se agregaran al array `CONTENT_TYPES` para mantener consistencia con el sistema real:
+- `{ value: "articulo", label: "Articulo" }`
+- `{ value: "prenda", label: "Prenda" }`
 
 ---
 
@@ -54,7 +59,7 @@ El campo "Estado" ya existe en la tabla como `status` (default `'pendiente'`).
 
 | Archivo | Cambio |
 |---|---|
-| Nueva migracion SQL | Agregar columnas `request_date`, `fan_username`, `fan_spent_amount` |
-| `src/pages/creadores/personalizados/useCustomRequests.ts` | Actualizar tipo y mutacion |
-| `src/pages/creadores/personalizados/NewRequestModal.tsx` | Agregar 4 campos, renombrar label del chatter |
+| Nueva migracion SQL | Agregar columna `category` |
+| `useCustomRequests.ts` | Agregar `category` al tipo y mutacion |
+| `NewRequestModal.tsx` | Nuevo campo Categoria, reactividad visual, override de payload |
 
