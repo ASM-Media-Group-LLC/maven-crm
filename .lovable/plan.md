@@ -1,21 +1,13 @@
 
-## Quitar campo "Título" del modal de Nueva Solicitud
 
-### Cambio principal
+## Mover campo "Creadora" al inicio del formulario
 
-Eliminar el campo de texto "Título" del formulario y auto-generar el título al momento de crear la solicitud, usando el tipo de contenido y la creadora seleccionada.
+Reorganizar el orden de los campos en `NewRequestModal.tsx` para que "Creadora" sea el primer campo visible al abrir el modal, antes de "Descripcion".
 
-**Formato auto-generado:** `"Video - NombreCreadora"` o `"Foto - Sin asignar"` si no hay creadora.
+### Archivo a modificar
 
----
+**`src/pages/creadores/personalizados/NewRequestModal.tsx`**
 
-### Archivos a modificar
+- Mover el bloque completo del Popover/Combobox de "Creadora" (Label + Popover con Command) desde su posicion actual (despues de Tipo de Contenido/Prioridad) hacia arriba, colocandolo como el primer campo dentro del area scrollable, antes de "Descripcion".
+- No se modifica ninguna logica, solo el orden visual de los campos.
 
-**1. `NewRequestModal.tsx`**
-- Eliminar el estado `title` y su `setTitle`
-- Eliminar el bloque JSX del campo "Título" (Label + Input)
-- En `handleSubmit`: construir el título automaticamente con `contentType` + nombre de la creadora seleccionada
-- Eliminar `setTitle("")` del reset en `onSuccess`
-- Quitar la validacion `disabled={!title.trim()}` del boton (ya no depende de titulo)
-
-**2. Sin cambios en otros archivos** - El campo `title` sigue existiendo en la base de datos y se sigue mostrando en la tabla, tracking drawer y modal de vista. Solo se deja de pedir manualmente.
