@@ -97,7 +97,7 @@ import ReportesPage from "./pages/finanzas/reportes/ReportesPage";
 import ConfiguracionPage from "./pages/finanzas/configuracion/ConfiguracionPage";
 import CollectionsPage from "./pages/finanzas/collections/CollectionsPage";
 import HorasVariablesPage from "./pages/finanzas/horas-variables/HorasVariablesPage";
-import WhaticketPage from "./pages/WhaticketPage";
+import PersonalizadosPage from "./pages/creadores/personalizados/PersonalizadosPage";
 
 const queryClient = new QueryClient();
 
@@ -160,7 +160,7 @@ const App = () => (
               <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
-              <Route path="/whaticket" element={<ProtectedRoute><WhaticketPage /></ProtectedRoute>} />
+              <Route path="/creadores/personalizados" element={<ProtectedRoute><PersonalizadosPage /></ProtectedRoute>} />
               {/* HR routes */}
               <Route path="/hr" element={<ProtectedRoute><HRLayout><HRDashboard /></HRLayout></ProtectedRoute>} />
               <Route path="/hr/directorio" element={<ProtectedRoute><HRLayout><EmployeeDirectory /></HRLayout></ProtectedRoute>} />

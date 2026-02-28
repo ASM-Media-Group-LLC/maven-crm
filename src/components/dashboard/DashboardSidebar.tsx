@@ -47,13 +47,14 @@ const DashboardSidebar = () => {
     { title: "Listado", url: "/creadores" },
   ];
 
-  const creadoresPersonalizados = [
-    { title: "Whaticket", url: "/whaticket" },
+  const creadoresSubItemsExtra = [
+    { title: "Personalizados", url: "/creadores/personalizados" },
   ];
 
-  const isCreadoresActive = creadoresSubItems.some((item) =>
+  const allCreadoresItems = [...creadoresSubItems, ...creadoresSubItemsExtra];
+  const isCreadoresActive = allCreadoresItems.some((item) =>
     item.url === "/creadores" ? pathname === "/creadores" : pathname.startsWith(item.url)
-  ) || creadoresPersonalizados.some((item) => pathname.startsWith(item.url));
+  );
 
   const creatorSalesSubItems = [
     { title: "Dashboard", url: "/sales-overview" },
@@ -222,17 +223,11 @@ const DashboardSidebar = () => {
                           {item.title}
                         </DropdownMenuItem>
                       ))}
-                      {creadoresPersonalizados.length > 0 && (
-                        <>
-                          <div className="-mx-1 my-1 h-px bg-muted" />
-                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Personalizados</div>
-                          {creadoresPersonalizados.map((item) => (
-                            <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
-                              {item.title}
-                            </DropdownMenuItem>
-                          ))}
-                        </>
-                      )}
+                      {creadoresSubItemsExtra.map((item) => (
+                        <DropdownMenuItem key={item.url} onClick={() => navigate(item.url)} className={pathname === item.url ? "bg-accent text-accent-foreground font-medium" : ""}>
+                          {item.title}
+                        </DropdownMenuItem>
+                      ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
@@ -255,19 +250,13 @@ const DashboardSidebar = () => {
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
-                        {creadoresPersonalizados.length > 0 && (
-                          <>
-                            <div className="my-1.5 mx-2 h-px bg-border" />
-                            <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Personalizados</div>
-                            {creadoresPersonalizados.map((item) => (
-                              <SidebarMenuSubItem key={item.url}>
-                                <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
-                                  <NavLink to={item.url}>{item.title}</NavLink>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </>
-                        )}
+                        {creadoresSubItemsExtra.map((item) => (
+                          <SidebarMenuSubItem key={item.url}>
+                            <SidebarMenuSubButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")} className="sidebar-glass-hover data-[active=true]:sidebar-glass-active">
+                              <NavLink to={item.url}>{item.title}</NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
                       </SidebarMenuSub>
                     </CollapsibleContent>
                   </SidebarMenuItem>
