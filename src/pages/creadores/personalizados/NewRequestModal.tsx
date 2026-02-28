@@ -102,11 +102,11 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg !flex !flex-col gap-0 max-h-[85vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Nueva Solicitud de Contenido</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 pt-2">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pt-2 pr-1">
           <div className="space-y-2">
             <Label>Título *</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Describe brevemente la solicitud" />
@@ -223,13 +223,13 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
           </div>
+        </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={!title.trim() || createRequest.isPending}>
-              {createRequest.isPending ? "Creando..." : "Crear Solicitud"}
-            </Button>
-          </div>
+        <div className="shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={!title.trim() || createRequest.isPending}>
+            {createRequest.isPending ? "Creando..." : "Crear Solicitud"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
