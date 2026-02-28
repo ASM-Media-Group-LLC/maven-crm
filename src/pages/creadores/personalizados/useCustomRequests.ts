@@ -19,6 +19,9 @@ export type CustomContentRequest = {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  request_date: string | null;
+  fan_username: string | null;
+  fan_spent_amount: number | null;
   creators?: { id: string; name: string; artistic_name: string | null; profile_photo_url: string | null } | null;
   profiles?: { id: string; full_name: string | null } | null;
   assigned_chatter?: { id: string; full_name: string | null } | null;
@@ -51,6 +54,10 @@ export const useCustomRequests = () => {
       due_date?: string | null;
       assigned_chatter_id?: string | null;
       paid_amount?: number;
+      status?: string;
+      request_date?: string | null;
+      fan_username?: string;
+      fan_spent_amount?: number;
     }) => {
       const { error } = await supabase.from("custom_content_requests").insert({
         ...values,
