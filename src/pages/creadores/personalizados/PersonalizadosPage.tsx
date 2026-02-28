@@ -16,6 +16,7 @@ import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
 import NewRequestModal from "./NewRequestModal";
 import ViewRequestModal from "./ViewRequestModal";
+import TrackingDrawer from "./TrackingDrawer";
 
 const TYPE_COLORS: Record<string, string> = {
   foto: "bg-purple-500/15 text-purple-400 border-purple-500/20",
@@ -62,6 +63,16 @@ const PersonalizadosPage = () => {
   const [typeFilter, setTypeFilter] = useState("all");
   const [newOpen, setNewOpen] = useState(false);
   const [viewRequest, setViewRequest] = useState<CustomContentRequest | null>(null);
+  const [drawerRequest, setDrawerRequest] = useState<CustomContentRequest | null>(null);
+
+  const handleRowClick = (r: CustomContentRequest) => {
+    const isOverdue = r.status !== "completado" && !!r.due_date && new Date(r.due_date) < new Date();
+    if (isOverdue) {
+      setDrawerRequest(r);
+    } else {
+      setViewRequest(r);
+    }
+  };
 
   const filtered = requests.filter((r) => {
     const matchSearch =
@@ -160,7 +171,7 @@ const PersonalizadosPage = () => {
                     </TableRow>
                   ) : (
                     filtered.map((r) => (
-                      <TableRow key={r.id} className="cursor-pointer" onClick={() => setViewRequest(r)}>
+                      <TableRow key={r.id} className="cursor-pointer" onClick={() => handleRowClick(r)}>
                         <TableCell className="font-medium">{r.creators?.artistic_name || r.creators?.name || "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={`capitalize ${TYPE_COLORS[r.content_type] || TYPE_COLORS.otro}`}>{r.content_type}</Badge>
@@ -223,6 +234,7 @@ const PersonalizadosPage = () => {
 
       <NewRequestModal open={newOpen} onOpenChange={setNewOpen} />
       <ViewRequestModal request={viewRequest} open={!!viewRequest} onOpenChange={(open) => !open && setViewRequest(null)} />
+      <TrackingDrawer request={drawerRequest} open={!!drawerRequest} onOpenChange={(open) => !open && setDrawerRequest(null)} />
     </SidebarProvider>
   );
 };
