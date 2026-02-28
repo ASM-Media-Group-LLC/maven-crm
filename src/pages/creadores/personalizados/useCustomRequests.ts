@@ -60,6 +60,8 @@ export const useCustomRequests = () => {
       fan_username?: string;
       fan_spent_amount?: number;
       category?: string;
+      quantity_or_duration?: string;
+      notes?: string;
     }) => {
       const { error } = await supabase.from("custom_content_requests").insert({
         ...values,
