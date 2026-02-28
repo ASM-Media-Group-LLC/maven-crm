@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Trash2, FileText, Clock, Loader, CheckCircle2, AlertTriangle } from "lucide-react";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCustomRequests, type CustomContentRequest } from "./useCustomRequests";
@@ -59,6 +60,9 @@ const PersonalizadosPage = () => {
   const pendientes = requests.filter((r) => r.status === "pendiente").length;
   const enProgreso = requests.filter((r) => r.status === "en_progreso").length;
   const completadas = requests.filter((r) => r.status === "completado").length;
+  const alertas = requests.filter(
+    (r) => r.status === "pendiente" && r.due_date && new Date(r.due_date) < new Date()
+  ).length;
 
   return (
     <SidebarProvider>
@@ -78,20 +82,12 @@ const PersonalizadosPage = () => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Total", value: total },
-                { label: "Pendientes", value: pendientes },
-                { label: "En Progreso", value: enProgreso },
-                { label: "Completadas", value: completadas },
-              ].map((m) => (
-                <Card key={m.label}>
-                  <CardContent className="p-5">
-                    <p className="text-xs font-medium text-muted-foreground">{m.label}</p>
-                    <p className="text-2xl font-bold tracking-tight mt-1">{m.value}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <DashboardMetricCard label="Total Solicitudes" value={String(total)} icon={FileText} subtitle="Todas las solicitudes" color="primary" />
+              <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} subtitle="Por gestionar" color="warning" />
+              <DashboardMetricCard label="En Progreso" value={String(enProgreso)} icon={Loader} subtitle="En proceso" color="accent" />
+              <DashboardMetricCard label="Completadas" value={String(completadas)} icon={CheckCircle2} subtitle="Finalizadas" color="success" />
+              <DashboardMetricCard label="Alertas Críticas" value={String(alertas)} icon={AlertTriangle} subtitle={alertas > 0 ? "Solicitudes vencidas" : "Sin alertas"} color="destructive" />
             </div>
 
             <div className="flex flex-wrap gap-3">
