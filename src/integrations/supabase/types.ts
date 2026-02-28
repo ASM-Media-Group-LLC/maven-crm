@@ -1586,6 +1586,7 @@ export type Database = {
       }
       custom_content_requests: {
         Row: {
+          assigned_chatter_id: string | null
           completed_at: string | null
           content_type: string
           created_at: string
@@ -1594,6 +1595,7 @@ export type Database = {
           due_date: string | null
           id: string
           notes: string | null
+          paid_amount: number | null
           priority: string
           requested_by: string | null
           status: string
@@ -1601,6 +1603,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_chatter_id?: string | null
           completed_at?: string | null
           content_type?: string
           created_at?: string
@@ -1609,6 +1612,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
+          paid_amount?: number | null
           priority?: string
           requested_by?: string | null
           status?: string
@@ -1616,6 +1620,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_chatter_id?: string | null
           completed_at?: string | null
           content_type?: string
           created_at?: string
@@ -1624,6 +1629,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           notes?: string | null
+          paid_amount?: number | null
           priority?: string
           requested_by?: string | null
           status?: string
@@ -1631,6 +1637,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "custom_content_requests_assigned_chatter_id_fkey"
+            columns: ["assigned_chatter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "custom_content_requests_creator_id_fkey"
             columns: ["creator_id"]

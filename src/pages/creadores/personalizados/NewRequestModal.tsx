@@ -42,6 +42,9 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const [creatorId, setCreatorId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [chatterId, setChatterId] = useState<string | null>(null);
+  const [chatterOpen, setChatterOpen] = useState(false);
+  const [paidAmount, setPaidAmount] = useState("");
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-list-simple"],
@@ -50,6 +53,17 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         .from("creators")
         .select("id, name, artistic_name")
         .order("name");
+      return data || [];
+    },
+  });
+
+  const { data: chatters = [] } = useQuery({
+    queryKey: ["profiles-list-simple"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .order("full_name");
       return data || [];
     },
   });
@@ -64,6 +78,8 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         creator_id: creatorId,
         priority,
         due_date: dueDate || null,
+        assigned_chatter_id: chatterId,
+        paid_amount: parseFloat(paidAmount) || undefined,
       },
       {
         onSuccess: () => {
@@ -74,12 +90,15 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           setPriority("normal");
           setCreatorId(null);
           setDueDate("");
+          setChatterId(null);
+          setPaidAmount("");
         },
       }
     );
   };
 
   const selectedCreator = creators.find((c) => c.id === creatorId);
+  const selectedChatter = chatters.find((c) => c.id === chatterId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -156,8 +175,53 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Fecha Límite</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <Label>Chatter / Usuario Asignado</Label>
+            <Popover open={chatterOpen} onOpenChange={setChatterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                  {selectedChatter ? (selectedChatter.full_name || "Sin nombre") : "Seleccionar chatter..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar chatter..." />
+                  <CommandList>
+                    <CommandEmpty>Sin resultados</CommandEmpty>
+                    <CommandGroup>
+                      {chatters.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={c.full_name || ""}
+                          onSelect={() => { setChatterId(c.id); setChatterOpen(false); }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", chatterId === c.id ? "opacity-100" : "opacity-0")} />
+                          {c.full_name || "Sin nombre"}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Valor Pagado</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                placeholder="$0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Fecha Límite</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
