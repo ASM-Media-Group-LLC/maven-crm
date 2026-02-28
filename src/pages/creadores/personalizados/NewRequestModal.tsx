@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,8 @@ const CONTENT_TYPES = [
   { value: "video", label: "Video" },
   { value: "audio", label: "Audio" },
   { value: "texto", label: "Texto" },
+  { value: "articulo", label: "Artículo" },
+  { value: "prenda", label: "Prenda" },
   { value: "otro", label: "Otro" },
 ];
 
@@ -49,6 +51,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const [status, setStatus] = useState("pendiente");
   const [fanUsername, setFanUsername] = useState("");
   const [fanSpentAmount, setFanSpentAmount] = useState("");
+  const [category, setCategory] = useState("normal");
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-list-simple"],
@@ -74,13 +77,14 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
 
   const handleSubmit = () => {
     if (!title.trim()) return;
+    const isBuster = category === "buster";
     createRequest.mutate(
       {
         title: title.trim(),
         description: description.trim() || undefined,
         content_type: contentType,
         creator_id: creatorId,
-        priority,
+        priority: isBuster ? "alta" : priority,
         due_date: dueDate || null,
         assigned_chatter_id: chatterId,
         paid_amount: parseFloat(paidAmount) || undefined,
@@ -88,6 +92,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         request_date: requestDate || null,
         fan_username: fanUsername.trim() || undefined,
         fan_spent_amount: parseFloat(fanSpentAmount) || undefined,
+        category,
       },
       {
         onSuccess: () => {
@@ -104,6 +109,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           setStatus("pendiente");
           setFanUsername("");
           setFanSpentAmount("");
+          setCategory("normal");
         },
       }
     );
@@ -129,7 +135,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detalles adicionales..." rows={3} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Fecha de Solicitud</Label>
               <Input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} />
@@ -146,6 +152,16 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Categoría</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="buster">Buster</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -156,6 +172,9 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
             <div className="space-y-2">
               <Label>Cuánto ha Gastado</Label>
               <Input type="number" step="0.01" min="0" value={fanSpentAmount} onChange={(e) => setFanSpentAmount(e.target.value)} placeholder="$0.00" />
+              {category === "buster" && (
+                <p className="text-xs text-amber-500">Aplicar tarifa Buster (Sugerido: +20% o cuota fija)</p>
+              )}
             </div>
           </div>
 
@@ -261,8 +280,11 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Fecha Límite</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <Label className="flex items-center gap-1">
+                Fecha Límite
+                {category === "buster" && <Zap className="h-3.5 w-3.5 text-amber-500" />}
+              </Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={category === "buster" ? "border-red-400" : ""} />
             </div>
           </div>
         </div>
