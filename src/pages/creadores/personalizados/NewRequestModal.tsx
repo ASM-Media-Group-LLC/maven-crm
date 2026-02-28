@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, Zap } from "lucide-react";
+import { Check, ChevronsUpDown, Zap, Upload, X, FileVideo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,10 +22,8 @@ const CONTENT_TYPES = [
   { value: "foto", label: "Foto" },
   { value: "video", label: "Video" },
   { value: "audio", label: "Audio" },
-  { value: "texto", label: "Texto" },
   { value: "articulo", label: "Artículo" },
   { value: "prenda", label: "Prenda" },
-  { value: "otro", label: "Otro" },
 ];
 
 const PRIORITIES = [
@@ -47,12 +45,16 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
   const [chatterOpen, setChatterOpen] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
   const [requestDate, setRequestDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [status, setStatus] = useState("pendiente");
+  const [status, setStatus] = useState("solicitado");
   const [fanUsername, setFanUsername] = useState("");
   const [fanSpentAmount, setFanSpentAmount] = useState("");
   const [category, setCategory] = useState("normal");
   const [quantityOrDuration, setQuantityOrDuration] = useState("");
   const [notes, setNotes] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-list-simple"],
@@ -76,11 +78,48 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
     },
   });
 
-  const handleSubmit = () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAttachmentFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setAttachmentPreview(url);
+    } else {
+      setAttachmentPreview(null);
+    }
+  };
+
+  const removeFile = () => {
+    setAttachmentFile(null);
+    setAttachmentPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleSubmit = async () => {
     const isBuster = category === "buster";
     const contentLabel = CONTENT_TYPES.find((t) => t.value === contentType)?.label || contentType;
     const creatorName = selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Sin asignar";
     const autoTitle = `${contentLabel} - ${creatorName}`;
+
+    let attachment_url: string | undefined;
+    if (attachmentFile) {
+      setUploading(true);
+      const ext = attachmentFile.name.split(".").pop();
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("custom-request-attachments")
+        .upload(path, attachmentFile);
+      setUploading(false);
+      if (uploadError) {
+        return;
+      }
+      const { data: urlData } = supabase.storage
+        .from("custom-request-attachments")
+        .getPublicUrl(path);
+      attachment_url = urlData.publicUrl;
+    }
+
     createRequest.mutate(
       {
         title: autoTitle,
@@ -98,6 +137,7 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
         category,
         quantity_or_duration: quantityOrDuration.trim() || undefined,
         notes: notes.trim() || undefined,
+        attachment_url,
       },
       {
         onSuccess: () => {
@@ -110,12 +150,13 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
           setChatterId(null);
           setPaidAmount("");
           setRequestDate(new Date().toISOString().slice(0, 10));
-          setStatus("pendiente");
+          setStatus("solicitado");
           setFanUsername("");
           setFanSpentAmount("");
           setCategory("normal");
           setQuantityOrDuration("");
           setNotes("");
+          removeFile();
         },
       }
     );
@@ -178,10 +219,11 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="solicitado">Solicitado</SelectItem>
+                  <SelectItem value="en_proceso">En proceso</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="en_progreso">En Progreso</SelectItem>
-                  <SelectItem value="completado">Completado</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                  <SelectItem value="entregado">Entregado</SelectItem>
+                  <SelectItem value="denegado">Denegado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -241,10 +283,47 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
               <Label>Tiempo o Cantidad</Label>
               <Input value={quantityOrDuration} onChange={(e) => setQuantityOrDuration(e.target.value)} placeholder="Ej: 5 min, 3 fotos..." />
             </div>
-            <div className="space-y-2">
-              <Label>Notas</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones adicionales..." rows={2} />
-            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Notas</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones adicionales..." rows={2} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Adjuntar Imagen o Video</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {!attachmentFile ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Seleccionar archivo...
+              </Button>
+            ) : (
+              <div className="flex items-center gap-3 rounded-md border p-2">
+                {attachmentPreview ? (
+                  <img src={attachmentPreview} alt="Preview" className="h-16 w-16 rounded object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded bg-muted">
+                    <FileVideo className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+                <span className="flex-1 truncate text-sm">{attachmentFile.name}</span>
+                <Button type="button" variant="ghost" size="icon" onClick={removeFile}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -303,8 +382,8 @@ const NewRequestModal = ({ open, onOpenChange }: Props) => {
 
         <div className="shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={createRequest.isPending}>
-            {createRequest.isPending ? "Creando..." : "Crear Solicitud"}
+          <Button onClick={handleSubmit} disabled={createRequest.isPending || uploading}>
+            {uploading ? "Subiendo..." : createRequest.isPending ? "Creando..." : "Crear Solicitud"}
           </Button>
         </div>
       </DialogContent>

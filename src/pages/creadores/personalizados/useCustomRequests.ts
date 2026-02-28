@@ -23,6 +23,7 @@ export type CustomContentRequest = {
   fan_username: string | null;
   fan_spent_amount: number | null;
   category: string;
+  attachment_url: string | null;
   creators?: { id: string; name: string; artistic_name: string | null; profile_photo_url: string | null } | null;
   profiles?: { id: string; full_name: string | null } | null;
   assigned_chatter?: { id: string; full_name: string | null } | null;
@@ -62,6 +63,7 @@ export const useCustomRequests = () => {
       category?: string;
       quantity_or_duration?: string;
       notes?: string;
+      attachment_url?: string;
     }) => {
       const { error } = await supabase.from("custom_content_requests").insert({
         ...values,
