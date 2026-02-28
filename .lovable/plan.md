@@ -1,87 +1,50 @@
 
 
-## Reemplazar Whaticket por "Personalizados" (solicitudes de contenido personalizado)
+## Migrar KPIs a DashboardMetricCard y agregar "Alertas Criticas"
 
 ### Resumen
 
-Se eliminara la funcionalidad de Whaticket (pagina, sidebar link, hook) y se reemplazara con una nueva seccion "Personalizados" dentro de Creadores. Esta seccion permitira crear solicitudes de contenido personalizado y ver/gestionar las existentes.
+Se reemplazaran las 4 tarjetas KPI actuales (Card + CardContent manuales) por el componente estandarizado `DashboardMetricCard` que ya existe en el proyecto, y se agregara una quinta tarjeta "Alertas Criticas" que muestra solicitudes con estado "pendiente" que han superado su fecha limite (no enviadas a tiempo).
 
----
+### Cambios en un solo archivo
 
-### 1. Crear tabla en Supabase
+**Archivo:** `src/pages/creadores/personalizados/PersonalizadosPage.tsx`
 
-Nueva tabla `custom_content_requests`:
+### 1. Nuevos imports
 
-```text
-id             UUID (PK, default gen_random_uuid())
-creator_id     UUID (FK -> creators.id, nullable)
-title          TEXT NOT NULL
-description    TEXT
-content_type   TEXT NOT NULL (ej: "foto", "video", "audio", "otro")
-status         TEXT DEFAULT 'pendiente' (pendiente, en_progreso, completado, cancelado)
-priority       TEXT DEFAULT 'normal' (baja, normal, alta, urgente)
-requested_by   UUID (FK -> profiles.id)
-notes          TEXT
-due_date       DATE (nullable)
-completed_at   TIMESTAMPTZ (nullable)
-created_at     TIMESTAMPTZ DEFAULT now()
-updated_at     TIMESTAMPTZ DEFAULT now()
+- Agregar `DashboardMetricCard` desde `@/components/dashboard/DashboardMetricCard`
+- Agregar iconos de Lucide: `FileText`, `Clock`, `Loader`, `CheckCircle`, `AlertTriangle`
+
+### 2. Nueva metrica: "Alertas Criticas"
+
+Calcular solicitudes "no enviadas" como aquellas con `status === "pendiente"` cuya `due_date` ya paso (fecha limite vencida):
+
+```typescript
+const alertas = requests.filter(
+  (r) => r.status === "pendiente" && r.due_date && new Date(r.due_date) < new Date()
+).length;
 ```
 
-Con politicas RLS para usuarios autenticados y trigger `update_updated_at_column`.
+### 3. Reemplazar grid de KPIs
 
----
+Cambiar el bloque actual de `<Card>` manuales (lineas 81-95) por un grid de 5 columnas usando `DashboardMetricCard`:
 
-### 2. Crear pagina `/creadores/personalizados`
+```text
+grid grid-cols-2 md:grid-cols-5 gap-4
+```
 
-Nuevo archivo `src/pages/creadores/personalizados/PersonalizadosPage.tsx`:
+Las 5 tarjetas seran:
 
-- **KPI Cards**: Total solicitudes, Pendientes, En progreso, Completadas
-- **Filtros**: Busqueda por titulo/creadora, filtro por estado, filtro por tipo de contenido
-- **Tabla**: Lista de solicitudes con columnas: titulo, creadora, tipo, estado, prioridad, fecha, acciones
-- **Modal "Nueva Solicitud"**: Formulario con campos de titulo, descripcion, tipo de contenido, creadora (combobox searchable), prioridad, fecha limite
-- **Modal "Ver/Editar"**: Para ver detalle y actualizar estado/notas
+| Label | Valor | Icono | Color |
+|---|---|---|---|
+| Total Solicitudes | total | FileText | primary |
+| Pendientes | pendientes | Clock | warning |
+| En Progreso | enProgreso | Loader | accent |
+| Completadas | completadas | CheckCircle | success |
+| Alertas Criticas | alertas | AlertTriangle | destructive |
 
-Seguira el mismo patron de layout que las demas paginas de creadores (SidebarProvider + DashboardSidebar + DashboardTopbar).
+La tarjeta de "Alertas Criticas" usara el color `destructive` del DashboardMetricCard, que aplica automaticamente el tono rojo sutil en dark mode (icono rojo, valor rojo, hover con gradiente rojo). Ademas incluira un `subtitle` condicional: si hay alertas mostrara "Solicitudes vencidas", si no mostrara "Sin alertas".
 
----
+### Resultado visual
 
-### 3. Actualizar Sidebar
-
-En `src/components/dashboard/DashboardSidebar.tsx`:
-
-- Cambiar `creadoresPersonalizados` de `{ title: "Whaticket", url: "/whaticket" }` a `{ title: "Personalizados", url: "/creadores/personalizados" }`
-- Eliminar la sub-seccion visual "Personalizados" como grupo separado; en su lugar, agregar "Personalizados" como un item mas dentro de `creadoresSubItems` (quinto item despues de Listado)
-- Eliminar el separador y label "Personalizados" del JSX
-
----
-
-### 4. Actualizar rutas en App.tsx
-
-- Eliminar la ruta `/whaticket` y el import de `WhaticketPage`
-- Agregar ruta `/creadores/personalizados` con el nuevo `PersonalizadosPage`
-
----
-
-### 5. Limpiar archivos de Whaticket
-
-- **No eliminar**: `src/hooks/useWhaticketLink.ts` ni las referencias en `InfoTabContent.tsx` / `ViewCreadorModal.tsx` (esos muestran el link de Whaticket en el perfil de la creadora, que es funcionalidad independiente y util)
-- **Eliminar**: `src/pages/WhaticketPage.tsx` (se vaciara/reemplazara)
-
----
-
-### Detalles tecnicos
-
-**Archivos a crear:**
-- `src/pages/creadores/personalizados/PersonalizadosPage.tsx` - Pagina principal
-- `src/pages/creadores/personalizados/NewRequestModal.tsx` - Modal de nueva solicitud
-- `src/pages/creadores/personalizados/ViewRequestModal.tsx` - Modal de ver/editar
-- `src/pages/creadores/personalizados/useCustomRequests.ts` - Hook de datos
-
-**Archivos a modificar:**
-- `src/components/dashboard/DashboardSidebar.tsx` - Actualizar navegacion
-- `src/App.tsx` - Actualizar rutas
-
-**Archivos a eliminar/vaciar:**
-- `src/pages/WhaticketPage.tsx` - Ya no se necesita como pagina independiente
-
+Las tarjetas tendran el mismo estilo estandarizado del resto de la plataforma: icono con fondo semitransparente, efecto hover con escala y gradiente, y colores semanticos consistentes con el dark mode existente.
