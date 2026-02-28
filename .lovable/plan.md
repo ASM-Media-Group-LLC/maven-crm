@@ -1,50 +1,69 @@
 
 
-## Migrar KPIs a DashboardMetricCard y agregar "Alertas Criticas"
+## Redisenar tabla de seguimiento en Personalizados
 
 ### Resumen
 
-Se reemplazaran las 4 tarjetas KPI actuales (Card + CardContent manuales) por el componente estandarizado `DashboardMetricCard` que ya existe en el proyecto, y se agregara una quinta tarjeta "Alertas Criticas" que muestra solicitudes con estado "pendiente" que han superado su fecha limite (no enviadas a tiempo).
+Se actualizara la tabla en `PersonalizadosPage.tsx` para incluir las columnas solicitadas con badges estilizados, una columna de Notas con Popover flotante, y una columna de Alerta de Envio con indicadores visuales.
 
 ### Cambios en un solo archivo
 
 **Archivo:** `src/pages/creadores/personalizados/PersonalizadosPage.tsx`
 
-### 1. Nuevos imports
+### 1. Nuevas columnas de la tabla
 
-- Agregar `DashboardMetricCard` desde `@/components/dashboard/DashboardMetricCard`
-- Agregar iconos de Lucide: `FileText`, `Clock`, `Loader`, `CheckCircle`, `AlertTriangle`
+Reemplazar las columnas actuales (Titulo, Creadora, Tipo, Estado, Prioridad, Fecha Limite, Acciones) por:
 
-### 2. Nueva metrica: "Alertas Criticas"
+| Columna | Contenido |
+|---|---|
+| Creadora | Nombre artistico o nombre real de la creadora |
+| Tipo de Contenido | Badge con color tenue segun tipo (foto, video, audio, texto, otro) |
+| Fecha Limite | Fecha formateada con date-fns |
+| Chatter/Usuario | Nombre del usuario que solicito (desde `profiles.full_name`) |
+| Estado | Badge con colores tenues existentes (pendiente, en_progreso, completado, cancelado) |
+| Notas | Icono de documento clicable que abre un Popover |
+| Alerta de Envio | Check verde si completado, X roja si pendiente/retrasado |
+| Acciones | Botones de ver y eliminar (sticky right) |
 
-Calcular solicitudes "no enviadas" como aquellas con `status === "pendiente"` cuya `due_date` ya paso (fecha limite vencida):
+### 2. Columna "Notas" con Popover
 
-```typescript
-const alertas = requests.filter(
-  (r) => r.status === "pendiente" && r.due_date && new Date(r.due_date) < new Date()
-).length;
-```
+- Se importara `Popover`, `PopoverTrigger`, `PopoverContent` desde `@/components/ui/popover`
+- Al hacer clic en el icono `MessageSquare`, se abrira un Popover con fondo oscuro (`bg-card border`) que mostrara:
+  - El titulo de la solicitud como encabezado
+  - La descripcion completa
+  - Las notas/detalles de pago
+  - Un area para miniaturas de fotos de referencia (placeholder con icono de imagen si no hay fotos)
+- Se usara `e.stopPropagation()` para evitar que el clic abra el modal de vista
 
-### 3. Reemplazar grid de KPIs
+### 3. Columna "Alerta de Envio"
 
-Cambiar el bloque actual de `<Card>` manuales (lineas 81-95) por un grid de 5 columnas usando `DashboardMetricCard`:
+Logica del indicador visual:
+- **Check verde** (`CheckCircle2` con `text-green-400`): si `status === "completado"`
+- **X roja** (`XCircle` con `text-red-400`): si `status === "pendiente"` o `status === "en_progreso"` y la fecha limite ya paso
+- **Reloj amarillo** (`Clock` con `text-yellow-400`): si esta pendiente pero la fecha limite no ha pasado aun
+- **Guion**: si no hay fecha limite asignada
+
+### 4. Badges con colores tenues para tipo de contenido
+
+Nuevo mapa de colores para la columna "Tipo":
 
 ```text
-grid grid-cols-2 md:grid-cols-5 gap-4
+foto   -> bg-purple-500/15 text-purple-400 border-purple-500/20
+video  -> bg-cyan-500/15 text-cyan-400 border-cyan-500/20  
+audio  -> bg-pink-500/15 text-pink-400 border-pink-500/20
+texto  -> bg-emerald-500/15 text-emerald-400 border-emerald-500/20
+otro   -> bg-muted text-muted-foreground
 ```
 
-Las 5 tarjetas seran:
+### 5. Estilos de tabla
 
-| Label | Valor | Icono | Color |
-|---|---|---|---|
-| Total Solicitudes | total | FileText | primary |
-| Pendientes | pendientes | Clock | warning |
-| En Progreso | enProgreso | Loader | accent |
-| Completadas | completadas | CheckCircle | success |
-| Alertas Criticas | alertas | AlertTriangle | destructive |
+- Header sticky con `sticky top-0 z-10 bg-card`
+- Columna acciones sticky right
+- Texto de headers en `text-xs`
+- ColSpan actualizado a 8 para los estados vacios/cargando
 
-La tarjeta de "Alertas Criticas" usara el color `destructive` del DashboardMetricCard, que aplica automaticamente el tono rojo sutil en dark mode (icono rojo, valor rojo, hover con gradiente rojo). Ademas incluira un `subtitle` condicional: si hay alertas mostrara "Solicitudes vencidas", si no mostrara "Sin alertas".
+### Imports nuevos necesarios
 
-### Resultado visual
+- `Popover, PopoverTrigger, PopoverContent` de `@/components/ui/popover`
+- `MessageSquare, XCircle, ImageIcon` de `lucide-react`
 
-Las tarjetas tendran el mismo estilo estandarizado del resto de la plataforma: icono con fondo semitransparente, efecto hover con escala y gradiente, y colores semanticos consistentes con el dark mode existente.
