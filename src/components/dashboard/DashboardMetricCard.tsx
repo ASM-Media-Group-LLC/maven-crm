@@ -49,14 +49,14 @@ const DashboardMetricCard = ({ label, value, icon: MetricIcon, subtitle, color =
   const config = colorConfig[color];
 
   return (
-    <Card className={cn("transition-all duration-200 cursor-default", config.hover)}>
+    <Card className={cn("transition-all duration-200 cursor-default min-w-0 overflow-hidden", config.hover)}>
       <CardContent className="flex items-start gap-4 p-5">
         <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", config.icon)}>
           <MetricIcon className="h-5 w-5" />
         </div>
-        <div className="flex-1 space-y-0.5">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className={cn("text-2xl font-bold tracking-tight", config.value)}>{value}</p>
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
+          <p className={cn("text-xl font-bold tracking-tight", config.value)}>{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
       </CardContent>

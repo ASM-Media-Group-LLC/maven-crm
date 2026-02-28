@@ -110,7 +110,7 @@ const PersonalizadosPage = () => {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               <DashboardMetricCard label="Total Solicitudes" value={String(total)} icon={FileText} subtitle="Todas las solicitudes" color="primary" />
               <DashboardMetricCard label="Pendientes" value={String(pendientes)} icon={Clock} subtitle="Por gestionar" color="warning" />
               <DashboardMetricCard label="En Progreso" value={String(enProgreso)} icon={Loader} subtitle="En proceso" color="accent" />
