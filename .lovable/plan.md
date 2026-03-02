@@ -1,33 +1,45 @@
 
 
-## Problema
+## Plan: Mejorar el Landing Page de Maven
 
-Supabase **no devuelve un error** cuando un email ya está registrado — por seguridad, devuelve status 200 con un objeto `user` falso para no revelar qué emails existen. La diferencia es que `data.user.identities` viene como un **array vacío** `[]` cuando el email ya existe.
+El landing actual tiene una estructura básica (hero, 6 módulos, 4 stats, CTA, footer). Vamos a enriquecerlo significativamente con más secciones y contenido que refleje todo lo que la plataforma ofrece.
 
-El código actual no detecta esto y procede como si el registro fuera exitoso, navegando a `/verify-email` donde el usuario nunca recibe código.
+### Nuevas secciones y mejoras
 
-## Solución
+**1. Navbar** — Agregar más links: "Funcionalidades", "Módulos", "Beneficios", "Métricas"
 
-En `Register.tsx`, después de la llamada a `signUp`, verificar si `data.user?.identities?.length === 0`. Si es así, mostrar un error claro al usuario indicando que ese email ya está registrado, **sin navegar** a `/verify-email`.
+**2. Hero mejorado** — Subtítulo más descriptivo + lista de bullets rápidos con iconos (ej: "Gestión de creadores", "Sales tracking", "HR completo", "Messenger interno")
 
-### Cambio en `Register.tsx` (después de línea 64)
+**3. Módulos expandidos (de 6 a 10+)** — Agregar los módulos que faltan:
+- HR & Recursos Humanos (onboarding, nómina, vacaciones, monitoreo)
+- Finanzas (facturación, comisiones, nómina, reportes)
+- Messenger interno (chat, videollamadas, archivos compartidos)
+- Tareas & Proyectos (kanban, subtareas, compartir proyectos)
+- Tickets (soporte interno, seguimiento)
+- AI Sales (chat IA para ventas)
 
-Agregar detección de email duplicado:
+**4. Nueva sección: "Cómo funciona"** — 3 pasos visuales:
+1. Registra tu agencia
+2. Configura tus módulos
+3. Escala tus operaciones
 
-```typescript
-if (!error && data.user?.identities?.length === 0) {
-  setLoading(false);
-  toast({
-    title: "Email ya registrado",
-    description: "Ya existe una cuenta con este email. Intenta iniciar sesión.",
-    variant: "destructive",
-  });
-  return;
-}
-```
+**5. Nueva sección: "Beneficios clave"** — Grid de 4 beneficios con iconos:
+- Todo centralizado
+- Automatización inteligente
+- Reportes en tiempo real
+- Seguridad y control de roles
 
-También eliminar el toast redundante de línea 88 ("Cuenta creada...") ya que la página `/verify-email` comunica lo necesario.
+**6. Nueva sección: "Trusted by" / Social proof** — Texto de confianza con logos/badges genéricos
 
-### Un solo archivo modificado
-- `src/pages/Register.tsx` — agregar detección de `identities` vacío + eliminar toast redundante
+**7. Stats mejorados** — Agregar más métricas relevantes
+
+**8. FAQ section** — 4-5 preguntas frecuentes con acordeón
+
+**9. Footer mejorado** — Columnas con links organizados por categoría
+
+### Archivo modificado
+- `src/pages/Landing.tsx` — reescritura completa con todas las secciones nuevas
+
+### Diseño visual
+Se mantiene el mismo lenguaje visual: fondo oscuro `hsl(240,10%,2%)`, glass cards, gradientes animados, tipografía white/60 para texto secundario, componentes existentes (`Badge`, `Button`, `AnimatedGradientBackground`, `AnimatedWaves`). Se usa el `Accordion` de Radix para el FAQ.
 
