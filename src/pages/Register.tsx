@@ -85,8 +85,8 @@ const Register = () => {
     }
 
     setLoading(false);
-    toast({ title: "Cuenta creada", description: "Te enviamos un correo de verificación. Revisa tu bandeja de entrada y haz clic en el enlace para activar tu cuenta." });
-    navigate("/login");
+    toast({ title: "Cuenta creada", description: "Te enviamos un código de verificación a tu email." });
+    navigate("/verify-email", { state: { email: email.trim() } });
   };
 
   return (
