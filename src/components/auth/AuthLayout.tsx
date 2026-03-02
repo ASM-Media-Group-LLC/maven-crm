@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import AnimatedGradientBackground from "./AnimatedGradientBackground";
 import AnimatedWaves from "./AnimatedWaves";
@@ -16,13 +15,11 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
       <AnimatedGradientBackground />
       <AnimatedWaves />
       {/* Topbar */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4">
-        <Link to="/">
-          <Button type="button" variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-start px-6 py-4">
+        <Link to="/" className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm">
+          <ArrowLeft className="h-4 w-4" />
+          <span>Volver al inicio</span>
         </Link>
-        <Logo size="xs" />
       </div>
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-8">
         <Logo size="md" />
