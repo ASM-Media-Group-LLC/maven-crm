@@ -69,6 +69,16 @@ const Register = () => {
       return;
     }
 
+    if (!error && data.user?.identities?.length === 0) {
+      setLoading(false);
+      toast({
+        title: "Email ya registrado",
+        description: "Ya existe una cuenta con este email. Intenta iniciar sesión.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (company.trim() && data.user) {
       const { data: companyData } = await supabase
         .from("companies")
@@ -85,7 +95,6 @@ const Register = () => {
     }
 
     setLoading(false);
-    toast({ title: "Cuenta creada", description: "Te enviamos un código de verificación a tu email." });
     navigate("/verify-email", { state: { email: email.trim() } });
   };
 
