@@ -4,6 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import ScrollReveal from "@/components/landing/ScrollReveal";
 
 const faqs = [
   {
@@ -31,27 +32,29 @@ const faqs = [
 const LandingFAQ = () => (
   <section id="faq" className="py-20">
     <div className="mx-auto max-w-3xl px-4">
-      <h2 className="mb-3 animate-fade-in-up text-center text-2xl font-bold text-white md:text-3xl">
-        Preguntas frecuentes
-      </h2>
-      <p className="mx-auto mb-10 max-w-xl text-center text-white/50">
-        Todo lo que necesitas saber para empezar.
-      </p>
+      <ScrollReveal>
+        <h2 className="mb-3 text-center text-2xl font-bold text-white md:text-3xl">
+          Preguntas frecuentes
+        </h2>
+        <p className="mx-auto mb-10 max-w-xl text-center text-white/50">
+          Todo lo que necesitas saber para empezar.
+        </p>
+      </ScrollReveal>
       <Accordion type="single" collapsible className="space-y-3">
         {faqs.map((faq, i) => (
-          <AccordionItem
-            key={i}
-            value={`faq-${i}`}
-            className="glass-card-subtle animate-fade-in-up overflow-hidden rounded-xl border-white/[0.06] px-5"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
-            <AccordionTrigger className="text-left text-sm font-medium text-white hover:no-underline [&>svg]:text-white/40">
-              {faq.q}
-            </AccordionTrigger>
-            <AccordionContent className="text-sm leading-relaxed text-white/55">
-              {faq.a}
-            </AccordionContent>
-          </AccordionItem>
+          <ScrollReveal key={i} delay={i * 80}>
+            <AccordionItem
+              value={`faq-${i}`}
+              className="glass-card-subtle overflow-hidden rounded-xl border-white/[0.06] px-5 transition-all duration-300 hover:border-white/15"
+            >
+              <AccordionTrigger className="text-left text-sm font-medium text-white hover:no-underline [&>svg]:text-white/40">
+                {faq.q}
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-white/55">
+                {faq.a}
+              </AccordionContent>
+            </AccordionItem>
+          </ScrollReveal>
         ))}
       </Accordion>
     </div>
