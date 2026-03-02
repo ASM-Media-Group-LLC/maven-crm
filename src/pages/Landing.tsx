@@ -11,6 +11,7 @@ import LandingBenefits from "./landing/LandingBenefits";
 import LandingStats from "./landing/LandingStats";
 import LandingFAQ from "./landing/LandingFAQ";
 import LandingFooter from "./landing/LandingFooter";
+import ScrollReveal from "@/components/landing/ScrollReveal";
 
 const heroPills = [
   { icon: Users, label: "Gestión de creadores" },
@@ -66,7 +67,7 @@ const Landing = () => {
           {/* Hero pills */}
           <div className="mb-8 flex animate-fade-in-up flex-wrap justify-center gap-3" style={{ animationDelay: "250ms" }}>
             {heroPills.map((pill) => (
-              <span key={pill.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
+              <span key={pill.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition-all duration-300 hover:border-white/20 hover:bg-white/10">
                 <pill.icon className="h-3.5 w-3.5 text-primary" />
                 {pill.label}
               </span>
@@ -83,17 +84,28 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Gradient divider */}
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+
       {/* Modules */}
       <LandingModules />
+
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-accent/20 to-transparent" />
 
       {/* How it works */}
       <LandingHowItWorks />
 
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+
       {/* Benefits */}
       <LandingBenefits />
 
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-accent/20 to-transparent" />
+
       {/* Stats */}
       <LandingStats />
+
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
 
       {/* FAQ */}
       <LandingFAQ />
@@ -102,18 +114,20 @@ const Landing = () => {
       <section className="relative overflow-hidden py-20">
         <AnimatedGradientBackground />
         <div className="relative z-10 mx-auto max-w-3xl px-4 text-center">
-          <div className="glass-card p-10 md:p-14">
-            <Zap className="mx-auto mb-4 h-10 w-10 animate-float text-primary" />
-            <h2 className="mb-4 text-2xl font-bold text-white md:text-3xl">
-              ¿Listo para escalar tu agencia?
-            </h2>
-            <p className="mb-8 text-white/60">
-              Únete a las agencias que ya optimizan sus operaciones con Maven.
-            </p>
-            <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
-              <Link to="/register">Comenzar ahora</Link>
-            </Button>
-          </div>
+          <ScrollReveal direction="scale">
+            <div className="glass-card p-10 md:p-14">
+              <Zap className="mx-auto mb-4 h-10 w-10 animate-float text-primary" />
+              <h2 className="mb-4 text-2xl font-bold text-white md:text-3xl">
+                ¿Listo para escalar tu agencia?
+              </h2>
+              <p className="mb-8 text-white/60">
+                Únete a las agencias que ya optimizan sus operaciones con Maven.
+              </p>
+              <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
+                <Link to="/register">Comenzar ahora</Link>
+              </Button>
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
