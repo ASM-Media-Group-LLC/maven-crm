@@ -7,7 +7,7 @@ import AuthLayout from "@/components/auth/AuthLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
   const { user, loading: authLoading } = useAuth();
@@ -53,11 +53,6 @@ const Login = () => {
     <AuthLayout>
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-2">
-          <Link to="/" className="self-start">
-            <Button type="button" variant="ghost" size="icon" className="text-white/50 hover:text-white hover:bg-white/10">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
           <h2 className="text-2xl font-bold text-white">Iniciar sesión</h2>
           <p className="text-sm text-white/50">Ingresa tus credenciales para acceder al CRM</p>
         </div>
