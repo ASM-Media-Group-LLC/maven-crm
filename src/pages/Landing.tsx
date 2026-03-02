@@ -4,85 +4,39 @@ import Logo from "@/components/Logo";
 import { Badge } from "@/components/ui/badge";
 import AnimatedGradientBackground from "@/components/auth/AnimatedGradientBackground";
 import AnimatedWaves from "@/components/auth/AnimatedWaves";
-import {
-  Users,
-  FileText,
-  Target,
-  Contact,
-  Receipt,
-  CalendarDays,
-  TrendingUp,
-  BarChart3,
-  Clock,
-  Zap,
-} from "lucide-react";
+import { Zap, Users, DollarSign, Briefcase, MessageSquare } from "lucide-react";
+import LandingModules from "./landing/LandingModules";
+import LandingHowItWorks from "./landing/LandingHowItWorks";
+import LandingBenefits from "./landing/LandingBenefits";
+import LandingStats from "./landing/LandingStats";
+import LandingFAQ from "./landing/LandingFAQ";
+import LandingFooter from "./landing/LandingFooter";
 
-const modules = [
-  {
-    icon: Users,
-    title: "Gestión de Creadores",
-    description: "Administra perfiles, contratos, monetización y seguimiento de cada creador en un solo lugar.",
-    metric: "215+ creadores",
-    color: "bg-accent",
-  },
-  {
-    icon: FileText,
-    title: "Promolog",
-    description: "Registro y seguimiento de promociones, campañas y acciones de marketing por creador.",
-    metric: "Tracking diario",
-    color: "bg-primary",
-  },
-  {
-    icon: Target,
-    title: "LeadGen & Marketing",
-    description: "Captura, califica y convierte leads en creadores activos con pipeline visual.",
-    metric: "Pipeline completo",
-    color: "bg-success",
-  },
-  {
-    icon: Contact,
-    title: "Contacts & Closers",
-    description: "Gestiona contactos, asigna closers y da seguimiento a cada oportunidad de negocio.",
-    metric: "CRM integrado",
-    color: "bg-warning",
-  },
-  {
-    icon: Receipt,
-    title: "Sales & Revenue",
-    description: "Dashboards de ventas, earnings por creador, métricas de rendimiento y reportes.",
-    metric: "$2.3M+ tracked",
-    color: "bg-destructive",
-  },
-  {
-    icon: CalendarDays,
-    title: "Eventos & Calendario",
-    description: "Organiza eventos, gestiona invitados, checklists y comparte links externos.",
-    metric: "Gestión completa",
-    color: "bg-primary",
-  },
-];
-
-const stats = [
-  { icon: Users, value: "215+", label: "Creadores activos" },
-  { icon: BarChart3, value: "2.3K+", label: "Registros procesados" },
-  { icon: Clock, value: "24/7", label: "Monitoreo continuo" },
-  { icon: TrendingUp, value: "↑ 32%", label: "Crecimiento mensual" },
+const heroPills = [
+  { icon: Users, label: "Gestión de creadores" },
+  { icon: DollarSign, label: "Sales tracking" },
+  { icon: Briefcase, label: "HR completo" },
+  { icon: MessageSquare, label: "Messenger interno" },
 ];
 
 const Landing = () => {
   return (
     <div className="min-h-screen bg-[hsl(240,10%,2%)] text-white">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-[hsl(240,10%,2%)]/80 backdrop-blur-xl transition-all duration-300">
+      <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-[hsl(240,10%,2%)]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Logo size="sm" />
           <div className="hidden items-center gap-6 md:flex">
-            <a href="#funcionalidades" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Funcionalidades</span>
-            </a>
-            <a href="#metricas" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Métricas</span>
-            </a>
+            {[
+              { href: "#modulos", label: "Módulos" },
+              { href: "#beneficios", label: "Beneficios" },
+              { href: "#metricas", label: "Métricas" },
+              { href: "#faq", label: "FAQ" },
+            ].map((link) => (
+              <a key={link.href} href={link.href} className="text-sm text-white/50 transition-colors hover:text-white">
+                {link.label}
+              </a>
+            ))}
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" asChild className="border-white/10 text-white hover:bg-white/10">
@@ -106,13 +60,21 @@ const Landing = () => {
           <div className="animate-fade-in-up" style={{ animationDelay: "100ms" }}>
             <Logo size="lg" className="mb-6" />
           </div>
-          <p className="mx-auto mb-4 max-w-2xl animate-fade-in-up text-lg text-white/60 md:text-xl" style={{ animationDelay: "200ms" }}>
-            La plataforma todo-en-uno para gestionar creadores, ventas, leads, eventos y operaciones de tu agencia.
+          <p className="mx-auto mb-6 max-w-2xl animate-fade-in-up text-lg text-white/60 md:text-xl" style={{ animationDelay: "200ms" }}>
+            La plataforma todo-en-uno para gestionar creadores, ventas, leads, HR, finanzas, eventos y comunicación de tu agencia.
           </p>
-          <div className="mb-10 h-1 w-24 animate-fade-in-up animate-pulse rounded-full bg-gradient-to-r from-accent to-primary opacity-80" style={{ animationDelay: "250ms" }} />
-          <div className="flex animate-fade-in-up items-center gap-4" style={{ animationDelay: "300ms" }}>
+          {/* Hero pills */}
+          <div className="mb-8 flex animate-fade-in-up flex-wrap justify-center gap-3" style={{ animationDelay: "250ms" }}>
+            {heroPills.map((pill) => (
+              <span key={pill.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">
+                <pill.icon className="h-3.5 w-3.5 text-primary" />
+                {pill.label}
+              </span>
+            ))}
+          </div>
+          <div className="flex animate-fade-in-up items-center gap-4" style={{ animationDelay: "350ms" }}>
             <Button size="lg" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-[0_0_25px_hsl(var(--primary)/0.4)]">
-              <Link to="/register">Crear cuenta</Link>
+              <Link to="/register">Crear cuenta gratis</Link>
             </Button>
             <Button size="lg" variant="outline" asChild className="border-white/10 text-white transition-all duration-300 hover:scale-105 hover:bg-white/10">
               <Link to="/login">Iniciar sesión</Link>
@@ -121,45 +83,20 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Modules Grid */}
-      <section id="funcionalidades" className="mx-auto max-w-6xl px-4 pb-20 pt-20">
-        <h2 className="mb-10 animate-fade-in-up text-center text-2xl font-bold text-white md:text-3xl">
-          Todo lo que necesitas en un solo lugar
-        </h2>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {modules.map((mod, i) => (
-            <div
-              key={mod.title}
-              className="glass-card-subtle group animate-fade-in-up p-6 transition-all duration-300 hover:scale-[1.02] hover:border-white/15"
-              style={{ animationDelay: `${i * 100}ms` }}
-            >
-              <div className={`mb-4 inline-flex rounded-lg ${mod.color} p-3 transition-transform duration-300 group-hover:scale-110`}>
-                <mod.icon className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold text-white">{mod.title}</h3>
-              <p className="mb-4 text-sm text-white/60">{mod.description}</p>
-              <span className="text-xs font-medium text-primary">{mod.metric}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Modules */}
+      <LandingModules />
+
+      {/* How it works */}
+      <LandingHowItWorks />
+
+      {/* Benefits */}
+      <LandingBenefits />
 
       {/* Stats */}
-      <section id="metricas" className="py-16">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 px-4 md:grid-cols-4">
-          {stats.map((stat, i) => (
-            <div
-              key={stat.label}
-              className="glass-card-subtle flex animate-fade-in-up flex-col items-center p-6 text-center"
-              style={{ animationDelay: `${i * 100}ms` }}
-            >
-              <stat.icon className="mb-3 h-8 w-8 animate-float text-primary" />
-              <span className="text-3xl font-bold text-white">{stat.value}</span>
-              <span className="mt-1 text-sm text-white/60">{stat.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <LandingStats />
+
+      {/* FAQ */}
+      <LandingFAQ />
 
       {/* CTA Section */}
       <section className="relative overflow-hidden py-20">
@@ -181,32 +118,7 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[hsl(240,10%,2%)] py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4">
-          <Logo size="sm" />
-          <p className="text-sm text-white/60">
-            La plataforma integral para gestionar, escalar y optimizar tus operaciones.
-          </p>
-          <nav className="flex flex-wrap items-center justify-center gap-6">
-            <a href="#funcionalidades" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Funcionalidades</span>
-            </a>
-            <a href="#metricas" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Métricas</span>
-            </a>
-            <Link to="/login" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Iniciar sesión</span>
-            </Link>
-            <Link to="/register" className="story-link text-sm text-white/60 transition-colors hover:text-white">
-              <span>Registrarse</span>
-            </Link>
-          </nav>
-          <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} Maven CRM. Todos los derechos reservados.
-          </p>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 };
