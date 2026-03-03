@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  BarChart3, Trophy, TrendingDown, Zap, Bell,
+  BarChart3, Trophy, TrendingDown, Zap, Bell, ChevronRight,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import type { PeriodComparisonResult } from "./usePeriodComparison";
@@ -26,6 +26,8 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "comparatives",
       title: "Comparativas",
       icon: BarChart3,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40",
+      iconColor: "text-primary",
       content: (
         <div className="h-10 w-full">
           {sparklineData.length > 1 ? (
@@ -45,6 +47,8 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "top10",
       title: "Top 10",
       icon: Trophy,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
+      iconColor: "text-accent-foreground",
       content: (
         <div className="space-y-1">
           {data.top10.slice(0, 3).map((c, i) => (
@@ -61,6 +65,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "falling",
       title: "Bajando",
       icon: TrendingDown,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40",
       iconColor: "text-warning",
       content: (
         <div className="space-y-1">
@@ -79,9 +84,10 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "high_potential",
       title: "Alto Potencial",
       icon: Zap,
-      iconColor: "text-accent",
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-accent/15 hover:to-transparent hover:border-accent/40",
+      iconColor: "text-accent-foreground",
       content: (
-        <p className="text-2xl font-bold text-accent">{data.highPotential.length}</p>
+        <p className="text-2xl font-bold text-accent-foreground">{data.highPotential.length}</p>
       ),
       onClick: () => navigate("/sales-overview/alto-potencial"),
     },
@@ -89,6 +95,7 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       id: "alerts",
       title: "Alertas",
       icon: Bell,
+      hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40",
       iconColor: "text-warning",
       content: (
         <p className="text-2xl font-bold text-warning">{alertCount}</p>
@@ -101,13 +108,16 @@ const SalesOperationalCards = ({ data, onCardClick, sparklineData = [] }: Props)
       {cards.map((card) => (
         <Card
           key={card.id}
-          className="cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg"
+          className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${card.hoverClass}`}
           onClick={() => card.onClick ? card.onClick() : onCardClick(card.id)}
         >
           <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <card.icon className={`h-4 w-4 ${card.iconColor || "text-muted-foreground"}`} />
-              <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <card.icon className={`h-4 w-4 ${card.iconColor || "text-muted-foreground"}`} />
+                <span className="text-xs font-medium text-muted-foreground">{card.title}</span>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
             </div>
             {card.content}
           </CardContent>
