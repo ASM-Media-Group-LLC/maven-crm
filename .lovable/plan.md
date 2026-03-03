@@ -1,23 +1,10 @@
 
 
-## Plan: Mover las Operational Cards debajo de las KPI Cards
+## Plan: Ajustar grid de SalesOperationalCards al ancho completo
 
-Actualmente en `SalesOverview.tsx` el orden es:
-1. `SalesKPICards` (5 KPIs arriba)
-2. Gráficos (trend + channel)
-3. `TopCreatorsTable`
-4. `SalesOperationalCards` (Comparativas, Top 10, Bajando, etc.)
+Las KPI cards usan `lg:grid-cols-5` para 5 cards. Las operational cards son 5 pero usan `lg:grid-cols-6`, dejando una columna vacía y sin ocupar todo el ancho.
 
-El usuario quiere que las operational cards (Comparativas, Top 10, Bajando, Alto Potencial, Alertas) queden inmediatamente debajo de las 5 KPI cards.
+### Cambio en `src/pages/sales-overview/SalesOperationalCards.tsx` (línea 100)
 
-### Cambio en `src/pages/SalesOverview.tsx`
-
-Mover `<SalesOperationalCards ... />` de la línea 106-110 a justo después de `<SalesKPICards ... />` (línea 100), antes del grid de gráficos. El orden final será:
-
-1. `SalesKPICards`
-2. `SalesOperationalCards`
-3. Gráficos
-4. `TopCreatorsTable`
-
-Un solo cambio de posición de líneas, sin modificar props ni lógica.
+Cambiar el grid de `grid-cols-2 md:grid-cols-3 lg:grid-cols-6` a `grid-cols-2 md:grid-cols-3 lg:grid-cols-5` para que las 5 cards se distribuyan equitativamente en todo el ancho del contenedor, igual que las KPI cards de arriba.
 
