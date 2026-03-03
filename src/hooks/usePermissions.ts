@@ -39,12 +39,18 @@ export const usePermissions = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Modules that are universally accessible regardless of permissions
+  const UNIVERSAL_MODULES = ["Dashboard", "Messenger"];
+
   const canAccess = (module: string, submodule?: string): boolean => {
     // Admin always has full access
     if (isAdmin) return true;
 
-    // If no permissions configured for this role, allow access (permissive fallback)
-    if (permissions.length === 0) return true;
+    // Universal modules are always accessible
+    if (UNIVERSAL_MODULES.includes(module)) return true;
+
+    // If no permissions configured for this role, DENY access (restrictive fallback)
+    if (permissions.length === 0) return false;
 
     // Check specific submodule permission first
     if (submodule) {

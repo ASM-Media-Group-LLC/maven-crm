@@ -32,13 +32,14 @@ const DashboardSidebar = () => {
   const { isAdmin } = useUserRole();
   const { canAccess } = usePermissions();
 
-  const mainMenu = [
-    { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard },
-    { title: "Messenger", url: "/messenger", icon: MessageCircle },
-    { title: t("nav.contacts"), url: "/contactos", icon: UserPlus },
-    { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare },
-    { title: t("nav.events"), url: "/eventos", icon: CalendarDays },
+  const mainMenuAll = [
+    { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
+    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger" },
+    { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
+    { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
+    { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
   ];
+  const mainMenu = mainMenuAll.filter((item) => canAccess(item.module));
 
   const creadoresSubItems = [
     { title: "Dashboard", url: "/creadores/dashboard" },
@@ -62,12 +63,13 @@ const DashboardSidebar = () => {
     { title: "IA Ventas", url: "/aisales" },
   ];
 
-  const operationsMenu = [
-    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: 97 },
-    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity },
-    { title: t("nav.closers"), url: "/closers", icon: Phone },
-    { title: t("nav.tickets"), url: "/tickets", icon: Ticket },
+  const operationsMenuAll = [
+    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: 97, module: "Promolog" },
+    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, module: "LeadGen" },
+    { title: t("nav.closers"), url: "/closers", icon: Phone, module: "Closers" },
+    { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets" },
   ];
+  const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module));
 
   const isCreatorSalesActive = creatorSalesSubItems.some((item) => pathname === item.url) || pathname === "/aisales" || pathname === "/ai-sales-config";
 
@@ -208,7 +210,7 @@ const DashboardSidebar = () => {
               ))}
 
               {/* Creadores submenu */}
-              {collapsed ? (
+              {canAccess("Creadores") && (collapsed ? (
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -261,10 +263,10 @@ const DashboardSidebar = () => {
                     </CollapsibleContent>
                   </SidebarMenuItem>
                 </Collapsible>
-              )}
+              ))}
 
               {/* Creator Sales submenu */}
-              {collapsed ? (
+              {canAccess("Creator Sales") && (collapsed ? (
                 <SidebarMenuItem>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -305,7 +307,7 @@ const DashboardSidebar = () => {
                     </CollapsibleContent>
                   </SidebarMenuItem>
                 </Collapsible>
-              )}
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -334,7 +336,7 @@ const DashboardSidebar = () => {
         </SidebarGroup>
 
         {/* ── Finanzas ────────────────────────────────────────────── */}
-        {(() => {
+        {canAccess("Finanzas") && (() => {
           type FinItem = { title: string; url: string };
           type FinGroup = { label: string; icon: typeof Wallet; key: string; items: FinItem[] };
 
@@ -461,6 +463,7 @@ const DashboardSidebar = () => {
           );
         })()}
 
+        {canAccess("HR") && (
         <SidebarGroup>
           <SidebarGroupLabel>Recursos Humanos</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -561,6 +564,7 @@ const DashboardSidebar = () => {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
 
         {canAccess("Administración") && (
           <SidebarGroup>

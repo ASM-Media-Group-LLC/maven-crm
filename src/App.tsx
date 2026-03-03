@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PermissionRoute from "@/components/PermissionRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -127,83 +128,83 @@ const App = () => (
               {/* Protected routes */}
               <Route path="/design-system" element={<ProtectedRoute><DesignSystem /></ProtectedRoute>} />
               <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
-              <Route path="/sales-overview" element={<ProtectedRoute><SalesOverview /></ProtectedRoute>} />
-              <Route path="/sales-overview/comparativas" element={<ProtectedRoute><ComparativasPage /></ProtectedRoute>} />
-              <Route path="/sales-overview/top10" element={<ProtectedRoute><Top10Page /></ProtectedRoute>} />
-              <Route path="/sales-overview/subiendo" element={<ProtectedRoute><SubiendoPage /></ProtectedRoute>} />
-              <Route path="/sales-overview/bajando" element={<ProtectedRoute><BajandoPage /></ProtectedRoute>} />
-              <Route path="/sales-overview/alto-potencial" element={<ProtectedRoute><AltoPotencialPage /></ProtectedRoute>} />
-              <Route path="/sales-overview/en-riesgo" element={<ProtectedRoute><EnRiesgoPage /></ProtectedRoute>} />
-              <Route path="/salesdashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
+              <Route path="/sales-overview" element={<PermissionRoute module="Creator Sales"><SalesOverview /></PermissionRoute>} />
+              <Route path="/sales-overview/comparativas" element={<PermissionRoute module="Creator Sales"><ComparativasPage /></PermissionRoute>} />
+              <Route path="/sales-overview/top10" element={<PermissionRoute module="Creator Sales"><Top10Page /></PermissionRoute>} />
+              <Route path="/sales-overview/subiendo" element={<PermissionRoute module="Creator Sales"><SubiendoPage /></PermissionRoute>} />
+              <Route path="/sales-overview/bajando" element={<PermissionRoute module="Creator Sales"><BajandoPage /></PermissionRoute>} />
+              <Route path="/sales-overview/alto-potencial" element={<PermissionRoute module="Creator Sales"><AltoPotencialPage /></PermissionRoute>} />
+              <Route path="/sales-overview/en-riesgo" element={<PermissionRoute module="Creator Sales"><EnRiesgoPage /></PermissionRoute>} />
+              <Route path="/salesdashboard" element={<PermissionRoute module="Creator Sales"><SalesDashboard /></PermissionRoute>} />
               
-              <Route path="/aisales" element={<ProtectedRoute><AiSales /></ProtectedRoute>} />
-              <Route path="/ai-sales-config" element={<ProtectedRoute><AiSalesConfig /></ProtectedRoute>} />
+              <Route path="/aisales" element={<PermissionRoute module="Creator Sales"><AiSales /></PermissionRoute>} />
+              <Route path="/ai-sales-config" element={<PermissionRoute module="Creator Sales"><AiSalesConfig /></PermissionRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
-              <Route path="/contactos/nuevo" element={<ProtectedRoute><NuevoContacto /></ProtectedRoute>} />
-              <Route path="/creadores/dashboard" element={<ProtectedRoute><CreadorasDashboardPage /></ProtectedRoute>} />
-              <Route path="/creadores" element={<ProtectedRoute><Creadores /></ProtectedRoute>} />
-              <Route path="/creadores/prospectos" element={<ProtectedRoute><ProspectosPage /></ProtectedRoute>} />
-              <Route path="/creadores/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-              <Route path="/creadores/onboarding/nuevo" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
-              <Route path="/creadores/onboarding/:id" element={<ProtectedRoute><OnboardingWizardPage /></ProtectedRoute>} />
-              <Route path="/creadores/nuevo" element={<ProtectedRoute><NuevoCreador /></ProtectedRoute>} />
-              <Route path="/creadores/:id" element={<ProtectedRoute><CreadorProfile /></ProtectedRoute>} />
-              <Route path="/eventos" element={<ProtectedRoute><Eventos /></ProtectedRoute>} />
-              <Route path="/leadgen" element={<ProtectedRoute><LeadGen /></ProtectedRoute>} />
-              <Route path="/leadgen/base-datos" element={<ProtectedRoute><LeadGenBaseDatos /></ProtectedRoute>} />
-              <Route path="/closers" element={<ProtectedRoute><Closers /></ProtectedRoute>} />
-              <Route path="/tickets" element={<ProtectedRoute><Tickets /></ProtectedRoute>} />
-              <Route path="/promolog" element={<ProtectedRoute><Promolog /></ProtectedRoute>} />
+              <Route path="/contactos" element={<PermissionRoute module="Contactos"><Contactos /></PermissionRoute>} />
+              <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
+              <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores"><CreadorasDashboardPage /></PermissionRoute>} />
+              <Route path="/creadores" element={<PermissionRoute module="Creadores"><Creadores /></PermissionRoute>} />
+              <Route path="/creadores/prospectos" element={<PermissionRoute module="Creadores"><ProspectosPage /></PermissionRoute>} />
+              <Route path="/creadores/onboarding" element={<PermissionRoute module="Creadores"><OnboardingPage /></PermissionRoute>} />
+              <Route path="/creadores/onboarding/nuevo" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
+              <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
+              <Route path="/creadores/nuevo" element={<PermissionRoute module="Creadores"><NuevoCreador /></PermissionRoute>} />
+              <Route path="/creadores/:id" element={<PermissionRoute module="Creadores"><CreadorProfile /></PermissionRoute>} />
+              <Route path="/eventos" element={<PermissionRoute module="Eventos"><Eventos /></PermissionRoute>} />
+              <Route path="/leadgen" element={<PermissionRoute module="LeadGen"><LeadGen /></PermissionRoute>} />
+              <Route path="/leadgen/base-datos" element={<PermissionRoute module="LeadGen"><LeadGenBaseDatos /></PermissionRoute>} />
+              <Route path="/closers" element={<PermissionRoute module="Closers"><Closers /></PermissionRoute>} />
+              <Route path="/tickets" element={<PermissionRoute module="Tickets"><Tickets /></PermissionRoute>} />
+              <Route path="/promolog" element={<PermissionRoute module="Promolog"><Promolog /></PermissionRoute>} />
               <Route path="/tareas" element={<ProtectedRoute><Tareas /></ProtectedRoute>} />
               <Route path="/tareas/:projectId" element={<ProtectedRoute><TareaProject /></ProtectedRoute>} />
-              <Route path="/eventos/nuevo" element={<ProtectedRoute><NuevoEvento /></ProtectedRoute>} />
-              <Route path="/eventos/:id/editar" element={<ProtectedRoute><EditEvento /></ProtectedRoute>} />
-              <Route path="/eventos/:id" element={<ProtectedRoute><EventoDetail /></ProtectedRoute>} />
+              <Route path="/eventos/nuevo" element={<PermissionRoute module="Eventos"><NuevoEvento /></PermissionRoute>} />
+              <Route path="/eventos/:id/editar" element={<PermissionRoute module="Eventos"><EditEvento /></PermissionRoute>} />
+              <Route path="/eventos/:id" element={<PermissionRoute module="Eventos"><EventoDetail /></PermissionRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
-              <Route path="/creadores/personalizados" element={<ProtectedRoute><PersonalizadosPage /></ProtectedRoute>} />
+              <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores"><PersonalizadosPage /></PermissionRoute>} />
               {/* HR routes */}
-              <Route path="/hr" element={<ProtectedRoute><HRLayout><HRDashboard /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/directorio" element={<ProtectedRoute><HRLayout><EmployeeDirectory /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/empleado/nuevo" element={<ProtectedRoute><HRLayout><EmployeeNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/empleado/:id" element={<ProtectedRoute><HRLayout><EmployeeProfile /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/ausencias" element={<ProtectedRoute><HRLayout><HRAbsences /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/incidentes" element={<ProtectedRoute><HRLayout><HRIncidents /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/incidentes/nuevo" element={<ProtectedRoute><HRLayout><HRIncidentNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/candidatos" element={<ProtectedRoute><HRLayout><HRApplicants /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/candidatos/nuevo" element={<ProtectedRoute><HRLayout><HRApplicantNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/onboarding" element={<ProtectedRoute><HRLayout><HROnboarding /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/onboarding/nuevo" element={<ProtectedRoute><HRLayout><HROnboardingNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/offboarding" element={<ProtectedRoute><HRLayout><HROffboarding /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/offboarding/nuevo" element={<ProtectedRoute><HRLayout><HROffboardingNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/capacitacion" element={<ProtectedRoute><HRLayout><HRTraining /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/capacitacion/chatters" element={<ProtectedRoute><HRLayout><HRTrainingChatters /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/capacitacion/tecnologia" element={<ProtectedRoute><HRLayout><HRTrainingTech /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/desempeno" element={<ProtectedRoute><HRLayout><HRPerformance /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/desempeno/nuevo" element={<ProtectedRoute><HRLayout><HRPerformanceNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/asistencia" element={<ProtectedRoute><HRLayout><HRAttendance /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/vacaciones" element={<ProtectedRoute><HRLayout><HRVacations /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/permisos" element={<ProtectedRoute><HRLayout><HRPermisos /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/horarios" element={<ProtectedRoute><HRLayout><HRSchedules /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/horarios/horas-extras" element={<ProtectedRoute><HRLayout><HROvertimeDetail /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/horarios/banco-horas" element={<ProtectedRoute><HRLayout><HRHourBank /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/horarios-chatters" element={<ProtectedRoute><HRLayout><HRChatterSchedules /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/monitoreo" element={<ProtectedRoute><HRLayout><HRMonitoring /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/organizacion/directorio" element={<ProtectedRoute><HRLayout><HRDirectoryLookup /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/organizacion/organigrama" element={<ProtectedRoute><HRLayout><HROrganigrama /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/deducciones" element={<ProtectedRoute><HRLayout><HRDeductions /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/deducciones/nuevo" element={<ProtectedRoute><HRLayout><HRDeductionNew /></HRLayout></ProtectedRoute>} />
-              <Route path="/hr/anuncios" element={<ProtectedRoute><HRLayout><HRAnnouncements /></HRLayout></ProtectedRoute>} />
+              <Route path="/hr" element={<PermissionRoute module="HR"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/directorio" element={<PermissionRoute module="HR"><HRLayout><EmployeeDirectory /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/empleado/nuevo" element={<PermissionRoute module="HR"><HRLayout><EmployeeNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/empleado/:id" element={<PermissionRoute module="HR"><HRLayout><EmployeeProfile /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/ausencias" element={<PermissionRoute module="HR"><HRLayout><HRAbsences /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/incidentes" element={<PermissionRoute module="HR"><HRLayout><HRIncidents /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/incidentes/nuevo" element={<PermissionRoute module="HR"><HRLayout><HRIncidentNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/candidatos" element={<PermissionRoute module="HR"><HRLayout><HRApplicants /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/candidatos/nuevo" element={<PermissionRoute module="HR"><HRLayout><HRApplicantNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/onboarding" element={<PermissionRoute module="HR"><HRLayout><HROnboarding /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/onboarding/nuevo" element={<PermissionRoute module="HR"><HRLayout><HROnboardingNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/offboarding" element={<PermissionRoute module="HR"><HRLayout><HROffboarding /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/offboarding/nuevo" element={<PermissionRoute module="HR"><HRLayout><HROffboardingNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/capacitacion" element={<PermissionRoute module="HR"><HRLayout><HRTraining /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/capacitacion/chatters" element={<PermissionRoute module="HR"><HRLayout><HRTrainingChatters /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/capacitacion/tecnologia" element={<PermissionRoute module="HR"><HRLayout><HRTrainingTech /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/desempeno" element={<PermissionRoute module="HR"><HRLayout><HRPerformance /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/desempeno/nuevo" element={<PermissionRoute module="HR"><HRLayout><HRPerformanceNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/asistencia" element={<PermissionRoute module="HR"><HRLayout><HRAttendance /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/vacaciones" element={<PermissionRoute module="HR"><HRLayout><HRVacations /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/permisos" element={<PermissionRoute module="HR"><HRLayout><HRPermisos /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/horarios" element={<PermissionRoute module="HR"><HRLayout><HRSchedules /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/horarios/horas-extras" element={<PermissionRoute module="HR"><HRLayout><HROvertimeDetail /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/horarios/banco-horas" element={<PermissionRoute module="HR"><HRLayout><HRHourBank /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/horarios-chatters" element={<PermissionRoute module="HR"><HRLayout><HRChatterSchedules /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/monitoreo" element={<PermissionRoute module="HR"><HRLayout><HRMonitoring /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/organizacion/directorio" element={<PermissionRoute module="HR"><HRLayout><HRDirectoryLookup /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/organizacion/organigrama" element={<PermissionRoute module="HR"><HRLayout><HROrganigrama /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/deducciones" element={<PermissionRoute module="HR"><HRLayout><HRDeductions /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/deducciones/nuevo" element={<PermissionRoute module="HR"><HRLayout><HRDeductionNew /></HRLayout></PermissionRoute>} />
+              <Route path="/hr/anuncios" element={<PermissionRoute module="HR"><HRLayout><HRAnnouncements /></HRLayout></PermissionRoute>} />
               {/* Finanzas routes */}
-              <Route path="/finanzas" element={<ProtectedRoute><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/nomina" element={<ProtectedRoute><FinanzasLayout><NominaPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/facturacion" element={<ProtectedRoute><FinanzasLayout><FacturacionPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/control" element={<ProtectedRoute><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/reportes" element={<ProtectedRoute><FinanzasLayout><ReportesPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/collections" element={<ProtectedRoute><FinanzasLayout><CollectionsPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/horas-variables" element={<ProtectedRoute><FinanzasLayout><HorasVariablesPage /></FinanzasLayout></ProtectedRoute>} />
-              <Route path="/finanzas/configuracion" element={<ProtectedRoute><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></ProtectedRoute>} />
+              <Route path="/finanzas" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/nomina" element={<PermissionRoute module="Finanzas"><FinanzasLayout><NominaPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/control" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/reportes" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ReportesPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/collections" element={<PermissionRoute module="Finanzas"><FinanzasLayout><CollectionsPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/horas-variables" element={<PermissionRoute module="Finanzas"><FinanzasLayout><HorasVariablesPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/configuracion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ConfiguracionPage /></FinanzasLayout></PermissionRoute>} />
               {/* Admin routes */}
               <Route path="/admin/usuarios" element={<AdminRoute><AdminUsuarios /></AdminRoute>} />
               <Route path="/admin/auditoria" element={<AdminRoute><AuditoriaRoles /></AdminRoute>} />
