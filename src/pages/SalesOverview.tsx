@@ -98,16 +98,16 @@ const SalesOverview = () => {
             ) : (
               <>
                 <SalesKPICards data={comparison} onCardClick={setModalType} />
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <EarningsTrendChart rows={filteredRows} earningsMode="net" />
-                  <EarningsByChannelChart rows={filteredRows} earningsMode="net" />
-                </div>
-                <TopCreatorsTable creators={comparison.top10} />
                 <SalesOperationalCards
                   data={comparison}
                   onCardClick={setModalType}
                   sparklineData={sparklineData}
                 />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <EarningsTrendChart rows={filteredRows} earningsMode="net" />
+                  <EarningsByChannelChart rows={filteredRows} earningsMode="net" />
+                </div>
+                <TopCreatorsTable creators={comparison.top10} />
                 <CardDetailModal
                   open={!!modalType}
                   onOpenChange={(open) => !open && setModalType(null)}
