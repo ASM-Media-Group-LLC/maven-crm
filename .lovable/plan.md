@@ -1,22 +1,23 @@
 
 
-## Plan: Igualar alturas de cards en todas las secciones
+## Plan: Mover las Operational Cards debajo de las KPI Cards
 
-El problema es que el componente `ScrollReveal` no tiene `h-full` en varias secciones, lo que rompe el estiramiento natural del grid. Las cards internas tampoco tienen `h-full`.
+Actualmente en `SalesOverview.tsx` el orden es:
+1. `SalesKPICards` (5 KPIs arriba)
+2. Gráficos (trend + channel)
+3. `TopCreatorsTable`
+4. `SalesOperationalCards` (Comparativas, Top 10, Bajando, etc.)
 
-### Cambios
+El usuario quiere que las operational cards (Comparativas, Top 10, Bajando, Alto Potencial, Alertas) queden inmediatamente debajo de las 5 KPI cards.
 
-**1. `src/pages/landing/LandingModules.tsx` (linea 128-147)**
-- Agregar `className="h-full"` al `ScrollReveal`
-- Agregar `h-full` al div interno de la card
+### Cambio en `src/pages/SalesOverview.tsx`
 
-**2. `src/pages/landing/LandingBenefits.tsx` (linea 40-50)**
-- Agregar `className="h-full"` al `ScrollReveal`
-- Agregar `h-full` al div interno de la card
+Mover `<SalesOperationalCards ... />` de la línea 106-110 a justo después de `<SalesKPICards ... />` (línea 100), antes del grid de gráficos. El orden final será:
 
-**3. `src/pages/landing/LandingStats.tsx` (linea 59-65)**
-- Agregar `className="h-full"` al `ScrollReveal`
-- Agregar `h-full` al div interno de la card
+1. `SalesKPICards`
+2. `SalesOperationalCards`
+3. Gráficos
+4. `TopCreatorsTable`
 
-Esto fuerza a que cada wrapper y card ocupe el 100% de la celda del grid, igualando todas las alturas por fila.
+Un solo cambio de posición de líneas, sin modificar props ni lógica.
 
