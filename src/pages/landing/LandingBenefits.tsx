@@ -37,8 +37,8 @@ const LandingBenefits = () => (
       </ScrollReveal>
       <div className="grid gap-6 sm:grid-cols-2">
         {benefits.map((b, i) => (
-          <ScrollReveal key={b.title} delay={i * 120} direction={i % 2 === 0 ? "left" : "right"}>
-            <div className="glass-card-subtle group flex gap-4 p-6 transition-all duration-500 hover:border-white/15 hover:shadow-[0_0_25px_-5px_hsl(211_100%_50%/0.15)]">
+          <ScrollReveal key={b.title} delay={i * 120} direction={i % 2 === 0 ? "left" : "right"} className="h-full">
+            <div className="glass-card-subtle group flex h-full gap-4 p-6 transition-all duration-500 hover:border-white/15 hover:shadow-[0_0_25px_-5px_hsl(211_100%_50%/0.15)]">
               <div className="shrink-0 rounded-lg bg-primary/10 p-3 transition-all duration-500 group-hover:bg-primary/20 group-hover:shadow-[0_0_20px_hsl(211_100%_50%/0.3)]">
                 <b.icon className="h-6 w-6 text-primary transition-transform duration-500 group-hover:scale-110" />
               </div>

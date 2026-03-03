@@ -125,9 +125,9 @@ const LandingModules = () => (
     </ScrollReveal>
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {modules.map((mod, i) => (
-        <ScrollReveal key={mod.title} delay={i * 60} direction={i % 2 === 0 ? "up" : "scale"}>
+        <ScrollReveal key={mod.title} delay={i * 60} direction={i % 2 === 0 ? "up" : "scale"} className="h-full">
           <div
-            className="glass-card-subtle group p-5 transition-all duration-500 hover:scale-[1.03] hover:border-white/15"
+            className="glass-card-subtle group h-full p-5 transition-all duration-500 hover:scale-[1.03] hover:border-white/15"
             style={{
               ["--card-glow" as string]: mod.glow,
             }}
