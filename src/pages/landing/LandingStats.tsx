@@ -56,8 +56,8 @@ const LandingStats = () => {
     <section id="metricas" className="py-20">
       <div ref={ref} className="mx-auto grid max-w-5xl grid-cols-2 gap-6 px-4 md:grid-cols-3 lg:grid-cols-6">
         {stats.map((stat, i) => (
-          <ScrollReveal key={stat.label} delay={i * 100}>
-            <div className="glass-card-subtle flex flex-col items-center p-5 text-center transition-all duration-500 hover:border-white/15 hover:shadow-[0_0_20px_-5px_hsl(211_100%_50%/0.2)]">
+          <ScrollReveal key={stat.label} delay={i * 100} className="h-full">
+            <div className="glass-card-subtle flex h-full flex-col items-center p-5 text-center transition-all duration-500 hover:border-white/15 hover:shadow-[0_0_20px_-5px_hsl(211_100%_50%/0.2)]">
               <stat.icon className="mb-2 h-7 w-7 animate-float text-primary" />
               <AnimatedCounter value={stat.value} isVisible={isVisible} extraPrefix={stat.prefix || ""} />
               <span className="mt-1 text-xs text-white/50">{stat.label}</span>
