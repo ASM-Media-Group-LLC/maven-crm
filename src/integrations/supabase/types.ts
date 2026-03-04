@@ -2970,6 +2970,27 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_automation_log: {
+        Row: {
+          automation_type: string
+          id: string
+          last_run_at: string | null
+          records_processed: number | null
+        }
+        Insert: {
+          automation_type: string
+          id?: string
+          last_run_at?: string | null
+          records_processed?: number | null
+        }
+        Update: {
+          automation_type?: string
+          id?: string
+          last_run_at?: string | null
+          records_processed?: number | null
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           channel_email: boolean | null
@@ -3008,6 +3029,7 @@ export type Database = {
       }
       notifications: {
         Row: {
+          automation_key: string | null
           created_at: string
           deep_link_url: string | null
           id: string
@@ -3027,6 +3049,7 @@ export type Database = {
           visibility_scope: string | null
         }
         Insert: {
+          automation_key?: string | null
           created_at?: string
           deep_link_url?: string | null
           id?: string
@@ -3046,6 +3069,7 @@ export type Database = {
           visibility_scope?: string | null
         }
         Update: {
+          automation_key?: string | null
           created_at?: string
           deep_link_url?: string | null
           id?: string

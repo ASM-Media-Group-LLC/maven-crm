@@ -634,10 +634,10 @@ const DashboardSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip={t("nav.settings")}>
-                  <NavLink to="/dashboard/settings" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                <SidebarMenuButton asChild tooltip="Ajustes">
+                  <NavLink to="/ajustes/notificaciones" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                     <Settings className="h-4 w-4 shrink-0" />
-                    <span>{t("nav.settings")}</span>
+                    <span>Ajustes</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

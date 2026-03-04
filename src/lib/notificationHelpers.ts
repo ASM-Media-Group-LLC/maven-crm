@@ -113,3 +113,42 @@ export const STATUS_OPTIONS = [
   { value: "read", label: "Leída" },
   { value: "archived", label: "Archivada" },
 ] as const;
+
+// ─── Notification types by module (for preferences) ───────────
+export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label: string }[]> = {
+  Creadores: [
+    { type: "onboarding_complete", label: "Onboarding completado" },
+    { type: "verification_pending", label: "Verificación pendiente" },
+    { type: "document_missing", label: "Documento faltante" },
+    { type: "onboarding_inactivity", label: "Inactividad en onboarding" },
+    { type: "verification_approved", label: "Verificación aprobada" },
+    { type: "verification_rejected", label: "Verificación rechazada" },
+  ],
+  Tareas: [
+    { type: "task_assignment", label: "Tarea asignada" },
+    { type: "task_due_soon", label: "Tarea próxima a vencer" },
+    { type: "task_completed", label: "Tarea completada" },
+    { type: "task_overdue", label: "Tarea vencida" },
+    { type: "task_stale", label: "Tarea sin actividad" },
+    { type: "project_assignment", label: "Proyecto asignado" },
+  ],
+  HR: [
+    { type: "absence_request", label: "Solicitud de ausencia" },
+    { type: "contract_expiring", label: "Contrato por vencer" },
+    { type: "incident_created", label: "Incidente creado" },
+  ],
+  Finanzas: [
+    { type: "invoice_created", label: "Factura creada" },
+    { type: "payment_pending", label: "Pago pendiente" },
+    { type: "payroll_ready", label: "Nómina lista" },
+  ],
+  Eventos: [
+    { type: "event_created", label: "Evento creado" },
+    { type: "event_reminder", label: "Recordatorio de evento" },
+    { type: "guest_confirmed", label: "Invitado confirmado" },
+  ],
+  Tickets: [
+    { type: "ticket_assigned", label: "Ticket asignado" },
+    { type: "ticket_escalated", label: "Ticket escalado" },
+  ],
+};
