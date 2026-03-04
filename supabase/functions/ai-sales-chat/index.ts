@@ -52,6 +52,97 @@ const deduplicateByCreatorDay = (rows: EarningRow[]): EarningRow[] => {
   return Array.from(grouped.values());
 };
 
+interface DailySummaryRow {
+  date: string;
+  total: number;
+  subs: number;
+  messages: number;
+  tips: number;
+  active_fans: number;
+  new_fans: number;
+  creators: number;
+}
+
+const EARNINGS_BATCH_SIZE = 1000;
+
+const fetchAllEarnings = async (supabase: any): Promise<EarningRow[]> => {
+  let offset = 0;
+  const allRows: EarningRow[] = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("of_gross_earnings")
+      .select(
+        "id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, creator_id, pending_creator"
+      )
+      .order("date", { ascending: false })
+      .range(offset, offset + EARNINGS_BATCH_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = (data ?? []) as EarningRow[];
+    allRows.push(...batch);
+
+    if (batch.length < EARNINGS_BATCH_SIZE) break;
+    offset += EARNINGS_BATCH_SIZE;
+  }
+
+  return allRows;
+};
+
+const buildDailySummary = (rows: EarningRow[]): DailySummaryRow[] => {
+  const grouped = new Map<
+    string,
+    {
+      total: number;
+      subs: number;
+      messages: number;
+      tips: number;
+      active_fans: number;
+      new_fans: number;
+      creators: Set<string>;
+    }
+  >();
+
+  for (const row of rows) {
+    const day = row.effective_date || computeEffectiveDate(row.date);
+    const creatorKey = row.creator_id || row.pending_creator || row.id;
+
+    const existing = grouped.get(day) || {
+      total: 0,
+      subs: 0,
+      messages: 0,
+      tips: 0,
+      active_fans: 0,
+      new_fans: 0,
+      creators: new Set<string>(),
+    };
+
+    existing.total += row.total_earnings_gross ?? 0;
+    existing.subs += row.subscription_gross ?? 0;
+    existing.messages += row.message_gross ?? 0;
+    existing.tips += row.tips_gross ?? 0;
+    existing.active_fans += row.active_fans ?? 0;
+    existing.new_fans += row.new_fans ?? 0;
+    existing.creators.add(creatorKey);
+
+    grouped.set(day, existing);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([date, data]) => ({
+      date,
+      total: data.total,
+      subs: data.subs,
+      messages: data.messages,
+      tips: data.tips,
+      active_fans: data.active_fans,
+      new_fans: data.new_fans,
+      creators: data.creators.size,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -99,14 +190,8 @@ serve(async (req) => {
       .from("creators")
       .select("id, name, artistic_name, status, category, country, city");
 
-    // Fetch earnings
-    const { data: earnings } = await supabase
-      .from("of_gross_earnings")
-      .select(
-        "id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, creator_id, pending_creator"
-      )
-      .order("date", { ascending: false })
-      .limit(1000);
+    // Fetch earnings (paginated to avoid 1000-row default limit)
+    const earnings = await fetchAllEarnings(supabase);
 
     // Apply effective date + dedup
     const mapped = (earnings ?? []).map((e: any) => ({
@@ -132,6 +217,21 @@ serve(async (req) => {
         country: c.country,
         city: c.city,
       }))
+    );
+
+    const dailySummaryJson = JSON.stringify(
+      buildDailySummary(deduped)
+        .slice(0, 120)
+        .map((d) => ({
+          date: d.date,
+          total: d.total,
+          subs: d.subs,
+          messages: d.messages,
+          tips: d.tips,
+          active_fans: d.active_fans,
+          new_fans: d.new_fans,
+          creators: d.creators,
+        }))
     );
 
     const earningsJson = JSON.stringify(
@@ -185,10 +285,19 @@ ${userInstructions ? `\nINSTRUCCIONES ADICIONALES DEL USUARIO:\n${userInstructio
 DATOS DE CREADORAS:
 ${creatorsJson}
 
-DATOS DE GANANCIAS (últimos registros, deduplicados por creadora/día, fecha efectiva aplicada):
+DATOS DE GANANCIAS DIARIAS (FUENTE PRINCIPAL para preguntas por fechas, semanas o "últimos N días"):
+${dailySummaryJson}
+
+DATOS DE GANANCIAS POR CREADORA (muestra reciente deduplicada por creadora/día):
 ${earningsJson}
 
-Campos: total, subs, new_subs, recurring, messages, tips, active_fans, new_fans, following, ranking.
+Reglas de uso de datos:
+- Para consultas por rango de fechas, usa primero DATOS DE GANANCIAS DIARIAS.
+- No inventes días en cero si no están en los datos.
+- Si faltan días para completar un rango solicitado, indícalo explícitamente.
+
+Campos diarios: total, subs, messages, tips, active_fans, new_fans, creators.
+Campos por creadora: total, subs, new_subs, recurring, messages, tips, active_fans, new_fans, following, ranking.
 Montos en USD bruto. La "fecha efectiva" ajusta registros entre 00:00-00:55 al día anterior.`;
 
     const response = await fetch(
