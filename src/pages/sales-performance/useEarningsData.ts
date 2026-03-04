@@ -85,7 +85,7 @@ const fetchEarnings = async (): Promise<EarningsRow[]> => {
 
 export const useEarningsData = () => {
   return useQuery({
-    queryKey: ["of_gross_earnings_performance"],
+    queryKey: ["of_gross_earnings_performance", "paginated-v1"],
     queryFn: fetchEarnings,
   });
 };
