@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { getAiConfig } from "@/lib/ai-config";
 import { useAiMessages } from "@/hooks/useAiConversations";
@@ -305,7 +306,7 @@ const ClariAiChat = ({
 
                   {m.role === "assistant" ? (
                     <div className="ai-chat-content relative z-10">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap text-sm leading-relaxed relative z-10">{m.content}</p>
