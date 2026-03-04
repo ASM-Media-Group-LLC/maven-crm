@@ -26,13 +26,33 @@ const deduplicateByCreatorDay = (rows: EarningsRow[]): EarningsRow[] => {
   return Array.from(grouped.values());
 };
 
-const fetchEarnings = async (): Promise<EarningsRow[]> => {
-  const { data: earnings, error } = await supabase
-    .from("of_gross_earnings")
-    .select("id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, fans_renew_on, renew_on_percentage, change_expired_fan_count, avg_spend_per_spender_gross, avg_spend_per_transaction_gross, avg_earnings_per_fan_gross, document_id, pending_creator, creator_id")
-    .order("date", { ascending: false });
+const BATCH_SIZE = 1000;
 
-  if (error) throw error;
+const fetchEarnings = async (): Promise<EarningsRow[]> => {
+  const allEarnings: any[] = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("of_gross_earnings")
+      .select("id, date, total_earnings_gross, subscription_gross, new_subscriptions_sub_gross, recurring_sub_gross, message_gross, tips_gross, active_fans, new_fans, following, of_ranking, contribution, fans_renew_on, renew_on_percentage, change_expired_fan_count, avg_spend_per_spender_gross, avg_spend_per_transaction_gross, avg_earnings_per_fan_gross, document_id, pending_creator, creator_id")
+      .order("date", { ascending: false })
+      .range(offset, offset + BATCH_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = data ?? [];
+    allEarnings.push(...batch);
+
+    if (batch.length < BATCH_SIZE) {
+      hasMore = false;
+    } else {
+      offset += BATCH_SIZE;
+    }
+  }
+
+  const earnings = allEarnings;
 
   const creatorIds = [
     ...new Set(
