@@ -112,6 +112,10 @@ async function checkInactivityAlerts(creators: OnboardingCreator[]) {
     message: `${c.name} no ha actualizado su onboarding en más de 3 días.`,
     reference_id: c.id,
     reference_type: "creator",
+    module_origin: "creadores",
+    priority: "high",
+    deep_link_url: `/creadores/${c.id}`,
+    required_permission_module: "Creadores",
   }));
 
   await supabase.from("notifications").insert(notifications);

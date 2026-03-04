@@ -2970,39 +2970,99 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          channel_email: boolean | null
+          channel_in_app: boolean | null
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          module: string
+          notification_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_email?: boolean | null
+          channel_in_app?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          module: string
+          notification_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_email?: boolean | null
+          channel_in_app?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          module?: string
+          notification_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
+          deep_link_url: string | null
           id: string
           is_read: boolean
           message: string | null
+          module_origin: string | null
+          priority: string | null
           reference_id: string | null
           reference_type: string | null
+          required_permission_module: string | null
+          required_permission_submodule: string | null
+          role_target: string | null
+          status: string | null
           title: string
           type: string
           user_id: string | null
+          visibility_scope: string | null
         }
         Insert: {
           created_at?: string
+          deep_link_url?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
+          module_origin?: string | null
+          priority?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          required_permission_module?: string | null
+          required_permission_submodule?: string | null
+          role_target?: string | null
+          status?: string | null
           title: string
           type: string
           user_id?: string | null
+          visibility_scope?: string | null
         }
         Update: {
           created_at?: string
+          deep_link_url?: string | null
           id?: string
           is_read?: boolean
           message?: string | null
+          module_origin?: string | null
+          priority?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          required_permission_module?: string | null
+          required_permission_submodule?: string | null
+          role_target?: string | null
+          status?: string | null
           title?: string
           type?: string
           user_id?: string | null
+          visibility_scope?: string | null
         }
         Relationships: []
       }
@@ -4499,6 +4559,10 @@ export type Database = {
       }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_role_name: {
+        Args: { _role_name: string; _user_id: string }
         Returns: boolean
       }
       user_has_tasks_in_project: {

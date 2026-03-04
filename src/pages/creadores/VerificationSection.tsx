@@ -54,6 +54,10 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
         message: `${creatorName} ha sido verificada y activada.`,
         reference_id: creatorId,
         reference_type: "creator",
+        module_origin: "creadores",
+        priority: "low",
+        deep_link_url: `/creadores/${creatorId}`,
+        required_permission_module: "Creadores",
       });
 
       qc.invalidateQueries({ queryKey: ["creator", creatorId] });
@@ -95,6 +99,10 @@ const VerificationSection = ({ creatorId, creatorName, currentStatus }: Props) =
         message: `${creatorName} fue rechazada: ${rejectReason}`,
         reference_id: creatorId,
         reference_type: "creator",
+        module_origin: "creadores",
+        priority: "high",
+        deep_link_url: `/creadores/${creatorId}`,
+        required_permission_module: "Creadores",
       });
 
       qc.invalidateQueries({ queryKey: ["creator", creatorId] });

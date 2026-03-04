@@ -99,6 +99,10 @@ export const useProjects = () => {
           message: `Fuiste agregado(a) al proyecto '${project.name}'`,
           reference_id: projectId,
           reference_type: "project",
+          module_origin: "tareas",
+          priority: "medium",
+          deep_link_url: `/tareas/${projectId}`,
+          required_permission_module: "Tareas",
         }));
         await supabase.from("notifications").insert(notifications);
       }
@@ -163,6 +167,10 @@ export const useProjects = () => {
               message: `Fuiste agregado(a) al proyecto '${project.name}'`,
               reference_id: project.id,
               reference_type: "project",
+              module_origin: "tareas",
+              priority: "medium",
+              deep_link_url: `/tareas/${project.id}`,
+              required_permission_module: "Tareas",
             }));
             await supabase.from("notifications").insert(notifications);
           }
