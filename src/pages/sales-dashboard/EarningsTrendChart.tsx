@@ -78,8 +78,9 @@ const EarningsTrendChart = ({ rows, comparedRows, earningsMode }: Props) => {
             <BarChart data={data} barSize={hasComparison ? 20 : 40}>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
+                stroke="hsl(var(--border)/0.4)"
                 vertical={false}
+                fill="none"
               />
               <XAxis
                 dataKey="label"
