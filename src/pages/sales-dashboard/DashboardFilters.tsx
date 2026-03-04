@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const viewTabs = ["Vista General", "Rendimiento por Creadora"] as const;
-const timePeriods = ["Ayer", "Hoy", "Esta semana", "Este mes"] as const;
+const timePeriods = ["Ayer", "Hoy", "Esta semana", "Este mes", "Últimos 7 días", "Últimos 30 días", "Últimos 90 días"] as const;
 
 type ViewTab = (typeof viewTabs)[number];
 type TimePeriod = (typeof timePeriods)[number];
