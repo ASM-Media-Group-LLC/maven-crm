@@ -264,6 +264,7 @@ const ClariAiChat = ({
   };
 
   const isPanel = mode === "panel";
+  const canChat = isPanel || !!conversationId;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -342,14 +343,14 @@ const ClariAiChat = ({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              !conversationId
+              !canChat
                 ? "Crea o selecciona un chat para comenzar…"
                 : isRecording
                 ? "🎙️ Escuchando…"
                 : "Escribe tu pregunta…"
             }
             rows={1}
-            disabled={!conversationId}
+            disabled={!canChat}
             className={`flex-1 resize-none rounded-2xl border bg-background px-4 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               isRecording ? "border-destructive ring-2 ring-destructive/30" : "border-input"
             }`}
@@ -359,7 +360,7 @@ const ClariAiChat = ({
               onClick={toggleRecording}
               variant="outline"
               size="icon"
-              disabled={!conversationId}
+              disabled={!canChat}
               className={`h-10 w-10 shrink-0 rounded-full transition-all ${
                 isRecording
                   ? "border-destructive text-destructive animate-pulse hover:bg-destructive/10"
@@ -372,7 +373,7 @@ const ClariAiChat = ({
           )}
           <Button
             onClick={send}
-            disabled={!input.trim() || isLoading || !conversationId}
+            disabled={!input.trim() || isLoading || !canChat}
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full shadow-md"
           >
