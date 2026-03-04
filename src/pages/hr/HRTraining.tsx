@@ -1295,8 +1295,8 @@ function GeneralModuleManagementView({ program, onBack }: { program: any; onBack
       const path = `training-modules/${program.id}/${moduleId}/${file.name}`;
       const { error: uploadError } = await supabase.storage.from("creator-files").upload(path, file, { upsert: true });
       if (uploadError) { toast({ title: "Error al subir archivo", variant: "destructive" }); return; }
-      const { data: urlData } = supabase.storage.from("creator-files").getPublicUrl(path);
-      const { error: updateError } = await supabase.from("training_modules").update({ content_url: urlData.publicUrl }).eq("id", moduleId);
+      const { data: signedData } = await supabase.storage.from("creator-files").createSignedUrl(path, 86400);
+      const { error: updateError } = await supabase.from("training_modules").update({ content_url: signedData?.signedUrl || path }).eq("id", moduleId);
       if (updateError) { toast({ title: "Error al guardar URL", variant: "destructive" }); return; }
       queryClient.invalidateQueries({ queryKey: ["training-modules", program.id] });
       toast({ title: "Contenido subido exitosamente" });
