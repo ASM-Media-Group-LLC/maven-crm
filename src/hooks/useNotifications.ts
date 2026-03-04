@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 
 export interface Notification {
   id: string;
@@ -35,6 +36,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
+  const { isTypeEnabled } = useNotificationPreferences();
 
   const query = useQuery({
     queryKey: ["notifications", options.moduleFilter, options.priorityFilter, options.statusFilter],
@@ -97,8 +99,15 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {
-    if (!n.required_permission_module) return true;
-    return canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined);
+    // Permission filter
+    if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
+      return false;
+    }
+    // Preference filter (opt-out model)
+    if (n.module_origin && n.type) {
+      if (!isTypeEnabled(n.module_origin, n.type)) return false;
+    }
+    return true;
   });
 
   const unreadCount = filteredNotifications.filter((n) => n.status === "new" || (!n.status && !n.is_read)).length;

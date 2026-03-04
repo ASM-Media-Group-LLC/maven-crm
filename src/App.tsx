@@ -58,6 +58,7 @@ import AdminRoute from "./components/AdminRoute";
 import Roadmap from "./pages/Roadmap";
 import Messenger from "./pages/Messenger";
 import Notificaciones from "./pages/Notificaciones";
+import NotificacionesSettings from "./pages/ajustes/NotificacionesSettings";
 import NotFound from "./pages/NotFound";
 import HRDashboard from "./pages/hr/HRDashboard";
 import EmployeeDirectory from "./pages/hr/EmployeeDirectory";
@@ -165,6 +166,7 @@ const App = () => (
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
               <Route path="/notificaciones" element={<ProtectedRoute><Notificaciones /></ProtectedRoute>} />
+              <Route path="/ajustes/notificaciones" element={<ProtectedRoute><NotificacionesSettings /></ProtectedRoute>} />
               <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores"><PersonalizadosPage /></PermissionRoute>} />
               {/* HR routes */}
               <Route path="/hr" element={<PermissionRoute module="HR"><HRLayout><HRDashboard /></HRLayout></PermissionRoute>} />
