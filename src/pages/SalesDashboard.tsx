@@ -30,12 +30,18 @@ const getDateRange = (period: TimePeriod): { from: Date; to: Date } => {
       return { from: startOfWeek(today, { weekStartsOn: 1 }), to: today };
     case "Este mes":
       return { from: startOfMonth(today), to: today };
+    case "Últimos 7 días":
+      return { from: subDays(today, 6), to: today };
+    case "Últimos 30 días":
+      return { from: subDays(today, 29), to: today };
+    case "Últimos 90 días":
+      return { from: subDays(today, 89), to: today };
   }
 };
 
 const SalesDashboard = () => {
   const [activeView, setActiveView] = useState<ViewTab>("Vista General");
-  const [activePeriod, setActivePeriod] = useState<TimePeriod>("Esta semana");
+  const [activePeriod, setActivePeriod] = useState<TimePeriod>("Últimos 7 días");
   const [compareMode, setCompareMode] = useState(false);
   const [compareRange, setCompareRange] = useState<{ from?: Date; to?: Date }>({});
   const [earningsMode, setEarningsMode] = useState<EarningsMode>("net");
