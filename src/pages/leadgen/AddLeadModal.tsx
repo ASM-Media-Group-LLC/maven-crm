@@ -98,10 +98,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
             .from("creator-files")
             .upload(filePath, file);
           if (uploadError) throw uploadError;
-          const { data: urlData } = supabase.storage
+          const { data: signedData } = await supabase.storage
             .from("creator-files")
-            .getPublicUrl(filePath);
-          evidenceUrls.push(urlData.publicUrl);
+            .createSignedUrl(filePath, 86400);
+          evidenceUrls.push(signedData?.signedUrl || filePath);
         }
       }
 

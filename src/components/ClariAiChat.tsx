@@ -9,6 +9,8 @@ import { useAiMessages } from "@/hooks/useAiConversations";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+import { supabase } from "@/integrations/supabase/client";
+
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-chat`;
 
 const WELCOME: Msg = {
@@ -30,11 +32,16 @@ async function streamChat({
   onError: (msg: string) => void;
   config?: { customInstructions?: string; tone?: string; model?: string };
 }) {
+  // Get the user's session token for authenticated access
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   const resp = await fetch(CHAT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      Authorization: `Bearer ${token}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     },
     body: JSON.stringify({ messages, config }),
   });

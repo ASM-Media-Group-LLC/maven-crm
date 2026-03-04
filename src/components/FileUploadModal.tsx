@@ -105,10 +105,12 @@ export default function FileUploadModal({ open, onClose, category, tempId, onFil
         continue;
       }
 
-      const { data: urlData } = supabase.storage.from("creator-files").getPublicUrl(path);
+      // Store path, generate signed URL for immediate use
+      const { data: signedData } = await supabase.storage.from("creator-files").createSignedUrl(path, 3600);
+      const fileUrl = signedData?.signedUrl || path;
       uploaded.push({
         name: file.name,
-        url: urlData.publicUrl,
+        url: fileUrl,
         type: file.type,
         size: file.size,
         category,

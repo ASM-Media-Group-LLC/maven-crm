@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast";
 import FileUploadModal, { type UploadedFile } from "@/components/FileUploadModal";
 import { useUserRole } from "@/hooks/useUserRole";
+import { getSignedFileUrl } from "@/lib/storageHelpers";
 
 const IDENTITY_DOC_TERMS = ["cedula", "cédula", "selfie", "identidad", "dni", "pasaporte", "documento de identidad"];
 
@@ -121,11 +122,16 @@ export default function DocumentosTabContent({ creatorId }: Props) {
                       {d.uploaded_at ? format(new Date(d.uploaded_at), "dd MMM yyyy", { locale: es }) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <a href={d.file_url} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          const url = await getSignedFileUrl(d.file_url);
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
