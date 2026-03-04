@@ -273,13 +273,14 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 
 /* ===== AI Chat WhatsApp-style content ===== */
 .ai-chat-content {
-  font-size: 0.875rem;
-  line-height: 1.65;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
   word-break: break-word;
 }
 
 .ai-chat-content p {
-  margin: 0.5em 0;
+  margin: 0.65em 0;
 }
 .ai-chat-content p:first-child {
   margin-top: 0;
@@ -305,7 +306,7 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
 }
 
 .ai-chat-content li {
-  margin: 0.35em 0;
+  margin: 0.45em 0;
 }
 
 .ai-chat-content li::marker {
@@ -359,37 +360,57 @@ All colors MUST be HSL. Light mode in :root, dark mode in .dark.
   padding: 0;
 }
 
-/* Tables inside chat */
+/* Tables inside chat — Excel-style */
 .ai-chat-content table {
   width: 100%;
-  border-collapse: collapse;
-  margin: 0.6em 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1em 0;
   font-size: 0.82em;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid hsl(var(--border));
+  border: 1.5px solid hsl(var(--border));
+  box-shadow: 0 2px 8px hsl(var(--foreground) / 0.06);
+}
+
+.ai-chat-content thead {
+  position: sticky;
+  top: 0;
 }
 
 .ai-chat-content th {
-  background: hsl(var(--muted));
-  font-weight: 600;
+  background: hsl(var(--primary) / 0.12);
+  font-weight: 700;
   text-align: left;
-  padding: 0.5em 0.65em;
-  border-bottom: 2px solid hsl(var(--border));
+  padding: 0.6em 0.85em;
+  border-bottom: 2px solid hsl(var(--primary) / 0.25);
   white-space: nowrap;
+  color: hsl(var(--primary));
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .ai-chat-content td {
-  padding: 0.45em 0.65em;
-  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  padding: 0.55em 0.85em;
+  border-bottom: 1px solid hsl(var(--border) / 0.4);
+  border-right: 1px solid hsl(var(--border) / 0.2);
+}
+
+.ai-chat-content td:last-child {
+  border-right: none;
 }
 
 .ai-chat-content tr:last-child td {
   border-bottom: none;
 }
 
-.ai-chat-content tr:hover td {
-  background: hsl(var(--accent) / 0.3);
+.ai-chat-content tbody tr:nth-child(even) td {
+  background: hsl(var(--muted) / 0.35);
+}
+
+.ai-chat-content tbody tr:hover td {
+  background: hsl(var(--primary) / 0.08);
 }
 
 /* Links */
