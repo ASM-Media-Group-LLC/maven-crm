@@ -265,58 +265,77 @@ const ClariAiChat = ({
   const isPanel = mode === "panel";
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className={`flex-1 px-4 py-4 ${isPanel ? "" : "py-6"}`} ref={scrollRef}>
-        <div className={`space-y-4 ${isPanel ? "" : "mx-auto max-w-3xl space-y-6"}`}>
-          {localMessages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}
-            >
+    <div className="flex flex-col h-full bg-background">
+      {/* Chat wallpaper area */}
+      <ScrollArea className="flex-1 px-3 py-5" ref={scrollRef}>
+        <div className={`space-y-3 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
+          {localMessages.map((m, i) => {
+            const isUser = m.role === "user";
+            return (
               <div
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                  m.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
+                key={i}
+                className={`flex items-end gap-2 ${isUser ? "flex-row-reverse" : ""}`}
               >
-                {m.role === "user" ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                {/* Avatar */}
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm ${
+                    isUser
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-accent text-accent-foreground"
+                  }`}
+                >
+                  {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                </div>
+
+                {/* Bubble */}
+                <div
+                  className={`relative max-w-[85%] shadow-sm ${
+                    isUser
+                      ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md"
+                      : "bg-card text-card-foreground border border-border/50 rounded-2xl rounded-bl-md"
+                  } ${isPanel ? "px-3 py-2.5" : "px-4 py-3"}`}
+                >
+                  {/* Tail notch */}
+                  {!isUser && (
+                    <div className="absolute -left-1.5 bottom-1 w-3 h-3 bg-card border-l border-b border-border/50 rotate-45" />
+                  )}
+                  {isUser && (
+                    <div className="absolute -right-1.5 bottom-1 w-3 h-3 bg-primary rotate-45" />
+                  )}
+
+                  {m.role === "assistant" ? (
+                    <div className="ai-chat-content relative z-10">
+                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed relative z-10">{m.content}</p>
+                  )}
+                </div>
               </div>
-              <div
-                className={`rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                  isPanel ? "max-w-[85%]" : "max-w-[80%] px-4 py-3"
-                } ${
-                  m.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground"
-                }`}
-              >
-                {m.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-table:my-2">
-                    <ReactMarkdown>{m.content}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Typing indicator */}
           {isLoading && localMessages[localMessages.length - 1]?.role === "user" && (
-            <div className="flex gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Bot className="h-3.5 w-3.5" />
+            <div className="flex items-end gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-sm">
+                <Bot className="h-4 w-4" />
               </div>
-              <div className="flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Pensando…
+              <div className="flex items-center gap-2 bg-card border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                <div className="flex gap-1">
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" />
+                </div>
               </div>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border bg-background p-3">
-        <div className={`flex gap-2 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
+      {/* Input bar */}
+      <div className="border-t border-border bg-card/80 backdrop-blur-sm p-3">
+        <div className={`flex items-end gap-2 ${isPanel ? "" : "mx-auto max-w-3xl"}`}>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -325,13 +344,13 @@ const ClariAiChat = ({
               !conversationId
                 ? "Crea o selecciona un chat para comenzar…"
                 : isRecording
-                ? "Escuchando…"
-                : "Pregunta sobre creadoras y ganancias…"
+                ? "🎙️ Escuchando…"
+                : "Escribe tu pregunta…"
             }
             rows={1}
             disabled={!conversationId}
-            className={`flex-1 resize-none rounded-xl border bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-              isRecording ? "border-destructive" : "border-input"
+            className={`flex-1 resize-none rounded-2xl border bg-background px-4 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              isRecording ? "border-destructive ring-2 ring-destructive/30" : "border-input"
             }`}
           />
           {SpeechRecAPI && (
@@ -340,10 +359,10 @@ const ClariAiChat = ({
               variant="outline"
               size="icon"
               disabled={!conversationId}
-              className={`h-10 w-10 shrink-0 rounded-xl transition-colors ${
+              className={`h-10 w-10 shrink-0 rounded-full transition-all ${
                 isRecording
                   ? "border-destructive text-destructive animate-pulse hover:bg-destructive/10"
-                  : ""
+                  : "hover:bg-accent"
               }`}
               title={isRecording ? "Detener grabación" : "Hablar"}
             >
@@ -354,7 +373,7 @@ const ClariAiChat = ({
             onClick={send}
             disabled={!input.trim() || isLoading || !conversationId}
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-xl"
+            className="h-10 w-10 shrink-0 rounded-full shadow-md"
           >
             <Send className="h-4 w-4" />
           </Button>
