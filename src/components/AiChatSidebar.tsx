@@ -87,7 +87,7 @@ export default function AiChatSidebar({
 
   return (
     <>
-      <div className="flex w-64 shrink-0 flex-col border-r border-border bg-background h-full">
+      <div className="flex w-72 shrink-0 flex-col border-r border-border bg-background h-full">
         {/* New Chat Button */}
         <div className="p-3 border-b border-border">
           <Button onClick={onCreate} className="w-full gap-2" size="sm">
@@ -111,12 +111,12 @@ export default function AiChatSidebar({
                 <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {group.label}
                 </p>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {group.items.map((conv) => (
                     <div
                       key={conv.id}
                       className={cn(
-                        "group relative flex items-center rounded-lg px-2 py-1.5 cursor-pointer transition-colors",
+                        "group relative flex items-center rounded-lg px-2.5 py-2 cursor-pointer transition-colors",
                         activeId === conv.id
                           ? "bg-muted text-foreground"
                           : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -137,33 +137,33 @@ export default function AiChatSidebar({
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span className="flex-1 truncate text-sm">
+                        <span className="flex-1 text-sm leading-snug line-clamp-2">
                           {conv.title}
                         </span>
                       )}
 
                       {/* Action buttons on hover */}
                       {editingId !== conv.id && (hoveredId === conv.id || activeId === conv.id) && (
-                        <div className="ml-1 flex items-center gap-0.5 shrink-0">
+                        <div className="ml-2 flex items-center gap-1 shrink-0">
                           <button
-                            className="rounded p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            className="rounded-md p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               startEditing(conv);
                             }}
                             title="Renombrar"
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            className="rounded p-0.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                            className="rounded-md p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeleteId(conv.id);
                             }}
                             title="Eliminar"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       )}
