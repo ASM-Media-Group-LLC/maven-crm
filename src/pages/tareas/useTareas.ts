@@ -209,6 +209,10 @@ export const useTareas = (projectId?: string) => {
             message: `Fuiste asignado(a) a la tarea '${task.title}'`,
             reference_id: taskId,
             reference_type: "task",
+            module_origin: "tareas",
+            priority: "medium",
+            deep_link_url: `/tareas?taskId=${taskId}`,
+            required_permission_module: "Tareas",
           });
         }
       }
@@ -344,6 +348,10 @@ export const useTareas = (projectId?: string) => {
             message: `Fuiste asignado(a) a la tarea '${task.title}'`,
             reference_id: task.id,
             reference_type: "task",
+            module_origin: "tareas",
+            priority: "medium",
+            deep_link_url: `/tareas?taskId=${task.id}`,
+            required_permission_module: "Tareas",
           });
         }
       }
@@ -432,6 +440,10 @@ export const useTareas = (projectId?: string) => {
             message: `Fuiste asignado(a) a la tarea '${existingTask?.title || ""}'`,
             reference_id: taskId,
             reference_type: "task",
+            module_origin: "tareas",
+            priority: "medium",
+            deep_link_url: `/tareas?taskId=${taskId}`,
+            required_permission_module: "Tareas",
           });
         }
       }

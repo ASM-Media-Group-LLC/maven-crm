@@ -464,6 +464,10 @@ export default function OnboardingWizard({ onCancel, initialStep, editCreatorId 
           message: `${step1.name} ha completado el proceso de onboarding y está pendiente de verificación.`,
           reference_id: createdId,
           reference_type: "creator",
+          module_origin: "creadores",
+          priority: "medium",
+          deep_link_url: `/creadores/${createdId}`,
+          required_permission_module: "Creadores",
         });
       }
       toast({ title: isDraft ? "Borrador guardado" : "Onboarding completado exitosamente" });

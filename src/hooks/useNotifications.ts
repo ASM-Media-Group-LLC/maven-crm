@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export interface Notification {
   id: string;
@@ -12,34 +14,101 @@ export interface Notification {
   reference_type: string | null;
   is_read: boolean;
   created_at: string;
+  // v2 fields
+  module_origin: string | null;
+  priority: string | null;
+  status: string | null;
+  deep_link_url: string | null;
+  required_permission_module: string | null;
+  required_permission_submodule: string | null;
+  visibility_scope: string | null;
+  role_target: string | null;
 }
 
-export function useNotifications() {
+interface UseNotificationsOptions {
+  moduleFilter?: string | null;
+  priorityFilter?: string | null;
+  statusFilter?: string | null;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { canAccess } = usePermissions();
 
   const query = useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", options.moduleFilter, options.priorityFilter, options.statusFilter],
     queryFn: async (): Promise<Notification[]> => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
+
+      // Apply status filter or default to non-archived
+      if (options.statusFilter) {
+        q = q.eq("status", options.statusFilter);
+      } else {
+        q = q.neq("status", "archived");
+      }
+
+      if (options.moduleFilter) {
+        q = q.eq("module_origin", options.moduleFilter);
+      }
+      if (options.priorityFilter) {
+        q = q.eq("priority", options.priorityFilter);
+      }
+
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Notification[];
     },
     enabled: !!user,
-    refetchInterval: 30000,
+    refetchInterval: 60000, // Fallback polling; Realtime is primary
   });
 
-  const unreadCount = (query.data ?? []).filter((n) => !n.is_read).length;
+  // ─── Realtime subscription ───────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
 
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          const n = payload.new as Notification;
+          // Only add if it's for this user or role-targeted
+          if (n.user_id === user.id || (n.user_id === null && n.role_target)) {
+            qc.invalidateQueries({ queryKey: ["notifications"] });
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, qc]);
+
+  // ─── Permission-filtered notifications ───────────────────────────
+  const filteredNotifications = (query.data ?? []).filter((n) => {
+    if (!n.required_permission_module) return true;
+    return canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined);
+  });
+
+  const unreadCount = filteredNotifications.filter((n) => n.status === "new" || (!n.status && !n.is_read)).length;
+
+  // ─── Mutations ───────────────────────────────────────────────────
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("notifications")
-        .update({ is_read: true })
+        .update({ is_read: true, status: "read" } as any)
         .eq("id", id);
       if (error) throw error;
     },
@@ -50,18 +119,42 @@ export function useNotifications() {
     mutationFn: async () => {
       const { error } = await supabase
         .from("notifications")
-        .update({ is_read: true })
-        .eq("is_read", false);
+        .update({ is_read: true, status: "read" } as any)
+        .in("status", ["new"]);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const archiveNotification = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ status: "archived" } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const archiveAll = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ status: "archived" } as any)
+        .in("status", ["new", "read"]);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
   return {
-    notifications: query.data ?? [],
+    notifications: filteredNotifications,
     unreadCount,
     isLoading: query.isLoading,
     markAsRead,
     markAllAsRead,
+    archiveNotification,
+    archiveAll,
   };
 }
