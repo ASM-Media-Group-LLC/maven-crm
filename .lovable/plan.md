@@ -1,28 +1,22 @@
 
 
-## Sistema de Notificaciones v2 — Estado completo
+## Problem
 
-### FASE 1: COMPLETA ✅
-- DB: tabla `notifications` con campos v2
-- DB: tabla `notification_preferences`
-- Hook `useNotifications` con Realtime, filtros, canAccess
-- Deep linking con `resolveDeepLink`
-- NotificationBell + NotificationItem + página `/notificaciones`
-- 5 emisores actualizados
-- RLS con soporte role_target
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### FASE 2: COMPLETA ✅
-- Hook `useNotificationPreferences` con CRUD y opt-out model
-- `NOTIFICATION_TYPES_BY_MODULE` en notificationHelpers.ts
-- Página `/ajustes/notificaciones` con toggles por módulo y tipo
-- Integración de preferences en useNotifications (filtrado)
-- Sidebar: "Ajustes" → `/ajustes/notificaciones`
-- Email marcado como "Próximamente"
+## Solution
 
-### FASE 3: COMPLETA ✅
-- Edge function `notification-automations` desplegada
-- Automatizaciones: tareas vencidas, tareas sin actividad, recordatorios de eventos
-- Tabla `notification_automation_log` para tracking
-- Campo `automation_key` con índice único para deduplicación
-- Registrada en `supabase/config.toml`
-- Pendiente: configurar cron job con `pg_cron` + `pg_net` para ejecución horaria
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+
+## Changes
+
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
+
