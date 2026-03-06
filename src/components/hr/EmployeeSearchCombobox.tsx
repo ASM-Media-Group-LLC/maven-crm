@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronsUpDown, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useEmployees } from "@/hooks/useEmployees";
 
@@ -31,8 +31,9 @@ export function EmployeeSearchCombobox({ value, onChange, placeholder = "Selecci
       <PopoverContent className="w-full p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar empleado..." />
-          <CommandEmpty>No se encontró ningún empleado.</CommandEmpty>
-          <CommandGroup className="max-h-60 overflow-y-auto">
+          <CommandList>
+            <CommandEmpty>No se encontró ningún empleado.</CommandEmpty>
+            <CommandGroup className="max-h-60 overflow-y-auto">
             <CommandItem value="" onSelect={() => { onChange(null); setOpen(false); }} className="text-muted-foreground">
               <User className="mr-2 h-4 w-4" />
               Ninguno
@@ -48,7 +49,8 @@ export function EmployeeSearchCombobox({ value, onChange, placeholder = "Selecci
                 <span className="ml-auto text-xs text-muted-foreground">{emp.employee_code}</span>
               </CommandItem>
             ))}
-          </CommandGroup>
+            </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
