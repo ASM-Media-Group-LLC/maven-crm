@@ -1,32 +1,22 @@
 
 
-## Plan: Arreglar selectores de empleados en RRHH
+## Problem
 
-### Problema raíz
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-El componente `EmployeeSearchCombobox` usa `cmdk` v1.x pero **no envuelve el `CommandGroup` dentro de `CommandList`**. En cmdk v1, los items deben estar dentro de `CommandList` para que funcione la selección y el filtrado. Sin esto, hacer clic en un item no dispara `onSelect`.
+## Solution
 
-### Archivos a modificar
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-**1. `src/components/hr/EmployeeSearchCombobox.tsx`**
+## Changes
 
-Envolver `CommandEmpty` y `CommandGroup` dentro de `<CommandList>`:
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-```tsx
-<Command>
-  <CommandInput placeholder="Buscar empleado..." />
-  <CommandList>           {/* ← AGREGAR */}
-    <CommandEmpty>No se encontró ningún empleado.</CommandEmpty>
-    <CommandGroup className="max-h-60 overflow-y-auto">
-      ...items...
-    </CommandGroup>
-  </CommandList>          {/* ← AGREGAR */}
-</Command>
-```
+Replace the single `.select()` call with a paginated loop:
 
-Agregar `CommandList` al import desde `@/components/ui/command`.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-Este único cambio arregla todos los selectores de empleados en: Incidentes, Deducciones, Desempeño, Capacitación, Horas Extra, Banco de Horas, Ausencias, Permisos y Vacaciones (12 archivos usan este componente).
-
-Los selectores de Onboarding y Offboarding usan `<Select>` de Radix directamente (no el combobox), por lo que no deberían tener este problema. Si reportas que esos también fallan, sería un tema diferente.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
