@@ -54,6 +54,8 @@ const schema = z.object({
   bank_name: z.string().optional(),
   bank_account_number: z.string().optional(),
   bank_account_type: z.string().optional(),
+  bank_notes: z.string().optional(),
+  has_commission: z.string().optional(),
   eps: z.string().optional(),
   arl: z.string().optional(),
   afp: z.string().optional(),
@@ -124,6 +126,8 @@ export default function EmployeeNew() {
         arl: values.arl || null,
         afp: values.afp || null,
         caja_compensacion: values.caja_compensacion || null,
+        bank_notes: values.bank_notes || null,
+        has_commission: values.has_commission === "si",
         notes: values.notes || null,
         created_by: user?.id,
         profile_id: linkedProfileId || null,
@@ -326,6 +330,16 @@ export default function EmployeeNew() {
                       <SelectContent>{SALARY_FREQUENCIES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label>¿Comisiona o Bonifica?</Label>
+                    <Select onValueChange={(v) => setValue("has_commission", v)} defaultValue="no">
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="si">Sí</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label>Notas Internas</Label>
                     <Textarea {...register("notes")} placeholder="Observaciones relevantes..." rows={3} />
@@ -387,6 +401,10 @@ export default function EmployeeNew() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>{BANK_ACCOUNT_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Notas</Label>
+                    <Textarea {...register("bank_notes")} placeholder="Observaciones sobre la información bancaria..." rows={3} />
                   </div>
                 </CardContent>
               </Card>

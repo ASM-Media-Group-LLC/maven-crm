@@ -2277,6 +2277,7 @@ export type Database = {
           bank_account_number: string | null
           bank_account_type: string | null
           bank_name: string | null
+          bank_notes: string | null
           base_salary: number | null
           birth_date: string | null
           caja_compensacion: string | null
@@ -2296,6 +2297,7 @@ export type Database = {
           eps: string | null
           first_name: string
           gender: string | null
+          has_commission: boolean | null
           hire_date: string | null
           hour_bank_enabled: boolean | null
           id: string
@@ -2324,6 +2326,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_account_type?: string | null
           bank_name?: string | null
+          bank_notes?: string | null
           base_salary?: number | null
           birth_date?: string | null
           caja_compensacion?: string | null
@@ -2343,6 +2346,7 @@ export type Database = {
           eps?: string | null
           first_name: string
           gender?: string | null
+          has_commission?: boolean | null
           hire_date?: string | null
           hour_bank_enabled?: boolean | null
           id?: string
@@ -2371,6 +2375,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_account_type?: string | null
           bank_name?: string | null
+          bank_notes?: string | null
           base_salary?: number | null
           birth_date?: string | null
           caja_compensacion?: string | null
@@ -2390,6 +2395,7 @@ export type Database = {
           eps?: string | null
           first_name?: string
           gender?: string | null
+          has_commission?: boolean | null
           hire_date?: string | null
           hour_bank_enabled?: boolean | null
           id?: string
