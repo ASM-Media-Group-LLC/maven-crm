@@ -65,6 +65,7 @@ const UsersGrid = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRem
                 </Avatar>
                 <div>
                   <p className="font-semibold">{user.full_name || "Sin nombre"}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[180px]">{user.email || "Sin email"}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {user.created_at ? format(new Date(user.created_at), "dd MMM yyyy", { locale: es }) : "—"}
                   </p>
