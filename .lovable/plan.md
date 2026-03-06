@@ -1,22 +1,18 @@
 
 
-## Problem
+## Plan: Mostrar email en las tarjetas de usuarios
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+El email ya se obtiene en `useAdminUsers.ts` (vía la edge function `admin-user-actions`), simplemente no se muestra en la UI.
 
-## Solution
+### Cambio
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+**Archivo: `src/pages/admin/UsersGrid.tsx`**
 
-## Changes
+Agregar el email del usuario debajo del nombre en cada tarjeta, como texto pequeño truncado con `text-muted-foreground`.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
-
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+```
+<p className="font-semibold">{user.full_name || "Sin nombre"}</p>
++ <p className="text-xs text-muted-foreground truncate max-w-[180px]">{user.email || "Sin email"}</p>
+<p className="text-xs text-muted-foreground mt-1">...</p>
+```
 
