@@ -176,5 +176,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     markAllAsRead,
     archiveNotification,
     archiveAll,
+    deleteNotification,
   };
 }
