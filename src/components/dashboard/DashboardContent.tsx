@@ -298,6 +298,9 @@ const DashboardContent = () => {
         </div>
       </header>
 
+      {/* Announcement Banners */}
+      <AnnouncementBanner banners={banners} onViewDetail={handleOpenDetail} />
+
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
