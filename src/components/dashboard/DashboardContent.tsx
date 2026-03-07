@@ -696,6 +696,14 @@ const DashboardContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Announcement Detail Modal */}
+      <AnnouncementPublicDetail
+        announcement={detailAnnouncement}
+        open={!!detailAnnouncement}
+        onOpenChange={(open) => !open && setDetailAnnouncement(null)}
+        onOpened={handleRecordOpen}
+      />
     </div>
   );
 };
