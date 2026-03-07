@@ -44,10 +44,10 @@ export const useAnnouncements = () =>
       if (!user) return [];
 
       // Get user's employee profile for department filtering
-      const { data: profile } = await supabase
+      const { data: profile } = await (supabase
         .from("employees")
-        .select("id, department_id")
-        .eq("auth_user_id", user.id)
+        .select("id, department_id") as any)
+        .eq("profile_id", user.id)
         .maybeSingle();
 
       // Get user's roles
