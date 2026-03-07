@@ -1,22 +1,48 @@
 
 
-## Problem
+## Plan: Mejorar página de Notificaciones
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Cambios a realizar
 
-## Solution
+#### 1. Layout con header y filtros fijos (`Notificaciones.tsx`)
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+Reestructurar usando el patrón `h-full` con header/filtros en `shrink-0` y lista en `flex-1 overflow-auto`:
 
-## Changes
+```text
+HRLayout (h-screen)
+  └─ div (h-full flex flex-col)
+      ├─ Header + Filtros (shrink-0, p-4/p-6)  ← FIJO
+      └─ Lista (flex-1 overflow-auto)            ← SCROLLABLE
+```
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+Usar `HRLayout` como wrapper en lugar del inline `SidebarProvider + DashboardSidebar + DashboardTopbar`.
 
-Replace the single `.select()` call with a paginated loop:
+#### 2. Tipografía consistente
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+- Título: `text-xl font-bold` (en vez de `text-lg font-semibold`)
+- NotificationItem: título `text-sm` (en vez de `text-xs`), mensaje `text-xs`, timestamp `text-[11px]`
+- Filtros: mantener `text-xs` en SelectTrigger (consistente con otras secciones)
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+#### 3. Agregar acción "Eliminar notificación"
+
+- Agregar mutation `deleteNotification` en `useNotifications.ts` que hace `.delete().eq("id", id)`
+- Agregar botón de eliminar (Trash2 icon) en `NotificationItem.tsx` al lado del botón archivar, con confirmación visual
+- Agregar `onDelete` prop al `NotificationItem`
+
+#### 4. Botón de Configuración de notificaciones
+
+- Agregar botón con icono Settings en el header que navega a `/ajustes/notificaciones`
+- En `NotificacionesSettings.tsx`:
+  - Usar `HRLayout` para consistencia
+  - Agregar columna "WhatsApp" al lado de "Email" con badge "Próximamente"
+  - Ajustar tipografía a `text-sm` para títulos de tipo
+
+### Archivos a modificar
+
+| Archivo | Cambio |
+|---|---|
+| `src/pages/Notificaciones.tsx` | Layout fijo, usar HRLayout, tipografía, botón config |
+| `src/components/notifications/NotificationItem.tsx` | Tipografía, botón eliminar |
+| `src/hooks/useNotifications.ts` | Agregar mutation `deleteNotification` |
+| `src/pages/ajustes/NotificacionesSettings.tsx` | Layout HRLayout, columna WhatsApp |
 
