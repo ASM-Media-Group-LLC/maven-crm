@@ -391,7 +391,7 @@ const DashboardContent = () => {
                   Sin avisos por el momento
                 </div>
               ) : (
-                <div className="space-y-3 max-h-60 overflow-auto">
+                <div className="space-y-3 max-h-72 overflow-auto">
                   {/* Birthdays */}
                   {birthdays.map((b) => (
                     <div key={b.id} className="flex items-start gap-3">
@@ -411,22 +411,14 @@ const DashboardContent = () => {
                       )}
                     </div>
                   ))}
-                  {/* Announcements */}
+                  {/* Announcement Feed Cards */}
                   {announcements.map((a) => (
-                    <div key={a.id} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                        <Megaphone className="h-3.5 w-3.5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{a.title}</p>
-                          {a.priority === "high" && (
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Urgente</Badge>
-                          )}
-                        </div>
-                        {a.message && <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>}
-                      </div>
-                    </div>
+                    <AnnouncementFeedCard
+                      key={a.id}
+                      announcement={a}
+                      onOpen={handleOpenDetail}
+                      onVisible={handleRecordView}
+                    />
                   ))}
                 </div>
               )}
