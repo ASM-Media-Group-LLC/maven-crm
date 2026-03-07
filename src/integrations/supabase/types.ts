@@ -3102,9 +3102,12 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          channel_digest: boolean
           channel_email: boolean | null
           channel_in_app: boolean | null
+          channel_push: boolean
           created_at: string | null
+          delivery_mode: string
           id: string
           is_enabled: boolean | null
           module: string
@@ -3113,9 +3116,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          channel_digest?: boolean
           channel_email?: boolean | null
           channel_in_app?: boolean | null
+          channel_push?: boolean
           created_at?: string | null
+          delivery_mode?: string
           id?: string
           is_enabled?: boolean | null
           module: string
@@ -3124,14 +3130,80 @@ export type Database = {
           user_id: string
         }
         Update: {
+          channel_digest?: boolean
           channel_email?: boolean | null
           channel_in_app?: boolean | null
+          channel_push?: boolean
           created_at?: string | null
+          delivery_mode?: string
           id?: string
           is_enabled?: boolean | null
           module?: string
           notification_type?: string
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_settings: {
+        Row: {
+          auto_mark_read_on_open: boolean
+          created_at: string
+          digest_channel: string
+          digest_enabled: boolean
+          digest_frequency: string
+          digest_time: string
+          dnd_allow_critical: boolean
+          dnd_enabled: boolean
+          dnd_end_time: string | null
+          dnd_start_time: string | null
+          group_similar: boolean
+          id: string
+          notifications_enabled: boolean
+          realtime_enabled: boolean
+          show_critical_banners: boolean
+          sound_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_mark_read_on_open?: boolean
+          created_at?: string
+          digest_channel?: string
+          digest_enabled?: boolean
+          digest_frequency?: string
+          digest_time?: string
+          dnd_allow_critical?: boolean
+          dnd_enabled?: boolean
+          dnd_end_time?: string | null
+          dnd_start_time?: string | null
+          group_similar?: boolean
+          id?: string
+          notifications_enabled?: boolean
+          realtime_enabled?: boolean
+          show_critical_banners?: boolean
+          sound_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_mark_read_on_open?: boolean
+          created_at?: string
+          digest_channel?: string
+          digest_enabled?: boolean
+          digest_frequency?: string
+          digest_time?: string
+          dnd_allow_critical?: boolean
+          dnd_enabled?: boolean
+          dnd_end_time?: string | null
+          dnd_start_time?: string | null
+          group_similar?: boolean
+          id?: string
+          notifications_enabled?: boolean
+          realtime_enabled?: boolean
+          show_critical_banners?: boolean
+          sound_enabled?: boolean
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
