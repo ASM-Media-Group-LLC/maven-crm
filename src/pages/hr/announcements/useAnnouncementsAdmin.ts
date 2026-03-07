@@ -48,6 +48,66 @@ export interface AnnouncementView {
 const QUERY_KEY = ["admin-announcements"];
 const PUBLIC_KEY = ["internal-announcements"];
 
+// Send notifications to target audience when announcement is published via 'notification' channel
+async function sendAnnouncementNotifications(
+  announcementId: string,
+  title: string,
+  message: string,
+  priority: string,
+  audience?: Omit<AudienceTarget, "id" | "announcement_id">[]
+) {
+  try {
+    let userIds: string[] = [];
+
+    // Determine target users
+    const isGlobal = !audience || audience.length === 0 || audience.some((a) => a.target_type === "all");
+
+    if (isGlobal) {
+      const { data } = await supabase.from("profiles").select("id").limit(500);
+      userIds = (data ?? []).map((p) => p.id);
+    } else {
+      const ids = new Set<string>();
+      for (const target of audience!) {
+        if (target.target_type === "user" && target.target_id) {
+          ids.add(target.target_id);
+        } else if (target.target_type === "department" && target.target_id) {
+          const { data } = await (supabase.from("employees").select("profile_id") as any)
+            .eq("department_id", target.target_id).eq("status", "activo");
+          (data ?? []).forEach((e: any) => e.profile_id && ids.add(e.profile_id));
+        } else if (target.target_type === "role" && target.target_id) {
+          const { data } = await supabase.from("user_roles").select("user_id").eq("role", target.target_id as any);
+          (data ?? []).forEach((r: any) => ids.add(r.user_id));
+        }
+      }
+      userIds = [...ids];
+    }
+
+    if (userIds.length === 0) return;
+
+    const priorityMap: Record<string, string> = { high: "high", normal: "medium", low: "low" };
+
+    // Insert notifications in batches of 100
+    const notifications = userIds.map((uid) => ({
+      user_id: uid,
+      title: `📢 ${title}`,
+      message: message.slice(0, 200) || null,
+      type: "announcement",
+      module_origin: "Comunicación",
+      deep_link_url: "/hr/anuncios",
+      reference_id: announcementId,
+      reference_type: "announcement",
+      priority: priorityMap[priority] || "medium",
+      visibility_scope: "personal",
+    }));
+
+    for (let i = 0; i < notifications.length; i += 100) {
+      await supabase.from("notifications").insert(notifications.slice(i, i + 100));
+    }
+  } catch (err) {
+    console.error("Error sending announcement notifications:", err);
+  }
+}
+
 export const useAnnouncementsAdmin = () =>
   useQuery({
     queryKey: QUERY_KEY,
@@ -137,6 +197,11 @@ export const useCreateAnnouncement = () => {
           .from("announcement_audience")
           .insert(audience.map((a) => ({ ...a, announcement_id: data.id })));
         if (audError) throw audError;
+      }
+
+      // Send notifications if channel includes 'notification' and status is active
+      if (is_active && values.delivery_channels?.includes("notification")) {
+        await sendAnnouncementNotifications(data.id, values.title, values.message || "", values.priority, audience);
       }
     },
     onSuccess: () => {
