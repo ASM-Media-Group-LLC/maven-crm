@@ -1,22 +1,40 @@
 
 
-## Problem
+## Plan: Corregir inputs de hora y layout en CreateAnnouncementModal
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problema
+1. Los inputs de hora usan `<Input type="time">` nativo del navegador, inconsistente con el design system (Selects de Shadcn)
+2. Fecha de expiración y repetición están en filas separadas, pueden compartir fila
 
-## Solution
+### Cambios
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+#### 1. Crear componente `TimeSelect` (`src/components/ui/time-select.tsx`)
 
-## Changes
+Componente reutilizable que reemplaza `<Input type="time">` con dos `Select` de Shadcn lado a lado (hora y minutos):
+- Horas: 00–23
+- Minutos: 00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55 (intervalos de 5)
+- Props: `value` (string "HH:mm"), `onChange`, `disabled`, `className`
+- Diseño: dos selects en una fila con separador ":"
+- Estilo consistente con los SelectTrigger del resto del formulario
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+#### 2. Actualizar `CreateAnnouncementModal.tsx` (Step 1)
 
-Replace the single `.select()` call with a paginated loop:
+- Reemplazar `<Input type="time">` por `<TimeSelect>` en hora de publicación y hora de expiración
+- Reorganizar layout del Step 1:
+  - Fila 1: Publicar como (ancho completo)
+  - Fila 2 (si programado): Fecha de publicación + Hora de publicación
+  - Fila 3: Fecha de expiración + Repetición (misma fila)
+  - Fila 4 condicional: Hora de expiración (si hay fecha exp.) + Fin de repetición (si hay recurrencia)
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+#### 3. Actualizar `EditAnnouncementModal.tsx`
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+Aplicar los mismos cambios: reemplazar `<Input type="time">` por `<TimeSelect>`.
+
+### Archivos
+
+| Archivo | Acción |
+|---|---|
+| `src/components/ui/time-select.tsx` | **Nuevo** — componente TimeSelect |
+| `src/pages/hr/announcements/CreateAnnouncementModal.tsx` | Reemplazar inputs de hora, reorganizar layout |
+| `src/pages/hr/announcements/EditAnnouncementModal.tsx` | Reemplazar inputs de hora |
 
