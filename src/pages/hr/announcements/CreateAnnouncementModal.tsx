@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TimeSelect } from "@/components/ui/time-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateInput } from "@/components/ui/date-input";
 import { Progress } from "@/components/ui/progress";
@@ -284,7 +285,7 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
                   </div>
                   <div className="space-y-2">
                     <Label>Hora de publicación</Label>
-                    <Input type="time" value={startsTime} onChange={(e) => setStartsTime(e.target.value)} />
+                    <TimeSelect value={startsTime} onChange={setStartsTime} />
                   </div>
                 </div>
               )}
@@ -294,14 +295,6 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
                   <Label>Fecha de expiración (opcional)</Label>
                   <DateInput value={expiresAt} onChange={setExpiresAt} placeholder="Sin expiración" />
                 </div>
-                {expiresAt && (
-                  <div className="space-y-2">
-                    <Label>Hora de expiración</Label>
-                    <Input type="time" value={expiresTime} onChange={(e) => setExpiresTime(e.target.value)} />
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Repetición</Label>
                   <Select value={recurrence} onValueChange={setRecurrence}>
@@ -311,13 +304,24 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
                     </SelectContent>
                   </Select>
                 </div>
-                {recurrence !== "none" && (
-                  <div className="space-y-2">
-                    <Label>Fin de repetición</Label>
-                    <DateInput value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="Sin fin" />
-                  </div>
-                )}
               </div>
+
+              {(expiresAt || recurrence !== "none") && (
+                <div className="grid grid-cols-2 gap-4">
+                  {expiresAt && (
+                    <div className="space-y-2">
+                      <Label>Hora de expiración</Label>
+                      <TimeSelect value={expiresTime} onChange={setExpiresTime} />
+                    </div>
+                  )}
+                  {recurrence !== "none" && (
+                    <div className={`space-y-2 ${!expiresAt ? "col-start-2" : ""}`}>
+                      <Label>Fin de repetición</Label>
+                      <DateInput value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="Sin fin" />
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 
