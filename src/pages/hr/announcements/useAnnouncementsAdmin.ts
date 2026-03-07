@@ -138,6 +138,11 @@ export const useCreateAnnouncement = () => {
           .insert(audience.map((a) => ({ ...a, announcement_id: data.id })));
         if (audError) throw audError;
       }
+
+      // Send notifications if channel includes 'notification' and status is active
+      if (is_active && values.delivery_channels?.includes("notification")) {
+        await sendAnnouncementNotifications(data.id, values.title, values.message || "", values.priority, audience);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
