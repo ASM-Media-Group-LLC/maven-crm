@@ -155,7 +155,7 @@ export const useUpdateAnnouncement = () => {
       id,
       audience,
       ...values
-    }: Partial<AnnouncementRow> & { id: string; audience?: Omit<AudienceTarget, "id" | "announcement_id">[] }) => {
+    }: Omit<Partial<AnnouncementRow>, "audience"> & { id: string; audience?: Omit<AudienceTarget, "id" | "announcement_id">[] }) => {
       const updateData: any = { ...values, updated_at: new Date().toISOString() };
       delete updateData.audience;
 
