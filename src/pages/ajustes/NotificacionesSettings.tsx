@@ -1,137 +1,110 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Bell, Mail, MessageCircle } from "lucide-react";
-import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
-import { usePermissions } from "@/hooks/usePermissions";
-import { NOTIFICATION_TYPES_BY_MODULE } from "@/lib/notificationHelpers";
-import { toast } from "sonner";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Settings, Bell, Radio, Layers, BarChart3, FileText, Moon, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import HRLayout from "@/pages/hr/HRLayout";
+import GeneralTab from "./notificaciones/GeneralTab";
+import CanalesTab from "./notificaciones/CanalesTab";
+import EventosTab from "./notificaciones/EventosTab";
+import PrioridadTab from "./notificaciones/PrioridadTab";
+import ResumenesTab from "./notificaciones/ResumenesTab";
+import NoMolestarTab from "./notificaciones/NoMolestarTab";
+
+const TABS = [
+  { id: "general", label: "General", icon: Settings },
+  { id: "canales", label: "Canales", icon: Radio },
+  { id: "eventos", label: "Eventos", icon: Bell },
+  { id: "prioridad", label: "Prioridad", icon: BarChart3 },
+  { id: "resumenes", label: "Resúmenes", icon: FileText },
+  { id: "no-molestar", label: "No Molestar", icon: Moon },
+] as const;
+
+const TAB_CONTENT: Record<string, React.FC> = {
+  general: GeneralTab,
+  canales: CanalesTab,
+  eventos: EventosTab,
+  prioridad: PrioridadTab,
+  resumenes: ResumenesTab,
+  "no-molestar": NoMolestarTab,
+};
 
 const NotificacionesSettings = () => {
-  const { preferences, upsertPreference, isTypeEnabled, isModuleEnabled } = useNotificationPreferences();
-  const { canAccess } = usePermissions();
-
-  const accessibleModules = Object.entries(NOTIFICATION_TYPES_BY_MODULE).filter(
-    ([module]) => canAccess(module)
-  );
-
-  const handleToggle = (module: string, type: string, currentEnabled: boolean) => {
-    upsertPreference.mutate(
-      { module, notification_type: type, is_enabled: !currentEnabled, channel_in_app: !currentEnabled },
-      { onSuccess: () => toast.success("Preferencia actualizada") }
-    );
-  };
-
-  const handleModuleToggle = (module: string) => {
-    const currentlyEnabled = isModuleEnabled(module);
-    const types = NOTIFICATION_TYPES_BY_MODULE[module as keyof typeof NOTIFICATION_TYPES_BY_MODULE] ?? [];
-    
-    types.forEach((t) => {
-      upsertPreference.mutate({
-        module,
-        notification_type: t.type,
-        is_enabled: !currentlyEnabled,
-        channel_in_app: !currentlyEnabled,
-      });
-    });
-    toast.success(currentlyEnabled ? "Módulo desactivado" : "Módulo activado");
-  };
+  const [activeTab, setActiveTab] = useState("general");
+  const navigate = useNavigate();
+  const ActiveComponent = TAB_CONTENT[activeTab];
 
   return (
     <HRLayout>
-      <div className="h-full overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Preferencias de Notificaciones</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Configura qué notificaciones deseas recibir por módulo y tipo.
-            </p>
+      <div className="h-full flex flex-col">
+        {/* Fixed Header */}
+        <div className="shrink-0 border-b border-border bg-background px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => navigate("/notificaciones")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Configuración de Notificaciones</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Controla qué notificaciones recibes, por qué canal y con qué prioridad.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content: Sidebar + Tab Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Vertical Tabs - Desktop */}
+          <nav className="hidden md:flex shrink-0 w-48 border-r border-border bg-muted/30 flex-col py-2">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  "flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
+                  activeTab === id
+                    ? "bg-background text-foreground font-medium border-r-2 border-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Horizontal Tabs - Mobile */}
+          <div className="md:hidden shrink-0 border-b border-border bg-background overflow-x-auto">
+            <div className="flex px-2 py-1.5 gap-1 min-w-max">
+              {TABS.map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors",
+                    activeTab === id
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {accessibleModules.map(([module, types]) => (
-            <Card key={module} className="border-border">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">{module}</CardTitle>
-                    <CardDescription className="text-xs">{types.length} tipos de notificación</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`module-${module}`} className="text-xs text-muted-foreground">
-                      Todas
-                    </Label>
-                    <Switch
-                      id={`module-${module}`}
-                      checked={isModuleEnabled(module)}
-                      onCheckedChange={() => handleModuleToggle(module)}
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-4">
-                <div className="grid gap-3">
-                  {/* Header */}
-                  <div className="grid grid-cols-[1fr,80px,80px,80px] gap-4 items-center px-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tipo</span>
-                    <div className="flex items-center justify-center gap-1">
-                      <Bell className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">In-app</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">Email</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1">
-                      <MessageCircle className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">WhatsApp</span>
-                    </div>
-                  </div>
-
-                  {types.map((t) => {
-                    const enabled = isTypeEnabled(module, t.type);
-                    return (
-                      <div
-                        key={t.type}
-                        className="grid grid-cols-[1fr,80px,80px,80px] gap-4 items-center rounded-md px-2 py-2 hover:bg-muted/50 transition-colors"
-                      >
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{t.label}</span>
-                        </div>
-                        <div className="flex justify-center">
-                          <Switch
-                            checked={enabled}
-                            onCheckedChange={() => handleToggle(module, t.type, enabled)}
-                          />
-                        </div>
-                        <div className="flex justify-center">
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground cursor-not-allowed">
-                            Próximamente
-                          </Badge>
-                        </div>
-                        <div className="flex justify-center">
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground cursor-not-allowed">
-                            Próximamente
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {accessibleModules.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No tienes acceso a módulos con notificaciones configurables.
-              </CardContent>
-            </Card>
-          )}
+          {/* Tab Content */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="max-w-3xl">
+              <ActiveComponent />
+            </div>
+          </div>
         </div>
       </div>
     </HRLayout>
