@@ -262,25 +262,42 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
 
           {step === 1 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Fecha de publicación</Label>
-                  <DateInput value={startsAt} onChange={setStartsAt} placeholder="Fecha inicio" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Hora de publicación</Label>
-                  <Input type="time" value={startsTime} onChange={(e) => setStartsTime(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                <Label>Publicar como</Label>
+                <Select value={publishAs} onValueChange={setPublishAs}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Publicar ahora</SelectItem>
+                    <SelectItem value="scheduled">Programado</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {publishAs !== "active" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Fecha de publicación</Label>
+                    <DateInput value={startsAt} onChange={setStartsAt} placeholder="Fecha inicio" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Hora de publicación</Label>
+                    <Input type="time" value={startsTime} onChange={(e) => setStartsTime(e.target.value)} />
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Fecha de expiración (opcional)</Label>
                   <DateInput value={expiresAt} onChange={setExpiresAt} placeholder="Sin expiración" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Hora de expiración</Label>
-                  <Input type="time" value={expiresTime} onChange={(e) => setExpiresTime(e.target.value)} />
-                </div>
+                {expiresAt && (
+                  <div className="space-y-2">
+                    <Label>Hora de expiración</Label>
+                    <Input type="time" value={expiresTime} onChange={(e) => setExpiresTime(e.target.value)} />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -298,17 +315,6 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
                     <DateInput value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="Sin fin" />
                   </div>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label>Publicar como</Label>
-                <Select value={publishAs} onValueChange={setPublishAs}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Borrador</SelectItem>
-                    <SelectItem value="scheduled">Programado</SelectItem>
-                    <SelectItem value="active">Publicar ahora</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </>
           )}
