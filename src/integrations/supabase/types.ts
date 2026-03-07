@@ -204,6 +204,73 @@ export type Database = {
           },
         ]
       }
+      announcement_audience: {
+        Row: {
+          announcement_id: string
+          created_at: string
+          id: string
+          target_id: string | null
+          target_label: string
+          target_type: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string
+          id?: string
+          target_id?: string | null
+          target_label: string
+          target_type: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string
+          id?: string
+          target_id?: string | null
+          target_label?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_audience_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "internal_announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcement_views: {
+        Row: {
+          announcement_id: string
+          id: string
+          opened_at: string | null
+          user_id: string
+          viewed_at: string
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          opened_at?: string | null
+          user_id: string
+          viewed_at?: string
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          opened_at?: string | null
+          user_id?: string
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_views_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "internal_announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       applicants: {
         Row: {
           assigned_to: string | null
@@ -2783,42 +2850,78 @@ export type Database = {
       internal_announcements: {
         Row: {
           announcement_type: string
+          attachment_name: string | null
+          attachment_url: string | null
+          content_html: string | null
           created_at: string
           created_by: string
+          delivery_channels: string[]
           expires_at: string | null
           id: string
+          image_url: string | null
           is_active: boolean
           message: string | null
+          open_count: number
           priority: string
+          recurrence_end_at: string | null
+          recurrence_type: string
+          related_module: string | null
           starts_at: string
+          status: string
           title: string
           updated_at: string
+          view_count: number
+          visibility: string
         }
         Insert: {
           announcement_type?: string
+          attachment_name?: string | null
+          attachment_url?: string | null
+          content_html?: string | null
           created_at?: string
           created_by: string
+          delivery_channels?: string[]
           expires_at?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           message?: string | null
+          open_count?: number
           priority?: string
+          recurrence_end_at?: string | null
+          recurrence_type?: string
+          related_module?: string | null
           starts_at?: string
+          status?: string
           title: string
           updated_at?: string
+          view_count?: number
+          visibility?: string
         }
         Update: {
           announcement_type?: string
+          attachment_name?: string | null
+          attachment_url?: string | null
+          content_html?: string | null
           created_at?: string
           created_by?: string
+          delivery_channels?: string[]
           expires_at?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           message?: string | null
+          open_count?: number
           priority?: string
+          recurrence_end_at?: string | null
+          recurrence_type?: string
+          related_module?: string | null
           starts_at?: string
+          status?: string
           title?: string
           updated_at?: string
+          view_count?: number
+          visibility?: string
         }
         Relationships: []
       }
