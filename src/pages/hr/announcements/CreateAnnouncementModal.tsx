@@ -119,9 +119,11 @@ const CreateAnnouncementModal = ({ open, onOpenChange }: Props) => {
       attachmentName = attachmentFile.name;
     }
 
-    const startsIso = startsAt
-      ? new Date(`${startsAt}T${startsTime}:00`).toISOString()
-      : new Date().toISOString();
+    const startsIso = publishAs === "active"
+      ? new Date().toISOString()
+      : startsAt
+        ? new Date(`${startsAt}T${startsTime}:00`).toISOString()
+        : new Date().toISOString();
     const expiresIso = expiresAt
       ? new Date(`${expiresAt}T${expiresTime}:00`).toISOString()
       : null;
