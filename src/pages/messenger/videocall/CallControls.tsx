@@ -5,6 +5,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import BackgroundSelector, { BackgroundEffect } from "./BackgroundSelector";
 
 interface CallControlsProps {
   isMicOn: boolean;
@@ -13,6 +14,7 @@ interface CallControlsProps {
   isHandRaised: boolean;
   isChatOpen: boolean;
   isParticipantsOpen: boolean;
+  backgroundEffect: BackgroundEffect;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleScreenShare: () => void;
@@ -20,6 +22,7 @@ interface CallControlsProps {
   onToggleChat: () => void;
   onToggleParticipants: () => void;
   onSendReaction: (emoji: string) => void;
+  onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
 }
 
@@ -53,8 +56,9 @@ function ControlBtn({
 
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen,
+  backgroundEffect,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
-  onToggleChat, onToggleParticipants, onSendReaction, onLeave,
+  onToggleChat, onToggleParticipants, onSendReaction, onBackgroundChange, onLeave,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-3 py-4 bg-[hsl(240_8%_10%)]">
@@ -93,6 +97,7 @@ export default function CallControls({
         </PopoverContent>
       </Popover>
 
+      <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
       <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
 

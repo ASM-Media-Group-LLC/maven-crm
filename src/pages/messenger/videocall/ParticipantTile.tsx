@@ -5,19 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { MicOff, Hand, Monitor } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
+import { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
 
 interface ParticipantTileProps {
   participant: LKParticipant;
   room: Room | null;
   large?: boolean;
   className?: string;
+  backgroundEffect?: BackgroundEffect;
 }
 
 function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function ParticipantTile({ participant, room, large, className }: ParticipantTileProps) {
+export default function ParticipantTile({ participant, room, large, className, backgroundEffect = "none" }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -66,6 +68,11 @@ export default function ParticipantTile({ participant, room, large, className }:
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
+  // Resolve background template gradient
+  const templateBg = BACKGROUND_TEMPLATES.find((t) => t.id === backgroundEffect);
+  const isBlur = backgroundEffect === "soft-blur" || backgroundEffect === "hard-blur";
+  const blurAmount = backgroundEffect === "soft-blur" ? "blur(8px)" : backgroundEffect === "hard-blur" ? "blur(24px)" : undefined;
+
   return (
     <div
       className={cn(
@@ -75,14 +82,33 @@ export default function ParticipantTile({ participant, room, large, className }:
       )}
       style={{ background: showVideo ? "hsl(240 6% 10%)" : "hsl(240 8% 12%)" }}
     >
+      {/* Template background layer */}
+      {templateBg && showVideo && (
+        <div className="absolute inset-0 z-0" style={{ background: templateBg.gradient }} />
+      )}
+
       {showVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={participant.isLocal}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={participant.isLocal}
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              ...(isBlur ? { filter: blurAmount } : {}),
+              ...(templateBg ? { mixBlendMode: "luminosity", opacity: 0.7 } : {}),
+              zIndex: 1,
+            }}
+          />
+          {/* Overlay for template to tint */}
+          {templateBg && (
+            <div
+              className="absolute inset-0 z-[2]"
+              style={{ background: templateBg.gradient, opacity: 0.4, mixBlendMode: "color" }}
+            />
+          )}
+        </>
       ) : (
         <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)]", large ? "h-24 w-24" : "h-16 w-16")}>
           <AvatarFallback
@@ -98,7 +124,7 @@ export default function ParticipantTile({ participant, room, large, className }:
 
       {/* Reactions floating */}
       {participant.reactions.length > 0 && (
-        <div className="absolute top-3 right-3 flex gap-1 animate-bounce">
+        <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
           {participant.reactions.map((emoji, i) => (
             <span key={i} className="text-2xl drop-shadow-lg">
               {emoji}
@@ -109,14 +135,14 @@ export default function ParticipantTile({ participant, room, large, className }:
 
       {/* Hand raised */}
       {participant.handRaised && (
-        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse">
+        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse z-10">
           <Hand className="h-4 w-4 text-white" />
         </div>
       )}
 
       {/* Screen sharing indicator */}
       {participant.isScreenSharing && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge variant="secondary" className="gap-1 text-[10px]">
             <Monitor className="h-3 w-3" /> Compartiendo pantalla
           </Badge>
@@ -124,7 +150,7 @@ export default function ParticipantTile({ participant, room, large, className }:
       )}
 
       {/* Bottom label */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-1.5 bg-[hsl(0_0%_0%/0.6)] backdrop-blur-sm rounded-md px-2 py-1">
           <span className="text-xs font-medium text-[hsl(0_0%_96%)]">
             {participant.isLocal ? "Tú" : participant.name}

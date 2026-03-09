@@ -9,6 +9,7 @@ import ParticipantTile from "./ParticipantTile";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BackgroundEffect } from "./BackgroundSelector";
 
 interface LiveKitCallViewProps {
   roomName: string;
@@ -22,6 +23,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
   // Connect on mount
   useEffect(() => {
@@ -94,7 +96,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
           {layout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {lk.participants.map((p) => (
-                <ParticipantTile key={p.sid} participant={p} room={room} />
+                <ParticipantTile key={p.sid} participant={p} room={room} backgroundEffect={p.isLocal ? bgEffect : "none"} />
               ))}
             </div>
           ) : (
@@ -106,6 +108,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     room={room}
                     large
                     className="h-full"
+                    backgroundEffect={spotlightParticipant.isLocal ? bgEffect : "none"}
                   />
                 </div>
               )}
@@ -115,7 +118,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={p.sid} className="w-40 shrink-0">
-                        <ParticipantTile participant={p} room={room} />
+                        <ParticipantTile participant={p} room={room} backgroundEffect={p.isLocal ? bgEffect : "none"} />
                       </div>
                     ))}
                 </div>
@@ -151,6 +154,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
+        backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
@@ -158,6 +162,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
         onSendReaction={lk.sendReaction}
+        onBackgroundChange={setBgEffect}
         onLeave={handleLeave}
       />
     </div>
