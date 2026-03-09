@@ -97,6 +97,7 @@ export default function CallControls({
         </PopoverContent>
       </Popover>
 
+      <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
       <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
 
