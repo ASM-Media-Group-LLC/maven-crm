@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export function useChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,7 +44,6 @@ export function useChat() {
 
     if (!participations || participations.length === 0) {
       setConversations([]);
-      setLoading(false);
       return;
     }
 
@@ -59,7 +58,6 @@ export function useChat() {
 
     if (!convs) {
       setConversations([]);
-      setLoading(false);
       return;
     }
 
@@ -142,7 +140,6 @@ export function useChat() {
     });
 
     setConversations(enriched);
-    setLoading(false);
   }, [user]);
 
   // Initial load
@@ -383,7 +380,7 @@ export function useChat() {
 export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
@@ -394,7 +391,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       setMessages([]);
       return;
     }
-    setLoading(true);
     const { data } = await supabase
       .from("chat_messages")
       .select("*")
@@ -403,7 +399,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       .limit(200);
 
     setMessages((data as ChatMessage[]) || []);
-    setLoading(false);
 
     // Mark as read
     if (user) {

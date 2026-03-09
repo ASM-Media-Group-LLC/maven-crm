@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2, SearchCheck, Contact } from "lucide-react";
+import { Search, Users, Video, MessageSquarePlus, Trash2, SearchCheck, Contact } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -118,11 +118,7 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
 
       <ScrollArea className="flex-1">
         <div className="px-2 pb-2">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="text-center py-6 space-y-2">
               <p className="text-sm text-muted-foreground">
                 {search ? "Sin resultados" : "Inicia una conversación"}

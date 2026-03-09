@@ -1,7 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
-import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import { Loader2 } from "lucide-react";
 
 interface PermissionRouteProps {
@@ -30,11 +29,7 @@ const PermissionRoute = ({ module, submodule, children }: PermissionRouteProps) 
     return <Navigate to="/dashboard" replace />;
   }
 
-  return (
-    <OnlinePresenceProvider>
-      {children}
-    </OnlinePresenceProvider>
-  );
+  return <>{children}</>;
 };
 
 export default PermissionRoute;

@@ -1,5 +1,4 @@
 import { useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
@@ -77,14 +76,6 @@ export default function MessageList({
   }, [highlightedMsgId]);
 
   const groups = groupMessages(messages);
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   if (messages.length === 0) {
     return (

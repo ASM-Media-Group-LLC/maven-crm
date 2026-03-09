@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
+import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
 import Landing from "./pages/Landing";
@@ -112,6 +113,7 @@ const App = () => (
       <TooltipProvider>
         <LanguageProvider>
         <AuthProvider>
+        <OnlinePresenceProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -218,6 +220,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+        </OnlinePresenceProvider>
         </AuthProvider>
         </LanguageProvider>
       </TooltipProvider>
