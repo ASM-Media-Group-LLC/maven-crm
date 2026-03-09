@@ -114,21 +114,21 @@ interface QuickAction {
 }
 
 const ALL_ACTIONS: QuickAction[] = [
-  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "contactos" },
-  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "tareas" },
-  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "eventos" },
-  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "creadores" },
-  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "leadgen" },
-  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "closers" },
-  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "tickets" },
-  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "hr" },
-  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "finanzas" },
-  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "promolog" },
-  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "sales" },
-  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "admin" },
+  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "Contactos" },
+  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "Tareas" },
+  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "Eventos" },
+  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "Creadores" },
+  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "LeadGen" },
+  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "Closers" },
+  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "Tickets" },
+  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "HR" },
+  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "Finanzas" },
+  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "Promolog" },
+  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "Creator Sales" },
+  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
 ];
 
-const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos", "creadores", "tickets", "hr"];
+const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos"];
 const MAX_SHORTCUTS = 6;
 const LS_KEY = "dashboard_quick_actions";
 
