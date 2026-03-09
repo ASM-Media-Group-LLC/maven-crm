@@ -42,7 +42,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
     toast.info("Llamada finalizada");
   }, [lk, onLeave]);
 
-  const shareLink = `${window.location.origin}/messenger?room=${roomName}`;
+  const shareLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
 
   // Find screen sharer for spotlight
   const screenSharer = lk.participants.find((p) => p.isScreenSharing);
