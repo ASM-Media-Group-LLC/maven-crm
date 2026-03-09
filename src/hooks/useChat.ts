@@ -224,17 +224,23 @@ export function useChat() {
         return null;
       }
 
-      // Insert both participants in parallel
-      const [r1, r2] = await Promise.all([
-        supabase.from("chat_participants").insert(
-          { conversation_id: newConvId, user_id: user.id, role: "admin" }
-        ),
-        supabase.from("chat_participants").insert(
-          { conversation_id: newConvId, user_id: otherUserId, role: "member" }
-        ),
-      ]);
+      // Insert creator first (RLS requires creator to be participant before adding others)
+      const { error: addCreatorError } = await supabase
+        .from("chat_participants")
+        .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
 
-      if (r1.error || r2.error) {
+      if (addCreatorError) {
+        await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        toast.error("Error al crear conversación");
+        return null;
+      }
+
+      const { error: addOtherError } = await supabase
+        .from("chat_participants")
+        .insert({ conversation_id: newConvId, user_id: otherUserId, role: "member" });
+
+      if (addOtherError) {
+        await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
         await supabase.from("chat_conversations").delete().eq("id", newConvId);
         toast.error("Error al crear conversación");
         return null;
