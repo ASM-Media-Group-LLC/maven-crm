@@ -81,6 +81,11 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
             <StatusPicker />
           </div>
           <div className="flex gap-0.5">
+            {onOpenGlobalSearch && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenGlobalSearch} title="Buscar en todo">
+                <SearchCheck className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
