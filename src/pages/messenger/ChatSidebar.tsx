@@ -25,6 +25,7 @@ interface ChatSidebarProps {
   onNewChat: () => void;
   onNewGroup: () => void;
   onOpenVideoRooms: () => void;
+  onOpenContacts: () => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
   onOpenGlobalSearch?: () => void;
