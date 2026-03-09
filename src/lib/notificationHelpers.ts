@@ -27,6 +27,7 @@ export function resolveDeepLink(
     lead: `/leadgen?id=${referenceId}`,
     deal: `/closers?id=${referenceId}`,
     conversation: `/messenger?chat=${referenceId}`,
+    announcement: `/hr/anuncios?id=${referenceId}`,
   };
 
   return routes[referenceType] || "/dashboard";
