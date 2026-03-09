@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, FileText, BarChart3 } from "lucide-react";
-import { format, isSameDay, differenceInMinutes, startOfDay, endOfDay, subDays } from "date-fns";
+import { useState, useMemo, useEffect } from "react";
+import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Instagram } from "lucide-react";
+import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
@@ -20,19 +19,19 @@ interface AgentDetailViewProps {
 }
 
 const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100" },
-  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100" },
-  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100" },
-  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100" },
-  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground" },
+  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100", border: "border-emerald-500" },
+  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100", border: "border-blue-500" },
+  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100", border: "border-cyan-500" },
+  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100", border: "border-violet-500" },
+  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground", border: "border-border" },
 ];
 
 const qualityBadgeColors: Record<string, string> = {
-  "a+": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  "a": "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  "b+": "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
-  "b": "bg-violet-500/15 text-violet-400 border-violet-500/30",
-  "c": "bg-muted text-muted-foreground border-border",
+  "a+": "bg-emerald-500 text-white",
+  "a": "bg-blue-500 text-white",
+  "b+": "bg-cyan-600 text-white",
+  "b": "bg-violet-500 text-white",
+  "c": "bg-muted text-muted-foreground",
 };
 
 const tabs = [
@@ -41,14 +40,24 @@ const tabs = [
   { id: "qa", label: "QA / Retroalimentación" },
 ];
 
+const OBJETIVO_POR_HORA = 20;
+
 const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
+  const [filterContacto, setFilterContacto] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [now, setNow] = useState(new Date());
+
+  // Live clock
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const agentLeads = useMemo(() =>
     leads.filter(l =>
@@ -56,18 +65,38 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
       l.company?.toLowerCase() === agent.email.toLowerCase()
     ), [leads, agent]);
 
-  const now = new Date();
   const todayLeads = useMemo(() =>
     agentLeads.filter(l => isSameDay(new Date(l.created_at), now)),
-    [agentLeads]);
+    [agentLeads, now]);
 
   const lastHourLeads = useMemo(() =>
     todayLeads.filter(l => differenceInMinutes(now, new Date(l.created_at)) < 60),
-    [todayLeads]);
+    [todayLeads, now]);
 
-  const minutesSinceStart = Math.max(60, differenceInMinutes(now, startOfDay(now)));
-  const hoursWorked = minutesSinceStart / 60;
+  // Calculate time active from first lead today
+  const firstLeadToday = useMemo(() => {
+    if (todayLeads.length === 0) return null;
+    const sorted = [...todayLeads].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    return new Date(sorted[0].created_at);
+  }, [todayLeads]);
+
+  const totalSecondsActive = firstLeadToday ? Math.max(0, differenceInSeconds(now, firstLeadToday)) : 0;
+  const activeHours = Math.floor(totalSecondsActive / 3600);
+  const activeMinutes = Math.floor((totalSecondsActive % 3600) / 60);
+  const activeSeconds = totalSecondsActive % 60;
+
+  const hoursWorked = totalSecondsActive / 3600;
   const avgPerHour = hoursWorked > 0 ? (todayLeads.length / hoursWorked).toFixed(1) : "0";
+  const esperados = Math.round(hoursWorked * OBJETIVO_POR_HORA);
+  const diferencia = todayLeads.length - esperados;
+
+  // Count leads added in the last hour vs previous interval
+  const prevHourLeads = useMemo(() =>
+    todayLeads.filter(l => {
+      const mins = differenceInMinutes(now, new Date(l.created_at));
+      return mins >= 60 && mins < 120;
+    }), [todayLeads, now]);
+  const lastHourDelta = lastHourLeads.length - prevHourLeads.length;
 
   const qualityCounts = useMemo(() => {
     const counts: Record<string, number> = { "a+": 0, "a": 0, "b+": 0, "b": 0, "c": 0 };
@@ -84,16 +113,15 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
     if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
     if (filterCalidad) result = result.filter(l => l.quality?.toLowerCase() === filterCalidad);
     if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
+    if (filterContacto === "con_telefono") result = result.filter(l => l.phone_raw || l.phone_e164);
+    if (filterContacto === "sin_telefono") result = result.filter(l => !l.phone_raw && !l.phone_e164);
     if (searchTerm) result = result.filter(l =>
       l.model_handle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.ticket_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       l.company?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return result;
-  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, searchTerm]);
-
-  const initials = agent.name.slice(0, 2).toUpperCase();
-  const activeHours = Math.floor(hoursWorked);
-  const activeMinutes = Math.floor(minutesSinceStart % 60);
+  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, filterContacto, searchTerm]);
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
@@ -108,28 +136,30 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9 shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
-            </Avatar>
             <div>
               <h1 className="text-xl font-semibold">{agent.name}</h1>
-              <p className="text-sm text-muted-foreground">@{agent.name}</p>
+              <p className="text-sm text-muted-foreground">@{agent.name.toLowerCase().replace(/\s+/g, '')}</p>
             </div>
             <div className="flex items-center gap-4 ml-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-xs text-muted-foreground">Tiempo Activo</span>
+                <span className="text-sm font-mono font-semibold">
+                  {String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min {String(activeSeconds).padStart(2, "0")}s
+                </span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-                <span className="text-sm font-medium">{lastHourLeads.length}</span>
-                <Badge variant="secondary" className="text-xs">Última Hora</Badge>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+                <span className="text-xs text-muted-foreground">Última Hora</span>
+                <span className="text-sm font-semibold">{lastHourLeads.length}</span>
+                <Badge className={`text-xs ${lastHourDelta >= 0 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-destructive/20 text-destructive border-destructive/30"}`}>
+                  {lastHourDelta >= 0 ? `+${lastHourDelta}` : lastHourDelta}
+                </Badge>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm"><Plus className="h-4 w-4" />Lead</Button>
-            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4" />Contacto</Button>
+            <Button variant="default" size="sm"><Plus className="h-4 w-4 mr-1" />Lead</Button>
+            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4 mr-1" />Contacto</Button>
           </div>
         </div>
       </header>
@@ -138,9 +168,44 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-4">
-            <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground mb-1">Última Hora</p><p className="text-3xl font-bold">{lastHourLeads.length}</p><p className="text-xs text-muted-foreground mt-1">Modelos contactados</p></CardContent></Card>
-            <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground mb-1">Total Hoy</p><p className="text-3xl font-bold">{todayLeads.length}</p><p className="text-xs text-muted-foreground mt-1">Modelos contactados</p></CardContent></Card>
-            <Card><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-muted-foreground mb-1">Promedio por Hora</p><p className="text-3xl font-bold">{avgPerHour}</p><p className="text-xs text-muted-foreground mt-1">Objetivo: 10 · Esperados: {Math.round(hoursWorked * 10)}</p></div><Button variant="outline" size="sm" className="text-xs">Ver QA (0)</Button></div></CardContent></Card>
+            <Card className="border-t-[3px] border-t-primary">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Última Hora</p>
+                </div>
+                <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-t-[3px] border-t-accent">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Total Hoy</p>
+                </div>
+                <p className="text-3xl font-bold text-primary">{todayLeads.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+              </CardContent>
+            </Card>
+            <Card className="border-t-[3px] border-t-accent">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Promedio por Hora</p>
+                    </div>
+                    <p className="text-3xl font-bold text-primary">{avgPerHour}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
+                    <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
+                      Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" className="text-xs">Ver QA (0)</Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -148,7 +213,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         <div className="px-6 pb-4">
           <div className="grid grid-cols-5 gap-3">
             {qualityCards.map((q) => (
-              <div key={q.key} className={`rounded-xl p-4 text-center ${q.bg}`}>
+              <div key={q.key} className={`rounded-xl p-4 border-l-[3px] ${q.border} ${q.bg}`}>
+                <p className={`text-xs ${q.text} opacity-70`}>{q.key.toUpperCase()}</p>
                 <p className={`text-3xl font-bold ${q.text}`}>{qualityCounts[q.key]}</p>
                 <p className={`text-xs mt-1 ${q.text} opacity-80`}>{q.label}</p>
               </div>
@@ -194,6 +260,14 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <SelectItem value="contactado">Contactado</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={filterContacto || undefined} onValueChange={(v) => setFilterContacto(v === "__all__" ? "" : v)}>
+                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
+                    <SelectItem value="con_telefono">Con Teléfono</SelectItem>
+                    <SelectItem value="sin_telefono">Sin Teléfono</SelectItem>
+                  </SelectContent>
+                </Select>
                 <div className="ml-auto flex gap-1">
                   <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
                   <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
@@ -215,35 +289,67 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[60px]">#</TableHead>
-                          <TableHead>Handle</TableHead>
-                          <TableHead>Calidad</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>País</TableHead>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead className="text-center">Acciones</TableHead>
+                          <TableHead className="text-xs">Ticket</TableHead>
+                          <TableHead className="text-xs">Handle</TableHead>
+                          <TableHead className="text-xs">Calidad</TableHead>
+                          <TableHead className="text-xs">Estado</TableHead>
+                          <TableHead className="text-xs">País</TableHead>
+                          <TableHead className="text-xs">Fecha</TableHead>
+                          <TableHead className="text-xs text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLeads.map((lead, idx) => {
+                        {filteredLeads.map((lead) => {
                           const cat = lead.quality?.toLowerCase() || "c";
                           const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
                           return (
                             <TableRow key={lead.id}>
-                              <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                              <TableCell><p className="font-medium text-sm">@{lead.model_handle}</p></TableCell>
                               <TableCell>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${badgeClass}`}>
+                                <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                  #{lead.ticket_number || "—"}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1.5">
+                                  <Instagram className="h-3.5 w-3.5 text-pink-500" />
+                                  <a
+                                    href={lead.source_link || `https://instagram.com/${lead.model_handle}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm font-medium text-primary hover:underline"
+                                  >
+                                    @Ver
+                                  </a>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
                                   {lead.quality?.toUpperCase()}
                                 </span>
                               </TableCell>
-                              <TableCell><Badge variant="outline" className="text-xs capitalize">{lead.status}</Badge></TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
+                              </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {format(new Date(lead.created_at), "dd MMM, HH:mm", { locale: es })}
+                                {format(new Date(lead.created_at), "d MMM", { locale: es })}
                               </TableCell>
-                              <TableCell className="text-center">
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
+                                  <Select defaultValue={cat}>
+                                    <SelectTrigger className="h-7 w-16 text-xs font-semibold">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="a+">A+</SelectItem>
+                                      <SelectItem value="a">A</SelectItem>
+                                      <SelectItem value="b+">B+</SelectItem>
+                                      <SelectItem value="b">B</SelectItem>
+                                      <SelectItem value="c">C</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -261,14 +367,18 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                       <Card key={lead.id}>
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${badgeClass}`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-mono text-muted-foreground">#{lead.ticket_number || "—"}</span>
+                              <Instagram className="h-3.5 w-3.5 text-pink-500" />
+                              <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
+                            </div>
+                            <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
                               {lead.quality?.toUpperCase()}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs capitalize">{lead.status}</Badge>
-                            <span>{format(new Date(lead.created_at), "dd MMM, HH:mm", { locale: es })}</span>
+                            <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
+                            <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
                         </CardContent>
