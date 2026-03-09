@@ -79,7 +79,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     setPhone(contacto.phone);
     setNotas(contacto.notes);
     setPlataforma(contacto.platform || "Instagram");
-    setProfilePhoto(contacto.profile_picture_url ? { url: contacto.profile_picture_url, name: "current", type: "image/jpeg", size: 0 } : null);
+    setProfilePhoto(contacto.profile_picture_url ? { url: contacto.profile_picture_url, name: "current", type: "image/jpeg", size: 0, category: "piclink" as const } : null);
     setExtraFiles([]);
   }
 
