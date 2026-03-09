@@ -22,13 +22,13 @@ interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
-  onNewChat: () => void;
   onNewGroup: () => void;
   onOpenVideoRooms: () => void;
-  onOpenContacts: () => void;
+  onSelectContact: (userId: string) => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
   onOpenGlobalSearch?: () => void;
+  profiles: Record<string, import("./types").UserProfile>;
 }
 
 function getInitials(name: string) {
