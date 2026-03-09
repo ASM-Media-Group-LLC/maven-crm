@@ -140,7 +140,6 @@ export function useChat() {
     });
 
     setConversations(enriched);
-    setLoading(false);
   }, [user]);
 
   // Initial load
