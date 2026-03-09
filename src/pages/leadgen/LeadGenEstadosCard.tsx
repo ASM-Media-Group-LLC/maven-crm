@@ -1,8 +1,7 @@
 import { Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-type Lead = { status: string; notas?: string | null };
+import type { LeadGenEntry } from "./useLeadGen";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
@@ -10,12 +9,12 @@ interface ActiveFilter {
 }
 
 interface Props {
-  leads: Lead[];
+  leads: LeadGenEntry[];
   activeFilter?: ActiveFilter;
   onFilterChange?: (filter: ActiveFilter) => void;
 }
 
-const knownStatuses = new Set(["nuevo", "contactado", "respondio", "interesado", "no_interesado"]);
+const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
 
 const estadoConfig = [
   {
@@ -24,7 +23,7 @@ const estadoConfig = [
     dotClass: "bg-primary",
     activeClass: "bg-primary/10 border-l-primary",
     hoverClass: "hover:bg-primary/8 hover:border-l-primary/60",
-    count: (leads: Lead[]) =>
+    count: (leads: LeadGenEntry[]) =>
       leads.filter((l) => l.status === "contactado" || l.status === "respondio").length,
   },
   {
@@ -33,7 +32,7 @@ const estadoConfig = [
     dotClass: "bg-success",
     activeClass: "bg-success/10 border-l-success",
     hoverClass: "hover:bg-success/8 hover:border-l-success/60",
-    count: (leads: Lead[]) => leads.filter((l) => l.status === "interesado").length,
+    count: (leads: LeadGenEntry[]) => leads.filter((l) => l.status === "interesado").length,
   },
   {
     key: "no_interesadas",
@@ -41,7 +40,7 @@ const estadoConfig = [
     dotClass: "bg-destructive",
     activeClass: "bg-destructive/10 border-l-destructive",
     hoverClass: "hover:bg-destructive/8 hover:border-l-destructive/60",
-    count: (leads: Lead[]) => leads.filter((l) => l.status === "no_interesado").length,
+    count: (leads: LeadGenEntry[]) => leads.filter((l) => l.status === "no_interesado").length,
   },
   {
     key: "otros",
@@ -49,7 +48,7 @@ const estadoConfig = [
     dotClass: "bg-muted-foreground/50",
     activeClass: "bg-muted border-l-muted-foreground",
     hoverClass: "hover:bg-muted hover:border-l-muted-foreground/40",
-    count: (leads: Lead[]) => leads.filter((l) => !knownStatuses.has(l.status)).length,
+    count: (leads: LeadGenEntry[]) => leads.filter((l) => !knownStatuses.has(l.status)).length,
   },
   {
     key: "con_telefono",
@@ -58,8 +57,8 @@ const estadoConfig = [
     activeClass: "bg-warning/10 border-l-warning",
     hoverClass: "hover:bg-warning/8 hover:border-l-warning/60",
     isPhone: true,
-    count: (leads: Lead[]) =>
-      leads.filter((l) => l.notas && /\+?\d[\d\s\-().]{7,}/.test(l.notas)).length,
+    count: (leads: LeadGenEntry[]) =>
+      leads.filter((l) => !!l.phone_raw || !!l.phone_e164).length,
   },
 ];
 
