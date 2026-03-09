@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { ChatMessage, UserProfile } from "../types";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
