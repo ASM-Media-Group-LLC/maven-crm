@@ -13,7 +13,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
-  agent: { name: string; email: string };
+  agent: { name: string; email?: string; id?: string };
   leads: LeadGenEntry[];
   onBack: () => void;
 }
