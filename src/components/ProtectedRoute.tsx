@@ -1,6 +1,5 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import { Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -18,11 +17,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return (
-    <OnlinePresenceProvider>
-      {children}
-    </OnlinePresenceProvider>
-  );
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;
