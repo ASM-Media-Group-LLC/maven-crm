@@ -2,30 +2,21 @@
 
 ## Problem
 
-The `useProjects` hook (line 42-48) fetches **all** projects from `task_projects` with no user filtering. Similarly, `allTasks` (line 53-64) fetches **all** tasks. A closer (or any non-admin role) sees every project and task in the system instead of only those they created, lead, or are assigned to.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-## Plan
+## Solution
 
-**File: `src/pages/tareas/useProjects.ts`**
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-1. **Filter projects by user involvement** — After fetching all projects, also fetch the user's `project_members` rows. Then filter the projects list client-side to only include projects where:
-   - `created_by === user.id`, OR
-   - `leader_id === user.id`, OR
-   - user appears in `project_members` for that project
+## Changes
 
-   For admins (using `useUserRole`), skip the filter and show everything.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-2. **Filter allTasks accordingly** — After filtering projects, only keep tasks whose `project_id` is in the user's visible project set. This ensures KPIs and task counts reflect only relevant data.
+Replace the single `.select()` call with a paginated loop:
 
-**Implementation approach:**
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-- Import `useUserRole` into `useProjects.ts`
-- Add a query for `project_members` filtered by `user_id = user.id` to get the list of project IDs the user is a member of
-- Use `useMemo` to compute `filteredProjects` from `projects` using the three ownership conditions above (skip filter if `isAdmin`)
-- Filter `allTasks` to only include tasks from `filteredProjects`
-- Return `filteredProjects` as `projects` and filtered `allTasks`
-
-This is a client-side filter approach (rather than RLS) because the RLS on `task_projects` is already open to all authenticated users by design (for collaboration visibility). The business logic restriction is role-based, not row-based.
-
-Single file change, no database modifications needed.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
