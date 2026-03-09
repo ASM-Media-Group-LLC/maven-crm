@@ -108,6 +108,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     room={room}
                     large
                     className="h-full"
+                    backgroundEffect={spotlightParticipant.isLocal ? bgEffect : "none"}
                   />
                 </div>
               )}
