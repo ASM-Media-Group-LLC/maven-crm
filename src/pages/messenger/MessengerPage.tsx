@@ -16,7 +16,6 @@ import { useVideoCall } from "@/hooks/useVideoCall";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-/** Opens the video call in a new browser tab (like Google Meet) */
 function openCallInNewTab(roomName: string, isAdmin: boolean) {
   const url = `/call/${encodeURIComponent(roomName)}${isAdmin ? "?admin=1" : ""}`;
   window.open(url, `call-${roomName}`, "noopener");
@@ -47,6 +46,7 @@ export default function MessengerPage() {
   const {
     messages, loading: msgsLoading, typingUsers,
     sendMessage, sendTyping, editMessage, deleteMessage,
+    hasMore, loadingMore, loadOlderMessages,
   } = useMessages(activeChatId, handleNewMessage);
 
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
@@ -55,7 +55,6 @@ export default function MessengerPage() {
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
   const { getReadBy } = useReadReceipts(activeChatId, messageIds);
 
-  // Select contact → find or create direct chat, then open it
   const handleSelectUser = useCallback(async (userId: string) => {
     const convId = await createDirectChat(userId);
     if (convId) setActiveChatId(convId);
@@ -105,7 +104,6 @@ export default function MessengerPage() {
     setGlobalSearchOpen(false);
   }, []);
 
-  // Handle ?chat= deep link
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
     if (chatParam && !activeChatId) {
@@ -114,7 +112,6 @@ export default function MessengerPage() {
     }
   }, [activeChatId]);
 
-  // Handle ?room= deep link
   useEffect(() => {
     if (joinedFromLinkRef.current) return;
     const roomParam = new URLSearchParams(window.location.search).get("room");
@@ -184,6 +181,9 @@ export default function MessengerPage() {
               getReactionsForMessage={getReactionsForMessage}
               onToggleReaction={toggleReaction}
               getReadByUsers={getReadBy}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadOlderMessages}
             />
           </div>
         ) : (
