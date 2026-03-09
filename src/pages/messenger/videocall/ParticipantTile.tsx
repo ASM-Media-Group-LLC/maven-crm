@@ -84,7 +84,7 @@ export default function ParticipantTile({ participant, room, large, className, b
     >
       {/* Template background layer */}
       {templateBg && showVideo && (
-        <div className="absolute inset-0 z-0" style={{ background: templateBg.gradient }} />
+        <img src={templateBg.src} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
       )}
 
       {showVideo ? (
@@ -97,17 +97,10 @@ export default function ParticipantTile({ participant, room, large, className, b
             className="absolute inset-0 w-full h-full object-cover"
             style={{
               ...(isBlur ? { filter: blurAmount } : {}),
-              ...(templateBg ? { mixBlendMode: "luminosity", opacity: 0.7 } : {}),
+              ...(templateBg ? { mixBlendMode: "luminosity", opacity: 0.65 } : {}),
               zIndex: 1,
             }}
           />
-          {/* Overlay for template to tint */}
-          {templateBg && (
-            <div
-              className="absolute inset-0 z-[2]"
-              style={{ background: templateBg.gradient, opacity: 0.4, mixBlendMode: "color" }}
-            />
-          )}
         </>
       ) : (
         <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)]", large ? "h-24 w-24" : "h-16 w-16")}>
