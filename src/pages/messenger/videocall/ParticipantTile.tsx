@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { MicOff, Hand, Monitor } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
+import { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
 
 interface ParticipantTileProps {
   participant: LKParticipant;
   room: Room | null;
   large?: boolean;
   className?: string;
+  backgroundEffect?: BackgroundEffect;
 }
 
 function getInitials(name: string) {
