@@ -23,6 +23,7 @@ export const useProjects = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin } = useUserRole();
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
@@ -38,7 +39,7 @@ export const useProjects = () => {
     enabled: !!user,
   });
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: rawProjects = [], isLoading } = useQuery({
     queryKey: ["task-projects", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -52,7 +53,32 @@ export const useProjects = () => {
     enabled: !!user,
   });
 
-  const { data: allTasks = [] } = useQuery({
+  const { data: myMemberProjectIds = [] } = useQuery({
+    queryKey: ["my-project-memberships", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("project_members" as any)
+        .select("project_id")
+        .eq("user_id", user.id);
+      if (error) throw error;
+      return (data || []).map((r: any) => r.project_id as string);
+    },
+    enabled: !!user,
+  });
+
+  const projects = useMemo(() => {
+    if (isAdmin) return rawProjects;
+    if (!user) return [];
+    const memberSet = new Set(myMemberProjectIds);
+    return rawProjects.filter(
+      (p) => p.created_by === user.id || p.leader_id === user.id || memberSet.has(p.id)
+    );
+  }, [rawProjects, myMemberProjectIds, isAdmin, user]);
+
+  const visibleProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
+
+  const { data: rawAllTasks = [] } = useQuery({
     queryKey: ["all-tasks-for-projects", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -64,6 +90,11 @@ export const useProjects = () => {
     },
     enabled: !!user,
   });
+
+  const allTasks = useMemo(() => {
+    if (isAdmin) return rawAllTasks;
+    return rawAllTasks.filter((t) => t.project_id && visibleProjectIds.has(t.project_id));
+  }, [rawAllTasks, visibleProjectIds, isAdmin]);
 
   const createProject = useMutation({
     mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
@@ -112,6 +143,7 @@ export const useProjects = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-projects"] });
       queryClient.invalidateQueries({ queryKey: ["project-members"] });
+      queryClient.invalidateQueries({ queryKey: ["my-project-memberships"] });
       toast({ title: "Proyecto creado", description: "El proyecto fue creado exitosamente." });
     },
     onError: (err: any) => {
@@ -182,6 +214,7 @@ export const useProjects = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-projects"] });
       queryClient.invalidateQueries({ queryKey: ["project-members"] });
+      queryClient.invalidateQueries({ queryKey: ["my-project-memberships"] });
       toast({ title: "Proyecto actualizado", description: "El proyecto fue actualizado exitosamente." });
     },
     onError: (err: any) => {
@@ -234,6 +267,7 @@ export const useProjects = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      queryClient.invalidateQueries({ queryKey: ["my-project-memberships"] });
       toast({ title: "Proyecto eliminado", description: "El proyecto fue eliminado exitosamente." });
     },
     onError: () => {
