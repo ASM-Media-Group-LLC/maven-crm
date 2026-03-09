@@ -68,7 +68,6 @@ export default function ParticipantTile({ participant, room, large, className, b
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
-  // Resolve background template gradient
   const templateBg = BACKGROUND_TEMPLATES.find((t) => t.id === backgroundEffect);
   const isBlur = backgroundEffect === "soft-blur" || backgroundEffect === "hard-blur";
   const blurAmount = backgroundEffect === "soft-blur" ? "blur(8px)" : backgroundEffect === "hard-blur" ? "blur(24px)" : undefined;
@@ -80,30 +79,24 @@ export default function ParticipantTile({ participant, room, large, className, b
         participant.isSpeaking && "ring-2 ring-primary ring-offset-1 ring-offset-[hsl(240_10%_6%)]",
         className
       )}
-      style={{ background: showVideo ? "hsl(240 6% 10%)" : "hsl(240 8% 12%)" }}
+      style={{ background: "hsl(240 8% 12%)" }}
     >
-      {/* Template background layer */}
-      {templateBg && showVideo && (
+      {/* Template background shown when camera is OFF */}
+      {templateBg && !showVideo && (
         <img src={templateBg.src} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
       )}
 
       {showVideo ? (
-        <>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={participant.isLocal}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{
-              ...(isBlur ? { filter: blurAmount } : {}),
-              ...(templateBg ? { mixBlendMode: "luminosity", opacity: 0.65 } : {}),
-              zIndex: 1,
-            }}
-          />
-        </>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={participant.isLocal}
+          className="absolute inset-0 w-full h-full object-cover z-[1]"
+          style={isBlur ? { filter: blurAmount } : undefined}
+        />
       ) : (
-        <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)]", large ? "h-24 w-24" : "h-16 w-16")}>
+        <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)] z-[1]", large ? "h-24 w-24" : "h-16 w-16")}>
           <AvatarFallback
             className={cn("bg-primary/20 text-primary font-semibold", large ? "text-3xl" : "text-lg")}
           >
