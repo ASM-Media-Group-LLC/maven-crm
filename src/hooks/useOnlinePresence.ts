@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import React from "react";
@@ -28,13 +28,21 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [userStatuses, setUserStatuses] = useState<Record<string, UserStatus>>({});
   const [myStatus, setMyStatusState] = useState<UserStatus>("available");
+  const channelRef = useRef<any>(null);
+  const myStatusRef = useRef<UserStatus>("available");
 
+  // Keep ref in sync
+  myStatusRef.current = myStatus;
+
+  // Single channel subscription — does NOT depend on myStatus
   useEffect(() => {
     if (!user) return;
 
     const presenceChannel = supabase.channel("online-users", {
       config: { presence: { key: user.id } },
     });
+
+    channelRef.current = presenceChannel;
 
     presenceChannel
       .on("presence", { event: "sync" }, () => {
@@ -54,19 +62,30 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
           await presenceChannel.track({
             user_id: user.id,
             online_at: new Date().toISOString(),
-            status: myStatus,
+            status: myStatusRef.current,
           });
         }
       });
 
     return () => {
+      channelRef.current = null;
       supabase.removeChannel(presenceChannel);
     };
-  }, [user, myStatus]);
+  }, [user]);
 
+  // When status changes, re-track without recreating channel
   const setMyStatus = useCallback((status: UserStatus) => {
     setMyStatusState(status);
-  }, []);
+    myStatusRef.current = status;
+    const channel = channelRef.current;
+    if (channel) {
+      channel.track({
+        user_id: user?.id,
+        online_at: new Date().toISOString(),
+        status,
+      });
+    }
+  }, [user]);
 
   const isOnline = useCallback(
     (userId: string) => onlineUsers.has(userId),

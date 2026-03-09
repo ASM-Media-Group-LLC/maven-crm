@@ -129,14 +129,21 @@ export function useLiveKit() {
         setConnectionState(state);
       });
 
-      room.on(RoomEvent.ParticipantConnected, () => refreshParticipants());
-      room.on(RoomEvent.ParticipantDisconnected, () => refreshParticipants());
-      room.on(RoomEvent.TrackSubscribed, () => refreshParticipants());
-      room.on(RoomEvent.TrackUnsubscribed, () => refreshParticipants());
-      room.on(RoomEvent.TrackMuted, () => refreshParticipants());
-      room.on(RoomEvent.TrackUnmuted, () => refreshParticipants());
-      room.on(RoomEvent.LocalTrackPublished, () => refreshParticipants());
-      room.on(RoomEvent.LocalTrackUnpublished, () => refreshParticipants());
+      // Use debounced refresh to avoid rapid re-renders causing flickering
+      let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+      const debouncedRefresh = () => {
+        if (refreshTimer) clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => refreshParticipants(), 50);
+      };
+
+      room.on(RoomEvent.ParticipantConnected, debouncedRefresh);
+      room.on(RoomEvent.ParticipantDisconnected, debouncedRefresh);
+      room.on(RoomEvent.TrackSubscribed, debouncedRefresh);
+      room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
+      room.on(RoomEvent.TrackMuted, debouncedRefresh);
+      room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
+      room.on(RoomEvent.LocalTrackPublished, debouncedRefresh);
+      room.on(RoomEvent.LocalTrackUnpublished, debouncedRefresh);
 
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         if (speakers.length > 0) {
