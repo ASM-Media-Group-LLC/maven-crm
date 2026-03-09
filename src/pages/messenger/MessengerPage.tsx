@@ -104,6 +104,15 @@ export default function MessengerPage() {
     return success;
   };
 
+  // Handle ?chat= deep link from notifications
+  useEffect(() => {
+    const chatParam = new URLSearchParams(window.location.search).get("chat");
+    if (chatParam && !activeChatId) {
+      setActiveChatId(chatParam);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [activeChatId]);
+
   useEffect(() => {
     if (joinedFromLinkRef.current || activeCallRoom) return;
 
