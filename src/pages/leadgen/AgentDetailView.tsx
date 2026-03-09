@@ -13,11 +13,9 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { LeadGenEntry } from "./useLeadGen";
 
-type Lead = LeadGenEntry;
-
 interface AgentDetailViewProps {
   agent: { name: string; email: string };
-  leads: Lead[];
+  leads: LeadGenEntry[];
   onBack: () => void;
 }
 
@@ -54,8 +52,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
 
   const agentLeads = useMemo(() =>
     leads.filter(l =>
-      l.compania?.toLowerCase() === agent.name.toLowerCase() ||
-      l.compania?.toLowerCase() === agent.email.toLowerCase()
+      l.company?.toLowerCase() === agent.name.toLowerCase() ||
+      l.company?.toLowerCase() === agent.email.toLowerCase()
     ), [leads, agent]);
 
   const now = new Date();
@@ -74,7 +72,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const qualityCounts = useMemo(() => {
     const counts: Record<string, number> = { "a+": 0, "a": 0, "b+": 0, "b": 0, "c": 0 };
     agentLeads.forEach(l => {
-      const cat = l.categoria?.toLowerCase();
+      const cat = l.quality?.toLowerCase();
       if (cat && counts[cat] !== undefined) counts[cat]++;
     });
     return counts;
@@ -84,11 +82,11 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
     let result = agentLeads;
     if (dateFrom) result = result.filter(l => new Date(l.created_at) >= startOfDay(dateFrom));
     if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
-    if (filterCalidad) result = result.filter(l => l.categoria?.toLowerCase() === filterCalidad);
+    if (filterCalidad) result = result.filter(l => l.quality?.toLowerCase() === filterCalidad);
     if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
     if (searchTerm) result = result.filter(l =>
-      l.url_perfil?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      l.compania?.toLowerCase().includes(searchTerm.toLowerCase())
+      l.model_handle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.company?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return result;
   }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, searchTerm]);
@@ -99,7 +97,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
-      {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
           <button onClick={onBack} className="hover:text-foreground transition-colors">LeadGen</button>
@@ -112,9 +109,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                {initials}
-              </AvatarFallback>
+              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
             </Avatar>
             <div>
               <h1 className="text-xl font-semibold">{agent.name}</h1>
@@ -123,9 +118,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             <div className="flex items-center gap-4 ml-4">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">
-                  {String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min
-                </span>
+                <span className="text-sm font-medium">{String(activeHours).padStart(2, "0")}h {String(activeMinutes).padStart(2, "0")}min</span>
                 <span className="text-xs text-muted-foreground">Tiempo Activo</span>
               </div>
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
@@ -135,14 +128,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Plus className="h-4 w-4" />
-              Lead
-            </Button>
-            <Button variant="outline" size="sm">
-              <UserPlus className="h-4 w-4" />
-              Contacto
-            </Button>
+            <Button variant="outline" size="sm"><Plus className="h-4 w-4" />Lead</Button>
+            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4" />Contacto</Button>
           </div>
         </div>
       </header>
@@ -151,36 +138,9 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Última Hora</p>
-                <p className="text-3xl font-bold">{lastHourLeads.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground mb-1">Total Hoy</p>
-                <p className="text-3xl font-bold">{todayLeads.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Promedio por Hora</p>
-                    <p className="text-3xl font-bold">{avgPerHour}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Objetivo: 10 · Esperados: {Math.round(hoursWorked * 10)}
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" className="text-xs">
-                    Ver QA (0)
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground mb-1">Última Hora</p><p className="text-3xl font-bold">{lastHourLeads.length}</p><p className="text-xs text-muted-foreground mt-1">Modelos contactados</p></CardContent></Card>
+            <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground mb-1">Total Hoy</p><p className="text-3xl font-bold">{todayLeads.length}</p><p className="text-xs text-muted-foreground mt-1">Modelos contactados</p></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-muted-foreground mb-1">Promedio por Hora</p><p className="text-3xl font-bold">{avgPerHour}</p><p className="text-xs text-muted-foreground mt-1">Objetivo: 10 · Esperados: {Math.round(hoursWorked * 10)}</p></div><Button variant="outline" size="sm" className="text-xs">Ver QA (0)</Button></div></CardContent></Card>
           </div>
         </div>
 
@@ -188,10 +148,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         <div className="px-6 pb-4">
           <div className="grid grid-cols-5 gap-3">
             {qualityCards.map((q) => (
-              <div
-                key={q.key}
-                className={`rounded-xl p-4 text-center ${q.bg}`}
-              >
+              <div key={q.key} className={`rounded-xl p-4 text-center ${q.bg}`}>
                 <p className={`text-3xl font-bold ${q.text}`}>{qualityCounts[q.key]}</p>
                 <p className={`text-xs mt-1 ${q.text} opacity-80`}>{q.label}</p>
               </div>
@@ -199,17 +156,11 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
           </div>
         </div>
 
-        {/* Internal Tab bar */}
+        {/* Tab bar */}
         <div className="px-6 py-2">
           <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
             {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setActiveTab(tab.id)}
-                className="text-xs"
-              >
+              <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
                 {tab.label}
               </Button>
             ))}
@@ -220,55 +171,32 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         <div className="p-6">
           {activeTab === "leads" && (
             <div className="space-y-4">
-              {/* Filters */}
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar lead..."
-                    className="pl-9 h-9"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+                  <Input placeholder="Buscar lead..." className="pl-9 h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                <DateRangePicker
-                  from={dateFrom}
-                  to={dateTo}
-                  onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
-                  placeholder="Seleccionar fechas"
-                  className="h-9"
-                />
+                <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Seleccionar fechas" className="h-9" />
                 <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9">
-                    <SelectValue placeholder="Calidad" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="a+">A+</SelectItem>
-                    <SelectItem value="a">A</SelectItem>
-                    <SelectItem value="b+">B+</SelectItem>
-                    <SelectItem value="b">B</SelectItem>
+                    <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
+                    <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
                     <SelectItem value="c">C</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="nuevo">Nuevo</SelectItem>
+                    <SelectItem value="no_response">Sin Resp.</SelectItem>
                     <SelectItem value="contactado">Contactado</SelectItem>
-                    <SelectItem value="no_response">No Response</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="ml-auto flex gap-1">
-                  <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}>
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}>
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
+                  <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+                  <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
                 </div>
               </div>
 
@@ -298,30 +226,24 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                       </TableHeader>
                       <TableBody>
                         {filteredLeads.map((lead, idx) => {
-                          const cat = lead.categoria?.toLowerCase() || "c";
+                          const cat = lead.quality?.toLowerCase() || "c";
                           const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
                           return (
                             <TableRow key={lead.id}>
                               <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                              <TableCell>
-                                <p className="font-medium text-sm">{lead.url_perfil}</p>
-                              </TableCell>
+                              <TableCell><p className="font-medium text-sm">@{lead.model_handle}</p></TableCell>
                               <TableCell>
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${badgeClass}`}>
-                                  {lead.categoria?.toUpperCase()}
+                                  {lead.quality?.toUpperCase()}
                                 </span>
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs capitalize">{lead.status}</Badge>
-                              </TableCell>
-                              <TableCell className="text-sm">{lead.pais || "—"}</TableCell>
+                              <TableCell><Badge variant="outline" className="text-xs capitalize">{lead.status}</Badge></TableCell>
+                              <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {format(new Date(lead.created_at), "dd MMM, HH:mm", { locale: es })}
                               </TableCell>
                               <TableCell className="text-center">
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
                               </TableCell>
                             </TableRow>
                           );
@@ -333,22 +255,22 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
-                    const cat = lead.categoria?.toLowerCase() || "c";
+                    const cat = lead.quality?.toLowerCase() || "c";
                     const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
                     return (
                       <Card key={lead.id}>
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <p className="font-medium text-sm truncate">{lead.url_perfil}</p>
+                            <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${badgeClass}`}>
-                              {lead.categoria?.toUpperCase()}
+                              {lead.quality?.toUpperCase()}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <Badge variant="outline" className="text-xs capitalize">{lead.status}</Badge>
                             <span>{format(new Date(lead.created_at), "dd MMM, HH:mm", { locale: es })}</span>
                           </div>
-                          {lead.pais && <p className="text-xs text-muted-foreground mt-1">{lead.pais}</p>}
+                          {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
                         </CardContent>
                       </Card>
                     );
@@ -380,10 +302,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
               .map(([key, value]) => ({ category: key.toUpperCase(), count: value }));
 
             const qualityBarColors: Record<string, string> = {
-              "A+": "hsl(160, 60%, 45%)",
-              "A": "hsl(217, 71%, 53%)",
-              "B+": "hsl(187, 72%, 50%)",
-              "B": "hsl(263, 70%, 50%)",
+              "A+": "hsl(160, 60%, 45%)", "A": "hsl(217, 71%, 53%)",
+              "B+": "hsl(187, 72%, 50%)", "B": "hsl(263, 70%, 50%)",
               "C": "hsl(215, 14%, 50%)",
             };
 
@@ -392,7 +312,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
 
             return (
               <div className="space-y-6">
-                {/* KPI Summary */}
                 <Card>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
@@ -417,7 +336,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Leads por Día */}
                   <Card>
                     <CardContent className="p-5">
                       <h3 className="font-semibold mb-4">Leads por Día</h3>
@@ -425,20 +343,16 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={dailyData}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                            <XAxis dataKey="label" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                            <Tooltip
-                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                              labelStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Bar dataKey="count" name="Leads" fill="hsl(263, 70%, 50%)" radius={[4, 4, 0, 0]} />
+                            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                            <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }} />
+                            <Bar dataKey="count" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* Leads por Hora */}
                   <Card>
                     <CardContent className="p-5">
                       <h3 className="font-semibold mb-4">Leads por Hora (Hoy)</h3>
@@ -446,21 +360,10 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={filteredHourly}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                            <XAxis dataKey="hour" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                            <Tooltip
-                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                              labelStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="count"
-                              name="Leads"
-                              stroke="hsl(187, 72%, 50%)"
-                              strokeWidth={2}
-                              dot={{ r: 4, fill: "hsl(var(--card))", stroke: "hsl(187, 72%, 50%)", strokeWidth: 2 }}
-                              activeDot={{ r: 6 }}
-                            />
+                            <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                            <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }} />
+                            <Line type="monotone" dataKey="count" name="Leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: "hsl(var(--card))", stroke: "hsl(var(--primary))", strokeWidth: 2 }} activeDot={{ r: 6 }} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -468,7 +371,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   </Card>
                 </div>
 
-                {/* Distribución por Calidad */}
                 {qualityDistData.length > 0 && (
                   <Card>
                     <CardContent className="p-5">
@@ -477,16 +379,10 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                            <YAxis type="category" dataKey="category" tick={{ fontSize: 13, fontWeight: 600 }} className="fill-muted-foreground" width={40} />
-                            <Tooltip
-                              contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
-                              labelStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Bar
-                              dataKey="count"
-                              name="Leads"
-                              radius={[0, 4, 4, 0]}
+                            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
+                            <YAxis type="category" dataKey="category" tick={{ fontSize: 13, fontWeight: 600 }} width={40} />
+                            <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }} />
+                            <Bar dataKey="count" name="Leads" radius={[0, 4, 4, 0]}
                               shape={(props: any) => {
                                 const color = qualityBarColors[props.category] || "hsl(var(--primary))";
                                 return <rect {...props} fill={color} />;

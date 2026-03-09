@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { format, subDays, startOfDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -12,7 +11,6 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,11 +26,8 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-
-import type { LeadGenEntry } from "./useLeadGen";
 import { useLeadGenEntries } from "./useLeadGen";
-
-type Lead = LeadGenEntry;
+import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadColors: Record<string, string> = {
   "a+": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -43,7 +38,6 @@ const calidadColors: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  nuevo: "Nuevo",
   no_response: "Sin Respuesta",
   contactado: "Contactado",
   cerrado: "Cerrado",
@@ -62,30 +56,18 @@ const LeadGenBaseDatosContent = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ["leads-base-datos"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Lead[];
-    },
-  });
+  const { data: leads = [], isLoading } = useLeadGenEntries();
 
-  // Derive unique agents from compania
   const agentes = useMemo(
-    () => [...new Set(leads.map((l) => l.compania))].sort(),
+    () => [...new Set(leads.map((l) => l.company).filter(Boolean))].sort() as string[],
     [leads]
   );
 
-  // Filter leads
   const filtered = useMemo(() => {
     return leads.filter((l) => {
-      if (searchTerm && !l.url_perfil.toLowerCase().includes(searchTerm.toLowerCase()) && !l.compania.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (filterAgente !== "todos" && l.compania !== filterAgente) return false;
-      if (filterCalidad !== "todos" && l.categoria !== filterCalidad) return false;
+      if (searchTerm && !l.model_handle.toLowerCase().includes(searchTerm.toLowerCase()) && !(l.company || "").toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      if (filterAgente !== "todos" && l.company !== filterAgente) return false;
+      if (filterCalidad !== "todos" && l.quality?.toLowerCase() !== filterCalidad) return false;
       if (filterEstado !== "todos" && l.status !== filterEstado) return false;
       if (dateFrom) {
         const d = new Date(l.created_at);
@@ -101,16 +83,14 @@ const LeadGenBaseDatosContent = () => {
     });
   }, [leads, searchTerm, filterAgente, filterCalidad, filterEstado, dateFrom, dateTo]);
 
-  // KPIs
   const totalLeads = filtered.length;
   const conContacto = filtered.filter((l) => ["contactado", "cerrado"].includes(l.status)).length;
-  const aPlus = filtered.filter((l) => l.categoria === "a+").length;
-  const aCount = filtered.filter((l) => l.categoria === "a").length;
-  const bPlus = filtered.filter((l) => l.categoria === "b+").length;
-  const bCount = filtered.filter((l) => l.categoria === "b").length;
-  const cCount = filtered.filter((l) => l.categoria === "c").length;
+  const aPlus = filtered.filter((l) => l.quality?.toLowerCase() === "a+").length;
+  const aCount = filtered.filter((l) => l.quality?.toLowerCase() === "a").length;
+  const bPlus = filtered.filter((l) => l.quality?.toLowerCase() === "b+").length;
+  const bCount = filtered.filter((l) => l.quality?.toLowerCase() === "b").length;
+  const cCount = filtered.filter((l) => l.quality?.toLowerCase() === "c").length;
 
-  // Charts data
   const hourlyData = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, i) => ({ hour: String(i).padStart(2, "0"), leads: 0 }));
     filtered.filter((l) => isToday(new Date(l.created_at))).forEach((l) => {
@@ -157,24 +137,17 @@ const LeadGenBaseDatosContent = () => {
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
-      {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <button
-              onClick={() => navigate("/leadgen")}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              LeadGen
+            <button onClick={() => navigate("/leadgen")} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1 transition-colors">
+              <ArrowLeft className="h-3 w-3" />LeadGen
             </button>
             <h1 className="text-2xl font-semibold">Base de Datos</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Todos los leads registrados en el sistema
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Todos los leads registrados en el sistema</p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-primary">{leads.length}</p>
+            <p className="text-3xl font-bold text-primary">{leads.length.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">leads</p>
           </div>
         </div>
@@ -184,62 +157,10 @@ const LeadGenBaseDatosContent = () => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">GENERAL</p>
-                <div className="flex items-baseline gap-4">
-                  <div>
-                    <p className="text-2xl font-bold">{totalLeads}</p>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-primary">{conContacto}</p>
-                    <p className="text-xs text-muted-foreground">Con Contacto</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD ALTA</p>
-                <div className="flex items-baseline gap-4">
-                  <div>
-                    <p className="text-2xl font-bold text-emerald-400">{aPlus}</p>
-                    <p className="text-xs text-muted-foreground">A+</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-400">{aCount}</p>
-                    <p className="text-xs text-muted-foreground">A</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD MEDIA</p>
-                <div className="flex items-baseline gap-4">
-                  <div>
-                    <p className="text-2xl font-bold text-yellow-400">{bPlus}</p>
-                    <p className="text-xs text-muted-foreground">B+</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-orange-400">{bCount}</p>
-                    <p className="text-xs text-muted-foreground">B</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD BAJA</p>
-                <div className="flex items-baseline gap-4">
-                  <div>
-                    <p className="text-2xl font-bold text-red-400">{cCount}</p>
-                    <p className="text-xs text-muted-foreground">C</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">GENERAL</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">Total</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">Con Contacto</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD ALTA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-emerald-400">{aPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">A+</p></div><div><p className="text-2xl font-bold text-green-400">{aCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">A</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD MEDIA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-yellow-400">{bPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">B+</p></div><div><p className="text-2xl font-bold text-orange-400">{bCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">B</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD BAJA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-red-400">{cCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">C</p></div></div></CardContent></Card>
           </div>
         </div>
 
@@ -249,34 +170,21 @@ const LeadGenBaseDatosContent = () => {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <Button
-                  key={tab.id}
-                  variant={activeTab === tab.id ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setActiveTab(tab.id)}
-                  className="text-xs"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
+                <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
+                  <Icon className="h-3.5 w-3.5" />{tab.label}
                 </Button>
               );
             })}
           </div>
         </div>
 
-        {/* Filters (shared) */}
+        {/* Filters */}
         <div className="px-6 py-3 flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar lead..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9"
-            />
+            <Input placeholder="Buscar lead..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9" />
           </div>
 
-          {/* Agent combobox */}
           <Popover open={agentSelectOpen} onOpenChange={setAgentSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
@@ -290,13 +198,11 @@ const LeadGenBaseDatosContent = () => {
                 <CommandList>
                   <CommandEmpty>No encontrado</CommandEmpty>
                   <CommandItem onSelect={() => { setFilterAgente("todos"); setAgentSelectOpen(false); }}>
-                    Todos
-                    {filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
+                    Todos{filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
                   {agentes.map((a) => (
                     <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgentSelectOpen(false); }}>
-                      {a}
-                      {filterAgente === a && <Check className="ml-auto h-4 w-4" />}
+                      {a}{filterAgente === a && <Check className="ml-auto h-4 w-4" />}
                     </CommandItem>
                   ))}
                 </CommandList>
@@ -305,26 +211,19 @@ const LeadGenBaseDatosContent = () => {
           </Popover>
 
           <Select value={filterCalidad} onValueChange={setFilterCalidad}>
-            <SelectTrigger className="w-[120px] h-9">
-              <SelectValue placeholder="Calidad" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Calidad</SelectItem>
-              <SelectItem value="a+">A+</SelectItem>
-              <SelectItem value="a">A</SelectItem>
-              <SelectItem value="b+">B+</SelectItem>
-              <SelectItem value="b">B</SelectItem>
+              <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
+              <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
               <SelectItem value="c">C</SelectItem>
             </SelectContent>
           </Select>
 
           <Select value={filterEstado} onValueChange={setFilterEstado}>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Estado</SelectItem>
-              <SelectItem value="nuevo">Nuevo</SelectItem>
               <SelectItem value="no_response">Sin Respuesta</SelectItem>
               <SelectItem value="contactado">Contactado</SelectItem>
               <SelectItem value="cerrado">Cerrado</SelectItem>
@@ -332,22 +231,12 @@ const LeadGenBaseDatosContent = () => {
             </SelectContent>
           </Select>
 
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onApply={(from, to) => { setDateFrom(from); setDateTo(to); }}
-            placeholder="Filtrar por fecha"
-            className="h-9"
-          />
+          <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder="Filtrar por fecha" className="h-9" />
 
           {activeTab === "leads" && (
             <div className="ml-auto flex gap-1">
-              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}>
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
+              <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+              <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
             </div>
           )}
         </div>
@@ -357,7 +246,7 @@ const LeadGenBaseDatosContent = () => {
           {activeTab === "leads" && (
             <>
               <p className="text-sm text-muted-foreground mb-4">
-                Leads Encontrados: <span className="font-semibold text-foreground">{filtered.length}</span>
+                Leads Encontrados: <span className="font-semibold text-foreground">{filtered.length.toLocaleString()}</span>
               </p>
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
@@ -365,17 +254,17 @@ const LeadGenBaseDatosContent = () => {
                 </div>
               ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filtered.map((lead, idx) => (
+                  {filtered.slice(0, 200).map((lead, idx) => (
                     <Card key={lead.id} className="hover:border-primary/30 transition-colors">
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">#{idx + 1}</span>
-                          <Badge variant="outline" className={calidadColors[lead.categoria] || ""}>
-                            {lead.categoria.toUpperCase()}
+                          <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>
+                            {lead.quality?.toUpperCase()}
                           </Badge>
                         </div>
-                        <p className="font-medium text-sm truncate">{lead.url_perfil}</p>
-                        <p className="text-xs text-muted-foreground">{lead.compania}</p>
+                        <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
+                        <p className="text-xs text-muted-foreground">{lead.company || "—"}</p>
                         <div className="flex items-center justify-between">
                           <Badge variant="secondary" className="text-xs">
                             {statusLabels[lead.status] || lead.status}
@@ -406,14 +295,14 @@ const LeadGenBaseDatosContent = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filtered.map((lead, idx) => (
+                          {filtered.slice(0, 500).map((lead, idx) => (
                             <TableRow key={lead.id}>
                               <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                              <TableCell className="font-medium text-sm max-w-[200px] truncate">{lead.url_perfil}</TableCell>
-                              <TableCell className="text-sm">{lead.compania}</TableCell>
+                              <TableCell className="font-medium text-sm max-w-[200px] truncate">@{lead.model_handle}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className={calidadColors[lead.categoria] || ""}>
-                                  {lead.categoria.toUpperCase()}
+                                <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>
+                                  {lead.quality?.toUpperCase()}
                                 </Badge>
                               </TableCell>
                               <TableCell>
@@ -421,24 +310,15 @@ const LeadGenBaseDatosContent = () => {
                                   {statusLabels[lead.status] || lead.status}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-sm">{lead.pais || "—"}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {format(new Date(lead.created_at), "d MMM yy", { locale: es })}
+                              <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                                {format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}
                               </TableCell>
-                              <TableCell className="text-center sticky right-0 bg-card z-20">
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
+                              <TableCell className="text-center sticky right-0 bg-card">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
                               </TableCell>
                             </TableRow>
                           ))}
-                          {filtered.length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                                No se encontraron leads
-                              </TableCell>
-                            </TableRow>
-                          )}
                         </TableBody>
                       </Table>
                     </div>
@@ -450,80 +330,51 @@ const LeadGenBaseDatosContent = () => {
 
           {activeTab === "analisis" && (
             <div className="space-y-6">
-              {/* Total card */}
-              <Card className="bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground font-medium">Total de Leads Filtrados</p>
-                    <p className="text-4xl font-bold text-primary mt-1">{filtered.length}</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-primary" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Leads por hora */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 font-semibold mb-4">
-                    <BarChart3 className="h-5 w-5" />
-                    Leads por Hora del Día (Hoy)
-                  </div>
-                  <div className="h-[250px] w-full">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Leads por Hora (Hoy)</h3>
+                  <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={hourlyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                         <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                        <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Leads por día - semana */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 font-semibold mb-4">
-                    <BarChart3 className="h-5 w-5" />
-                    Leads por Día (Última Semana)
-                  </div>
-                  <div className="h-[250px] w-full">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Leads por Día (Última Semana)</h3>
+                  <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyData}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                         <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Bar dataKey="leads" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                        <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Leads por día - 30 días */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 font-semibold mb-4">
-                    <TrendingUp className="h-5 w-5" />
-                    Leads por Día (Últimos 30 días)
-                  </div>
-                  <div className="h-[280px] w-full">
+                  <h3 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Tendencia (Últimos 30 días)</h3>
+                  <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={monthlyData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={2} />
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip />
-                        <Line
-                          type="monotone"
-                          dataKey="leads"
-                          stroke="hsl(270, 70%, 60%)"
-                          strokeWidth={2}
-                          dot={{ r: 3, fill: "hsl(270, 70%, 60%)" }}
-                        />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
+                        <Line type="monotone" dataKey="leads" name="Leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} activeDot={{ r: 5 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
