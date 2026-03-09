@@ -54,6 +54,7 @@ const STATUS_TABS = [
 
 const HRAnnouncements = () => {
   const { data: announcements = [], isLoading } = useAnnouncementsAdmin();
+  const [searchParams, setSearchParams] = useSearchParams();
   const duplicateAnn = useDuplicateAnnouncement();
   const archiveAnn = useArchiveAnnouncement();
 
