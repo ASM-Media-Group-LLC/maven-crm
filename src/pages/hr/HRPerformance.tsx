@@ -259,6 +259,13 @@ export default function HRPerformance() {
             </Button>
           </div>
         </div>
+        {/* Department Tabs */}
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap mt-4">
+          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
+          {departments.map((d) => (
+            <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
+          ))}
+        </div>
       </header>
 
       {/* ── Scrollable content ────────────────────────────────────────────── */}
@@ -276,14 +283,6 @@ export default function HRPerformance() {
               <DashboardMetricCard label="Con Objetivos" value={String(withGoals)} icon={Target} subtitle={evals.length > 0 ? `${((withGoals / evals.length) * 100).toFixed(0)}% del total` : "—"} color="primary" />
             </>
           )}
-        </div>
-
-        {/* Department Tabs */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 flex-wrap">
-          <Button variant={!deptTab ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab("")}>Todos</Button>
-          {departments.map((d) => (
-            <Button key={d.id} variant={deptTab === d.id ? "secondary" : "ghost"} size="sm" onClick={() => setDeptTab(d.id)}>{d.name}</Button>
-          ))}
         </div>
 
         {/* Status Tabs */}
