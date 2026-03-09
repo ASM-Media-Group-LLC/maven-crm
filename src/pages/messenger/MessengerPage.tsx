@@ -3,7 +3,6 @@ import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
-import LiveKitCallView from "./videocall/LiveKitCallView";
 import NewChatModal from "./NewChatModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
@@ -14,6 +13,12 @@ import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useB
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+/** Opens the video call in a new browser tab (like Google Meet) */
+function openCallInNewTab(roomName: string, isAdmin: boolean) {
+  const url = `/call/${encodeURIComponent(roomName)}${isAdmin ? "?admin=1" : ""}`;
+  window.open(url, `call-${roomName}`, "noopener");
+}
+
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
@@ -22,7 +27,6 @@ export default function MessengerPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
-  const [activeCallRoom, setActiveCallRoom] = useState<{ roomName: string; displayName: string; isAdmin: boolean } | null>(null);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const joinedFromLinkRef = useRef(false);
@@ -32,7 +36,6 @@ export default function MessengerPage() {
   const handleNewMessage = useCallback((msg: ChatMessage) => {
     const senderName = profiles[msg.sender_id]?.full_name || "Nuevo mensaje";
     notify(senderName, msg.content || "📎 Archivo", () => {
-      // Focus the conversation on click
       setActiveChatId(msg.conversation_id);
     });
   }, [profiles, notify]);
@@ -44,7 +47,6 @@ export default function MessengerPage() {
 
   const { toggleReaction, getReactionsForMessage, addMessageId } = useReactions(activeChatId);
 
-  // Keep messageIdsRef in sync with loaded messages
   useEffect(() => { messages.forEach((m) => addMessageId(m.id)); }, [messages, addMessageId]);
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
   const { getReadBy } = useReadReceipts(activeChatId, messageIds);
@@ -70,30 +72,20 @@ export default function MessengerPage() {
       createdAt: new Date(),
       participants: [],
       isActive: false,
-      shareLink: `${window.location.origin}/messenger?room=${encodeURIComponent(roomId)}`,
+      shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}`,
     };
     setVideoRooms(prev => [newRoom, ...prev]);
     toast.success(`Sala "${name}" creada`);
   };
 
   const handleJoinRoom = (room: VideoRoom) => {
-    const currentUser = Object.values(profiles).find(p => p.id);
-    setActiveCallRoom({
-      roomName: room.id,
-      displayName: currentUser?.full_name || "Usuario",
-      isAdmin: room.createdBy === "me",
-    });
+    openCallInNewTab(room.id, room.createdBy === "me");
     setShowVideoRooms(false);
   };
 
   const handleStartVideoCall = (conv: ConversationWithDetails) => {
     const roomName = `call-${conv.id}`;
-    const currentUser = Object.values(profiles).find(p => p.id);
-    setActiveCallRoom({
-      roomName,
-      displayName: currentUser?.full_name || "Usuario",
-      isAdmin: true,
-    });
+    openCallInNewTab(roomName, true);
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -113,8 +105,9 @@ export default function MessengerPage() {
     }
   }, [activeChatId]);
 
+  // Handle ?room= deep link — open in new tab
   useEffect(() => {
-    if (joinedFromLinkRef.current || activeCallRoom) return;
+    if (joinedFromLinkRef.current) return;
 
     const roomParam = new URLSearchParams(window.location.search).get("room");
     if (!roomParam) return;
@@ -122,17 +115,11 @@ export default function MessengerPage() {
     const roomName = decodeURIComponent(roomParam).trim();
     if (!roomName) return;
 
-    const currentUser = Object.values(profiles).find(p => p.id);
-    setActiveCallRoom({
-      roomName,
-      displayName: currentUser?.full_name || "Usuario",
-      isAdmin: false,
-    });
-    setShowVideoRooms(false);
+    openCallInNewTab(roomName, false);
     joinedFromLinkRef.current = true;
     window.history.replaceState({}, "", window.location.pathname);
-    toast.success("Uniéndote a la sala...");
-  }, [profiles, activeCallRoom]);
+    toast.success("Abriendo sala en nueva pestaña...");
+  }, []);
 
   if (activeCallRoom) {
     return (
