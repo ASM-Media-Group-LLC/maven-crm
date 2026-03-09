@@ -25,6 +25,11 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
+  const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
+    setBgEffect(effect);
+    await lk.setBackgroundEffect(effect);
+  }, [lk]);
+
   // Connect on mount
   useEffect(() => {
     lk.connect(roomName, displayName, isAdmin);
@@ -96,7 +101,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
           {layout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {lk.participants.map((p) => (
-                <ParticipantTile key={p.sid} participant={p} room={room} backgroundEffect={p.isLocal ? bgEffect : "none"} />
+                <ParticipantTile key={p.sid} participant={p} room={room} />
               ))}
             </div>
           ) : (
@@ -108,7 +113,6 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     room={room}
                     large
                     className="h-full"
-                    backgroundEffect={spotlightParticipant.isLocal ? bgEffect : "none"}
                   />
                 </div>
               )}
@@ -118,7 +122,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={p.sid} className="w-40 shrink-0">
-                        <ParticipantTile participant={p} room={room} backgroundEffect={p.isLocal ? bgEffect : "none"} />
+                        <ParticipantTile participant={p} room={room} />
                       </div>
                     ))}
                 </div>
@@ -162,7 +166,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
         onSendReaction={lk.sendReaction}
-        onBackgroundChange={setBgEffect}
+        onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
       />
     </div>
