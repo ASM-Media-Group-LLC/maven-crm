@@ -154,6 +154,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
+        backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
@@ -161,6 +162,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
         onSendReaction={lk.sendReaction}
+        onBackgroundChange={setBgEffect}
         onLeave={handleLeave}
       />
     </div>
