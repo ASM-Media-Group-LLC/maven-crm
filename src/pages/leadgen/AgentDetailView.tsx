@@ -11,9 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import type { Tables } from "@/integrations/supabase/types";
+import type { LeadGenEntry } from "./useLeadGen";
 
-type Lead = Tables<"leads">;
+type Lead = LeadGenEntry;
 
 interface AgentDetailViewProps {
   agent: { name: string; email: string };

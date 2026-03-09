@@ -29,19 +29,10 @@ import {
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
-type Lead = {
-  id: string;
-  url_perfil: string;
-  compania: string;
-  categoria: string;
-  status: string;
-  pais: string | null;
-  notas: string | null;
-  plataforma: string;
-  created_at: string;
-  updated_at: string;
-  evidence_urls: string[] | null;
-};
+import type { LeadGenEntry } from "./useLeadGen";
+import { useLeadGenEntries } from "./useLeadGen";
+
+type Lead = LeadGenEntry;
 
 const calidadColors: Record<string, string> = {
   "a+": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
