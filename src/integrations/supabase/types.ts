@@ -5286,6 +5286,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_call_creator: {
+        Args: { _call_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_call_participant: {
+        Args: { _call_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_chat_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
