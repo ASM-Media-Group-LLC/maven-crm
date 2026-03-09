@@ -166,6 +166,7 @@ const App = () => (
               <Route path="/eventos/:id" element={<PermissionRoute module="Eventos"><EventoDetail /></PermissionRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
+              <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
               <Route path="/notificaciones" element={<ProtectedRoute><Notificaciones /></ProtectedRoute>} />
               <Route path="/ajustes/notificaciones" element={<ProtectedRoute><NotificacionesSettings /></ProtectedRoute>} />
               <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores"><PersonalizadosPage /></PermissionRoute>} />
