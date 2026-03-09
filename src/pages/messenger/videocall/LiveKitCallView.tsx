@@ -9,6 +9,7 @@ import ParticipantTile from "./ParticipantTile";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BackgroundEffect } from "./BackgroundSelector";
 
 interface LiveKitCallViewProps {
   roomName: string;
