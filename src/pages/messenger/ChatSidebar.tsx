@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2, SearchCheck, Contact } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { useAuth } from "@/hooks/useAuth";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 
@@ -22,13 +23,13 @@ interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
-  onNewChat: () => void;
   onNewGroup: () => void;
   onOpenVideoRooms: () => void;
-  onOpenContacts: () => void;
+  onSelectContact: (userId: string) => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
   onOpenGlobalSearch?: () => void;
+  profiles: Record<string, import("./types").UserProfile>;
 }
 
 function getInitials(name: string) {
@@ -51,7 +52,7 @@ function truncate(text: string, max: number) {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
-export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms, onOpenContacts, onDeleteChat, loading, onOpenGlobalSearch }: ChatSidebarProps) {
+export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewGroup, onOpenVideoRooms, onSelectContact, onDeleteChat, loading, onOpenGlobalSearch, profiles }: ChatSidebarProps) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
@@ -87,17 +88,11 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
                 <SearchCheck className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenContacts} title="Contactos">
-              <Contact className="h-4 w-4" />
-            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNewGroup} title="Nuevo grupo">
               <Users className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={onNewChat} title="Nuevo chat">
-              <MessageSquarePlus className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -128,10 +123,7 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mx-auto">
-                <MessageSquarePlus className="h-5 w-5 text-muted-foreground" />
-              </div>
+            <div className="text-center py-6 space-y-2">
               <p className="text-sm text-muted-foreground">
                 {search ? "Sin resultados" : "Inicia una conversación"}
               </p>
@@ -150,6 +142,9 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
         </div>
       </ScrollArea>
 
+      {/* Always-visible contacts section */}
+      <ContactsSection profiles={profiles} onSelectContact={onSelectContact} />
+
       <DeleteChatDialog
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
@@ -158,6 +153,80 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
         onConfirm={handleConfirmDelete}
         isLoading={deleting}
       />
+    </div>
+  );
+}
+function ContactsSection({ profiles, onSelectContact }: {
+  profiles: Record<string, import("./types").UserProfile>;
+  onSelectContact: (userId: string) => void;
+}) {
+  const { user } = useAuth();
+  const { isOnline, getStatus } = useOnlinePresence();
+  const [expanded, setExpanded] = useState(true);
+
+  const contacts = useMemo(() => {
+    return Object.values(profiles)
+      .filter(p => p.id !== user?.id)
+      .sort((a, b) => {
+        const aOn = isOnline(a.id);
+        const bOn = isOnline(b.id);
+        if (aOn && !bOn) return -1;
+        if (!aOn && bOn) return 1;
+        return (a.full_name || "").localeCompare(b.full_name || "");
+      });
+  }, [profiles, user?.id, isOnline]);
+
+  const onlineCount = useMemo(() => contacts.filter(p => isOnline(p.id)).length, [contacts, isOnline]);
+
+  return (
+    <div className="border-t border-border">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/30 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <Contact className="h-3.5 w-3.5" />
+          Contactos
+        </span>
+        <span className="text-[10px] font-normal normal-case">
+          {onlineCount} en línea
+        </span>
+      </button>
+      {expanded && (
+        <ScrollArea className="max-h-48">
+          <div className="px-2 pb-2">
+            {contacts.map(p => {
+              const online = isOnline(p.id);
+              const status = getStatus(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelectContact(p.id)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-muted/50 transition-colors"
+                >
+                  <div className="relative shrink-0">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
+                        {getInitials(p.full_name || "?")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className={cn(
+                      "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-card",
+                      getStatusColor(status, online)
+                    )} />
+                  </div>
+                  <span className={cn(
+                    "text-xs truncate",
+                    online ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {p.full_name || "Sin nombre"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

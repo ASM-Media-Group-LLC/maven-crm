@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
-import ContactsListPanel from "./ContactsListPanel";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
@@ -32,8 +31,6 @@ export default function MessengerPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
-  const [showContacts, setShowContacts] = useState(false);
-  const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const joinedFromLinkRef = useRef(false);
@@ -58,12 +55,11 @@ export default function MessengerPage() {
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
   const { getReadBy } = useReadReceipts(activeChatId, messageIds);
 
-  const handleSelectUser = async (userId: string) => {
+  // Select contact → find or create direct chat, then open it
+  const handleSelectUser = useCallback(async (userId: string) => {
     const convId = await createDirectChat(userId);
     if (convId) setActiveChatId(convId);
-    setNewChatOpen(false);
-    setShowContacts(false);
-  };
+  }, [createDirectChat]);
 
   const handleCreateGroup = async (name: string, memberIds: string[]) => {
     const convId = await createGroupChat(name, memberIds);
@@ -104,13 +100,12 @@ export default function MessengerPage() {
     return success;
   };
 
-  // Handle global search result selection
   const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
     setActiveChatId(conversationId);
     setGlobalSearchOpen(false);
   }, []);
 
-  // Handle ?chat= deep link from notifications
+  // Handle ?chat= deep link
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
     if (chatParam && !activeChatId) {
@@ -119,22 +114,18 @@ export default function MessengerPage() {
     }
   }, [activeChatId]);
 
-  // Handle ?room= deep link — open in new tab
+  // Handle ?room= deep link
   useEffect(() => {
     if (joinedFromLinkRef.current) return;
-
     const roomParam = new URLSearchParams(window.location.search).get("room");
     if (!roomParam) return;
-
     const roomName = decodeURIComponent(roomParam).trim();
     if (!roomName) return;
-
     openCallInNewTab(roomName, false);
     joinedFromLinkRef.current = true;
     window.history.replaceState({}, "", window.location.pathname);
     toast.success("Abriendo sala en nueva pestaña...");
   }, []);
-
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
@@ -142,13 +133,7 @@ export default function MessengerPage() {
         "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
         activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
       )}>
-        {showContacts ? (
-          <ContactsListPanel
-            profiles={profiles}
-            onSelectUser={handleSelectUser}
-            onClose={() => setShowContacts(false)}
-          />
-        ) : showVideoRooms ? (
+        {showVideoRooms ? (
           <VideoRoomsPanel
             rooms={videoRooms}
             onCreateRoom={handleCreateRoom}
@@ -166,13 +151,13 @@ export default function MessengerPage() {
               conversations={conversations}
               activeChatId={activeChatId}
               onSelectChat={setActiveChatId}
-              onNewChat={() => setNewChatOpen(true)}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
-              onOpenContacts={() => setShowContacts(true)}
+              onSelectContact={handleSelectUser}
               onDeleteChat={handleDeleteChat}
               loading={loading}
               onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+              profiles={profiles}
             />
           </>
         )}
@@ -209,14 +194,13 @@ export default function MessengerPage() {
               </div>
               <h3 className="text-xl font-semibold text-foreground">Messenger</h3>
               <p className="text-sm text-muted-foreground max-w-sm">
-                Selecciona un chat para comenzar a conversar o inicia una nueva conversación
+                Selecciona un chat o contacto para comenzar a conversar
               </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Incoming call modal */}
       {incomingCall && (
         <IncomingCallModal
           call={incomingCall}
@@ -225,14 +209,6 @@ export default function MessengerPage() {
         />
       )}
 
-      <NewChatModal
-        open={newChatOpen}
-        onClose={() => setNewChatOpen(false)}
-        profiles={profiles}
-        onSelectUser={handleSelectUser}
-        isOnlineFn={isOnline}
-        getStatusFn={getStatus}
-      />
       <NewChatModal
         open={newGroupOpen}
         onClose={() => setNewGroupOpen(false)}
