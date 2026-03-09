@@ -190,34 +190,28 @@ export function useChat() {
     async (otherUserId: string) => {
       if (!user) return null;
 
-      const { data: myConvs } = await supabase
+      // Fast path: check local state first (zero network calls)
+      const existing = conversations.find(
+        (c) =>
+          c.type === "direct" &&
+          c.participants.some((p) => p.user_id === otherUserId)
+      );
+      if (existing) return existing.id;
+
+      // Fallback: single DB query to verify no conversation exists
+      const { data: otherP } = await supabase
         .from("chat_participants")
-        .select("conversation_id")
-        .eq("user_id", user.id);
+        .select("conversation_id, chat_conversations!inner(type)")
+        .eq("user_id", otherUserId)
+        .eq("chat_conversations.type", "direct")
+        .in(
+          "conversation_id",
+          conversations.map((c) => c.id)
+        )
+        .limit(1);
 
-      if (myConvs) {
-        const convIds = myConvs.map((mc: any) => mc.conversation_id);
-        
-        const { data: directConvs } = await supabase
-          .from("chat_conversations")
-          .select("id")
-          .in("id", convIds)
-          .eq("type", "direct");
-
-        if (directConvs) {
-          const directIds = directConvs.map((c: any) => c.id);
-          
-          const { data: otherP } = await supabase
-            .from("chat_participants")
-            .select("conversation_id")
-            .in("conversation_id", directIds)
-            .eq("user_id", otherUserId)
-            .limit(1);
-
-          if (otherP && otherP.length > 0) {
-            return otherP[0].conversation_id;
-          }
-        }
+      if (otherP && otherP.length > 0) {
+        return otherP[0].conversation_id;
       }
 
       const newConvId = crypto.randomUUID();
@@ -230,30 +224,27 @@ export function useChat() {
         return null;
       }
 
-      const { error: addCreatorError } = await supabase.from("chat_participants").insert(
-        { conversation_id: newConvId, user_id: user.id, role: "admin" }
-      );
+      // Insert both participants in parallel
+      const [r1, r2] = await Promise.all([
+        supabase.from("chat_participants").insert(
+          { conversation_id: newConvId, user_id: user.id, role: "admin" }
+        ),
+        supabase.from("chat_participants").insert(
+          { conversation_id: newConvId, user_id: otherUserId, role: "member" }
+        ),
+      ]);
 
-      if (addCreatorError) {
+      if (r1.error || r2.error) {
         await supabase.from("chat_conversations").delete().eq("id", newConvId);
         toast.error("Error al crear conversación");
         return null;
       }
 
-      const { error: addOtherError } = await supabase.from("chat_participants").insert(
-        { conversation_id: newConvId, user_id: otherUserId, role: "member" }
-      );
-
-      if (addOtherError) {
-        await supabase.from("chat_conversations").delete().eq("id", newConvId);
-        toast.error("Error al crear conversación");
-        return null;
-      }
-
+      // Realtime will pick up the new conversation; do a fast local reload
       await loadConversations();
       return newConvId;
     },
-    [user, loadConversations]
+    [user, conversations, loadConversations]
   );
 
   const createGroupChat = useCallback(
