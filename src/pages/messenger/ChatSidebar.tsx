@@ -122,10 +122,7 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-12 space-y-2">
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mx-auto">
-                <MessageSquarePlus className="h-5 w-5 text-muted-foreground" />
-              </div>
+            <div className="text-center py-6 space-y-2">
               <p className="text-sm text-muted-foreground">
                 {search ? "Sin resultados" : "Inicia una conversación"}
               </p>
@@ -143,6 +140,9 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
           )}
         </div>
       </ScrollArea>
+
+      {/* Always-visible contacts section */}
+      <ContactsSection profiles={profiles} onSelectContact={onSelectContact} />
 
       <DeleteChatDialog
         open={!!deleteTarget}
