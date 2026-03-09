@@ -1,22 +1,28 @@
 
 
-## Problem
+## Plan: Deep link de notificaciones de anuncios al detalle del anuncio
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problema
+Cuando llega una notificación de un anuncio de RRHH, al hacer click no lleva al anuncio específico sino al módulo general de comunicación.
 
-## Solution
+### Cambios
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+#### 1. Agregar ruta `announcement` en `resolveDeepLink` (`src/lib/notificationHelpers.ts`)
+- Añadir entrada: `announcement: /hr/anuncios?id=${referenceId}`
 
-## Changes
+#### 2. Leer query param `id` en `HRAnnouncements.tsx`
+- Al cargar la página, leer `?id=` de la URL
+- Buscar el anuncio correspondiente en la lista cargada
+- Abrir automáticamente el `AnnouncementDetailModal` con ese anuncio como `detailTarget`
+- Limpiar el param de la URL después de abrirlo
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+#### 3. Verificar creación de notificaciones para anuncios
+- Actualmente no existe un trigger que cree notificaciones al publicar un anuncio con canal "notification". Si se quiere que esto funcione end-to-end, se necesitaría un trigger SQL o lógica en el frontend al crear/activar el anuncio. Esto es un paso adicional que se puede abordar después si se desea.
 
-Replace the single `.select()` call with a paginated loop:
+### Archivos
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+| Archivo | Cambio |
+|---|---|
+| `src/lib/notificationHelpers.ts` | Agregar ruta `announcement` |
+| `src/pages/hr/HRAnnouncements.tsx` | Leer `?id=` y abrir detalle automáticamente |
 
