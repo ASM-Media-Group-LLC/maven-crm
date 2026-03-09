@@ -25,6 +25,11 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
+  const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
+    setBgEffect(effect);
+    await lk.setBackgroundEffect(effect);
+  }, [lk]);
+
   // Connect on mount
   useEffect(() => {
     lk.connect(roomName, displayName, isAdmin);
