@@ -324,6 +324,48 @@ export function useLiveKit() {
   // Get the Room object for attaching video/audio elements
   const getRoom = useCallback(() => roomRef.current, []);
 
+  // Background effect using LiveKit track processors (ML-based segmentation)
+  const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
+    const room = roomRef.current;
+    if (!room) return;
+
+    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
+      .find((t) => t.source === Track.Source.Camera)?.track;
+
+    if (!camTrack) return;
+
+    try {
+      if (effect === "none") {
+        // Remove processor
+        await camTrack.stopProcessor();
+        bgProcessorRef.current = null;
+        return;
+      }
+
+      if (effect === "soft-blur") {
+        const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 10 });
+        await camTrack.setProcessor(processor);
+        bgProcessorRef.current = processor;
+      } else if (effect === "hard-blur") {
+        const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 25 });
+        await camTrack.setProcessor(processor);
+        bgProcessorRef.current = processor;
+      } else {
+        // Template image — resolve to full URL
+        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
+        const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
+        if (tpl) {
+          const imagePath = `${window.location.origin}${tpl.src}`;
+          const processor = BackgroundProcessor({ mode: "virtual-background", imagePath });
+          await camTrack.setProcessor(processor);
+          bgProcessorRef.current = processor;
+        }
+      }
+    } catch (err) {
+      console.error("Background processor error:", err);
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -352,5 +394,6 @@ export function useLiveKit() {
     muteParticipant,
     removeParticipant,
     getRoom,
+    setBackgroundEffect,
   };
 }
