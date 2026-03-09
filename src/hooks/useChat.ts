@@ -44,7 +44,6 @@ export function useChat() {
 
     if (!participations || participations.length === 0) {
       setConversations([]);
-      setLoading(false);
       return;
     }
 
