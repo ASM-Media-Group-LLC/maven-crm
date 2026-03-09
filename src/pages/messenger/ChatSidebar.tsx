@@ -15,6 +15,7 @@ import {
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { useAuth } from "@/hooks/useAuth";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 
