@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
-import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { ExternalLink, MessageCircle, Pencil, Plus, Sparkles, Trash2, Upload, X, Phone, FileText } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -13,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import type { Contacto } from "./ContactosContent";
 
 const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -39,6 +44,8 @@ interface Props {
 
 const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: Props) => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -46,6 +53,26 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
   const [notas, setNotas] = useState("");
   const [estadoContacto, setEstadoContacto] = useState("Sin cambio");
   const [archivos, setArchivos] = useState<File[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch interactions for this contact
+  const { data: interactions = [] } = useQuery({
+    queryKey: ["contact_interactions", contacto?.id],
+    queryFn: async () => {
+      if (!contacto?.id) return [];
+      const { data, error } = await supabase
+        .from("contact_interactions")
+        .select("*")
+        .eq("contact_id", contacto.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!contacto?.id && open,
+  });
+
+  const callCount = interactions.filter((i: any) => i.interaction_type === "llamada").length;
+  const noteCount = interactions.filter((i: any) => i.interaction_type === "nota").length;
 
   const resetForm = () => {
     setShowForm(false);
@@ -55,9 +82,62 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
     setArchivos([]);
   };
 
-  const handleSave = () => {
-    toast({ title: "Interacción registrada", description: "La interacción se ha guardado correctamente." });
-    resetForm();
+  const handleSave = async () => {
+    if (!contacto || !user) return;
+    setIsSaving(true);
+    try {
+      // Insert interaction
+      const { data: interaction, error: intError } = await supabase
+        .from("contact_interactions")
+        .insert({
+          contact_id: contacto.id,
+          user_id: user.id,
+          interaction_type: tipoContacto,
+          notes: notas.trim() || null,
+          call_number: tipoContacto === "llamada" ? callCount + 1 : null,
+          resulting_status: estadoContacto !== "Sin cambio" ? estadoContacto : null,
+        })
+        .select("id")
+        .single();
+      if (intError) throw intError;
+
+      // Upload files if any
+      if (archivos.length > 0 && interaction) {
+        for (const file of archivos) {
+          const path = `interactions/${interaction.id}/${file.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("contact-files")
+            .upload(path, file);
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from("contact-files").getPublicUrl(path);
+            await supabase.from("contact_interaction_files").insert({
+              interaction_id: interaction.id,
+              file_name: file.name,
+              file_type: file.type,
+              file_url: urlData.publicUrl,
+            });
+          }
+        }
+      }
+
+      // Update contact status if changed
+      if (estadoContacto !== "Sin cambio") {
+        await supabase
+          .from("closers_contacts")
+          .update({ status: estadoContacto })
+          .eq("id", contacto.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["contact_interactions", contacto.id] });
+      queryClient.invalidateQueries({ queryKey: ["contact_interaction_counts"] });
+      queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
+      toast({ title: "Interacción registrada" });
+      resetForm();
+    } catch (err: any) {
+      toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,23 +166,25 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                 <div>
                   <DialogTitle className="text-xl">{contacto.nombre}</DialogTitle>
                   <DialogDescription className="mt-1 space-x-2">
-                    <span className="font-mono">{contacto.ticket}</span>
-                    <span>{flag}</span>
-                    <span>· Ingresado por: {contacto.creadoPor}</span>
+                    {contacto.ticket && <span className="font-mono">{contacto.ticket}</span>}
+                    {flag && <span>{flag}</span>}
+                    {contacto.creadoPor && <span>· Ingresado por: <span className="text-primary">{contacto.creadoPor}</span></span>}
                   </DialogDescription>
                 </div>
-                <Badge variant={categoryVariant[contacto.categoria] ?? "secondary-soft"} className="text-base px-3 py-1 shrink-0">
-                  {contacto.categoria}
-                </Badge>
+                {contacto.categoria && (
+                  <Badge variant={categoryVariant[contacto.categoria] ?? "secondary-soft"} className="text-base px-3 py-1 shrink-0">
+                    {contacto.categoria}
+                  </Badge>
+                )}
               </div>
             </DialogHeader>
 
             {/* Metadata badges */}
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">Creado: {contacto.creacion}</Badge>
-              <Badge variant="outline">0 llamadas</Badge>
-              <Badge variant="outline">0 notas</Badge>
-              <Badge variant="outline">Compañía</Badge>
+              <Badge variant="outline">{callCount} llamadas</Badge>
+              <Badge variant="outline">{noteCount} notas</Badge>
+              {contacto.company && <Badge variant="outline">{contacto.company}</Badge>}
             </div>
 
             {/* Action buttons */}
@@ -114,7 +196,10 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                 <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar
               </Button>
               <div className="flex-1" />
-              <Button variant="outline" size="sm" onClick={() => toast({ title: "Funcionalidad próximamente", description: "La conversión a creador estará disponible pronto." })}>
+              <Button variant="outline" size="sm" onClick={() => {
+                onOpenChange(false);
+                // Trigger convert via parent
+              }}>
                 <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Convertir a Creadora
               </Button>
             </div>
@@ -122,32 +207,42 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
             <Separator />
 
             {/* Instagram */}
-            <div className="flex items-center gap-3">
-              <InstagramIcon className="h-5 w-5 text-muted-foreground" />
-              <a
-                href={`https://instagram.com/${contacto.instagram}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-              >
-                @{contacto.instagram}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
+            {contacto.instagram && (
+              <div className="flex items-center gap-3 border rounded-md p-3">
+                <InstagramIcon className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Instagram / Handle</p>
+                  <a
+                    href={`https://instagram.com/${contacto.instagram.replace("@", "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:underline"
+                  >
+                    {contacto.instagram}
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  </a>
+                </div>
+              </div>
+            )}
 
             {/* WhatsApp */}
-            <div className="flex items-center gap-3">
-              <MessageCircle className="h-5 w-5 text-muted-foreground" />
-              <a
-                href={`https://wa.me/${contacto.whatsapp}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-              >
-                Abrir chat
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
+            {contacto.whatsapp && (
+              <div className="flex items-center gap-3 border rounded-md p-3">
+                <MessageCircle className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">WhatsApp</p>
+                  <a
+                    href={`https://wa.me/${contacto.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  >
+                    Abrir chat
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            )}
 
             <Separator />
 
@@ -176,7 +271,6 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     <p className="text-xs text-muted-foreground">Contacto: {contacto.nombre}</p>
                   </div>
 
-                  {/* Tipo de Contacto */}
                   <div className="space-y-2">
                     <Label className="text-xs">Tipo de Contacto</Label>
                     <RadioGroup value={tipoContacto} onValueChange={(v) => setTipoContacto(v as "nota" | "llamada")} className="flex gap-4">
@@ -191,7 +285,6 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     </RadioGroup>
                   </div>
 
-                  {/* Notas */}
                   <div className="space-y-2">
                     <Label className="text-xs">Notas</Label>
                     <Textarea
@@ -202,7 +295,6 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     />
                   </div>
 
-                  {/* Estado del Contacto */}
                   <div className="space-y-2">
                     <Label className="text-xs">Estado del Contacto</Label>
                     <Select value={estadoContacto} onValueChange={setEstadoContacto}>
@@ -217,7 +309,6 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     </Select>
                   </div>
 
-                  {/* Adjuntar Archivos */}
                   <div className="space-y-2">
                     <Label className="text-xs">Adjuntar Archivos (Fotos/Videos - máx. 10)</Label>
                     <input
@@ -251,22 +342,54 @@ const ViewContactoModal = ({ open, onOpenChange, contacto, onEdit, onDelete }: P
                     )}
                   </div>
 
-                  {/* Footer */}
                   <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" size="sm" onClick={resetForm}>Cancelar</Button>
-                    <Button size="sm" disabled={!notas.trim()} onClick={handleSave}>Guardar</Button>
+                    <Button size="sm" disabled={!notas.trim() || isSaving} onClick={handleSave}>
+                      {isSaving ? "Guardando..." : "Guardar"}
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {contacto.interacciones === 0 ? (
+              {interactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  No hay interacciones registradas para este contacto. Puedes registrar llamadas, mensajes, emails, reuniones o notas.
+                  No hay interacciones registradas para este contacto.<br />
+                  Puedes registrar llamadas, mensajes, emails, reuniones o notas.
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  {contacto.interacciones} interacción(es) registrada(s).
-                </p>
+                <div className="space-y-3">
+                  {interactions.map((inter: any) => (
+                    <div key={inter.id} className="border rounded-md p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {inter.interaction_type === "llamada" ? (
+                            <Phone className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium capitalize">{inter.interaction_type}</span>
+                          {inter.call_number && (
+                            <Badge variant="outline" className="text-[10px]">Llamada #{inter.call_number}</Badge>
+                          )}
+                          {inter.resulting_status && (
+                            <Badge variant="secondary" className="text-[10px]">→ {inter.resulting_status}</Badge>
+                          )}
+                        </div>
+                        {inter.created_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {format(new Date(inter.created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                          </span>
+                        )}
+                      </div>
+                      {inter.notes && (
+                        <p className="text-sm text-muted-foreground mt-1">{inter.notes}</p>
+                      )}
+                      {inter.call_summary && (
+                        <p className="text-sm text-muted-foreground mt-1 italic">{inter.call_summary}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

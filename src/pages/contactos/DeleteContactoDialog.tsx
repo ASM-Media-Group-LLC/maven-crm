@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import type { Contacto } from "./ContactosContent";
 
 interface Props {
@@ -14,12 +17,29 @@ interface Props {
 
 const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!contacto) return null;
 
-  const handleDelete = () => {
-    toast({ title: `"${contacto.nombre}" eliminado` });
-    onOpenChange(false);
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("closers_contacts")
+        .delete()
+        .eq("id", contacto.id);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contact_interaction_counts"] });
+      toast({ title: `"${contacto.nombre}" eliminado` });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error al eliminar", description: err.message, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -35,12 +55,13 @@ const DeleteContactoDialog = ({ open, onOpenChange, contacto }: Props) => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
+            disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            Eliminar
+            {isDeleting ? "Eliminando..." : "Eliminar"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
