@@ -124,7 +124,7 @@ export default function ParticipantTile({ participant, room, large, className, b
 
       {/* Reactions floating */}
       {participant.reactions.length > 0 && (
-        <div className="absolute top-3 right-3 flex gap-1 animate-bounce">
+        <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
           {participant.reactions.map((emoji, i) => (
             <span key={i} className="text-2xl drop-shadow-lg">
               {emoji}
