@@ -87,17 +87,11 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
                 <SearchCheck className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenContacts} title="Contactos">
-              <Contact className="h-4 w-4" />
-            </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNewGroup} title="Nuevo grupo">
               <Users className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={onNewChat} title="Nuevo chat">
-              <MessageSquarePlus className="h-4 w-4" />
             </Button>
           </div>
         </div>
