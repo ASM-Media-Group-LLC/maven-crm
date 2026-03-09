@@ -5,21 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { MicOff, Hand, Monitor } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
-import { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
 
 interface ParticipantTileProps {
   participant: LKParticipant;
   room: Room | null;
   large?: boolean;
   className?: string;
-  backgroundEffect?: BackgroundEffect;
 }
 
 function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function ParticipantTile({ participant, room, large, className, backgroundEffect = "none" }: ParticipantTileProps) {
+export default function ParticipantTile({ participant, room, large, className }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -32,7 +30,6 @@ export default function ParticipantTile({ participant, room, large, className, b
 
     if (!lkParticipant) return;
 
-    // Attach video
     const videoTrack = [...lkParticipant.videoTrackPublications.values()].find(
       (t) => t.source === (participant.isScreenSharing ? Track.Source.ScreenShare : Track.Source.Camera)
     );
@@ -41,7 +38,6 @@ export default function ParticipantTile({ participant, room, large, className, b
       videoTrack.track.attach(videoRef.current);
     }
 
-    // Attach audio (remote only)
     if (!participant.isLocal) {
       const audioTrack = [...lkParticipant.audioTrackPublications.values()].find(
         (t) => t.source === Track.Source.Microphone
@@ -68,8 +64,6 @@ export default function ParticipantTile({ participant, room, large, className, b
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
-  const templateBg = BACKGROUND_TEMPLATES.find((t) => t.id === backgroundEffect);
-
   return (
     <div
       className={cn(
@@ -79,11 +73,6 @@ export default function ParticipantTile({ participant, room, large, className, b
       )}
       style={{ background: "hsl(240 8% 12%)" }}
     >
-      {/* Template background shown when camera is OFF */}
-      {templateBg && !showVideo && (
-        <img src={templateBg.src} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
-      )}
-
       {showVideo ? (
         <video
           ref={videoRef}
@@ -102,28 +91,22 @@ export default function ParticipantTile({ participant, room, large, className, b
         </Avatar>
       )}
 
-      {/* Audio element for remote participants */}
       {!participant.isLocal && <audio ref={audioRef} autoPlay />}
 
-      {/* Reactions floating */}
       {participant.reactions.length > 0 && (
         <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
           {participant.reactions.map((emoji, i) => (
-            <span key={i} className="text-2xl drop-shadow-lg">
-              {emoji}
-            </span>
+            <span key={i} className="text-2xl drop-shadow-lg">{emoji}</span>
           ))}
         </div>
       )}
 
-      {/* Hand raised */}
       {participant.handRaised && (
         <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse z-10">
           <Hand className="h-4 w-4 text-white" />
         </div>
       )}
 
-      {/* Screen sharing indicator */}
       {participant.isScreenSharing && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge variant="secondary" className="gap-1 text-[10px]">
@@ -132,7 +115,6 @@ export default function ParticipantTile({ participant, room, large, className, b
         </div>
       )}
 
-      {/* Bottom label */}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-1.5 bg-[hsl(0_0%_0%/0.6)] backdrop-blur-sm rounded-md px-2 py-1">
           <span className="text-xs font-medium text-[hsl(0_0%_96%)]">

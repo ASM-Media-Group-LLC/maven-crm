@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ImageIcon, Check, Ban } from "lucide-react";
+import { ImageIcon, Check, Ban, Cloudy, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type BackgroundEffect = "none" | string;
+export type BackgroundEffect = "none" | "soft-blur" | "hard-blur" | string;
 
 export const BACKGROUND_TEMPLATES = [
   { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg" },
@@ -48,23 +48,28 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
       </PopoverTrigger>
       <PopoverContent side="top" align="center" className="w-80 p-3">
         <p className="text-xs font-semibold text-foreground mb-3">Fondo virtual</p>
-        <p className="text-[10px] text-muted-foreground mb-3">Se muestra cuando la cámara está apagada</p>
 
-        {/* No effect option */}
+        {/* Effect options row */}
         <div className="flex gap-2 mb-3">
-          <EffectOption
-            label="Sin efecto"
-            active={isSelected("none")}
-            onClick={() => onSelect("none")}
-          >
+          <EffectOption label="Sin efecto" active={isSelected("none")} onClick={() => onSelect("none")}>
             <div className="w-full h-full bg-muted/40 rounded flex items-center justify-center">
               <Ban className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </EffectOption>
+          <EffectOption label="Difuminado leve" active={isSelected("soft-blur")} onClick={() => onSelect("soft-blur")}>
+            <div className="w-full h-full rounded bg-muted/30 flex items-center justify-center">
+              <Cloudy className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </EffectOption>
+          <EffectOption label="Difuminado fuerte" active={isSelected("hard-blur")} onClick={() => onSelect("hard-blur")}>
+            <div className="w-full h-full rounded bg-muted/50 flex items-center justify-center">
+              <Cloud className="h-4 w-4 text-muted-foreground" />
             </div>
           </EffectOption>
         </div>
 
         {/* Image templates */}
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Plantillas</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Fondos virtuales</p>
         <div className="grid grid-cols-4 gap-1.5 mb-3">
           {BACKGROUND_TEMPLATES.map((tpl) => (
             <button
@@ -76,12 +81,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
                 isSelected(tpl.id) ? "border-primary ring-1 ring-primary/30" : "border-transparent hover:border-muted-foreground/30"
               )}
             >
-              <img
-                src={tpl.src}
-                alt={tpl.label}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              <img src={tpl.src} alt={tpl.label} className="w-full h-full object-cover" loading="lazy" />
               {isSelected(tpl.id) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <Check className="h-4 w-4 text-white" />
@@ -94,12 +94,11 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           ))}
         </div>
 
-        {/* Random button */}
         <button
           onClick={handleRandom}
           className="w-full text-xs text-center py-1.5 rounded-md bg-accent text-accent-foreground hover:bg-accent/80 transition-colors"
         >
-          🎲 Plantilla aleatoria
+          🎲 Fondo aleatorio
         </button>
       </PopoverContent>
     </Popover>
