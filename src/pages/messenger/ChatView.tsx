@@ -26,12 +26,16 @@ interface ChatViewProps {
   getReactionsForMessage: (messageId: string) => ReactionGroup[];
   onToggleReaction: (messageId: string, emoji: string) => void;
   getReadByUsers: (messageId: string) => string[];
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers,
+  hasMore, loadingMore, onLoadMore,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -43,24 +47,20 @@ export default function ChatView({
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
 
-  // Search results
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
     return messages.filter(m => m.content?.toLowerCase().includes(q) && !m.is_deleted);
   }, [messages, searchQuery]);
 
-  // Reset search index when query changes
   useEffect(() => { setSearchIndex(0); }, [searchQuery]);
 
-  // Navigate to search result
   const handleSearchNavigate = useCallback((index: number) => {
     setSearchIndex(index);
     const msg = searchResults[index];
     if (msg) setHighlightedMsgId(msg.id);
   }, [searchResults]);
 
-  // Thread replies
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];
     return messages.filter(m => m.reply_to_id === threadParent.id);
@@ -71,13 +71,11 @@ export default function ChatView({
     onSendMessage(content, "text", undefined, undefined, threadParent.id);
   }, [threadParent, onSendMessage]);
 
-  // Get thread reply count for a message
   const getThreadCount = useCallback((messageId: string) => {
     return messages.filter(m => m.reply_to_id === messageId).length;
   }, [messages]);
 
   const handleOpenThread = useCallback((msg: ChatMessage) => {
-    // If msg is a reply, open the parent thread
     if (msg.reply_to_id) {
       const parent = messages.find(m => m.id === msg.reply_to_id);
       if (parent) { setThreadParent(parent); return; }
@@ -131,6 +129,9 @@ export default function ChatView({
           highlightedMsgId={highlightedMsgId}
           onOpenThread={handleOpenThread}
           getThreadCount={getThreadCount}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={onLoadMore}
         />
 
         <MessageInput
@@ -142,7 +143,6 @@ export default function ChatView({
         />
       </div>
 
-      {/* Side panels */}
       {threadParent && !showSharedFiles && (
         <ThreadPanel
           parentMessage={threadParent}
@@ -162,7 +162,6 @@ export default function ChatView({
         />
       )}
 
-      {/* Notification settings popover */}
       {showNotifSettings && (
         <div className="absolute right-4 top-16 z-50 w-72 bg-card border border-border rounded-xl shadow-lg">
           <NotificationSettings

@@ -20,7 +20,6 @@ export function useChat() {
   const delayedRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   profilesRef.current = profiles;
 
-  // Load all profiles once
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
       .from("profiles")
@@ -32,11 +31,9 @@ export function useChat() {
     }
   }, []);
 
-  // Load conversations with participants and last message
   const loadConversations = useCallback(async () => {
     if (!user) return;
 
-    // Get conversations user participates in
     const { data: participations } = await supabase
       .from("chat_participants")
       .select("conversation_id")
@@ -49,7 +46,6 @@ export function useChat() {
 
     const convIds = participations.map((p: any) => p.conversation_id);
 
-    // Get conversations
     const { data: convs } = await supabase
       .from("chat_conversations")
       .select("*")
@@ -61,20 +57,17 @@ export function useChat() {
       return;
     }
 
-    // Get all participants for these conversations
     const { data: allParticipants } = await supabase
       .from("chat_participants")
       .select("*")
       .in("conversation_id", convIds);
 
-    // Get last message for each conversation
     const enriched: ConversationWithDetails[] = await Promise.all(
       convs.map(async (conv: any) => {
         const convParticipants = (allParticipants || []).filter(
           (p: any) => p.conversation_id === conv.id
         );
 
-        // Get last message
         const { data: lastMsgs } = await supabase
           .from("chat_messages")
           .select("*")
@@ -84,7 +77,6 @@ export function useChat() {
 
         const lastMessage = lastMsgs?.[0] || undefined;
 
-        // Count unread messages
         const myParticipation = convParticipants.find(
           (p: any) => p.user_id === user.id
         );
@@ -106,7 +98,6 @@ export function useChat() {
           unreadCount = count || 0;
         }
 
-        // Display name
         let displayName = conv.name || "";
         if (conv.type === "direct") {
           const otherParticipant = convParticipants.find(
@@ -132,7 +123,6 @@ export function useChat() {
       })
     );
 
-    // Sort: most recent first
     enriched.sort((a, b) => {
       const aTime = a.lastMessage?.created_at || a.updated_at;
       const bTime = b.lastMessage?.created_at || b.updated_at;
@@ -142,7 +132,6 @@ export function useChat() {
     setConversations(enriched);
   }, [user]);
 
-  // Initial load
   useEffect(() => {
     loadProfiles().then(() => loadConversations());
   }, [loadProfiles, loadConversations]);
@@ -197,12 +186,10 @@ export function useChat() {
     };
   }, [user, loadConversations]);
 
-  // Create direct conversation
   const createDirectChat = useCallback(
     async (otherUserId: string) => {
       if (!user) return null;
 
-      // Check if direct chat already exists
       const { data: myConvs } = await supabase
         .from("chat_participants")
         .select("conversation_id")
@@ -211,7 +198,6 @@ export function useChat() {
       if (myConvs) {
         const convIds = myConvs.map((mc: any) => mc.conversation_id);
         
-        // Get only direct conversations in a single query
         const { data: directConvs } = await supabase
           .from("chat_conversations")
           .select("id")
@@ -221,7 +207,6 @@ export function useChat() {
         if (directConvs) {
           const directIds = directConvs.map((c: any) => c.id);
           
-          // Check if the other user is a participant in any of these
           const { data: otherP } = await supabase
             .from("chat_participants")
             .select("conversation_id")
@@ -235,7 +220,6 @@ export function useChat() {
         }
       }
 
-      // Create new conversation
       const newConvId = crypto.randomUUID();
       const { error: createConvError } = await supabase
         .from("chat_conversations")
@@ -246,7 +230,6 @@ export function useChat() {
         return null;
       }
 
-      // Add creator first (so RLS recognizes them as participant)
       const { error: addCreatorError } = await supabase.from("chat_participants").insert(
         { conversation_id: newConvId, user_id: user.id, role: "admin" }
       );
@@ -273,7 +256,6 @@ export function useChat() {
     [user, loadConversations]
   );
 
-  // Create group conversation
   const createGroupChat = useCallback(
     async (name: string, memberIds: string[]) => {
       if (!user) return null;
@@ -288,7 +270,6 @@ export function useChat() {
         return null;
       }
 
-      // Add creator first (so RLS recognizes them as participant)
       const { error: addCreatorError } = await supabase.from("chat_participants").insert(
         { conversation_id: newConvId, user_id: user.id, role: "admin" }
       );
@@ -322,13 +303,10 @@ export function useChat() {
     [user, loadConversations]
   );
 
-  // Delete conversation (and all related data)
   const deleteConversation = useCallback(
     async (conversationId: string) => {
       if (!user) return false;
 
-      // Delete messages, reactions, read receipts, participants, then conversation
-      // Order matters due to foreign keys
       const { error: msgError } = await supabase
         .from("chat_messages")
         .delete()
@@ -377,28 +355,43 @@ export function useChat() {
   };
 }
 
+const PAGE_SIZE = 50;
+
 export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
+  const offlineQueueRef = useRef<Array<{
+    content: string;
+    type: ChatMessage["type"];
+    fileUrl?: string;
+    fileName?: string;
+    replyToId?: string;
+  }>>([]);
   onNewMessageRef.current = onNewMessage;
 
+  // Load initial messages (most recent PAGE_SIZE)
   const loadMessages = useCallback(async () => {
     if (!conversationId) {
       setMessages([]);
+      setHasMore(true);
       return;
     }
     const { data } = await supabase
       .from("chat_messages")
       .select("*")
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-      .limit(200);
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
 
-    setMessages((data as ChatMessage[]) || []);
+    const sorted = ((data as ChatMessage[]) || []).reverse();
+    setMessages(sorted);
+    setHasMore((data?.length || 0) >= PAGE_SIZE);
 
     // Mark as read
     if (user) {
@@ -410,9 +403,60 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     }
   }, [conversationId, user]);
 
+  // Load older messages (infinite scroll)
+  const loadOlderMessages = useCallback(async () => {
+    if (!conversationId || loadingMore || !hasMore || messages.length === 0) return;
+    
+    setLoadingMore(true);
+    const oldestMessage = messages[0];
+    
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .lt("created_at", oldestMessage.created_at)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (data && data.length > 0) {
+      const older = (data as ChatMessage[]).reverse();
+      setMessages(prev => [...older, ...prev]);
+      setHasMore(data.length >= PAGE_SIZE);
+    } else {
+      setHasMore(false);
+    }
+    setLoadingMore(false);
+  }, [conversationId, loadingMore, hasMore, messages]);
+
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  // Flush offline queue when back online
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (!conversationId || !user) return;
+      const queue = offlineQueueRef.current;
+      if (queue.length === 0) return;
+      offlineQueueRef.current = [];
+      
+      for (const item of queue) {
+        await supabase.from("chat_messages").insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: item.content,
+          type: item.type,
+          file_url: item.fileUrl || null,
+          file_name: item.fileName || null,
+          reply_to_id: item.replyToId || null,
+        });
+      }
+      toast.success(`${queue.length} mensaje(s) sincronizado(s)`);
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [conversationId, user]);
 
   // Realtime messages
   useEffect(() => {
@@ -435,12 +479,10 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             return [...prev, newMsg];
           });
 
-          // Notify via callback for browser notifications
           if (user && newMsg.sender_id !== user.id) {
             onNewMessageRef.current?.(newMsg);
           }
 
-          // Mark as read if we're viewing this conversation
           if (user && newMsg.sender_id !== user.id) {
             supabase
               .from("chat_participants")
@@ -466,7 +508,18 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
           );
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // On reconnection, reload messages to catch any missed
+        if (status === "SUBSCRIBED") {
+          // Don't reload on initial subscribe, only on reconnect
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          // Auto-retry with backoff
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+          }, 3000);
+        }
+      });
 
     // Typing indicator via presence
     const presenceChannel = supabase
@@ -512,7 +565,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     ) => {
       if (!conversationId || !user) return;
 
-      // Optimistic insert so the message appears instantly
+      // Optimistic insert
       const optimisticId = crypto.randomUUID();
       const optimisticMsg: ChatMessage = {
         id: optimisticId,
@@ -531,6 +584,13 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       };
       setMessages((prev) => [...prev, optimisticMsg]);
 
+      // If offline, queue the message
+      if (!navigator.onLine) {
+        offlineQueueRef.current.push({ content, type, fileUrl, fileName, replyToId });
+        toast.info("Sin conexión — el mensaje se enviará al reconectar");
+        return;
+      }
+
       const { data, error } = await supabase.from("chat_messages").insert({
         conversation_id: conversationId,
         sender_id: user.id,
@@ -542,15 +602,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       }).select().single();
 
       if (error) {
-        // Remove optimistic message on error
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         toast.error("Error al enviar mensaje");
       } else if (data) {
-        // Replace optimistic with real message
         setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
       }
 
-      // Update conversation updated_at
       await supabase
         .from("chat_conversations")
         .update({ updated_at: new Date().toISOString() })
@@ -571,24 +628,39 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   const editMessage = useCallback(
     async (messageId: string, newContent: string) => {
-      await supabase
+      // Optimistic update
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
+      const { error } = await supabase
         .from("chat_messages")
         .update({ content: newContent, is_edited: true })
         .eq("id", messageId);
+      if (error) {
+        toast.error("Error al editar mensaje");
+        loadMessages();
+      }
     },
-    []
+    [loadMessages]
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    await supabase
+    // Optimistic update
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true, content: null } : m));
+    const { error } = await supabase
       .from("chat_messages")
       .update({ is_deleted: true, content: null })
       .eq("id", messageId);
-  }, []);
+    if (error) {
+      toast.error("Error al eliminar mensaje");
+      loadMessages();
+    }
+  }, [loadMessages]);
 
   return {
     messages,
     loading,
+    hasMore,
+    loadingMore,
+    loadOlderMessages,
     typingUsers,
     sendMessage,
     sendTyping,

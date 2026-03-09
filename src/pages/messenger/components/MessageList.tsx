@@ -1,8 +1,9 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -22,6 +23,9 @@ interface MessageListProps {
   highlightedMsgId?: string | null;
   onOpenThread: (msg: ChatMessage) => void;
   getThreadCount: (messageId: string) => number;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 function formatDateSeparator(dateStr: string): string {
@@ -58,15 +62,41 @@ export default function MessageList({
   loading, onReply, onCopy, onEdit, onDelete,
   getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
   highlightedMsgId, onOpenThread, getThreadCount,
+  hasMore, loadingMore, onLoadMore,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const msgRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const prevMessagesLengthRef = useRef(0);
+  const isInitialLoadRef = useRef(true);
 
+  // Auto-scroll to bottom on new messages (only if near bottom)
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    
+    if (isInitialLoadRef.current) {
+      // First load: scroll to bottom
+      el.scrollTop = el.scrollHeight;
+      isInitialLoadRef.current = false;
+      prevMessagesLengthRef.current = messages.length;
+      return;
     }
+
+    const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    
+    if (messages.length > prevMessagesLengthRef.current && wasNearBottom) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
+
+  // Reset on conversation change
+  useEffect(() => {
+    isInitialLoadRef.current = true;
+    prevMessagesLengthRef.current = 0;
+  }, [chatType]);
 
   // Scroll to highlighted message
   useEffect(() => {
@@ -74,6 +104,29 @@ export default function MessageList({
       msgRefs.current[highlightedMsgId]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [highlightedMsgId]);
+
+  // Infinite scroll: load more on scroll to top
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current || !hasMore || loadingMore || !onLoadMore) return;
+    if (scrollRef.current.scrollTop < 80) {
+      const prevHeight = scrollRef.current.scrollHeight;
+      onLoadMore();
+      // Preserve scroll position after loading older messages
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          const newHeight = scrollRef.current.scrollHeight;
+          scrollRef.current.scrollTop = newHeight - prevHeight;
+        }
+      });
+    }
+  }, [hasMore, loadingMore, onLoadMore]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   const groups = groupMessages(messages);
 
@@ -93,6 +146,23 @@ export default function MessageList({
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto py-4 px-2 md:px-4 space-y-1">
+        {/* Load more indicator */}
+        {loadingMore && (
+          <div className="flex justify-center py-3">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {hasMore && !loadingMore && (
+          <div className="flex justify-center py-2">
+            <button
+              onClick={onLoadMore}
+              className="text-xs text-primary hover:underline"
+            >
+              Cargar mensajes anteriores
+            </button>
+          </div>
+        )}
+
         {groups.map((group, gi) => (
           <div key={gi}>
             <div className="flex justify-center my-4">
