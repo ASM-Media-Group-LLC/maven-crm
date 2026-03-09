@@ -377,7 +377,7 @@ const DashboardContent = () => {
           )}
 
           {/* Avisos y Celebraciones */}
-          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
+          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("LeadGen") ? "lg:col-span-2" : ""}`}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Bell className="h-4 w-4" />
