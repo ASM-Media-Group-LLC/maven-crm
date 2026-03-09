@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Smile, Paperclip, Send, X, Reply, Loader2 } from "lucide-react";
+import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,12 +8,19 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import VoiceNoteRecorder from "./VoiceNoteRecorder";
 
 const EMOJIS = [
   "😀","😂","😍","🥰","😎","🤔","👍","👋","🎉","🔥",
   "❤️","💯","🚀","✅","⭐","💪","🙏","😊","🤩","👏",
   "😅","🫡","🤝","💀","🥲","😤","🤓","🫠","🙌","💜",
 ];
+
+interface PendingFile {
+  file: File;
+  preview?: string;
+  type: "image" | "file";
+}
 
 interface MessageInputProps {
   onSendMessage: (content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string, replyToId?: string) => void;
@@ -29,18 +36,43 @@ export default function MessageInput({
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
+    // Send pending files first
+    if (pendingFiles.length > 0) {
+      setUploading(true);
+      for (const pf of pendingFiles) {
+        const path = `${user!.id}/${Date.now()}-${pf.file.name}`;
+        const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
+        if (error) {
+          toast.error(`Error al subir ${pf.file.name}`);
+          continue;
+        }
+        const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
+        // Only attach text to the first file
+        const msgContent = pendingFiles.indexOf(pf) === 0 && text.trim() ? text.trim() : pf.file.name;
+        onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
+      }
+      setPendingFiles([]);
+      setText("");
+      onCancelReply();
+      setUploading(false);
+      inputRef.current?.focus();
+      return;
+    }
+
     if (!text.trim()) return;
     onSendMessage(text.trim(), "text", undefined, undefined, replyTo?.id);
     setText("");
     onCancelReply();
     onSendTyping(false);
     inputRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -56,23 +88,50 @@ export default function MessageInput({
     typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const newPending: PendingFile[] = files.map(file => {
+      const isImg = file.type.startsWith("image/");
+      return {
+        file,
+        preview: isImg ? URL.createObjectURL(file) : undefined,
+        type: isImg ? "image" as const : "file" as const,
+      };
+    });
+
+    setPendingFiles(prev => [...prev, ...newPending]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => {
+      const updated = [...prev];
+      if (updated[index].preview) URL.revokeObjectURL(updated[index].preview!);
+      updated.splice(index, 1);
+      return updated;
+    });
+  };
+
+  const handleVoiceNoteSend = useCallback(async (blob: Blob, durationSec: number) => {
+    if (!user) return;
     setUploading(true);
-    const path = `${user.id}/${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from("chat-files").upload(path, file);
+    const fileName = `voice-note-${Date.now()}.webm`;
+    const path = `${user.id}/${fileName}`;
+    const { error } = await supabase.storage.from("chat-files").upload(path, blob);
     if (error) {
-      toast.error("Error al subir archivo");
+      toast.error("Error al subir nota de voz");
       setUploading(false);
       return;
     }
     const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-    const type = file.type.startsWith("image/") ? "image" : "file";
-    onSendMessage(file.name, type as ChatMessage["type"], urlData.publicUrl, file.name);
+    const mins = Math.floor(durationSec / 60);
+    const secs = durationSec % 60;
+    onSendMessage(`🎤 Nota de voz (${mins}:${secs.toString().padStart(2, "0")})`, "file" as ChatMessage["type"], urlData.publicUrl, fileName);
+    setIsRecording(false);
     setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  }, [user, onSendMessage]);
 
   return (
     <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm">
@@ -92,64 +151,110 @@ export default function MessageInput({
         </div>
       )}
 
+      {/* File previews */}
+      {pendingFiles.length > 0 && (
+        <div className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-border bg-muted/20">
+          {pendingFiles.map((pf, i) => (
+            <div key={i} className="relative shrink-0 group/file">
+              {pf.preview ? (
+                <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
+              ) : (
+                <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
+                    {pf.file.name.split(".").pop()?.toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => removePendingFile(i)}
+                className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+              <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Input row */}
       <div className="flex items-end gap-1.5 px-3 py-2.5">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground">
-              <Smile className="h-5 w-5" />
+        {!isRecording && (
+          <>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground">
+                  <Smile className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-2" side="top" align="start">
+                <div className="grid grid-cols-10 gap-0.5">
+                  {EMOJIS.map(e => (
+                    <button
+                      key={e}
+                      className="text-lg hover:bg-muted rounded-md p-1 transition-colors"
+                      onClick={() => handleTextChange(text + e)}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
+            <Button
+              variant="ghost" size="icon"
+              className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-2" side="top" align="start">
-            <div className="grid grid-cols-10 gap-0.5">
-              {EMOJIS.map(e => (
-                <button
-                  key={e}
-                  className="text-lg hover:bg-muted rounded-md p-1 transition-colors"
-                  onClick={() => handleTextChange(text + e)}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+          </>
+        )}
 
-        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
-        <Button
-          variant="ghost" size="icon"
-          className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
-        </Button>
-
-        <div className="flex-1 relative">
-          <Textarea
-            ref={inputRef}
-            placeholder="Escribe un mensaje..."
-            className="min-h-[38px] max-h-[120px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
-            rows={1}
-            value={text}
-            onChange={e => handleTextChange(e.target.value)}
-            onKeyDown={handleKeyDown}
+        {isRecording ? (
+          <VoiceNoteRecorder
+            isRecording={isRecording}
+            onStartRecording={() => setIsRecording(true)}
+            onSend={handleVoiceNoteSend}
+            onCancel={() => setIsRecording(false)}
           />
-        </div>
+        ) : (
+          <>
+            <div className="flex-1 relative">
+              <Textarea
+                ref={inputRef}
+                placeholder="Escribe un mensaje..."
+                className="min-h-[38px] max-h-[120px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
+                rows={1}
+                value={text}
+                onChange={e => handleTextChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
 
-        <Button
-          size="icon"
-          onClick={handleSend}
-          className={cn(
-            "shrink-0 h-9 w-9 rounded-full transition-all",
-            text.trim()
-              ? "bg-primary text-primary-foreground shadow-md hover:shadow-lg scale-100"
-              : "bg-muted text-muted-foreground scale-95 opacity-50"
-          )}
-          disabled={!text.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+            {text.trim() || pendingFiles.length > 0 ? (
+              <Button
+                size="icon"
+                onClick={handleSend}
+                className="shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-all"
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            ) : (
+              <VoiceNoteRecorder
+                isRecording={false}
+                onStartRecording={() => setIsRecording(true)}
+                onSend={handleVoiceNoteSend}
+                onCancel={() => setIsRecording(false)}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );
