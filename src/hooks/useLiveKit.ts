@@ -46,6 +46,7 @@ interface DataMessage {
 
 export function useLiveKit() {
   const roomRef = useRef<Room | null>(null);
+  const bgProcessorRef = useRef<any>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [participants, setParticipants] = useState<LKParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<LKChatMessage[]>([]);
