@@ -437,7 +437,11 @@ const DashboardContent = () => {
               {activityLoading ? (
                 <p className="text-sm text-muted-foreground">Cargando…</p>
               ) : recentActivity.length > 0 ? (
-                recentActivity.map((item) => {
+                recentActivity.filter((item) => {
+                  if (item.type === "ticket" && !canAccess("Tickets")) return false;
+                  if (item.type === "event" && !canAccess("Eventos")) return false;
+                  return true;
+                }).map((item) => {
                   const config = ACTIVITY_CONFIG[item.type];
                   const Icon = config.icon;
                   return (
