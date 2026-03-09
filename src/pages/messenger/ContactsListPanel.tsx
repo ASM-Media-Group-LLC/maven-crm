@@ -118,7 +118,7 @@ function ContactRow({ profile, online, status, onClick }: {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{profile.full_name || "Sin nombre"}</p>
         <p className="text-xs text-muted-foreground">
-          {online ? (status ? getStatusLabel(status) : "En línea") : "Desconectado"}
+          {getStatusLabel(status, online)}
         </p>
       </div>
       <MessageSquarePlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0" />
