@@ -143,9 +143,9 @@ export const useLeadGenProfiles = () =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, username, email");
+        .select("id, full_name, email");
       if (error) throw error;
-      return (data || []) as Array<{ id: string; full_name: string | null; username: string | null; email: string | null }>;
+      return (data || []) as Array<{ id: string; full_name: string | null; email: string | null }>;
     },
     staleTime: 5 * 60 * 1000,
   });
