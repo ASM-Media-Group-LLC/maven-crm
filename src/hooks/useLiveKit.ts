@@ -14,7 +14,9 @@ import {
   createLocalTracks,
   VideoPresets,
 } from "livekit-client";
+import { BackgroundProcessor } from "@livekit/track-processors";
 import { supabase } from "@/integrations/supabase/client";
+import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 
 export interface LKParticipant {
   sid: string;
