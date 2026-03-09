@@ -608,9 +608,9 @@ const DashboardContent = () => {
                 </p>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
-          {canAccess("closers") && (
+          {canAccess("Closers") && (
             <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
