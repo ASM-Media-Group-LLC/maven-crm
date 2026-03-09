@@ -5,6 +5,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import BackgroundSelector, { BackgroundEffect } from "./BackgroundSelector";
 
 interface CallControlsProps {
   isMicOn: boolean;
@@ -13,6 +14,7 @@ interface CallControlsProps {
   isHandRaised: boolean;
   isChatOpen: boolean;
   isParticipantsOpen: boolean;
+  backgroundEffect: BackgroundEffect;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleScreenShare: () => void;
@@ -20,6 +22,7 @@ interface CallControlsProps {
   onToggleChat: () => void;
   onToggleParticipants: () => void;
   onSendReaction: (emoji: string) => void;
+  onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
 }
 
