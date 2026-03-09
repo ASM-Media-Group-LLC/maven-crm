@@ -7,25 +7,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { LeadGenEntry } from "./useLeadGen";
 
-type Lead = Tables<"leads">;
-
-const extractHandle = (url: string) => {
-  try {
-    const u = new URL(url);
-    return u.pathname.replace(/^\//, "").split("/")[0] || url;
-  } catch {
-    return url;
-  }
-};
-
-const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
+const getTicketId = (entry: LeadGenEntry) =>
+  entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lead: Lead;
+  lead: LeadGenEntry;
   onConverted: () => void;
 }
 
@@ -38,29 +28,34 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
     onOpenChange(false);
   };
 
-  const handle = extractHandle(lead.url_perfil);
-  const ticketId = getTicketId(lead.id);
+  const ticketId = getTicketId(lead);
 
   const convert = useMutation({
     mutationFn: async () => {
-      const { error: insertError } = await supabase.from("contactos").insert({
-        nombre: handle,
-        instagram: lead.url_perfil,
-        pais: lead.pais,
-        compania: lead.compania,
-        ticket: ticketId,
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      const { error: insertError } = await supabase.from("closers_contacts").insert({
+        name: lead.model_handle,
+        handle: lead.model_handle,
+        platform: lead.platform,
+        country_code: lead.country_code,
+        phone: lead.phone_raw,
+        company: lead.company,
+        ticket_number: ticketId,
+        created_by: user.id,
       });
       if (insertError) throw insertError;
 
       const { error: updateError } = await supabase
-        .from("leads")
-        .update({ status: "contactado" })
+        .from("leadgen_entries")
+        .update({ status: "contactado" } as any)
         .eq("id", lead.id);
       if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leads"] });
-      queryClient.invalidateQueries({ queryKey: ["contactos"] });
+      queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       toast({ title: "Lead convertido", description: "El contacto fue creado exitosamente." });
       onConverted();
     },
@@ -70,10 +65,10 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   });
 
   const items = [
-    { label: "Handle", value: handle },
-    { label: "Plataforma", value: lead.plataforma },
-    { label: "País", value: lead.pais || "—" },
-    { label: "Compañía", value: lead.compania || "—" },
+    { label: "Handle", value: `@${lead.model_handle}` },
+    { label: "Plataforma", value: lead.platform },
+    { label: "País", value: lead.country_code || "—" },
+    { label: "Compañía", value: lead.company || "—" },
     { label: "Ticket", value: ticketId },
   ];
 

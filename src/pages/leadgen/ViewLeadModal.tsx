@@ -16,10 +16,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
 import ConvertLeadModal from "./ConvertLeadModal";
-
-type Lead = Tables<"leads">;
+import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "a+": "success-soft",
@@ -29,7 +27,8 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
   c: "destructive-soft",
 };
 
-const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
+const getTicketId = (entry: LeadGenEntry) =>
+  entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
 const countryToFlag = (code: string | null) => {
   if (!code || code.length < 2) return "🌍";
@@ -37,8 +36,8 @@ const countryToFlag = (code: string | null) => {
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 };
 
-const getPlatformIcon = (plataforma: string) => {
-  const p = plataforma.toLowerCase();
+const getPlatformIcon = (platform: string) => {
+  const p = platform.toLowerCase();
   if (p.includes("instagram")) return <InstagramIcon className="h-4 w-4" />;
   if (p.includes("tiktok")) return <TikTokIcon className="h-4 w-4" />;
   if (p.includes("twitter") || p.includes("x")) return <XIcon className="h-4 w-4" />;
@@ -48,7 +47,7 @@ const getPlatformIcon = (plataforma: string) => {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lead: Lead | null;
+  lead: LeadGenEntry | null;
 }
 
 const InfoCard = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -66,16 +65,16 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
   const [showConvertModal, setShowConvertModal] = useState(false);
 
   const { data: notes = [] } = useQuery({
-    queryKey: ["lead_notes", lead?.id],
+    queryKey: ["leadgen_notes", lead?.id],
     queryFn: async () => {
       if (!lead) return [];
       const { data, error } = await supabase
-        .from("lead_notes" as any)
+        .from("leadgen_notes" as any)
         .select("*")
-        .eq("lead_id", lead.id)
+        .eq("entry_id", lead.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as Array<{ id: string; lead_id: string; note_text: string; created_at: string }>;
+      return (data ?? []) as unknown as Array<{ id: string; entry_id: string; note_text: string; created_at: string; user_id: string }>;
     },
     enabled: !!lead && open,
   });
@@ -83,13 +82,15 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
   const addNote = useMutation({
     mutationFn: async (text: string) => {
       if (!lead) throw new Error("No lead");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No auth");
       const { error } = await supabase
-        .from("lead_notes" as any)
-        .insert({ lead_id: lead.id, note_text: text });
+        .from("leadgen_notes" as any)
+        .insert({ entry_id: lead.id, user_id: user.id, note_text: text });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["lead_notes", lead?.id] });
+      queryClient.invalidateQueries({ queryKey: ["leadgen_notes", lead?.id] });
       setNoteText("");
       setShowNoteForm(false);
       toast({ title: "Nota guardada" });
@@ -101,8 +102,16 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
 
   if (!lead) return null;
 
-  const cat = lead.categoria.toLowerCase();
+  const cat = lead.quality.toLowerCase();
   const createdDate = new Date(lead.created_at);
+
+  const buildProfileUrl = () => {
+    if (lead.source_link) return lead.source_link;
+    const p = lead.platform.toLowerCase();
+    if (p.includes("instagram")) return `https://instagram.com/${lead.model_handle}`;
+    if (p.includes("tiktok")) return `https://tiktok.com/@${lead.model_handle}`;
+    return `https://${lead.model_handle}`;
+  };
 
   const handleSaveNote = () => {
     const trimmed = noteText.trim();
@@ -121,7 +130,6 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
       <DialogContent className="sm:max-w-2xl p-0">
         <ScrollArea className="max-h-[80vh]">
           <div className="p-6 space-y-4">
-            {/* Header */}
             <DialogHeader>
               <div className="flex items-start justify-between gap-4 pr-8">
                 <DialogTitle className="text-xl">Lead</DialogTitle>
@@ -138,24 +146,22 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
               <DialogDescription className="sr-only">Detalle del lead</DialogDescription>
             </DialogHeader>
 
-            {/* Metadata row */}
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="font-mono text-xs">
-                {getTicketId(lead.id)}
+                {getTicketId(lead)}
               </Badge>
               <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                {lead.categoria.toUpperCase()}
+                {lead.quality.toUpperCase()}
               </Badge>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                {getPlatformIcon(lead.plataforma)}
-                <span>{lead.plataforma}</span>
+                {getPlatformIcon(lead.platform)}
+                <span>{lead.platform}</span>
               </div>
             </div>
 
-            {/* Info grid */}
             <div className="grid grid-cols-3 gap-3">
-              <InfoCard label="Creado por">
-                <span className="text-muted-foreground">—</span>
+              <InfoCard label="Handle">
+                <span>@{lead.model_handle}</span>
               </InfoCard>
               <InfoCard label="Fecha de entrada">
                 {format(createdDate, "dd MMM yyyy", { locale: es })}
@@ -165,13 +171,13 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
               </InfoCard>
               <InfoCard label="Ubicación">
                 <span className="flex items-center gap-1.5">
-                  {countryToFlag(lead.pais)}
-                  <span>{lead.pais || "—"}</span>
+                  {countryToFlag(lead.country_code)}
+                  <span>{lead.country_code || "—"}{lead.city ? `, ${lead.city}` : ""}</span>
                 </span>
               </InfoCard>
               <InfoCard label="Fuente">
                 <a
-                  href={lead.url_perfil}
+                  href={buildProfileUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-primary hover:underline truncate"
@@ -181,26 +187,29 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
                 </a>
               </InfoCard>
               <InfoCard label="Compañía">
-                <span className="truncate block">{lead.compania || "—"}</span>
+                <span className="truncate block">{lead.company || "—"}</span>
               </InfoCard>
+              {lead.phone_raw && (
+                <InfoCard label="Teléfono">
+                  <span>{lead.phone_e164 || lead.phone_raw}</span>
+                </InfoCard>
+              )}
             </div>
 
             <Separator />
 
-            {/* Notas del Lead */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
                 <h3 className="text-sm font-semibold">Notas del Lead</h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                {lead.notas || "Sin notas"}
+                {lead.notes || "Sin notas"}
               </p>
             </div>
 
             <Separator />
 
-            {/* Notas Adicionales */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -208,11 +217,7 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
                   <h3 className="text-sm font-semibold">Notas Adicionales</h3>
                 </div>
                 {!showNoteForm && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowNoteForm(true)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowNoteForm(true)}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Agregar
                   </Button>
@@ -228,20 +233,11 @@ const ViewLeadModal = ({ open, onOpenChange, lead }: Props) => {
                     rows={3}
                   />
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveNote}
-                      disabled={!noteText.trim() || addNote.isPending}
-                    >
+                    <Button size="sm" onClick={handleSaveNote} disabled={!noteText.trim() || addNote.isPending}>
                       <Save className="h-3.5 w-3.5 mr-1" />
                       Guardar
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelNote}
-                      disabled={addNote.isPending}
-                    >
+                    <Button variant="outline" size="sm" onClick={handleCancelNote} disabled={addNote.isPending}>
                       Cancelar
                     </Button>
                   </div>

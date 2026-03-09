@@ -3281,6 +3281,276 @@ export type Database = {
           },
         ]
       }
+      leadgen_alerts: {
+        Row: {
+          created_at: string | null
+          entry_id: string | null
+          id: string
+          lg_user_id: string
+          link: string | null
+          message: string
+          read_at: string | null
+          severity: string
+        }
+        Insert: {
+          created_at?: string | null
+          entry_id?: string | null
+          id?: string
+          lg_user_id: string
+          link?: string | null
+          message: string
+          read_at?: string | null
+          severity: string
+        }
+        Update: {
+          created_at?: string | null
+          entry_id?: string | null
+          id?: string
+          lg_user_id?: string
+          link?: string | null
+          message?: string
+          read_at?: string | null
+          severity?: string
+        }
+        Relationships: []
+      }
+      leadgen_entries: {
+        Row: {
+          city: string | null
+          company: string | null
+          country_code: string | null
+          created_at: string | null
+          created_creator_id: string | null
+          entry_date: string
+          id: string
+          lg_user_id: string
+          model_handle: string
+          notes: string | null
+          phone_e164: string | null
+          phone_raw: string | null
+          platform: string
+          quality: string
+          source_link: string | null
+          state: string | null
+          status: string | null
+          ticket_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_creator_id?: string | null
+          entry_date?: string
+          id?: string
+          lg_user_id: string
+          model_handle: string
+          notes?: string | null
+          phone_e164?: string | null
+          phone_raw?: string | null
+          platform: string
+          quality?: string
+          source_link?: string | null
+          state?: string | null
+          status?: string | null
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_creator_id?: string | null
+          entry_date?: string
+          id?: string
+          lg_user_id?: string
+          model_handle?: string
+          notes?: string | null
+          phone_e164?: string | null
+          phone_raw?: string | null
+          platform?: string
+          quality?: string
+          source_link?: string | null
+          state?: string | null
+          status?: string | null
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      leadgen_evidence_files: {
+        Row: {
+          file_type: string
+          file_url: string
+          id: string
+          leadgen_entry_id: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          file_type: string
+          file_url: string
+          id?: string
+          leadgen_entry_id: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          file_type?: string
+          file_url?: string
+          id?: string
+          leadgen_entry_id?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      leadgen_files: {
+        Row: {
+          created_at: string | null
+          entry_id: string
+          file_type: string
+          file_url: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          entry_id: string
+          file_type: string
+          file_url: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          entry_id?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      leadgen_note_files: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id: string
+          note_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id?: string
+          note_id: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          note_id?: string
+        }
+        Relationships: []
+      }
+      leadgen_notes: {
+        Row: {
+          created_at: string | null
+          entry_id: string
+          id: string
+          note_text: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          entry_id: string
+          id?: string
+          note_text: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          entry_id?: string
+          id?: string
+          note_text?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      leadgen_qa: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          entry_id: string | null
+          id: string
+          rating: string | null
+          score: string | null
+          supervisor_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          entry_id?: string | null
+          id?: string
+          rating?: string | null
+          score?: string | null
+          supervisor_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          entry_id?: string | null
+          id?: string
+          rating?: string | null
+          score?: string | null
+          supervisor_id?: string | null
+        }
+        Relationships: []
+      }
+      leadgen_qa_feedback: {
+        Row: {
+          category: string
+          created_at: string | null
+          entry_id: string
+          feedback: string
+          id: string
+          lg_user_id: string
+          rating: string
+          reviewer_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          entry_id: string
+          feedback: string
+          id?: string
+          lg_user_id: string
+          rating: string
+          reviewer_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          entry_id?: string
+          feedback?: string
+          id?: string
+          lg_user_id?: string
+          rating?: string
+          reviewer_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           categoria: string

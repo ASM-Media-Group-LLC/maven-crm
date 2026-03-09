@@ -6,26 +6,15 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cleanHandle } from "@/lib/utils";
-import type { Tables } from "@/integrations/supabase/types";
-import { useUpdateLeadCategoria } from "./useLeadGen";
-
-type Lead = Tables<"leads">;
+import { useUpdateLeadQuality } from "./useLeadGen";
+import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "a+": "success-soft",
@@ -36,21 +25,22 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
 };
 
 const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
-  nuevo: "primary-soft",
+  no_response: "primary-soft",
   contactado: "warning-soft",
   cerrado: "success-soft",
   rechazado: "destructive-soft",
 };
 
 const statusLabels: Record<string, string> = {
-  nuevo: "Sin resp.",
+  no_response: "Sin resp.",
   contactado: "Contactado",
   en_llamada: "En llamada",
   cerrado: "Cerrado",
   rechazado: "Rechazado",
 };
 
-const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
+const getTicketId = (entry: LeadGenEntry) =>
+  entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
 const countryToFlag = (code: string | null) => {
   if (!code || code.length < 2) return "🌍";
@@ -58,8 +48,8 @@ const countryToFlag = (code: string | null) => {
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 };
 
-const getPlatformIcon = (plataforma: string) => {
-  const p = plataforma.toLowerCase();
+const getPlatformIcon = (platform: string) => {
+  const p = platform.toLowerCase();
   if (p.includes("instagram")) return <InstagramIcon className="h-4 w-4" />;
   if (p.includes("tiktok")) return <TikTokIcon className="h-4 w-4" />;
   if (p.includes("twitter") || p.includes("x")) return <XIcon className="h-4 w-4" />;
@@ -69,35 +59,31 @@ const getPlatformIcon = (plataforma: string) => {
 type SortKey = "hora" | "ticket" | "handle" | "agente" | "calidad" | "estado" | "pais" | "contacto" | "qa";
 
 interface Props {
-  leads: Lead[];
-  onView?: (lead: Lead) => void;
-  onEdit?: (lead: Lead) => void;
+  leads: LeadGenEntry[];
+  onView?: (lead: LeadGenEntry) => void;
+  onEdit?: (lead: LeadGenEntry) => void;
 }
 
 const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
-  const updateCategoria = useUpdateLeadCategoria();
+  const updateQuality = useUpdateLeadQuality();
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
-    else {
-      setSortKey(key);
-      setSortAsc(true);
-    }
+    else { setSortKey(key); setSortAsc(true); }
   };
 
   const sorted = [...leads].sort((a, b) => {
-    let va = "";
-    let vb = "";
+    let va = "", vb = "";
     switch (sortKey) {
       case "hora": va = a.created_at; vb = b.created_at; break;
       case "ticket": va = a.id; vb = b.id; break;
-      case "handle": va = cleanHandle(a.url_perfil); vb = cleanHandle(b.url_perfil); break;
-      case "agente": va = ""; vb = ""; break;
-      case "calidad": va = a.categoria; vb = b.categoria; break;
+      case "handle": va = a.model_handle; vb = b.model_handle; break;
+      case "agente": va = a.company ?? ""; vb = b.company ?? ""; break;
+      case "calidad": va = a.quality; vb = b.quality; break;
       case "estado": va = a.status; vb = b.status; break;
-      case "pais": va = a.pais ?? ""; vb = b.pais ?? ""; break;
+      case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
       case "qa": va = ""; vb = ""; break;
     }
@@ -110,6 +96,15 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       <ArrowUpDown className="ml-1 h-3 w-3" />
     </Button>
   );
+
+  const buildProfileUrl = (entry: LeadGenEntry) => {
+    if (entry.source_link) return entry.source_link;
+    const p = entry.platform.toLowerCase();
+    if (p.includes("instagram")) return `https://instagram.com/${entry.model_handle}`;
+    if (p.includes("tiktok")) return `https://tiktok.com/@${entry.model_handle}`;
+    if (p.includes("twitter") || p.includes("x")) return `https://x.com/${entry.model_handle}`;
+    return `https://${entry.model_handle}`;
+  };
 
   return (
     <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
@@ -130,7 +125,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
         </TableHeader>
         <TableBody>
           {sorted.map((lead) => {
-            const cat = lead.categoria.toLowerCase();
+            const cat = lead.quality.toLowerCase();
             return (
               <TableRow key={lead.id} className="cursor-pointer" onClick={() => onView?.(lead)}>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -138,44 +133,41 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className="font-mono text-xs">
-                    {getTicketId(lead.id)}
+                    {getTicketId(lead)}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   <a
-                    href={lead.url_perfil}
+                    href={buildProfileUrl(lead)}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                   >
-                    {getPlatformIcon(lead.plataforma)}
-                    <span className="truncate max-w-[140px]">@{cleanHandle(lead.url_perfil)}</span>
+                    {getPlatformIcon(lead.platform)}
+                    <span className="truncate max-w-[140px]">@{lead.model_handle}</span>
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                 <TableCell>
                   <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                    {lead.categoria.toUpperCase()}
+                    {lead.quality.toUpperCase()}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 -ml-2"
-                    onClick={() => onView?.(lead)}
-                  >
+                  <Button variant="ghost" size="sm" className="h-8 -ml-2" onClick={() => onView?.(lead)}>
                     <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
                       {statusLabels[lead.status] || lead.status}
                     </Badge>
                   </Button>
                 </TableCell>
                 <TableCell className="text-center text-lg">
-                  {countryToFlag(lead.pais)}
+                  {countryToFlag(lead.country_code)}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">—</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {lead.phone_raw ? "📞" : "—"}
+                </TableCell>
                 <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
@@ -186,7 +178,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 flex items-center gap-1">
                           <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                            {lead.categoria.toUpperCase()}
+                            {lead.quality.toUpperCase()}
                           </Badge>
                           <ChevronDown className="h-3 w-3 text-muted-foreground" />
                         </Button>
@@ -195,7 +187,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                         {["a+", "a", "b+", "b", "c"].map((c) => (
                           <DropdownMenuItem
                             key={c}
-                            onClick={() => updateCategoria.mutate({ id: lead.id, categoria: c })}
+                            onClick={() => updateQuality.mutate({ id: lead.id, quality: c })}
                           >
                             <Badge variant={calidadVariant[c] ?? "secondary-soft"} className="mr-2">
                               {c.toUpperCase()}

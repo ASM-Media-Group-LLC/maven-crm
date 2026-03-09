@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-type Lead = { categoria: string; evidence_urls?: string[] | null };
+import type { LeadGenEntry } from "./useLeadGen";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
@@ -9,7 +8,7 @@ interface ActiveFilter {
 }
 
 interface Props {
-  leads: Lead[];
+  leads: LeadGenEntry[];
   activeFilter?: ActiveFilter;
   onFilterChange?: (filter: ActiveFilter) => void;
 }
@@ -26,13 +25,14 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
   const total = leads.length;
 
   const counts: Record<string, number> = {
-    "a+": leads.filter((l) => l.categoria?.toLowerCase() === "a+").length,
-    a:   leads.filter((l) => l.categoria?.toLowerCase() === "a").length,
-    "b+": leads.filter((l) => l.categoria?.toLowerCase() === "b+").length,
-    b:   leads.filter((l) => l.categoria?.toLowerCase() === "b").length,
-    c:   leads.filter((l) => l.categoria?.toLowerCase() === "c").length,
+    "a+": leads.filter((l) => l.quality?.toLowerCase() === "a+").length,
+    a:   leads.filter((l) => l.quality?.toLowerCase() === "a").length,
+    "b+": leads.filter((l) => l.quality?.toLowerCase() === "b+").length,
+    b:   leads.filter((l) => l.quality?.toLowerCase() === "b").length,
+    c:   leads.filter((l) => l.quality?.toLowerCase() === "c").length,
   };
-  const qa = leads.filter((l) => (l.evidence_urls?.length ?? 0) > 0).length;
+  // QA count: entries that have phone info
+  const qa = leads.filter((l) => !!l.phone_raw || !!l.phone_e164).length;
 
   const handleClick = (key: string) => {
     if (!onFilterChange) return;
@@ -47,14 +47,13 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
     activeFilter?.type === "categoria" && activeFilter.value === key;
 
   return (
-      <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
+    <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
       <CardHeader className="pb-2">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        {/* Category chips grid */}
         <div className="grid grid-cols-5 gap-1.5 mb-3">
           {categoryConfig.map((cat) => {
             const count = counts[cat.key] ?? 0;
@@ -83,7 +82,6 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
           })}
         </div>
 
-        {/* Total & QA row */}
         <div className="grid grid-cols-2 gap-1.5">
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
             <span className="text-xs font-medium text-muted-foreground">Total</span>

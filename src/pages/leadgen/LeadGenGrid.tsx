@@ -8,11 +8,8 @@ import XIcon from "@/components/icons/XIcon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cleanHandle } from "@/lib/utils";
 import AssignCalidadModal from "./AssignCalidadModal";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Lead = Tables<"leads">;
+import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "a+": "success-soft",
@@ -23,21 +20,22 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
 };
 
 const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
-  nuevo: "primary-soft",
+  no_response: "primary-soft",
   contactado: "warning-soft",
   cerrado: "success-soft",
   rechazado: "destructive-soft",
 };
 
 const statusLabels: Record<string, string> = {
-  nuevo: "Sin resp.",
+  no_response: "Sin resp.",
   contactado: "Contactado",
   en_llamada: "En llamada",
   cerrado: "Cerrado",
   rechazado: "Rechazado",
 };
 
-const getTicketId = (id: string) => `#LG${id.slice(-7).toUpperCase()}`;
+const getTicketId = (entry: LeadGenEntry) =>
+  entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
 const countryToFlag = (code: string | null) => {
   if (!code || code.length < 2) return "🌍";
@@ -45,8 +43,8 @@ const countryToFlag = (code: string | null) => {
   return String.fromCodePoint(...[...c].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 };
 
-const getPlatformIcon = (plataforma: string) => {
-  const p = plataforma.toLowerCase();
+const getPlatformIcon = (platform: string) => {
+  const p = platform.toLowerCase();
   if (p.includes("instagram")) return <InstagramIcon className="h-4 w-4" />;
   if (p.includes("tiktok")) return <TikTokIcon className="h-4 w-4" />;
   if (p.includes("twitter") || p.includes("x")) return <XIcon className="h-4 w-4" />;
@@ -54,12 +52,20 @@ const getPlatformIcon = (plataforma: string) => {
 };
 
 interface Props {
-  leads: Lead[];
-  onView?: (lead: Lead) => void;
+  leads: LeadGenEntry[];
+  onView?: (lead: LeadGenEntry) => void;
 }
 
 const LeadGenGrid = ({ leads, onView }: Props) => {
-  const [calidadLead, setCalidadLead] = useState<Lead | null>(null);
+  const [calidadLead, setCalidadLead] = useState<LeadGenEntry | null>(null);
+
+  const buildProfileUrl = (entry: LeadGenEntry) => {
+    if (entry.source_link) return entry.source_link;
+    const p = entry.platform.toLowerCase();
+    if (p.includes("instagram")) return `https://instagram.com/${entry.model_handle}`;
+    if (p.includes("tiktok")) return `https://tiktok.com/@${entry.model_handle}`;
+    return `https://${entry.model_handle}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -68,7 +74,7 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {leads.map((lead) => {
-          const cat = lead.categoria.toLowerCase();
+          const cat = lead.quality.toLowerCase();
           const createdAt = new Date(lead.created_at);
           return (
             <Card
@@ -77,34 +83,32 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
               onClick={() => onView?.(lead)}
             >
               <CardContent className="p-3 space-y-2">
-                {/* Header */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      {getTicketId(lead.id)}
+                      {getTicketId(lead)}
                     </Badge>
                     <a
-                      href={lead.url_perfil}
+                      href={buildProfileUrl(lead)}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      {getPlatformIcon(lead.plataforma)}
+                      {getPlatformIcon(lead.platform)}
                       <span className="truncate max-w-[100px]">Ver Perfil</span>
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
                   <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                    {lead.categoria.toUpperCase()}
+                    {lead.quality.toUpperCase()}
                   </Badge>
                 </div>
 
-                {/* Body */}
                 <div className="space-y-1.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Agente:</span>
-                    <span className="font-medium">—</span>
+                    <span className="font-medium">{lead.company || "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Fecha:</span>
@@ -121,18 +125,13 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">País:</span>
                     <span className="font-medium">
-                      {countryToFlag(lead.pais)} {lead.pais || "—"}
+                      {countryToFlag(lead.country_code)} {lead.country_code || "—"}
                     </span>
                   </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => onView?.(lead)}
-                  >
+                  <Button size="sm" className="flex-1" onClick={() => onView?.(lead)}>
                     <Eye className="h-4 w-4 mr-1" />
                     Ver Detalles
                   </Button>
