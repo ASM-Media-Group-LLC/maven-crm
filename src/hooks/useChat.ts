@@ -380,7 +380,7 @@ export function useChat() {
 export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
@@ -391,7 +391,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       setMessages([]);
       return;
     }
-    setLoading(true);
     const { data } = await supabase
       .from("chat_messages")
       .select("*")
@@ -400,7 +399,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       .limit(200);
 
     setMessages((data as ChatMessage[]) || []);
-    setLoading(false);
 
     // Mark as read
     if (user) {
