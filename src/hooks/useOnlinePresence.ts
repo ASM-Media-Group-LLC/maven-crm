@@ -34,9 +34,12 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   // Keep ref in sync
   myStatusRef.current = myStatus;
 
-  // Single channel subscription — does NOT depend on myStatus
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
+
+  // Single channel subscription — depends only on user identity
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
     const presenceChannel = supabase.channel("online-users", {
       config: { presence: { key: user.id } },
@@ -44,19 +47,23 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
 
     channelRef.current = presenceChannel;
 
+    const syncState = () => {
+      const state = presenceChannel.presenceState();
+      const ids = new Set<string>();
+      const statuses: Record<string, UserStatus> = {};
+      Object.entries(state).forEach(([key, presences]) => {
+        ids.add(key);
+        const latest = (presences as any[])?.[0];
+        if (latest?.status) statuses[key] = latest.status as UserStatus;
+      });
+      setOnlineUsers(ids);
+      setUserStatuses(statuses);
+    };
+
     presenceChannel
-      .on("presence", { event: "sync" }, () => {
-        const state = presenceChannel.presenceState();
-        const ids = new Set<string>();
-        const statuses: Record<string, UserStatus> = {};
-        Object.entries(state).forEach(([key, presences]) => {
-          ids.add(key);
-          const latest = (presences as any[])?.[0];
-          if (latest?.status) statuses[key] = latest.status as UserStatus;
-        });
-        setOnlineUsers(ids);
-        setUserStatuses(statuses);
-      })
+      .on("presence", { event: "sync" }, syncState)
+      .on("presence", { event: "join" }, syncState)
+      .on("presence", { event: "leave" }, syncState)
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await presenceChannel.track({
@@ -71,7 +78,7 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
       channelRef.current = null;
       supabase.removeChannel(presenceChannel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // When status changes, re-track without recreating channel
   const setMyStatus = useCallback((status: UserStatus) => {
@@ -80,12 +87,12 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     const channel = channelRef.current;
     if (channel) {
       channel.track({
-        user_id: user?.id,
+        user_id: userIdRef.current,
         online_at: new Date().toISOString(),
         status,
       });
     }
-  }, [user]);
+  }, []);
 
   const isOnline = useCallback(
     (userId: string) => onlineUsers.has(userId),

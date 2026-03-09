@@ -1,24 +1,22 @@
 
 
-## Problem Analysis
+## Problem
 
-The presence system (contact online status) fails because the `useOnlinePresence` effect depends on `[user]` (the full object reference). The `AuthProvider` sets `user` via both `onAuthStateChange` AND `getSession()`, producing **two different object references** for the same user on every page load. This causes the effect to:
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-1. Create channel → subscribe → begin tracking
-2. Immediately tear down that channel (cleanup from re-run)
-3. Create a **new** channel → subscribe again
+## Solution
 
-This race condition destroys the first presence sync before it completes, and the second channel may not fully establish. Result: "0 en línea" permanently.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-## Fix
+## Changes
 
-**File: `src/hooks/useOnlinePresence.ts`**
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-1. Change the `useEffect` dependency from `[user]` to `[user?.id]` — the effect only needs to re-run when the user *identity* changes (login/logout), not when the object reference changes.
+Replace the single `.select()` call with a paginated loop:
 
-2. Store `user?.id` in a ref for use inside `setMyStatus` callback, and change its dependency from `[user]` to `[user?.id]` as well.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-3. Add `join` and `leave` presence event handlers (in addition to `sync`) for more responsive status updates — `sync` only fires periodically, while `join`/`leave` fire immediately when a user connects or disconnects.
-
-These are minimal, targeted changes to `useOnlinePresence.ts` only. No other files need modification.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
