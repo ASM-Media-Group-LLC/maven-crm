@@ -61,7 +61,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants, onSendReaction, onBackgroundChange, onLeave,
 }: CallControlsProps) {
   return (
-    <div className="shrink-0 flex items-center justify-center gap-3 py-4 bg-[hsl(240_8%_10%)]">
+    <div className="shrink-0 flex items-center justify-center gap-2 md:gap-3 py-4 bg-[hsl(240_8%_10%)] flex-wrap px-2">
       <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label="Micrófono" />
       <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label="Cámara" />
       <ControlBtn
