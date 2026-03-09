@@ -91,7 +91,6 @@ export default function ParticipantTile({ participant, room, large, className, b
           playsInline
           muted={participant.isLocal}
           className="absolute inset-0 w-full h-full object-cover z-[1]"
-          style={isBlur ? { filter: blurAmount } : undefined}
         />
       ) : (
         <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)] z-[1]", large ? "h-24 w-24" : "h-16 w-16")}>

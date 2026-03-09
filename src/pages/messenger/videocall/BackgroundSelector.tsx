@@ -48,8 +48,9 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
       </PopoverTrigger>
       <PopoverContent side="top" align="center" className="w-80 p-3">
         <p className="text-xs font-semibold text-foreground mb-3">Fondo virtual</p>
+        <p className="text-[10px] text-muted-foreground mb-3">Se muestra cuando la cámara está apagada</p>
 
-        {/* Blur options row */}
+        {/* No effect option */}
         <div className="flex gap-2 mb-3">
           <EffectOption
             label="Sin efecto"
@@ -58,26 +59,6 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
           >
             <div className="w-full h-full bg-muted/40 rounded flex items-center justify-center">
               <Ban className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </EffectOption>
-          <EffectOption
-            label="Soft blur"
-            active={isSelected("soft-blur")}
-            onClick={() => onSelect("soft-blur")}
-          >
-            <div className="w-full h-full rounded relative overflow-hidden bg-muted/30">
-              <div className="absolute inset-0" style={{ backdropFilter: "blur(2px)", background: "hsl(var(--muted) / 0.3)" }} />
-              <div className="absolute inset-1.5 rounded-sm bg-foreground/8" />
-            </div>
-          </EffectOption>
-          <EffectOption
-            label="Hard blur"
-            active={isSelected("hard-blur")}
-            onClick={() => onSelect("hard-blur")}
-          >
-            <div className="w-full h-full rounded relative overflow-hidden bg-muted/50">
-              <div className="absolute inset-0" style={{ backdropFilter: "blur(6px)", background: "hsl(var(--muted) / 0.5)" }} />
-              <div className="absolute inset-1.5 rounded-sm bg-foreground/15" />
             </div>
           </EffectOption>
         </div>
