@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2, SearchCheck } from "lucide-react";
+import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2, SearchCheck, Contact } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
