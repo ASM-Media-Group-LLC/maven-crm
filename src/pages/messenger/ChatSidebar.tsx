@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2 } from "lucide-react";
+import { Search, Users, Video, MessageSquarePlus, Loader2, Trash2, SearchCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,6 +27,7 @@ interface ChatSidebarProps {
   onOpenVideoRooms: () => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
+  onOpenGlobalSearch?: () => void;
 }
 
 function getInitials(name: string) {
@@ -49,7 +50,7 @@ function truncate(text: string, max: number) {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
-export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms, onDeleteChat, loading }: ChatSidebarProps) {
+export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms, onDeleteChat, loading, onOpenGlobalSearch }: ChatSidebarProps) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
@@ -80,6 +81,11 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
             <StatusPicker />
           </div>
           <div className="flex gap-0.5">
+            {onOpenGlobalSearch && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenGlobalSearch} title="Buscar en todo">
+                <SearchCheck className="h-4 w-4" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>

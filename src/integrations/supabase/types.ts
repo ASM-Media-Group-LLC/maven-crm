@@ -447,6 +447,88 @@ export type Database = {
         }
         Relationships: []
       }
+      call_participants: {
+        Row: {
+          call_id: string
+          id: string
+          joined_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          id?: string
+          joined_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          id?: string
+          joined_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_participants_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          call_status: string
+          call_type: string
+          caller_id: string
+          conversation_id: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          is_group: boolean
+          receiver_id: string | null
+          room_id: string
+          start_time: string | null
+        }
+        Insert: {
+          call_status?: string
+          call_type?: string
+          caller_id: string
+          conversation_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_group?: boolean
+          receiver_id?: string | null
+          room_id: string
+          start_time?: string | null
+        }
+        Update: {
+          call_status?: string
+          call_type?: string
+          caller_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          is_group?: boolean
+          receiver_id?: string | null
+          room_id?: string
+          start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_conversations: {
         Row: {
           avatar_url: string | null
