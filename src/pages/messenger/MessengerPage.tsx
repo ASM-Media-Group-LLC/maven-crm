@@ -121,18 +121,6 @@ export default function MessengerPage() {
     toast.success("Abriendo sala en nueva pestaña...");
   }, []);
 
-  if (activeCallRoom) {
-    return (
-      <div className="h-full w-full">
-        <LiveKitCallView
-          roomName={activeCallRoom.roomName}
-          displayName={activeCallRoom.displayName}
-          isAdmin={activeCallRoom.isAdmin}
-          onLeave={() => setActiveCallRoom(null)}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
