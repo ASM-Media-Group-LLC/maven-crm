@@ -68,6 +68,19 @@ const HRAnnouncements = () => {
   const [filterType, setFilterType] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
 
+  // Deep-link: open announcement detail from ?id= param
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id && announcements.length > 0 && !detailTarget) {
+      const target = announcements.find((a) => a.id === id);
+      if (target) {
+        setDetailTarget(target);
+        searchParams.delete("id");
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, announcements, detailTarget, setSearchParams]);
+
   const filtered = useMemo(() => {
     let result = announcements;
     if (statusTab !== "all") result = result.filter((a) => a.status === statusTab);
