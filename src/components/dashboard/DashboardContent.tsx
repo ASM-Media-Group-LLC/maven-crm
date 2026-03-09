@@ -114,21 +114,21 @@ interface QuickAction {
 }
 
 const ALL_ACTIONS: QuickAction[] = [
-  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "contactos" },
-  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "tareas" },
-  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "eventos" },
-  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "creadores" },
-  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "leadgen" },
-  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "closers" },
-  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "tickets" },
-  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "hr" },
-  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "finanzas" },
-  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "promolog" },
-  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "sales" },
-  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "admin" },
+  { id: "contactos",  label: "Contactos",        icon: UserPlus,      url: "/contactos",         module: "Contactos" },
+  { id: "tareas",     label: "Tareas",           icon: CheckSquare,   url: "/tareas",            module: "Tareas" },
+  { id: "eventos",    label: "Eventos",          icon: Calendar,      url: "/eventos",           module: "Eventos" },
+  { id: "creadores",  label: "Creadoras",        icon: Users,         url: "/creadores",         module: "Creadores" },
+  { id: "leadgen",    label: "Lead Gen",         icon: MessageSquare, url: "/leadgen",           module: "LeadGen" },
+  { id: "closers",    label: "Closers",          icon: Phone,         url: "/closers",           module: "Closers" },
+  { id: "tickets",    label: "Tickets",          icon: Ticket,        url: "/tickets",           module: "Tickets" },
+  { id: "hr",         label: "Recursos Humanos", icon: Briefcase,     url: "/hr",                module: "HR" },
+  { id: "finanzas",   label: "Finanzas",         icon: DollarSign,    url: "/finanzas",          module: "Finanzas" },
+  { id: "promolog",   label: "Promolog",         icon: Megaphone,     url: "/promolog",          module: "Promolog" },
+  { id: "sales",      label: "Sales Dashboard",  icon: TrendingUp,    url: "/sales",             module: "Creator Sales" },
+  { id: "admin",      label: "Administración",   icon: Settings,      url: "/admin/usuarios",    module: "Administración" },
 ];
 
-const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos", "creadores", "tickets", "hr"];
+const DEFAULT_ACTION_IDS = ["contactos", "tareas", "eventos"];
 const MAX_SHORTCUTS = 6;
 const LS_KEY = "dashboard_quick_actions";
 
@@ -245,7 +245,7 @@ const DashboardContent = () => {
       icon: Users,
       color: "primary" as const,
       subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
-      show: canAccess("creadores"),
+      show: canAccess("Creadores"),
     },
     {
       label: "Active Tickets",
@@ -253,7 +253,7 @@ const DashboardContent = () => {
       icon: Ticket,
       color: "destructive" as const,
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
-      show: true,
+      show: canAccess("Tickets"),
     },
     {
       label: "New Leads Today",
@@ -261,7 +261,7 @@ const DashboardContent = () => {
       icon: MessageSquare,
       color: "accent" as const,
       subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
-      show: canAccess("leadgen"),
+      show: canAccess("LeadGen"),
     },
     {
       label: "Empleados Activos",
@@ -269,7 +269,7 @@ const DashboardContent = () => {
       icon: Users,
       color: "success" as const,
       subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
-      show: canAccess("hr"),
+      show: canAccess("HR"),
     },
     {
       label: "Tareas Vencidas",
@@ -352,7 +352,7 @@ const DashboardContent = () => {
 
         {/* Row 2: Weekly Performance + Avisos/Actividad */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {canAccess("leadgen") && (
+          {canAccess("LeadGen") && (
             <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Rendimiento Semanal</CardTitle>
@@ -377,7 +377,7 @@ const DashboardContent = () => {
           )}
 
           {/* Avisos y Celebraciones */}
-          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("leadgen") ? "lg:col-span-2" : ""}`}>
+          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("LeadGen") ? "lg:col-span-2" : ""}`}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Bell className="h-4 w-4" />
@@ -437,7 +437,11 @@ const DashboardContent = () => {
               {activityLoading ? (
                 <p className="text-sm text-muted-foreground">Cargando…</p>
               ) : recentActivity.length > 0 ? (
-                recentActivity.map((item) => {
+                recentActivity.filter((item) => {
+                  if (item.type === "ticket" && !canAccess("Tickets")) return false;
+                  if (item.type === "event" && !canAccess("Eventos")) return false;
+                  return true;
+                }).map((item) => {
                   const config = ACTIVITY_CONFIG[item.type];
                   const Icon = config.icon;
                   return (
@@ -470,7 +474,7 @@ const DashboardContent = () => {
 
         {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {canAccess("leadgen") && (
+          {canAccess("LeadGen") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Distribución Pipeline</CardTitle>
@@ -508,7 +512,7 @@ const DashboardContent = () => {
             </Card>
           )}
 
-          {canAccess("creadores") && (
+          {canAccess("Creadores") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
@@ -574,7 +578,7 @@ const DashboardContent = () => {
 
         {/* Row 4: Operational Cards */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
+          {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Headphones className="h-5 w-5 text-destructive" />
@@ -604,9 +608,9 @@ const DashboardContent = () => {
                 </p>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
-          {canAccess("closers") && (
+          {canAccess("Closers") && (
             <Card className="border-t-[3px] border-t-primary transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
@@ -630,7 +634,7 @@ const DashboardContent = () => {
             </Card>
           )}
 
-          {canAccess("hr") && (
+          {canAccess("HR") && (
             <Card className="border-t-[3px] border-t-accent transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-accent/5 hover:to-transparent">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
