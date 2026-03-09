@@ -150,7 +150,7 @@ export default function ParticipantTile({ participant, room, large, className, b
       )}
 
       {/* Bottom label */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-1.5 bg-[hsl(0_0%_0%/0.6)] backdrop-blur-sm rounded-md px-2 py-1">
           <span className="text-xs font-medium text-[hsl(0_0%_96%)]">
             {participant.isLocal ? "Tú" : participant.name}
