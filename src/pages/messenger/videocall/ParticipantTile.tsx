@@ -135,7 +135,7 @@ export default function ParticipantTile({ participant, room, large, className, b
 
       {/* Hand raised */}
       {participant.handRaised && (
-        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse">
+        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse z-10">
           <Hand className="h-4 w-4 text-white" />
         </div>
       )}
