@@ -19,7 +19,7 @@ function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function ParticipantTile({ participant, room, large, className }: ParticipantTileProps) {
+export default function ParticipantTile({ participant, room, large, className, backgroundEffect = "none" }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
