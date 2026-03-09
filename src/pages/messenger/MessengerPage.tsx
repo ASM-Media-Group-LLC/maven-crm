@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
+import ContactsListPanel from "./ContactsListPanel";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
@@ -31,6 +32,7 @@ export default function MessengerPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
@@ -60,6 +62,7 @@ export default function MessengerPage() {
     const convId = await createDirectChat(userId);
     if (convId) setActiveChatId(convId);
     setNewChatOpen(false);
+    setShowContacts(false);
   };
 
   const handleCreateGroup = async (name: string, memberIds: string[]) => {
@@ -139,7 +142,13 @@ export default function MessengerPage() {
         "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
         activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
       )}>
-        {showVideoRooms ? (
+        {showContacts ? (
+          <ContactsListPanel
+            profiles={profiles}
+            onSelectUser={handleSelectUser}
+            onClose={() => setShowContacts(false)}
+          />
+        ) : showVideoRooms ? (
           <VideoRoomsPanel
             rooms={videoRooms}
             onCreateRoom={handleCreateRoom}
@@ -160,6 +169,7 @@ export default function MessengerPage() {
               onNewChat={() => setNewChatOpen(true)}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
+              onOpenContacts={() => setShowContacts(true)}
               onDeleteChat={handleDeleteChat}
               loading={loading}
               onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
