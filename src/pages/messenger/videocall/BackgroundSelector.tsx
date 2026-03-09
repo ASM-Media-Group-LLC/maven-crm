@@ -3,7 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ImageIcon, Check, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type BackgroundEffect = "none" | "soft-blur" | "hard-blur" | string;
+export type BackgroundEffect = "none" | string;
 
 export const BACKGROUND_TEMPLATES = [
   { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg" },
