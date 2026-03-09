@@ -155,8 +155,82 @@ export default function ChatSidebar({ conversations, activeChatId, onSelectChat,
     </div>
   );
 }
+function ContactsSection({ profiles, onSelectContact }: {
+  profiles: Record<string, import("./types").UserProfile>;
+  onSelectContact: (userId: string) => void;
+}) {
+  const { user } = useAuth();
+  const { isOnline, getStatus } = useOnlinePresence();
+  const [expanded, setExpanded] = useState(true);
 
-function ConversationItem({ conversation, isActive, onClick, onDelete }: {
+  const contacts = useMemo(() => {
+    return Object.values(profiles)
+      .filter(p => p.id !== user?.id)
+      .sort((a, b) => {
+        const aOn = isOnline(a.id);
+        const bOn = isOnline(b.id);
+        if (aOn && !bOn) return -1;
+        if (!aOn && bOn) return 1;
+        return (a.full_name || "").localeCompare(b.full_name || "");
+      });
+  }, [profiles, user?.id, isOnline]);
+
+  const onlineCount = useMemo(() => contacts.filter(p => isOnline(p.id)).length, [contacts, isOnline]);
+
+  return (
+    <div className="border-t border-border">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:bg-muted/30 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <Contact className="h-3.5 w-3.5" />
+          Contactos
+        </span>
+        <span className="text-[10px] font-normal normal-case">
+          {onlineCount} en línea
+        </span>
+      </button>
+      {expanded && (
+        <ScrollArea className="max-h-48">
+          <div className="px-2 pb-2">
+            {contacts.map(p => {
+              const online = isOnline(p.id);
+              const status = getStatus(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelectContact(p.id)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left hover:bg-muted/50 transition-colors"
+                >
+                  <div className="relative shrink-0">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
+                        {getInitials(p.full_name || "?")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className={cn(
+                      "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-card",
+                      getStatusColor(status, online)
+                    )} />
+                  </div>
+                  <span className={cn(
+                    "text-xs truncate",
+                    online ? "text-foreground" : "text-muted-foreground"
+                  )}>
+                    {p.full_name || "Sin nombre"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
+
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
