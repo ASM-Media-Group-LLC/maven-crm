@@ -512,7 +512,7 @@ const DashboardContent = () => {
             </Card>
           )}
 
-          {canAccess("creadores") && (
+          {canAccess("Creadores") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Top 5 Creadoras</CardTitle>
