@@ -4,6 +4,7 @@ import {
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
   MessageCircle,
 } from "lucide-react";
+import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
@@ -32,9 +33,11 @@ const DashboardSidebar = () => {
   const { isAdmin } = useUserRole();
   const { canAccess } = usePermissions();
 
-  const mainMenuAll = [
+  const unreadChatCount = useUnreadChatCount();
+
+  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger" },
+    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
@@ -204,6 +207,11 @@ const DashboardSidebar = () => {
                     <NavLink to={item.url} end={item.url === "/dashboard"} className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
+                      {"badge" in item && item.badge != null && (
+                        <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-destructive-foreground">
+                          {item.badge > 99 ? "99+" : item.badge}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
