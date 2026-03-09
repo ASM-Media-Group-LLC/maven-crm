@@ -142,7 +142,7 @@ export default function ParticipantTile({ participant, room, large, className, b
 
       {/* Screen sharing indicator */}
       {participant.isScreenSharing && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge variant="secondary" className="gap-1 text-[10px]">
             <Monitor className="h-3 w-3" /> Compartiendo pantalla
           </Badge>
