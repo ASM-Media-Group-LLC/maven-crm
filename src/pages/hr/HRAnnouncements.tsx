@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Pencil, Trash2, Copy, Archive, Eye, Megaphone, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ const STATUS_TABS = [
 
 const HRAnnouncements = () => {
   const { data: announcements = [], isLoading } = useAnnouncementsAdmin();
+  const [searchParams, setSearchParams] = useSearchParams();
   const duplicateAnn = useDuplicateAnnouncement();
   const archiveAnn = useArchiveAnnouncement();
 
@@ -65,6 +67,19 @@ const HRAnnouncements = () => {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
+
+  // Deep-link: open announcement detail from ?id= param
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id && announcements.length > 0 && !detailTarget) {
+      const target = announcements.find((a) => a.id === id);
+      if (target) {
+        setDetailTarget(target);
+        searchParams.delete("id");
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  }, [searchParams, announcements, detailTarget, setSearchParams]);
 
   const filtered = useMemo(() => {
     let result = announcements;
