@@ -23,11 +23,21 @@ export interface Contacto {
   nombre: string;
   estado: string;
   instagram: string;
+  platform: string;
   pais: string;
+  city: string;
   categoria: string;
   whatsapp: string;
   interacciones: number;
   creadoPor: string;
+  email: string;
+  phone: string;
+  country_code: string;
+  company: string;
+  notes: string;
+  source: string;
+  profile_picture_url: string;
+  assigned_to: string;
 }
 
 const emptyFilters: ContactoFilters = {
@@ -53,10 +63,10 @@ const ContactosContent = () => {
   const { toast } = useToast();
 
   const { data: dbContactos = [], isLoading } = useQuery({
-    queryKey: ["contactos"],
+    queryKey: ["closers_contacts"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contactos")
+        .from("closers_contacts")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -64,21 +74,47 @@ const ContactosContent = () => {
     },
   });
 
+  // Fetch interaction counts per contact
+  const { data: interactionCounts = {} } = useQuery({
+    queryKey: ["contact_interaction_counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contact_interactions")
+        .select("contact_id");
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((r: any) => {
+        counts[r.contact_id] = (counts[r.contact_id] || 0) + 1;
+      });
+      return counts;
+    },
+  });
+
   const allContactos: Contacto[] = useMemo(() =>
-    dbContactos.map((c, i) => ({
+    dbContactos.map((c) => ({
       id: c.id,
-      creacion: new Date(c.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
-      ticket: c.ticket || `CT${String(i + 1).padStart(6, "0")}`,
-      nombre: c.nombre,
-      estado: c.estado || "Nuevo",
-      instagram: c.instagram,
-      pais: c.pais || "",
-      categoria: c.categoria_fisica || "",
-      whatsapp: c.telefono ? `${c.country_code || ""}${c.telefono}` : "",
-      interacciones: 0,
-      creadoPor: "",
+      creacion: new Date(c.created_at || "").toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
+      ticket: c.ticket_number || "",
+      nombre: c.name,
+      estado: c.status || "Nuevo",
+      instagram: c.handle || "",
+      platform: c.platform || "Instagram",
+      pais: c.country_code || "",
+      city: c.city || "",
+      categoria: c.physical_appearance || "",
+      whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
+      interacciones: interactionCounts[c.id] || 0,
+      creadoPor: c.created_by || "",
+      email: c.email || "",
+      phone: c.phone || "",
+      country_code: c.country_code || "",
+      company: c.company || "",
+      notes: c.notes || "",
+      source: c.source || "",
+      profile_picture_url: c.profile_picture_url || "",
+      assigned_to: c.assigned_to || "",
     })),
-  [dbContactos]);
+  [dbContactos, interactionCounts]);
 
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
@@ -114,7 +150,11 @@ const ContactosContent = () => {
   const totalContactos = allContactos.length;
   const nuevos = allContactos.filter((c) => c.estado === "Nuevo").length;
   const convertidos = allContactos.filter((c) => c.estado === "Convertido").length;
-  const esteMes = allContactos.length;
+  const esteMes = allContactos.filter((c) => {
+    const now = new Date();
+    const created = new Date(dbContactos.find(d => d.id === c.id)?.created_at || "");
+    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+  }).length;
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">

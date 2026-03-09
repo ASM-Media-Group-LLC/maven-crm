@@ -8,12 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
-type Contacto = Tables<"contactos">;
+type ClosersContact = Tables<"closers_contacts">;
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  contacto: Contacto | null;
+  contacto: ClosersContact | null;
   onConverted: () => void;
 }
 
@@ -25,28 +25,28 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
     mutationFn: async () => {
       if (!contacto) throw new Error("No contacto");
       const { error: insertError } = await supabase.from("creators").insert({
-        name: contacto.nombre,
-        instagram_handle: contacto.instagram,
-        country: contacto.pais,
-        category: contacto.categoria_fisica,
-        phone: contacto.telefono,
+        name: contacto.name,
+        instagram_handle: contacto.handle,
+        country: contacto.country_code,
+        category: contacto.physical_appearance,
+        phone: contacto.phone,
         country_code: contacto.country_code,
         email: contacto.email,
-        profile_photo_url: contacto.profile_photo_url,
+        profile_photo_url: contacto.profile_picture_url,
         source: "contacto",
         status: "pendiente",
-        internal_notes: contacto.compania ? `Compañía: ${contacto.compania}` : null,
+        internal_notes: contacto.company ? `Compañía: ${contacto.company}` : null,
       });
       if (insertError) throw insertError;
 
       const { error: updateError } = await supabase
-        .from("contactos")
-        .update({ estado: "Convertido" })
+        .from("closers_contacts")
+        .update({ status: "Convertido" })
         .eq("id", contacto.id);
       if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contactos"] });
+      queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
       queryClient.invalidateQueries({ queryKey: ["creators"] });
       toast({ title: "Contacto convertido", description: "El creador fue creado exitosamente." });
       onConverted();
@@ -59,11 +59,11 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
   if (!contacto) return null;
 
   const items = [
-    { label: "Nombre", value: contacto.nombre },
-    { label: "Instagram", value: contacto.instagram },
-    { label: "País", value: contacto.pais || "—" },
-    { label: "Categoría", value: contacto.categoria_fisica || "—" },
-    { label: "Teléfono", value: contacto.telefono ? `${contacto.country_code || ""}${contacto.telefono}` : "—" },
+    { label: "Nombre", value: contacto.name },
+    { label: "Handle", value: contacto.handle },
+    { label: "País", value: contacto.country_code || "—" },
+    { label: "Categoría", value: contacto.physical_appearance || "—" },
+    { label: "Teléfono", value: contacto.phone ? `${contacto.country_code || ""}${contacto.phone}` : "—" },
     { label: "Email", value: contacto.email || "—" },
   ];
 

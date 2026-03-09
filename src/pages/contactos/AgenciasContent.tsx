@@ -25,14 +25,27 @@ const AgenciasContent = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: dbAgencias = [] } = useQuery({
-    queryKey: ["agencias"],
+    queryKey: ["agencies"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("agencias" as any)
+        .from("agencies")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as Agencia[];
+      // Map agencies table fields to Agencia interface
+      return (data ?? []).map((a): Agencia => ({
+        id: a.id,
+        nombre: a.name,
+        estado: a.status || "Discovery",
+        pais: a.country_code || "",
+        contacto_nombre: a.contact_name || "",
+        contacto_email: a.email || "",
+        contacto_telefono: a.phone || "",
+        instagram: "",
+        website: a.website || "",
+        notas: a.notes || "",
+        created_at: a.created_at || "",
+      }));
     },
   });
 
@@ -65,17 +78,10 @@ const AgenciasContent = () => {
       <div className="flex items-center gap-3">
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre, handle..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Buscar por nombre, handle..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={estadoFilter || undefined} onValueChange={(v) => setEstadoFilter(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todos</SelectItem>
             {AGENCIA_ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
@@ -104,13 +110,7 @@ const AgenciasContent = () => {
         <AgenciasGrid agencias={filtered} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />
       )}
 
-      <ViewAgenciaModal
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        agencia={selected}
-        onEdit={() => { setViewOpen(false); setEditOpen(true); }}
-        onDelete={() => { setViewOpen(false); setDeleteOpen(true); }}
-      />
+      <ViewAgenciaModal open={viewOpen} onOpenChange={setViewOpen} agencia={selected} onEdit={() => { setViewOpen(false); setEditOpen(true); }} onDelete={() => { setViewOpen(false); setDeleteOpen(true); }} />
       <EditAgenciaModal open={editOpen} onOpenChange={setEditOpen} agencia={selected} />
       <DeleteAgenciaDialog open={deleteOpen} onOpenChange={setDeleteOpen} agencia={selected} />
     </div>

@@ -23,24 +23,25 @@ const AddAgenciaModal = ({ open, onOpenChange }: Props) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [form, setForm] = useState({
-    nombre: "",
-    estado: "Discovery",
-    pais: "",
-    contacto_nombre: "",
-    contacto_email: "",
-    contacto_telefono: "",
-    instagram: "",
-    website: "",
-    notas: "",
+    nombre: "", estado: "Discovery", pais: "", contacto_nombre: "", contacto_email: "", contacto_telefono: "", instagram: "", website: "", notas: "",
   });
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("agencias" as any).insert(form as any);
+      const { error } = await supabase.from("agencies").insert({
+        name: form.nombre,
+        status: form.estado,
+        country_code: form.pais || null,
+        contact_name: form.contacto_nombre || null,
+        email: form.contacto_email || null,
+        phone: form.contacto_telefono || null,
+        website: form.website || null,
+        notes: form.notas || null,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["agencias"] });
+      qc.invalidateQueries({ queryKey: ["agencies"] });
       toast({ title: "Agencia creada exitosamente" });
       onOpenChange(false);
       setForm({ nombre: "", estado: "Discovery", pais: "", contacto_nombre: "", contacto_email: "", contacto_telefono: "", instagram: "", website: "", notas: "" });
@@ -55,61 +56,25 @@ const AddAgenciaModal = ({ open, onOpenChange }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Agregar Agencia</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Agregar Agencia</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nombre *</Label>
-            <Input value={form.nombre} onChange={(e) => update("nombre", e.target.value)} placeholder="Nombre de la agencia" />
-          </div>
-          <div className="space-y-2">
-            <Label>Estado</Label>
-            <Select value={form.estado} onValueChange={(v) => update("estado", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {AGENCIA_ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>País</Label>
-            <Input value={form.pais} onChange={(e) => update("pais", e.target.value)} placeholder="País" />
+          <div className="space-y-2"><Label>Nombre *</Label><Input value={form.nombre} onChange={(e) => update("nombre", e.target.value)} placeholder="Nombre de la agencia" /></div>
+          <div className="space-y-2"><Label>Estado</Label><Select value={form.estado} onValueChange={(v) => update("estado", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{AGENCIA_ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent></Select></div>
+          <div className="space-y-2"><Label>País</Label><Input value={form.pais} onChange={(e) => update("pais", e.target.value)} placeholder="País" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Contacto Principal</Label><Input value={form.contacto_nombre} onChange={(e) => update("contacto_nombre", e.target.value)} placeholder="Nombre" /></div>
+            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contacto_email} onChange={(e) => update("contacto_email", e.target.value)} placeholder="email@agencia.com" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Contacto Principal</Label>
-              <Input value={form.contacto_nombre} onChange={(e) => update("contacto_nombre", e.target.value)} placeholder="Nombre" />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={form.contacto_email} onChange={(e) => update("contacto_email", e.target.value)} placeholder="email@agencia.com" />
-            </div>
+            <div className="space-y-2"><Label>Teléfono</Label><Input value={form.contacto_telefono} onChange={(e) => update("contacto_telefono", e.target.value)} placeholder="+1 234 567 8900" /></div>
+            <div className="space-y-2"><Label>Instagram</Label><Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@handle" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <Input value={form.contacto_telefono} onChange={(e) => update("contacto_telefono", e.target.value)} placeholder="+1 234 567 8900" />
-            </div>
-            <div className="space-y-2">
-              <Label>Instagram</Label>
-              <Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} placeholder="@handle" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Website</Label>
-            <Input value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://agencia.com" />
-          </div>
-          <div className="space-y-2">
-            <Label>Notas</Label>
-            <Textarea value={form.notas} onChange={(e) => update("notas", e.target.value)} placeholder="Notas adicionales..." rows={3} />
-          </div>
+          <div className="space-y-2"><Label>Website</Label><Input value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://agencia.com" /></div>
+          <div className="space-y-2"><Label>Notas</Label><Textarea value={form.notas} onChange={(e) => update("notas", e.target.value)} placeholder="Notas adicionales..." rows={3} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!form.nombre || mutation.isPending}>
-            {mutation.isPending ? "Guardando..." : "Guardar"}
-          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={!form.nombre || mutation.isPending}>{mutation.isPending ? "Guardando..." : "Guardar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

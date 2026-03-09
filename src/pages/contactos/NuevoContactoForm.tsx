@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import FileUploadModal, { type UploadCategory, type UploadedFile } from "@/components/FileUploadModal";
 
 const CATEGORIES = [
@@ -71,6 +72,7 @@ const defaultForm: FormData = {
 const NuevoContactoForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
@@ -111,8 +113,7 @@ const NuevoContactoForm = () => {
   const handleSubmit = async () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
-    if (!form.categoria) e.categoria = "La categoría es obligatoria";
-    if (!form.instagramLink.trim()) e.instagramLink = "El link de Instagram es obligatorio";
+    if (!form.instagramLink.trim()) e.instagramLink = "El handle es obligatorio";
     if (Object.keys(e).length > 0) {
       setErrors(e);
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
@@ -121,17 +122,20 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase.from("contactos").insert({
-        nombre: form.nombre.trim(),
-        instagram: form.instagramLink.trim(),
-        categoria_fisica: form.categoria,
-        compania: form.compania || null,
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: form.nombre.trim(),
+        handle: form.instagramLink.trim(),
+        platform: form.plataforma,
+        physical_appearance: form.categoria || null,
+        company: form.compania || null,
         email: form.email || null,
         country_code: form.countryCode,
-        telefono: form.phone || null,
-        ticket: form.ticket || null,
-        notas: form.notas || null,
-        profile_photo_url: profilePhoto?.url || null,
+        phone: form.phone || null,
+        ticket_number: form.ticket || null,
+        notes: form.notas || null,
+        profile_picture_url: profilePhoto?.url || null,
+        created_by: user?.id || "",
+        status: "Nuevo",
       });
 
       if (error) throw error;
@@ -167,125 +171,70 @@ const NuevoContactoForm = () => {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="space-y-6 rounded-lg border border-border p-6">
-          {/* Nombre + Categoría */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Nombre del Contacto *" error={errors.nombre}>
-              <Input
-                value={form.nombre}
-                onChange={(e) => set("nombre", e.target.value)}
-                placeholder="Nombre completo"
-                className={errors.nombre ? "border-destructive" : ""}
-              />
+              <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder="Nombre completo" className={errors.nombre ? "border-destructive" : ""} />
             </Field>
             <Field label="Categoría Física *" error={errors.categoria}>
               <Select value={form.categoria} onValueChange={(v) => set("categoria", v)}>
-                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}>
-                  <SelectValue placeholder="Seleccionar categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                </SelectContent>
+                <SelectTrigger className={errors.categoria ? "border-destructive" : ""}><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
           </div>
 
-          {/* Compañía */}
           <Field label="Compañía / Cuenta de Origen">
-            <CompanySelector
-              value={form.compania}
-              onChange={(v) => set("compania", v)}
-              companies={companies}
-              onAddCompany={(name) => setCompanies((prev) => [...prev, name])}
-            />
+            <CompanySelector value={form.compania} onChange={(v) => set("compania", v)} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
           </Field>
 
-          {/* Email + Teléfono */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Email">
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-                placeholder="email@ejemplo.com"
-              />
+              <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@ejemplo.com" />
             </Field>
             <Field label="Teléfono">
               <div className="flex gap-2">
                 <Select value={form.countryCode} onValueChange={(v) => set("countryCode", v)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}
-                  </SelectContent>
+                  <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
                 </Select>
-                <Input
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
-                  placeholder="Número de teléfono"
-                  className="flex-1"
-                />
+                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Número de teléfono" className="flex-1" />
               </div>
             </Field>
           </div>
 
-          {/* Plataforma + Instagram */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Plataforma">
               <Select value={form.plataforma} onValueChange={(v) => set("plataforma", v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <div>
-              <Field label="Link de Instagram *" error={errors.instagramLink}>
-                <Input
-                  value={form.instagramLink}
-                  onChange={(e) => set("instagramLink", e.target.value)}
-                  placeholder="@usuario o https://instagram.com/usuario"
-                  className={errors.instagramLink ? "border-destructive" : ""}
-                />
+              <Field label="Handle *" error={errors.instagramLink}>
+                <Input value={form.instagramLink} onChange={(e) => set("instagramLink", e.target.value)} placeholder="@usuario o handle" className={errors.instagramLink ? "border-destructive" : ""} />
               </Field>
               <p className="text-xs text-muted-foreground mt-1">Puedes ingresar el handle (@usuario) o el link completo</p>
             </div>
           </div>
 
-          {/* Ticket */}
           <Field label="Número de Ticket">
-            <Input
-              value={form.ticket}
-              onChange={(e) => set("ticket", e.target.value)}
-              placeholder="Ej: TKT-001"
-            />
+            <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
           </Field>
 
-          {/* Notas */}
           <Field label="Notas">
-            <Textarea
-              value={form.notas}
-              onChange={(e) => set("notas", e.target.value)}
-              placeholder="Notas adicionales sobre el contacto..."
-              rows={4}
-            />
+            <Textarea value={form.notas} onChange={(e) => set("notas", e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={4} />
           </Field>
 
           <div>
             <Label className="text-sm font-medium">Foto de Perfil</Label>
             <div className="flex items-center gap-4 mt-2">
               <Avatar className="h-16 w-16">
-                {profilePhoto ? (
-                  <AvatarImage src={profilePhoto.url} alt="Foto de perfil" />
-                ) : null}
+                {profilePhoto ? <AvatarImage src={profilePhoto.url} alt="Foto de perfil" /> : null}
                 <AvatarFallback><UserPlus className="h-6 w-6 text-muted-foreground" /></AvatarFallback>
               </Avatar>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "piclink" })}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Subir Foto
+                  <Upload className="mr-2 h-4 w-4" /> Subir Foto
                 </Button>
                 {profilePhoto && (
                   <Button variant="ghost" size="sm" type="button" onClick={() => setProfilePhoto(null)}>
@@ -294,20 +243,16 @@ const NuevoContactoForm = () => {
                 )}
               </div>
             </div>
-            {profilePhoto && <p className="text-xs text-muted-foreground mt-1">{profilePhoto.name}</p>}
-            {!profilePhoto && <p className="text-xs text-muted-foreground mt-1">Formatos: JPG, PNG, GIF. Máximo 5MB.</p>}
           </div>
 
-          {/* Fotos y Videos Extras */}
           <div>
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Fotos y Videos Extras</Label>
-                <p className="text-xs text-muted-foreground mt-1">Formatos: Imágenes (JPG, PNG, GIF) y Videos (MP4, MOV). Máximo 20MB por archivo.</p>
+                <p className="text-xs text-muted-foreground mt-1">Formatos: Imágenes y Videos. Máximo 20MB por archivo.</p>
               </div>
               <Button variant="outline" size="sm" type="button" onClick={() => setUploadModal({ open: true, category: "extras" })}>
-                <Upload className="mr-2 h-4 w-4" />
-                Subir Archivos
+                <Upload className="mr-2 h-4 w-4" /> Subir Archivos
               </Button>
             </div>
             {extraFiles.length > 0 && (
@@ -330,26 +275,16 @@ const NuevoContactoForm = () => {
         </div>
       </div>
 
-      {/* Footer fijo */}
       <footer className="border-t border-border bg-background px-6 py-4 shrink-0">
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => navigate("/contactos")}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={() => navigate("/contactos")}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={isSaving}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving ? "Guardando..." : "Guardar Contacto"}
+            <Save className="mr-2 h-4 w-4" /> {isSaving ? "Guardando..." : "Guardar Contacto"}
           </Button>
         </div>
       </footer>
 
-      <FileUploadModal
-        open={uploadModal.open}
-        onClose={() => setUploadModal((prev) => ({ ...prev, open: false }))}
-        category={uploadModal.category}
-        tempId={tempId}
-        onFilesUploaded={handleFilesUploaded}
-      />
+      <FileUploadModal open={uploadModal.open} onClose={() => setUploadModal((prev) => ({ ...prev, open: false }))} category={uploadModal.category} tempId={tempId} onFilesUploaded={handleFilesUploaded} />
     </main>
   );
 };
@@ -389,12 +324,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setAddingNew(false); }}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-        >
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
           {value || <span className="text-muted-foreground">Seleccionar compañía</span>}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -403,23 +333,10 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
         {addingNew ? (
           <div className="p-3 space-y-2">
             <p className="text-xs text-muted-foreground font-medium">Nueva compañía</p>
-            <Input
-              autoFocus
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Nombre de la compañía"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAdd();
-                if (e.key === "Escape") { setAddingNew(false); setNewName(""); }
-              }}
-            />
+            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre de la compañía" onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAddingNew(false); setNewName(""); } }} />
             <div className="flex gap-2">
-              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>
-                Agregar
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>
-                Cancelar
-              </Button>
+              <Button size="sm" className="flex-1" onClick={handleAdd} disabled={!newName.trim()}>Agregar</Button>
+              <Button size="sm" variant="outline" onClick={() => { setAddingNew(false); setNewName(""); }}>Cancelar</Button>
             </div>
           </div>
         ) : (
@@ -429,11 +346,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
               <CommandEmpty>Sin resultados.</CommandEmpty>
               <CommandGroup>
                 {companies.map((c) => (
-                  <CommandItem
-                    key={c}
-                    value={c}
-                    onSelect={() => { onChange(c === value ? "" : c); setOpen(false); }}
-                  >
+                  <CommandItem key={c} value={c} onSelect={() => { onChange(c === value ? "" : c); setOpen(false); }}>
                     <Check className={cn("mr-2 h-4 w-4", value === c ? "opacity-100" : "opacity-0")} />
                     {c}
                   </CommandItem>
@@ -441,8 +354,7 @@ function CompanySelector({ value, onChange, companies, onAddCompany }: CompanySe
               </CommandGroup>
               <CommandGroup>
                 <CommandItem onSelect={() => setAddingNew(true)} className="text-muted-foreground">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar nueva compañía…
+                  <Plus className="mr-2 h-4 w-4" /> Agregar nueva compañía…
                 </CommandItem>
               </CommandGroup>
             </CommandList>

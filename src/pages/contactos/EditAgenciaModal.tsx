@@ -46,11 +46,20 @@ const EditAgenciaModal = ({ open, onOpenChange, agencia }: Props) => {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!agencia) return;
-      const { error } = await supabase.from("agencias" as any).update(form as any).eq("id", agencia.id);
+      const { error } = await supabase.from("agencies").update({
+        name: form.nombre,
+        status: form.estado,
+        country_code: form.pais || null,
+        contact_name: form.contacto_nombre || null,
+        email: form.contacto_email || null,
+        phone: form.contacto_telefono || null,
+        website: form.website || null,
+        notes: form.notas || null,
+      }).eq("id", agencia.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["agencias"] });
+      qc.invalidateQueries({ queryKey: ["agencies"] });
       toast({ title: "Agencia actualizada" });
       onOpenChange(false);
     },
@@ -66,61 +75,25 @@ const EditAgenciaModal = ({ open, onOpenChange, agencia }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Agencia</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Editar Agencia</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nombre *</Label>
-            <Input value={form.nombre} onChange={(e) => update("nombre", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Estado</Label>
-            <Select value={form.estado} onValueChange={(v) => update("estado", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {AGENCIA_ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>País</Label>
-            <Input value={form.pais} onChange={(e) => update("pais", e.target.value)} />
+          <div className="space-y-2"><Label>Nombre *</Label><Input value={form.nombre} onChange={(e) => update("nombre", e.target.value)} /></div>
+          <div className="space-y-2"><Label>Estado</Label><Select value={form.estado} onValueChange={(v) => update("estado", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{AGENCIA_ESTADOS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent></Select></div>
+          <div className="space-y-2"><Label>País</Label><Input value={form.pais} onChange={(e) => update("pais", e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Contacto Principal</Label><Input value={form.contacto_nombre} onChange={(e) => update("contacto_nombre", e.target.value)} /></div>
+            <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.contacto_email} onChange={(e) => update("contacto_email", e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Contacto Principal</Label>
-              <Input value={form.contacto_nombre} onChange={(e) => update("contacto_nombre", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={form.contacto_email} onChange={(e) => update("contacto_email", e.target.value)} />
-            </div>
+            <div className="space-y-2"><Label>Teléfono</Label><Input value={form.contacto_telefono} onChange={(e) => update("contacto_telefono", e.target.value)} /></div>
+            <div className="space-y-2"><Label>Instagram</Label><Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <Input value={form.contacto_telefono} onChange={(e) => update("contacto_telefono", e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Instagram</Label>
-              <Input value={form.instagram} onChange={(e) => update("instagram", e.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Website</Label>
-            <Input value={form.website} onChange={(e) => update("website", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Notas</Label>
-            <Textarea value={form.notas} onChange={(e) => update("notas", e.target.value)} rows={3} />
-          </div>
+          <div className="space-y-2"><Label>Website</Label><Input value={form.website} onChange={(e) => update("website", e.target.value)} /></div>
+          <div className="space-y-2"><Label>Notas</Label><Textarea value={form.notas} onChange={(e) => update("notas", e.target.value)} rows={3} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!form.nombre || mutation.isPending}>
-            {mutation.isPending ? "Guardando..." : "Guardar"}
-          </Button>
+          <Button onClick={() => mutation.mutate()} disabled={!form.nombre || mutation.isPending}>{mutation.isPending ? "Guardando..." : "Guardar"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

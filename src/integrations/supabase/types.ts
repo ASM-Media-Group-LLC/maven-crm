@@ -124,6 +124,51 @@ export type Database = {
         }
         Relationships: []
       }
+      agencies: {
+        Row: {
+          contact_name: string | null
+          country_code: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          contact_name?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          contact_name?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       agenda_share_tokens: {
         Row: {
           created_at: string
@@ -727,6 +772,75 @@ export type Database = {
           },
         ]
       }
+      closers_contacts: {
+        Row: {
+          assigned_to: string | null
+          city: string | null
+          company: string | null
+          country_code: string | null
+          created_at: string | null
+          created_by: string
+          email: string | null
+          handle: string
+          id: string
+          media_files: Json | null
+          name: string
+          notes: string | null
+          phone: string | null
+          physical_appearance: string | null
+          platform: string
+          profile_picture_url: string | null
+          source: string | null
+          status: string | null
+          ticket_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by: string
+          email?: string | null
+          handle: string
+          id?: string
+          media_files?: Json | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          physical_appearance?: string | null
+          platform: string
+          profile_picture_url?: string | null
+          source?: string | null
+          status?: string | null
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          city?: string | null
+          company?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by?: string
+          email?: string | null
+          handle?: string
+          id?: string
+          media_files?: Json | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          physical_appearance?: string | null
+          platform?: string
+          profile_picture_url?: string | null
+          source?: string | null
+          status?: string | null
+          ticket_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       commissions: {
         Row: {
           area: string | null
@@ -820,6 +934,72 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      contact_interaction_files: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id: string
+          interaction_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_type: string
+          file_url: string
+          id?: string
+          interaction_id: string
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_type?: string
+          file_url?: string
+          id?: string
+          interaction_id?: string
+        }
+        Relationships: []
+      }
+      contact_interactions: {
+        Row: {
+          call_number: number | null
+          call_summary: string | null
+          contact_id: string
+          created_at: string | null
+          id: string
+          interaction_date: string | null
+          interaction_type: string
+          notes: string | null
+          resulting_status: string | null
+          user_id: string
+        }
+        Insert: {
+          call_number?: number | null
+          call_summary?: string | null
+          contact_id: string
+          created_at?: string | null
+          id?: string
+          interaction_date?: string | null
+          interaction_type: string
+          notes?: string | null
+          resulting_status?: string | null
+          user_id: string
+        }
+        Update: {
+          call_number?: number | null
+          call_summary?: string | null
+          contact_id?: string
+          created_at?: string | null
+          id?: string
+          interaction_date?: string | null
+          interaction_type?: string
+          notes?: string | null
+          resulting_status?: string | null
+          user_id?: string
         }
         Relationships: []
       }

@@ -21,11 +21,11 @@ const DeleteAgenciaDialog = ({ open, onOpenChange, agencia }: Props) => {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!agencia) return;
-      const { error } = await supabase.from("agencias" as any).delete().eq("id", agencia.id);
+      const { error } = await supabase.from("agencies").delete().eq("id", agencia.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["agencias"] });
+      qc.invalidateQueries({ queryKey: ["agencies"] });
       toast({ title: `"${agencia?.nombre}" eliminada` });
       onOpenChange(false);
     },
@@ -50,10 +50,7 @@ const DeleteAgenciaDialog = ({ open, onOpenChange, agencia }: Props) => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => mutation.mutate()}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
+          <AlertDialogAction onClick={() => mutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             Eliminar
           </AlertDialogAction>
         </AlertDialogFooter>
