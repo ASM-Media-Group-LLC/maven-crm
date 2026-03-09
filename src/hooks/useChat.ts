@@ -517,7 +517,26 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     ) => {
       if (!conversationId || !user) return;
 
-      const { error } = await supabase.from("chat_messages").insert({
+      // Optimistic insert so the message appears instantly
+      const optimisticId = crypto.randomUUID();
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content,
+        type,
+        file_url: fileUrl || null,
+        file_name: fileName || null,
+        file_size: null,
+        reply_to_id: replyToId || null,
+        is_edited: false,
+        is_deleted: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+
+      const { data, error } = await supabase.from("chat_messages").insert({
         conversation_id: conversationId,
         sender_id: user.id,
         content,
@@ -525,10 +544,15 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         file_url: fileUrl || null,
         file_name: fileName || null,
         reply_to_id: replyToId || null,
-      });
+      }).select().single();
 
       if (error) {
+        // Remove optimistic message on error
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         toast.error("Error al enviar mensaje");
+      } else if (data) {
+        // Replace optimistic with real message
+        setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
       }
 
       // Update conversation updated_at
