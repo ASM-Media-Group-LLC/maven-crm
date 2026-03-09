@@ -1,6 +1,5 @@
 import { useRef, useEffect } from "react";
 import { ChatMessage, UserProfile } from "../types";
-import { ChatMessage, UserProfile } from "../types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import MessageBubble from "./MessageBubble";
 import { cn } from "@/lib/utils";
