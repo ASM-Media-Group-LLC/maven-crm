@@ -118,7 +118,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={p.sid} className="w-40 shrink-0">
-                        <ParticipantTile participant={p} room={room} />
+                        <ParticipantTile participant={p} room={room} backgroundEffect={p.isLocal ? bgEffect : "none"} />
                       </div>
                     ))}
                 </div>
