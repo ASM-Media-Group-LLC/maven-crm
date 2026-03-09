@@ -7,7 +7,6 @@ import NewChatModal from "./NewChatModal";
 import GlobalSearchPanel from "./components/GlobalSearchPanel";
 import IncomingCallModal from "./components/IncomingCallModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
-import { useChat } from "@/hooks/useChat";
 import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
