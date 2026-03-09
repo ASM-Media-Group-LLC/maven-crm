@@ -32,9 +32,8 @@ export default function MessengerPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
-  const [showContacts, setShowContacts] = useState(false);
-  const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const joinedFromLinkRef = useRef(false);
 

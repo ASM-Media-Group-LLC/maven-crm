@@ -231,7 +231,7 @@ function ContactsSection({ profiles, onSelectContact }: {
   );
 }
 
-
+function ConversationItem({ conversation, isActive, onClick, onDelete }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
