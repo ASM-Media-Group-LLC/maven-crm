@@ -1,22 +1,31 @@
 
 
-## Problem
+## Plan: Separar las dos barras de tabs en Desempeño
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problema
+En `/hr/desempeno` hay dos barras de tabs (Departamentos y Estados) una al lado de la otra visualmente, sin separación clara. No sigue la estructura del resto de páginas HR.
 
-## Solution
+### Solución
+Mover la barra de **departamentos** al header como segunda fila (debajo del título, dentro del `<header>`), y dejar la barra de **estado** como primera sección del contenido scrollable. Esto crea la jerarquía visual: header con título + departamentos arriba, y debajo el contenido con status tabs, filtros, y tabla.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### Cambios en `src/pages/hr/HRPerformance.tsx`
 
-## Changes
+1. **Mover Department Tabs al header** (dentro del `<header>`, después del div de título/botones, con un `mt-4`):
+   ```
+   <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
+     <div className="flex items-center justify-between gap-4">
+       ...título y botones...
+     </div>
+     {/* Department Tabs - ahora en el header */}
+     <div className="inline-flex items-center gap-1 rounded-lg border ... mt-4">
+       ...departamentos...
+     </div>
+   </header>
+   ```
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+2. **Status Tabs permanecen** como primera sección del contenido scrollable (donde están ahora, líneas 289-294), sin cambios.
 
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Resultado
+- Header fijo: título + departamentos
+- Contenido scrollable: KPIs → Status tabs → Filtros → Tabla/Grid
 
