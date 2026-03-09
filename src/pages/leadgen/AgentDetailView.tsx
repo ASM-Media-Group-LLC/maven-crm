@@ -13,7 +13,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
-  agent: { name: string; email: string };
+  agent: { name: string; email?: string; id?: string };
   leads: LeadGenEntry[];
   onBack: () => void;
 }
@@ -61,8 +61,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
 
   const agentLeads = useMemo(() =>
     leads.filter(l =>
-      l.company?.toLowerCase() === agent.name.toLowerCase() ||
-      l.company?.toLowerCase() === agent.email.toLowerCase()
+      (agent.id && l.lg_user_id === agent.id) ||
+      l.company?.toLowerCase() === agent.name.toLowerCase()
     ), [leads, agent]);
 
   const todayLeads = useMemo(() =>
