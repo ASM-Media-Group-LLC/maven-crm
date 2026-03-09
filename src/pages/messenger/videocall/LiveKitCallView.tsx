@@ -166,7 +166,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
         onSendReaction={lk.sendReaction}
-        onBackgroundChange={setBgEffect}
+        onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
       />
     </div>
