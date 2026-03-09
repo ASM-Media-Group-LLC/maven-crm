@@ -4,6 +4,7 @@ import {
   UserCog, BookOpen, AlertTriangle, UserCheck, Clock, Eye, GraduationCap, Wallet, Calculator, BarChart3, DollarSign,
   MessageCircle,
 } from "lucide-react";
+import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
