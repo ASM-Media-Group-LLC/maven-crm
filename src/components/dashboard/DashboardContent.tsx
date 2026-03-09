@@ -245,7 +245,7 @@ const DashboardContent = () => {
       icon: Users,
       color: "primary" as const,
       subtitle: creatorsLoading ? "" : `${creatorsData?.active ?? 0} activas / ${creatorsData?.inactive ?? 0} inactivas`,
-      show: canAccess("creadores"),
+      show: canAccess("Creadores"),
     },
     {
       label: "Active Tickets",
@@ -253,7 +253,7 @@ const DashboardContent = () => {
       icon: Ticket,
       color: "destructive" as const,
       subtitle: ticketsLoading ? "" : `${ticketsData?.resolved ?? 0} resueltos`,
-      show: true,
+      show: canAccess("Tickets"),
     },
     {
       label: "New Leads Today",
@@ -261,7 +261,7 @@ const DashboardContent = () => {
       icon: MessageSquare,
       color: "accent" as const,
       subtitle: leadsLoading ? "" : `${leadsData?.interestedCount ?? 0} interesados`,
-      show: canAccess("leadgen"),
+      show: canAccess("LeadGen"),
     },
     {
       label: "Empleados Activos",
@@ -269,7 +269,7 @@ const DashboardContent = () => {
       icon: Users,
       color: "success" as const,
       subtitle: `${opKPIs?.absencesToday ?? 0} ausencias hoy`,
-      show: canAccess("hr"),
+      show: canAccess("HR"),
     },
     {
       label: "Tareas Vencidas",
