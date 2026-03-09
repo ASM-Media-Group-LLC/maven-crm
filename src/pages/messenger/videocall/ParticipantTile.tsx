@@ -69,8 +69,6 @@ export default function ParticipantTile({ participant, room, large, className, b
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
   const templateBg = BACKGROUND_TEMPLATES.find((t) => t.id === backgroundEffect);
-  const isBlur = backgroundEffect === "soft-blur" || backgroundEffect === "hard-blur";
-  const blurAmount = backgroundEffect === "soft-blur" ? "blur(8px)" : backgroundEffect === "hard-blur" ? "blur(24px)" : undefined;
 
   return (
     <div
