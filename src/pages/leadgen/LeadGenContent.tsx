@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock, Search, List, LayoutGrid, FileText, Eye, ChevronsUpDown, Check, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import AgentDetailView from "./AgentDetailView";
@@ -7,7 +7,6 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { format, isSameDay, subDays, startOfDay, subMonths, addDays, startOfWeek, endOfWeek, isToday, isFuture } from "date-fns";
 import { es } from "date-fns/locale";
-import { useQuery } from "@tanstack/react-query";
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import LeadGenTable from "./LeadGenTable";
@@ -23,7 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { supabase } from "@/integrations/supabase/client";
+import { useLeadGenEntries } from "./useLeadGen";
+import type { LeadGenEntry } from "./useLeadGen";
 
 const mockSupervisores = [
   { name: "Luisroman07", email: "luisroman07@unlok.me" },
@@ -58,6 +58,8 @@ const getWeekDays = (offset: number): Date[] => {
 
 const DAY_LABELS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
 
+const knownStatuses = new Set(["no_response", "contactado", "respondio", "interesado", "no_interesado"]);
+
 const LeadGenContent = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("leads");
@@ -68,36 +70,24 @@ const LeadGenContent = () => {
   const [agentSelectOpen, setAgentSelectOpen] = useState(false);
   const [addContactoOpen, setAddContactoOpen] = useState(false);
   const [viewLeadOpen, setViewLeadOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<(typeof leads)[number] | null>(null);
+  const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<(typeof mockSupervisores)[number] | null>(null);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [activeFilter, setActiveFilter] = useState<{ type: "categoria" | "status" | null; value: string | null }>({ type: null, value: null });
 
-  const { data: leads = [], isLoading: leadsLoading } = useQuery({
-    queryKey: ["leads"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const knownStatuses = new Set(["nuevo", "contactado", "respondio", "interesado", "no_interesado"]);
+  const { data: leads = [], isLoading: leadsLoading } = useLeadGenEntries();
 
   const filteredLeads = leads.filter((lead) => {
     if (activeFilter.type === "categoria") {
-      return lead.categoria?.toLowerCase() === activeFilter.value;
+      return lead.quality?.toLowerCase() === activeFilter.value;
     }
     if (activeFilter.type === "status") {
       if (activeFilter.value === "respondieron") return lead.status === "contactado" || lead.status === "respondio";
       if (activeFilter.value === "interesadas") return lead.status === "interesado";
       if (activeFilter.value === "no_interesadas") return lead.status === "no_interesado";
       if (activeFilter.value === "otros") return !knownStatuses.has(lead.status);
-      if (activeFilter.value === "con_telefono") return !!(lead.notas && /\+?\d[\d\s\-().]{7,}/.test(lead.notas));
+      if (activeFilter.value === "con_telefono") return !!(lead.phone_raw || lead.phone_e164);
     }
     return true;
   });
@@ -114,7 +104,7 @@ const LeadGenContent = () => {
           <div>
             <h1 className="text-2xl font-semibold">LeadGen</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Marketing y generación de leads · {leads.length} leads
+              Marketing y generación de leads · {leads.length.toLocaleString()} leads
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -130,7 +120,7 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* Scrollable content: KPIs + tabs + filters + tab content */}
+      {/* Scrollable content */}
       <div className="flex-1 overflow-auto">
         {/* KPI Cards */}
         <div className="px-6 py-4">
@@ -169,7 +159,7 @@ const LeadGenContent = () => {
         <div className="px-6 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : activeTab === "rendimiento" || activeTab === "leads-hora" ? "Buscar..." : "Buscar lead..."} className="pl-9 h-9" />
+            <Input placeholder={activeTab === "agentes" ? "Buscar agente..." : activeTab === "supervisores" ? "Buscar supervisor..." : "Buscar lead..."} className="pl-9 h-9" />
           </div>
           <DateRangePicker
             from={dateFrom}
@@ -180,9 +170,7 @@ const LeadGenContent = () => {
           />
           {activeTab === "supervisores" || activeTab === "rendimiento" || activeTab === "leads-hora" ? null : activeTab === "agentes" ? (
             <Select>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="Rendimiento" />
-              </SelectTrigger>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Rendimiento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
                 <SelectItem value="alto">Alto</SelectItem>
@@ -193,19 +181,15 @@ const LeadGenContent = () => {
           ) : (
             <>
               <Select>
-                <SelectTrigger className="w-[120px] h-9">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="nuevo">Nuevo</SelectItem>
+                  <SelectItem value="no_response">Sin Resp.</SelectItem>
                   <SelectItem value="contactado">Contactado</SelectItem>
                 </SelectContent>
               </Select>
               <Select>
-                <SelectTrigger className="w-[120px] h-9">
-                  <SelectValue placeholder="Calidad" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="a+">A+</SelectItem>
@@ -216,9 +200,7 @@ const LeadGenContent = () => {
                 </SelectContent>
               </Select>
               <Select>
-                <SelectTrigger className="w-[100px] h-9">
-                  <SelectValue placeholder="QA" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[100px] h-9"><SelectValue placeholder="QA" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="aprobado">Aprobado</SelectItem>
@@ -228,29 +210,14 @@ const LeadGenContent = () => {
             </>
           )}
           <div className="ml-auto flex gap-1">
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setViewMode("list")}
-            >
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("list")}>
               <List className="h-4 w-4" />
             </Button>
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setViewMode("grid")}
-            >
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("grid")}>
               <LayoutGrid className="h-4 w-4" />
             </Button>
             {(activeTab === "agentes" || activeTab === "supervisores") && (
-              <Button
-                variant={viewMode === "calendar" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-9 w-9"
-                onClick={() => setViewMode("calendar")}
-              >
+              <Button variant={viewMode === "calendar" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setViewMode("calendar")}>
                 <Calendar className="h-4 w-4" />
               </Button>
             )}
@@ -274,9 +241,7 @@ const LeadGenContent = () => {
                 filteredLeads.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
                     <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground text-sm">
-                      No hay leads para revisar con estos filtros
-                    </p>
+                    <p className="text-muted-foreground text-sm">No hay leads para revisar con estos filtros</p>
                   </div>
                 ) : (
                   <LeadGenTable
@@ -315,13 +280,12 @@ const LeadGenContent = () => {
               {viewMode === "calendar" ? (() => {
                 const weekDays = getWeekDays(weekOffset);
                 const leadsInDay = (agente: typeof mockSupervisores[0], day: Date) =>
-                  leads.filter(l => l.compania?.toLowerCase() === agente.name.toLowerCase() && isSameDay(new Date(l.created_at), day)).length;
+                  leads.filter(l => l.company?.toLowerCase() === agente.name.toLowerCase() && isSameDay(new Date(l.created_at), day)).length;
                 const colTotals = weekDays.map(day => mockSupervisores.reduce((sum, ag) => sum + leadsInDay(ag, day), 0));
                 const grandTotal = colTotals.reduce((a, b) => a + b, 0);
                 return (
                   <Card>
                     <CardContent className="pt-4 px-4 pb-4">
-                      {/* Week navigation */}
                       <div className="flex items-center justify-between mb-4">
                         <Button variant="outline" size="sm" onClick={() => setWeekOffset(w => w - 1)}>
                           <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
@@ -371,9 +335,7 @@ const LeadGenContent = () => {
                                   {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
                                 </TableCell>
                               ))}
-                              <TableCell className="text-center">
-                                <Badge variant="default">{grandTotal}</Badge>
-                              </TableCell>
+                              <TableCell className="text-center"><Badge variant="default">{grandTotal}</Badge></TableCell>
                             </TableRow>
                           </tfoot>
                         </Table>
@@ -509,14 +471,12 @@ const LeadGenContent = () => {
                     <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                       <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
                     </div>
-                    <p className="text-muted-foreground text-sm">
-                      Selecciona un agente para ver su rendimiento
-                    </p>
+                    <p className="text-muted-foreground text-sm">Selecciona un agente para ver su rendimiento</p>
                   </div>
                 ) : (() => {
                   const now = new Date();
-                  const agentLeads = leads.filter(l => l.compania?.toLowerCase() === selectedAgente.toLowerCase());
-                  
+                  const agentLeads = leads.filter(l => l.company?.toLowerCase() === selectedAgente.toLowerCase());
+
                   const hourlyAgentData = Array.from({ length: 24 }, (_, i) => ({
                     hour: `${i}:00`,
                     count: agentLeads.filter(l => isSameDay(new Date(l.created_at), now) && new Date(l.created_at).getHours() === i).length,
@@ -527,7 +487,6 @@ const LeadGenContent = () => {
                     return {
                       label: format(day, "EEE dd", { locale: es }),
                       count: agentLeads.filter(l => isSameDay(new Date(l.created_at), day)).length,
-                      fullDate: format(day, "dd/MM/yyyy"),
                     };
                   });
 
@@ -552,7 +511,6 @@ const LeadGenContent = () => {
 
                   return (
                     <div className="space-y-6">
-                      {/* Total card */}
                       <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/15 to-primary/5 p-6">
                         <div className="flex items-center justify-between">
                           <div>
@@ -563,7 +521,6 @@ const LeadGenContent = () => {
                         </div>
                       </div>
 
-                      {/* Hourly chart */}
                       <Card>
                         <CardContent className="pt-6">
                           <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -584,7 +541,6 @@ const LeadGenContent = () => {
                         </CardContent>
                       </Card>
 
-                      {/* Weekly chart */}
                       <Card>
                         <CardContent className="pt-6">
                           <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -605,7 +561,6 @@ const LeadGenContent = () => {
                         </CardContent>
                       </Card>
 
-                      {/* 30 days line chart */}
                       <Card>
                         <CardContent className="pt-6">
                           <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -626,7 +581,6 @@ const LeadGenContent = () => {
                         </CardContent>
                       </Card>
 
-                      {/* 12 months chart */}
                       <Card>
                         <CardContent className="pt-6">
                           <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
@@ -674,7 +628,6 @@ const LeadGenContent = () => {
 
           {activeTab === "supervisores" && (
             <div className="space-y-6">
-              {/* Banner */}
               <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
                 <div className="p-6 flex items-center justify-between">
                   <div>
@@ -744,9 +697,7 @@ const LeadGenContent = () => {
                               {weekDays.map((day, i) => (
                                 <TableCell key={i} className={`text-center text-sm text-muted-foreground ${isToday(day) ? "bg-primary/10" : ""}`}>—</TableCell>
                               ))}
-                              <TableCell className="text-center">
-                                <Badge variant="default">0</Badge>
-                              </TableCell>
+                              <TableCell className="text-center"><Badge variant="default">0</Badge></TableCell>
                             </TableRow>
                           </tfoot>
                         </Table>
@@ -755,124 +706,114 @@ const LeadGenContent = () => {
                   </Card>
                 );
               })() : viewMode === "list" ? (
-              <Card>
-                <CardContent className="pt-6 px-0">
-                  <div className="max-h-[calc(100vh-24rem)] overflow-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-card">
-                      <TableRow>
-                        <TableHead>Supervisor</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead className="text-center">Total QA</TableHead>
-                        <TableHead className="text-center">A+</TableHead>
-                        <TableHead className="text-center">A</TableHead>
-                        <TableHead className="text-center">B+</TableHead>
-                        <TableHead className="text-center">B</TableHead>
-                        <TableHead className="text-center">C</TableHead>
-                        <TableHead className="text-center">Aprobados</TableHead>
-                        <TableHead className="text-center">Rechazados</TableHead>
-                        <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockSupervisores.map((sup) => {
-                        const initials = sup.name.slice(0, 2).toUpperCase();
-                        return (
-                          <TableRow key={sup.email}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                    {initials}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium text-sm">{sup.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge className="justify-center">{sup.totalQA}</Badge>
-                            </TableCell>
-                            <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
-                            <TableCell className="text-center font-medium">{sup.a}</TableCell>
-                            <TableCell className="text-center font-medium">{sup.bPlus}</TableCell>
-                            <TableCell className="text-center font-medium">{sup.b}</TableCell>
-                            <TableCell className="text-center font-medium">{sup.c}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant="success" className="justify-center">{sup.aprobados}</Badge>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge>
-                            </TableCell>
-                            <TableCell className="text-center sticky right-0 bg-card">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
+                <Card>
+                  <CardContent className="pt-6 px-0">
+                    <div className="max-h-[calc(100vh-24rem)] overflow-auto">
+                      <Table>
+                        <TableHeader className="sticky top-0 z-10 bg-card">
+                          <TableRow>
+                            <TableHead>Supervisor</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead className="text-center">Total QA</TableHead>
+                            <TableHead className="text-center">A+</TableHead>
+                            <TableHead className="text-center">A</TableHead>
+                            <TableHead className="text-center">B+</TableHead>
+                            <TableHead className="text-center">B</TableHead>
+                            <TableHead className="text-center">C</TableHead>
+                            <TableHead className="text-center">Aprobados</TableHead>
+                            <TableHead className="text-center">Rechazados</TableHead>
+                            <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </CardContent>
-              </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {mockSupervisores.map((sup) => {
+                            const initials = sup.name.slice(0, 2).toUpperCase();
+                            return (
+                              <TableRow key={sup.email}>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">{initials}</AvatarFallback>
+                                    </Avatar>
+                                    <span className="font-medium text-sm">{sup.name}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{sup.email}</TableCell>
+                                <TableCell className="text-center"><Badge className="justify-center">{sup.totalQA}</Badge></TableCell>
+                                <TableCell className="text-center font-medium text-primary">{sup.aPlus}</TableCell>
+                                <TableCell className="text-center font-medium">{sup.a}</TableCell>
+                                <TableCell className="text-center font-medium">{sup.bPlus}</TableCell>
+                                <TableCell className="text-center font-medium">{sup.b}</TableCell>
+                                <TableCell className="text-center font-medium">{sup.c}</TableCell>
+                                <TableCell className="text-center"><Badge variant="success" className="justify-center">{sup.aprobados}</Badge></TableCell>
+                                <TableCell className="text-center"><Badge variant="destructive" className="justify-center">{sup.rechazados}</Badge></TableCell>
+                                <TableCell className="text-center sticky right-0 bg-card">
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {mockSupervisores.map((sup) => {
-                  const initials = sup.name.slice(0, 2).toUpperCase();
-                  return (
-                    <Card key={sup.email}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <Users className="h-5 w-5 text-primary" />
+                <div className="grid grid-cols-1 gap-4">
+                  {mockSupervisores.map((sup) => {
+                    const initials = sup.name.slice(0, 2).toUpperCase();
+                    return (
+                      <Card key={sup.email}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">{sup.name}</p>
+                                <p className="text-xs text-muted-foreground">{sup.email}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-semibold text-sm">{sup.name}</p>
-                              <p className="text-xs text-muted-foreground">{sup.email}</p>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <CheckSquare className="h-4 w-4" />
+                              <span className="text-sm font-medium">{sup.totalQA}</span>
+                              <span className="text-xs">QA reviews</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <CheckSquare className="h-4 w-4" />
-                            <span className="text-sm font-medium">{sup.totalQA}</span>
-                            <span className="text-xs">QA reviews</span>
+                          <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border mb-3">
+                            {[
+                              { label: "A+", value: sup.aPlus, color: "text-primary" },
+                              { label: "A", value: sup.a, color: "text-success" },
+                              { label: "B+", value: sup.bPlus, color: "text-warning" },
+                              { label: "B", value: sup.b, color: "text-muted-foreground" },
+                              { label: "C", value: sup.c, color: "text-muted-foreground" },
+                            ].map((item) => (
+                              <div key={item.label} className="bg-muted/30 p-3 text-center">
+                                <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                                <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <div className="grid grid-cols-5 gap-px rounded-lg overflow-hidden border mb-3">
-                          {[
-                            { label: "A+", value: sup.aPlus, color: "text-primary" },
-                            { label: "A", value: sup.a, color: "text-success" },
-                            { label: "B+", value: sup.bPlus, color: "text-warning" },
-                            { label: "B", value: sup.b, color: "text-muted-foreground" },
-                            { label: "C", value: sup.c, color: "text-muted-foreground" },
-                          ].map((item) => (
-                            <div key={item.label} className="bg-muted/30 p-3 text-center">
-                              <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                              <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                          <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden border">
+                            <div className="bg-success/5 p-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Aprobados</p>
+                              <p className="text-lg font-bold text-success">{sup.aprobados}</p>
                             </div>
-                          ))}
-                        </div>
-                        <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden border">
-                          <div className="bg-success/5 p-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Aprobados</p>
-                            <p className="text-lg font-bold text-success">{sup.aprobados}</p>
+                            <div className="bg-warning/5 p-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Mejorar</p>
+                              <p className="text-lg font-bold text-warning">{sup.mejorar}</p>
+                            </div>
+                            <div className="bg-destructive/5 p-3 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Rechazados</p>
+                              <p className="text-lg font-bold text-destructive">{sup.rechazados}</p>
+                            </div>
                           </div>
-                          <div className="bg-warning/5 p-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Mejorar</p>
-                            <p className="text-lg font-bold text-warning">{sup.mejorar}</p>
-                          </div>
-                          <div className="bg-destructive/5 p-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Rechazados</p>
-                            <p className="text-lg font-bold text-destructive">{sup.rechazados}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
