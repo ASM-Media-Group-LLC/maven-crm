@@ -33,9 +33,11 @@ const DashboardSidebar = () => {
   const { isAdmin } = useUserRole();
   const { canAccess } = usePermissions();
 
-  const mainMenuAll = [
+  const unreadChatCount = useUnreadChatCount();
+
+  const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
-    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger" },
+    { title: "Messenger", url: "/messenger", icon: MessageCircle, module: "Messenger", badge: unreadChatCount || undefined },
     { title: t("nav.contacts"), url: "/contactos", icon: UserPlus, module: "Contactos" },
     { title: t("nav.tasks"), url: "/tareas", icon: CheckSquare, module: "Tareas" },
     { title: t("nav.events"), url: "/eventos", icon: CalendarDays, module: "Eventos" },
