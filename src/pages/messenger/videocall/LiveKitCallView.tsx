@@ -23,6 +23,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
   // Connect on mount
   useEffect(() => {
