@@ -142,7 +142,13 @@ export default function MessengerPage() {
         "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
         activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
       )}>
-        {showVideoRooms ? (
+        {showContacts ? (
+          <ContactsListPanel
+            profiles={profiles}
+            onSelectUser={handleSelectUser}
+            onClose={() => setShowContacts(false)}
+          />
+        ) : showVideoRooms ? (
           <VideoRoomsPanel
             rooms={videoRooms}
             onCreateRoom={handleCreateRoom}
@@ -163,6 +169,7 @@ export default function MessengerPage() {
               onNewChat={() => setNewChatOpen(true)}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
+              onOpenContacts={() => setShowContacts(true)}
               onDeleteChat={handleDeleteChat}
               loading={loading}
               onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
