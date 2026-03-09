@@ -325,6 +325,7 @@ export function useLiveKit() {
   const getRoom = useCallback(() => roomRef.current, []);
 
   // Background effect using LiveKit track processors (ML-based segmentation)
+  // Uses a single persistent processor with switchTo() to avoid flickering
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     const room = roomRef.current;
     if (!room) return;
@@ -335,30 +336,28 @@ export function useLiveKit() {
     if (!camTrack) return;
 
     try {
-      if (effect === "none") {
-        // Remove processor
-        await camTrack.stopProcessor();
-        bgProcessorRef.current = null;
-        return;
+      // If no processor exists yet, create one in disabled mode and attach it
+      if (!bgProcessorRef.current) {
+        const processor = BackgroundProcessor({ mode: "disabled" });
+        await camTrack.setProcessor(processor);
+        bgProcessorRef.current = processor;
       }
 
-      if (effect === "soft-blur") {
-        const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 10 });
-        await camTrack.setProcessor(processor);
-        bgProcessorRef.current = processor;
+      const processor = bgProcessorRef.current;
+
+      if (effect === "none") {
+        await processor.switchTo({ mode: "disabled" });
+      } else if (effect === "soft-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
       } else if (effect === "hard-blur") {
-        const processor = BackgroundProcessor({ mode: "background-blur", blurRadius: 25 });
-        await camTrack.setProcessor(processor);
-        bgProcessorRef.current = processor;
+        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
       } else {
-        // Template image — resolve to full URL
+        // Template image
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (tpl) {
           const imagePath = `${window.location.origin}${tpl.src}`;
-          const processor = BackgroundProcessor({ mode: "virtual-background", imagePath });
-          await camTrack.setProcessor(processor);
-          bgProcessorRef.current = processor;
+          await processor.switchTo({ mode: "virtual-background", imagePath });
         }
       }
     } catch (err) {
