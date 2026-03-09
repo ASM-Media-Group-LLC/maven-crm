@@ -27,6 +27,7 @@ interface ChatSidebarProps {
   onOpenVideoRooms: () => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
+  onOpenGlobalSearch?: () => void;
 }
 
 function getInitials(name: string) {
