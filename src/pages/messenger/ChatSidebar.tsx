@@ -50,7 +50,7 @@ function truncate(text: string, max: number) {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 
-export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms, onDeleteChat, loading }: ChatSidebarProps) {
+export default function ChatSidebar({ conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms, onDeleteChat, loading, onOpenGlobalSearch }: ChatSidebarProps) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
