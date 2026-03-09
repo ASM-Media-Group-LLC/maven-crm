@@ -58,7 +58,6 @@ export function useChat() {
 
     if (!convs) {
       setConversations([]);
-      setLoading(false);
       return;
     }
 
