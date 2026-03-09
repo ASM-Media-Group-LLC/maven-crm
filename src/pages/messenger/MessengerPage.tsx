@@ -4,12 +4,15 @@ import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
+import GlobalSearchPanel from "./components/GlobalSearchPanel";
+import IncomingCallModal from "./components/IncomingCallModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
 import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import { useVideoCall } from "@/hooks/useVideoCall";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -24,11 +27,13 @@ export default function MessengerPage() {
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
+  const { incomingCall, acceptCall, declineCall } = useVideoCall();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const joinedFromLinkRef = useRef(false);
 
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
@@ -96,6 +101,12 @@ export default function MessengerPage() {
     return success;
   };
 
+  // Handle global search result selection
+  const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
+    setActiveChatId(conversationId);
+    setGlobalSearchOpen(false);
+  }, []);
+
   // Handle ?chat= deep link from notifications
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
@@ -136,16 +147,24 @@ export default function MessengerPage() {
             onClose={() => setShowVideoRooms(false)}
           />
         ) : (
-          <ChatSidebar
-            conversations={conversations}
-            activeChatId={activeChatId}
-            onSelectChat={setActiveChatId}
-            onNewChat={() => setNewChatOpen(true)}
-            onNewGroup={() => setNewGroupOpen(true)}
-            onOpenVideoRooms={() => setShowVideoRooms(true)}
-            onDeleteChat={handleDeleteChat}
-            loading={loading}
-          />
+          <>
+            <GlobalSearchPanel
+              open={globalSearchOpen}
+              onClose={() => setGlobalSearchOpen(false)}
+              onSelectResult={handleGlobalSearchResult}
+            />
+            <ChatSidebar
+              conversations={conversations}
+              activeChatId={activeChatId}
+              onSelectChat={setActiveChatId}
+              onNewChat={() => setNewChatOpen(true)}
+              onNewGroup={() => setNewGroupOpen(true)}
+              onOpenVideoRooms={() => setShowVideoRooms(true)}
+              onDeleteChat={handleDeleteChat}
+              loading={loading}
+              onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+            />
+          </>
         )}
       </div>
 
@@ -186,6 +205,15 @@ export default function MessengerPage() {
           </div>
         )}
       </div>
+
+      {/* Incoming call modal */}
+      {incomingCall && (
+        <IncomingCallModal
+          call={incomingCall}
+          onAccept={acceptCall}
+          onDecline={declineCall}
+        />
+      )}
 
       <NewChatModal
         open={newChatOpen}
