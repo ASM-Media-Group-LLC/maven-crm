@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { MessageSquare } from "lucide-react";
 import ChatSidebar from "./ChatSidebar";
+import ContactsListPanel from "./ContactsListPanel";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
