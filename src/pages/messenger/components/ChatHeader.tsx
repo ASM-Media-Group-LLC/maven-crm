@@ -12,6 +12,7 @@ import { ConversationWithDetails, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor, getStatusLabel } from "./StatusPicker";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -36,10 +37,12 @@ export default function ChatHeader({
   onSearchToggle, onSearchChange, onBack, onStartVideoCall,
   onOpenNotificationSettings, onOpenSharedFiles,
 }: ChatHeaderProps) {
+  const { user } = useAuth();
   const { isOnline, getStatus } = useOnlinePresence();
 
+  // Find the OTHER participant in direct chats
   const otherParticipant = conversation.type === "direct"
-    ? conversation.participants.find(p => p.profile && p.user_id !== conversation.created_by)
+    ? conversation.participants.find(p => p.user_id !== user?.id)
     : null;
   const otherUserId = otherParticipant?.user_id;
   const online = otherUserId ? isOnline(otherUserId) : false;
@@ -49,13 +52,17 @@ export default function ChatHeader({
     .map(id => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
     .join(", ");
 
+  const onlineCount = conversation.type === "group"
+    ? conversation.participants.filter(p => isOnline(p.user_id)).length
+    : 0;
+
   const subtitle = typingNames
     ? `${typingNames} está escribiendo...`
     : conversation.type === "group"
-      ? `${conversation.participants.length} miembros`
+      ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}`
       : online
         ? getStatusLabel(status, online)
-        : "";
+        : "Desconectado";
 
   return (
     <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">

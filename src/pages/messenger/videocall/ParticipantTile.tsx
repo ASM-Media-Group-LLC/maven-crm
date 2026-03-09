@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Track, Participant, Room } from "livekit-client";
+import { useEffect, useRef, useState } from "react";
+import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MicOff, Hand, Monitor } from "lucide-react";
@@ -20,7 +20,9 @@ function getInitials(name: string) {
 export default function ParticipantTile({ participant, room, large, className }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [audioReady, setAudioReady] = useState(false);
 
+  // Attach/detach tracks
   useEffect(() => {
     if (!room) return;
 
@@ -30,37 +32,48 @@ export default function ParticipantTile({ participant, room, large, className }:
 
     if (!lkParticipant) return;
 
+    // Video
     const videoTrack = [...lkParticipant.videoTrackPublications.values()].find(
       (t) => t.source === (participant.isScreenSharing ? Track.Source.ScreenShare : Track.Source.Camera)
     );
 
-    if (videoTrack?.track && videoRef.current) {
-      videoTrack.track.attach(videoRef.current);
+    const videoEl = videoRef.current;
+    if (videoTrack?.track && videoEl) {
+      videoTrack.track.attach(videoEl);
     }
 
-    if (!participant.isLocal) {
+    // Audio — only for remote participants
+    const audioEl = audioRef.current;
+    if (!participant.isLocal && audioEl) {
       const audioTrack = [...lkParticipant.audioTrackPublications.values()].find(
         (t) => t.source === Track.Source.Microphone
       );
-      if (audioTrack?.track && audioRef.current) {
-        audioTrack.track.attach(audioRef.current);
+      if (audioTrack?.track) {
+        audioTrack.track.attach(audioEl);
+        // Ensure autoplay works
+        audioEl.volume = 1;
+        audioEl.play().catch(() => {
+          // Browser may block autoplay; user interaction required
+          setAudioReady(false);
+        });
+        setAudioReady(true);
       }
     }
 
     return () => {
-      if (videoTrack?.track && videoRef.current) {
-        videoTrack.track.detach(videoRef.current);
+      if (videoTrack?.track && videoEl) {
+        videoTrack.track.detach(videoEl);
       }
-      if (!participant.isLocal) {
+      if (!participant.isLocal && audioEl) {
         const at = [...lkParticipant.audioTrackPublications.values()].find(
           (t) => t.source === Track.Source.Microphone
         );
-        if (at?.track && audioRef.current) {
-          at.track.detach(audioRef.current);
+        if (at?.track) {
+          at.track.detach(audioEl);
         }
       }
     };
-  }, [room, participant]);
+  }, [room, participant.sid, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.isMuted]);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
@@ -91,7 +104,15 @@ export default function ParticipantTile({ participant, room, large, className }:
         </Avatar>
       )}
 
-      {!participant.isLocal && <audio ref={audioRef} autoPlay />}
+      {/* Audio element for remote participants — always mounted */}
+      {!participant.isLocal && (
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+          style={{ display: "none" }}
+        />
+      )}
 
       {participant.reactions.length > 0 && (
         <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
