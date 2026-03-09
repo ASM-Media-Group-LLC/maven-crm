@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export function useChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
