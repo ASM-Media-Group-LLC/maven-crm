@@ -78,14 +78,6 @@ export default function MessageList({
 
   const groups = groupMessages(messages);
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
