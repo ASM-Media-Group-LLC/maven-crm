@@ -140,17 +140,21 @@ export function useChat() {
   useEffect(() => {
     if (!user) return;
 
-    const scheduleConversationsReload = (isDeleteEvent = false) => {
+    const scheduleConversationsReload = (immediate = false) => {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+
+      // Immediate reload for high-priority events (e.g. current user added to a new conversation)
+      const delay = immediate ? 50 : 200;
       refreshTimeoutRef.current = setTimeout(() => {
         void loadConversations();
-      }, 180);
+      }, delay);
 
-      if (isDeleteEvent) {
-        if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+      // Delayed secondary reload for DELETE events (cascading cleanup)
+      if (!immediate) {
         delayedRefreshTimeoutRef.current = setTimeout(() => {
           void loadConversations();
-        }, 900);
+        }, 1000);
       }
     };
 
@@ -165,23 +169,57 @@ export function useChat() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_participants" },
+        { event: "INSERT", schema: "public", table: "chat_participants" },
         (payload) => {
-          scheduleConversationsReload(payload.eventType === "DELETE");
+          // If the current user was added to a conversation, reload immediately
+          const newRow = payload.new as any;
+          const isForMe = newRow?.user_id === user.id;
+          scheduleConversationsReload(isForMe);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_participants" },
+        () => {
+          scheduleConversationsReload();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_participants" },
+        () => {
+          scheduleConversationsReload();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "chat_conversations" },
-        (payload) => {
-          scheduleConversationsReload(payload.eventType === "DELETE");
+        () => {
+          scheduleConversationsReload();
         }
       )
       .subscribe();
 
+    // Fallback: reload conversations when the tab becomes visible (handles missed events)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadConversations();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Periodic fallback poll every 30s to catch any missed realtime events
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadConversations();
+      }
+    }, 30_000);
+
     return () => {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
       if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [user, loadConversations]);
