@@ -33,6 +33,8 @@ interface MessageInputProps {
   replyTo: ChatMessage | null;
   profiles: Record<string, UserProfile>;
   onCancelReply: () => void;
+  participants?: { user_id: string; profile?: UserProfile }[];
+  chatType?: string;
 }
 
 export default function MessageInput({
