@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput } from "lucide-react";
+import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,19 @@ const ProjectsListContent = () => {
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [folderFilter, setFolderFilter] = useState<string>("");
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   const toggleFolderCollapse = (folderId: string) => {
     setCollapsedFolders(prev => {
@@ -106,6 +120,35 @@ const ProjectsListContent = () => {
       return matchesSearch && matchesStatus && matchesMember && matchesPriority && matchesFolder;
     });
   }, [projects, search, statusFilter, memberFilter, priorityFilter, folderFilter, allMembers, allTasks]);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === filteredProjects.length) return new Set();
+      return new Set(filteredProjects.map(p => p.id));
+    });
+  }, [filteredProjects]);
+
+  const handleBatchArchive = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      archiveProject.mutate({ id, status: "archived" });
+    });
+    clearSelection();
+  }, [selectedIds, archiveProject, clearSelection]);
+
+  const handleBatchDelete = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      deleteProject.mutate(id);
+    });
+    clearSelection();
+    setBatchDeleteOpen(false);
+  }, [selectedIds, deleteProject, clearSelection]);
+
+  const handleBatchMove = useCallback((folderId: string | null) => {
+    Array.from(selectedIds).forEach(projectId => {
+      moveProjectToFolder.mutate({ projectId, folderId });
+    });
+    clearSelection();
+  }, [selectedIds, moveProjectToFolder, clearSelection]);
 
   // Group projects by folder
   const groupedProjects = useMemo(() => {
@@ -200,15 +243,23 @@ const ProjectsListContent = () => {
     const counts = getProjectTaskCounts(project.id);
     const progress = getProjectProgress(project.id);
     const leader = project.leader_id ? companyProfiles.find(p => p.id === project.leader_id) : null;
+    const isSelected = selectedIds.has(project.id);
     return (
       <Card
         key={project.id}
-        className={cn("cursor-pointer transition-colors hover:bg-muted/50", project.status === "archived" && "opacity-60")}
+        className={cn("cursor-pointer transition-all hover:bg-muted/50 relative", project.status === "archived" && "opacity-60", isSelected && "ring-2 ring-primary")}
         onClick={() => navigate(`/tareas/${project.id}`)}
       >
         <CardContent className="p-5 space-y-3">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2 flex-1 min-w-0">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => toggleSelect(project.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-base truncate">{project.name}</h3>
                 {project.status === "archived" && (
@@ -218,6 +269,7 @@ const ProjectsListContent = () => {
               {project.description && (
                 <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{project.description}</p>
               )}
+              </div>
             </div>
             <div className="flex items-center gap-1">
               {(() => {
@@ -416,6 +468,9 @@ const ProjectsListContent = () => {
             onArchive={handleArchive}
             folders={folders}
             onMoveToFolder={(projectId, folderId) => moveProjectToFolder.mutate({ projectId, folderId })}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleAll={toggleSelectAll}
           />
         ) : hasFolders ? (
           // Grouped grid view with collapsible folders
@@ -520,6 +575,51 @@ const ProjectsListContent = () => {
         }}
         isLoading={deleteProject.isPending}
       />
+
+      {/* Batch delete confirmation */}
+      <DeleteProjectDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        projectName={`${selectedIds.size} proyecto(s)`}
+        onConfirm={handleBatchDelete}
+        isLoading={deleteProject.isPending}
+      />
+
+      {/* Floating batch action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
+          <div className="flex items-center gap-3 bg-card border border-border rounded-xl shadow-lg px-5 py-3">
+            <span className="text-sm font-medium">{selectedIds.size} seleccionado(s)</span>
+            <div className="h-5 w-px bg-border" />
+            {folders.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <FolderInput className="h-4 w-4 mr-1" /> Mover
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleBatchMove(null)}>Sin carpeta</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {folders.map(f => (
+                    <DropdownMenuItem key={f.id} onClick={() => handleBatchMove(f.id)}>{f.name}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button variant="outline" size="sm" onClick={handleBatchArchive}>
+              <Archive className="h-4 w-4 mr-1" /> Archivar
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => setBatchDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
+            <div className="h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              <X className="h-4 w-4 mr-1" /> Deseleccionar
+            </Button>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
