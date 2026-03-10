@@ -37,15 +37,33 @@ export function useGlobalSearch() {
 
       const convIds = participantRows.map((r) => r.conversation_id);
 
-      // Fetch conversations for titles
-      const { data: convRows } = await supabase
-        .from("chat_conversations")
-        .select("id, name")
-        .in("id", convIds);
+      // Fetch conversations for titles + participants for DM name resolution
+      const [convsRes, participantsRes] = await Promise.all([
+        supabase.from("chat_conversations").select("id, name, type").in("id", convIds),
+        supabase.from("chat_participants").select("conversation_id, user_id").in("conversation_id", convIds),
+      ]);
+
+      // Get all profiles for participant name resolution
+      const allUserIds = [...new Set((participantsRes.data ?? []).map((p: any) => p.user_id))];
+      const { data: allProfiles } = await supabase.from("profiles").select("id, full_name").in("id", allUserIds);
+      const profileNameMap = new Map<string, string>();
+      for (const p of allProfiles ?? []) {
+        profileNameMap.set(p.id, p.full_name ?? "Usuario");
+      }
 
       const titleMap = new Map<string, string>();
-      for (const c of convRows ?? []) {
-        titleMap.set(c.id, c.name ?? "Sin nombre");
+      for (const c of convsRes.data ?? []) {
+        if (c.name) {
+          titleMap.set(c.id, c.name);
+        } else if (c.type === "direct") {
+          // Find the other participant's name
+          const otherP = (participantsRes.data ?? []).find(
+            (p: any) => p.conversation_id === c.id && p.user_id !== user.id
+          );
+          titleMap.set(c.id, otherP ? (profileNameMap.get(otherP.user_id) ?? "Chat") : "Chat");
+        } else {
+          titleMap.set(c.id, "Grupo");
+        }
       }
 
       // Search messages by content (using ilike for server-side filtering)
