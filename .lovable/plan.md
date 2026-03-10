@@ -2,17 +2,21 @@
 
 ## Problem
 
-The "Creado por" filter is not visible because `creatorsList` only includes creators found in the `profiles` table. Since most legacy contacts have unresolvable UUIDs, the list is empty, and the conditional `{creators.length > 0 && ...}` hides the dropdown entirely.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-Additionally, the label should be "Agente" instead of "Creado por".
+## Solution
+
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
 ## Changes
 
-**1. `src/pages/contactos/ContactosContent.tsx`**
-- Update `creatorsList` to include ALL unique creators — resolved names from `profilesMap` AND fallback "Usuario #XXXXXXXX" for unresolvable UUIDs
-- Derive the list from `dbContactos` creator IDs, not just `profilesMap` entries
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-**2. `src/pages/contactos/ContactosFilters.tsx`**
-- Rename placeholder from `"Creado por"` to `"Agente"`
-- Remove the `{creators.length > 0 && ...}` conditional so the select always renders (or keep it, since the list will now be populated)
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

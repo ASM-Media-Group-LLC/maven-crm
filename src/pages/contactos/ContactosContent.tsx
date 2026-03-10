@@ -105,14 +105,18 @@ const ContactosContent = () => {
     },
   });
 
-  // Build creators list for filter dropdown
+  // Build creators list for filter dropdown (include all unique creators)
   const creatorsList = useMemo(() => {
-    const entries = Object.entries(profilesMap)
-      .filter(([, name]) => name)
-      .map(([id, name]) => ({ value: id, label: name }));
+    const map = new Map<string, string>();
+    creatorIds.forEach((id) => {
+      const name = profilesMap[id];
+      map.set(id, name || `Usuario #${id.slice(0, 8)}`);
+    });
+    const entries = Array.from(map.entries())
+      .map(([, label]) => ({ value: label, label }));
     entries.sort((a, b) => a.label.localeCompare(b.label));
     return entries;
-  }, [profilesMap]);
+  }, [creatorIds, profilesMap]);
 
   // Fetch interaction counts per contact
   const { data: interactionCounts = {} } = useQuery({
