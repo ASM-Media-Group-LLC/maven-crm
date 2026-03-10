@@ -34,7 +34,7 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
-type SortKey = "creacion" | "ticket" | "nombre" | "estado" | "instagram" | "pais" | "categoria" | "interacciones" | "creadoPor";
+type SortKey = "creacion" | "ticket" | "nombre" | "creadoPor" | "estado" | "instagram" | "pais" | "categoria" | "interacciones";
 
 interface Props {
   contactos: Contacto[];
