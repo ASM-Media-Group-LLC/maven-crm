@@ -679,6 +679,8 @@ const DashboardContent = () => {
             </Card>
           )}
         </div>
+          );
+        })()}
       </main>
 
       {/* Quick Actions Config Dialog */}
