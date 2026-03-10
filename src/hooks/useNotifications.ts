@@ -99,6 +99,8 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {
+    // Exclude orphaned notifications (no user_id and no role_target)
+    if (!n.user_id && !n.role_target) return false;
     // Permission filter
     if (n.required_permission_module && !canAccess(n.required_permission_module, n.required_permission_submodule ?? undefined)) {
       return false;
