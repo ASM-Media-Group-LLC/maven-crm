@@ -80,7 +80,8 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       case "hora": va = a.created_at; vb = b.created_at; break;
       case "ticket": va = a.id; vb = b.id; break;
       case "handle": va = a.model_handle; vb = b.model_handle; break;
-      case "agente": va = a.company ?? ""; vb = b.company ?? ""; break;
+      case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
+      case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
       case "calidad": va = a.quality; vb = b.quality; break;
       case "estado": va = a.status; vb = b.status; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
