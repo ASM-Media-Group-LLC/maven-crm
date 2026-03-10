@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText } from "lucide-react";
+import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
