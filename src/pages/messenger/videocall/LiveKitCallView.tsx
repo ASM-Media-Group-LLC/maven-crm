@@ -97,7 +97,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   return (
     <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)]">
       <CallTopBar
-        roomName={roomName}
+        roomName={callDisplayName || roomName}
         participantCount={lk.participants.length}
         layout={layout}
         onToggleLayout={() => setLayout((l) => (l === "grid" ? "spotlight" : "grid"))}

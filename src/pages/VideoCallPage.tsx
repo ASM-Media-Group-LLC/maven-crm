@@ -56,6 +56,7 @@ export default function VideoCallPage() {
       <LiveKitCallView
         roomName={roomName}
         displayName={profile.full_name || "Usuario"}
+        callDisplayName={callDisplayName}
         isAdmin={isAdmin}
         onLeave={handleLeave}
       />

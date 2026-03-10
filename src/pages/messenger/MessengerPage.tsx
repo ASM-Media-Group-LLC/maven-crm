@@ -88,7 +88,7 @@ export default function MessengerPage() {
 
   const handleStartVideoCall = (conv: ConversationWithDetails) => {
     const roomName = `call-${conv.id}`;
-    openCallInNewTab(roomName, true);
+    openCallInNewTab(roomName, true, conv.displayName);
   };
 
   const handleDeleteChat = async (chatId: string) => {
