@@ -116,6 +116,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
             <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
             <TableHead><SortHeader label="Handle" col="handle" /></TableHead>
             <TableHead><SortHeader label="Agente" col="agente" /></TableHead>
+            <TableHead><SortHeader label="Agencia" col="agencia" /></TableHead>
             <TableHead><SortHeader label="Calidad" col="calidad" /></TableHead>
             <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
