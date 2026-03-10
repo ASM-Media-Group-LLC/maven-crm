@@ -28,6 +28,7 @@ import {
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useLeadGenEntries } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { LEADGEN_COMPANIES } from "./leadgenConstants";
 
 const calidadColors: Record<string, string> = {
   "a+": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
