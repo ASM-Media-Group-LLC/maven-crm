@@ -166,6 +166,15 @@ export default function ChatView({
         />
       )}
 
+      {showGroupMembers && conversation.type === "group" && (
+        <GroupMembersPanel
+          conversation={conversation}
+          profiles={profiles}
+          onClose={() => setShowGroupMembers(false)}
+          onMembersChanged={() => { onMembersChanged?.(); }}
+        />
+      )}
+
       {showNotifSettings && (
         <div className="absolute right-4 top-16 z-50 w-72 bg-card border border-border rounded-xl shadow-lg">
           <NotificationSettings
