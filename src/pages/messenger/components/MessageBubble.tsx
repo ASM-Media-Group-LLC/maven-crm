@@ -83,7 +83,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     : cn("rounded-2xl rounded-tl-lg", isLastInGroup ? "rounded-bl-md" : "rounded-bl-2xl");
 
   const isVoiceNote = message.type === "file" && message.file_name?.startsWith("voice-note");
-  const isAudioFile = message.file_url && (message.file_url.endsWith(".webm") || message.file_url.endsWith(".ogg") || message.file_url.endsWith(".mp3"));
+  const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
+  const isAudioFile = message.file_url && audioExtPattern.test(message.file_url);
   const isImage = message.type === "image" && message.file_url;
   const isVideo = message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
 
