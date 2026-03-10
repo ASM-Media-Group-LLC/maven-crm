@@ -45,6 +45,8 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   closers: DollarSign,
   messenger: MessageSquare,
   admin: ShieldAlert,
+  "Comunicación": MessageSquare,
+  comunicacion: MessageSquare,
 };
 
 export function getModuleIcon(moduleOrigin: string | null): LucideIcon {
