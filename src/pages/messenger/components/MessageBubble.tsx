@@ -1,6 +1,6 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, useMemo } from "react";
 import {
-  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic,
+  MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,6 +14,9 @@ import ReactionPicker from "./ReactionPicker";
 import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
+import { renderTextWithMentions } from "./MentionAutocomplete";
+
+const MAX_GRID_IMAGES = 9;
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,6 +39,10 @@ interface MessageBubbleProps {
   threadCount?: number;
   unreadThreadCount?: number;
   onOpenThread?: () => void;
+  /** Adjacent image messages in the same group for grid display */
+  adjacentImages?: ChatMessage[];
+  isGridLeader?: boolean;
+  isPartOfGrid?: boolean;
 }
 
 function getInitials(name: string) {
@@ -51,9 +58,20 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, totalParticipants,
   threadCount = 0, unreadThreadCount = 0, onOpenThread,
+  adjacentImages, isGridLeader, isPartOfGrid,
 }, ref) => {
   const senderName = profiles[message.sender_id]?.full_name || "Usuario";
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState("");
+  const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
+  const [showAllImages, setShowAllImages] = useState(false);
+
+  const participantNames = useMemo(() => {
+    return Object.values(profiles).map(p => p.full_name).filter(Boolean) as string[];
+  }, [profiles]);
+
+  // If this message is part of a grid but not the leader, don't render
+  if (isPartOfGrid && !isGridLeader) return null;
 
   if (message.is_deleted) {
     return (
@@ -67,7 +85,13 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   }
 
   const highlightText = (text: string) => {
-    if (!highlight) return text;
+    if (!highlight) {
+      // Render mentions
+      if (chatType === "group") {
+        return renderTextWithMentions(text, participantNames);
+      }
+      return text;
+    }
     const idx = text.toLowerCase().indexOf(highlight);
     if (idx === -1) return text;
     return (
@@ -89,15 +113,22 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const isImage = message.type === "image" && message.file_url;
   const isVideo = message.file_url && (message.file_url.match(/\.(mp4|webm|mov)(\?|$)/i));
 
-  const renderContent = () => {
-    if (isImage) {
+  const openLightbox = (src: string, type: "image" | "video") => {
+    setLightboxSrc(src);
+    setLightboxType(type);
+    setLightboxOpen(true);
+  };
+
+  const renderImageGrid = () => {
+    if (!adjacentImages || adjacentImages.length <= 1) {
+      // Single image
       return (
         <div>
           <img
             src={message.file_url!}
             alt={message.file_name || "image"}
             className="rounded-lg max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-            onClick={() => setLightboxOpen(true)}
+            onClick={() => openLightbox(message.file_url!, "image")}
           />
           {message.content && message.content !== message.file_name && (
             <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
@@ -106,15 +137,85 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       );
     }
 
+    // Grid display
+    const images = adjacentImages;
+    const displayImages = showAllImages ? images : images.slice(0, MAX_GRID_IMAGES);
+    const remaining = images.length - MAX_GRID_IMAGES;
+    const count = displayImages.length;
+
+    // Dynamic grid classes
+    const gridClass = count === 1
+      ? "grid-cols-1"
+      : count === 2
+        ? "grid-cols-2"
+        : count <= 4
+          ? "grid-cols-2"
+          : count <= 6
+            ? "grid-cols-3"
+            : "grid-cols-3";
+
+    return (
+      <div>
+        <div className={cn("grid gap-1", gridClass)}>
+          {displayImages.map((img, i) => {
+            const isLast = i === displayImages.length - 1 && remaining > 0 && !showAllImages;
+            return (
+              <div
+                key={img.id}
+                className="relative cursor-pointer overflow-hidden rounded-lg aspect-square"
+                onClick={() => {
+                  if (isLast) {
+                    setShowAllImages(true);
+                  } else {
+                    openLightbox(img.file_url!, "image");
+                  }
+                }}
+              >
+                <img
+                  src={img.file_url!}
+                  alt={img.file_name || "image"}
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                />
+                {isLast && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-white text-xl font-bold">+{remaining}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {message.content && message.content !== message.file_name && (
+          <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (isImage) {
+      return renderImageGrid();
+    }
+
     if (isVideo) {
       return (
         <div>
-          <video
-            src={message.file_url!}
-            controls
-            className="rounded-lg max-w-full max-h-60"
-            preload="metadata"
-          />
+          <div
+            className="relative rounded-lg overflow-hidden cursor-pointer group/video max-w-full max-h-60"
+            onClick={() => openLightbox(message.file_url!, "video")}
+          >
+            <video
+              src={message.file_url!}
+              className="rounded-lg max-w-full max-h-60 object-cover"
+              preload="metadata"
+              muted
+            />
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-100 group-hover/video:bg-black/50 transition-colors">
+              <div className="h-12 w-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                <Play className="h-6 w-6 text-foreground ml-0.5" />
+              </div>
+            </div>
+          </div>
           {message.content && message.content !== message.file_name && (
             <p className="text-[13px] mt-1.5 leading-relaxed">{highlightText(message.content)}</p>
           )}
@@ -135,7 +236,6 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
     if (message.type === "file") {
       const ext = message.file_name?.split(".").pop()?.toLowerCase() || "";
-      const isPreviewable = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv"].includes(ext);
       return (
         <a href={message.file_url || "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
           <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-muted")}>
@@ -278,15 +378,14 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         {isMe && <div className="w-0 shrink-0" />}
       </div>
 
-      {/* Lightbox */}
-      {isImage && (
-        <ImageLightbox
-          src={message.file_url!}
-          alt={message.file_name || "image"}
-          isOpen={lightboxOpen}
-          onClose={() => setLightboxOpen(false)}
-        />
-      )}
+      {/* Lightbox for images and videos */}
+      <ImageLightbox
+        src={lightboxSrc}
+        alt={message.file_name || "media"}
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        type={lightboxType}
+      />
     </>
   );
 });

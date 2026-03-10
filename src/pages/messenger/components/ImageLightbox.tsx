@@ -1,41 +1,82 @@
 import { useState, useEffect, useCallback } from "react";
-import { X, Download, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
+import { X, Download, ZoomIn, ZoomOut, RotateCw, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface ImageLightboxProps {
+interface MediaLightboxProps {
   src: string;
   alt?: string;
   isOpen: boolean;
   onClose: () => void;
+  type?: "image" | "video";
 }
 
-export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightboxProps) {
+export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image" }: MediaLightboxProps) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (!isOpen) { setScale(1); setRotation(0); }
+    if (!isOpen) { setScale(1); setRotation(0); setPosition({ x: 0, y: 0 }); }
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "+") setScale(s => Math.min(s + 0.25, 4));
+      if (e.key === "+" || e.key === "=") setScale(s => Math.min(s + 0.25, 5));
       if (e.key === "-") setScale(s => Math.max(s - 0.25, 0.25));
+      if (e.key === "0") { setScale(1); setPosition({ x: 0, y: 0 }); setRotation(0); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
+  // Mouse wheel zoom
+  useEffect(() => {
+    if (!isOpen) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setScale(s => Math.min(Math.max(s + delta, 0.25), 5));
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [isOpen]);
+
   const handleDownload = useCallback(() => {
     const a = document.createElement("a");
     a.href = src;
-    a.download = alt || "image";
+    a.download = alt || (type === "video" ? "video" : "image");
     a.target = "_blank";
     a.click();
-  }, [src, alt]);
+  }, [src, alt, type]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1) return;
+    e.preventDefault();
+    setDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragging) return;
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handleMouseUp = () => setDragging(false);
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (scale === 1) {
+      setScale(2.5);
+    } else {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -43,18 +84,24 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
     <div
       className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center animate-fade-in"
       onClick={onClose}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
       {/* Toolbar */}
       <div className="absolute top-4 right-4 flex items-center gap-1 z-10" onClick={e => e.stopPropagation()}>
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.min(s + 0.25, 4))}>
+        <span className="text-white/50 text-xs mr-2">{Math.round(scale * 100)}%</span>
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.min(s + 0.25, 5))}>
           <ZoomIn className="h-5 w-5" />
         </Button>
         <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setScale(s => Math.max(s - 0.25, 0.25))}>
           <ZoomOut className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setRotation(r => r + 90)}>
-          <RotateCw className="h-5 w-5" />
-        </Button>
+        {type === "image" && (
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setRotation(r => r + 90)}>
+            <RotateCw className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload}>
           <Download className="h-5 w-5" />
         </Button>
@@ -63,15 +110,40 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
         </Button>
       </div>
 
-      {/* Image */}
-      <img
-        src={src}
-        alt={alt || ""}
-        className="max-w-[90vw] max-h-[90vh] object-contain transition-transform duration-200 select-none"
-        style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
-        onClick={e => e.stopPropagation()}
-        draggable={false}
-      />
+      {/* Hint */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs select-none pointer-events-none">
+        Doble clic para zoom · Scroll para ajustar · Arrastra para mover
+      </div>
+
+      {/* Media */}
+      {type === "video" ? (
+        <video
+          src={src}
+          controls
+          autoPlay
+          className="max-w-[90vw] max-h-[90vh] rounded-lg transition-transform duration-200 select-none"
+          style={{
+            transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            cursor: scale > 1 ? (dragging ? "grabbing" : "grab") : "default",
+          }}
+          onClick={e => e.stopPropagation()}
+          draggable={false}
+        />
+      ) : (
+        <img
+          src={src}
+          alt={alt || ""}
+          className="max-w-[90vw] max-h-[90vh] object-contain transition-transform duration-200 select-none"
+          style={{
+            transform: `scale(${scale}) rotate(${rotation}deg) translate(${position.x / scale}px, ${position.y / scale}px)`,
+            cursor: scale > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
+          }}
+          onClick={e => e.stopPropagation()}
+          onDoubleClick={handleDoubleClick}
+          onMouseDown={handleMouseDown}
+          draggable={false}
+        />
+      )}
     </div>
   );
 }

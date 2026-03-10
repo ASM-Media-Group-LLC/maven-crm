@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import MentionAutocomplete from "./MentionAutocomplete";
 import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,12 +33,16 @@ interface MessageInputProps {
   replyTo: ChatMessage | null;
   profiles: Record<string, UserProfile>;
   onCancelReply: () => void;
+  participants?: { user_id: string; profile?: UserProfile }[];
+  chatType?: string;
 }
 
 export default function MessageInput({
   onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
+  participants, chatType,
 }: MessageInputProps) {
   const { user } = useAuth();
+  const [cursorPosition, setCursorPosition] = useState(0);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -90,9 +95,16 @@ export default function MessageInput({
 
   const handleTextChange = (val: string) => {
     setText(val);
+    setCursorPosition(inputRef.current?.selectionStart || val.length);
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
+  };
+
+  const handleMentionSelect = (newText: string, _userId: string) => {
+    setText(newText);
+    setCursorPosition(newText.length);
+    inputRef.current?.focus();
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,14 +292,24 @@ export default function MessageInput({
         ) : (
           <>
             <div className="flex-1 relative">
+              {chatType === "group" && participants && (
+                <MentionAutocomplete
+                  text={text}
+                  cursorPosition={cursorPosition}
+                  participants={participants}
+                  currentUserId={user?.id}
+                  onSelect={handleMentionSelect}
+                />
+              )}
               <Textarea
                 ref={inputRef}
-                placeholder="Escribe un mensaje..."
+                placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
                 className="min-h-[38px] max-h-[120px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
                 rows={1}
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onSelect={e => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
               />
             </div>
 
