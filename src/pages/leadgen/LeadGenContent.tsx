@@ -116,6 +116,7 @@ const LeadGenContent = () => {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [qualityFilter, setQualityFilter] = useState("todos");
   const [qaFilter, setQaFilter] = useState("todos");
+  const [agencyFilter, setAgencyFilter] = useState("todos");
   const [activeFilter, setActiveFilter] = useState<{ type: "categoria" | "status" | null; value: string | null }>({ type: null, value: null });
 
   // Filter leads
