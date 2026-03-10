@@ -1,22 +1,37 @@
 
 
-## Problem
+## Plan: Move Contactos/Agencias tab bar below KPI cards
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+Currently the tab bar (Contactos | Agencias) is inside the fixed `<header>` block above the scrollable content. It should be moved into the scrollable area, right after the KPI cards.
 
-## Solution
+### File: `src/pages/contactos/ContactosContent.tsx`
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+1. **Remove the tab bar from the header** (lines 182-197) — remove the `div` with the inline-flex tab buttons from inside `<header>`.
 
-## Changes
+2. **Move tab bar into the scrollable content area**, right after `<ContactosKPICards>` and before `<ContactosFilters>`. The tab bar renders for both tabs, so place it outside the `activeTab === "contactos"` conditional — directly after the KPI cards block:
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+```
+<div className="flex-1 overflow-auto p-6 space-y-6">
+  <ContactosKPICards ... />
+  
+  {/* Tab bar moved here */}
+  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+    <Button ...>Contactos</Button>
+    <Button ...>Agencias</Button>
+  </div>
 
-Replace the single `.select()` call with a paginated loop:
+  {activeTab === "contactos" ? (
+    <>
+      <ContactosFilters ... />
+      {view === "table" ? <ContactosTable /> : <ContactosGrid />}
+    </>
+  ) : (
+    <AgenciasContent />
+  )}
+</div>
+```
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+3. **Keep KPI cards always visible** (outside the tab conditional) since they provide overall stats. The header keeps only the title and the action button.
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+One file changed, just moving ~15 lines of JSX.
 
