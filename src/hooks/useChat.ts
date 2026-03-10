@@ -498,6 +498,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     }
   }, [conversationId, user]);
 
+  // Keep ref updated for use inside effects without triggering re-subscriptions
+  loadMessagesRef.current = loadMessages;
+
   // Load older messages (infinite scroll)
   const loadOlderMessages = useCallback(async () => {
     if (!conversationId || loadingMore || !hasMore || messages.length === 0) return;
