@@ -15,8 +15,18 @@ export interface TaskProject {
   status: string;
   share_token: string | null;
   leader_id: string | null;
+  folder_id: string | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface ProjectFolder {
+  id: string;
+  name: string;
+  company_id: string | null;
+  created_by: string;
+  position: number;
+  created_at: string;
 }
 
 export const useProjects = () => {
@@ -49,6 +59,19 @@ export const useProjects = () => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as unknown as TaskProject[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: folders = [], isLoading: foldersLoading } = useQuery({
+    queryKey: ["project-folders", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("project_folders" as any)
+        .select("*")
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return (data || []) as unknown as ProjectFolder[];
     },
     enabled: !!user,
   });
@@ -97,7 +120,7 @@ export const useProjects = () => {
   }, [rawAllTasks, visibleProjectIds, isAdmin]);
 
   const createProject = useMutation({
-    mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
+    mutationFn: async (project: { name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string }) => {
       if (!user || !profile) throw new Error("Not authenticated");
       const trimmedName = project.name.trim();
       const { data: existing } = await supabase
@@ -112,6 +135,7 @@ export const useProjects = () => {
         created_by: user.id,
         company_id: profile.company_id,
         leader_id: project.leaderId || null,
+        folder_id: project.folderId || null,
       } as any).select("id").single();
       if (error) throw error;
       
@@ -124,7 +148,6 @@ export const useProjects = () => {
         }));
         await supabase.from("project_members" as any).insert(rows as any);
 
-        // Send notifications to assigned members
         const notifications = project.memberIds.map(uid => ({
           user_id: uid,
           type: "project_assignment",
@@ -156,7 +179,7 @@ export const useProjects = () => {
   });
 
   const updateProject = useMutation({
-    mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => {
+    mutationFn: async (project: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string | null }) => {
       const trimmedName = project.name.trim();
       const { data: existing } = await supabase
         .from("task_projects" as any)
@@ -165,9 +188,13 @@ export const useProjects = () => {
         .neq("id", project.id)
         .limit(1);
       if (existing && existing.length > 0) throw new Error("DUPLICATE");
+      const updatePayload: any = { name: project.name, description: project.description || null, leader_id: project.leaderId || null };
+      if (project.folderId !== undefined) {
+        updatePayload.folder_id = project.folderId || null;
+      }
       const { data: updated, error } = await supabase
         .from("task_projects" as any)
-        .update({ name: project.name, description: project.description || null, leader_id: project.leaderId || null } as any)
+        .update(updatePayload)
         .eq("id", project.id)
         .select("id")
         .maybeSingle();
@@ -175,7 +202,6 @@ export const useProjects = () => {
       if (!updated) throw new Error("No tienes permisos para editar este proyecto.");
 
       if (project.memberIds !== undefined) {
-        // Get existing members before deleting
         const { data: existingMembers } = await supabase
           .from("project_members" as any)
           .select("user_id")
@@ -191,7 +217,6 @@ export const useProjects = () => {
           }));
           await supabase.from("project_members" as any).insert(rows as any);
 
-          // Notify only newly added members
           const newMemberIds = project.memberIds.filter(uid => !existingIds.has(uid));
           if (newMemberIds.length > 0) {
             const notifications = newMemberIds.map(uid => ({
@@ -228,14 +253,12 @@ export const useProjects = () => {
 
   const deleteProject = useMutation({
     mutationFn: async (projectId: string) => {
-      // 1. Get all task IDs for this project
       const { data: tasks } = await supabase
         .from("tasks" as any)
         .select("id")
         .eq("project_id", projectId);
       const taskIds = (tasks || []).map((t: any) => t.id);
 
-      // 2. Delete subtasks of those tasks
       if (taskIds.length > 0) {
         const { error: subtaskErr } = await supabase
           .from("subtasks" as any)
@@ -244,21 +267,18 @@ export const useProjects = () => {
         if (subtaskErr) throw subtaskErr;
       }
 
-      // 3. Delete tasks
       const { error: taskErr } = await supabase
         .from("tasks" as any)
         .delete()
         .eq("project_id", projectId);
       if (taskErr) throw taskErr;
 
-      // 4. Delete project members
       const { error: memberErr } = await supabase
         .from("project_members" as any)
         .delete()
         .eq("project_id", projectId);
       if (memberErr) throw memberErr;
 
-      // 5. Delete the project
       const { error } = await supabase
         .from("task_projects" as any)
         .delete()
@@ -335,11 +355,79 @@ export const useProjects = () => {
     },
   });
 
+  // Folder mutations
+  const createFolder = useMutation({
+    mutationFn: async (name: string) => {
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase.from("project_folders" as any).insert({
+        name,
+        created_by: user.id,
+        company_id: profile?.company_id || null,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-folders"] });
+      toast({ title: "Carpeta creada", description: "La carpeta fue creada exitosamente." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo crear la carpeta.", variant: "destructive" });
+    },
+  });
+
+  const renameFolder = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("project_folders" as any).update({ name } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-folders"] });
+      toast({ title: "Carpeta renombrada" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo renombrar la carpeta.", variant: "destructive" });
+    },
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("project_folders" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-folders"] });
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      toast({ title: "Carpeta eliminada", description: "Los proyectos fueron movidos a 'Sin carpeta'." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo eliminar la carpeta.", variant: "destructive" });
+    },
+  });
+
+  const moveProjectToFolder = useMutation({
+    mutationFn: async ({ projectId, folderId }: { projectId: string; folderId: string | null }) => {
+      const { error } = await supabase
+        .from("task_projects" as any)
+        .update({ folder_id: folderId } as any)
+        .eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-projects"] });
+      toast({ title: "Proyecto movido" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo mover el proyecto.", variant: "destructive" });
+    },
+  });
+
   return {
     projects,
     allTasks,
     isLoading,
     profile,
+    folders,
+    foldersLoading,
     createProject,
     updateProject,
     deleteProject,
@@ -347,5 +435,9 @@ export const useProjects = () => {
     getProjectTaskCounts,
     getProjectProgress,
     reorderProjects,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    moveProjectToFolder,
   };
 };

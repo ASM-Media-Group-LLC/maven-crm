@@ -17,18 +17,20 @@ interface EditProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: TaskProject | null;
-  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
+  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string | null }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
   currentMemberIds?: string[];
+  folders?: { id: string; name: string }[];
 }
 
-const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [] }: EditProjectModalProps) => {
+const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [], folders = [] }: EditProjectModalProps) => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [leaderId, setLeaderId] = useState<string>("");
+  const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   useEffect(() => {
@@ -37,6 +39,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       setDescription(project.description || "");
       setSelectedMembers(currentMemberIds);
       setLeaderId((project as any).leader_id || "");
+      setFolderId((project as any).folder_id || "");
     }
   }, [project, currentMemberIds]);
 
@@ -58,6 +61,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       description: description.trim() || undefined,
       memberIds: selectedMembers,
       leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
+      folderId: folderId && folderId !== "__none__" ? folderId : null,
     });
     onOpenChange(false);
   };
@@ -77,6 +81,24 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
             <Label htmlFor="edit-project-desc">Descripción</Label>
             <Textarea id="edit-project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          {/* Folder select */}
+          {folders.length > 0 && (
+            <div>
+              <Label>Carpeta</Label>
+              <Select value={folderId} onValueChange={setFolderId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sin carpeta (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin carpeta</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Leader select */}
           {profiles.length > 0 && (

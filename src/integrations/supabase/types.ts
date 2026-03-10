@@ -4228,6 +4228,41 @@ export type Database = {
           },
         ]
       }
+      project_folders: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_folders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_members: {
         Row: {
           created_at: string
@@ -4644,6 +4679,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           description: string | null
+          folder_id: string | null
           id: string
           leader_id: string | null
           name: string
@@ -4657,6 +4693,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           description?: string | null
+          folder_id?: string | null
           id?: string
           leader_id?: string | null
           name: string
@@ -4670,6 +4707,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           description?: string | null
+          folder_id?: string | null
           id?: string
           leader_id?: string | null
           name?: string
@@ -4679,6 +4717,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "task_projects_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "project_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_projects_leader_id_fkey"
             columns: ["leader_id"]
@@ -5204,6 +5249,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           description: string | null
+          folder_id: string | null
           id: string
           leader_id: string | null
           name: string

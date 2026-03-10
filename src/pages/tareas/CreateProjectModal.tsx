@@ -15,17 +15,19 @@ import { useToast } from "@/hooks/use-toast";
 interface CreateProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
+  onSubmit: (data: { name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
+  folders?: { id: string; name: string }[];
 }
 
-const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles = [] }: CreateProjectModalProps) => {
+const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles = [], folders = [] }: CreateProjectModalProps) => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [leaderId, setLeaderId] = useState<string>("");
+  const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const toggleMember = (id: string) => {
@@ -45,11 +47,13 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
       description: description.trim() || undefined,
       memberIds: selectedMembers.length > 0 ? selectedMembers : undefined,
       leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
+      folderId: folderId && folderId !== "__none__" ? folderId : undefined,
     });
     setName("");
     setDescription("");
     setSelectedMembers([]);
     setLeaderId("");
+    setFolderId("");
     onOpenChange(false);
   };
 
@@ -68,6 +72,24 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
             <Label htmlFor="project-desc">Descripción</Label>
             <Textarea id="project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
+
+          {/* Folder select */}
+          {folders.length > 0 && (
+            <div>
+              <Label>Carpeta</Label>
+              <Select value={folderId} onValueChange={setFolderId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sin carpeta (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin carpeta</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Leader select */}
           {profiles.length > 0 && (
