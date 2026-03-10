@@ -52,15 +52,6 @@ const ClosersContent = () => {
         {/* KPIs */}
         <ClosersKPICards deals={deals} />
 
-        {/* Contactos placeholder */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Contactos</h2>
-          <div className="rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Sección de contactos próximamente
-            </p>
-          </div>
-        </div>
 
         {/* Filters + toggle */}
         <div className="flex flex-wrap items-center gap-3">
