@@ -458,6 +458,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
+  const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
   const offlineQueueRef = useRef<Array<{
     content: string;
