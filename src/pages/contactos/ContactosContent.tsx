@@ -179,7 +179,17 @@ const ContactosContent = () => {
           )}
         </div>
 
-        <div className="mt-4 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+      </header>
+
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        <ContactosKPICards
+          total={totalContactos}
+          nuevos={nuevos}
+          convertidos={convertidos}
+          esteMes={esteMes}
+        />
+
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           <Button
             variant={activeTab === "contactos" ? "secondary" : "ghost"}
             size="sm"
@@ -197,18 +207,9 @@ const ContactosContent = () => {
             Agencias
           </Button>
         </div>
-      </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
         {activeTab === "contactos" ? (
           <>
-            <ContactosKPICards
-              total={totalContactos}
-              nuevos={nuevos}
-              convertidos={convertidos}
-              esteMes={esteMes}
-            />
-
             <ContactosFilters
               filters={filters}
               onChange={updateFilters}
