@@ -61,6 +61,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       description: description.trim() || undefined,
       memberIds: selectedMembers,
       leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
+      folderId: folderId && folderId !== "__none__" ? folderId : null,
     });
     onOpenChange(false);
   };
