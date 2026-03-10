@@ -13,6 +13,8 @@ import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { useVideoCall } from "@/hooks/useVideoCall";
+import { useSpaces } from "@/hooks/useSpaces";
+import { usePinnedChats } from "@/hooks/usePinnedChats";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -31,6 +33,8 @@ export default function MessengerPage() {
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
+  const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
+  const { isPinned, togglePin } = usePinnedChats();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
@@ -73,12 +77,8 @@ export default function MessengerPage() {
   const handleCreateRoom = (name: string) => {
     const roomId = `room-${Date.now()}`;
     const newRoom: VideoRoom = {
-      id: roomId,
-      name,
-      createdBy: "me",
-      createdAt: new Date(),
-      participants: [],
-      isActive: false,
+      id: roomId, name, createdBy: "me", createdAt: new Date(),
+      participants: [], isActive: false,
       shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}`,
     };
     setVideoRooms(prev => [newRoom, ...prev]);
@@ -97,9 +97,7 @@ export default function MessengerPage() {
 
   const handleDeleteChat = async (chatId: string) => {
     const success = await deleteConversation(chatId);
-    if (success && activeChatId === chatId) {
-      setActiveChatId(null);
-    }
+    if (success && activeChatId === chatId) setActiveChatId(null);
     return success;
   };
 
@@ -130,9 +128,10 @@ export default function MessengerPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
+      {/* Sidebar — responsive widths */}
       <div className={cn(
-        "w-full md:w-[360px] lg:w-[400px] shrink-0 transition-all",
-        activeChatId ? "hidden md:flex md:flex-col" : "flex flex-col"
+        "w-full sm:w-[280px] md:w-[320px] lg:w-[380px] xl:w-[400px] shrink-0 transition-all",
+        activeChatId ? "hidden sm:flex sm:flex-col" : "flex flex-col"
       )}>
         {showVideoRooms ? (
           <VideoRoomsPanel
@@ -159,14 +158,23 @@ export default function MessengerPage() {
               loading={loading}
               onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
               profiles={profiles}
+              isPinned={isPinned}
+              onTogglePin={togglePin}
+              spaces={spaces}
+              onCreateSpace={createSpace}
+              onDeleteSpace={deleteSpace}
+              onRenameSpace={renameSpace}
+              onAddConversationToSpace={addConversationToSpace}
+              onRemoveConversationFromSpace={removeConversationFromSpace}
             />
           </>
         )}
       </div>
 
+      {/* Chat view */}
       <div className={cn(
         "flex-1 min-w-0",
-        !activeChatId ? "hidden md:flex" : "flex"
+        !activeChatId ? "hidden sm:flex" : "flex"
       )}>
         {activeConv ? (
           <div className="flex-1">
@@ -193,12 +201,12 @@ export default function MessengerPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center bg-muted/20">
-            <div className="text-center space-y-3">
-              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <MessageSquare className="h-10 w-10 text-primary" />
+            <div className="text-center space-y-3 px-4">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <MessageSquare className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground">Messenger</h3>
-              <p className="text-sm text-muted-foreground max-w-sm">
+              <h3 className="text-lg sm:text-xl font-semibold text-foreground">Messenger</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
                 Selecciona un chat o contacto para comenzar a conversar
               </p>
             </div>
