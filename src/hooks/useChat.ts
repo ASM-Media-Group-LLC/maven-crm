@@ -558,8 +558,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   // Realtime messages with proper reconnection
   useEffect(() => {
-    if (!conversationId) return;
-
+    if (!conversationId || !user?.id) return;
+    const userId = user.id;
     let retryCount = 0;
     const maxRetries = 5;
 
