@@ -34,6 +34,7 @@ interface MessageBubbleProps {
   readByUsers: string[];
   totalParticipants: number;
   threadCount?: number;
+  unreadThreadCount?: number;
   onOpenThread?: () => void;
 }
 
