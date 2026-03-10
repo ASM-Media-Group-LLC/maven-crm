@@ -1,27 +1,22 @@
 
 
-## Restructure Closers Layout: KPI Cards Above Tabs
+## Problem
 
-### What Changes
-Move the KPI stats cards **out of the Dashboard tab** and place them **above the tab bar** as a persistent summary -- matching the module-layout-standard used in Contactos, Creadores, etc.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Changes to `ClosersContent.tsx`
+## Solution
 
-1. **Remove the "Dashboard" tab** entirely (remove `TabsTrigger` for "dashboard" and its `TabsContent`)
-2. **Remove the `ClosersDashboard` import** (no longer needed as a separate tab)
-3. **Place `<ClosersKPICards creators={creators} />` above the `<Tabs>` component** inside the scrollable content area
-4. Set `defaultValue` to `"mis-creators"` instead of `"dashboard"`
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-The resulting layout order inside the scroll area:
-```
-ClosersKPICards (always visible)
-  ↓
-TabsList (Mis Creators | Pipeline | Confirmadas | Completadas | No Interesadas | Asignación)
-  ↓
-TabsContent (filters + table for selected tab)
-```
+## Changes
 
-### Files
-- **Edit**: `src/pages/closers/ClosersContent.tsx` -- move KPI cards above tabs, remove Dashboard tab
-- **Delete**: `src/pages/closers/tabs/ClosersDashboard.tsx` -- no longer needed
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

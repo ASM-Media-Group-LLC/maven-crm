@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCloserCreators, CloserCreator } from "./useCloserCreators";
-import ClosersDashboard from "./tabs/ClosersDashboard";
+import ClosersKPICards from "./components/ClosersKPICards";
 import MisCreatorsTab from "./tabs/MisCreatorsTab";
 import PipelineTab from "./tabs/PipelineTab";
 import ConfirmadasTab from "./tabs/ConfirmadasTab";
@@ -46,10 +46,10 @@ const ClosersContent = () => {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando...</p>
         ) : (
-          <Tabs defaultValue="dashboard">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
+          <>
+            <ClosersKPICards creators={creators} />
+            <Tabs defaultValue="mis-creators">
+              <TabsList className="flex-wrap">
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
               <TabsTrigger value="completadas">Completadas</TabsTrigger>
@@ -57,9 +57,6 @@ const ClosersContent = () => {
               {isAdmin && <TabsTrigger value="asignacion">Asignación</TabsTrigger>}
             </TabsList>
 
-            <TabsContent value="dashboard">
-              <ClosersDashboard creators={creators} />
-            </TabsContent>
             <TabsContent value="mis-creators">
               <MisCreatorsTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} onDelete={setDeletingCreator} />
             </TabsContent>
@@ -84,6 +81,7 @@ const ClosersContent = () => {
               </TabsContent>
             )}
           </Tabs>
+          </>
         )}
       </div>
 
