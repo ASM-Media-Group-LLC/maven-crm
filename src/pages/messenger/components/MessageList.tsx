@@ -62,7 +62,7 @@ export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
   loading, onReply, onCopy, onEdit, onDelete,
   getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
-  highlightedMsgId, onOpenThread, getThreadCount,
+  highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
