@@ -151,6 +151,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                 <TableCell>
                   <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
