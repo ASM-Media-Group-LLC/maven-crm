@@ -46,10 +46,11 @@ const ClosersContent = () => {
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando...</p>
         ) : (
-          <Tabs defaultValue="dashboard">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
+          <>
+            <ClosersKPICards creators={creators} />
+            <Tabs defaultValue="mis-creators">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
               <TabsTrigger value="completadas">Completadas</TabsTrigger>
