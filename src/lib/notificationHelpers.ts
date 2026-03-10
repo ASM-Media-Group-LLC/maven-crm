@@ -170,4 +170,7 @@ export const NOTIFICATION_TYPES_BY_MODULE: Record<string, { type: string; label:
     { type: "ticket_assigned", label: "Ticket asignado" },
     { type: "ticket_escalated", label: "Ticket escalado" },
   ],
+  Comunicación: [
+    { type: "announcement", label: "Anuncio publicado" },
+  ],
 };

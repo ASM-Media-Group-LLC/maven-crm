@@ -334,12 +334,20 @@ export const useDeleteAnnouncement = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      // Delete related notifications first
+      await supabase
+        .from("notifications")
+        .delete()
+        .eq("reference_type", "announcement")
+        .eq("reference_id", id);
+
       const { error } = await supabase.from("internal_announcements").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
       qc.invalidateQueries({ queryKey: PUBLIC_KEY });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
       toast.success("Anuncio eliminado");
     },
     onError: (e: Error) => toast.error(e.message),
