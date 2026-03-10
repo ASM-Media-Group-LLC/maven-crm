@@ -184,28 +184,41 @@ export default function MessageInput({
 
       {/* File previews */}
       {pendingFiles.length > 0 && (
-        <div className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-border bg-muted/20">
-          {pendingFiles.map((pf, i) => (
-            <div key={i} className="relative shrink-0 group/file">
-              {pf.preview ? (
-                <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
-              ) : (
-                <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
-                    {pf.file.name.split(".").pop()?.toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <button
-                onClick={() => removePendingFile(i)}
-                className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-              <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
-            </div>
-          ))}
+        <div className="border-b border-border bg-muted/20">
+          <div className="flex items-center justify-between px-4 pt-2 pb-1">
+            <span className="text-[11px] text-muted-foreground font-medium">
+              {pendingFiles.length}/{MAX_FILES} archivos adjuntos
+            </span>
+            <Button variant="ghost" size="sm" className="h-5 text-[10px] text-destructive hover:text-destructive" onClick={() => {
+              pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+              setPendingFiles([]);
+            }}>
+              Quitar todos
+            </Button>
+          </div>
+          <div className="flex gap-2 px-4 pb-2 overflow-x-auto">
+            {pendingFiles.map((pf, i) => (
+              <div key={i} className="relative shrink-0 group/file">
+                {pf.preview ? (
+                  <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
+                ) : (
+                  <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
+                      {pf.file.name.split(".").pop()?.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removePendingFile(i)}
+                  className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+                <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
