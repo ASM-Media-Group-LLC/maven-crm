@@ -78,6 +78,30 @@ export default function ChatView({
     return messages.filter(m => m.reply_to_id === messageId).length;
   }, [messages]);
 
+  // Track which threads the user has "seen" — replies after the last time they opened the thread
+  const [seenThreadCounts, setSeenThreadCounts] = useState<Record<string, number>>({});
+
+  const getUnreadThreadCount = useCallback((messageId: string) => {
+    const total = messages.filter(m => m.reply_to_id === messageId).length;
+    const seen = seenThreadCounts[messageId] || 0;
+    return Math.max(0, total - seen);
+  }, [messages, seenThreadCounts]);
+
+  const handleOpenThreadWithTracking = useCallback((msg: ChatMessage) => {
+    const parentId = msg.reply_to_id
+      ? (messages.find(m => m.id === msg.reply_to_id) ? msg.reply_to_id : msg.id)
+      : msg.id;
+    // Mark all current replies as seen
+    const count = messages.filter(m => m.reply_to_id === parentId).length;
+    setSeenThreadCounts(prev => ({ ...prev, [parentId]: count }));
+
+    if (msg.reply_to_id) {
+      const parent = messages.find(m => m.id === msg.reply_to_id);
+      if (parent) { setThreadParent(parent); return; }
+    }
+    setThreadParent(msg);
+  }, [messages]);
+
   const handleOpenThread = useCallback((msg: ChatMessage) => {
     if (msg.reply_to_id) {
       const parent = messages.find(m => m.id === msg.reply_to_id);
