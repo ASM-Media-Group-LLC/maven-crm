@@ -74,6 +74,28 @@ const ContactosContent = () => {
     },
   });
 
+  // Resolve created_by UUIDs to profile names
+  const creatorIds = useMemo(() => {
+    const ids = new Set<string>();
+    dbContactos.forEach((c) => { if (c.created_by) ids.add(c.created_by); });
+    return Array.from(ids);
+  }, [dbContactos]);
+
+  const { data: profilesMap = {} } = useQuery({
+    queryKey: ["profiles_for_contacts", creatorIds],
+    enabled: creatorIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", creatorIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p) => { map[p.id] = p.full_name || ""; });
+      return map;
+    },
+  });
+
   // Fetch interaction counts per contact
   const { data: interactionCounts = {} } = useQuery({
     queryKey: ["contact_interaction_counts"],
