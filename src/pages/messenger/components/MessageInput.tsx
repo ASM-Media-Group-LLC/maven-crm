@@ -16,6 +16,10 @@ const EMOJIS = [
   "😅","🫡","🤝","💀","🥲","😤","🤓","🫠","🙌","💜",
 ];
 
+const MAX_FILES = 20;
+const MAX_FILE_SIZE_MB = 350;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 interface PendingFile {
   file: File;
   preview?: string;
@@ -36,6 +40,7 @@ export default function MessageInput({
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -46,7 +51,9 @@ export default function MessageInput({
     // Send pending files first
     if (pendingFiles.length > 0) {
       setUploading(true);
-      for (const pf of pendingFiles) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const pf = pendingFiles[i];
+        setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name}`);
         const path = `${user!.id}/${Date.now()}-${pf.file.name}`;
         const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
         if (error) {
@@ -54,14 +61,14 @@ export default function MessageInput({
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-        // Only attach text to the first file
-        const msgContent = pendingFiles.indexOf(pf) === 0 && text.trim() ? text.trim() : pf.file.name;
+        const msgContent = i === 0 && text.trim() ? text.trim() : pf.file.name;
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
       }
       setPendingFiles([]);
       setText("");
       onCancelReply();
       setUploading(false);
+      setUploadProgress("");
       inputRef.current?.focus();
       return;
     }
@@ -91,6 +98,23 @@ export default function MessageInput({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+
+    // Validate max files
+    const totalFiles = pendingFiles.length + files.length;
+    if (totalFiles > MAX_FILES) {
+      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Validate file sizes
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      const names = oversized.map(f => f.name).join(", ");
+      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     const newPending: PendingFile[] = files.map(file => {
       const isImg = file.type.startsWith("image/");
@@ -163,28 +187,49 @@ export default function MessageInput({
 
       {/* File previews */}
       {pendingFiles.length > 0 && (
-        <div className="flex gap-2 px-4 py-2 overflow-x-auto border-b border-border bg-muted/20">
-          {pendingFiles.map((pf, i) => (
-            <div key={i} className="relative shrink-0 group/file">
-              {pf.preview ? (
-                <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
-              ) : (
-                <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
-                    {pf.file.name.split(".").pop()?.toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <button
-                onClick={() => removePendingFile(i)}
-                className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-              <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
-            </div>
-          ))}
+        <div className="border-b border-border bg-muted/20">
+          <div className="flex items-center justify-between px-4 pt-2 pb-1">
+            <span className="text-[11px] text-muted-foreground font-medium">
+              {pendingFiles.length}/{MAX_FILES} archivos adjuntos
+            </span>
+            <Button variant="ghost" size="sm" className="h-5 text-[10px] text-destructive hover:text-destructive" onClick={() => {
+              pendingFiles.forEach(pf => { if (pf.preview) URL.revokeObjectURL(pf.preview); });
+              setPendingFiles([]);
+            }}>
+              Quitar todos
+            </Button>
+          </div>
+          <div className="flex gap-2 px-4 pb-2 overflow-x-auto">
+            {pendingFiles.map((pf, i) => (
+              <div key={i} className="relative shrink-0 group/file">
+                {pf.preview ? (
+                  <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
+                ) : (
+                  <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
+                      {pf.file.name.split(".").pop()?.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removePendingFile(i)}
+                  className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+                <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upload progress */}
+      {uploading && uploadProgress && (
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-primary/5">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+          <span className="text-[11px] text-primary font-medium truncate">{uploadProgress}</span>
         </div>
       )}
 
