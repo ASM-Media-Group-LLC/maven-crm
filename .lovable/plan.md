@@ -1,30 +1,70 @@
 
 
-## Analysis: Internal Announcements Visibility
+## Fix: Orphaned Announcement Notifications
 
-After a thorough review of the announcements system, **the logic is already correct** -- global announcements will be visible to all roles (closer, employee, manager, etc.).
+### Root Cause
 
-Here is the verification:
+The announcement "Prueba nuevo anuncio de RRHH" (`400f0719...`) was deleted from `internal_announcements`, but its 10+ notification records remain in the `notifications` table. The client-side cleanup in `useDeleteAnnouncement` tries to delete notifications with `.eq("reference_type", "announcement").eq("reference_id", id)`, but **RLS blocks it** because the admin can only modify their own notifications, not other users' notifications.
 
-### How it works today
+Same problem affects `useArchiveAnnouncement` — it tries to update other users' notifications but RLS prevents it.
 
-1. **`useAnnouncements.ts` (line 93-94)**: If `visibility === "global"`, the announcement is returned to ALL authenticated users regardless of role. No permission check blocks it.
+### Changes
 
-2. **Dashboard (`DashboardContent.tsx`)**: The "Avisos y Celebraciones" card is **not** wrapped in any `canAccess()` guard -- it renders for every role.
+**1. Database trigger (migration) — automatic cleanup**
 
-3. **Banners** (`AnnouncementBanner` on line 310): Rendered for all roles, no permission gate.
+Create an `ON DELETE` trigger on `internal_announcements` that automatically deletes all related notifications using `SECURITY DEFINER` (bypasses RLS):
 
-4. **Popups** (`Dashboard.tsx` line 24): Rendered for all roles, no permission gate.
+```sql
+CREATE OR REPLACE FUNCTION public.cleanup_announcement_notifications()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  DELETE FROM notifications
+  WHERE reference_type = 'announcement' AND reference_id = OLD.id::text;
+  RETURN OLD;
+END;
+$$;
 
-### Current state
+CREATE TRIGGER trg_cleanup_announcement_notifications
+BEFORE DELETE ON internal_announcements
+FOR EACH ROW EXECUTE FUNCTION cleanup_announcement_notifications();
+```
 
-The database has **0 announcements** right now, so nothing is displaying for any role. When you create a general/global announcement, it will appear for all roles on the dashboard via feed, banner, or popup depending on the delivery channel selected.
+**2. Database trigger — auto-archive on deactivation**
 
-### No code changes needed
+When an announcement is archived (`is_active` set to `false`), auto-archive its notifications:
 
-The announcement audience filtering system is correctly implemented:
-- `visibility = "global"` → shown to everyone
-- `visibility = "targeted"` → checks `announcement_audience` table for department/role/user matches
+```sql
+CREATE OR REPLACE FUNCTION public.archive_announcement_notifications()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF OLD.is_active = true AND NEW.is_active = false THEN
+    UPDATE notifications SET status = 'archived'
+    WHERE reference_type = 'announcement' AND reference_id = NEW.id::text;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-If you'd like, you can test this by creating a global announcement from the admin panel and verifying it appears on the dashboard for a closer account.
+CREATE TRIGGER trg_archive_announcement_notifications
+BEFORE UPDATE ON internal_announcements
+FOR EACH ROW EXECUTE FUNCTION archive_announcement_notifications();
+```
+
+**3. Clean up existing orphaned data (data operation)**
+
+Delete the 10 orphaned notifications referencing the deleted announcement `400f0719-939e-4ab9-b0dc-dc369587ab7d`.
+
+**4. Client-side filter (`useNotifications.ts`)**
+
+Add a defense-in-depth check: for notifications with `reference_type = 'announcement'`, verify the referenced announcement still exists (or simply filter out announcement notifications whose `reference_id` doesn't match any active announcement). This is lightweight — we'll use a simpler approach: just validate that `reference_id` is not null for announcement-type notifications.
+
+Actually, the DB triggers handle this going forward, so the client-side change is optional. The critical fix is the triggers + data cleanup.
 
