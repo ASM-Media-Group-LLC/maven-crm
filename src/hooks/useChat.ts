@@ -597,15 +597,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             return [...prev, newMsg];
           });
 
-          if (user && newMsg.sender_id !== user.id) {
+          if (newMsg.sender_id !== userId) {
             onNewMessageRef.current?.(newMsg);
-            // Mark as read if window is focused
             if (document.hasFocus()) {
               supabase
                 .from("chat_participants")
                 .update({ last_read_at: new Date().toISOString() })
                 .eq("conversation_id", conversationId)
-                .eq("user_id", user.id)
+                .eq("user_id", userId)
                 .then();
             }
           }
