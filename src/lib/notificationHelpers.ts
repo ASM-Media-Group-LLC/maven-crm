@@ -101,8 +101,25 @@ export const MODULE_OPTIONS = [
   { value: "tickets", label: "Tickets" },
   { value: "leadgen", label: "LeadGen" },
   { value: "closers", label: "Closers" },
+  { value: "Comunicación", label: "Comunicación" },
+  { value: "messenger", label: "Messenger" },
   { value: "admin", label: "Admin" },
 ] as const;
+
+// Maps module option values to RBAC permission module names (capitalized)
+export const MODULE_PERMISSION_MAP: Record<string, string | null> = {
+  creadores: "Creadores",
+  tareas: "Tareas",
+  eventos: "Eventos",
+  hr: "HR",
+  finanzas: "Finanzas",
+  tickets: "Tickets",
+  leadgen: "LeadGen",
+  closers: "Closers",
+  "Comunicación": "HR",
+  messenger: null, // universal
+  admin: "Administración",
+};
 
 export const PRIORITY_OPTIONS = [
   { value: "high", label: "Alta" },
