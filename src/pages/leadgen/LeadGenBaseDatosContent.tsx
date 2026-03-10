@@ -189,19 +189,19 @@ const LeadGenBaseDatosContent = () => {
           <Popover open={agentSelectOpen} onOpenChange={setAgentSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
-                {filterAgente === "todos" ? "Agente" : filterAgente}
+                {filterAgente === "todos" ? "Agencia" : filterAgente}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[200px] p-0">
               <Command>
-                <CommandInput placeholder="Buscar agente..." />
+                <CommandInput placeholder="Buscar agencia..." />
                 <CommandList>
                   <CommandEmpty>No encontrado</CommandEmpty>
                   <CommandItem onSelect={() => { setFilterAgente("todos"); setAgentSelectOpen(false); }}>
-                    Todos{filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
+                    Todas{filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
-                  {agentes.map((a) => (
+                  {LEADGEN_COMPANIES.map((a) => (
                     <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgentSelectOpen(false); }}>
                       {a}{filterAgente === a && <Check className="ml-auto h-4 w-4" />}
                     </CommandItem>

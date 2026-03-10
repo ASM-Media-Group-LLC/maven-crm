@@ -297,6 +297,15 @@ const LeadGenContent = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={agencyFilter} onValueChange={setAgencyFilter}>
+                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas las agencias</SelectItem>
+                  {LEADGEN_COMPANIES.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </>
           )}
           {(activeTab === "leads" || activeTab === "agentes") && (
