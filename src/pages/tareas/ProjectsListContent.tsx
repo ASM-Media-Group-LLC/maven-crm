@@ -575,6 +575,51 @@ const ProjectsListContent = () => {
         }}
         isLoading={deleteProject.isPending}
       />
+
+      {/* Batch delete confirmation */}
+      <DeleteProjectDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        projectName={`${selectedIds.size} proyecto(s)`}
+        onConfirm={handleBatchDelete}
+        isLoading={deleteProject.isPending}
+      />
+
+      {/* Floating batch action bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
+          <div className="flex items-center gap-3 bg-card border border-border rounded-xl shadow-lg px-5 py-3">
+            <span className="text-sm font-medium">{selectedIds.size} seleccionado(s)</span>
+            <div className="h-5 w-px bg-border" />
+            {folders.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <FolderInput className="h-4 w-4 mr-1" /> Mover
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleBatchMove(null)}>Sin carpeta</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {folders.map(f => (
+                    <DropdownMenuItem key={f.id} onClick={() => handleBatchMove(f.id)}>{f.name}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button variant="outline" size="sm" onClick={handleBatchArchive}>
+              <Archive className="h-4 w-4 mr-1" /> Archivar
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => setBatchDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+            </Button>
+            <div className="h-5 w-px bg-border" />
+            <Button variant="ghost" size="sm" onClick={clearSelection}>
+              <X className="h-4 w-4 mr-1" /> Deseleccionar
+            </Button>
+          </div>
+        </div>
+      )}
     </main>
   );
 };
