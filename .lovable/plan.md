@@ -1,22 +1,31 @@
 
 
-## Problem
+## Plan: Show Creator Name and Creation Date in Contacts Directory
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+The "Creado por" column in the contacts table/grid displays the raw `created_by` UUID instead of the user's full name.
 
-## Solution
+### Solution
+Fetch profiles for all distinct `created_by` IDs and resolve them to `full_name` in the contact mapping.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### Changes
 
-## Changes
+**1. `src/pages/contactos/ContactosContent.tsx`**
+- Add a query to fetch `profiles` for all unique `created_by` user IDs from `dbContactos`
+- In the `allContactos` mapping, replace `c.created_by || ""` with the resolved `full_name` from the profiles lookup
+- Ensure `creacion` shows a clear date+time format (already does, but will verify formatting is clean)
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+**2. `src/pages/contactos/ContactosTable.tsx`**
+- No structural changes needed — already renders `c.creadoPor` and `c.creacion` columns
 
-Replace the single `.select()` call with a paginated loop:
+**3. `src/pages/contactos/ContactosGrid.tsx`**
+- Add display of `c.creadoPor` (creator name) and `c.creacion` (date) in the card layout, since they are currently missing from the grid view
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### Technical Detail
+```
+Query: supabase.from("profiles").select("id, full_name").in("id", uniqueCreatorIds)
+Mapping: profiles stored in a Record<string, string> → used to resolve creadoPor
+```
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+This is a read-only UI enhancement with no database changes required.
 
