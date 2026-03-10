@@ -5,9 +5,11 @@ import DashboardContent from "@/components/dashboard/DashboardContent";
 import ClariAiFab from "@/components/ClariAiFab";
 import AnnouncementPopup from "@/components/dashboard/AnnouncementPopup";
 import { useAnnouncementsByChannel } from "@/hooks/useAnnouncements";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const Dashboard = () => {
   const { popups } = useAnnouncementsByChannel();
+  const { isAdmin } = useUserRole();
 
   return (
     <SidebarProvider>
