@@ -66,12 +66,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   const [lightboxType, setLightboxType] = useState<"image" | "video">("image");
   const [showAllImages, setShowAllImages] = useState(false);
 
-  // If this message is part of a grid but not the leader, don't render
-  if (isPartOfGrid && !isGridLeader) return null;
-
   const participantNames = useMemo(() => {
     return Object.values(profiles).map(p => p.full_name).filter(Boolean) as string[];
   }, [profiles]);
+
+  // If this message is part of a grid but not the leader, don't render
+  if (isPartOfGrid && !isGridLeader) return null;
 
   if (message.is_deleted) {
     return (
