@@ -1,28 +1,22 @@
 
 
-## Plan: Fix Dashboard layout gaps for all roles
+## Problem
 
-The problem: when a role (like "employee") has limited permissions, most dashboard sections are hidden via `canAccess()` but the grid containers still render with fixed column counts, leaving awkward empty spaces.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Issues identified in `src/components/dashboard/DashboardContent.tsx`:
+## Solution
 
-1. **Row 2 (line 362)**: Hard-coded `lg:grid-cols-3`. When LeadGen is hidden, Avisos gets `lg:col-span-2` but inside a 3-col grid — doesn't fill properly.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-2. **Row 3 (line 484)**: Pipeline + Top 5 + Pending Tasks grid. Uses `getGridCols` counting booleans, but when only "Tareas Pendientes" shows, it renders in a multi-col grid with empty space.
+## Changes
 
-3. **Row 4 (line 588)**: Tickets + Closers + HR cards. If none are accessible, the empty grid div still renders.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-### Changes (single file: `DashboardContent.tsx`):
+Replace the single `.select()` call with a paginated loop:
 
-1. **Row 2**: Dynamically set grid columns based on which cards are visible. If only Avisos shows, use `grid-cols-1` full width. If both show, use `lg:grid-cols-3` as today.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-2. **Row 3**: Conditionally render the entire row only if at least one card is visible. Use dynamic column count matching the visible card count (1, 2, or 3).
-
-3. **Row 4**: Wrap in a conditional — only render if at least one of Tickets/Closers/HR is accessible. Use dynamic column count.
-
-4. **Row 2b (Actividad Reciente, line 438)**: Filter items by permission. If all filtered out, the "Sin actividad reciente" fallback shows — this is fine but the card should still look good standalone.
-
-5. **Avisos y Celebraciones card**: When it's the only card in its row, remove the `col-span` hack and let it be full-width naturally via `grid-cols-1`.
-
-All changes are layout/CSS adjustments — no logic or data changes.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

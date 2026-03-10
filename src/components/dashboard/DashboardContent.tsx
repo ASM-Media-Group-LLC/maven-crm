@@ -359,7 +359,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 2: Weekly Performance + Avisos/Actividad */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${canAccess("LeadGen") ? "lg:grid-cols-3" : ""}`}>
           {canAccess("LeadGen") && (
             <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
@@ -385,7 +385,7 @@ const DashboardContent = () => {
           )}
 
           {/* Avisos y Celebraciones */}
-          <Card className={`transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30 ${!canAccess("LeadGen") ? "lg:col-span-2" : ""}`}>
+          <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Bell className="h-4 w-4" />
@@ -481,7 +481,10 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
-        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("LeadGen"), canAccess("Creadores"), true].filter(Boolean).length)}`}>
+        {(() => {
+          const row3Count = [canAccess("LeadGen"), canAccess("Creadores"), true].filter(Boolean).length;
+          return (
+        <div className={`grid gap-4 ${getGridCols(row3Count)}`}>
           {canAccess("LeadGen") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
               <CardHeader className="pb-2">
@@ -583,9 +586,15 @@ const DashboardContent = () => {
             </CardContent>
           </Card>
         </div>
+          );
+        })()}
 
         {/* Row 4: Operational Cards */}
-        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("Tickets"), canAccess("Closers"), canAccess("HR")].filter(Boolean).length)}`}>
+        {(() => {
+          const row4Count = [canAccess("Tickets"), canAccess("Closers"), canAccess("HR")].filter(Boolean).length;
+          if (row4Count === 0) return null;
+          return (
+        <div className={`grid gap-4 ${getGridCols(row4Count)}`}>
           {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
@@ -670,6 +679,8 @@ const DashboardContent = () => {
             </Card>
           )}
         </div>
+          );
+        })()}
       </main>
 
       {/* Quick Actions Config Dialog */}
