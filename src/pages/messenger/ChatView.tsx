@@ -37,7 +37,7 @@ export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers,
-  hasMore, loadingMore, onLoadMore,
+  hasMore, loadingMore, onLoadMore, onMembersChanged,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
