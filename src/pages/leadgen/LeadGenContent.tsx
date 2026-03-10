@@ -93,7 +93,7 @@ const LeadGenContent = () => {
       ];
     }
     const baseTabs = [
-      { id: "leads", label: "Leads (QA)", icon: CheckSquare },
+      { id: "leads", label: "Leads", icon: CheckSquare },
       { id: "agentes", label: "Agentes", icon: Users },
     ];
     if (viewMode === "owner") {
