@@ -297,6 +297,7 @@ function ContactsSection({ profiles, onSelectContact }: {
                 >
                   <div className="relative shrink-0">
                     <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                      {p.avatar_url && <AvatarImage src={p.avatar_url} alt={p.full_name || ""} className="object-cover" />}
                       <AvatarFallback className="text-[9px] sm:text-[10px] font-semibold bg-primary/10 text-primary">
                         {getInitials(p.full_name || "?")}
                       </AvatarFallback>
