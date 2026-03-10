@@ -14,11 +14,12 @@ import { BackgroundEffect } from "./BackgroundSelector";
 interface LiveKitCallViewProps {
   roomName: string;
   displayName: string;
+  callDisplayName?: string;
   isAdmin?: boolean;
   onLeave: () => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, isAdmin = false, onLeave }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
