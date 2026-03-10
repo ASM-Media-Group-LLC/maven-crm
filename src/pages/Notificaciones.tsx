@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
-import { resolveDeepLink, MODULE_OPTIONS, PRIORITY_OPTIONS, STATUS_OPTIONS } from "@/lib/notificationHelpers";
+import { resolveDeepLink, MODULE_OPTIONS, MODULE_PERMISSION_MAP, PRIORITY_OPTIONS, STATUS_OPTIONS } from "@/lib/notificationHelpers";
 import NotificationItem from "@/components/notifications/NotificationItem";
 import type { Notification } from "@/hooks/useNotifications";
 import HRLayout from "@/pages/hr/HRLayout";
@@ -22,6 +22,19 @@ const Notificaciones = () => {
   const { canAccess } = usePermissions();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Filter module options by role permissions
+  const filteredModuleOptions = useMemo(
+    () =>
+      MODULE_OPTIONS.filter((o) => {
+        const permModule = MODULE_PERMISSION_MAP[o.value];
+        // null means universal (e.g. messenger) — always show
+        if (permModule === null) return true;
+        if (permModule === undefined) return true;
+        return canAccess(permModule);
+      }),
+    [canAccess]
+  );
 
   const handleClick = (n: Notification) => {
     if (n.status === "new" || (!n.status && !n.is_read)) {
@@ -72,7 +85,7 @@ const Notificaciones = () => {
                 <SelectValue placeholder="Módulo" />
               </SelectTrigger>
               <SelectContent>
-                {MODULE_OPTIONS.map((o) => (
+                {filteredModuleOptions.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
