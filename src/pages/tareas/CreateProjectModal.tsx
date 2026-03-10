@@ -47,11 +47,13 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
       description: description.trim() || undefined,
       memberIds: selectedMembers.length > 0 ? selectedMembers : undefined,
       leaderId: leaderId && leaderId !== "__none__" ? leaderId : undefined,
+      folderId: folderId && folderId !== "__none__" ? folderId : undefined,
     });
     setName("");
     setDescription("");
     setSelectedMembers([]);
     setLeaderId("");
+    setFolderId("");
     onOpenChange(false);
   };
 
