@@ -585,7 +585,7 @@ const DashboardContent = () => {
         </div>
 
         {/* Row 4: Operational Cards */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("Tickets"), canAccess("Closers"), canAccess("HR")].filter(Boolean).length)}`}>
           {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">

@@ -72,8 +72,8 @@ export const usePermissions = () => {
       return modulePerms.some((p) => p.can_access);
     }
 
-    // No permission configured for this module — allow by default
-    return true;
+    // No permission configured for this module — deny by default
+    return false;
   };
 
   const dataScope = (module: string): "all" | "subordinates" | "self" => {

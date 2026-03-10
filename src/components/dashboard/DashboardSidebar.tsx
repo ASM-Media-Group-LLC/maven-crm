@@ -638,22 +638,6 @@ const DashboardSidebar = () => {
           </SidebarGroup>
         )}
 
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Ajustes">
-                  <NavLink to="/ajustes/notificaciones" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                    <Settings className="h-4 w-4 shrink-0" />
-                    <span>Ajustes</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter />
