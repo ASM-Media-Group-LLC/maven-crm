@@ -312,7 +312,7 @@ const DashboardContent = () => {
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className={`grid gap-4 ${getGridCols(kpis.length)}`}>
           {kpis.map((k) => (
             <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
           ))}
