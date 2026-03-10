@@ -102,13 +102,6 @@ export default function ChatView({
     setThreadParent(msg);
   }, [messages]);
 
-  const handleOpenThread = useCallback((msg: ChatMessage) => {
-    if (msg.reply_to_id) {
-      const parent = messages.find(m => m.id === msg.reply_to_id);
-      if (parent) { setThreadParent(parent); return; }
-    }
-    setThreadParent(msg);
-  }, [messages]);
 
   return (
     <div className="flex h-full bg-background relative">
