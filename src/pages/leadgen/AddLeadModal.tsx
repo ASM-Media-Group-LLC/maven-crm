@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getMiamiDateStr } from "./timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -141,6 +142,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         notes: data.notes || null,
         source_link: data.source_link || null,
         lg_user_id: user.id,
+        entry_date: getMiamiDateStr(),
       } as any).select("id").single();
 
       if (error) throw error;

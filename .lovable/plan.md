@@ -1,32 +1,22 @@
 
 
-## Verification: Closer Lead Visibility
+## Problem
 
-### What works correctly
-- The closer role has `data_scope: "self"` for LeadGen, so `viewMode = "agent"` and the query filters by `lg_user_id = user.id` -- correct.
-- The insert in `AddLeadModal` sets `lg_user_id: user.id` -- correct.
-- RLS is disabled on `leadgen_entries`, so there are no RLS blocks on insert or select.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Bug found: Timezone mismatch on `entry_date`
+## Solution
 
-The `AddLeadModal` insert does **not** set `entry_date` explicitly. It relies on the Postgres default `CURRENT_DATE`, which uses the server timezone: **UTC**.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-However, the UI defaults to today's date in **Miami time** (`getMiamiDateStr()` returns `America/New_York`).
+## Changes
 
-**Consequence**: If a closer creates a lead after 8 PM ET (midnight UTC), Postgres stores `entry_date` as the *next day* (UTC), but the UI filters for *today* (Miami). The lead won't appear until the user manually changes the date filter or the next day arrives in Miami time.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-### Fix
+Replace the single `.select()` call with a paginated loop:
 
-**`AddLeadModal.tsx`** — Explicitly pass `entry_date` using Miami time in the insert:
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-```typescript
-import { getMiamiDateStr } from "./timezoneUtils";
-
-// In the insert object:
-entry_date: getMiamiDateStr(),
-```
-
-This is a one-line addition to the insert payload at line ~135. It ensures the stored `entry_date` matches the UI's timezone, so the closer always sees their newly created lead immediately.
-
-No other changes needed — the query logic, permission scoping, and filtering are all correct.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
