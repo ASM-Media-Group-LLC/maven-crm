@@ -243,15 +243,23 @@ const ProjectsListContent = () => {
     const counts = getProjectTaskCounts(project.id);
     const progress = getProjectProgress(project.id);
     const leader = project.leader_id ? companyProfiles.find(p => p.id === project.leader_id) : null;
+    const isSelected = selectedIds.has(project.id);
     return (
       <Card
         key={project.id}
-        className={cn("cursor-pointer transition-colors hover:bg-muted/50", project.status === "archived" && "opacity-60")}
+        className={cn("cursor-pointer transition-all hover:bg-muted/50 relative", project.status === "archived" && "opacity-60", isSelected && "ring-2 ring-primary")}
         onClick={() => navigate(`/tareas/${project.id}`)}
       >
         <CardContent className="p-5 space-y-3">
           <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2 flex-1 min-w-0">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => toggleSelect(project.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="mt-1 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-base truncate">{project.name}</h3>
                 {project.status === "archived" && (
