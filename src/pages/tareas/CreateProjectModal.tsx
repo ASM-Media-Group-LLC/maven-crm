@@ -15,9 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 interface CreateProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
+  onSubmit: (data: { name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
+  folders?: { id: string; name: string }[];
 }
 
 const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles = [] }: CreateProjectModalProps) => {
