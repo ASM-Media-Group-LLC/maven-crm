@@ -136,7 +136,7 @@ const ContactosContent = () => {
       profile_picture_url: c.profile_picture_url || "",
       assigned_to: c.assigned_to || "",
     })),
-  [dbContactos, interactionCounts]);
+  [dbContactos, interactionCounts, profilesMap]);
 
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };

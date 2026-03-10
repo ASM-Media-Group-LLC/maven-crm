@@ -87,6 +87,10 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
 
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">{c.pais}</p>
+                {c.creadoPor && (
+                  <p className="text-xs text-muted-foreground">Creado por: {c.creadoPor}</p>
+                )}
+                <p className="text-xs text-muted-foreground">{c.creacion}</p>
                 <a
                   href={`https://instagram.com/${c.instagram}`}
                   target="_blank"
