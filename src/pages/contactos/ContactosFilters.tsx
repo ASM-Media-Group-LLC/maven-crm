@@ -47,7 +47,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
     <FilterSelect
       placeholder="País"
       value={filters.pais}
-      options={["CO", "MX", "AR", "ES", "UY", "BR", "CL", "PE", "US"]}
+      options={["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]}
       onChange={(v) => onChange({ pais: v })}
     />
     <FilterSelect

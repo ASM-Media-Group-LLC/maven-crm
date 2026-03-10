@@ -160,6 +160,13 @@ const ContactosContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   const filtered = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = now.getDay();
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfToday.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     return allContactos.filter((c) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -172,9 +179,16 @@ const ContactosContent = () => {
       if (filters.estado && c.estado !== filters.estado) return false;
       if (filters.pais && c.pais !== filters.pais) return false;
       if (filters.categoria && c.categoria !== filters.categoria) return false;
+      if (filters.fechaCreacion) {
+        const raw = dbContactos.find((d) => d.id === c.id);
+        const created = new Date(raw?.created_at || "");
+        if (filters.fechaCreacion === "hoy" && created < startOfToday) return false;
+        if (filters.fechaCreacion === "semana" && created < startOfWeek) return false;
+        if (filters.fechaCreacion === "mes" && created < startOfMonth) return false;
+      }
       return true;
     });
-  }, [filters, allContactos]);
+  }, [filters, allContactos, dbContactos]);
 
   const totalContactos = allContactos.length;
   const nuevos = allContactos.filter((c) => c.estado === "Nuevo").length;
