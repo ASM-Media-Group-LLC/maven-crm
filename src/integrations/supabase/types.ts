@@ -711,6 +711,35 @@ export type Database = {
           },
         ]
       }
+      chat_pinned: {
+        Row: {
+          conversation_id: string
+          id: string
+          pinned_at: string | null
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          pinned_at?: string | null
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          pinned_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_pinned_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_reactions: {
         Row: {
           created_at: string
@@ -771,6 +800,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      chat_space_conversations: {
+        Row: {
+          added_at: string | null
+          conversation_id: string
+          id: string
+          sort_order: number | null
+          space_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          conversation_id: string
+          id?: string
+          sort_order?: number | null
+          space_id: string
+        }
+        Update: {
+          added_at?: string | null
+          conversation_id?: string
+          id?: string
+          sort_order?: number | null
+          space_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_space_conversations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_space_conversations_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "chat_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_spaces: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          created_by: string
+          icon: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          created_by: string
+          icon?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          created_by?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       closers_contacts: {
         Row: {
