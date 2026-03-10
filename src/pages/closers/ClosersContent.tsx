@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCloserCreators, CloserCreator } from "./useCloserCreators";
-import ClosersDashboard from "./tabs/ClosersDashboard";
+import ClosersKPICards from "./components/ClosersKPICards";
 import MisCreatorsTab from "./tabs/MisCreatorsTab";
 import PipelineTab from "./tabs/PipelineTab";
 import ConfirmadasTab from "./tabs/ConfirmadasTab";
