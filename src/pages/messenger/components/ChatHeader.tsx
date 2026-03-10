@@ -36,7 +36,7 @@ function getInitials(name: string) {
 export default function ChatHeader({
   conversation, profiles, typingUsers, searchOpen, searchQuery,
   onSearchToggle, onSearchChange, onBack, onStartVideoCall,
-  onOpenNotificationSettings, onOpenSharedFiles,
+  onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
 }: ChatHeaderProps) {
   const { user } = useAuth();
   const { isOnline, getStatus } = useOnlinePresence();
