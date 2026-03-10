@@ -1,4 +1,4 @@
-import { Search, List, LayoutGrid, CalendarDays, X } from "lucide-react";
+import { Search, List, LayoutGrid, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -8,13 +8,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format, parseISO } from "date-fns";
 
 export interface ContactoFilters {
   search: string;
   estado: string;
   pais: string;
   categoria: string;
-  fechaCreacion: string;
+  dateFrom: string;
+  dateTo: string;
+  creadoPor: string;
+}
+
+interface CreatorOption {
+  value: string;
+  label: string;
 }
 
 interface Props {
@@ -24,10 +33,11 @@ interface Props {
   onViewChange: (v: "table" | "grid") => void;
   hasActiveFilters?: boolean;
   onClear?: () => void;
+  creators?: CreatorOption[];
 }
 
-const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear }: Props) => (
-  <div className="flex items-center gap-3">
+const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [] }: Props) => (
+  <div className="flex flex-wrap items-center gap-3">
     <div className="relative w-64">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
@@ -57,20 +67,27 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       onChange={(v) => onChange({ categoria: v })}
     />
 
-    <div className="flex items-center gap-1.5">
-      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-      <Select value={filters.fechaCreacion || undefined} onValueChange={(v) => onChange({ fechaCreacion: v === "__all__" ? "" : v })}>
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Fecha creación" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">Todos</SelectItem>
-          <SelectItem value="hoy">Hoy</SelectItem>
-          <SelectItem value="semana">Esta semana</SelectItem>
-          <SelectItem value="mes">Este mes</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+    <DateRangePicker
+      from={filters.dateFrom ? parseISO(filters.dateFrom) : undefined}
+      to={filters.dateTo ? parseISO(filters.dateTo) : undefined}
+      onApply={(from, to) =>
+        onChange({
+          dateFrom: from ? format(from, "yyyy-MM-dd") : "",
+          dateTo: to ? format(to, "yyyy-MM-dd") : "",
+        })
+      }
+      placeholder="Fecha creación"
+      className="w-auto"
+    />
+
+    {creators.length > 0 && (
+      <FilterSelect
+        placeholder="Creado por"
+        value={filters.creadoPor}
+        options={creators.map((c) => c.label)}
+        onChange={(v) => onChange({ creadoPor: v })}
+      />
+    )}
 
     {hasActiveFilters && onClear && (
       <Button variant="ghost" size="sm" onClick={onClear}>
