@@ -21,12 +21,13 @@ interface CreateProjectModalProps {
   folders?: { id: string; name: string }[];
 }
 
-const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles = [] }: CreateProjectModalProps) => {
+const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles = [], folders = [] }: CreateProjectModalProps) => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [leaderId, setLeaderId] = useState<string>("");
+  const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const toggleMember = (id: string) => {
