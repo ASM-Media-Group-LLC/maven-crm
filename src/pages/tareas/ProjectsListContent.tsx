@@ -74,6 +74,48 @@ const ProjectsListContent = () => {
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [folderFilter, setFolderFilter] = useState<string>("");
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === filteredProjects.length) return new Set();
+      return new Set(filteredProjects.map(p => p.id));
+    });
+  }, [filteredProjects]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleBatchArchive = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      archiveProject.mutate({ id, status: "archived" });
+    });
+    clearSelection();
+  }, [selectedIds, archiveProject, clearSelection]);
+
+  const handleBatchDelete = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      deleteProject.mutate(id);
+    });
+    clearSelection();
+    setBatchDeleteOpen(false);
+  }, [selectedIds, deleteProject, clearSelection]);
+
+  const handleBatchMove = useCallback((folderId: string | null) => {
+    Array.from(selectedIds).forEach(projectId => {
+      moveProjectToFolder.mutate({ projectId, folderId });
+    });
+    clearSelection();
+  }, [selectedIds, moveProjectToFolder, clearSelection]);
 
   const toggleFolderCollapse = (folderId: string) => {
     setCollapsedFolders(prev => {
