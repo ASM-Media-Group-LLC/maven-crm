@@ -41,7 +41,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
     <FilterSelect
       placeholder="Estado"
       value={filters.estado}
-      options={["Nuevo", "Contactado", "Convertido", "Descartado"]}
+      options={["Nuevo", "Contactado", "Interesado", "Descartado"]}
       onChange={(v) => onChange({ estado: v })}
     />
     <FilterSelect
