@@ -119,6 +119,7 @@ export default function ChatView({
           onOpenNotificationSettings={() => setShowNotifSettings(true)}
           onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); setShowGroupMembers(false); }}
           onOpenGroupMembers={() => { setShowGroupMembers(true); setShowSharedFiles(false); setThreadParent(null); }}
+          onAvatarChanged={onMembersChanged}
         />
 
         {searchOpen && searchQuery && (
