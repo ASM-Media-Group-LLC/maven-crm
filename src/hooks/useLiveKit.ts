@@ -264,6 +264,12 @@ export function useLiveKit() {
           const resumeAudio = () => {
             room.startAudio().then(() => {
               console.info("[LiveKit] Audio playback resumed");
+              // Re-play all audio elements that may have been blocked
+              document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+                if (el.paused && el.srcObject) {
+                  el.play().catch(() => {});
+                }
+              });
               document.removeEventListener("click", resumeAudio);
               document.removeEventListener("touchstart", resumeAudio);
             });
