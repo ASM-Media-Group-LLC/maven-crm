@@ -148,8 +148,9 @@ export default function ChatView({
           getReadByUsers={getReadByUsers}
           totalParticipants={conversation.participants.length}
           highlightedMsgId={highlightedMsgId}
-          onOpenThread={handleOpenThread}
+          onOpenThread={handleOpenThreadWithTracking}
           getThreadCount={getThreadCount}
+          getUnreadThreadCount={getUnreadThreadCount}
           hasMore={hasMore}
           loadingMore={loadingMore}
           onLoadMore={onLoadMore}
