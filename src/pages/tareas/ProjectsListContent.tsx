@@ -468,6 +468,9 @@ const ProjectsListContent = () => {
             onArchive={handleArchive}
             folders={folders}
             onMoveToFolder={(projectId, folderId) => moveProjectToFolder.mutate({ projectId, folderId })}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleAll={toggleSelectAll}
           />
         ) : hasFolders ? (
           // Grouped grid view with collapsible folders
