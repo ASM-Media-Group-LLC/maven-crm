@@ -85,7 +85,7 @@ const Notificaciones = () => {
                 <SelectValue placeholder="Módulo" />
               </SelectTrigger>
               <SelectContent>
-                {MODULE_OPTIONS.map((o) => (
+                {filteredModuleOptions.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
