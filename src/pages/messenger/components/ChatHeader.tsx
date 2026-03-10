@@ -26,6 +26,7 @@ interface ChatHeaderProps {
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   onOpenNotificationSettings: () => void;
   onOpenSharedFiles: () => void;
+  onOpenGroupMembers?: () => void;
 }
 
 function getInitials(name: string) {
