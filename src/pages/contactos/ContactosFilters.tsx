@@ -1,4 +1,5 @@
-import { Search, List, LayoutGrid, X } from "lucide-react";
+import { useState } from "react";
+import { Search, List, LayoutGrid, X, Check, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -10,6 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { format, parseISO } from "date-fns";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 export interface ContactoFilters {
   search: string;
