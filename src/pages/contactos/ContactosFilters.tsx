@@ -82,7 +82,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
 
     {creators.length > 0 && (
       <FilterSelect
-        placeholder="Creado por"
+        placeholder="Agente"
         value={filters.creadoPor}
         options={creators.map((c) => c.label)}
         onChange={(v) => onChange({ creadoPor: v })}
