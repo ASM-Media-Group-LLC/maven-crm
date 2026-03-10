@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText,
+  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
