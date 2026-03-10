@@ -307,18 +307,12 @@ export const useArchiveAnnouncement = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      // DB trigger auto-archives related notifications when is_active becomes false
       const { error } = await supabase
         .from("internal_announcements")
         .update({ status: "archived", is_active: false, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
-
-      // Archive related notifications
-      await supabase
-        .from("notifications")
-        .update({ status: "archived" } as any)
-        .eq("reference_type", "announcement")
-        .eq("reference_id", id);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
