@@ -96,6 +96,23 @@ export default function MessageInput({
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
+    // Validate max files
+    const totalFiles = pendingFiles.length + files.length;
+    if (totalFiles > MAX_FILES) {
+      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // Validate file sizes
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      const names = oversized.map(f => f.name).join(", ");
+      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     const newPending: PendingFile[] = files.map(file => {
       const isImg = file.type.startsWith("image/");
       return {
