@@ -1,22 +1,30 @@
 
 
-## Problem
+## Analysis: Internal Announcements Visibility
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+After a thorough review of the announcements system, **the logic is already correct** -- global announcements will be visible to all roles (closer, employee, manager, etc.).
 
-## Solution
+Here is the verification:
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### How it works today
 
-## Changes
+1. **`useAnnouncements.ts` (line 93-94)**: If `visibility === "global"`, the announcement is returned to ALL authenticated users regardless of role. No permission check blocks it.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+2. **Dashboard (`DashboardContent.tsx`)**: The "Avisos y Celebraciones" card is **not** wrapped in any `canAccess()` guard -- it renders for every role.
 
-Replace the single `.select()` call with a paginated loop:
+3. **Banners** (`AnnouncementBanner` on line 310): Rendered for all roles, no permission gate.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+4. **Popups** (`Dashboard.tsx` line 24): Rendered for all roles, no permission gate.
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Current state
+
+The database has **0 announcements** right now, so nothing is displaying for any role. When you create a general/global announcement, it will appear for all roles on the dashboard via feed, banner, or popup depending on the delivery channel selected.
+
+### No code changes needed
+
+The announcement audience filtering system is correctly implemented:
+- `visibility = "global"` → shown to everyone
+- `visibility = "targeted"` → checks `announcement_audience` table for department/role/user matches
+
+If you'd like, you can test this by creating a global announcement from the admin panel and verifying it appears on the dashboard for a closer account.
 
