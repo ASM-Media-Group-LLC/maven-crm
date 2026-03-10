@@ -23,6 +23,7 @@ interface MessageListProps {
   highlightedMsgId?: string | null;
   onOpenThread: (msg: ChatMessage) => void;
   getThreadCount: (messageId: string) => number;
+  getUnreadThreadCount?: (messageId: string) => number;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
