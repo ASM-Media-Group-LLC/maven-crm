@@ -73,6 +73,24 @@ const CreateProjectModal = ({ open, onOpenChange, onSubmit, isLoading, profiles 
             <Textarea id="project-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" rows={3} />
           </div>
 
+          {/* Folder select */}
+          {folders.length > 0 && (
+            <div>
+              <Label>Carpeta</Label>
+              <Select value={folderId} onValueChange={setFolderId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sin carpeta (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin carpeta</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Leader select */}
           {profiles.length > 0 && (
             <div>
