@@ -179,49 +179,92 @@ export default function MessageList({
               </span>
             </div>
 
-            {group.messages.map((msg, mi) => {
-              const isMe = msg.sender_id === currentUserId;
-              const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
-              const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
-              const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
-              const isLastInGroup = !nextMsg || !isSameGroup(msg, nextMsg);
-              const isHighlighted = highlightedMsgId === msg.id;
-              const threadCount = getThreadCount(msg.id);
+            {(() => {
+              // Compute image groups for grid display
+              const imageGroups = new Map<number, ChatMessage[]>();
+              const msgGridLeader = new Map<string, boolean>();
+              const msgGridPart = new Map<string, boolean>();
+              const msgGridImages = new Map<string, ChatMessage[]>();
 
-              return (
-                <div
-                  key={msg.id}
-                  ref={el => { msgRefs.current[msg.id] = el; }}
-                  className={cn(
-                    "transition-colors duration-700",
-                    isHighlighted && "bg-primary/10 rounded-lg"
-                  )}
-                >
-                  <MessageBubble
-                    message={msg}
-                    isMe={isMe}
-                    chatType={chatType}
-                    profiles={profiles}
-                    highlight={searchQuery.toLowerCase()}
-                    onReply={() => onReply(msg)}
-                    onCopy={() => onCopy(msg.content || "")}
-                    onEdit={(content) => onEdit(msg.id, content)}
-                    onDelete={() => onDelete(msg.id)}
-                    replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
-                    showAvatar={isLastInGroup && !isMe}
-                    showSender={isFirstInGroup && !isMe}
-                    isLastInGroup={isLastInGroup}
-                    reactions={getReactionsForMessage(msg.id)}
-                    onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
-                    readByUsers={getReadByUsers(msg.id)}
-                    totalParticipants={totalParticipants}
-                    threadCount={threadCount}
-                    unreadThreadCount={getUnreadThreadCount?.(msg.id) ?? 0}
-                    onOpenThread={() => onOpenThread(msg)}
-                  />
-                </div>
-              );
-            })}
+              let i = 0;
+              while (i < group.messages.length) {
+                const msg = group.messages[i];
+                if (msg.type === "image" && msg.file_url && !msg.is_deleted) {
+                  const groupStart = i;
+                  const imgs: ChatMessage[] = [msg];
+                  let j = i + 1;
+                  while (j < group.messages.length) {
+                    const next = group.messages[j];
+                    if (next.type === "image" && next.file_url && !next.is_deleted &&
+                        next.sender_id === msg.sender_id &&
+                        Math.abs(new Date(next.created_at).getTime() - new Date(msg.created_at).getTime()) < 60000) {
+                      imgs.push(next);
+                      j++;
+                    } else break;
+                  }
+                  if (imgs.length > 1) {
+                    imageGroups.set(groupStart, imgs);
+                    imgs.forEach((im, idx) => {
+                      msgGridPart.set(im.id, true);
+                      if (idx === 0) {
+                        msgGridLeader.set(im.id, true);
+                        msgGridImages.set(im.id, imgs);
+                      }
+                    });
+                  }
+                  i = j;
+                } else {
+                  i++;
+                }
+              }
+
+              return group.messages.map((msg, mi) => {
+                const isMe = msg.sender_id === currentUserId;
+                const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
+                const nextMsg = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
+                const isFirstInGroup = !prevMsg || !isSameGroup(prevMsg, msg);
+                const isLastInGroup = !nextMsg || !isSameGroup(msg, nextMsg);
+                const isHighlighted = highlightedMsgId === msg.id;
+                const threadCount = getThreadCount(msg.id);
+
+                return (
+                  <div
+                    key={msg.id}
+                    ref={el => { msgRefs.current[msg.id] = el; }}
+                    className={cn(
+                      "transition-colors duration-700",
+                      isHighlighted && "bg-primary/10 rounded-lg"
+                    )}
+                  >
+                    <MessageBubble
+                      message={msg}
+                      isMe={isMe}
+                      chatType={chatType}
+                      profiles={profiles}
+                      highlight={searchQuery.toLowerCase()}
+                      onReply={() => onReply(msg)}
+                      onCopy={() => onCopy(msg.content || "")}
+                      onEdit={(content) => onEdit(msg.id, content)}
+                      onDelete={() => onDelete(msg.id)}
+                      replyMessage={msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : undefined}
+                      showAvatar={isLastInGroup && !isMe}
+                      showSender={isFirstInGroup && !isMe}
+                      isLastInGroup={isLastInGroup}
+                      reactions={getReactionsForMessage(msg.id)}
+                      onToggleReaction={(emoji) => onToggleReaction(msg.id, emoji)}
+                      readByUsers={getReadByUsers(msg.id)}
+                      totalParticipants={totalParticipants}
+                      threadCount={threadCount}
+                      unreadThreadCount={getUnreadThreadCount?.(msg.id) ?? 0}
+                      onOpenThread={() => onOpenThread(msg)}
+                      adjacentImages={msgGridImages.get(msg.id)}
+                      isGridLeader={msgGridLeader.has(msg.id)}
+                      isPartOfGrid={msgGridPart.has(msg.id)}
+                    />
+                  </div>
+                );
+              });
+            })()}
           </div>
         ))}
       </div>
