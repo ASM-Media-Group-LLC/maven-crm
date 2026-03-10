@@ -703,7 +703,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         typingChannelRef.current = null;
       }
     };
-  }, [conversationId, user, loadMessages]);
+  }, [conversationId, user?.id]);
 
   const sendMessage = useCallback(
     async (
