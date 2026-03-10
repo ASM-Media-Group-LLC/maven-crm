@@ -101,11 +101,16 @@ const ParticipantTile = memo(function ParticipantTile({
           }
           audioTrack.track.attach(audioEl);
           attachedAudioTrackRef.current = audioTrack.track;
-          // Ensure playback
+          // Ensure playback — retry with exponential backoff if autoplay blocked
           audioEl.volume = 1;
-          audioEl.play().catch(() => {
-            // Autoplay blocked — will be resumed by AudioPlaybackStatusChanged handler
-          });
+          const tryPlay = (attempt = 0) => {
+            audioEl.play().catch(() => {
+              if (attempt < 3) {
+                setTimeout(() => tryPlay(attempt + 1), 500 * Math.pow(2, attempt));
+              }
+            });
+          };
+          tryPlay();
         }
       } else if (attachedAudioTrackRef.current && audioEl) {
         attachedAudioTrackRef.current.detach(audioEl);
@@ -172,12 +177,13 @@ const ParticipantTile = memo(function ParticipantTile({
         </Avatar>
       )}
 
-      {/* Audio element for remote participants — always mounted */}
+      {/* Audio element for remote participants — always mounted, marked for autoplay recovery */}
       {!participant.isLocal && (
         <audio
           ref={audioRef}
           autoPlay
           playsInline
+          data-lk-audio="true"
           style={{ display: "none" }}
         />
       )}
