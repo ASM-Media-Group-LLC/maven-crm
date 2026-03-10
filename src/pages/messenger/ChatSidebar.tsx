@@ -152,14 +152,37 @@ export default function ChatSidebar({
           />
         </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full grid grid-cols-4 h-7 sm:h-8 bg-muted/40 rounded-lg">
-            <TabsTrigger value="all" className="text-[10px] sm:text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">Todos</TabsTrigger>
-            <TabsTrigger value="unread" className="text-[10px] sm:text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">No leídos</TabsTrigger>
-            <TabsTrigger value="pinned" className="text-[10px] sm:text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">Fijados</TabsTrigger>
-            <TabsTrigger value="groups" className="text-[10px] sm:text-xs rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm">Grupos</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      </div>
+
+      {/* Google Chat-style shortcuts */}
+      <div className="shrink-0 px-2 sm:px-3 pb-1">
+        <p className="text-[11px] font-semibold text-muted-foreground px-2 pb-1 flex items-center gap-1">
+          <span className="text-[10px]">▾</span> Shortcuts
+        </p>
+        {[
+          { key: "all", icon: Home, label: "Todos" },
+          { key: "unread", icon: Mail, label: "No leídos" },
+          { key: "pinned", icon: Star, label: "Fijados" },
+          { key: "groups", icon: Users, label: "Grupos" },
+        ].map(item => {
+          const isActive = tab === item.key;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-1.5 rounded-full text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary/15 text-primary"
+                  : "text-foreground/70 hover:bg-muted/60"
+              )}
+            >
+              <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+              <span className="truncate">{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <ScrollArea className="flex-1">
