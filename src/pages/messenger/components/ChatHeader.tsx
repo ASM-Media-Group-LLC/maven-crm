@@ -121,6 +121,11 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
+              {conversation.type === "group" && onOpenGroupMembers && (
+                <DropdownMenuItem onClick={onOpenGroupMembers}>
+                  <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onOpenNotificationSettings}>
                 <Bell className="h-3.5 w-3.5 mr-2" /> Notificaciones
               </DropdownMenuItem>
