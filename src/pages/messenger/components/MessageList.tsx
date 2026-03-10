@@ -92,11 +92,12 @@ export default function MessageList({
     prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
-  // Reset on conversation change
+  // Reset on conversation change (use messages reference identity as proxy for conv change)
+  const conversationKey = messages.length > 0 ? messages[0]?.conversation_id : null;
   useEffect(() => {
     isInitialLoadRef.current = true;
     prevMessagesLengthRef.current = 0;
-  }, [chatType]);
+  }, [conversationKey]);
 
   // Scroll to highlighted message
   useEffect(() => {
