@@ -359,7 +359,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 2: Weekly Performance + Avisos/Actividad */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {canAccess("LeadGen") && (
             <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
