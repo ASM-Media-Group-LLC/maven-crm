@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import MentionAutocomplete from "./MentionAutocomplete";
 import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
