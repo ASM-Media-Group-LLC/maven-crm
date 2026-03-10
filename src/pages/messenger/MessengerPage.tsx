@@ -26,7 +26,7 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 }
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation } = useChat();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
@@ -188,6 +188,7 @@ export default function MessengerPage() {
               hasMore={hasMore}
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}
+              onMembersChanged={loadConversations}
             />
           </div>
         ) : (

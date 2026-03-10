@@ -23,6 +23,7 @@ interface MessageListProps {
   highlightedMsgId?: string | null;
   onOpenThread: (msg: ChatMessage) => void;
   getThreadCount: (messageId: string) => number;
+  getUnreadThreadCount?: (messageId: string) => number;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
@@ -61,7 +62,7 @@ export default function MessageList({
   messages, profiles, chatType, currentUserId, searchQuery,
   loading, onReply, onCopy, onEdit, onDelete,
   getReactionsForMessage, onToggleReaction, getReadByUsers, totalParticipants,
-  highlightedMsgId, onOpenThread, getThreadCount,
+  highlightedMsgId, onOpenThread, getThreadCount, getUnreadThreadCount,
   hasMore, loadingMore, onLoadMore,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -215,6 +216,7 @@ export default function MessageList({
                     readByUsers={getReadByUsers(msg.id)}
                     totalParticipants={totalParticipants}
                     threadCount={threadCount}
+                    unreadThreadCount={getUnreadThreadCount?.(msg.id) ?? 0}
                     onOpenThread={() => onOpenThread(msg)}
                   />
                 </div>

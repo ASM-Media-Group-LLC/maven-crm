@@ -10,6 +10,7 @@ import ThreadPanel from "./components/ThreadPanel";
 import SearchResultsBar from "./components/SearchResultsBar";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
+import GroupMembersPanel from "./components/GroupMembersPanel";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
@@ -29,13 +30,14 @@ interface ChatViewProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  onMembersChanged?: () => void;
 }
 
 export default function ChatView({
   conversation, messages, profiles, typingUsers, onSendMessage, onSendTyping,
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers,
-  hasMore, loadingMore, onLoadMore,
+  hasMore, loadingMore, onLoadMore, onMembersChanged,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -46,6 +48,7 @@ export default function ChatView({
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -75,13 +78,30 @@ export default function ChatView({
     return messages.filter(m => m.reply_to_id === messageId).length;
   }, [messages]);
 
-  const handleOpenThread = useCallback((msg: ChatMessage) => {
+  // Track which threads the user has "seen" — replies after the last time they opened the thread
+  const [seenThreadCounts, setSeenThreadCounts] = useState<Record<string, number>>({});
+
+  const getUnreadThreadCount = useCallback((messageId: string) => {
+    const total = messages.filter(m => m.reply_to_id === messageId).length;
+    const seen = seenThreadCounts[messageId] || 0;
+    return Math.max(0, total - seen);
+  }, [messages, seenThreadCounts]);
+
+  const handleOpenThreadWithTracking = useCallback((msg: ChatMessage) => {
+    const parentId = msg.reply_to_id
+      ? (messages.find(m => m.id === msg.reply_to_id) ? msg.reply_to_id : msg.id)
+      : msg.id;
+    // Mark all current replies as seen
+    const count = messages.filter(m => m.reply_to_id === parentId).length;
+    setSeenThreadCounts(prev => ({ ...prev, [parentId]: count }));
+
     if (msg.reply_to_id) {
       const parent = messages.find(m => m.id === msg.reply_to_id);
       if (parent) { setThreadParent(parent); return; }
     }
     setThreadParent(msg);
   }, [messages]);
+
 
   return (
     <div className="flex h-full bg-background relative">
@@ -97,7 +117,8 @@ export default function ChatView({
           onBack={onBack}
           onStartVideoCall={onStartVideoCall}
           onOpenNotificationSettings={() => setShowNotifSettings(true)}
-          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); }}
+          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); setShowGroupMembers(false); }}
+          onOpenGroupMembers={() => { setShowGroupMembers(true); setShowSharedFiles(false); setThreadParent(null); }}
         />
 
         {searchOpen && searchQuery && (
@@ -127,8 +148,9 @@ export default function ChatView({
           getReadByUsers={getReadByUsers}
           totalParticipants={conversation.participants.length}
           highlightedMsgId={highlightedMsgId}
-          onOpenThread={handleOpenThread}
+          onOpenThread={handleOpenThreadWithTracking}
           getThreadCount={getThreadCount}
+          getUnreadThreadCount={getUnreadThreadCount}
           hasMore={hasMore}
           loadingMore={loadingMore}
           onLoadMore={onLoadMore}
@@ -159,6 +181,15 @@ export default function ChatView({
           conversationId={conversation.id}
           profiles={profiles}
           onClose={() => setShowSharedFiles(false)}
+        />
+      )}
+
+      {showGroupMembers && conversation.type === "group" && (
+        <GroupMembersPanel
+          conversation={conversation}
+          profiles={profiles}
+          onClose={() => setShowGroupMembers(false)}
+          onMembersChanged={() => { onMembersChanged?.(); }}
         />
       )}
 

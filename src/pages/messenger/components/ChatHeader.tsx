@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText,
+  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,6 +26,7 @@ interface ChatHeaderProps {
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   onOpenNotificationSettings: () => void;
   onOpenSharedFiles: () => void;
+  onOpenGroupMembers?: () => void;
 }
 
 function getInitials(name: string) {
@@ -35,7 +36,7 @@ function getInitials(name: string) {
 export default function ChatHeader({
   conversation, profiles, typingUsers, searchOpen, searchQuery,
   onSearchToggle, onSearchChange, onBack, onStartVideoCall,
-  onOpenNotificationSettings, onOpenSharedFiles,
+  onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
 }: ChatHeaderProps) {
   const { user } = useAuth();
   const { isOnline, getStatus } = useOnlinePresence();
@@ -120,6 +121,11 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
+              {conversation.type === "group" && onOpenGroupMembers && (
+                <DropdownMenuItem onClick={onOpenGroupMembers}>
+                  <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onOpenNotificationSettings}>
                 <Bell className="h-3.5 w-3.5 mr-2" /> Notificaciones
               </DropdownMenuItem>
