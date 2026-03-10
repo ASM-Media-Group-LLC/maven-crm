@@ -10,6 +10,7 @@ import ThreadPanel from "./components/ThreadPanel";
 import SearchResultsBar from "./components/SearchResultsBar";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
+import GroupMembersPanel from "./components/GroupMembersPanel";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
