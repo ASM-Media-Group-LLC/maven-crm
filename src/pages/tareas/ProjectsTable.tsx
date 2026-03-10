@@ -7,6 +7,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import type { TaskProject, ProjectFolder } from "./useProjects";
 
 type SortKey = "name" | "status" | "pending" | "in_progress" | "overdue" | "completed" | "progress";
@@ -23,9 +25,12 @@ interface ProjectsTableProps {
   onArchive: (project: TaskProject) => void;
   folders?: ProjectFolder[];
   onMoveToFolder?: (projectId: string, folderId: string | null) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onToggleAll?: () => void;
 }
 
-const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, profiles = [], getMembersForProject, onEdit, onDelete, onShare, onArchive, folders = [], onMoveToFolder }: ProjectsTableProps) => {
+const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, profiles = [], getMembersForProject, onEdit, onDelete, onShare, onArchive, folders = [], onMoveToFolder, selectedIds = new Set(), onToggleSelect, onToggleAll }: ProjectsTableProps) => {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortAsc, setSortAsc] = useState(true);
@@ -49,8 +54,6 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
     return sortAsc ? diff : -diff;
   });
 
-  // Group by folder for display
-  const folderMap = new Map(folders.map(f => [f.id, f.name]));
   const groupedSorted: { folderId: string | null; folderName: string; projects: TaskProject[] }[] = [];
   
   if (folders.length > 0) {
@@ -64,6 +67,9 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
     groupedSorted.push({ folderId: null, folderName: "", projects: sorted });
   }
 
+  const allSelected = projects.length > 0 && selectedIds.size === projects.length;
+  const colSpan = onToggleSelect ? 12 : 11;
+
   const SortHeader = ({ label, col }: { label: string; col: SortKey }) => (
     <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs" onClick={() => handleSort(col)}>
       {label} <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -74,8 +80,14 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
     const counts = getProjectTaskCounts(project.id);
     const progress = getProjectProgress(project.id);
     const leader = project.leader_id ? profiles.find(p => p.id === project.leader_id) : null;
+    const isSelected = selectedIds.has(project.id);
     return (
-      <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/tareas/${project.id}`)}>
+      <TableRow key={project.id} className={cn("cursor-pointer", isSelected && "bg-primary/5")} onClick={() => navigate(`/tareas/${project.id}`)}>
+        {onToggleSelect && (
+          <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+            <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(project.id)} />
+          </TableCell>
+        )}
         <TableCell className="font-medium">{project.name}</TableCell>
         <TableCell className="hidden sm:table-cell text-muted-foreground text-sm truncate max-w-[200px]">{project.description || "—"}</TableCell>
         <TableCell>
@@ -184,6 +196,11 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
+            {onToggleSelect && (
+              <TableHead className="w-10" onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={allSelected} onCheckedChange={onToggleAll} />
+              </TableHead>
+            )}
             <TableHead><SortHeader label="Nombre" col="name" /></TableHead>
             <TableHead className="hidden sm:table-cell">Descripción</TableHead>
             <TableHead>Líder</TableHead>
@@ -202,7 +219,7 @@ const ProjectsTable = ({ projects, getProjectTaskCounts, getProjectProgress, pro
             <>
               {folders.length > 0 && (
                 <TableRow key={`folder-${group.folderId || 'none'}`} className="bg-muted/30 hover:bg-muted/30">
-                  <TableCell colSpan={11} className="py-2">
+                  <TableCell colSpan={colSpan} className="py-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                       <FolderOpen className="h-4 w-4" />
                       {group.folderName}
