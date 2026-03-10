@@ -55,8 +55,8 @@ export default function MessengerPage() {
   const messageIds = useMemo(() => messages.map(m => m.id), [messages]);
   const { getReadBy } = useReadReceipts(activeChatId, messageIds);
 
-  const handleSelectUser = useCallback(async (userId: string) => {
-    const convId = await createDirectChat(userId);
+  const handleSelectUser = useCallback((userId: string) => {
+    const convId = createDirectChat(userId);
     if (convId) setActiveChatId(convId);
   }, [createDirectChat]);
 
