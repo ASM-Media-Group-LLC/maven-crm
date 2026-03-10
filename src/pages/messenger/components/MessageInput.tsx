@@ -95,9 +95,16 @@ export default function MessageInput({
 
   const handleTextChange = (val: string) => {
     setText(val);
+    setCursorPosition(inputRef.current?.selectionStart || val.length);
     onSendTyping(true);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => onSendTyping(false), 2000);
+  };
+
+  const handleMentionSelect = (newText: string, _userId: string) => {
+    setText(newText);
+    setCursorPosition(newText.length);
+    inputRef.current?.focus();
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
