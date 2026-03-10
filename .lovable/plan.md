@@ -1,38 +1,22 @@
 
 
-## Problems Identified
+## Problem
 
-1. **"Recursos" visible to employee role**: The `canAccess` function (line 76 in `usePermissions.ts`) returns `true` when no permission is configured for a module. Since the employee role has no explicit "Administración" entry in `role_permissions`, `canAccess("Administración")` defaults to `true`, showing the Recursos section.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-2. **Dashboard spacing/layout**: Looking at the screenshot, the grid layout has inconsistent spacing — sections stretch unevenly, and when permission-filtered cards disappear, remaining cards don't redistribute well across the grid.
+## Solution
 
-3. **"Ajustes" in sidebar**: The sidebar has a dedicated "Ajustes" link pointing to `/ajustes/notificaciones`. This should be removed since notification settings are already accessible from within the Notificaciones page itself (via the gear icon).
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-## Plan
+## Changes
 
-### 1. Fix default permission fallback (`src/hooks/usePermissions.ts`)
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-Change line 76 from `return true` (allow by default) to `return false` (deny by default). This aligns with the "Default Deny" security model documented in the RBAC memory. If a module has no permission configured for a role, access is denied.
+Replace the single `.select()` call with a paginated loop:
 
-This single change fixes the "Recursos" bug for employee and any other role that lacks explicit permission entries.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-### 2. Remove "Ajustes" from sidebar (`src/components/dashboard/DashboardSidebar.tsx`)
-
-Remove the entire "Ajustes" group block (lines 641-656) — the `SidebarSeparator` and the `SidebarGroup` containing the Settings NavLink to `/ajustes/notificaciones`.
-
-### 3. Improve dashboard layout spacing (`src/components/dashboard/DashboardContent.tsx`)
-
-- **KPI row** (line 307): Change from fixed `lg:grid-cols-5` to `lg:grid-cols-${kpis.length}` pattern — use a dynamic approach: when fewer KPIs are visible, cards should fill the space. Use `grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5` with auto-fill so fewer cards don't look lost.
-- **Row 3 (Pipeline + Top5 + Pending Tasks)** (line 476): When some cards are hidden by permissions, the remaining ones should expand. Change `lg:grid-cols-3` to use conditional column count based on how many cards are visible.
-- **Row 4 (Operational Cards)** (line 580): Same approach — conditionally adjust grid columns.
-- Add consistent `gap-4` instead of mixed `gap-4`/`gap-6` for uniform spacing throughout.
-
-**Specific layout logic:**
-- Count visible cards per row and set grid cols accordingly (e.g., if only 1 card visible in a row, it spans full width; 2 cards get `lg:grid-cols-2`).
-- Use `useMemo` to compute visible card counts for rows 3 and 4.
-
-### Files to modify
-- `src/hooks/usePermissions.ts` — change default return to `false`
-- `src/components/dashboard/DashboardSidebar.tsx` — remove Ajustes section
-- `src/components/dashboard/DashboardContent.tsx` — improve grid responsiveness
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

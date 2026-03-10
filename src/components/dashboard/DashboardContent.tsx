@@ -238,6 +238,14 @@ const DashboardContent = () => {
     queryClient.invalidateQueries();
   };
 
+  const getGridCols = (count: number) => {
+    if (count <= 1) return "grid-cols-1";
+    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
+    if (count === 3) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+    if (count === 4) return "grid-cols-2 sm:grid-cols-2 lg:grid-cols-4";
+    return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5";
+  };
+
   const kpis = [
     {
       label: "Total Creators",
@@ -304,7 +312,7 @@ const DashboardContent = () => {
       {/* Scrollable Content */}
       <main className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className={`grid gap-4 ${getGridCols(kpis.length)}`}>
           {kpis.map((k) => (
             <DashboardMetricCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} subtitle={k.subtitle} />
           ))}
@@ -351,7 +359,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 2: Weekly Performance + Avisos/Actividad */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {canAccess("LeadGen") && (
             <Card className="lg:col-span-2 transition-all duration-300 hover:translate-y-[-2px] hover:border-primary/30">
               <CardHeader className="pb-2">
@@ -473,7 +481,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("LeadGen"), canAccess("Creadores"), true].filter(Boolean).length)}`}>
           {canAccess("LeadGen") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
               <CardHeader className="pb-2">
@@ -577,7 +585,7 @@ const DashboardContent = () => {
         </div>
 
         {/* Row 4: Operational Cards */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("Tickets"), canAccess("Closers"), canAccess("HR")].filter(Boolean).length)}`}>
           {canAccess("Tickets") && <Card className="border-t-[3px] border-t-destructive transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-b hover:from-destructive/5 hover:to-transparent">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
