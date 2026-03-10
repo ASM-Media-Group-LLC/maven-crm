@@ -148,7 +148,7 @@ const LeadGenContent = () => {
       }
       return true;
     });
-  }, [enrichedLeads, searchQuery, statusFilter, qualityFilter, activeFilter]);
+  }, [enrichedLeads, searchQuery, agencyFilter, statusFilter, qualityFilter, activeFilter]);
 
   // Agent stats
   const agentStats = useMemo(() => {
