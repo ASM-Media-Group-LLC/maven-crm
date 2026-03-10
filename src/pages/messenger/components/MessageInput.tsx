@@ -40,6 +40,7 @@ export default function MessageInput({
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
