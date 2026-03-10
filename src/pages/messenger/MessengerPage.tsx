@@ -188,6 +188,7 @@ export default function MessengerPage() {
               hasMore={hasMore}
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}
+              onMembersChanged={loadConversations}
             />
           </div>
         ) : (
