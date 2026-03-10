@@ -48,6 +48,7 @@ export default function ChatView({
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
