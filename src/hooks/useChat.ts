@@ -670,14 +670,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     // Typing indicator via presence
     const presenceChannel = supabase
       .channel(`typing-${conversationId}`, {
-        config: { presence: { key: user?.id ?? `anon-${conversationId}` } },
+        config: { presence: { key: userId } },
       })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
         Object.values(state).forEach((presences: any) => {
           presences.forEach((p: any) => {
-            if (p.typing && p.user_id !== user?.id) {
+            if (p.typing && p.user_id !== userId) {
               typing.push(p.user_id);
             }
           });
@@ -687,8 +687,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     typingChannelRef.current = presenceChannel;
     presenceChannel.subscribe((status) => {
-      if (status === "SUBSCRIBED" && user) {
-        void presenceChannel.track({ user_id: user.id, typing: false });
+      if (status === "SUBSCRIBED") {
+        void presenceChannel.track({ user_id: userId, typing: false });
       }
     });
 
