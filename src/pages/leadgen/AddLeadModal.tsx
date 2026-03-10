@@ -142,6 +142,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         notes: data.notes || null,
         source_link: data.source_link || null,
         lg_user_id: user.id,
+        entry_date: getMiamiDateStr(),
       } as any).select("id").single();
 
       if (error) throw error;
