@@ -1,22 +1,28 @@
 
 
-## Problem
+## Plan: Fix Contact Filters Logic
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Root Cause
+Three issues found:
 
-## Solution
+1. **Status mismatch**: DB stores English values (`new`, `contacted`, `interested`, `not_interested`) but filters use Spanish labels (`Nuevo`, `Contactado`, `Convertido`, `Descartado`). The `estado` field in the Contacto mapping passes `c.status` raw without translation, so `filters.estado === c.estado` never matches.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+2. **Date filter not applied**: The `fechaCreacion` filter (Hoy/Esta semana/Este mes) is rendered in the UI but never checked in the `filtered` useMemo — it's completely ignored.
 
-## Changes
+3. **Incomplete country list**: DB has 20 distinct country codes but filters only list 9.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+### Changes
 
-Replace the single `.select()` call with a paginated loop:
+**1. `ContactosContent.tsx`**
+- Add a status translation map: `{ new: "Nuevo", contacted: "Contactado", interested: "Interesado", not_interested: "Descartado" }`
+- Apply the map on line 121: `estado: statusMap[c.status] || c.status || "Nuevo"`
+- Add `fechaCreacion` filter logic in the `filtered` useMemo — lookup the raw `created_at` from `dbContactos` and compare against today/this week/this month
+- Fix KPI counters that also depend on translated estado values
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+**2. `ContactosFilters.tsx`**
+- Update Estado options to match translated values: `["Nuevo", "Contactado", "Interesado", "Descartado"]` (change "Convertido" to "Interesado" to match DB value `interested`)
+- Update country list to include all 20 DB values: add `CR`, `EC`, `GB`, `GT`, `HN`, `IT`, `PA`, `PY`, `SV`, `TH`, `VE`
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+**3. `ContactosTable.tsx` / `ContactosGrid.tsx`**
+- No changes needed — they render `c.estado` which will now be the correct Spanish label
 
