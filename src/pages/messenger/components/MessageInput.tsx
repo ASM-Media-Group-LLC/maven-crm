@@ -39,8 +39,10 @@ interface MessageInputProps {
 
 export default function MessageInput({
   onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
+  participants, chatType,
 }: MessageInputProps) {
   const { user } = useAuth();
+  const [cursorPosition, setCursorPosition] = useState(0);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
