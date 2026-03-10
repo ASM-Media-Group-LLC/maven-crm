@@ -86,14 +86,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableRow>
             <TableHead><SortHeader label="Creación" col="creacion" /></TableHead>
             <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
-            <TableHead><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead className="max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
             <TableHead><SortHeader label="Instagram" col="instagram" /></TableHead>
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
             <TableHead><SortHeader label="Categoría" col="categoria" /></TableHead>
             <TableHead>WhatsApp</TableHead>
             <TableHead><SortHeader label="Inter." col="interacciones" /></TableHead>
-            <TableHead><SortHeader label="Creado por" col="creadoPor" /></TableHead>
             <TableHead className="sticky right-0 bg-card z-20"></TableHead>
           </TableRow>
         </TableHeader>
