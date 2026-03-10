@@ -125,7 +125,7 @@ const ContactosContent = () => {
       creacion: new Date(c.created_at || "").toLocaleDateString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
       ticket: c.ticket_number || "",
       nombre: c.name,
-      estado: c.status || "Nuevo",
+      estado: statusMap[c.status || ""] || c.status || "Nuevo",
       instagram: c.handle || "",
       platform: c.platform || "Instagram",
       pais: c.country_code || "",
