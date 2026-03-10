@@ -39,7 +39,7 @@ const needsReminder = (lastContact: string | null) => {
 };
 
 const defaultRender = (creator: CloserCreator, key: string): React.ReactNode => {
-  const val = (creator as Record<string, unknown>)[key];
+  const val = (creator as unknown as Record<string, unknown>)[key];
   if (key === "stage") return <Badge className={stageBadgeColor(String(val))}>{String(val)}</Badge>;
   if (key === "estimated_monetization" || key === "monthly_monetization")
     return `$${Number(val || 0).toLocaleString()}`;

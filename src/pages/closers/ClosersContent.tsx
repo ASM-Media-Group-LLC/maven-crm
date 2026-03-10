@@ -1,52 +1,30 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, Search, List, LayoutGrid, X } from "lucide-react";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { useDeals, STAGES, SOURCES, Deal } from "./useDeals";
-import ClosersKPICards from "./ClosersKPICards";
-import ClosersTable from "./ClosersTable";
-import ClosersGrid from "./ClosersGrid";
-import NewDealModal from "./NewDealModal";
-import EditDealModal from "./EditDealModal";
-import ViewDealModal from "./ViewDealModal";
-import DeleteDealDialog from "./DeleteDealDialog";
-
-type ViewMode = "table" | "grid";
+import { Plus } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useCloserCreators, CloserCreator } from "./useCloserCreators";
+import ClosersDashboard from "./tabs/ClosersDashboard";
+import MisCreatorsTab from "./tabs/MisCreatorsTab";
+import PipelineTab from "./tabs/PipelineTab";
+import ConfirmadasTab from "./tabs/ConfirmadasTab";
+import CompletadasTab from "./tabs/CompletadasTab";
+import NoInteresadasTab from "./tabs/NoInteresadasTab";
+import AsignacionTab from "./tabs/AsignacionTab";
+import NewCreatorModal from "./components/NewCreatorModal";
+import EditCreatorModal from "./components/EditCreatorModal";
+import ViewCreatorModal from "./components/ViewCreatorModal";
+import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
 
 const ClosersContent = () => {
-  const { deals, isLoading, createDeal, updateDeal, updateDealStage, deleteDeal } = useDeals();
-  const [showNewDeal, setShowNewDeal] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [selectedStage, setSelectedStage] = useState("");
-  const [selectedSource, setSelectedSource] = useState("");
+  const {
+    creators, isLoading, createCreator, updateCreator, updateStage,
+    deleteCreator, assignCreator, isAdmin,
+  } = useCloserCreators();
 
-  // Action state
-  const [viewDeal, setViewDeal] = useState<Deal | null>(null);
-  const [editDeal, setEditDeal] = useState<Deal | null>(null);
-  const [deletingDeal, setDeletingDeal] = useState<Deal | null>(null);
-
-  const filtered = deals.filter((d) => {
-    if (search && !d.prospect_handle.toLowerCase().includes(search.toLowerCase())) return false;
-    if (selectedStage && d.stage !== selectedStage) return false;
-    if (selectedSource && d.source !== selectedSource) return false;
-    return true;
-  });
-
-  const handleStageChange = (id: string, stage: string) => {
-    updateDealStage.mutate({ id, stage });
-  };
-
-  const handleEdit = (id: string, data: { prospect_handle: string; source: string; stage: string; notes: string }) => {
-    updateDeal.mutate({ id, ...data }, { onSuccess: () => setEditDeal(null) });
-  };
-
-  const handleDelete = (id: string) => {
-    deleteDeal.mutate(id, { onSuccess: () => setDeletingDeal(null) });
-  };
+  const [showNew, setShowNew] = useState(false);
+  const [viewCreator, setViewCreator] = useState<CloserCreator | null>(null);
+  const [editCreator, setEditCreator] = useState<CloserCreator | null>(null);
+  const [deletingCreator, setDeletingCreator] = useState<CloserCreator | null>(null);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -54,94 +32,80 @@ const ClosersContent = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Closers</h1>
-            <p className="text-sm text-muted-foreground">Gestión de deals y llamadas</p>
+            <p className="text-sm text-muted-foreground">Gestión de creators desde LeadGen</p>
           </div>
-          <Button onClick={() => setShowNewDeal(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nuevo Deal
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowNew(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva Creator
+            </Button>
+          )}
         </div>
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
-        <ClosersKPICards deals={deals} />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar handle..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 w-[200px]" />
-          </div>
-          <Select value={selectedStage || undefined} onValueChange={(v) => setSelectedStage(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={selectedSource || undefined} onValueChange={(v) => setSelectedSource(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Fuente" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {(search || selectedStage || selectedSource) && (
-            <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setSelectedStage(""); setSelectedSource(""); }}>
-              <X className="mr-1.5 h-4 w-4" />Limpiar filtros
-            </Button>
-          )}
-
-          <div className="ml-auto flex gap-1">
-            <Button variant={viewMode === "table" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("table")}>
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando...</p>
-        ) : viewMode === "table" ? (
-          <ClosersTable
-            deals={filtered}
-            onView={setViewDeal}
-            onEdit={setEditDeal}
-            onDelete={setDeletingDeal}
-            onStageChange={handleStageChange}
-          />
         ) : (
-          <ClosersGrid
-            deals={filtered}
-            onView={setViewDeal}
-            onEdit={setEditDeal}
-            onDelete={setDeletingDeal}
-            onStageChange={handleStageChange}
-          />
+          <Tabs defaultValue="dashboard">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
+              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
+              <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
+              <TabsTrigger value="completadas">Completadas</TabsTrigger>
+              <TabsTrigger value="no-interesadas">No Interesadas</TabsTrigger>
+              {isAdmin && <TabsTrigger value="asignacion">Asignación</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="dashboard">
+              <ClosersDashboard creators={creators} />
+            </TabsContent>
+            <TabsContent value="mis-creators">
+              <MisCreatorsTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} onDelete={setDeletingCreator} />
+            </TabsContent>
+            <TabsContent value="pipeline">
+              <PipelineTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} />
+            </TabsContent>
+            <TabsContent value="confirmadas">
+              <ConfirmadasTab creators={creators} onView={setViewCreator} />
+            </TabsContent>
+            <TabsContent value="completadas">
+              <CompletadasTab creators={creators} onView={setViewCreator} />
+            </TabsContent>
+            <TabsContent value="no-interesadas">
+              <NoInteresadasTab creators={creators} onView={setViewCreator} />
+            </TabsContent>
+            {isAdmin && (
+              <TabsContent value="asignacion">
+                <AsignacionTab
+                  creators={creators}
+                  onAssign={(id, to) => assignCreator.mutate({ id, assigned_to: to })}
+                />
+              </TabsContent>
+            )}
+          </Tabs>
         )}
       </div>
 
-      <NewDealModal
-        open={showNewDeal}
-        onOpenChange={setShowNewDeal}
-        onSubmit={(data) => createDeal.mutate(data, { onSuccess: () => setShowNewDeal(false) })}
-        isLoading={createDeal.isPending}
+      <NewCreatorModal
+        open={showNew}
+        onOpenChange={setShowNew}
+        onSubmit={(data) => createCreator.mutate(data, { onSuccess: () => setShowNew(false) })}
+        isLoading={createCreator.isPending}
       />
-      <ViewDealModal deal={viewDeal} open={!!viewDeal} onOpenChange={(o) => !o && setViewDeal(null)} />
-      <EditDealModal
-        deal={editDeal}
-        open={!!editDeal}
-        onOpenChange={(o) => !o && setEditDeal(null)}
-        onSubmit={handleEdit}
-        isLoading={updateDeal.isPending}
+      <ViewCreatorModal creator={viewCreator} open={!!viewCreator} onOpenChange={(o) => !o && setViewCreator(null)} />
+      <EditCreatorModal
+        creator={editCreator}
+        open={!!editCreator}
+        onOpenChange={(o) => !o && setEditCreator(null)}
+        onSubmit={(id, data) => updateCreator.mutate({ id, ...data }, { onSuccess: () => setEditCreator(null) })}
+        isLoading={updateCreator.isPending}
       />
-      <DeleteDealDialog
-        deal={deletingDeal}
-        open={!!deletingDeal}
-        onOpenChange={(o) => !o && setDeletingDeal(null)}
-        onConfirm={handleDelete}
+      <DeleteCreatorDialog
+        creator={deletingCreator}
+        open={!!deletingCreator}
+        onOpenChange={(o) => !o && setDeletingCreator(null)}
+        onConfirm={(id) => deleteCreator.mutate(id, { onSuccess: () => setDeletingCreator(null) })}
       />
     </main>
   );
