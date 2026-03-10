@@ -20,7 +20,7 @@ const Dashboard = () => {
           <DashboardContent />
         </div>
       </div>
-      <ClariAiFab />
+      {isAdmin && <ClariAiFab />}
       {popups.length > 0 && <AnnouncementPopup popups={popups} />}
     </SidebarProvider>
   );
