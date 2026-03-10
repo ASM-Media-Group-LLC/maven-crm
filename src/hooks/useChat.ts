@@ -211,8 +211,16 @@ export function useChat() {
           scheduleConversationsReload();
         }
       )
-      .subscribe();
-
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Connected — reload to catch any missed events
+          void loadConversations();
+        }
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          // Retry by reloading conversations after a delay
+          setTimeout(() => void loadConversations(), 2000);
+        }
+      });
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void loadConversations();
