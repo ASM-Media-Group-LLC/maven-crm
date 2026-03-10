@@ -50,7 +50,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
   replyMessage, showAvatar, showSender, isLastInGroup,
   reactions, onToggleReaction, readByUsers, totalParticipants,
-  threadCount = 0, onOpenThread,
+  threadCount = 0, unreadThreadCount = 0, onOpenThread,
 }, ref) => {
   const senderName = profiles[message.sender_id]?.full_name || "Usuario";
   const [lightboxOpen, setLightboxOpen] = useState(false);
