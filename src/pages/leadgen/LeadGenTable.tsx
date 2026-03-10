@@ -56,7 +56,7 @@ const getPlatformIcon = (platform: string) => {
   return <ExternalLink className="h-4 w-4 text-muted-foreground" />;
 };
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "calidad" | "estado" | "pais" | "contacto" | "qa";
+type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "estado" | "pais" | "contacto" | "qa";
 
 interface Props {
   leads: LeadGenEntry[];
