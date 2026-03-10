@@ -71,6 +71,23 @@ export const useDeals = () => {
     },
   });
 
+  const updateDeal = useMutation({
+    mutationFn: async ({ id, ...fields }: { id: string; prospect_handle?: string; source?: string; stage?: string; notes?: string }) => {
+      const { error } = await supabase
+        .from("deals")
+        .update(fields)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      toast({ title: "Deal actualizado" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "No se pudo actualizar el deal.", variant: "destructive" });
+    },
+  });
+
   const updateDealStage = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       const { error } = await supabase
