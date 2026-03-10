@@ -50,7 +50,6 @@ const ClosersContent = () => {
             <ClosersKPICards creators={creators} />
             <Tabs defaultValue="mis-creators">
               <TabsList className="flex-wrap">
-                <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
               <TabsTrigger value="completadas">Completadas</TabsTrigger>
@@ -58,9 +57,6 @@ const ClosersContent = () => {
               {isAdmin && <TabsTrigger value="asignacion">Asignación</TabsTrigger>}
             </TabsList>
 
-            <TabsContent value="dashboard">
-              <ClosersDashboard creators={creators} />
-            </TabsContent>
             <TabsContent value="mis-creators">
               <MisCreatorsTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} onDelete={setDeletingCreator} />
             </TabsContent>
@@ -85,6 +81,7 @@ const ClosersContent = () => {
               </TabsContent>
             )}
           </Tabs>
+          </>
         )}
       </div>
 
