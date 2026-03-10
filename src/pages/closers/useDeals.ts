@@ -112,5 +112,5 @@ export const useDeals = () => {
     },
   });
 
-  return { deals, isLoading, createDeal, updateDealStage, deleteDeal };
+  return { deals, isLoading, createDeal, updateDeal, updateDealStage, deleteDeal };
 };
