@@ -10,6 +10,7 @@ export default function VideoCallPage() {
   const { roomName } = useParams<{ roomName: string }>();
   const [searchParams] = useSearchParams();
   const isAdmin = searchParams.get("admin") === "1";
+  const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
 
   const { data: profile, isLoading } = useQuery({
