@@ -17,10 +17,11 @@ interface EditProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: TaskProject | null;
-  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string }) => void;
+  onSubmit: (data: { id: string; name: string; description?: string; memberIds?: string[]; leaderId?: string; folderId?: string | null }) => void;
   isLoading?: boolean;
   profiles?: { id: string; full_name: string | null }[];
   currentMemberIds?: string[];
+  folders?: { id: string; name: string }[];
 }
 
 const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [] }: EditProjectModalProps) => {
