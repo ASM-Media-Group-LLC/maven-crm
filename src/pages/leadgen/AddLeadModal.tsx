@@ -170,6 +170,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
       toast({ title: "Lead agregado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
       form.reset();
       setFiles([]);
       onOpenChange(false);

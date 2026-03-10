@@ -1,21 +1,22 @@
 
 
-## Diagnóstico: El lead de Marielby no aparece
+## Problem
 
-### Causa raíz
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-El lead **sí existe** en la base de datos (`entry_date: 2026-03-10`, `lg_user_id` correcto). El problema es un **bug de cache**: después de crear un lead, `AddLeadModal.tsx` (línea 172) invalida el query key `["leadgen-entries"]`, pero la página principal usa `useLeadGenByDateRange` que tiene el query key `["leadgen-entries-range", ...]`. Al no invalidar el cache correcto, el lead recién creado no aparece hasta que se recargue la página manualmente o expire el staleTime (2 min).
+## Solution
 
-### Cambio
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-**`src/pages/leadgen/AddLeadModal.tsx`** — Agregar invalidación del query key correcto:
+## Changes
 
-```typescript
-// Línea 172 - agregar:
-queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
-```
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-Esto asegura que al cerrar el modal de creación, la tabla se refresque inmediatamente mostrando el lead recién creado.
+Replace the single `.select()` call with a paginated loop:
 
-Es un cambio de una línea.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
