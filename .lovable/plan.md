@@ -1,38 +1,22 @@
 
 
-## Fix: Notifications showing to wrong roles
+## Problem
 
-### Root Cause
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-There are **two conflicting SELECT RLS policies** on the `notifications` table:
+## Solution
 
-1. `"Authenticated users can view notifications"` — allows ANY authenticated user to see all notifications where `user_id IS NULL`, **regardless of role_target**
-2. `"Users can view own or role-targeted notifications"` — correctly checks `role_target IS NOT NULL AND user_has_role_name(...)`
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-Since both are PERMISSIVE (PostgreSQL ORs them), policy #1 overrides #2 and lets every user see **all** null-user notifications (like "Nueva modelo ha completado el onboarding" and "Verificación aprobada") even when they have no `role_target` or the user's role doesn't match.
+## Changes
 
-### Database notifications with the problem
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-```text
-title: "Nueva modelo ha completado el onboarding"  → user_id=NULL, role_target=NULL
-title: "Verificación aprobada"                      → user_id=NULL, role_target=NULL
-```
+Replace the single `.select()` call with a paginated loop:
 
-These should only be visible to admins/managers, but every user sees them.
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-### Changes
-
-**1. Fix RLS policies (SQL migration)**
-
-- DROP the overly permissive `"Authenticated users can view notifications"` SELECT policy
-- DROP the overly permissive `"Authenticated users can update notifications"` UPDATE policy (same issue)
-- The remaining policies (`"Users can view own or role-targeted notifications"` and `"Users can update own notifications"`) already have correct logic
-
-**2. Client-side defense-in-depth (`useNotifications.ts`)**
-
-Add a filter in `filteredNotifications` to exclude notifications where `user_id` is null AND `role_target` is null — these are orphaned/legacy notifications that shouldn't be visible to anyone except through specific targeting.
-
-**3. Clean up orphaned notifications (SQL)**
-
-Set `status = 'archived'` on existing notifications that have `user_id = NULL` and `role_target = NULL` to clean up legacy data that was incorrectly broadcast to everyone.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
