@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 const leadSchema = z.object({
@@ -71,12 +72,21 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Duplicate check
+      // Normalize handle
+      const normalizedHandle = normalizeHandle(data.model_handle);
+      if (!normalizedHandle) {
+        toast({ title: "Handle inválido", description: "El handle ingresado no es válido.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Duplicate check in leadgen_entries
       const { data: existing } = await supabase
         .from("leadgen_entries")
         .select("id, model_handle, company")
-        .ilike("model_handle", data.model_handle)
+        .ilike("model_handle", normalizedHandle)
         .eq("platform", data.platform)
+        .limit(1)
         .maybeSingle();
       if (existing) {
         toast({
@@ -88,8 +98,42 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
+      // Cross-table duplicate check: closers_contacts
+      const { data: existingCloser } = await supabase
+        .from("closers_contacts")
+        .select("id, handle, company")
+        .ilike("handle", normalizedHandle)
+        .limit(1)
+        .maybeSingle();
+      if (existingCloser) {
+        toast({
+          title: "Duplicado detectado",
+          description: `Este handle ya existe en Closers (${existingCloser.company || "sin compañía"}): @${existingCloser.handle}`,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Cross-table duplicate check: creators
+      const { data: existingCreator } = await supabase
+        .from("creators")
+        .select("id, instagram_handle, name")
+        .ilike("instagram_handle", normalizedHandle)
+        .limit(1)
+        .maybeSingle();
+      if (existingCreator) {
+        toast({
+          title: "Duplicado detectado",
+          description: `Este handle ya existe como Creadora: ${existingCreator.name} (@${existingCreator.instagram_handle})`,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
-        model_handle: data.model_handle,
+        model_handle: normalizedHandle,
         platform: data.platform,
         quality: data.quality,
         company: data.company,

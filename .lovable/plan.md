@@ -1,29 +1,22 @@
 
 
-## Fix: Lead Duplicate Prevention
+## Problem
 
-### Problems Found
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-1. **No handle normalization before duplicate check** — `AddLeadModal.tsx` uses `.ilike("model_handle", data.model_handle)` with the raw input. If a user types `@usuario` and another types `usuario`, the `ilike` might match but the stored values differ. The `normalizeHandle()` utility exists and is used in other modules (Closers, Contactos, Creadores) but is **not used here**.
+## Solution
 
-2. **No DB-level unique constraint** — The `leadgen_entries` table has no unique index on `model_handle` (or `model_handle + platform`). Only a primary key on `id` and indexes on `lg_user_id` and `entry_date`. This means race conditions or concurrent submissions can create duplicates regardless of client-side checks.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-3. **`.maybeSingle()` fragility** — If duplicates already exist in the table, calling `.maybeSingle()` on a query that returns multiple rows will throw a PostgREST error instead of detecting the duplicate gracefully.
+## Changes
 
-4. **Stored handles are not normalized** — The handle is inserted as-is (`data.model_handle`), meaning `@User`, `user`, and `https://instagram.com/user` could all be stored as separate entries.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-### Changes
+Replace the single `.select()` call with a paginated loop:
 
-**1. Normalize handle before insert and duplicate check (`AddLeadModal.tsx`)**
-- Import `normalizeHandle` from `@/lib/handle-utils`
-- Normalize the handle before the duplicate check query
-- Store the normalized value in the database
-- Change `.maybeSingle()` to `.limit(1).maybeSingle()` for safety
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-**2. Add DB unique constraint (migration)**
-- Create a unique index on `LOWER(model_handle), platform` to enforce uniqueness at the database level
-- This prevents race-condition duplicates that client-side checks cannot catch
-
-**3. Cross-table duplicate check**
-- Also check `closers_contacts` and `creators` tables (as the memory notes mention the `/leadgen/new` page does), to prevent adding leads that already exist as contacts or creators. The current `AddLeadModal` skips this cross-check.
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
