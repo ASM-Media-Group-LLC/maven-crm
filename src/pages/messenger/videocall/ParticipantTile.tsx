@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, memo, useCallback } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MicOff, Hand, Monitor } from "lucide-react";
+import { MicOff, Hand, Monitor, Wifi, WifiOff } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 
@@ -17,10 +17,45 @@ function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function ParticipantTile({ participant, room, large, className }: ParticipantTileProps) {
+// Connection quality indicator
+function ConnectionIndicator({ quality }: { quality: string }) {
+  const bars = quality === "excellent" ? 3 : quality === "good" ? 2 : quality === "poor" ? 1 : 0;
+  const color = bars >= 2 ? "bg-emerald-400" : bars === 1 ? "bg-amber-400" : "bg-destructive";
+
+  if (quality === "lost") {
+    return (
+      <div className="flex items-center gap-0.5" title="Conexión perdida">
+        <WifiOff className="h-3 w-3 text-destructive" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-end gap-px h-3" title={`Calidad: ${quality}`}>
+      {[1, 2, 3].map((level) => (
+        <div
+          key={level}
+          className={cn(
+            "w-[3px] rounded-sm transition-colors",
+            level <= bars ? color : "bg-[hsl(0_0%_100%/0.2)]"
+          )}
+          style={{ height: `${level * 4}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const ParticipantTile = memo(function ParticipantTile({
+  participant,
+  room,
+  large,
+  className,
+}: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [audioReady, setAudioReady] = useState(false);
+  const attachedVideoTrackRef = useRef<any>(null);
+  const attachedAudioTrackRef = useRef<any>(null);
 
   // Attach/detach tracks
   useEffect(() => {
@@ -32,55 +67,87 @@ export default function ParticipantTile({ participant, room, large, className }:
 
     if (!lkParticipant) return;
 
-    // Video
+    // ── Video ────────────────────────────────────────────────
+    const videoSource = participant.isScreenSharing ? Track.Source.ScreenShare : Track.Source.Camera;
     const videoTrack = [...lkParticipant.videoTrackPublications.values()].find(
-      (t) => t.source === (participant.isScreenSharing ? Track.Source.ScreenShare : Track.Source.Camera)
+      (t) => t.source === videoSource
     );
 
     const videoEl = videoRef.current;
     if (videoTrack?.track && videoEl) {
-      videoTrack.track.attach(videoEl);
+      // Only reattach if track changed
+      if (attachedVideoTrackRef.current !== videoTrack.track) {
+        if (attachedVideoTrackRef.current) {
+          attachedVideoTrackRef.current.detach(videoEl);
+        }
+        videoTrack.track.attach(videoEl);
+        attachedVideoTrackRef.current = videoTrack.track;
+      }
+    } else if (attachedVideoTrackRef.current && videoEl) {
+      attachedVideoTrackRef.current.detach(videoEl);
+      attachedVideoTrackRef.current = null;
     }
 
-    // Audio — only for remote participants
+    // ── Audio (remote only) ──────────────────────────────────
     const audioEl = audioRef.current;
     if (!participant.isLocal && audioEl) {
       const audioTrack = [...lkParticipant.audioTrackPublications.values()].find(
         (t) => t.source === Track.Source.Microphone
       );
       if (audioTrack?.track) {
-        audioTrack.track.attach(audioEl);
-        // Ensure autoplay works
-        audioEl.volume = 1;
-        audioEl.play().catch(() => {
-          // Browser may block autoplay; user interaction required
-          setAudioReady(false);
-        });
-        setAudioReady(true);
+        if (attachedAudioTrackRef.current !== audioTrack.track) {
+          if (attachedAudioTrackRef.current) {
+            attachedAudioTrackRef.current.detach(audioEl);
+          }
+          audioTrack.track.attach(audioEl);
+          attachedAudioTrackRef.current = audioTrack.track;
+          // Ensure playback
+          audioEl.volume = 1;
+          audioEl.play().catch(() => {
+            // Autoplay blocked — will be resumed by AudioPlaybackStatusChanged handler
+          });
+        }
+      } else if (attachedAudioTrackRef.current && audioEl) {
+        attachedAudioTrackRef.current.detach(audioEl);
+        attachedAudioTrackRef.current = null;
       }
     }
 
     return () => {
-      if (videoTrack?.track && videoEl) {
-        videoTrack.track.detach(videoEl);
+      // Cleanup on unmount only — not on every rerender
+    };
+  }, [
+    room,
+    participant.sid,
+    participant.identity,
+    participant.isLocal,
+    participant.isCameraOff,
+    participant.isScreenSharing,
+    participant.isMuted,
+  ]);
+
+  // Full cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const videoEl = videoRef.current;
+      const audioEl = audioRef.current;
+      if (attachedVideoTrackRef.current && videoEl) {
+        attachedVideoTrackRef.current.detach(videoEl);
+        attachedVideoTrackRef.current = null;
       }
-      if (!participant.isLocal && audioEl) {
-        const at = [...lkParticipant.audioTrackPublications.values()].find(
-          (t) => t.source === Track.Source.Microphone
-        );
-        if (at?.track) {
-          at.track.detach(audioEl);
-        }
+      if (attachedAudioTrackRef.current && audioEl) {
+        attachedAudioTrackRef.current.detach(audioEl);
+        attachedAudioTrackRef.current = null;
       }
     };
-  }, [room, participant.sid, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.isMuted]);
+  }, []);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
   return (
     <div
       className={cn(
-        "relative rounded-xl overflow-hidden flex items-center justify-center h-full transition-all",
+        "relative rounded-xl overflow-hidden flex items-center justify-center h-full transition-shadow duration-200",
         participant.isSpeaking && "ring-2 ring-primary ring-offset-1 ring-offset-[hsl(240_10%_6%)]",
         className
       )}
@@ -93,6 +160,7 @@ export default function ParticipantTile({ participant, room, large, className }:
           playsInline
           muted={participant.isLocal}
           className="absolute inset-0 w-full h-full object-cover z-[1]"
+          style={{ transform: participant.isLocal && !participant.isScreenSharing ? "scaleX(-1)" : undefined }}
         />
       ) : (
         <Avatar className={cn("border-2 border-[hsl(0_0%_100%/0.1)] z-[1]", large ? "h-24 w-24" : "h-16 w-16")}>
@@ -114,6 +182,7 @@ export default function ParticipantTile({ participant, room, large, className }:
         />
       )}
 
+      {/* Reactions */}
       {participant.reactions.length > 0 && (
         <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
           {participant.reactions.map((emoji, i) => (
@@ -122,12 +191,14 @@ export default function ParticipantTile({ participant, room, large, className }:
         </div>
       )}
 
+      {/* Hand raised */}
       {participant.handRaised && (
         <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse z-10">
           <Hand className="h-4 w-4 text-white" />
         </div>
       )}
 
+      {/* Screen sharing badge */}
       {participant.isScreenSharing && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <Badge variant="secondary" className="gap-1 text-[10px]">
@@ -136,14 +207,18 @@ export default function ParticipantTile({ participant, room, large, className }:
         </div>
       )}
 
+      {/* Bottom bar — name, mic, connection quality */}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-1.5 bg-[hsl(0_0%_0%/0.6)] backdrop-blur-sm rounded-md px-2 py-1">
           <span className="text-xs font-medium text-[hsl(0_0%_96%)]">
             {participant.isLocal ? "Tú" : participant.name}
           </span>
           {participant.isMuted && <MicOff className="h-3 w-3 text-destructive" />}
+          <ConnectionIndicator quality={participant.connectionQuality} />
         </div>
       </div>
     </div>
   );
-}
+});
+
+export default ParticipantTile;

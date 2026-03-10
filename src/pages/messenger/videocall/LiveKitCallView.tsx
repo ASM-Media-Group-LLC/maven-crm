@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
@@ -6,7 +6,7 @@ import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import ParticipantTile from "./ParticipantTile";
-import { Loader2 } from "lucide-react";
+import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BackgroundEffect } from "./BackgroundSelector";
@@ -42,14 +42,20 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
     toast.info("Llamada finalizada");
   }, [lk, onLeave]);
 
-  const shareLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
+  const shareLink = useMemo(
+    () => `${window.location.origin}/call/${encodeURIComponent(roomName)}`,
+    [roomName]
+  );
 
   // Find screen sharer for spotlight
-  const screenSharer = lk.participants.find((p) => p.isScreenSharing);
-  const spotlightParticipant = screenSharer || lk.participants.find((p) => p.identity === lk.activeSpeaker) || lk.participants[0];
+  const spotlightParticipant = useMemo(() => {
+    const screenSharer = lk.participants.find((p) => p.isScreenSharing);
+    return screenSharer || lk.participants.find((p) => p.identity === lk.activeSpeaker) || lk.participants[0];
+  }, [lk.participants, lk.activeSpeaker]);
 
   const room = lk.getRoom();
 
+  // ── Loading state ──────────────────────────────────────────────
   if (lk.connectionState === ConnectionState.Connecting) {
     return (
       <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)] items-center justify-center gap-4">
@@ -59,6 +65,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
     );
   }
 
+  // ── Error state ────────────────────────────────────────────────
   if (lk.error) {
     return (
       <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)] items-center justify-center gap-4">
@@ -74,6 +81,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
     );
   }
 
+  // ── Grid columns ───────────────────────────────────────────────
   const gridCols =
     lk.participants.length <= 1
       ? "grid-cols-1"
@@ -94,6 +102,14 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
         onToggleLayout={() => setLayout((l) => (l === "grid" ? "spotlight" : "grid"))}
         shareLink={shareLink}
       />
+
+      {/* Reconnecting banner */}
+      {lk.isReconnecting && (
+        <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-amber-500/20 text-amber-300 text-xs font-medium">
+          <WifiOff className="h-3.5 w-3.5 animate-pulse" />
+          Reconectando...
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Video area */}
