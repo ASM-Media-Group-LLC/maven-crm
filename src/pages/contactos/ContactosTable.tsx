@@ -34,7 +34,7 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
-type SortKey = "creacion" | "ticket" | "nombre" | "estado" | "instagram" | "pais" | "categoria" | "interacciones" | "creadoPor";
+type SortKey = "creacion" | "ticket" | "nombre" | "creadoPor" | "estado" | "instagram" | "pais" | "categoria" | "interacciones";
 
 interface Props {
   contactos: Contacto[];
@@ -86,14 +86,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableRow>
             <TableHead><SortHeader label="Creación" col="creacion" /></TableHead>
             <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
-            <TableHead><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead className="max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+            <TableHead><SortHeader label="Agente" col="creadoPor" /></TableHead>
             <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
             <TableHead><SortHeader label="Instagram" col="instagram" /></TableHead>
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
             <TableHead><SortHeader label="Categoría" col="categoria" /></TableHead>
             <TableHead>WhatsApp</TableHead>
             <TableHead><SortHeader label="Inter." col="interacciones" /></TableHead>
-            <TableHead><SortHeader label="Creado por" col="creadoPor" /></TableHead>
             <TableHead className="sticky right-0 bg-card z-20"></TableHead>
           </TableRow>
         </TableHeader>
@@ -102,7 +102,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableRow key={c.id}>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
               <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
-              <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
+              <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   <Badge variant={statusVariant[c.estado] ?? "secondary-soft"}>
@@ -141,7 +142,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 </a>
               </TableCell>
               <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
               <TableCell className="sticky right-0 bg-card">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -166,7 +166,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                 No se encontraron contactos.
               </TableCell>
             </TableRow>
