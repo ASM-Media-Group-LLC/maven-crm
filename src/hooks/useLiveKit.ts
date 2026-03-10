@@ -114,7 +114,6 @@ const ROOM_OPTIONS: RoomOptions = {
   },
   // Publish defaults
   publishDefaults: {
-    audioBitrate: 32_000,        // 32kbps — clear voice
     dtx: true,                   // Discontinuous Transmission — saves bandwidth when silent
     red: true,                   // Redundant Audio Data — recovery from packet loss
     simulcast: true,             // Simulcast for adaptive quality
@@ -122,14 +121,6 @@ const ROOM_OPTIONS: RoomOptions = {
       VideoPresets.h180,
       VideoPresets.h360,
     ],
-  },
-  // Reconnect up to 7 times with backoff
-  reconnectPolicy: {
-    maxRetries: 7,
-    nextRetryDelayInMs: (context) => {
-      // Exponential backoff: 300ms, 600ms, 1200ms, 2400ms, ... capped at 10s
-      return Math.min(300 * Math.pow(2, context.retryCount), 10_000);
-    },
   },
   disconnectOnPageLeave: true,
 };
