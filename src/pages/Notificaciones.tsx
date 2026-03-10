@@ -23,6 +23,19 @@ const Notificaciones = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Filter module options by role permissions
+  const filteredModuleOptions = useMemo(
+    () =>
+      MODULE_OPTIONS.filter((o) => {
+        const permModule = MODULE_PERMISSION_MAP[o.value];
+        // null means universal (e.g. messenger) — always show
+        if (permModule === null) return true;
+        if (permModule === undefined) return true;
+        return canAccess(permModule);
+      }),
+    [canAccess]
+  );
+
   const handleClick = (n: Notification) => {
     if (n.status === "new" || (!n.status && !n.is_read)) {
       markAsRead.mutate(n.id);
