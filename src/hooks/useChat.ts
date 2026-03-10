@@ -225,7 +225,7 @@ export function useChat() {
   }, [user, loadConversations]);
 
   const createDirectChat = useCallback(
-    async (otherUserId: string) => {
+    (otherUserId: string): string | null => {
       if (!user) return null;
 
       // Fast path: check local state first (zero network calls)
@@ -236,56 +236,108 @@ export function useChat() {
       );
       if (existing) return existing.id;
 
-      // Fallback: single DB query to verify no conversation exists
-      const { data: otherP } = await supabase
-        .from("chat_participants")
-        .select("conversation_id, chat_conversations!inner(type)")
-        .eq("user_id", otherUserId)
-        .eq("chat_conversations.type", "direct")
-        .in(
-          "conversation_id",
-          conversations.map((c) => c.id)
-        )
-        .limit(1);
-
-      if (otherP && otherP.length > 0) {
-        return otherP[0].conversation_id;
-      }
-
+      // Generate ID and add optimistic conversation to local state immediately
       const newConvId = crypto.randomUUID();
-      const { error: createConvError } = await supabase
-        .from("chat_conversations")
-        .insert({ id: newConvId, type: "direct", created_by: user.id });
+      const now = new Date().toISOString();
+      const otherProfile = profilesRef.current[otherUserId];
 
-      if (createConvError) {
-        toast.error("Error al crear conversación");
-        return null;
-      }
+      const optimisticConv: ConversationWithDetails = {
+        id: newConvId,
+        type: "direct",
+        name: null,
+        description: null,
+        avatar_url: null,
+        created_by: user.id,
+        created_at: now,
+        updated_at: now,
+        participants: [
+          {
+            id: crypto.randomUUID(),
+            conversation_id: newConvId,
+            user_id: user.id,
+            role: "admin",
+            joined_at: now,
+            last_read_at: now,
+            is_muted: false,
+            notifications_mode: "all",
+            profile: profilesRef.current[user.id],
+          },
+          {
+            id: crypto.randomUUID(),
+            conversation_id: newConvId,
+            user_id: otherUserId,
+            role: "member",
+            joined_at: now,
+            last_read_at: null,
+            is_muted: false,
+            notifications_mode: "all",
+            profile: otherProfile,
+          },
+        ],
+        unreadCount: 0,
+        displayName: otherProfile?.full_name || "Chat",
+      };
 
-      // Insert creator first (RLS requires creator to be participant before adding others)
-      const { error: addCreatorError } = await supabase
-        .from("chat_participants")
-        .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
+      setConversations((prev) => [optimisticConv, ...prev]);
 
-      if (addCreatorError) {
-        await supabase.from("chat_conversations").delete().eq("id", newConvId);
-        toast.error("Error al crear conversación");
-        return null;
-      }
+      // Do DB operations in background
+      (async () => {
+        // Verify no conversation exists in DB
+        const { data: otherP } = await supabase
+          .from("chat_participants")
+          .select("conversation_id, chat_conversations!inner(type)")
+          .eq("user_id", otherUserId)
+          .eq("chat_conversations.type", "direct")
+          .in(
+            "conversation_id",
+            conversations.map((c) => c.id)
+          )
+          .limit(1);
 
-      const { error: addOtherError } = await supabase
-        .from("chat_participants")
-        .insert({ conversation_id: newConvId, user_id: otherUserId, role: "member" });
+        if (otherP && otherP.length > 0) {
+          // Already exists, remove optimistic and switch to real one
+          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+          return;
+        }
 
-      if (addOtherError) {
-        await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
-        await supabase.from("chat_conversations").delete().eq("id", newConvId);
-        toast.error("Error al crear conversación");
-        return null;
-      }
+        const { error: createConvError } = await supabase
+          .from("chat_conversations")
+          .insert({ id: newConvId, type: "direct", created_by: user.id });
 
-      // Realtime will pick up the new conversation; do a fast local reload
-      await loadConversations();
+        if (createConvError) {
+          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+          toast.error("Error al crear conversación");
+          return;
+        }
+
+        // Insert creator first (RLS requires creator to be participant before adding others)
+        const { error: addCreatorError } = await supabase
+          .from("chat_participants")
+          .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
+
+        if (addCreatorError) {
+          await supabase.from("chat_conversations").delete().eq("id", newConvId);
+          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+          toast.error("Error al crear conversación");
+          return;
+        }
+
+        const { error: addOtherError } = await supabase
+          .from("chat_participants")
+          .insert({ conversation_id: newConvId, user_id: otherUserId, role: "member" });
+
+        if (addOtherError) {
+          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
+          await supabase.from("chat_conversations").delete().eq("id", newConvId);
+          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+          toast.error("Error al crear conversación");
+          return;
+        }
+
+        // Realtime will pick up the new conversation; do a fast local reload
+        await loadConversations();
+      })();
+
       return newConvId;
     },
     [user, conversations, loadConversations]
