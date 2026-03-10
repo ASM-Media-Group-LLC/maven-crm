@@ -375,6 +375,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           {/* Avatar with status */}
           <div className="relative shrink-0">
             <Avatar className={cn("h-9 w-9 sm:h-11 sm:w-11", isActive && "ring-2 ring-primary/30")}>
+              {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
+              {!conversation.avatar_url && !isGroup && otherParticipant?.profile?.avatar_url && (
+                <AvatarImage src={otherParticipant.profile.avatar_url} alt={conversation.displayName} className="object-cover" />
+              )}
               <AvatarFallback className={cn(
                 "text-xs sm:text-sm font-semibold",
                 isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"
