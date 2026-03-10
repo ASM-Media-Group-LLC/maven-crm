@@ -658,14 +658,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     // Mark as read when window regains focus
     const handleFocus = () => {
-      if (user) {
-        supabase
-          .from("chat_participants")
-          .update({ last_read_at: new Date().toISOString() })
-          .eq("conversation_id", conversationId)
-          .eq("user_id", user.id)
-          .then();
-      }
+      supabase
+        .from("chat_participants")
+        .update({ last_read_at: new Date().toISOString() })
+        .eq("conversation_id", conversationId)
+        .eq("user_id", userId)
+        .then();
     };
     window.addEventListener("focus", handleFocus);
 
