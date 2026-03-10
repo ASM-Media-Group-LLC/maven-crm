@@ -481,7 +481,7 @@ const DashboardContent = () => {
         </Card>
 
         {/* Row 3: Pipeline + Top 5 + Pending Tasks */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-4 ${getGridCols([canAccess("LeadGen"), canAccess("Creadores"), true].filter(Boolean).length)}`}>
           {canAccess("LeadGen") && (
             <Card className="transition-all duration-300 hover:translate-y-[-2px] hover:border-accent/30">
               <CardHeader className="pb-2">
