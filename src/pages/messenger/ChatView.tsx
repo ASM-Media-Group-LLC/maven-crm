@@ -30,6 +30,7 @@ interface ChatViewProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  onMembersChanged?: () => void;
 }
 
 export default function ChatView({
