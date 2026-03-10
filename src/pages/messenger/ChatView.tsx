@@ -100,7 +100,8 @@ export default function ChatView({
           onBack={onBack}
           onStartVideoCall={onStartVideoCall}
           onOpenNotificationSettings={() => setShowNotifSettings(true)}
-          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); }}
+          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); setShowGroupMembers(false); }}
+          onOpenGroupMembers={() => { setShowGroupMembers(true); setShowSharedFiles(false); setThreadParent(null); }}
         />
 
         {searchOpen && searchQuery && (
