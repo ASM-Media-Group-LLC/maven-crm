@@ -162,6 +162,8 @@ export default function ChatView({
           replyTo={replyTo}
           profiles={profiles}
           onCancelReply={() => setReplyTo(null)}
+          participants={conversation.participants}
+          chatType={conversation.type}
         />
       </div>
 
