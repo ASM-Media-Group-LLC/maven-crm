@@ -40,6 +40,13 @@ export interface Contacto {
   assigned_to: string;
 }
 
+const statusMap: Record<string, string> = {
+  new: "Nuevo",
+  contacted: "Contactado",
+  interested: "Interesado",
+  not_interested: "Descartado",
+};
+
 const emptyFilters: ContactoFilters = {
   search: "",
   estado: "",
