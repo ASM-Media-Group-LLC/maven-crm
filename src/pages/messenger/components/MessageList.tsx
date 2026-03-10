@@ -216,6 +216,7 @@ export default function MessageList({
                     readByUsers={getReadByUsers(msg.id)}
                     totalParticipants={totalParticipants}
                     threadCount={threadCount}
+                    unreadThreadCount={getUnreadThreadCount?.(msg.id) ?? 0}
                     onOpenThread={() => onOpenThread(msg)}
                   />
                 </div>
