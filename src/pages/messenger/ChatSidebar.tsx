@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Search, Users, Video, Trash2, SearchCheck, Contact, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -297,6 +297,7 @@ function ContactsSection({ profiles, onSelectContact }: {
                 >
                   <div className="relative shrink-0">
                     <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                      {p.avatar_url && <AvatarImage src={p.avatar_url} alt={p.full_name || ""} className="object-cover" />}
                       <AvatarFallback className="text-[9px] sm:text-[10px] font-semibold bg-primary/10 text-primary">
                         {getInitials(p.full_name || "?")}
                       </AvatarFallback>
@@ -374,6 +375,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           {/* Avatar with status */}
           <div className="relative shrink-0">
             <Avatar className={cn("h-9 w-9 sm:h-11 sm:w-11", isActive && "ring-2 ring-primary/30")}>
+              {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
+              {!conversation.avatar_url && !isGroup && otherParticipant?.profile?.avatar_url && (
+                <AvatarImage src={otherParticipant.profile.avatar_url} alt={conversation.displayName} className="object-cover" />
+              )}
               <AvatarFallback className={cn(
                 "text-xs sm:text-sm font-semibold",
                 isGroup ? "bg-accent/10 text-accent" : "bg-primary/10 text-primary"

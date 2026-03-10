@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users,
+  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users, Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { getStatusColor, getStatusLabel } from "./StatusPicker";
 import { useAuth } from "@/hooks/useAuth";
+import AvatarUpload from "./AvatarUpload";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -27,6 +30,7 @@ interface ChatHeaderProps {
   onOpenNotificationSettings: () => void;
   onOpenSharedFiles: () => void;
   onOpenGroupMembers?: () => void;
+  onAvatarChanged?: () => void;
 }
 
 function getInitials(name: string) {
@@ -37,15 +41,22 @@ export default function ChatHeader({
   conversation, profiles, typingUsers, searchOpen, searchQuery,
   onSearchToggle, onSearchChange, onBack, onStartVideoCall,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
+  onAvatarChanged,
 }: ChatHeaderProps) {
   const { user } = useAuth();
   const { isOnline, getStatus } = useOnlinePresence();
 
+  const isGroup = conversation.type === "group";
+  const isAdmin = isGroup && conversation.participants.some(
+    p => p.user_id === user?.id && p.role === "admin"
+  );
+
   // Find the OTHER participant in direct chats
-  const otherParticipant = conversation.type === "direct"
+  const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
     : null;
   const otherUserId = otherParticipant?.user_id;
+  const otherProfile = otherUserId ? profiles[otherUserId] : null;
   const online = otherUserId ? isOnline(otherUserId) : false;
   const status = otherUserId ? getStatus(otherUserId) : null;
 
@@ -53,34 +64,84 @@ export default function ChatHeader({
     .map(id => profiles[id]?.full_name?.split(" ")[0] || "Alguien")
     .join(", ");
 
-  const onlineCount = conversation.type === "group"
+  const onlineCount = isGroup
     ? conversation.participants.filter(p => isOnline(p.user_id)).length
     : 0;
 
   const subtitle = typingNames
     ? `${typingNames} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
-    : conversation.type === "group"
+    : isGroup
       ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}`
       : online
         ? getStatusLabel(status, online)
         : "Desconectado";
 
+  // Avatar URL: group avatar or other user's avatar
+  const avatarUrl = isGroup
+    ? conversation.avatar_url
+    : otherProfile?.avatar_url;
+
+  const handleGroupAvatarChange = async (url: string) => {
+    const { error } = await supabase
+      .from("chat_conversations")
+      .update({ avatar_url: url })
+      .eq("id", conversation.id);
+    if (error) {
+      toast.error("Error al actualizar avatar del grupo");
+    } else {
+      onAvatarChanged?.();
+    }
+  };
+
+  const handleProfileAvatarChange = async (url: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: url })
+      .eq("id", user.id);
+    if (error) {
+      toast.error("Error al actualizar tu avatar");
+    } else {
+      onAvatarChanged?.();
+    }
+  };
+
   return (
     <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
-      <div className="flex items-center gap-3 px-4 py-2.5">
-        <Button variant="ghost" size="icon" className="md:hidden shrink-0 h-8 w-8" onClick={onBack}>
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5">
+        <Button variant="ghost" size="icon" className="sm:hidden shrink-0 h-8 w-8" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
         <div className="relative">
-          <Avatar className="h-9 w-9 shrink-0">
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-              {getInitials(conversation.displayName)}
-            </AvatarFallback>
-          </Avatar>
-          {conversation.type === "direct" && (
+          {isGroup && isAdmin ? (
+            <AvatarUpload
+              currentUrl={avatarUrl}
+              displayName={conversation.displayName}
+              onAvatarChanged={handleGroupAvatarChange}
+              size="sm"
+              isGroup
+              editable
+            />
+          ) : !isGroup ? (
+            <AvatarUpload
+              currentUrl={avatarUrl}
+              displayName={conversation.displayName}
+              onAvatarChanged={handleProfileAvatarChange}
+              size="sm"
+              editable={otherUserId === user?.id || !otherUserId}
+            />
+          ) : (
+            <Avatar className="h-9 w-9 shrink-0">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={conversation.displayName} className="object-cover" />}
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                {getInitials(conversation.displayName)}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          {!isGroup && (
             <span className={cn(
-              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card",
+              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card z-10",
               getStatusColor(status, online)
             )} />
           )}
@@ -121,7 +182,7 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
-              {conversation.type === "group" && onOpenGroupMembers && (
+              {isGroup && onOpenGroupMembers && (
                 <DropdownMenuItem onClick={onOpenGroupMembers}>
                   <Users className="h-3.5 w-3.5 mr-2" /> Miembros del grupo
                 </DropdownMenuItem>
