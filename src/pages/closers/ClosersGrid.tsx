@@ -1,16 +1,21 @@
-import { Deal } from "./useDeals";
+import { Deal, STAGES } from "./useDeals";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub,
+  DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Eye, Pencil, ArrowRightLeft, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface ClosersGridProps {
   deals: Deal[];
+  onView: (deal: Deal) => void;
+  onEdit: (deal: Deal) => void;
+  onDelete: (deal: Deal) => void;
+  onStageChange: (id: string, stage: string) => void;
 }
 
 const stageColors: Record<string, string> = {
@@ -23,7 +28,7 @@ const stageColors: Record<string, string> = {
   Perdido: "bg-muted text-muted-foreground",
 };
 
-const ClosersGrid = ({ deals }: ClosersGridProps) => {
+const ClosersGrid = ({ deals, onView, onEdit, onDelete, onStageChange }: ClosersGridProps) => {
   if (deals.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-muted-foreground/30 p-8 text-center">
@@ -49,17 +54,39 @@ const ClosersGrid = ({ deals }: ClosersGridProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Ver detalle</DropdownMenuItem>
-                  <DropdownMenuItem>Editar</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onView(deal)}>
+                    <Eye className="h-4 w-4 mr-2" />Ver detalle
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit(deal)}>
+                    <Pencil className="h-4 w-4 mr-2" />Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <ArrowRightLeft className="h-4 w-4 mr-2" />Cambiar etapa
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        {STAGES.map((s) => (
+                          <DropdownMenuItem
+                            key={s}
+                            disabled={deal.stage === s}
+                            onClick={() => onStageChange(deal.id, s)}
+                          >
+                            {s}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => onDelete(deal)}>
+                    <Trash2 className="h-4 w-4 mr-2" />Eliminar
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
             <div className="flex items-center justify-between mt-3">
-              <Badge variant="secondary" className={stageColors[deal.stage] || ""}>
-                {deal.stage}
-              </Badge>
+              <Badge variant="secondary" className={stageColors[deal.stage] || ""}>{deal.stage}</Badge>
               <span className="text-xs text-muted-foreground">
                 {deal.created_at ? format(new Date(deal.created_at), "dd/MM/yyyy") : "—"}
               </span>

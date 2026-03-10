@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Deal } from "./useDeals";
+import { Deal, STAGES } from "./useDeals";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,13 +7,18 @@ import {
 } from "@/components/ui/table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub,
+  DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, Eye, Pencil, ArrowRightLeft, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface ClosersTableProps {
   deals: Deal[];
+  onView: (deal: Deal) => void;
+  onEdit: (deal: Deal) => void;
+  onDelete: (deal: Deal) => void;
+  onStageChange: (id: string, stage: string) => void;
 }
 
 const stageColors: Record<string, string> = {
@@ -29,17 +34,13 @@ const stageColors: Record<string, string> = {
 type SortKey = "prospect_handle" | "source" | "stage" | "created_at";
 type SortDir = "asc" | "desc";
 
-const ClosersTable = ({ deals }: ClosersTableProps) => {
+const ClosersTable = ({ deals, onView, onEdit, onDelete, onStageChange }: ClosersTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
   };
 
   const sorted = [...deals].sort((a, b) => {
@@ -74,9 +75,7 @@ const ClosersTable = ({ deals }: ClosersTableProps) => {
               <TableCell className="font-medium">{deal.prospect_handle}</TableCell>
               <TableCell>{deal.source}</TableCell>
               <TableCell>
-                <Badge variant="secondary" className={stageColors[deal.stage] || ""}>
-                  {deal.stage}
-                </Badge>
+                <Badge variant="secondary" className={stageColors[deal.stage] || ""}>{deal.stage}</Badge>
               </TableCell>
               <TableCell className="text-muted-foreground text-sm">
                 {deal.created_at ? format(new Date(deal.created_at), "dd/MM/yyyy") : "—"}
@@ -89,10 +88,34 @@ const ClosersTable = ({ deals }: ClosersTableProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Ver detalle</DropdownMenuItem>
-                    <DropdownMenuItem>Editar</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onView(deal)}>
+                      <Eye className="h-4 w-4 mr-2" />Ver detalle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit(deal)}>
+                      <Pencil className="h-4 w-4 mr-2" />Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <ArrowRightLeft className="h-4 w-4 mr-2" />Cambiar etapa
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          {STAGES.map((s) => (
+                            <DropdownMenuItem
+                              key={s}
+                              disabled={deal.stage === s}
+                              onClick={() => onStageChange(deal.id, s)}
+                            >
+                              {s}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => onDelete(deal)}>
+                      <Trash2 className="h-4 w-4 mr-2" />Eliminar
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>
@@ -100,9 +123,7 @@ const ClosersTable = ({ deals }: ClosersTableProps) => {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                No hay deals
-              </TableCell>
+              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No hay deals</TableCell>
             </TableRow>
           )}
         </TableBody>
