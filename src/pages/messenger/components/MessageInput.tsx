@@ -256,12 +256,14 @@ export default function MessageInput({
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             ) : (
-              <VoiceNoteRecorder
-                isRecording={false}
-                onStartRecording={() => setIsRecording(true)}
-                onSend={handleVoiceNoteSend}
-                onCancel={() => setIsRecording(false)}
-              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => setIsRecording(true)}
+              >
+                <Mic className="h-5 w-5" />
+              </Button>
             )}
           </>
         )}
