@@ -51,7 +51,9 @@ export default function MessageInput({
     // Send pending files first
     if (pendingFiles.length > 0) {
       setUploading(true);
-      for (const pf of pendingFiles) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const pf = pendingFiles[i];
+        setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name}`);
         const path = `${user!.id}/${Date.now()}-${pf.file.name}`;
         const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
         if (error) {
@@ -59,14 +61,14 @@ export default function MessageInput({
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-        // Only attach text to the first file
-        const msgContent = pendingFiles.indexOf(pf) === 0 && text.trim() ? text.trim() : pf.file.name;
+        const msgContent = i === 0 && text.trim() ? text.trim() : pf.file.name;
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
       }
       setPendingFiles([]);
       setText("");
       onCancelReply();
       setUploading(false);
+      setUploadProgress("");
       inputRef.current?.focus();
       return;
     }
