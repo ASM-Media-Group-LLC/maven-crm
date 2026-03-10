@@ -12,7 +12,7 @@ import PermissionRoute from "@/components/PermissionRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import VerifyEmail from "./pages/VerifyEmail";
+
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import DesignSystem from "./pages/DesignSystem";
