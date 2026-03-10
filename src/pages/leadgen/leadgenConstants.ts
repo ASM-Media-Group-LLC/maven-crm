@@ -42,15 +42,15 @@ export const LEADGEN_COUNTRIES = [
 ];
 
 export const LEADGEN_COMPANIES = [
-  "Ora Miami",
-  "KASH Agency",
   "alvaroletshoot",
   "Blu app",
-  "piclink.me",
-  "Pagomundo",
   "Exchange",
-  "UNLOK",
+  "KASH Agency",
+  "Ora Miami",
+  "Pagomundo",
+  "piclink.me",
   "Trafix",
+  "UNLOK",
 ];
 
 export const US_STATES = [

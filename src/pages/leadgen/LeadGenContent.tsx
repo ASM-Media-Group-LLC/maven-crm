@@ -116,6 +116,7 @@ const LeadGenContent = () => {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [qualityFilter, setQualityFilter] = useState("todos");
   const [qaFilter, setQaFilter] = useState("todos");
+  const [agencyFilter, setAgencyFilter] = useState("todos");
   const [activeFilter, setActiveFilter] = useState<{ type: "categoria" | "status" | null; value: string | null }>({ type: null, value: null });
 
   // Filter leads
@@ -130,6 +131,8 @@ const LeadGenContent = () => {
           || (lead.ticket_number || "").toLowerCase().includes(q);
         if (!matches) return false;
       }
+      // Agency filter
+      if (agencyFilter !== "todos" && lead.company !== agencyFilter) return false;
       // Status filter
       if (statusFilter !== "todos" && lead.status !== statusFilter) return false;
       // Quality filter
@@ -145,7 +148,7 @@ const LeadGenContent = () => {
       }
       return true;
     });
-  }, [enrichedLeads, searchQuery, statusFilter, qualityFilter, activeFilter]);
+  }, [enrichedLeads, searchQuery, agencyFilter, statusFilter, qualityFilter, activeFilter]);
 
   // Agent stats
   const agentStats = useMemo(() => {
@@ -291,6 +294,15 @@ const LeadGenContent = () => {
                   <SelectItem value="todos">Calidad</SelectItem>
                   {QUALITY_OPTIONS.map(q => (
                     <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={agencyFilter} onValueChange={setAgencyFilter}>
+                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas las agencias</SelectItem>
+                  {LEADGEN_COMPANIES.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
