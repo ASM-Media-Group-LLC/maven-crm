@@ -873,6 +873,127 @@ export type Database = {
         }
         Relationships: []
       }
+      closer_contact_history: {
+        Row: {
+          channel: string
+          contact_date: string
+          created_at: string
+          created_by: string | null
+          creator_id: string
+          id: string
+          notes: string | null
+          result: string | null
+        }
+        Insert: {
+          channel: string
+          contact_date?: string
+          created_at?: string
+          created_by?: string | null
+          creator_id: string
+          id?: string
+          notes?: string | null
+          result?: string | null
+        }
+        Update: {
+          channel?: string
+          contact_date?: string
+          created_at?: string
+          created_by?: string | null
+          creator_id?: string
+          id?: string
+          notes?: string | null
+          result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closer_contact_history_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "closer_creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closer_creators: {
+        Row: {
+          agency_commission: number | null
+          assigned_to: string | null
+          category: string | null
+          company_id: string | null
+          completed_date: string | null
+          confirmed_date: string | null
+          created_at: string
+          created_by: string | null
+          estimated_monetization: number | null
+          id: string
+          instagram_handle: string
+          last_contact_date: string | null
+          monthly_monetization: number | null
+          notes: string | null
+          onlyfans_url: string | null
+          passed_date: string | null
+          phone: string | null
+          rejection_reason: string | null
+          source_account: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          agency_commission?: number | null
+          assigned_to?: string | null
+          category?: string | null
+          company_id?: string | null
+          completed_date?: string | null
+          confirmed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_monetization?: number | null
+          id?: string
+          instagram_handle: string
+          last_contact_date?: string | null
+          monthly_monetization?: number | null
+          notes?: string | null
+          onlyfans_url?: string | null
+          passed_date?: string | null
+          phone?: string | null
+          rejection_reason?: string | null
+          source_account?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_commission?: number | null
+          assigned_to?: string | null
+          category?: string | null
+          company_id?: string | null
+          completed_date?: string | null
+          confirmed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_monetization?: number | null
+          id?: string
+          instagram_handle?: string
+          last_contact_date?: string | null
+          monthly_monetization?: number | null
+          notes?: string | null
+          onlyfans_url?: string | null
+          passed_date?: string | null
+          phone?: string | null
+          rejection_reason?: string | null
+          source_account?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closer_creators_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       closers_contacts: {
         Row: {
           assigned_to: string | null
