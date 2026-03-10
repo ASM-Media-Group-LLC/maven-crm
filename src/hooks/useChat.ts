@@ -817,28 +817,5 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   };
 }
 
-export function useReadReceipts(messageIds: string[]) {
-  const [receipts, setReceipts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    if (messageIds.length === 0) return;
-
-    const load = async () => {
-      const { data } = await supabase
-        .from("chat_read_receipts")
-        .select("message_id")
-        .in("message_id", messageIds);
-
-      if (data) {
-        const counts: Record<string, number> = {};
-        data.forEach((r: any) => {
-          counts[r.message_id] = (counts[r.message_id] || 0) + 1;
-        });
-        setReceipts(counts);
-      }
-    };
-    load();
-  }, [messageIds]);
-
-  return receipts;
-}
+// Re-export from useReadReceipts.ts for backward compatibility
+export { useReadReceipts } from "@/hooks/useReadReceipts";
