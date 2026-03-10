@@ -69,23 +69,22 @@ export function useChat() {
       return;
     }
 
-    // Batch fetch last message per conversation using a single query ordered by created_at desc
-    // We'll get all recent messages and pick the latest per conversation client-side
-    const { data: recentMessages } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .in("conversation_id", convIds)
-      .order("created_at", { ascending: false })
-      .limit(convIds.length * 2); // Slightly over to ensure coverage
+    // Fetch last message per conversation reliably using parallel queries
+    const lastMessagePromises = convIds.map(async (convId) => {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      return { convId, msg: data?.[0] as ChatMessage | undefined };
+    });
 
+    const lastMessageResults = await Promise.all(lastMessagePromises);
     const lastMessageMap: Record<string, ChatMessage> = {};
-    if (recentMessages) {
-      for (const msg of recentMessages as ChatMessage[]) {
-        if (!lastMessageMap[msg.conversation_id]) {
-          lastMessageMap[msg.conversation_id] = msg;
-        }
-      }
-    }
+    lastMessageResults.forEach(({ convId, msg }) => {
+      if (msg) lastMessageMap[convId] = msg;
+    });
 
     // Batch unread counts: for each conversation, count messages after last_read_at
     // We'll do this in parallel with a single Promise.all
@@ -818,28 +817,5 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   };
 }
 
-export function useReadReceipts(messageIds: string[]) {
-  const [receipts, setReceipts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    if (messageIds.length === 0) return;
-
-    const load = async () => {
-      const { data } = await supabase
-        .from("chat_read_receipts")
-        .select("message_id")
-        .in("message_id", messageIds);
-
-      if (data) {
-        const counts: Record<string, number> = {};
-        data.forEach((r: any) => {
-          counts[r.message_id] = (counts[r.message_id] || 0) + 1;
-        });
-        setReceipts(counts);
-      }
-    };
-    load();
-  }, [messageIds]);
-
-  return receipts;
-}
+// Re-export from useReadReceipts.ts for backward compatibility
+export { useReadReceipts } from "@/hooks/useReadReceipts";

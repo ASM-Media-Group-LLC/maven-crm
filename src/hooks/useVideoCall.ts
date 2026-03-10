@@ -138,13 +138,13 @@ export function useVideoCall() {
     setActiveCall(null);
   }, [activeCall, user]);
 
-  // ── Poll for incoming calls ────────────────────────────────────
+  // ── Realtime listener for incoming calls ────────────────────────
   useEffect(() => {
     if (!user) return;
 
-    const pollIncoming = async () => {
+    // Initial check for any ringing calls
+    const checkIncoming = async () => {
       if (incomingCall || activeCall) return;
-
       const { data: directCalls } = await (supabase
         .from("calls") as any)
         .select("*")
@@ -168,40 +168,79 @@ export function useVideoCall() {
       }
     };
 
-    pollIncoming();
-    const intervalId = setInterval(pollIncoming, 3000);
-    return () => clearInterval(intervalId);
+    checkIncoming();
+
+    // Subscribe to realtime changes on calls table for this user
+    const channel = supabase
+      .channel(`incoming-calls-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "calls",
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const call = payload.new as Call;
+          if (call.call_status !== "ringing") return;
+
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", call.caller_id)
+            .single();
+
+          setIncomingCall({
+            ...call,
+            caller_name: profile?.full_name ?? "Usuario",
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, incomingCall, activeCall]);
 
-  // ── Poll active call status ────────────────────────────────────
+  // ── Realtime active call status tracking ───────────────────────
   useEffect(() => {
     if (!activeCall || !user) return;
 
-    const pollStatus = async () => {
-      const { data: call } = await (supabase.from("calls") as any)
-        .select("call_status")
-        .eq("id", activeCall.id)
-        .single();
+    const channel = supabase
+      .channel(`call-status-${activeCall.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "calls",
+          filter: `id=eq.${activeCall.id}`,
+        },
+        (payload) => {
+          const call = payload.new as Call;
 
-      if (!call) return;
+          if (activeCall.call_status === "ringing" && call.call_status === "accepted") {
+            if (ringingTimerRef.current) {
+              clearTimeout(ringingTimerRef.current);
+              ringingTimerRef.current = null;
+            }
+            setActiveCall((prev) => prev ? { ...prev, call_status: "accepted" } : prev);
+          } else if (call.call_status === "declined" || call.call_status === "ended") {
+            if (ringingTimerRef.current) {
+              clearTimeout(ringingTimerRef.current);
+              ringingTimerRef.current = null;
+            }
+            setActiveCall(null);
+          }
+        }
+      )
+      .subscribe();
 
-      if (activeCall.call_status === "ringing" && call.call_status === "accepted") {
-        if (ringingTimerRef.current) {
-          clearTimeout(ringingTimerRef.current);
-          ringingTimerRef.current = null;
-        }
-        setActiveCall((prev) => prev ? { ...prev, call_status: "accepted" } : prev);
-      } else if (call.call_status === "declined" || call.call_status === "ended") {
-        if (ringingTimerRef.current) {
-          clearTimeout(ringingTimerRef.current);
-          ringingTimerRef.current = null;
-        }
-        setActiveCall(null);
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    const intervalId = setInterval(pollStatus, 2000);
-    return () => clearInterval(intervalId);
   }, [activeCall, user]);
 
   return {

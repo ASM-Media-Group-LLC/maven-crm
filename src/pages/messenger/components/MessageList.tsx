@@ -106,19 +106,25 @@ export default function MessageList({
     }
   }, [highlightedMsgId]);
 
+  // Preserve scroll position after older messages are prepended
+  const prevScrollHeightRef = useRef(0);
+  const wasLoadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    if (wasLoadingMoreRef.current && !loadingMore && scrollRef.current) {
+      const newHeight = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = newHeight - prevScrollHeightRef.current;
+      wasLoadingMoreRef.current = false;
+    }
+  }, [messages, loadingMore]);
+
   // Infinite scroll: load more on scroll to top
   const handleScroll = useCallback(() => {
     if (!scrollRef.current || !hasMore || loadingMore || !onLoadMore) return;
     if (scrollRef.current.scrollTop < 80) {
-      const prevHeight = scrollRef.current.scrollHeight;
+      prevScrollHeightRef.current = scrollRef.current.scrollHeight;
+      wasLoadingMoreRef.current = true;
       onLoadMore();
-      // Preserve scroll position after loading older messages
-      requestAnimationFrame(() => {
-        if (scrollRef.current) {
-          const newHeight = scrollRef.current.scrollHeight;
-          scrollRef.current.scrollTop = newHeight - prevHeight;
-        }
-      });
     }
   }, [hasMore, loadingMore, onLoadMore]);
 

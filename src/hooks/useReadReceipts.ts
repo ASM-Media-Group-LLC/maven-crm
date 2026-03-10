@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -12,23 +12,27 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
   const { user } = useAuth();
   const [receipts, setReceipts] = useState<ReadReceipt[]>([]);
 
+  // Stabilize messageIds to avoid infinite channel re-subscriptions
+  const messageIdsKey = messageIds.join(",");
+  const stableMessageIds = useMemo(() => messageIds, [messageIdsKey]);
+
   const loadReceipts = useCallback(async () => {
-    if (!conversationId || messageIds.length === 0) { setReceipts([]); return; }
-    const last50 = messageIds.slice(-50);
+    if (!conversationId || stableMessageIds.length === 0) { setReceipts([]); return; }
+    const last50 = stableMessageIds.slice(-50);
     const { data } = await supabase
       .from("chat_read_receipts")
       .select("message_id, user_id, read_at")
       .in("message_id", last50);
     if (data) setReceipts(data as ReadReceipt[]);
-  }, [conversationId, messageIds]);
+  }, [conversationId, stableMessageIds]);
 
   useEffect(() => { loadReceipts(); }, [loadReceipts]);
 
   // Realtime sync for read receipts in active conversation
   useEffect(() => {
-    if (!conversationId || messageIds.length === 0) return;
+    if (!conversationId || stableMessageIds.length === 0) return;
 
-    const trackedMessageIds = new Set(messageIds);
+    const trackedMessageIds = new Set(stableMessageIds);
 
     const channel = supabase
       .channel(`read-receipts-${conversationId}`)
@@ -59,42 +63,38 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, messageIds, loadReceipts]);
+  }, [conversationId, stableMessageIds, loadReceipts]);
 
-  // Mark messages as read by inserting read receipts
+  // Batch mark messages as read
   const markAsRead = useCallback(async (msgIds: string[]) => {
     if (!user || msgIds.length === 0) return;
-    // Insert one by one, ignoring errors for duplicates
-    for (const id of msgIds) {
-      await supabase.from("chat_read_receipts").insert({ message_id: id, user_id: user.id }).maybeSingle();
-    }
+    const rows = msgIds.map(id => ({ message_id: id, user_id: user.id }));
+    // Insert all at once, ignore duplicates via individual error handling
+    await Promise.allSettled(
+      rows.map(row => supabase.from("chat_read_receipts").insert(row).maybeSingle())
+    );
   }, [user]);
 
   // Auto-mark visible messages as read only when window is focused
+  const receiptsRef = useRef(receipts);
+  receiptsRef.current = receipts;
+
   useEffect(() => {
-    if (!user || !conversationId || messageIds.length === 0) return;
-    if (!document.hasFocus()) return; // Don't mark as read if window is not focused
+    if (!user || !conversationId || stableMessageIds.length === 0) return;
 
-    const unread = messageIds.filter(id => {
-      return !receipts.find(r => r.message_id === id && r.user_id === user.id);
-    });
-    if (unread.length > 0) markAsRead(unread);
-  }, [messageIds, user, conversationId, receipts, markAsRead]);
-
-  // Also mark as read when window regains focus
-  useEffect(() => {
-    if (!user || !conversationId || messageIds.length === 0) return;
-
-    const handleFocus = () => {
-      const unread = messageIds.filter(id => {
-        return !receipts.find(r => r.message_id === id && r.user_id === user.id);
-      });
+    const markUnread = () => {
+      if (!document.hasFocus()) return;
+      const unread = stableMessageIds.filter(id =>
+        !receiptsRef.current.find(r => r.message_id === id && r.user_id === user.id)
+      );
       if (unread.length > 0) markAsRead(unread);
     };
 
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [messageIds, user, conversationId, receipts, markAsRead]);
+    markUnread();
+
+    window.addEventListener("focus", markUnread);
+    return () => window.removeEventListener("focus", markUnread);
+  }, [stableMessageIds, user, conversationId, markAsRead]);
 
   const getReadBy = useCallback((messageId: string): string[] => {
     return receipts.filter(r => r.message_id === messageId && r.user_id !== user?.id).map(r => r.user_id);
