@@ -269,6 +269,7 @@ const ProjectsListContent = () => {
               {project.description && (
                 <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{project.description}</p>
               )}
+              </div>
             </div>
             <div className="flex items-center gap-1">
               {(() => {
