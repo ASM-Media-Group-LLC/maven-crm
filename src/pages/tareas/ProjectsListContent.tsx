@@ -121,6 +121,35 @@ const ProjectsListContent = () => {
     });
   }, [projects, search, statusFilter, memberFilter, priorityFilter, folderFilter, allMembers, allTasks]);
 
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === filteredProjects.length) return new Set();
+      return new Set(filteredProjects.map(p => p.id));
+    });
+  }, [filteredProjects]);
+
+  const handleBatchArchive = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      archiveProject.mutate({ id, status: "archived" });
+    });
+    clearSelection();
+  }, [selectedIds, archiveProject, clearSelection]);
+
+  const handleBatchDelete = useCallback(() => {
+    Array.from(selectedIds).forEach(id => {
+      deleteProject.mutate(id);
+    });
+    clearSelection();
+    setBatchDeleteOpen(false);
+  }, [selectedIds, deleteProject, clearSelection]);
+
+  const handleBatchMove = useCallback((folderId: string | null) => {
+    Array.from(selectedIds).forEach(projectId => {
+      moveProjectToFolder.mutate({ projectId, folderId });
+    });
+    clearSelection();
+  }, [selectedIds, moveProjectToFolder, clearSelection]);
+
   // Group projects by folder
   const groupedProjects = useMemo(() => {
     const groups: { folderId: string | null; folderName: string; projects: TaskProject[] }[] = [];
