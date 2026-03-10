@@ -133,7 +133,7 @@ const ContactosContent = () => {
       categoria: c.physical_appearance || "",
       whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
       interacciones: interactionCounts[c.id] || 0,
-      creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
+      creadoPor: (c.created_by && profilesMap[c.created_by]) || (c.created_by ? `Usuario #${c.created_by.slice(0, 8)}` : ""),
       email: c.email || "",
       phone: c.phone || "",
       country_code: c.country_code || "",

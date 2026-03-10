@@ -108,6 +108,10 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                 <div className="space-y-1.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Agente:</span>
+                    <span className="font-medium">{lead.agent_name || "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Agencia:</span>
                     <span className="font-medium">{lead.company || "—"}</span>
                   </div>
                   <div className="flex items-center justify-between">

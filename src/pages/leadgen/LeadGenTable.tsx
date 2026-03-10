@@ -56,7 +56,7 @@ const getPlatformIcon = (platform: string) => {
   return <ExternalLink className="h-4 w-4 text-muted-foreground" />;
 };
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "calidad" | "estado" | "pais" | "contacto" | "qa";
+type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "estado" | "pais" | "contacto" | "qa";
 
 interface Props {
   leads: LeadGenEntry[];
@@ -80,7 +80,8 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       case "hora": va = a.created_at; vb = b.created_at; break;
       case "ticket": va = a.id; vb = b.id; break;
       case "handle": va = a.model_handle; vb = b.model_handle; break;
-      case "agente": va = a.company ?? ""; vb = b.company ?? ""; break;
+      case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
+      case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
       case "calidad": va = a.quality; vb = b.quality; break;
       case "estado": va = a.status; vb = b.status; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
@@ -115,6 +116,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
             <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
             <TableHead><SortHeader label="Handle" col="handle" /></TableHead>
             <TableHead><SortHeader label="Agente" col="agente" /></TableHead>
+            <TableHead><SortHeader label="Agencia" col="agencia" /></TableHead>
             <TableHead><SortHeader label="Calidad" col="calidad" /></TableHead>
             <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
@@ -149,6 +151,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                 <TableCell>
                   <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
@@ -203,7 +206,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
           })}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                 No se encontraron leads.
               </TableCell>
             </TableRow>
