@@ -458,6 +458,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
+  const loadMessagesRef = useRef<() => Promise<void>>();
   const optimisticIdsRef = useRef<Set<string>>(new Set());
   const offlineQueueRef = useRef<Array<{
     content: string;
@@ -496,6 +497,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         .eq("user_id", user.id);
     }
   }, [conversationId, user]);
+
+  // Keep ref updated for use inside effects without triggering re-subscriptions
+  loadMessagesRef.current = loadMessages;
 
   // Load older messages (infinite scroll)
   const loadOlderMessages = useCallback(async () => {
@@ -554,8 +558,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   // Realtime messages with proper reconnection
   useEffect(() => {
-    if (!conversationId) return;
-
+    if (!conversationId || !user?.id) return;
+    const userId = user.id;
     let retryCount = 0;
     const maxRetries = 5;
 
@@ -593,15 +597,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             return [...prev, newMsg];
           });
 
-          if (user && newMsg.sender_id !== user.id) {
+          if (newMsg.sender_id !== userId) {
             onNewMessageRef.current?.(newMsg);
-            // Mark as read if window is focused
             if (document.hasFocus()) {
               supabase
                 .from("chat_participants")
                 .update({ last_read_at: new Date().toISOString() })
                 .eq("conversation_id", conversationId)
-                .eq("user_id", user.id)
+                .eq("user_id", userId)
                 .then();
             }
           }
@@ -647,7 +650,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
             setTimeout(() => {
               // Reload messages to catch any missed during downtime
-              void loadMessages();
+              void loadMessagesRef.current?.();
             }, delay);
           }
         }
@@ -655,28 +658,26 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     // Mark as read when window regains focus
     const handleFocus = () => {
-      if (user) {
-        supabase
-          .from("chat_participants")
-          .update({ last_read_at: new Date().toISOString() })
-          .eq("conversation_id", conversationId)
-          .eq("user_id", user.id)
-          .then();
-      }
+      supabase
+        .from("chat_participants")
+        .update({ last_read_at: new Date().toISOString() })
+        .eq("conversation_id", conversationId)
+        .eq("user_id", userId)
+        .then();
     };
     window.addEventListener("focus", handleFocus);
 
     // Typing indicator via presence
     const presenceChannel = supabase
       .channel(`typing-${conversationId}`, {
-        config: { presence: { key: user?.id ?? `anon-${conversationId}` } },
+        config: { presence: { key: userId } },
       })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
         Object.values(state).forEach((presences: any) => {
           presences.forEach((p: any) => {
-            if (p.typing && p.user_id !== user?.id) {
+            if (p.typing && p.user_id !== userId) {
               typing.push(p.user_id);
             }
           });
@@ -686,8 +687,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     typingChannelRef.current = presenceChannel;
     presenceChannel.subscribe((status) => {
-      if (status === "SUBSCRIBED" && user) {
-        void presenceChannel.track({ user_id: user.id, typing: false });
+      if (status === "SUBSCRIBED") {
+        void presenceChannel.track({ user_id: userId, typing: false });
       }
     });
 
@@ -699,7 +700,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         typingChannelRef.current = null;
       }
     };
-  }, [conversationId, user, loadMessages]);
+  }, [conversationId, user?.id]);
 
   const sendMessage = useCallback(
     async (
