@@ -117,9 +117,19 @@ export default function MessageInput({
   const handleVoiceNoteSend = useCallback(async (blob: Blob, durationSec: number) => {
     if (!user) return;
     setUploading(true);
-    const fileName = `voice-note-${Date.now()}.webm`;
+    // Derive extension from actual blob mimeType
+    const mimeToExt: Record<string, string> = {
+      "audio/webm": "webm",
+      "audio/ogg": "ogg",
+      "audio/mp4": "m4a",
+      "audio/mpeg": "mp3",
+    };
+    const ext = mimeToExt[blob.type] || "webm";
+    const fileName = `voice-note-${Date.now()}.${ext}`;
     const path = `${user.id}/${fileName}`;
-    const { error } = await supabase.storage.from("chat-files").upload(path, blob);
+    const { error } = await supabase.storage.from("chat-files").upload(path, blob, {
+      contentType: blob.type,
+    });
     if (error) {
       toast.error("Error al subir nota de voz");
       setUploading(false);
