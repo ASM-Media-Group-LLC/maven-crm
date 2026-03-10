@@ -266,6 +266,11 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             >
               <MessageSquareText className="h-3 w-3" />
               <span>{threadCount} {threadCount === 1 ? "respuesta" : "respuestas"}</span>
+              {unreadThreadCount > 0 && (
+                <span className="ml-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+                  {unreadThreadCount}
+                </span>
+              )}
             </button>
           )}
         </div>
