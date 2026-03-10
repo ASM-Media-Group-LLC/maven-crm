@@ -328,13 +328,7 @@ export const useDeleteAnnouncement = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Delete related notifications first
-      await supabase
-        .from("notifications")
-        .delete()
-        .eq("reference_type", "announcement")
-        .eq("reference_id", id);
-
+      // DB trigger auto-deletes related notifications on cascade
       const { error } = await supabase.from("internal_announcements").delete().eq("id", id);
       if (error) throw error;
     },
