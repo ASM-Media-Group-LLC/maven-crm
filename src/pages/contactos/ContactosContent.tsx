@@ -74,6 +74,28 @@ const ContactosContent = () => {
     },
   });
 
+  // Resolve created_by UUIDs to profile names
+  const creatorIds = useMemo(() => {
+    const ids = new Set<string>();
+    dbContactos.forEach((c) => { if (c.created_by) ids.add(c.created_by); });
+    return Array.from(ids);
+  }, [dbContactos]);
+
+  const { data: profilesMap = {} } = useQuery({
+    queryKey: ["profiles_for_contacts", creatorIds],
+    enabled: creatorIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", creatorIds);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((p) => { map[p.id] = p.full_name || ""; });
+      return map;
+    },
+  });
+
   // Fetch interaction counts per contact
   const { data: interactionCounts = {} } = useQuery({
     queryKey: ["contact_interaction_counts"],
@@ -104,7 +126,7 @@ const ContactosContent = () => {
       categoria: c.physical_appearance || "",
       whatsapp: c.phone ? `${c.country_code || ""}${c.phone}` : "",
       interacciones: interactionCounts[c.id] || 0,
-      creadoPor: c.created_by || "",
+      creadoPor: (c.created_by && profilesMap[c.created_by]) || "",
       email: c.email || "",
       phone: c.phone || "",
       country_code: c.country_code || "",
@@ -114,7 +136,7 @@ const ContactosContent = () => {
       profile_picture_url: c.profile_picture_url || "",
       assigned_to: c.assigned_to || "",
     })),
-  [dbContactos, interactionCounts]);
+  [dbContactos, interactionCounts, profilesMap]);
 
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
