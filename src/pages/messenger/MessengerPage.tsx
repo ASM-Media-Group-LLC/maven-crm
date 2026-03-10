@@ -16,8 +16,12 @@ import { useVideoCall } from "@/hooks/useVideoCall";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-function openCallInNewTab(roomName: string, isAdmin: boolean) {
-  const url = `/call/${encodeURIComponent(roomName)}${isAdmin ? "?admin=1" : ""}`;
+function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: string) {
+  const params = new URLSearchParams();
+  if (isAdmin) params.set("admin", "1");
+  if (displayName) params.set("name", displayName);
+  const qs = params.toString();
+  const url = `/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   window.open(url, `call-${roomName}`, "noopener");
 }
 
