@@ -57,7 +57,7 @@ export default function ChatHeader({
     : 0;
 
   const subtitle = typingNames
-    ? `${typingNames} está escribiendo...`
+    ? `${typingNames} ${typingUsers.length > 1 ? "están escribiendo..." : "está escribiendo..."}`
     : conversation.type === "group"
       ? `${conversation.participants.length} miembros${onlineCount > 0 ? ` · ${onlineCount} en línea` : ""}`
       : online

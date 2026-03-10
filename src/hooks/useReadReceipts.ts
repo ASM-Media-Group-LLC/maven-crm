@@ -70,15 +70,30 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
     }
   }, [user]);
 
-  // Auto-mark visible messages as read
+  // Auto-mark visible messages as read only when window is focused
   useEffect(() => {
     if (!user || !conversationId || messageIds.length === 0) return;
+    if (!document.hasFocus()) return; // Don't mark as read if window is not focused
+
     const unread = messageIds.filter(id => {
       return !receipts.find(r => r.message_id === id && r.user_id === user.id);
     });
-    // Only mark messages not sent by me
-    // We don't have sender info here, so mark all — duplicates are ignored
     if (unread.length > 0) markAsRead(unread);
+  }, [messageIds, user, conversationId, receipts, markAsRead]);
+
+  // Also mark as read when window regains focus
+  useEffect(() => {
+    if (!user || !conversationId || messageIds.length === 0) return;
+
+    const handleFocus = () => {
+      const unread = messageIds.filter(id => {
+        return !receipts.find(r => r.message_id === id && r.user_id === user.id);
+      });
+      if (unread.length > 0) markAsRead(unread);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [messageIds, user, conversationId, receipts, markAsRead]);
 
   const getReadBy = useCallback((messageId: string): string[] => {

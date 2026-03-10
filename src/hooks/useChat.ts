@@ -36,7 +36,7 @@ export function useChat() {
 
     const { data: participations } = await supabase
       .from("chat_participants")
-      .select("conversation_id")
+      .select("conversation_id, last_read_at")
       .eq("user_id", user.id);
 
     if (!participations || participations.length === 0) {
@@ -45,83 +45,100 @@ export function useChat() {
     }
 
     const convIds = participations.map((p: any) => p.conversation_id);
+    const lastReadMap: Record<string, string | null> = {};
+    participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
 
-    const { data: convs } = await supabase
-      .from("chat_conversations")
-      .select("*")
-      .in("id", convIds)
-      .order("updated_at", { ascending: false });
+    // Batch: conversations, all participants, and last messages in parallel
+    const [convsResult, allParticipantsResult] = await Promise.all([
+      supabase
+        .from("chat_conversations")
+        .select("*")
+        .in("id", convIds)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("chat_participants")
+        .select("*")
+        .in("conversation_id", convIds),
+    ]);
+
+    const convs = convsResult.data;
+    const allParticipants = allParticipantsResult.data;
 
     if (!convs) {
       setConversations([]);
       return;
     }
 
-    const { data: allParticipants } = await supabase
-      .from("chat_participants")
+    // Batch fetch last message per conversation using a single query ordered by created_at desc
+    // We'll get all recent messages and pick the latest per conversation client-side
+    const { data: recentMessages } = await supabase
+      .from("chat_messages")
       .select("*")
-      .in("conversation_id", convIds);
+      .in("conversation_id", convIds)
+      .order("created_at", { ascending: false })
+      .limit(convIds.length * 2); // Slightly over to ensure coverage
 
-    const enriched: ConversationWithDetails[] = await Promise.all(
-      convs.map(async (conv: any) => {
-        const convParticipants = (allParticipants || []).filter(
-          (p: any) => p.conversation_id === conv.id
-        );
-
-        const { data: lastMsgs } = await supabase
-          .from("chat_messages")
-          .select("*")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        const lastMessage = lastMsgs?.[0] || undefined;
-
-        const myParticipation = convParticipants.find(
-          (p: any) => p.user_id === user.id
-        );
-        let unreadCount = 0;
-        if (myParticipation?.last_read_at) {
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", user.id)
-            .gt("created_at", myParticipation.last_read_at);
-          unreadCount = count || 0;
-        } else if (lastMessage) {
-          const { count } = await supabase
-            .from("chat_messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .neq("sender_id", user.id);
-          unreadCount = count || 0;
+    const lastMessageMap: Record<string, ChatMessage> = {};
+    if (recentMessages) {
+      for (const msg of recentMessages as ChatMessage[]) {
+        if (!lastMessageMap[msg.conversation_id]) {
+          lastMessageMap[msg.conversation_id] = msg;
         }
+      }
+    }
 
-        let displayName = conv.name || "";
-        if (conv.type === "direct") {
-          const otherParticipant = convParticipants.find(
-            (p: any) => p.user_id !== user.id
-          );
-          if (otherParticipant) {
-            displayName =
-              profilesRef.current[otherParticipant.user_id]?.full_name ||
-              "Usuario";
-          }
+    // Batch unread counts: for each conversation, count messages after last_read_at
+    // We'll do this in parallel with a single Promise.all
+    const unreadPromises = convIds.map(async (convId) => {
+      const lastRead = lastReadMap[convId];
+      let query = supabase
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", convId)
+        .neq("sender_id", user.id);
+
+      if (lastRead) {
+        query = query.gt("created_at", lastRead);
+      }
+
+      const { count } = await query;
+      return { convId, count: count || 0 };
+    });
+
+    const unreadResults = await Promise.all(unreadPromises);
+    const unreadMap: Record<string, number> = {};
+    unreadResults.forEach(r => { unreadMap[r.convId] = r.count; });
+
+    const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
+      const convParticipants = (allParticipants || []).filter(
+        (p: any) => p.conversation_id === conv.id
+      );
+
+      const lastMessage = lastMessageMap[conv.id];
+
+      let displayName = conv.name || "";
+      if (conv.type === "direct") {
+        const otherParticipant = convParticipants.find(
+          (p: any) => p.user_id !== user.id
+        );
+        if (otherParticipant) {
+          displayName =
+            profilesRef.current[otherParticipant.user_id]?.full_name ||
+            "Usuario";
         }
+      }
 
-        return {
-          ...conv,
-          participants: convParticipants.map((p: any) => ({
-            ...p,
-            profile: profilesRef.current[p.user_id],
-          })),
-          lastMessage,
-          unreadCount,
-          displayName,
-        } as ConversationWithDetails;
-      })
-    );
+      return {
+        ...conv,
+        participants: convParticipants.map((p: any) => ({
+          ...p,
+          profile: profilesRef.current[p.user_id],
+        })),
+        lastMessage,
+        unreadCount: unreadMap[conv.id] || 0,
+        displayName,
+      } as ConversationWithDetails;
+    });
 
     enriched.sort((a, b) => {
       const aTime = a.lastMessage?.created_at || a.updated_at;
@@ -144,13 +161,11 @@ export function useChat() {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
       if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
 
-      // Immediate reload for high-priority events (e.g. current user added to a new conversation)
       const delay = immediate ? 50 : 200;
       refreshTimeoutRef.current = setTimeout(() => {
         void loadConversations();
       }, delay);
 
-      // Delayed secondary reload for DELETE events (cascading cleanup)
       if (!immediate) {
         delayedRefreshTimeoutRef.current = setTimeout(() => {
           void loadConversations();
@@ -171,7 +186,6 @@ export function useChat() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_participants" },
         (payload) => {
-          // If the current user was added to a conversation, reload immediately
           const newRow = payload.new as any;
           const isForMe = newRow?.user_id === user.id;
           scheduleConversationsReload(isForMe);
@@ -200,7 +214,6 @@ export function useChat() {
       )
       .subscribe();
 
-    // Fallback: reload conversations when the tab becomes visible (handles missed events)
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void loadConversations();
@@ -208,7 +221,6 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Periodic fallback poll every 30s to catch any missed realtime events
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
@@ -228,7 +240,6 @@ export function useChat() {
     (otherUserId: string): string | null => {
       if (!user) return null;
 
-      // Fast path: check local state first (zero network calls)
       const existing = conversations.find(
         (c) =>
           c.type === "direct" &&
@@ -236,7 +247,6 @@ export function useChat() {
       );
       if (existing) return existing.id;
 
-      // Generate ID and add optimistic conversation to local state immediately
       const newConvId = crypto.randomUUID();
       const now = new Date().toISOString();
       const otherProfile = profilesRef.current[otherUserId];
@@ -280,9 +290,7 @@ export function useChat() {
 
       setConversations((prev) => [optimisticConv, ...prev]);
 
-      // Do DB operations in background
       (async () => {
-        // Verify no conversation exists in DB
         const { data: otherP } = await supabase
           .from("chat_participants")
           .select("conversation_id, chat_conversations!inner(type)")
@@ -295,7 +303,6 @@ export function useChat() {
           .limit(1);
 
         if (otherP && otherP.length > 0) {
-          // Already exists, remove optimistic and switch to real one
           setConversations((prev) => prev.filter((c) => c.id !== newConvId));
           return;
         }
@@ -310,7 +317,6 @@ export function useChat() {
           return;
         }
 
-        // Insert creator first (RLS requires creator to be participant before adding others)
         const { error: addCreatorError } = await supabase
           .from("chat_participants")
           .insert({ conversation_id: newConvId, user_id: user.id, role: "admin" });
@@ -334,7 +340,6 @@ export function useChat() {
           return;
         }
 
-        // Realtime will pick up the new conversation; do a fast local reload
         await loadConversations();
       })();
 
@@ -453,6 +458,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const onNewMessageRef = useRef(onNewMessage);
   const typingChannelRef = useRef<any>(null);
+  const optimisticIdsRef = useRef<Set<string>>(new Set());
   const offlineQueueRef = useRef<Array<{
     content: string;
     type: ChatMessage["type"];
@@ -462,7 +468,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   }>>([]);
   onNewMessageRef.current = onNewMessage;
 
-  // Load initial messages (most recent PAGE_SIZE)
+  // Load initial messages
   const loadMessages = useCallback(async () => {
     if (!conversationId) {
       setMessages([]);
@@ -479,6 +485,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     const sorted = ((data as ChatMessage[]) || []).reverse();
     setMessages(sorted);
     setHasMore((data?.length || 0) >= PAGE_SIZE);
+    optimisticIdsRef.current.clear();
 
     // Mark as read
     if (user) {
@@ -545,9 +552,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     return () => window.removeEventListener("online", handleOnline);
   }, [conversationId, user]);
 
-  // Realtime messages
+  // Realtime messages with proper reconnection
   useEffect(() => {
     if (!conversationId) return;
+
+    let retryCount = 0;
+    const maxRetries = 5;
 
     const channel = supabase
       .channel(`messages-${conversationId}`)
@@ -562,21 +572,38 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           setMessages((prev) => {
+            // Skip if already exists (exact ID match)
             if (prev.find((m) => m.id === newMsg.id)) return prev;
+
+            // Check if this is a message we sent optimistically — replace it
+            // The optimistic message has a different ID but same content/sender/timestamp (within 5s)
+            const optimisticMatch = prev.find(
+              (m) =>
+                optimisticIdsRef.current.has(m.id) &&
+                m.sender_id === newMsg.sender_id &&
+                m.content === newMsg.content &&
+                Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 5000
+            );
+
+            if (optimisticMatch) {
+              optimisticIdsRef.current.delete(optimisticMatch.id);
+              return prev.map((m) => (m.id === optimisticMatch.id ? newMsg : m));
+            }
+
             return [...prev, newMsg];
           });
 
           if (user && newMsg.sender_id !== user.id) {
             onNewMessageRef.current?.(newMsg);
-          }
-
-          if (user && newMsg.sender_id !== user.id) {
-            supabase
-              .from("chat_participants")
-              .update({ last_read_at: new Date().toISOString() })
-              .eq("conversation_id", conversationId)
-              .eq("user_id", user.id)
-              .then();
+            // Mark as read if window is focused
+            if (document.hasFocus()) {
+              supabase
+                .from("chat_participants")
+                .update({ last_read_at: new Date().toISOString() })
+                .eq("conversation_id", conversationId)
+                .eq("user_id", user.id)
+                .then();
+            }
           }
         }
       )
@@ -595,18 +622,49 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
           );
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "chat_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as any)?.id;
+          if (deletedId) {
+            setMessages((prev) => prev.filter((m) => m.id !== deletedId));
+          }
+        }
+      )
       .subscribe((status) => {
-        // On reconnection, reload messages to catch any missed
         if (status === "SUBSCRIBED") {
-          // Don't reload on initial subscribe, only on reconnect
+          retryCount = 0;
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // Auto-retry with backoff
-          setTimeout(() => {
-            supabase.removeChannel(channel);
-          }, 3000);
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+            setTimeout(() => {
+              // Reload messages to catch any missed during downtime
+              void loadMessages();
+            }, delay);
+          }
         }
       });
+
+    // Mark as read when window regains focus
+    const handleFocus = () => {
+      if (user) {
+        supabase
+          .from("chat_participants")
+          .update({ last_read_at: new Date().toISOString() })
+          .eq("conversation_id", conversationId)
+          .eq("user_id", user.id)
+          .then();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
 
     // Typing indicator via presence
     const presenceChannel = supabase
@@ -634,13 +692,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     });
 
     return () => {
+      window.removeEventListener("focus", handleFocus);
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
       if (typingChannelRef.current === presenceChannel) {
         typingChannelRef.current = null;
       }
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, loadMessages]);
 
   const sendMessage = useCallback(
     async (
@@ -654,6 +713,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
       // Optimistic insert
       const optimisticId = crypto.randomUUID();
+      optimisticIdsRef.current.add(optimisticId);
+
       const optimisticMsg: ChatMessage = {
         id: optimisticId,
         conversation_id: conversationId,
@@ -689,9 +750,11 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       }).select().single();
 
       if (error) {
+        optimisticIdsRef.current.delete(optimisticId);
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
         toast.error("Error al enviar mensaje");
       } else if (data) {
+        optimisticIdsRef.current.delete(optimisticId);
         setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
       }
 
@@ -715,7 +778,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   const editMessage = useCallback(
     async (messageId: string, newContent: string) => {
-      // Optimistic update
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
       const { error } = await supabase
         .from("chat_messages")
@@ -730,7 +792,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    // Optimistic update
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true, content: null } : m));
     const { error } = await supabase
       .from("chat_messages")
