@@ -14,11 +14,12 @@ import { BackgroundEffect } from "./BackgroundSelector";
 interface LiveKitCallViewProps {
   roomName: string;
   displayName: string;
+  callDisplayName?: string;
   isAdmin?: boolean;
   onLeave: () => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, isAdmin = false, onLeave }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
@@ -96,7 +97,7 @@ export default function LiveKitCallView({ roomName, displayName, isAdmin = false
   return (
     <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)]">
       <CallTopBar
-        roomName={roomName}
+        roomName={callDisplayName || roomName}
         participantCount={lk.participants.length}
         layout={layout}
         onToggleLayout={() => setLayout((l) => (l === "grid" ? "spotlight" : "grid"))}
