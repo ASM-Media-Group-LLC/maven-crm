@@ -651,7 +651,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
             setTimeout(() => {
               // Reload messages to catch any missed during downtime
-              void loadMessages();
+              void loadMessagesRef.current?.();
             }, delay);
           }
         }
