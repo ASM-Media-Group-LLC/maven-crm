@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
-import { resolveDeepLink, MODULE_OPTIONS, PRIORITY_OPTIONS, STATUS_OPTIONS } from "@/lib/notificationHelpers";
+import { resolveDeepLink, MODULE_OPTIONS, MODULE_PERMISSION_MAP, PRIORITY_OPTIONS, STATUS_OPTIONS } from "@/lib/notificationHelpers";
 import NotificationItem from "@/components/notifications/NotificationItem";
 import type { Notification } from "@/hooks/useNotifications";
 import HRLayout from "@/pages/hr/HRLayout";
