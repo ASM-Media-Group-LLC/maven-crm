@@ -39,6 +39,7 @@ const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, pr
       setDescription(project.description || "");
       setSelectedMembers(currentMemberIds);
       setLeaderId((project as any).leader_id || "");
+      setFolderId((project as any).folder_id || "");
     }
   }, [project, currentMemberIds]);
 
