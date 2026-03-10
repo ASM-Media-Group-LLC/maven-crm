@@ -52,7 +52,9 @@ const emptyFilters: ContactoFilters = {
   estado: "",
   pais: "",
   categoria: "",
-  fechaCreacion: "",
+  dateFrom: "",
+  dateTo: "",
+  creadoPor: "",
 };
 
 const ContactosContent = () => {
@@ -102,6 +104,15 @@ const ContactosContent = () => {
       return map;
     },
   });
+
+  // Build creators list for filter dropdown
+  const creatorsList = useMemo(() => {
+    const entries = Object.entries(profilesMap)
+      .filter(([, name]) => name)
+      .map(([id, name]) => ({ value: id, label: name }));
+    entries.sort((a, b) => a.label.localeCompare(b.label));
+    return entries;
+  }, [profilesMap]);
 
   // Fetch interaction counts per contact
   const { data: interactionCounts = {} } = useQuery({
@@ -160,13 +171,6 @@ const ContactosContent = () => {
     setFilters((prev) => ({ ...prev, ...patch }));
 
   const filtered = useMemo(() => {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dayOfWeek = now.getDay();
-    const startOfWeek = new Date(startOfToday);
-    startOfWeek.setDate(startOfToday.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
     return allContactos.filter((c) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -179,13 +183,22 @@ const ContactosContent = () => {
       if (filters.estado && c.estado !== filters.estado) return false;
       if (filters.pais && c.pais !== filters.pais) return false;
       if (filters.categoria && c.categoria !== filters.categoria) return false;
-      if (filters.fechaCreacion) {
+
+      // Date range filter
+      if (filters.dateFrom || filters.dateTo) {
         const raw = dbContactos.find((d) => d.id === c.id);
         const created = new Date(raw?.created_at || "");
-        if (filters.fechaCreacion === "hoy" && created < startOfToday) return false;
-        if (filters.fechaCreacion === "semana" && created < startOfWeek) return false;
-        if (filters.fechaCreacion === "mes" && created < startOfMonth) return false;
+        if (filters.dateFrom && created < new Date(filters.dateFrom)) return false;
+        if (filters.dateTo) {
+          const endOfDay = new Date(filters.dateTo);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (created > endOfDay) return false;
+        }
       }
+
+      // Creator filter
+      if (filters.creadoPor && c.creadoPor !== filters.creadoPor) return false;
+
       return true;
     });
   }, [filters, allContactos, dbContactos]);
@@ -198,6 +211,8 @@ const ContactosContent = () => {
     const created = new Date(dbContactos.find(d => d.id === c.id)?.created_at || "");
     return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
   }).length;
+
+  const hasActiveFilters = !!(filters.search || filters.estado || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -221,7 +236,6 @@ const ContactosContent = () => {
             </Button>
           )}
         </div>
-
       </header>
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -258,8 +272,9 @@ const ContactosContent = () => {
               onChange={updateFilters}
               view={view}
               onViewChange={setView}
-              hasActiveFilters={!!(filters.search || filters.estado || filters.pais || filters.categoria || filters.fechaCreacion)}
+              hasActiveFilters={hasActiveFilters}
               onClear={() => setFilters(emptyFilters)}
+              creators={creatorsList}
             />
 
             {view === "table" ? (

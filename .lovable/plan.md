@@ -1,23 +1,22 @@
 
 
-## Plan: Replace Date Select with DateRangePicker + Add "Creado por" Filter
+## Problem
 
-### Changes
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-**1. `src/pages/contactos/ContactosFilters.tsx`**
-- Update `ContactoFilters` interface: replace `fechaCreacion: string` with `dateFrom: string` and `dateTo: string`, add `creadoPor: string`
-- Remove the `CalendarDays` Select dropdown for fecha
-- Add `DateRangePicker` component (same as EventosFilters) with `onApply` that sets `dateFrom`/`dateTo` via `format(date, "yyyy-MM-dd")`
-- Add a new `FilterSelect` for "Creado por" that receives a `creators` prop (list of `{value, label}`) and filters by user
+## Solution
 
-**2. `src/pages/contactos/ContactosContent.tsx`**
-- Update `emptyFilters` to use `dateFrom: ""`, `dateTo: ""`, `creadoPor: ""` instead of `fechaCreacion: ""`
-- Build a `creators` list from `profilesMap` (unique creator names with their IDs) to pass to `ContactosFilters`
-- Replace the `fechaCreacion` filter logic in `filtered` useMemo with date range comparison: parse `dateFrom`/`dateTo` and check `created_at` falls within range
-- Add `creadoPor` filter: match `c.creadoPor` against the selected creator name, or match by creator UUID from `dbContactos`
-- Pass `creators` list to `ContactosFilters`
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-### Summary
-- Date filter becomes a full DateRangePicker with calendar, presets, and manual input (matching Eventos)
-- New "Creado por" dropdown lets users filter contacts by the user who created them
+## Changes
+
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
