@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,10 @@ function getInitials(name: string) {
   return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
-export default function NewChatModal({ open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn }: NewChatModalProps) {
+const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewChatModal(
+  { open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn },
+  ref,
+) {
   const { user } = useAuth();
   const isOnline = isOnlineFn || (() => false);
   const getStatus = getStatusFn || (() => null);
@@ -37,7 +40,6 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
 
   const allUsers = Object.values(profiles).filter(p => p.id !== user?.id);
 
-  // Sort: online users first, then alphabetically
   const sorted = [...allUsers].sort((a, b) => {
     const aOnline = isOnline(a.id);
     const bOnline = isOnline(b.id);
@@ -113,6 +115,7 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
                 )}
                 <div className="relative">
                   <Avatar className="h-9 w-9 shrink-0">
+                    {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.full_name || ""} className="object-cover" />}
                     <AvatarFallback className="text-xs bg-primary/20 text-primary">
                       {getInitials(profile.full_name || "?")}
                     </AvatarFallback>
@@ -145,4 +148,7 @@ export default function NewChatModal({ open, onClose, profiles, onSelectUser, is
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+NewChatModal.displayName = "NewChatModal";
+export default NewChatModal;

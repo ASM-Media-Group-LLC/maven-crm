@@ -128,9 +128,9 @@ export default function MessengerPage() {
 
   return (
     <div className="h-full flex overflow-hidden bg-background">
-      {/* Sidebar — responsive widths */}
+      {/* Sidebar */}
       <div className={cn(
-        "w-full sm:w-[280px] md:w-[320px] lg:w-[380px] xl:w-[400px] shrink-0 transition-all",
+        "w-full sm:w-[280px] md:w-[320px] lg:w-[340px] shrink-0 transition-all",
         activeChatId ? "hidden sm:flex sm:flex-col" : "flex flex-col"
       )}>
         {showVideoRooms ? (
@@ -200,15 +200,17 @@ export default function MessengerPage() {
             />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-muted/20">
-            <div className="text-center space-y-3 px-4">
-              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <MessageSquare className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+          <div className="flex-1 flex items-center justify-center bg-muted/10">
+            <div className="text-center space-y-4 px-4">
+              <div className="h-20 w-20 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto">
+                <MessageSquare className="h-10 w-10 text-primary/60" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground">Messenger</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
-                Selecciona un chat o contacto para comenzar a conversar
-              </p>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-semibold text-foreground">No conversation selected</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Selecciona un chat o contacto para comenzar a conversar
+                </p>
+              </div>
             </div>
           </div>
         )}
