@@ -131,6 +131,8 @@ const LeadGenContent = () => {
           || (lead.ticket_number || "").toLowerCase().includes(q);
         if (!matches) return false;
       }
+      // Agency filter
+      if (agencyFilter !== "todos" && lead.company !== agencyFilter) return false;
       // Status filter
       if (statusFilter !== "todos" && lead.status !== statusFilter) return false;
       // Quality filter
