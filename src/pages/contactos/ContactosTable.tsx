@@ -102,7 +102,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableRow key={c.id}>
               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{c.creacion}</TableCell>
               <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
-              <TableCell className="text-sm font-medium">{c.nombre}</TableCell>
+              <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
               <TableCell>
                 <div className="flex items-center gap-1">
                   <Badge variant={statusVariant[c.estado] ?? "secondary-soft"}>
@@ -141,7 +142,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 </a>
               </TableCell>
               <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
               <TableCell className="sticky right-0 bg-card">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
