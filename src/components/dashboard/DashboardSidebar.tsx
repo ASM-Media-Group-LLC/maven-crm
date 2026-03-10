@@ -604,37 +604,39 @@ const DashboardSidebar = () => {
           </SidebarGroup>
         )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>{t("sidebar.resources")}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip={t("nav.designSystem")}>
-                  <NavLink to="/design-system" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                    <Palette className="h-4 w-4 shrink-0" />
-                    <span>{t("nav.designSystem")}</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip={t("nav.docs")}>
-                  <NavLink to="/docs" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                    <FileText className="h-4 w-4 shrink-0" />
-                    <span>{t("nav.docs")}</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Roadmap">
-                  <NavLink to="/roadmap" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
-                    <Map className="h-4 w-4 shrink-0" />
-                    <span>Roadmap</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {canAccess("Administración") && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{t("sidebar.resources")}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip={t("nav.designSystem")}>
+                    <NavLink to="/design-system" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <Palette className="h-4 w-4 shrink-0" />
+                      <span>{t("nav.designSystem")}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip={t("nav.docs")}>
+                    <NavLink to="/docs" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span>{t("nav.docs")}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Roadmap">
+                    <NavLink to="/roadmap" className={LINK_CLASS} activeClassName={ACTIVE_CLASS}>
+                      <Map className="h-4 w-4 shrink-0" />
+                      <span>Roadmap</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         <SidebarSeparator />
 

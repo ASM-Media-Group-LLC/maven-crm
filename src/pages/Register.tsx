@@ -95,7 +95,8 @@ const Register = () => {
     }
 
     setLoading(false);
-    navigate("/verify-email", { state: { email: email.trim() } });
+    toast({ title: "Cuenta creada", description: "Revisa tu email para confirmar tu cuenta e inicia sesión." });
+    navigate("/login", { replace: true });
   };
 
   return (
