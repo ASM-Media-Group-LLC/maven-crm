@@ -8,12 +8,26 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { NOTIFICATION_TYPES_BY_MODULE } from "@/lib/notificationHelpers";
 import { toast } from "sonner";
 
+// Maps NOTIFICATION_TYPES_BY_MODULE keys to RBAC permission module names
+const TYPES_MODULE_PERMISSION_MAP: Record<string, string> = {
+  Creadores: "Creadores",
+  Tareas: "Tareas",
+  HR: "HR",
+  Finanzas: "Finanzas",
+  Eventos: "Eventos",
+  Tickets: "Tickets",
+  "Comunicación": "HR",
+};
+
 const EventosTab = () => {
   const { preferences, upsertPreference, isTypeEnabled, isModuleEnabled } = useNotificationPreferences();
   const { canAccess } = usePermissions();
 
   const accessibleModules = Object.entries(NOTIFICATION_TYPES_BY_MODULE).filter(
-    ([module]) => canAccess(module)
+    ([module]) => {
+      const permModule = TYPES_MODULE_PERMISSION_MAP[module];
+      return permModule ? canAccess(permModule) : canAccess(module);
+    }
   );
 
   const handleToggle = (module: string, type: string, currentEnabled: boolean) => {
