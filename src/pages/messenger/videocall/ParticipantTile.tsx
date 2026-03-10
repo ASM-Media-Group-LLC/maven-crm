@@ -177,12 +177,13 @@ const ParticipantTile = memo(function ParticipantTile({
         </Avatar>
       )}
 
-      {/* Audio element for remote participants — always mounted */}
+      {/* Audio element for remote participants — always mounted, marked for autoplay recovery */}
       {!participant.isLocal && (
         <audio
           ref={audioRef}
           autoPlay
           playsInline
+          data-lk-audio="true"
           style={{ display: "none" }}
         />
       )}
