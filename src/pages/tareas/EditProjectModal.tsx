@@ -24,12 +24,13 @@ interface EditProjectModalProps {
   folders?: { id: string; name: string }[];
 }
 
-const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [] }: EditProjectModalProps) => {
+const EditProjectModal = ({ open, onOpenChange, project, onSubmit, isLoading, profiles = [], currentMemberIds = [], folders = [] }: EditProjectModalProps) => {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [leaderId, setLeaderId] = useState<string>("");
+  const [folderId, setFolderId] = useState<string>("");
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   useEffect(() => {
