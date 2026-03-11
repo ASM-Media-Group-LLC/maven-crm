@@ -3,6 +3,8 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
   ChevronDown, Monitor, Volume2, Loader2,
 } from "lucide-react";
+import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
+import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
