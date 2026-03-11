@@ -82,7 +82,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
         createdAt: new Date(),
         participants: [],
         isActive: true,
-        shareLink: `${window.location.origin}/messenger?room=${encodeURIComponent(roomId)}`,
+        shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}`,
       });
       toast.success("Uniéndote por enlace...");
     }

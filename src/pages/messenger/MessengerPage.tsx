@@ -87,7 +87,7 @@ export default function MessengerPage() {
   };
 
   const handleJoinRoom = (room: VideoRoom) => {
-    openCallInNewTab(room.id, room.createdBy === "me");
+    openCallInNewTab(room.id, room.createdBy === "me", room.name);
     setShowVideoRooms(false);
   };
 
