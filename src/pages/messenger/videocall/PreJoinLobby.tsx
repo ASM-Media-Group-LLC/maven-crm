@@ -11,7 +11,7 @@ interface PreJoinLobbyProps {
   roomName: string;
   displayName: string;
   callDisplayName?: string;
-  onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string }) => void;
+  onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string; audioOutputDeviceId?: string; backgroundEffect?: BackgroundEffect }) => void;
 }
 
 function getInitials(name: string) {
