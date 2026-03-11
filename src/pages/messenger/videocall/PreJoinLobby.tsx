@@ -32,7 +32,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     audio: null,
   });
   const previewBgProcessorRef = useRef<any>(null);
+  const previewBgTrackRef = useRef<LocalVideoTrack | null>(null);
   const previewSessionRef = useRef(0);
+  const previewBgOpRef = useRef(0);
+  const preloadedTemplatesRef = useRef<Set<string>>(new Set());
   const bgEffectRef = useRef<BackgroundEffect>("none");
 
   const [micOn, setMicOn] = useState(true);
@@ -84,14 +87,38 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       } catch {}
     }
     previewTracksRef.current = { video: null, audio: null };
+    previewBgTrackRef.current = null;
+    previewBgOpRef.current += 1;
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
   }, []);
 
-  const applyPreviewBackground = useCallback(async (videoTrack: LocalVideoTrack | null, effect: BackgroundEffect) => {
-    if (!videoTrack) return;
+  const preloadBackgroundTemplate = useCallback(async (effect: BackgroundEffect) => {
+    if (effect === "none" || effect === "soft-blur" || effect === "hard-blur") return;
+
+    const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
+    if (!selectedTemplate || preloadedTemplatesRef.current.has(selectedTemplate.src)) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const image = new Image();
+      image.src = selectedTemplate.src;
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("template-load-failed"));
+    });
+
+    preloadedTemplatesRef.current.add(selectedTemplate.src);
+  }, []);
+
+  const applyPreviewBackground = useCallback(async (
+    videoTrack: LocalVideoTrack | null,
+    effect: BackgroundEffect,
+    sessionId: number = previewSessionRef.current,
+  ) => {
+    if (!videoTrack || sessionId !== previewSessionRef.current) return;
+
+    const opId = ++previewBgOpRef.current;
 
     if (effect !== "none" && !supportsBackgroundProcessors()) {
       setBackgroundPreviewUnsupported(true);
@@ -100,29 +127,58 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
     setBackgroundPreviewUnsupported(false);
 
-    if (!previewBgProcessorRef.current) {
-      previewBgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
-    }
+    try {
+      if (!previewBgProcessorRef.current) {
+        previewBgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
+      }
 
-    const processor = previewBgProcessorRef.current;
-    await videoTrack.setProcessor(processor, true);
+      const processor = previewBgProcessorRef.current;
 
-    if (effect === "none") {
-      await processor.switchTo({ mode: "disabled" });
-    } else if (effect === "soft-blur") {
-      await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
-    } else if (effect === "hard-blur") {
-      await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
-    } else {
-      const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
-      if (selectedTemplate) {
-        await processor.switchTo({
-          mode: "virtual-background",
-          imagePath: `${window.location.origin}${selectedTemplate.src}`,
-        });
+      if (previewBgTrackRef.current !== videoTrack) {
+        await videoTrack.setProcessor(processor, true);
+        previewBgTrackRef.current = videoTrack;
+      }
+
+      if (sessionId !== previewSessionRef.current || opId !== previewBgOpRef.current) return;
+
+      if (effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur") {
+        await preloadBackgroundTemplate(effect);
+      }
+
+      if (sessionId !== previewSessionRef.current || opId !== previewBgOpRef.current) return;
+
+      if (effect === "none") {
+        await processor.switchTo({ mode: "disabled" });
+      } else if (effect === "soft-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      } else if (effect === "hard-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+      } else {
+        const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
+        if (selectedTemplate) {
+          await processor.switchTo({
+            mode: "virtual-background",
+            imagePath: `${window.location.origin}${selectedTemplate.src}`,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Pre-join background preview failed", err);
+      if (opId === previewBgOpRef.current) {
+        setBackgroundPreviewUnsupported(effect !== "none");
+      }
+      try {
+        await previewBgProcessorRef.current?.switchTo({ mode: "disabled" });
+      } catch {}
+
+      if (videoRef.current) {
+        try {
+          videoTrack.detach(videoRef.current);
+          videoTrack.attach(videoRef.current);
+        } catch {}
       }
     }
-  }, []);
+  }, [preloadBackgroundTemplate]);
 
   // Start camera/mic preview
   const startPreview = useCallback(async () => {
@@ -154,7 +210,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
       if (videoRef.current && videoTrack) {
         videoTrack.attach(videoRef.current);
-        await applyPreviewBackground(videoTrack, bgEffectRef.current);
+        await applyPreviewBackground(videoTrack, bgEffectRef.current, previewSession);
       }
 
       await enumerateDevices();
@@ -171,7 +227,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     bgEffectRef.current = bgEffect;
     const currentVideoTrack = previewTracksRef.current.video;
     if (currentVideoTrack) {
-      applyPreviewBackground(currentVideoTrack, bgEffect).catch(() => {});
+      applyPreviewBackground(currentVideoTrack, bgEffect, previewSessionRef.current).catch(() => {});
     }
   }, [bgEffect, applyPreviewBackground]);
 
@@ -186,6 +242,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   useEffect(() => {
     return () => {
+      previewBgOpRef.current += 1;
+      previewBgTrackRef.current = null;
       const processor = previewBgProcessorRef.current;
       previewBgProcessorRef.current = null;
       if (processor?.destroy) {

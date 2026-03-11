@@ -233,6 +233,72 @@ export function useLiveKit() {
     return !!cameraPublication?.track && !cameraPublication.isMuted;
   }, []);
 
+  const waitForCameraPublication = useCallback(
+    async (room: Room, delays: number[]) => {
+      let isCameraReady = hasActiveCameraPublication(room);
+
+      for (const delayMs of delays) {
+        if (isCameraReady) break;
+        await wait(delayMs);
+        isCameraReady = hasActiveCameraPublication(room);
+        refreshParticipants();
+      }
+
+      return isCameraReady;
+    },
+    [hasActiveCameraPublication, refreshParticipants],
+  );
+
+  const enableCameraWithRecovery = useCallback(
+    async (room: Room, preferredVideoDeviceId?: string) => {
+      const preferredConstraint = getDeviceConstraint(preferredVideoDeviceId);
+
+      const tryEnable = async (constraint?: any) => {
+        await room.localParticipant.setCameraEnabled(true, constraint);
+        const isReady = await waitForCameraPublication(room, [140, 220, 320, 480, 700]);
+        refreshParticipants();
+        return isReady;
+      };
+
+      let isCameraReady = false;
+
+      try {
+        isCameraReady = await tryEnable(preferredConstraint);
+      } catch (error) {
+        console.warn("Camera enable failed with preferred device, retrying with default device", error);
+      }
+
+      if (!isCameraReady && preferredConstraint) {
+        try {
+          await room.localParticipant.setCameraEnabled(false);
+          await wait(180);
+          isCameraReady = await tryEnable(undefined);
+        } catch (error) {
+          console.warn("Camera enable fallback with default device failed", error);
+        }
+      }
+
+      if (!isCameraReady) {
+        try {
+          await room.localParticipant.setCameraEnabled(false);
+          await wait(220);
+          isCameraReady = await tryEnable(undefined);
+        } catch (error) {
+          console.error("Camera recovery retry failed", error);
+        }
+      }
+
+      if (!isCameraReady) {
+        await room.localParticipant.setCameraEnabled(false);
+        setIsCamOn(false);
+        refreshParticipants();
+      }
+
+      return isCameraReady;
+    },
+    [refreshParticipants, waitForCameraPublication],
+  );
+
   const applyBackgroundEffectToCurrentCamera = useCallback(async (effect: BackgroundEffect) => {
     const room = roomRef.current;
     if (!room) return false;
@@ -471,9 +537,9 @@ export function useLiveKit() {
       }
 
       if (shouldEnableCam) {
-        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+        const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none") {
           for (const delayMs of [120, 240, 420]) {
             await wait(delayMs);
             const applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
@@ -486,7 +552,7 @@ export function useLiveKit() {
       room.startAudio().catch(() => {});
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
-      setIsCamOn(room.localParticipant.isCameraEnabled);
+      setIsCamOn(hasActiveCameraPublication(room));
       playJoinSound();
       refreshParticipants();
 
@@ -500,7 +566,7 @@ export function useLiveKit() {
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -551,53 +617,35 @@ export function useLiveKit() {
 
     try {
       const shouldEnable = !room.localParticipant.isCameraEnabled;
-      const preferredConstraint = shouldEnable
-        ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId)
-        : undefined;
-
-      await room.localParticipant.setCameraEnabled(shouldEnable, preferredConstraint);
 
       if (shouldEnable) {
-        let isCameraReady = hasActiveCameraPublication(room);
+        const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
-        for (const delayMs of [140, 220, 320, 480, 700]) {
-          if (isCameraReady) break;
-          await wait(delayMs);
-          isCameraReady = hasActiveCameraPublication(room);
-          refreshParticipants();
+        if (!cameraEnabled) {
+          throw new Error("No se pudo activar la cámara");
         }
 
-        if (!isCameraReady) {
-          await room.localParticipant.setCameraEnabled(false);
-          await wait(180);
-          await room.localParticipant.setCameraEnabled(true, preferredConstraint);
-
-          for (const delayMs of [180, 320, 520]) {
-            await wait(delayMs);
-            isCameraReady = hasActiveCameraPublication(room);
-            refreshParticipants();
-            if (isCameraReady) break;
-          }
-        }
-
-        if (room.localParticipant.isCameraEnabled && backgroundEffectRef.current !== "none") {
+        if (backgroundEffectRef.current !== "none") {
           await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
         }
+      } else {
+        await room.localParticipant.setCameraEnabled(false);
       }
 
-      setIsCamOn(room.localParticipant.isCameraEnabled);
+      const camActive = hasActiveCameraPublication(room);
+      setIsCamOn(camActive);
       refreshParticipants();
       setTimeout(() => refreshParticipants(), 220);
       setTimeout(() => refreshParticipants(), 650);
       setTimeout(() => refreshParticipants(), 1200);
     } catch (err) {
       console.error("Camera toggle error:", err);
-      setIsCamOn(room.localParticipant.isCameraEnabled);
+      setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera]);
+  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
