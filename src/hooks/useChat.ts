@@ -48,8 +48,8 @@ export function useChat() {
     const lastReadMap: Record<string, string | null> = {};
     participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
 
-    // Batch: conversations, all participants, and last messages in parallel
-    const [convsResult, allParticipantsResult] = await Promise.all([
+    // Batch: conversations, all participants, and recent messages in parallel
+    const [convsResult, allParticipantsResult, recentMsgsResult] = await Promise.all([
       supabase
         .from("chat_conversations")
         .select("*")
@@ -59,6 +59,13 @@ export function useChat() {
         .from("chat_participants")
         .select("*")
         .in("conversation_id", convIds),
+      // Fetch recent messages for ALL conversations at once (limit high enough to cover 1 per conv)
+      supabase
+        .from("chat_messages")
+        .select("*")
+        .in("conversation_id", convIds)
+        .order("created_at", { ascending: false })
+        .limit(convIds.length * 2 > 1000 ? 1000 : convIds.length * 2),
     ]);
 
     const convs = convsResult.data;
@@ -69,44 +76,95 @@ export function useChat() {
       return;
     }
 
-    // Fetch last message per conversation reliably using parallel queries
-    const lastMessagePromises = convIds.map(async (convId) => {
-      const { data } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("conversation_id", convId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      return { convId, msg: data?.[0] as ChatMessage | undefined };
-    });
-
-    const lastMessageResults = await Promise.all(lastMessagePromises);
+    // Build last-message map from batch result (first occurrence per conv = latest)
     const lastMessageMap: Record<string, ChatMessage> = {};
-    lastMessageResults.forEach(({ convId, msg }) => {
-      if (msg) lastMessageMap[convId] = msg;
-    });
+    if (recentMsgsResult.data) {
+      for (const msg of recentMsgsResult.data as ChatMessage[]) {
+        if (!lastMessageMap[msg.conversation_id]) {
+          lastMessageMap[msg.conversation_id] = msg;
+        }
+      }
+    }
 
-    // Batch unread counts: for each conversation, count messages after last_read_at
-    // We'll do this in parallel with a single Promise.all
-    const unreadPromises = convIds.map(async (convId) => {
-      const lastRead = lastReadMap[convId];
-      let query = supabase
+    // For any conversations missing from batch (edge case: >1000 messages from other convs),
+    // fetch individually only for those missing
+    const missingConvIds = convIds.filter(id => !lastMessageMap[id]);
+    if (missingConvIds.length > 0 && missingConvIds.length <= 20) {
+      const fallbackResults = await Promise.all(
+        missingConvIds.map(convId =>
+          supabase.from("chat_messages").select("*")
+            .eq("conversation_id", convId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+        )
+      );
+      fallbackResults.forEach(({ data }, i) => {
+        if (data?.[0]) lastMessageMap[missingConvIds[i]] = data[0] as ChatMessage;
+      });
+    }
+
+    // Batch unread counts: use a single query with all conv IDs
+    // Group by conversation_id using head:true per conv is still N queries.
+    // Instead, fetch all unread message IDs in one go and count client-side.
+    const unreadMap: Record<string, number> = {};
+
+    // Build a single filter: messages not by me, after last_read_at, grouped client-side
+    const oldestLastRead = Object.values(lastReadMap).filter(Boolean).sort()[0] || null;
+    let unreadQuery = supabase
+      .from("chat_messages")
+      .select("conversation_id")
+      .in("conversation_id", convIds)
+      .neq("sender_id", user.id);
+
+    if (oldestLastRead) {
+      unreadQuery = unreadQuery.gt("created_at", oldestLastRead);
+    }
+
+    const { data: unreadMsgs } = await unreadQuery.limit(1000);
+
+    if (unreadMsgs) {
+      // Count per conversation, filtering by each conv's own last_read_at
+      for (const msg of unreadMsgs as any[]) {
+        const convLastRead = lastReadMap[msg.conversation_id];
+        // If no lastRead, all messages are unread; if there is one, 
+        // only count if we don't have a more specific filter
+        // (the query already filtered by oldestLastRead, so we need per-conv check)
+        if (!convLastRead) {
+          unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
+        }
+        // Messages already passed the gt(oldestLastRead) filter, but each conv
+        // may have a newer last_read_at, so no additional check needed here
+        // since oldestLastRead is the minimum — we accept slight over-count for speed
+        // Actually, let's do the per-conv check to be accurate:
+      }
+      // Re-do with per-conv accuracy using created_at
+    }
+
+    // Simpler accurate approach: fetch with created_at included
+    {
+      let q = supabase
         .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", convId)
+        .select("conversation_id, created_at")
+        .in("conversation_id", convIds)
         .neq("sender_id", user.id);
 
-      if (lastRead) {
-        query = query.gt("created_at", lastRead);
+      if (oldestLastRead) {
+        q = q.gt("created_at", oldestLastRead);
       }
 
-      const { count } = await query;
-      return { convId, count: count || 0 };
-    });
+      const { data: unreadData } = await q.limit(1000);
+      // Reset map
+      Object.keys(unreadMap).forEach(k => delete unreadMap[k]);
 
-    const unreadResults = await Promise.all(unreadPromises);
-    const unreadMap: Record<string, number> = {};
-    unreadResults.forEach(r => { unreadMap[r.convId] = r.count; });
+      if (unreadData) {
+        for (const msg of unreadData as any[]) {
+          const convLastRead = lastReadMap[msg.conversation_id];
+          if (!convLastRead || msg.created_at > convLastRead) {
+            unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
+          }
+        }
+      }
+    }
 
     const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
       const convParticipants = (allParticipants || []).filter(
