@@ -80,7 +80,7 @@ export default function MessengerPage() {
     const newRoom: VideoRoom = {
       id: roomId, name, createdBy: "me", createdAt: new Date(),
       participants: [], isActive: false,
-      shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}`,
+      shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}?name=${encodeURIComponent(name)}`,
     };
     setVideoRooms(prev => [newRoom, ...prev]);
     toast.success(`Sala "${name}" creada`);
