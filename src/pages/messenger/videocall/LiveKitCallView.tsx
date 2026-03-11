@@ -67,9 +67,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   useEffect(() => {
     if (lk.connectionState !== ConnectionState.Connected) return;
-    if (bgEffect === "none") return;
+    if (!lk.isCamOn || bgEffect === "none") return;
     lk.setBackgroundEffect(bgEffect);
-  }, [lk.connectionState, lk.setBackgroundEffect, bgEffect]);
+  }, [lk.connectionState, lk.isCamOn, lk.setBackgroundEffect, bgEffect]);
 
   // Find screen sharer for spotlight
   const spotlightParticipant = useMemo(() => {
