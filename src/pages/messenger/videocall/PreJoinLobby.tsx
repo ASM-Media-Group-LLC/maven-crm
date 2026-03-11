@@ -246,6 +246,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         <div className="flex flex-col items-center gap-4 flex-1 w-full max-w-[640px]">
           {/* Video preview */}
           <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-[hsl(240_6%_15%)] shadow-xl">
+            {selectedBackgroundTemplate && (
+              <img
+                src={selectedBackgroundTemplate.src}
+                alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+              />
+            )}
+
             {camOn ? (
               <video
                 ref={videoRef}
@@ -256,7 +265,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                 style={{ transform: "scaleX(-1)" }}
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-[hsl(240_8%_12%)]">
+              <div className="absolute inset-0 flex items-center justify-center bg-[hsl(240_8%_12%/0.78)]">
                 <Avatar className="h-24 w-24 border-2 border-[hsl(0_0%_100%/0.1)]">
                   <AvatarFallback className="text-3xl bg-primary/20 text-primary font-semibold">
                     {getInitials(displayName)}
