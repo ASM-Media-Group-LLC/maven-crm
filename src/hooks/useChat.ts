@@ -230,15 +230,32 @@ export function useChat() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_messages" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          // Inline update: refresh only the affected conversation's lastMessage
+          const msg = payload.new as any;
+          setConversations(prev => prev.map(c => {
+            if (c.id !== msg.conversation_id) return c;
+            if (c.lastMessage?.id === msg.id) {
+              return { ...c, lastMessage: msg as ChatMessage };
+            }
+            return c;
+          }));
         }
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "chat_messages" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          // Only reload if the deleted message was a lastMessage
+          const old = payload.old as any;
+          setConversations(prev => {
+            const affected = prev.find(c => c.lastMessage?.id === old.id);
+            if (affected) {
+              // Need full reload to determine new lastMessage
+              scheduleConversationsReload();
+            }
+            return prev;
+          });
         }
       )
       .on(

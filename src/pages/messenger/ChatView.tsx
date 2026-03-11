@@ -5,12 +5,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
-import MessageInput from "./components/MessageInput";
+import MessageInput, { MessageInputHandle } from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import SearchResultsBar from "./components/SearchResultsBar";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
+import { Upload } from "lucide-react";
 
 interface ChatViewProps {
   conversation: ConversationWithDetails;
@@ -49,6 +50,9 @@ export default function ChatView({
   const [showNotifSettings, setShowNotifSettings] = useState(false);
   const [showSharedFiles, setShowSharedFiles] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+  const messageInputRef = useRef<MessageInputHandle>(null);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -78,7 +82,6 @@ export default function ChatView({
     return messages.filter(m => m.reply_to_id === messageId).length;
   }, [messages]);
 
-  // Track which threads the user has "seen" — replies after the last time they opened the thread
   const [seenThreadCounts, setSeenThreadCounts] = useState<Record<string, number>>({});
 
   const getUnreadThreadCount = useCallback((messageId: string) => {
@@ -91,7 +94,6 @@ export default function ChatView({
     const parentId = msg.reply_to_id
       ? (messages.find(m => m.id === msg.reply_to_id) ? msg.reply_to_id : msg.id)
       : msg.id;
-    // Mark all current replies as seen
     const count = messages.filter(m => m.reply_to_id === parentId).length;
     setSeenThreadCounts(prev => ({ ...prev, [parentId]: count }));
 
@@ -102,9 +104,61 @@ export default function ChatView({
     setThreadParent(msg);
   }, [messages]);
 
+  // Drag-and-drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0 && messageInputRef.current) {
+      messageInputRef.current.addFiles(files);
+    }
+  }, []);
 
   return (
-    <div className="flex h-full bg-background relative">
+    <div
+      className="flex h-full bg-background relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drop overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm border-2 border-dashed border-primary rounded-xl flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center gap-3 text-primary">
+            <Upload className="h-12 w-12" />
+            <p className="text-lg font-semibold">Suelta archivos aquí</p>
+            <p className="text-sm text-muted-foreground">Máx. 20 archivos, 350MB cada uno</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col flex-1 min-w-0">
         <ChatHeader
           conversation={conversation}
@@ -158,6 +212,7 @@ export default function ChatView({
         />
 
         <MessageInput
+          ref={messageInputRef}
           onSendMessage={onSendMessage}
           onSendTyping={onSendTyping}
           replyTo={replyTo}
