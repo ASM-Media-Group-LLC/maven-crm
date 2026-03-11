@@ -32,7 +32,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     audio: null,
   });
   const previewBgProcessorRef = useRef<any>(null);
+  const previewBgTrackRef = useRef<LocalVideoTrack | null>(null);
   const previewSessionRef = useRef(0);
+  const previewBgOpRef = useRef(0);
+  const preloadedTemplatesRef = useRef<Set<string>>(new Set());
   const bgEffectRef = useRef<BackgroundEffect>("none");
 
   const [micOn, setMicOn] = useState(true);
