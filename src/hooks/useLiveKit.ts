@@ -588,11 +588,7 @@ export function useLiveKit() {
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
     clearSyncInterval();
-    if (bgProcessorRef.current) {
-      try {
-        bgProcessorRef.current = null;
-      } catch {}
-    }
+    void disposeBackgroundProcessor();
     roomRef.current?.disconnect();
     roomRef.current = null;
     setParticipants([]);
@@ -603,7 +599,7 @@ export function useLiveKit() {
     setActiveSpeaker(null);
     handRaisedMap.current = {};
     setConnectionState(ConnectionState.Disconnected);
-  }, [clearSyncInterval]);
+  }, [clearSyncInterval, disposeBackgroundProcessor]);
 
   // ── Mic toggle ────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
