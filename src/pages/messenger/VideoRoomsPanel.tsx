@@ -196,6 +196,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Crear nueva sala de video</DialogTitle>
+            <DialogDescription>Ingresa un nombre para tu nueva sala de videollamada.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">

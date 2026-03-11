@@ -121,20 +121,8 @@ describe("LiveKitCallView", () => {
     lkState = {
       ...defaultLkState,
       participants: [
-        ...defaultLkState.participants,
-        {
-          sid: "remote-sid",
-          identity: "user-2",
-          name: "Remote User",
-          isSpeaking: false,
-          isMuted: false,
-          isCameraOff: true,
-          isScreenSharing: false,
-          isLocal: false,
-          handRaised: false,
-          reactions: [],
-          connectionQuality: "good" as const,
-        },
+        makeParticipant(),
+        makeParticipant({ sid: "remote-sid", identity: "user-2", name: "Remote User", isLocal: false, connectionQuality: "good" }),
       ],
     };
     render(<LiveKitCallView {...defaultProps} />);
