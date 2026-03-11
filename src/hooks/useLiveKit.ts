@@ -459,17 +459,20 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return;
     try {
-      const newState = !isMicOn;
-      await room.localParticipant.setMicrophoneEnabled(newState);
-      setIsMicOn(newState);
-      debouncedRefresh();
+      const shouldEnable = !room.localParticipant.isMicrophoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(
+        shouldEnable,
+        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
+      );
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
+      setTimeout(() => refreshParticipants(), 180);
     } catch (err) {
       console.error("Mic toggle error:", err);
-      // If mic fails (permission denied, device unavailable), keep state in sync
-      const actualMicOn = room.localParticipant.isMicrophoneEnabled;
-      setIsMicOn(actualMicOn);
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
     }
-  }, [isMicOn, debouncedRefresh]);
+  }, [refreshParticipants]);
 
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
