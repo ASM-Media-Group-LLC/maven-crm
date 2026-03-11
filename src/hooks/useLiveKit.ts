@@ -603,30 +603,27 @@ export function useLiveKit() {
     camToggleInFlightRef.current = true;
 
     try {
-      const shouldEnable = !room.localParticipant.isCameraEnabled;
+      const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
-      if (shouldEnable) {
+      if (!currentlyEnabled) {
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
-
-        if (!cameraEnabled) {
-          throw new Error("No se pudo activar la cámara");
-        }
-
-        if (backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none") {
+          // Small delay so the track is fully ready before applying processor
+          await wait(100);
           await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
       }
 
+      await wait(80);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 220);
-      setTimeout(() => refreshParticipants(), 650);
-      setTimeout(() => refreshParticipants(), 1200);
+      // Single delayed refresh to catch late track state changes
+      setTimeout(() => refreshParticipants(), 400);
     } catch (err) {
-      console.error("Camera toggle error:", err);
+      console.error("[LiveKit] Camera toggle error:", err);
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } finally {
