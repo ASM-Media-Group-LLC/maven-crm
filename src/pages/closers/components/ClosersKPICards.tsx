@@ -1,4 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { UserCheck, MessageSquare, CheckCircle, Trophy, DollarSign, TrendingUp } from "lucide-react";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { CloserCreator } from "../useCloserCreators";
 
 interface Props {
@@ -20,24 +21,25 @@ const ClosersKPICards = ({ creators }: Props) => {
     .reduce((sum, c) => sum + Number(c.estimated_monetization || 0) * (Number(c.agency_commission || 0) / 100), 0);
 
   const cards = [
-    { label: "Asignadas", value: asignadas.toString(), sub: "Pendientes de contacto", color: "border-t-primary" },
-    { label: "En Negociación", value: enNegociacion.toString(), sub: "En proceso activo", color: "border-t-accent" },
-    { label: "Confirmadas", value: confirmadas.toString(), sub: "Listas para onboarding", color: "border-t-[hsl(var(--success,142_71%_45%))]" },
-    { label: "Completadas", value: completadas.toString(), sub: "Proceso finalizado", color: "border-t-[hsl(var(--success,142_71%_45%))]" },
-    { label: "Monetización Est.", value: `$${monetizacionTotal.toLocaleString()}`, sub: "Total estimado", color: "border-t-primary" },
-    { label: "Revenue Agencia", value: `$${revenueAgencia.toLocaleString()}`, sub: "Confirmadas + Completadas", color: "border-t-accent" },
+    { label: "Asignadas", value: asignadas.toString(), subtitle: "Pendientes de contacto", icon: UserCheck, color: "primary" as const },
+    { label: "En Negociación", value: enNegociacion.toString(), subtitle: "En proceso activo", icon: MessageSquare, color: "accent" as const },
+    { label: "Confirmadas", value: confirmadas.toString(), subtitle: "Listas para onboarding", icon: CheckCircle, color: "success" as const },
+    { label: "Completadas", value: completadas.toString(), subtitle: "Proceso finalizado", icon: Trophy, color: "success" as const },
+    { label: "Monetización Est.", value: `$${monetizacionTotal.toLocaleString()}`, subtitle: "Total estimado", icon: DollarSign, color: "warning" as const },
+    { label: "Revenue Agencia", value: `$${revenueAgencia.toLocaleString()}`, subtitle: "Confirmadas + Completadas", icon: TrendingUp, color: "primary" as const },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       {cards.map((card) => (
-        <Card key={card.label} className={`border-t-[3px] ${card.color}`}>
-          <CardContent className="px-4 py-3">
-            <p className="text-xs text-muted-foreground">{card.label}</p>
-            <p className="text-xl font-bold">{card.value}</p>
-            <p className="text-xs text-muted-foreground">{card.sub}</p>
-          </CardContent>
-        </Card>
+        <DashboardMetricCard
+          key={card.label}
+          label={card.label}
+          value={card.value}
+          subtitle={card.subtitle}
+          icon={card.icon}
+          color={card.color}
+        />
       ))}
     </div>
   );
