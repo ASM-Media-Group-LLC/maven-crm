@@ -118,11 +118,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
       <div className="flex-1 flex overflow-hidden">
         {/* Video area */}
-        <div className="flex-1 p-3 overflow-hidden">
+        <div className="relative flex-1 p-3 overflow-hidden">
           {layout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {lk.participants.map((p) => (
-                <ParticipantTile key={p.sid} participant={p} room={room} />
+                <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} />
               ))}
             </div>
           ) : (
@@ -142,12 +142,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                   {lk.participants
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
-                      <div key={p.sid} className="w-40 shrink-0">
+                      <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0">
                         <ParticipantTile participant={p} room={room} />
                       </div>
                     ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {lk.participants.length <= 1 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
+              <div className="rounded-full bg-background/80 border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">
+                Esperando a que otros participantes se unan...
+              </div>
             </div>
           )}
         </div>
