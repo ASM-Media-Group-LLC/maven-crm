@@ -306,23 +306,36 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return false;
 
+    const opId = ++bgApplyOpRef.current;
     const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((publication) => publication.source === Track.Source.Camera)?.track;
+      .find((publication) => publication.source === Track.Source.Camera)?.track as any;
 
     if (!camTrack) {
-      return effect === "none";
+      if (effect === "none") {
+        await disposeBackgroundProcessor();
+        return true;
+      }
+      return false;
     }
 
     try {
-      if (!bgProcessorRef.current) {
-        const processor = BackgroundProcessor({ mode: "disabled" });
-        await camTrack.setProcessor(processor);
+      let processor = bgProcessorRef.current;
+      if (!processor) {
+        processor = BackgroundProcessor({ mode: "disabled" });
         bgProcessorRef.current = processor;
-      } else {
-        await camTrack.setProcessor(bgProcessorRef.current);
       }
 
-      const processor = bgProcessorRef.current;
+      try {
+        await camTrack.setProcessor(processor);
+      } catch {
+        if (opId !== bgApplyOpRef.current) return false;
+        try { await processor?.destroy?.(); } catch {}
+        processor = BackgroundProcessor({ mode: "disabled" });
+        bgProcessorRef.current = processor;
+        await camTrack.setProcessor(processor);
+      }
+
+      if (opId !== bgApplyOpRef.current) return false;
 
       if (effect === "none") {
         await processor.switchTo({ mode: "disabled" });
@@ -346,7 +359,7 @@ export function useLiveKit() {
       console.error("Background processor error:", err);
       return false;
     }
-  }, []);
+  }, [disposeBackgroundProcessor]);
 
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (
