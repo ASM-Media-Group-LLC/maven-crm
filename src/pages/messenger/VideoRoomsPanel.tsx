@@ -208,10 +208,10 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
               />
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex items-center justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={!roomName.trim()}>Crear sala</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
