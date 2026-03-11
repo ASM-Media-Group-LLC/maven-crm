@@ -15,7 +15,14 @@ export default function VideoCallPage() {
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
   const [joined, setJoined] = useState(false);
-  const [joinOpts, setJoinOpts] = useState<{ micOn: boolean; camOn: boolean }>({ micOn: true, camOn: true });
+  const [joinOpts, setJoinOpts] = useState<{
+    micOn: boolean;
+    camOn: boolean;
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+    audioOutputDeviceId?: string;
+    backgroundEffect?: BackgroundEffect;
+  }>({ micOn: true, camOn: true, backgroundEffect: "none" });
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-for-call", user?.id],
