@@ -235,6 +235,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   useEffect(() => {
     return () => {
+      previewBgOpRef.current += 1;
+      previewBgTrackRef.current = null;
       const processor = previewBgProcessorRef.current;
       previewBgProcessorRef.current = null;
       if (processor?.destroy) {
