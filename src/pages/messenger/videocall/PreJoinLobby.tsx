@@ -27,12 +27,19 @@ interface DeviceInfo {
 
 export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin }: PreJoinLobbyProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const previewTracksRef = useRef<{ video: LocalVideoTrack | null; audio: LocalAudioTrack | null }>({
+    video: null,
+    audio: null,
+  });
+  const previewBgProcessorRef = useRef<any>(null);
+  const previewSessionRef = useRef(0);
+  const bgEffectRef = useRef<BackgroundEffect>("none");
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [joining, setJoining] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
+  const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
 
   // Device lists
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
@@ -63,34 +70,93 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     } catch {}
   }, [selectedAudioInput, selectedVideoInput, selectedAudioOutput]);
 
-  // Start camera preview
-  const startPreview = useCallback(async () => {
-    // Stop existing stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+  const stopPreview = useCallback(async () => {
+    const { video, audio } = previewTracksRef.current;
+    if (video) {
+      try {
+        video.detach();
+        video.stop();
+      } catch {}
     }
+    if (audio) {
+      try {
+        audio.stop();
+      } catch {}
+    }
+    previewTracksRef.current = { video: null, audio: null };
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const applyPreviewBackground = useCallback(async (videoTrack: LocalVideoTrack | null, effect: BackgroundEffect) => {
+    if (!videoTrack) return;
+
+    if (effect !== "none" && !supportsBackgroundProcessors()) {
+      setBackgroundPreviewUnsupported(true);
+      return;
+    }
+
+    setBackgroundPreviewUnsupported(false);
+
+    if (!previewBgProcessorRef.current) {
+      previewBgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
+    }
+
+    const processor = previewBgProcessorRef.current;
+    await videoTrack.setProcessor(processor, true);
+
+    if (effect === "none") {
+      await processor.switchTo({ mode: "disabled" });
+    } else if (effect === "soft-blur") {
+      await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+    } else if (effect === "hard-blur") {
+      await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+    } else {
+      const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
+      if (selectedTemplate) {
+        await processor.switchTo({
+          mode: "virtual-background",
+          imagePath: `${window.location.origin}${selectedTemplate.src}`,
+        });
+      }
+    }
+  }, []);
+
+  // Start camera/mic preview
+  const startPreview = useCallback(async () => {
+    const previewSession = ++previewSessionRef.current;
+    await stopPreview();
 
     if (!camOn && !micOn) return;
 
     try {
-      const constraints: MediaStreamConstraints = {};
-      if (camOn) {
-        constraints.video = selectedVideoInput ? { deviceId: { exact: selectedVideoInput } } : true;
-      }
-      if (micOn) {
-        constraints.audio = selectedAudioInput ? { deviceId: { exact: selectedAudioInput } } : true;
+      const tracks = await createLocalTracks({
+        video: camOn
+          ? (selectedVideoInput ? { deviceId: { exact: selectedVideoInput } } : true)
+          : false,
+        audio: micOn
+          ? (selectedAudioInput ? { deviceId: { exact: selectedAudioInput } } : true)
+          : false,
+      });
+
+      if (previewSession !== previewSessionRef.current) {
+        tracks.forEach((track) => track.stop());
+        return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
+      const videoTrack = tracks.find((track): track is LocalVideoTrack => track.kind === "video") || null;
+      const audioTrack = tracks.find((track): track is LocalAudioTrack => track.kind === "audio") || null;
+
+      previewTracksRef.current = { video: videoTrack, audio: audioTrack };
       setPermissionError(null);
 
-      if (videoRef.current && camOn) {
-        videoRef.current.srcObject = stream;
+      if (videoRef.current && videoTrack) {
+        videoTrack.attach(videoRef.current);
+        await applyPreviewBackground(videoTrack, bgEffectRef.current);
       }
 
-      // After first getUserMedia, enumerate to get labels
       await enumerateDevices();
     } catch (err: any) {
       if (err.name === "NotAllowedError") {
@@ -99,18 +165,34 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         setPermissionError("No se pudo acceder a los dispositivos.");
       }
     }
-  }, [camOn, micOn, selectedVideoInput, selectedAudioInput, enumerateDevices]);
+  }, [camOn, micOn, selectedVideoInput, selectedAudioInput, enumerateDevices, stopPreview, applyPreviewBackground]);
+
+  useEffect(() => {
+    bgEffectRef.current = bgEffect;
+    const currentVideoTrack = previewTracksRef.current.video;
+    if (currentVideoTrack) {
+      applyPreviewBackground(currentVideoTrack, bgEffect).catch(() => {});
+    }
+  }, [bgEffect, applyPreviewBackground]);
 
   useEffect(() => {
     startPreview();
+
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
+      previewSessionRef.current += 1;
+      stopPreview();
+    };
+  }, [startPreview, stopPreview]);
+
+  useEffect(() => {
+    return () => {
+      const processor = previewBgProcessorRef.current;
+      previewBgProcessorRef.current = null;
+      if (processor?.destroy) {
+        processor.destroy().catch(() => {});
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camOn, micOn, selectedVideoInput, selectedAudioInput]);
+  }, []);
 
   // Toggle mic in preview
   const handleToggleMic = () => {
