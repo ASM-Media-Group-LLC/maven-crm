@@ -171,39 +171,40 @@ export default function ChatSidebar({
 
       <ScrollArea className="flex-1">
         <div className="pb-2">
-          {/* Shortcuts section */}
-          <div className="px-2 pb-1">
-            <SectionHeader label="Shortcuts" />
-            {[
-              { key: "all", icon: Home, label: "Todos", badge: 0 },
-              { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
-              { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
-              { key: "groups", icon: Users, label: "Grupos", badge: 0 },
-            ].map(item => {
-              const isActive = tab === item.key;
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setTab(item.key)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-[7px] rounded-full text-sm transition-colors",
-                    isActive
-                      ? "bg-primary/12 text-primary font-medium"
-                      : "text-foreground/70 hover:bg-muted/60 font-normal"
-                  )}
-                >
-                  <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
-                  <span className="truncate flex-1 text-left">{item.label}</span>
-                  {item.badge > 0 && (
-                    <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full font-bold">
-                      {item.badge > 99 ? "99+" : item.badge}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* Acceso Rápido section */}
+          <CollapsibleSection label="Acceso Rápido" defaultOpen>
+            <div className="px-2 pb-1">
+              {[
+                { key: "all", icon: Home, label: "Todos", badge: 0 },
+                { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
+                { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
+                { key: "groups", icon: Users, label: "Grupos", badge: 0 },
+              ].map(item => {
+                const isActive = tab === item.key;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setTab(item.key)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-[7px] rounded-full text-sm transition-colors",
+                      isActive
+                        ? "bg-primary/12 text-primary font-medium"
+                        : "text-foreground/70 hover:bg-muted/60 font-normal"
+                    )}
+                  >
+                    <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+                    <span className="truncate flex-1 text-left">{item.label}</span>
+                    {item.badge > 0 && (
+                      <Badge className="h-5 min-w-5 px-1.5 text-[10px] bg-primary text-primary-foreground rounded-full font-bold">
+                        {item.badge > 99 ? "99+" : item.badge}
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </CollapsibleSection>
 
           {/* Direct messages section */}
           <div className="mt-1 px-2">
@@ -324,6 +325,23 @@ export default function ChatSidebar({
         onConfirm={handleConfirmDelete}
         isLoading={deleting}
       />
+    </div>
+  );
+}
+
+/* ── Collapsible Section Header ── */
+function CollapsibleSection({ label, defaultOpen = true, children }: { label: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-1.5 px-3 pb-0.5 pt-1 select-none hover:bg-muted/40 rounded transition-colors"
+      >
+        {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+      </button>
+      {open && children}
     </div>
   );
 }
