@@ -52,7 +52,12 @@ describe("VideoRoomsPanel", () => {
 
   it("calls onClose when close button is clicked", () => {
     render(<VideoRoomsPanel {...defaultProps} />);
-    const closeBtn = screen.getAllByRole("button").find(b => !b.textContent?.includes("sala") && !b.textContent?.includes("Unirse") && !b.textContent?.includes("ahora"));
+    // Close button is in the header
+    const buttons = screen.getAllByRole("button");
+    const closeBtn = buttons.find(b => {
+      const svg = b.querySelector("svg");
+      return svg && b.closest(".shrink-0");
+    });
     if (closeBtn) fireEvent.click(closeBtn);
   });
 
@@ -79,12 +84,14 @@ describe("VideoRoomsPanel", () => {
       expect(defaultProps.onJoinRoom).toHaveBeenCalled();
     });
 
-    it("disables join button when link is empty", () => {
+    it("join button is disabled when link input is empty", () => {
       render(<VideoRoomsPanel {...defaultProps} />);
-      const joinBtn = screen.getAllByText("Unirse").find(b => b.tagName === "BUTTON");
-      // The join-by-link button
-      const buttons = screen.getAllByRole("button");
-      const joinByLinkBtn = buttons.find(b => b.textContent === "Unirse");
+      // Find the secondary "Unirse" button (not the room join button)
+      const allButtons = screen.getAllByRole("button");
+      const joinByLinkBtn = allButtons.find(
+        b => b.textContent === "Unirse" && b.closest(".flex.gap-2")
+      );
+      expect(joinByLinkBtn).toBeDefined();
       if (joinByLinkBtn) {
         expect(joinByLinkBtn).toBeDisabled();
       }

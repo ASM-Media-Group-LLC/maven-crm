@@ -23,9 +23,11 @@ describe("CallParticipantsSidebar", () => {
     expect(screen.getByText("Participantes (3)")).toBeInTheDocument();
   });
 
-  it("shows local participant as 'Tú'", () => {
+  it("shows local participant label", () => {
     render(<CallParticipantsSidebar {...defaultProps} />);
-    expect(screen.getByText("Tú")).toBeInTheDocument();
+    // "Tú" appears both as name and badge
+    const tuElements = screen.getAllByText("Tú");
+    expect(tuElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows remote participant names", () => {
@@ -36,17 +38,13 @@ describe("CallParticipantsSidebar", () => {
 
   it("does not show moderation menu when not admin", () => {
     render(<CallParticipantsSidebar {...defaultProps} isAdmin={false} />);
-    // Should not have any MoreVertical buttons
-    const moreButtons = screen.queryAllByRole("button").filter(
-      btn => btn.querySelector('[class*="lucide-more-vertical"]')
-    );
+    const buttons = screen.getAllByRole("button");
     // Only the close button should exist
-    expect(screen.getAllByRole("button")).toHaveLength(1); // just close
+    expect(buttons).toHaveLength(1);
   });
 
   it("shows moderation menu when admin", () => {
     render(<CallParticipantsSidebar {...defaultProps} isAdmin={true} />);
-    // Should have moderation buttons for non-local participants
     const buttons = screen.getAllByRole("button");
     // Close + 2 moderation dropdowns (for 2 remote participants)
     expect(buttons.length).toBeGreaterThanOrEqual(3);
@@ -55,8 +53,7 @@ describe("CallParticipantsSidebar", () => {
   it("sorts hand-raised participants first (after local)", () => {
     const { container } = render(<CallParticipantsSidebar {...defaultProps} />);
     const names = container.querySelectorAll("span.truncate");
-    // Local first, then hand-raised (María), then Juan
-    const nameTexts = Array.from(names).map(n => n.textContent);
+    const nameTexts = Array.from(names).map((n) => n.textContent);
     expect(nameTexts[0]).toBe("Tú");
     expect(nameTexts[1]).toBe("María López"); // hand raised
     expect(nameTexts[2]).toBe("Juan Pérez");
@@ -64,7 +61,6 @@ describe("CallParticipantsSidebar", () => {
 
   it("calls onClose when close button is clicked", () => {
     render(<CallParticipantsSidebar {...defaultProps} />);
-    // Find close button (only non-admin button when not admin)
     const buttons = screen.getAllByRole("button");
     fireEvent.click(buttons[0]);
     expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
