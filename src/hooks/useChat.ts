@@ -406,41 +406,64 @@ export function useChat() {
     async (conversationId: string) => {
       if (!user) return false;
 
-      const { error: msgError } = await supabase
-        .from("chat_messages")
-        .delete()
-        .eq("conversation_id", conversationId);
-
-      if (msgError) {
-        toast.error("Error al eliminar mensajes");
-        return false;
-      }
-
-      const { error: partError } = await supabase
-        .from("chat_participants")
-        .delete()
-        .eq("conversation_id", conversationId);
-
-      if (partError) {
-        toast.error("Error al eliminar participantes");
-        return false;
-      }
-
-      const { error: convError } = await supabase
-        .from("chat_conversations")
-        .delete()
-        .eq("id", conversationId);
-
-      if (convError) {
-        toast.error("Error al eliminar conversación");
-        return false;
-      }
-
+      // Optimistic UI update — remove from list immediately
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
-      toast.success("Conversación eliminada");
-      return true;
+
+      try {
+        // Step 1: Delete all child records that reference messages (reactions, read receipts)
+        // and conversation-level references (pinned, space_conversations) in parallel
+        const { data: msgIds } = await supabase
+          .from("chat_messages")
+          .select("id")
+          .eq("conversation_id", conversationId);
+
+        const messageIdList = msgIds?.map((m: any) => m.id) || [];
+
+        if (messageIdList.length > 0) {
+          // Delete reactions and read receipts for all messages in parallel
+          const chunks: string[][] = [];
+          for (let i = 0; i < messageIdList.length; i += 100) {
+            chunks.push(messageIdList.slice(i, i + 100));
+          }
+          await Promise.all([
+            ...chunks.map(chunk =>
+              supabase.from("chat_reactions").delete().in("message_id", chunk)
+            ),
+            ...chunks.map(chunk =>
+              supabase.from("chat_read_receipts").delete().in("message_id", chunk)
+            ),
+          ]);
+        }
+
+        // Step 2: Delete pinned, space_conversations, messages, participants in parallel
+        await Promise.all([
+          supabase.from("chat_pinned").delete().eq("conversation_id", conversationId),
+          supabase.from("chat_space_conversations").delete().eq("conversation_id", conversationId),
+          supabase.from("chat_messages").delete().eq("conversation_id", conversationId),
+          supabase.from("chat_participants").delete().eq("conversation_id", conversationId),
+        ]);
+
+        // Step 3: Delete the conversation itself
+        const { error: convError } = await supabase
+          .from("chat_conversations")
+          .delete()
+          .eq("id", conversationId);
+
+        if (convError) {
+          throw convError;
+        }
+
+        toast.success("Conversación eliminada");
+        return true;
+      } catch (err) {
+        console.error("Error deleting conversation:", err);
+        toast.error("Error al eliminar conversación");
+        // Rollback: reload conversations
+        await loadConversations();
+        return false;
+      }
     },
-    [user]
+    [user, loadConversations]
   );
 
   return {

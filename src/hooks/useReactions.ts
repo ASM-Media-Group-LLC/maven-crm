@@ -21,6 +21,10 @@ export function useReactions(conversationId: string | null) {
   const { user } = useAuth();
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const messageIdsRef = useRef<Set<string>>(new Set());
+  const reactionsRef = useRef<Reaction[]>([]);
+
+  // Keep ref in sync for synchronous reads in toggleReaction
+  useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
 
   const loadReactions = useCallback(async () => {
     if (!conversationId) { setReactions([]); messageIdsRef.current = new Set(); return; }
@@ -36,12 +40,38 @@ export function useReactions(conversationId: string | null) {
     messageIdsRef.current = new Set(msgIds);
 
     const allReactions: Reaction[] = [];
+    // Parallel chunk fetching instead of sequential
+    const chunks: string[][] = [];
     for (let i = 0; i < msgIds.length; i += 100) {
-      const chunk = msgIds.slice(i, i + 100);
-      const { data } = await supabase
-        .from("chat_reactions")
-        .select("*")
-        .in("message_id", chunk);
+      chunks.push(msgIds.slice(i, i + 100));
+    }
+    const results = await Promise.all(
+      chunks.map(chunk =>
+        supabase.from("chat_reactions").select("*").in("message_id", chunk)
+      )
+    );
+    for (const { data } of results) {
+      if (data) allReactions.push(...(data as Reaction[]));
+    }
+    setReactions(allReactions);
+  }, [conversationId]);
+
+  // Lightweight refresh: only fetch reactions for known message IDs (skip re-fetching message list)
+  const refreshReactions = useCallback(async () => {
+    if (!conversationId || messageIdsRef.current.size === 0) return;
+
+    const msgIds = Array.from(messageIdsRef.current);
+    const allReactions: Reaction[] = [];
+    const chunks: string[][] = [];
+    for (let i = 0; i < msgIds.length; i += 100) {
+      chunks.push(msgIds.slice(i, i + 100));
+    }
+    const results = await Promise.all(
+      chunks.map(chunk =>
+        supabase.from("chat_reactions").select("*").in("message_id", chunk)
+      )
+    );
+    for (const { data } of results) {
       if (data) allReactions.push(...(data as Reaction[]));
     }
     setReactions(allReactions);
@@ -49,51 +79,52 @@ export function useReactions(conversationId: string | null) {
 
   useEffect(() => { loadReactions(); }, [loadReactions]);
 
-  // Realtime: always re-sync from DB on reaction changes to avoid stale/race conditions
+  // Realtime: use lightweight refresh (skip message ID re-fetch)
   useEffect(() => {
     if (!conversationId) return;
 
     const channel = supabase
       .channel(`reactions-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, () => {
-        void loadReactions();
+        void refreshReactions();
       })
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "chat_reactions" }, () => {
-        void loadReactions();
+        void refreshReactions();
       })
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          void loadReactions();
+          void refreshReactions();
         }
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, loadReactions]);
+  }, [conversationId, refreshReactions]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
-    let removedReaction: Reaction | null = null;
-    let existingId: string | null = null;
+    // Read current state synchronously from ref to avoid closure bugs
+    const current = reactionsRef.current;
+    const existing = current.find(
+      r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji
+    );
 
-    setReactions(prev => {
-      const found = prev.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
-      if (!found) return prev;
-      removedReaction = found;
-      existingId = found.id;
-      return prev.filter(r => r.id !== found.id);
-    });
-
-    if (existingId) {
-      const { error } = await supabase.from("chat_reactions").delete().eq("id", existingId);
-      if (error && removedReaction) {
-        setReactions(prev => prev.find(r => r.id === removedReaction!.id) ? prev : [...prev, removedReaction!]);
+    if (existing) {
+      // Optimistic remove
+      setReactions(prev => prev.filter(r => r.id !== existing.id));
+      const { error } = await supabase.from("chat_reactions").delete().eq("id", existing.id);
+      if (error) {
+        // Rollback
+        setReactions(prev =>
+          prev.find(r => r.id === existing.id) ? prev : [...prev, existing]
+        );
       }
       return;
     }
 
+    // Optimistic add
     const tempId = crypto.randomUUID();
     const tempReaction: Reaction = {
       id: tempId,
@@ -102,7 +133,6 @@ export function useReactions(conversationId: string | null) {
       emoji,
       created_at: new Date().toISOString(),
     };
-
     setReactions(prev => [...prev, tempReaction]);
 
     const { data, error } = await supabase.from("chat_reactions").insert({
@@ -123,7 +153,6 @@ export function useReactions(conversationId: string | null) {
     }
   }, [user]);
 
-  // Track new messages added to the conversation
   const addMessageId = useCallback((msgId: string) => {
     messageIdsRef.current.add(msgId);
   }, []);
