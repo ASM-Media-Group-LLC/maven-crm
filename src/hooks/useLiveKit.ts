@@ -400,15 +400,33 @@ export function useLiveKit() {
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
 
-      await room.localParticipant.enableCameraAndMicrophone();
+      const shouldEnableMic = options.initialMicOn ?? true;
+      const shouldEnableCam = options.initialCamOn ?? true;
+
+      await room.localParticipant.setMicrophoneEnabled(false);
+      await room.localParticipant.setCameraEnabled(false);
+
+      if (shouldEnableMic) {
+        await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
+      }
+
+      if (shouldEnableCam) {
+        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+      }
 
       // Try to start audio context immediately (for browsers that allow it)
       room.startAudio().catch(() => {});
 
-      setIsMicOn(true);
-      setIsCamOn(true);
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       playJoinSound();
       refreshParticipants();
+
+      if (shouldEnableCam && backgroundEffectRef.current !== "none") {
+        setTimeout(() => {
+          setBackgroundEffect(backgroundEffectRef.current);
+        }, 350);
+      }
 
       clearSyncInterval();
       syncIntervalRef.current = setInterval(() => {
