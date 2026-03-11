@@ -55,6 +55,10 @@ function getDeviceConstraint(deviceId?: string) {
   return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
 }
 
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 // ── Audio feedback helper ───────────────────────────────────────
 function playTone(frequency: number, duration: number, volume = 0.15) {
   try {
