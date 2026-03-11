@@ -103,16 +103,13 @@ export function useChat() {
       });
     }
 
-    // Batch unread counts: use a single query with all conv IDs
-    // Group by conversation_id using head:true per conv is still N queries.
-    // Instead, fetch all unread message IDs in one go and count client-side.
+    // Batch unread counts: single query, count per-conversation client-side
     const unreadMap: Record<string, number> = {};
-
-    // Build a single filter: messages not by me, after last_read_at, grouped client-side
     const oldestLastRead = Object.values(lastReadMap).filter(Boolean).sort()[0] || null;
+
     let unreadQuery = supabase
       .from("chat_messages")
-      .select("conversation_id")
+      .select("conversation_id, created_at")
       .in("conversation_id", convIds)
       .neq("sender_id", user.id);
 
@@ -120,48 +117,13 @@ export function useChat() {
       unreadQuery = unreadQuery.gt("created_at", oldestLastRead);
     }
 
-    const { data: unreadMsgs } = await unreadQuery.limit(1000);
+    const { data: unreadData } = await unreadQuery.limit(1000);
 
-    if (unreadMsgs) {
-      // Count per conversation, filtering by each conv's own last_read_at
-      for (const msg of unreadMsgs as any[]) {
+    if (unreadData) {
+      for (const msg of unreadData as any[]) {
         const convLastRead = lastReadMap[msg.conversation_id];
-        // If no lastRead, all messages are unread; if there is one, 
-        // only count if we don't have a more specific filter
-        // (the query already filtered by oldestLastRead, so we need per-conv check)
-        if (!convLastRead) {
+        if (!convLastRead || msg.created_at > convLastRead) {
           unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
-        }
-        // Messages already passed the gt(oldestLastRead) filter, but each conv
-        // may have a newer last_read_at, so no additional check needed here
-        // since oldestLastRead is the minimum — we accept slight over-count for speed
-        // Actually, let's do the per-conv check to be accurate:
-      }
-      // Re-do with per-conv accuracy using created_at
-    }
-
-    // Simpler accurate approach: fetch with created_at included
-    {
-      let q = supabase
-        .from("chat_messages")
-        .select("conversation_id, created_at")
-        .in("conversation_id", convIds)
-        .neq("sender_id", user.id);
-
-      if (oldestLastRead) {
-        q = q.gt("created_at", oldestLastRead);
-      }
-
-      const { data: unreadData } = await q.limit(1000);
-      // Reset map
-      Object.keys(unreadMap).forEach(k => delete unreadMap[k]);
-
-      if (unreadData) {
-        for (const msg of unreadData as any[]) {
-          const convLastRead = lastReadMap[msg.conversation_id];
-          if (!convLastRead || msg.created_at > convLastRead) {
-            unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
-          }
         }
       }
     }
