@@ -155,6 +155,7 @@ export function useLiveKit() {
     audioOutputDeviceId?: string;
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
+  const bgApplyOpRef = useRef(0);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -249,6 +250,20 @@ export function useLiveKit() {
     [hasActiveCameraPublication, refreshParticipants],
   );
 
+  const disposeBackgroundProcessor = useCallback(async () => {
+    bgApplyOpRef.current += 1;
+    const processor = bgProcessorRef.current;
+    bgProcessorRef.current = null;
+
+    if (processor?.destroy) {
+      try {
+        await processor.destroy();
+      } catch {
+        // no-op
+      }
+    }
+  }, []);
+
   const enableCameraWithRecovery = useCallback(
     async (room: Room, preferredVideoDeviceId?: string) => {
       // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
@@ -263,10 +278,11 @@ export function useLiveKit() {
         console.warn("[LiveKit] Camera enable attempt 1 failed:", err);
       }
 
-      // Attempt 2: no device constraint (browser default)
+      // Attempt 2: hard reset camera + processor, then enable using browser default
       try {
+        await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
-        await wait(150);
+        await wait(180);
         await room.localParticipant.setCameraEnabled(true);
         const isReady = await waitForCameraPublication(room, [200, 350, 500]);
         if (isReady) {
@@ -283,7 +299,7 @@ export function useLiveKit() {
       refreshParticipants();
       return false;
     },
-    [refreshParticipants, waitForCameraPublication],
+    [refreshParticipants, waitForCameraPublication, disposeBackgroundProcessor],
   );
 
   const applyBackgroundEffectToCurrentCamera = useCallback(async (effect: BackgroundEffect) => {
