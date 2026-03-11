@@ -566,7 +566,7 @@ export function useLiveKit() {
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
