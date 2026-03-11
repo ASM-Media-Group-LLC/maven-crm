@@ -267,14 +267,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      bgOpRef.current += 1;
-      const processor = bgProcessorRef.current;
-      bgProcessorRef.current = null;
-      if (processor?.destroy) {
-        processor.destroy().catch(() => {});
-      }
+      void disposeBackgroundProcessor();
     };
-  }, []);
+  }, [disposeBackgroundProcessor]);
 
   const handleToggleMic = () => setMicOn((v) => !v);
   const handleToggleCam = () => setCamOn((v) => !v);
