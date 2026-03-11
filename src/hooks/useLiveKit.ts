@@ -697,42 +697,8 @@ export function useLiveKit() {
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
-
-    const room = roomRef.current;
-    if (!room) return;
-
-    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((t) => t.source === Track.Source.Camera)?.track;
-
-    if (!camTrack) return;
-
-    try {
-      if (!bgProcessorRef.current) {
-        const processor = BackgroundProcessor({ mode: "disabled" });
-        await camTrack.setProcessor(processor);
-        bgProcessorRef.current = processor;
-      }
-
-      const processor = bgProcessorRef.current;
-
-      if (effect === "none") {
-        await processor.switchTo({ mode: "disabled" });
-      } else if (effect === "soft-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
-      } else if (effect === "hard-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
-      } else {
-        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
-        const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-        if (tpl) {
-          const imagePath = `${window.location.origin}${tpl.src}`;
-          await processor.switchTo({ mode: "virtual-background", imagePath });
-        }
-      }
-    } catch (err) {
-      console.error("Background processor error:", err);
-    }
-  }, []);
+    await applyBackgroundEffectToCurrentCamera(effect);
+  }, [applyBackgroundEffectToCurrentCamera]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
