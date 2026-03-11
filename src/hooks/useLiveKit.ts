@@ -163,12 +163,12 @@ export function useLiveKit() {
       (t) => t.source === Track.Source.ScreenShare
     );
 
-    // For local tracks, isSubscribed doesn't exist — use isMuted + track presence only
+    const localParticipant = p as any;
     const micMuted = isLocal
-      ? (audioTrack ? audioTrack.isMuted : true)
+      ? (typeof localParticipant.isMicrophoneEnabled === "boolean" ? !localParticipant.isMicrophoneEnabled : (audioTrack ? audioTrack.isMuted : true))
       : (audioTrack ? audioTrack.isMuted || !audioTrack.isSubscribed : true);
     const camOff = isLocal
-      ? (videoTrack ? videoTrack.isMuted : true)
+      ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
       : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
 
     return {
