@@ -136,6 +136,12 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           detail = body.message || body.error || detail;
         } catch {}
         console.error("TUS create failed:", createRes.status, detail);
+        if (createRes.status === 413 || detail.toLowerCase().includes("maximum allowed size")) {
+          return {
+            error:
+              "El archivo excede el límite real de Storage del proyecto (límite global de Supabase). Ajusta Storage > Settings > Global file size limit o sube un archivo más pequeño.",
+          };
+        }
         return { error: `Upload init failed: ${detail}` };
       }
 
@@ -248,7 +254,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           return;
         }
         if (uploadError) {
-          toast.error(`Error al subir ${pf.file.name}`);
+          toast.error(`Error al subir ${pf.file.name}: ${uploadError}`);
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
