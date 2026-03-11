@@ -52,7 +52,7 @@ interface ConnectOptions {
 }
 
 function getDeviceConstraint(deviceId?: string) {
-  return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
+  return deviceId ? ({ deviceId: { ideal: deviceId } } as any) : undefined;
 }
 
 function wait(ms: number) {
