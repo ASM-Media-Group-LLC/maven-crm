@@ -181,6 +181,40 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             resolve({ error: "Network error — check your connection and try again", nextOffset: currentOffset });
           };
 
+          xhr.onabort = () => {
+            abortRef.current = null;
+            resolve({ error: "cancelled", nextOffset: currentOffset });
+          };
+
+          xhr.timeout = 600000;
+          xhr.ontimeout = () => {
+            abortRef.current = null;
+            resolve({ error: "Upload timed out — file may be too large for your connection", nextOffset: currentOffset });
+          };
+
+          xhr.open("PATCH", uploadUrl);
+          xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+          xhr.setRequestHeader("apikey", apikey);
+          xhr.setRequestHeader("Content-Type", "application/offset+octet-stream");
+          xhr.setRequestHeader("Upload-Offset", String(currentOffset));
+          xhr.setRequestHeader("Tus-Resumable", "1.0.0");
+          xhr.send(chunk);
+        });
+
+        if (chunkResult.error) {
+          return { error: chunkResult.error };
+        }
+
+        offset = chunkResult.nextOffset;
+        setUploadPercent(Math.min(100, Math.round((offset / file.size) * 100)));
+      }
+
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || "Upload failed unexpectedly" };
+    }
+  }, []);
+
   const cancelUpload = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
