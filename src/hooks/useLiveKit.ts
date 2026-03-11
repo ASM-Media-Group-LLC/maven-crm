@@ -145,6 +145,12 @@ export function useLiveKit() {
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const handRaisedMap = useRef<Record<string, boolean>>({});
+  const preferredDevicesRef = useRef<{
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+    audioOutputDeviceId?: string;
+  }>({});
+  const backgroundEffectRef = useRef<BackgroundEffect>("none");
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
