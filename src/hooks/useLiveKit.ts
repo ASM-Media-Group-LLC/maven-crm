@@ -52,7 +52,7 @@ interface ConnectOptions {
 }
 
 function getDeviceConstraint(deviceId?: string) {
-  return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
+  return deviceId ? ({ deviceId: { ideal: deviceId } } as any) : undefined;
 }
 
 function wait(ms: number) {
@@ -251,50 +251,37 @@ export function useLiveKit() {
 
   const enableCameraWithRecovery = useCallback(
     async (room: Room, preferredVideoDeviceId?: string) => {
-      const preferredConstraint = getDeviceConstraint(preferredVideoDeviceId);
-
-      const tryEnable = async (constraint?: any) => {
-        await room.localParticipant.setCameraEnabled(true, constraint);
-        const isReady = await waitForCameraPublication(room, [140, 220, 320, 480, 700]);
-        refreshParticipants();
-        return isReady;
-      };
-
-      let isCameraReady = false;
-
+      // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
       try {
-        isCameraReady = await tryEnable(preferredConstraint);
-      } catch (error) {
-        console.warn("Camera enable failed with preferred device, retrying with default device", error);
-      }
-
-      if (!isCameraReady && preferredConstraint) {
-        try {
-          await room.localParticipant.setCameraEnabled(false);
-          await wait(180);
-          isCameraReady = await tryEnable(undefined);
-        } catch (error) {
-          console.warn("Camera enable fallback with default device failed", error);
+        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(preferredVideoDeviceId));
+        const isReady = await waitForCameraPublication(room, [150, 250, 400, 600]);
+        if (isReady) {
+          refreshParticipants();
+          return true;
         }
+      } catch (err) {
+        console.warn("[LiveKit] Camera enable attempt 1 failed:", err);
       }
 
-      if (!isCameraReady) {
-        try {
-          await room.localParticipant.setCameraEnabled(false);
-          await wait(220);
-          isCameraReady = await tryEnable(undefined);
-        } catch (error) {
-          console.error("Camera recovery retry failed", error);
-        }
-      }
-
-      if (!isCameraReady) {
+      // Attempt 2: no device constraint (browser default)
+      try {
         await room.localParticipant.setCameraEnabled(false);
-        setIsCamOn(false);
-        refreshParticipants();
+        await wait(150);
+        await room.localParticipant.setCameraEnabled(true);
+        const isReady = await waitForCameraPublication(room, [200, 350, 500]);
+        if (isReady) {
+          refreshParticipants();
+          return true;
+        }
+      } catch (err) {
+        console.warn("[LiveKit] Camera enable attempt 2 failed:", err);
       }
 
-      return isCameraReady;
+      // All attempts failed
+      try { await room.localParticipant.setCameraEnabled(false); } catch {}
+      setIsCamOn(false);
+      refreshParticipants();
+      return false;
     },
     [refreshParticipants, waitForCameraPublication],
   );
@@ -616,30 +603,27 @@ export function useLiveKit() {
     camToggleInFlightRef.current = true;
 
     try {
-      const shouldEnable = !room.localParticipant.isCameraEnabled;
+      const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
-      if (shouldEnable) {
+      if (!currentlyEnabled) {
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
-
-        if (!cameraEnabled) {
-          throw new Error("No se pudo activar la cámara");
-        }
-
-        if (backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none") {
+          // Small delay so the track is fully ready before applying processor
+          await wait(100);
           await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
       }
 
+      await wait(80);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 220);
-      setTimeout(() => refreshParticipants(), 650);
-      setTimeout(() => refreshParticipants(), 1200);
+      // Single delayed refresh to catch late track state changes
+      setTimeout(() => refreshParticipants(), 400);
     } catch (err) {
-      console.error("Camera toggle error:", err);
+      console.error("[LiveKit] Camera toggle error:", err);
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } finally {
