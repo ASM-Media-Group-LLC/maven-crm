@@ -53,6 +53,14 @@ export default function VideoCallPage() {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)]">
+        <p>Debes iniciar sesión para unirte a una llamada</p>
+      </div>
+    );
+  }
+
   if (isLoading || !profile) {
     return (
       <div className="h-screen flex items-center justify-center bg-[hsl(240_10%_6%)]">

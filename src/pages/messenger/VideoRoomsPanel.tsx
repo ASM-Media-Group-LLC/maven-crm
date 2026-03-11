@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VideoRoom } from "./types";
@@ -208,10 +208,10 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
               />
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex items-center justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={!roomName.trim()}>Crear sala</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
