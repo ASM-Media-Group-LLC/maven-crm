@@ -438,7 +438,7 @@ export function useLiveKit() {
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, setBackgroundEffect]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
