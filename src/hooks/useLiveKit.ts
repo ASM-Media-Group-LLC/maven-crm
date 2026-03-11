@@ -176,16 +176,30 @@ export function useLiveKit() {
 
   // ── Debounced participant refresh ──────────────────────────────
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearSyncInterval = useCallback(() => {
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
+    }
+  }, []);
 
   const refreshParticipants = useCallback(() => {
     const room = roomRef.current;
     if (!room) return;
-    const list: LKParticipant[] = [];
-    list.push(buildParticipant(room.localParticipant, true));
+
+    const participantMap = new Map<string, LKParticipant>();
+    const local = buildParticipant(room.localParticipant, true);
+    participantMap.set(local.identity || local.sid || "local", local);
+
     room.remoteParticipants.forEach((p) => {
-      list.push(buildParticipant(p, false));
+      const remote = buildParticipant(p, false);
+      const key = remote.identity || remote.sid;
+      if (key) participantMap.set(key, remote);
     });
-    setParticipants(list);
+
+    setParticipants(Array.from(participantMap.values()));
   }, [buildParticipant]);
 
   const debouncedRefresh = useCallback(() => {
