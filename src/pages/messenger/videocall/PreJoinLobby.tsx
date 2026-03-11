@@ -220,7 +220,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     bgEffectRef.current = bgEffect;
     const currentVideoTrack = previewTracksRef.current.video;
     if (currentVideoTrack) {
-      applyPreviewBackground(currentVideoTrack, bgEffect).catch(() => {});
+      applyPreviewBackground(currentVideoTrack, bgEffect, previewSessionRef.current).catch(() => {});
     }
   }, [bgEffect, applyPreviewBackground]);
 
