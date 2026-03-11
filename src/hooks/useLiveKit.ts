@@ -55,6 +55,10 @@ function getDeviceConstraint(deviceId?: string) {
   return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
 }
 
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 // ── Audio feedback helper ───────────────────────────────────────
 function playTone(frequency: number, duration: number, volume = 0.15) {
   try {
@@ -218,6 +222,62 @@ export function useLiveKit() {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => refreshParticipants(), 50);
   }, [refreshParticipants]);
+
+  const camToggleInFlightRef = useRef(false);
+
+  const hasActiveCameraPublication = useCallback((room: Room) => {
+    const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+      (publication) => publication.source === Track.Source.Camera,
+    );
+
+    return !!cameraPublication?.track && !cameraPublication.isMuted;
+  }, []);
+
+  const applyBackgroundEffectToCurrentCamera = useCallback(async (effect: BackgroundEffect) => {
+    const room = roomRef.current;
+    if (!room) return false;
+
+    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
+      .find((publication) => publication.source === Track.Source.Camera)?.track;
+
+    if (!camTrack) {
+      return effect === "none";
+    }
+
+    try {
+      if (!bgProcessorRef.current) {
+        const processor = BackgroundProcessor({ mode: "disabled" });
+        await camTrack.setProcessor(processor);
+        bgProcessorRef.current = processor;
+      } else {
+        await camTrack.setProcessor(bgProcessorRef.current);
+      }
+
+      const processor = bgProcessorRef.current;
+
+      if (effect === "none") {
+        await processor.switchTo({ mode: "disabled" });
+      } else if (effect === "soft-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      } else if (effect === "hard-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+      } else {
+        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
+        const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
+        if (selectedTemplate) {
+          await processor.switchTo({
+            mode: "virtual-background",
+            imagePath: `${window.location.origin}${selectedTemplate.src}`,
+          });
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.error("Background processor error:", err);
+      return false;
+    }
+  }, []);
 
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (
@@ -412,6 +472,14 @@ export function useLiveKit() {
 
       if (shouldEnableCam) {
         await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+
+        if (backgroundEffectRef.current !== "none") {
+          for (const delayMs of [120, 240, 420]) {
+            await wait(delayMs);
+            const applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            if (applied) break;
+          }
+        }
       }
 
       // Try to start audio context immediately (for browsers that allow it)
@@ -432,7 +500,7 @@ export function useLiveKit() {
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -477,26 +545,59 @@ export function useLiveKit() {
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
-    if (!room) return;
+    if (!room || camToggleInFlightRef.current) return;
+
+    camToggleInFlightRef.current = true;
 
     try {
       const shouldEnable = !room.localParticipant.isCameraEnabled;
-      await room.localParticipant.setCameraEnabled(
-        shouldEnable,
-        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId) : undefined,
-      );
+      const preferredConstraint = shouldEnable
+        ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId)
+        : undefined;
+
+      await room.localParticipant.setCameraEnabled(shouldEnable, preferredConstraint);
+
+      if (shouldEnable) {
+        let isCameraReady = hasActiveCameraPublication(room);
+
+        for (const delayMs of [140, 220, 320, 480, 700]) {
+          if (isCameraReady) break;
+          await wait(delayMs);
+          isCameraReady = hasActiveCameraPublication(room);
+          refreshParticipants();
+        }
+
+        if (!isCameraReady) {
+          await room.localParticipant.setCameraEnabled(false);
+          await wait(180);
+          await room.localParticipant.setCameraEnabled(true, preferredConstraint);
+
+          for (const delayMs of [180, 320, 520]) {
+            await wait(delayMs);
+            isCameraReady = hasActiveCameraPublication(room);
+            refreshParticipants();
+            if (isCameraReady) break;
+          }
+        }
+
+        if (room.localParticipant.isCameraEnabled && backgroundEffectRef.current !== "none") {
+          await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+        }
+      }
 
       setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 200);
-      setTimeout(() => refreshParticipants(), 600);
+      setTimeout(() => refreshParticipants(), 220);
+      setTimeout(() => refreshParticipants(), 650);
       setTimeout(() => refreshParticipants(), 1200);
     } catch (err) {
       console.error("Camera toggle error:", err);
       setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
+    } finally {
+      camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants]);
+  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
@@ -596,42 +697,8 @@ export function useLiveKit() {
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
-
-    const room = roomRef.current;
-    if (!room) return;
-
-    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((t) => t.source === Track.Source.Camera)?.track;
-
-    if (!camTrack) return;
-
-    try {
-      if (!bgProcessorRef.current) {
-        const processor = BackgroundProcessor({ mode: "disabled" });
-        await camTrack.setProcessor(processor);
-        bgProcessorRef.current = processor;
-      }
-
-      const processor = bgProcessorRef.current;
-
-      if (effect === "none") {
-        await processor.switchTo({ mode: "disabled" });
-      } else if (effect === "soft-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
-      } else if (effect === "hard-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
-      } else {
-        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
-        const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-        if (tpl) {
-          const imagePath = `${window.location.origin}${tpl.src}`;
-          await processor.switchTo({ mode: "virtual-background", imagePath });
-        }
-      }
-    } catch (err) {
-      console.error("Background processor error:", err);
-    }
-  }, []);
+    await applyBackgroundEffectToCurrentCamera(effect);
+  }, [applyBackgroundEffectToCurrentCamera]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
