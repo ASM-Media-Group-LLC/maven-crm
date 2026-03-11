@@ -595,6 +595,8 @@ export function useLiveKit() {
 
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
+    backgroundEffectRef.current = effect;
+
     const room = roomRef.current;
     if (!room) return;
 
