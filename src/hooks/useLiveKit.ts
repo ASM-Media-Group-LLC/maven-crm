@@ -472,6 +472,14 @@ export function useLiveKit() {
 
       if (shouldEnableCam) {
         await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+
+        if (backgroundEffectRef.current !== "none") {
+          for (const delayMs of [120, 240, 420]) {
+            await wait(delayMs);
+            const applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            if (applied) break;
+          }
+        }
       }
 
       // Try to start audio context immediately (for browsers that allow it)
