@@ -1,4 +1,4 @@
-import { X, MicOff, Hand, Crown, UserX } from "lucide-react";
+import { X, MicOff, Hand, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";

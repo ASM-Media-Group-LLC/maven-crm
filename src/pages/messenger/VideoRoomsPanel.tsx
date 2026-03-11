@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Video, Plus, Copy, Link2, Users, Clock, X, Phone, PhoneOff, Mic, MicOff, Monitor, MonitorOff, Settings } from "lucide-react";
+import { Video, Plus, Copy, Link2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
