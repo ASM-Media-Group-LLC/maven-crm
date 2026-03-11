@@ -155,6 +155,7 @@ export function useLiveKit() {
     audioOutputDeviceId?: string;
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
+  const bgApplyOpRef = useRef(0);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -249,6 +250,20 @@ export function useLiveKit() {
     [hasActiveCameraPublication, refreshParticipants],
   );
 
+  const disposeBackgroundProcessor = useCallback(async () => {
+    bgApplyOpRef.current += 1;
+    const processor = bgProcessorRef.current;
+    bgProcessorRef.current = null;
+
+    if (processor?.destroy) {
+      try {
+        await processor.destroy();
+      } catch {
+        // no-op
+      }
+    }
+  }, []);
+
   const enableCameraWithRecovery = useCallback(
     async (room: Room, preferredVideoDeviceId?: string) => {
       // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
@@ -263,10 +278,11 @@ export function useLiveKit() {
         console.warn("[LiveKit] Camera enable attempt 1 failed:", err);
       }
 
-      // Attempt 2: no device constraint (browser default)
+      // Attempt 2: hard reset camera + processor, then enable using browser default
       try {
+        await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
-        await wait(150);
+        await wait(180);
         await room.localParticipant.setCameraEnabled(true);
         const isReady = await waitForCameraPublication(room, [200, 350, 500]);
         if (isReady) {
@@ -283,30 +299,43 @@ export function useLiveKit() {
       refreshParticipants();
       return false;
     },
-    [refreshParticipants, waitForCameraPublication],
+    [refreshParticipants, waitForCameraPublication, disposeBackgroundProcessor],
   );
 
   const applyBackgroundEffectToCurrentCamera = useCallback(async (effect: BackgroundEffect) => {
     const room = roomRef.current;
     if (!room) return false;
 
+    const opId = ++bgApplyOpRef.current;
     const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((publication) => publication.source === Track.Source.Camera)?.track;
+      .find((publication) => publication.source === Track.Source.Camera)?.track as any;
 
     if (!camTrack) {
-      return effect === "none";
+      if (effect === "none") {
+        await disposeBackgroundProcessor();
+        return true;
+      }
+      return false;
     }
 
     try {
-      if (!bgProcessorRef.current) {
-        const processor = BackgroundProcessor({ mode: "disabled" });
-        await camTrack.setProcessor(processor);
+      let processor = bgProcessorRef.current;
+      if (!processor) {
+        processor = BackgroundProcessor({ mode: "disabled" });
         bgProcessorRef.current = processor;
-      } else {
-        await camTrack.setProcessor(bgProcessorRef.current);
       }
 
-      const processor = bgProcessorRef.current;
+      try {
+        await camTrack.setProcessor(processor);
+      } catch {
+        if (opId !== bgApplyOpRef.current) return false;
+        try { await processor?.destroy?.(); } catch {}
+        processor = BackgroundProcessor({ mode: "disabled" });
+        bgProcessorRef.current = processor;
+        await camTrack.setProcessor(processor);
+      }
+
+      if (opId !== bgApplyOpRef.current) return false;
 
       if (effect === "none") {
         await processor.switchTo({ mode: "disabled" });
@@ -330,7 +359,7 @@ export function useLiveKit() {
       console.error("Background processor error:", err);
       return false;
     }
-  }, []);
+  }, [disposeBackgroundProcessor]);
 
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (
@@ -502,6 +531,7 @@ export function useLiveKit() {
 
       room.on(RoomEvent.Disconnected, () => {
         clearSyncInterval();
+        void disposeBackgroundProcessor();
         setConnectionState(ConnectionState.Disconnected);
         setIsReconnecting(false);
         setParticipants([]);
@@ -553,16 +583,12 @@ export function useLiveKit() {
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
     clearSyncInterval();
-    if (bgProcessorRef.current) {
-      try {
-        bgProcessorRef.current = null;
-      } catch {}
-    }
+    void disposeBackgroundProcessor();
     roomRef.current?.disconnect();
     roomRef.current = null;
     setParticipants([]);
@@ -573,7 +599,7 @@ export function useLiveKit() {
     setActiveSpeaker(null);
     handRaisedMap.current = {};
     setConnectionState(ConnectionState.Disconnected);
-  }, [clearSyncInterval]);
+  }, [clearSyncInterval, disposeBackgroundProcessor]);
 
   // ── Mic toggle ────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -606,14 +632,20 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
+        await disposeBackgroundProcessor();
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
+
         if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          // Small delay so the track is fully ready before applying processor
-          await wait(100);
-          await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+          let applied = false;
+          for (const delayMs of [90, 180, 320, 480]) {
+            await wait(delayMs);
+            applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            if (applied) break;
+          }
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
+        await disposeBackgroundProcessor();
       }
 
       await wait(80);
@@ -629,7 +661,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery]);
+  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
@@ -737,9 +769,10 @@ export function useLiveKit() {
     return () => {
       clearSyncInterval();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
     };
-  }, [clearSyncInterval]);
+  }, [clearSyncInterval, disposeBackgroundProcessor]);
 
   return {
     connectionState,

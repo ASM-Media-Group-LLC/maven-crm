@@ -87,6 +87,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     }
   }, []);
 
+  const disposeBackgroundProcessor = useCallback(async () => {
+    bgOpRef.current += 1;
+    const processor = bgProcessorRef.current;
+    bgProcessorRef.current = null;
+    if (processor?.destroy) {
+      try { await processor.destroy(); } catch {}
+    }
+  }, []);
+
   // ── Background helpers ──────────────────────────────────────
   const preloadTemplate = useCallback(async (effect: BackgroundEffect) => {
     if (effect === "none" || effect === "soft-blur" || effect === "hard-blur") return;
@@ -169,6 +178,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   // ── Start video track (independent of audio) ────────────────
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
+    await disposeBackgroundProcessor();
     if (!camOn) return;
 
     try {
@@ -202,7 +212,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         setPermissionError("No se pudo acceder a la cámara.");
       }
     }
-  }, [camOn, selectedVideoInput, stopVideoTrack, applyBackground, enumerateDevices]);
+  }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, applyBackground, enumerateDevices]);
 
   // ── Start audio track (independent of video) ────────────────
   const startAudioTrack = useCallback(async () => {
@@ -257,20 +267,16 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      bgOpRef.current += 1;
-      const processor = bgProcessorRef.current;
-      bgProcessorRef.current = null;
-      if (processor?.destroy) {
-        processor.destroy().catch(() => {});
-      }
+      void disposeBackgroundProcessor();
     };
-  }, []);
+  }, [disposeBackgroundProcessor]);
 
   const handleToggleMic = () => setMicOn((v) => !v);
   const handleToggleCam = () => setCamOn((v) => !v);
 
   const handleJoin = async () => {
     setJoining(true);
+    await disposeBackgroundProcessor();
     stopVideoTrack();
     stopAudioTrack();
     onJoin({
