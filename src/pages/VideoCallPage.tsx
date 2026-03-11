@@ -87,6 +87,10 @@ export default function VideoCallPage() {
         onLeave={handleLeave}
         initialMicOn={joinOpts.micOn}
         initialCamOn={joinOpts.camOn}
+        initialAudioDeviceId={joinOpts.audioDeviceId}
+        initialVideoDeviceId={joinOpts.videoDeviceId}
+        initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
+        initialBackgroundEffect={joinOpts.backgroundEffect}
       />
     </div>
   );
