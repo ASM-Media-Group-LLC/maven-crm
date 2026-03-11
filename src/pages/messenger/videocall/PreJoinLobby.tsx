@@ -30,6 +30,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
   // Device lists
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
