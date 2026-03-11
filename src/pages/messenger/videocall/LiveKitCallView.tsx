@@ -9,7 +9,7 @@ import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { BackgroundEffect } from "./BackgroundSelector";
+import { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
 
 interface LiveKitCallViewProps {
   roomName: string;
@@ -19,9 +19,13 @@ interface LiveKitCallViewProps {
   onLeave: () => void;
   initialMicOn?: boolean;
   initialCamOn?: boolean;
+  initialAudioDeviceId?: string;
+  initialVideoDeviceId?: string;
+  initialAudioOutputDeviceId?: string;
+  initialBackgroundEffect?: BackgroundEffect;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
