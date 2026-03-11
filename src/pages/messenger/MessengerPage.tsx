@@ -24,7 +24,8 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
   if (displayName) params.set("name", displayName);
   const qs = params.toString();
   const url = `/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
-  window.open(url, `call-${roomName}`, "noopener");
+  const target = `call-${roomName}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+  window.open(url, target, "noopener");
 }
 
 export default function MessengerPage() {

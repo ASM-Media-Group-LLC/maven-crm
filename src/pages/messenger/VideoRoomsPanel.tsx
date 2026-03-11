@@ -35,17 +35,36 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
     const trimmed = value.trim();
     if (!trimmed) return "";
 
+    const directCode = trimmed.replace(/^\/+|\/+$/g, "");
+    if (!/^https?:\/\//i.test(trimmed) && !directCode.includes("/") && !directCode.includes("?")) {
+      return directCode;
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      const roomFromQuery = parsed.searchParams.get("room");
+      if (roomFromQuery) return decodeURIComponent(roomFromQuery).trim();
+
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      const callIndex = segments.findIndex((segment) => segment.toLowerCase() === "call");
+      if (callIndex !== -1 && segments[callIndex + 1]) {
+        return decodeURIComponent(segments[callIndex + 1]).trim();
+      }
+    } catch {
+      // Not an absolute URL, continue with regex fallback
+    }
+
     const roomParamMatch = trimmed.match(/[?&]room=([^&#]+)/i);
     if (roomParamMatch?.[1]) {
       return decodeURIComponent(roomParamMatch[1]).trim();
     }
 
-    const afterRoom = trimmed.split("room=")[1];
-    if (afterRoom) {
-      return decodeURIComponent(afterRoom.split("&")[0].split("#")[0]).trim();
+    const callPathMatch = trimmed.match(/\/call\/([^/?#]+)/i);
+    if (callPathMatch?.[1]) {
+      return decodeURIComponent(callPathMatch[1]).trim();
     }
 
-    return trimmed.replace(/^\/+|\/+$/g, "");
+    return directCode;
   };
 
   const handleJoinByLink = () => {
