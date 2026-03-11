@@ -340,6 +340,9 @@ export function useLiveKit() {
 
       // ── Connect & publish tracks ────────────────────────────
       await room.connect(livekitUrl, data.token);
+      console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
+      console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
+
       await room.localParticipant.enableCameraAndMicrophone();
 
       // Try to start audio context immediately (for browsers that allow it)
