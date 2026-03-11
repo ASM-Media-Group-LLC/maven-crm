@@ -60,10 +60,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     toast.info("Llamada finalizada");
   }, [lk, onLeave]);
 
-  const shareLink = useMemo(
-    () => `${window.location.origin}/call/${encodeURIComponent(roomName)}`,
-    [roomName]
-  );
+  const shareLink = useMemo(() => {
+    const params = new URLSearchParams();
+    const resolvedDisplayName = (callDisplayName || roomName).trim();
+
+    if (resolvedDisplayName) {
+      params.set("name", resolvedDisplayName);
+    }
+
+    const qs = params.toString();
+    return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
+  }, [roomName, callDisplayName]);
 
   useEffect(() => {
     if (lk.connectionState !== ConnectionState.Connected) return;
