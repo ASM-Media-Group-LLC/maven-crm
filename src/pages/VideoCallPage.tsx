@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
+import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
 
 export default function VideoCallPage() {
