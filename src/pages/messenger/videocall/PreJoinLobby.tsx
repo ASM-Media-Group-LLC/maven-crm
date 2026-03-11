@@ -276,6 +276,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const handleJoin = async () => {
     setJoining(true);
+    await disposeBackgroundProcessor();
     stopVideoTrack();
     stopAudioTrack();
     onJoin({
