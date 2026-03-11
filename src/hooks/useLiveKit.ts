@@ -478,22 +478,25 @@ export function useLiveKit() {
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
+
     try {
-      const newState = !isCamOn;
-      await room.localParticipant.setCameraEnabled(newState);
-      setIsCamOn(newState);
-      // Force multiple refreshes to catch track publication timing
+      const shouldEnable = !room.localParticipant.isCameraEnabled;
+      await room.localParticipant.setCameraEnabled(
+        shouldEnable,
+        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId) : undefined,
+      );
+
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
       setTimeout(() => refreshParticipants(), 200);
       setTimeout(() => refreshParticipants(), 600);
+      setTimeout(() => refreshParticipants(), 1200);
     } catch (err) {
       console.error("Camera toggle error:", err);
-      // Sync state with actual device state
-      const actualCamOn = room.localParticipant.isCameraEnabled;
-      setIsCamOn(actualCamOn);
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
     }
-  }, [isCamOn, refreshParticipants]);
+  }, [refreshParticipants]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
