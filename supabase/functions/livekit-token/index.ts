@@ -111,6 +111,11 @@ serve(async (req) => {
     const apiKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
 
+    // Use a unique identity per connection so the same user can join from
+    // multiple tabs/devices without LiveKit kicking the earlier connection.
+    const uniqueSuffix = crypto.randomUUID().slice(0, 8);
+    const identity = `${userId}_${uniqueSuffix}`;
+
     const grants: LiveKitGrants = {
       roomJoin: true,
       room: roomName,
@@ -123,7 +128,7 @@ serve(async (req) => {
     const lkToken = await createLiveKitToken(
       apiKey,
       apiSecret,
-      userId,
+      identity,
       participantName,
       grants
     );

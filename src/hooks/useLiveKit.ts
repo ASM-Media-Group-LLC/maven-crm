@@ -233,15 +233,24 @@ export function useLiveKit() {
 
       // Participant & track events
       room.on(RoomEvent.ParticipantConnected, (p) => {
+        console.info("[LiveKit] Participant connected:", p.identity, p.name);
         playJoinSound();
-        debouncedRefresh();
+        refreshParticipants();
       });
       room.on(RoomEvent.ParticipantDisconnected, (p) => {
+        console.info("[LiveKit] Participant disconnected:", p.identity, p.name);
         playLeaveSound();
+        refreshParticipants();
+      });
+      room.on(RoomEvent.TrackSubscribed, (_track, _pub, participant) => {
+        console.info("[LiveKit] Track subscribed from:", participant.identity);
         debouncedRefresh();
       });
-      room.on(RoomEvent.TrackSubscribed, debouncedRefresh);
       room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
+      room.on(RoomEvent.TrackPublished, (_pub, participant) => {
+        console.info("[LiveKit] Track published by:", participant.identity);
+        debouncedRefresh();
+      });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
       room.on(RoomEvent.LocalTrackPublished, debouncedRefresh);
@@ -331,6 +340,9 @@ export function useLiveKit() {
 
       // ── Connect & publish tracks ────────────────────────────
       await room.connect(livekitUrl, data.token);
+      console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
+      console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
+
       await room.localParticipant.enableCameraAndMicrophone();
 
       // Try to start audio context immediately (for browsers that allow it)
