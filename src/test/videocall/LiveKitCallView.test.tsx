@@ -64,6 +64,14 @@ vi.mock("livekit-client", async () => {
   };
 });
 
+vi.mock("@/pages/messenger/videocall/ParticipantTile", () => ({
+  default: ({ participant }: any) => (
+    <div data-testid={`participant-${participant.identity}`}>
+      {participant.isLocal ? "Tú" : participant.name}
+    </div>
+  ),
+}));
+
 vi.mock("sonner", () => ({ toast: { info: vi.fn(), success: vi.fn() } }));
 
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
