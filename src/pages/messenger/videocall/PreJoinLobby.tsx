@@ -237,6 +237,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           ? "Difuminado fuerte"
           : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
+  const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;
+
   return (
     <div className="h-screen w-screen bg-[hsl(220_13%_95%)] dark:bg-[hsl(240_10%_6%)] flex items-center justify-center p-4">
       <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12 max-w-5xl w-full">
