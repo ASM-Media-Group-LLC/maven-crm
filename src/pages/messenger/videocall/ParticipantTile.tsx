@@ -135,7 +135,7 @@ const ParticipantTile = memo(function ParticipantTile({
     }
 
     return () => {
-      // Cleanup on unmount only — not on every rerender
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [
     room,
