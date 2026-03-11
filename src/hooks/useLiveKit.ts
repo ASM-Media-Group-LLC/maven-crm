@@ -531,6 +531,7 @@ export function useLiveKit() {
 
       room.on(RoomEvent.Disconnected, () => {
         clearSyncInterval();
+        void disposeBackgroundProcessor();
         setConnectionState(ConnectionState.Disconnected);
         setIsReconnecting(false);
         setParticipants([]);
