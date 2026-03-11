@@ -545,26 +545,59 @@ export function useLiveKit() {
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
-    if (!room) return;
+    if (!room || camToggleInFlightRef.current) return;
+
+    camToggleInFlightRef.current = true;
 
     try {
       const shouldEnable = !room.localParticipant.isCameraEnabled;
-      await room.localParticipant.setCameraEnabled(
-        shouldEnable,
-        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId) : undefined,
-      );
+      const preferredConstraint = shouldEnable
+        ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId)
+        : undefined;
+
+      await room.localParticipant.setCameraEnabled(shouldEnable, preferredConstraint);
+
+      if (shouldEnable) {
+        let isCameraReady = hasActiveCameraPublication(room);
+
+        for (const delayMs of [140, 220, 320, 480, 700]) {
+          if (isCameraReady) break;
+          await wait(delayMs);
+          isCameraReady = hasActiveCameraPublication(room);
+          refreshParticipants();
+        }
+
+        if (!isCameraReady) {
+          await room.localParticipant.setCameraEnabled(false);
+          await wait(180);
+          await room.localParticipant.setCameraEnabled(true, preferredConstraint);
+
+          for (const delayMs of [180, 320, 520]) {
+            await wait(delayMs);
+            isCameraReady = hasActiveCameraPublication(room);
+            refreshParticipants();
+            if (isCameraReady) break;
+          }
+        }
+
+        if (room.localParticipant.isCameraEnabled && backgroundEffectRef.current !== "none") {
+          await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+        }
+      }
 
       setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 200);
-      setTimeout(() => refreshParticipants(), 600);
+      setTimeout(() => refreshParticipants(), 220);
+      setTimeout(() => refreshParticipants(), 650);
       setTimeout(() => refreshParticipants(), 1200);
     } catch (err) {
       console.error("Camera toggle error:", err);
       setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
+    } finally {
+      camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants]);
+  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
