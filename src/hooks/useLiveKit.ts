@@ -587,10 +587,11 @@ export function useLiveKit() {
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
     return () => {
+      clearSyncInterval();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       roomRef.current?.disconnect();
     };
-  }, []);
+  }, [clearSyncInterval]);
 
   return {
     connectionState,
