@@ -52,6 +52,7 @@ const ParticipantTile = memo(function ParticipantTile({
   room,
   large,
   className,
+  preferredAudioOutputDeviceId,
 }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
