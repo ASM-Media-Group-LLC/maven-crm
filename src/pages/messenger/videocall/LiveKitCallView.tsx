@@ -163,7 +163,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0">
-                        <ParticipantTile participant={p} room={room} />
+                        <ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
                       </div>
                     ))}
                 </div>
