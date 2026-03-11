@@ -17,9 +17,11 @@ interface LiveKitCallViewProps {
   callDisplayName?: string;
   isAdmin?: boolean;
   onLeave: () => void;
+  initialMicOn?: boolean;
+  initialCamOn?: boolean;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
