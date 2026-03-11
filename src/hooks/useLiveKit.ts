@@ -422,12 +422,6 @@ export function useLiveKit() {
       playJoinSound();
       refreshParticipants();
 
-      if (shouldEnableCam && backgroundEffectRef.current !== "none") {
-        setTimeout(() => {
-          setBackgroundEffect(backgroundEffectRef.current);
-        }, 350);
-      }
-
       clearSyncInterval();
       syncIntervalRef.current = setInterval(() => {
         refreshParticipants();
