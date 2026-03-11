@@ -769,9 +769,10 @@ export function useLiveKit() {
     return () => {
       clearSyncInterval();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
     };
-  }, [clearSyncInterval]);
+  }, [clearSyncInterval, disposeBackgroundProcessor]);
 
   return {
     connectionState,
