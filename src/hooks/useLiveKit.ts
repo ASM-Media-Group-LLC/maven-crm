@@ -42,6 +42,19 @@ interface DataMessage {
   payload: any;
 }
 
+interface ConnectOptions {
+  initialMicOn?: boolean;
+  initialCamOn?: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  audioOutputDeviceId?: string;
+  backgroundEffect?: BackgroundEffect;
+}
+
+function getDeviceConstraint(deviceId?: string) {
+  return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
+}
+
 // ── Audio feedback helper ───────────────────────────────────────
 function playTone(frequency: number, duration: number, volume = 0.15) {
   try {
