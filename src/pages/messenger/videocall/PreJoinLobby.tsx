@@ -27,15 +27,12 @@ interface DeviceInfo {
 
 export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin }: PreJoinLobbyProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewTracksRef = useRef<{ video: LocalVideoTrack | null; audio: LocalAudioTrack | null }>({
-    video: null,
-    audio: null,
-  });
-  const previewBgProcessorRef = useRef<any>(null);
-  const previewBgTrackRef = useRef<LocalVideoTrack | null>(null);
-  const previewSessionRef = useRef(0);
-  const previewBgOpRef = useRef(0);
-  const preloadedTemplatesRef = useRef<Set<string>>(new Set());
+  const videoTrackRef = useRef<LocalVideoTrack | null>(null);
+  const audioTrackRef = useRef<LocalAudioTrack | null>(null);
+  const bgProcessorRef = useRef<any>(null);
+  const bgOpRef = useRef(0);
+  const mountedRef = useRef(true);
+  const preloadedRef = useRef<Set<string>>(new Set());
   const bgEffectRef = useRef<BackgroundEffect>("none");
 
   const [micOn, setMicOn] = useState(true);
@@ -52,12 +49,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [selectedVideoInput, setSelectedVideoInput] = useState<string>("");
   const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
 
-  // Device selector dropdowns
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
-  // Enumerate devices
+  // ── Enumerate devices ───────────────────────────────────────
   const enumerateDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -73,80 +68,74 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     } catch {}
   }, [selectedAudioInput, selectedVideoInput, selectedAudioOutput]);
 
-  const stopPreview = useCallback(async () => {
-    const { video, audio } = previewTracksRef.current;
-    if (video) {
-      try {
-        video.detach();
-        video.stop();
-      } catch {}
+  // ── Stop individual tracks ──────────────────────────────────
+  const stopVideoTrack = useCallback(() => {
+    const track = videoTrackRef.current;
+    if (track) {
+      try { track.detach(); } catch {}
+      try { track.stop(); } catch {}
+      videoTrackRef.current = null;
     }
-    if (audio) {
-      try {
-        audio.stop();
-      } catch {}
-    }
-    previewTracksRef.current = { video: null, audio: null };
-    previewBgTrackRef.current = null;
-    previewBgOpRef.current += 1;
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+  const stopAudioTrack = useCallback(() => {
+    const track = audioTrackRef.current;
+    if (track) {
+      try { track.stop(); } catch {}
+      audioTrackRef.current = null;
     }
   }, []);
 
-  const preloadBackgroundTemplate = useCallback(async (effect: BackgroundEffect) => {
+  // ── Background helpers ──────────────────────────────────────
+  const preloadTemplate = useCallback(async (effect: BackgroundEffect) => {
     if (effect === "none" || effect === "soft-blur" || effect === "hard-blur") return;
-
-    const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
-    if (!selectedTemplate || preloadedTemplatesRef.current.has(selectedTemplate.src)) return;
-
+    const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
+    if (!tpl || preloadedRef.current.has(tpl.src)) return;
     await new Promise<void>((resolve, reject) => {
-      const image = new Image();
-      image.src = selectedTemplate.src;
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("template-load-failed"));
+      const img = new Image();
+      img.src = tpl.src;
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("template-load-failed"));
     });
-
-    preloadedTemplatesRef.current.add(selectedTemplate.src);
+    preloadedRef.current.add(tpl.src);
   }, []);
 
-  const applyPreviewBackground = useCallback(async (
-    videoTrack: LocalVideoTrack | null,
-    effect: BackgroundEffect,
-    sessionId: number = previewSessionRef.current,
-  ) => {
-    if (!videoTrack || sessionId !== previewSessionRef.current) return;
+  const applyBackground = useCallback(async (track: LocalVideoTrack | null, effect: BackgroundEffect) => {
+    if (!track || !mountedRef.current) return;
 
-    const opId = ++previewBgOpRef.current;
+    const opId = ++bgOpRef.current;
 
     if (effect !== "none" && !supportsBackgroundProcessors()) {
       setBackgroundPreviewUnsupported(true);
       return;
     }
-
     setBackgroundPreviewUnsupported(false);
 
     try {
-      if (!previewBgProcessorRef.current) {
-        previewBgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
+      // Create processor if needed
+      if (!bgProcessorRef.current) {
+        bgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
       }
 
-      const processor = previewBgProcessorRef.current;
-
-      if (previewBgTrackRef.current !== videoTrack) {
-        await videoTrack.setProcessor(processor, true);
-        previewBgTrackRef.current = videoTrack;
+      // Attach processor to track if not already
+      try {
+        await track.setProcessor(bgProcessorRef.current, true);
+      } catch {
+        // Processor might already be set — that's fine
       }
 
-      if (sessionId !== previewSessionRef.current || opId !== previewBgOpRef.current) return;
+      if (opId !== bgOpRef.current) return;
 
+      // Preload image template if applicable
       if (effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur") {
-        await preloadBackgroundTemplate(effect);
+        await preloadTemplate(effect);
       }
 
-      if (sessionId !== previewSessionRef.current || opId !== previewBgOpRef.current) return;
+      if (opId !== bgOpRef.current) return;
 
+      // Switch effect
+      const processor = bgProcessorRef.current;
       if (effect === "none") {
         await processor.switchTo({ mode: "disabled" });
       } else if (effect === "soft-blur") {
@@ -154,117 +143,136 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       } else if (effect === "hard-blur") {
         await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
       } else {
-        const selectedTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === effect);
-        if (selectedTemplate) {
+        const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
+        if (tpl) {
           await processor.switchTo({
             mode: "virtual-background",
-            imagePath: `${window.location.origin}${selectedTemplate.src}`,
+            imagePath: `${window.location.origin}${tpl.src}`,
           });
         }
       }
     } catch (err) {
-      console.warn("Pre-join background preview failed", err);
-      if (opId === previewBgOpRef.current) {
+      console.warn("[PreJoin] Background preview failed:", err);
+      if (opId === bgOpRef.current) {
         setBackgroundPreviewUnsupported(effect !== "none");
       }
-      try {
-        await previewBgProcessorRef.current?.switchTo({ mode: "disabled" });
-      } catch {}
-
-      if (videoRef.current) {
+      // Recovery: re-attach raw track to video element
+      if (videoRef.current && track) {
         try {
-          videoTrack.detach(videoRef.current);
-          videoTrack.attach(videoRef.current);
+          track.detach(videoRef.current);
+          track.attach(videoRef.current);
         } catch {}
       }
     }
-  }, [preloadBackgroundTemplate]);
+  }, [preloadTemplate]);
 
-  // Start camera/mic preview
-  const startPreview = useCallback(async () => {
-    const previewSession = ++previewSessionRef.current;
-    await stopPreview();
-
-    if (!camOn && !micOn) return;
+  // ── Start video track (independent of audio) ────────────────
+  const startVideoTrack = useCallback(async () => {
+    stopVideoTrack();
+    if (!camOn) return;
 
     try {
       const tracks = await createLocalTracks({
-        video: camOn
-          ? (selectedVideoInput ? { deviceId: { exact: selectedVideoInput } } : true)
-          : false,
-        audio: micOn
-          ? (selectedAudioInput ? { deviceId: { exact: selectedAudioInput } } : true)
-          : false,
+        video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true,
+        audio: false,
       });
 
-      if (previewSession !== previewSessionRef.current) {
-        tracks.forEach((track) => track.stop());
+      if (!mountedRef.current) {
+        tracks.forEach((t) => t.stop());
         return;
       }
 
-      const videoTrack = tracks.find((track): track is LocalVideoTrack => track.kind === "video") || null;
-      const audioTrack = tracks.find((track): track is LocalAudioTrack => track.kind === "audio") || null;
+      const vTrack = tracks.find((t): t is LocalVideoTrack => t.kind === "video") || null;
+      videoTrackRef.current = vTrack;
 
-      previewTracksRef.current = { video: videoTrack, audio: audioTrack };
-      setPermissionError(null);
-
-      if (videoRef.current && videoTrack) {
-        videoTrack.attach(videoRef.current);
-        await applyPreviewBackground(videoTrack, bgEffectRef.current, previewSession);
+      if (videoRef.current && vTrack) {
+        vTrack.attach(videoRef.current);
+        // Apply current background effect
+        if (bgEffectRef.current !== "none") {
+          await applyBackground(vTrack, bgEffectRef.current);
+        }
       }
 
+      setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
       if (err.name === "NotAllowedError") {
-        setPermissionError("Permiso de cámara/micrófono denegado. Habilítalo en la configuración del navegador.");
+        setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador.");
       } else {
-        setPermissionError("No se pudo acceder a los dispositivos.");
+        setPermissionError("No se pudo acceder a la cámara.");
       }
     }
-  }, [camOn, micOn, selectedVideoInput, selectedAudioInput, enumerateDevices, stopPreview, applyPreviewBackground]);
+  }, [camOn, selectedVideoInput, stopVideoTrack, applyBackground, enumerateDevices]);
 
+  // ── Start audio track (independent of video) ────────────────
+  const startAudioTrack = useCallback(async () => {
+    stopAudioTrack();
+    if (!micOn) return;
+
+    try {
+      const tracks = await createLocalTracks({
+        video: false,
+        audio: selectedAudioInput ? { deviceId: { ideal: selectedAudioInput } } : true,
+      });
+
+      if (!mountedRef.current) {
+        tracks.forEach((t) => t.stop());
+        return;
+      }
+
+      const aTrack = tracks.find((t): t is LocalAudioTrack => t.kind === "audio") || null;
+      audioTrackRef.current = aTrack;
+      setPermissionError(null);
+      await enumerateDevices();
+    } catch (err: any) {
+      if (err.name === "NotAllowedError") {
+        setPermissionError("Permiso de micrófono denegado. Habilítalo en la configuración del navegador.");
+      }
+    }
+  }, [micOn, selectedAudioInput, stopAudioTrack, enumerateDevices]);
+
+  // ── Manage video track lifecycle ────────────────────────────
+  useEffect(() => {
+    startVideoTrack();
+    return () => { stopVideoTrack(); };
+  }, [startVideoTrack, stopVideoTrack]);
+
+  // ── Manage audio track lifecycle (independent!) ─────────────
+  useEffect(() => {
+    startAudioTrack();
+    return () => { stopAudioTrack(); };
+  }, [startAudioTrack, stopAudioTrack]);
+
+  // ── Apply background when effect changes ────────────────────
   useEffect(() => {
     bgEffectRef.current = bgEffect;
-    const currentVideoTrack = previewTracksRef.current.video;
-    if (currentVideoTrack) {
-      applyPreviewBackground(currentVideoTrack, bgEffect, previewSessionRef.current).catch(() => {});
+    const track = videoTrackRef.current;
+    if (track) {
+      applyBackground(track, bgEffect).catch(() => {});
     }
-  }, [bgEffect, applyPreviewBackground]);
+  }, [bgEffect, applyBackground]);
 
+  // ── Cleanup processor on unmount ────────────────────────────
   useEffect(() => {
-    startPreview();
-
+    mountedRef.current = true;
     return () => {
-      previewSessionRef.current += 1;
-      stopPreview();
-    };
-  }, [startPreview, stopPreview]);
-
-  useEffect(() => {
-    return () => {
-      previewBgOpRef.current += 1;
-      previewBgTrackRef.current = null;
-      const processor = previewBgProcessorRef.current;
-      previewBgProcessorRef.current = null;
+      mountedRef.current = false;
+      bgOpRef.current += 1;
+      const processor = bgProcessorRef.current;
+      bgProcessorRef.current = null;
       if (processor?.destroy) {
         processor.destroy().catch(() => {});
       }
     };
   }, []);
 
-  // Toggle mic in preview
-  const handleToggleMic = () => {
-    setMicOn((v) => !v);
-  };
-
-  // Toggle cam in preview
-  const handleToggleCam = () => {
-    setCamOn((v) => !v);
-  };
+  const handleToggleMic = () => setMicOn((v) => !v);
+  const handleToggleCam = () => setCamOn((v) => !v);
 
   const handleJoin = async () => {
     setJoining(true);
-    await stopPreview();
+    stopVideoTrack();
+    stopAudioTrack();
     onJoin({
       micOn,
       camOn,
@@ -302,9 +310,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12 max-w-5xl w-full">
         {/* Left: Camera preview */}
         <div className="flex flex-col items-center gap-4 flex-1 w-full max-w-[640px]">
-          {/* Video preview */}
           <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-[hsl(240_6%_15%)] shadow-xl">
-            {selectedBackgroundTemplate && (
+            {/* Background template preview (behind video when no processor) */}
+            {selectedBackgroundTemplate && backgroundPreviewUnsupported && (
               <img
                 src={selectedBackgroundTemplate.src}
                 alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`}
@@ -374,7 +382,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
           {/* Device selectors row */}
           <div className="flex flex-wrap items-center justify-center gap-2">
-            {/* Mic selector */}
             <DeviceDropdown
               icon={<Mic className="h-3.5 w-3.5 shrink-0" />}
               label={truncateLabel(audioInputs.find((d) => d.deviceId === selectedAudioInput)?.label || "Micrófono")}
@@ -384,7 +391,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               isOpen={openDropdown === "mic"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "mic" ? null : "mic"); }}
             />
-            {/* Speaker selector */}
             <DeviceDropdown
               icon={<Volume2 className="h-3.5 w-3.5 shrink-0" />}
               label={truncateLabel(audioOutputs.find((d) => d.deviceId === selectedAudioOutput)?.label || "Altavoces")}
@@ -394,7 +400,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               isOpen={openDropdown === "speaker"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "speaker" ? null : "speaker"); }}
             />
-            {/* Camera selector */}
             <DeviceDropdown
               icon={<Monitor className="h-3.5 w-3.5 shrink-0" />}
               label={truncateLabel(videoInputs.find((d) => d.deviceId === selectedVideoInput)?.label || "Cámara")}
