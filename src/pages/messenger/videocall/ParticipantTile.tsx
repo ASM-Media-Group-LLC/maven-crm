@@ -1,8 +1,8 @@
-import { useEffect, useRef, memo, useCallback } from "react";
+import { useEffect, useRef, memo } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MicOff, Hand, Monitor, Wifi, WifiOff } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ interface ParticipantTileProps {
   room: Room | null;
   large?: boolean;
   className?: string;
+  preferredAudioOutputDeviceId?: string;
 }
 
 function getInitials(name: string) {
@@ -51,6 +52,7 @@ const ParticipantTile = memo(function ParticipantTile({
   room,
   large,
   className,
+  preferredAudioOutputDeviceId,
 }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -98,10 +100,20 @@ const ParticipantTile = memo(function ParticipantTile({
     };
     
     const needsRetry = attachVideo();
-    // Retry attachment after a delay if camera just turned on but track wasn't ready
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryAttempts = 0;
+
+    const scheduleAttachRetry = () => {
+      if (retryAttempts >= 5 || participant.isCameraOff) return;
+      retryTimer = setTimeout(() => {
+        retryAttempts += 1;
+        const stillNeedsRetry = attachVideo();
+        if (stillNeedsRetry) scheduleAttachRetry();
+      }, 250 * retryAttempts + 250);
+    };
+
     if (needsRetry && !participant.isCameraOff) {
-      retryTimer = setTimeout(() => attachVideo(), 500);
+      scheduleAttachRetry();
     }
 
     // ── Audio (remote only) ──────────────────────────────────
@@ -117,8 +129,20 @@ const ParticipantTile = memo(function ParticipantTile({
           }
           audioTrack.track.attach(audioEl);
           attachedAudioTrackRef.current = audioTrack.track;
-          // Ensure playback — retry with exponential backoff if autoplay blocked
           audioEl.volume = 1;
+          const mediaEl = audioEl as HTMLAudioElement & {
+            setSinkId?: (deviceId: string) => Promise<void>;
+            sinkId?: string;
+          };
+
+          if (
+            preferredAudioOutputDeviceId &&
+            typeof mediaEl.setSinkId === "function" &&
+            mediaEl.sinkId !== preferredAudioOutputDeviceId
+          ) {
+            mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
+          }
+
           const tryPlay = (attempt = 0) => {
             audioEl.play().catch(() => {
               if (attempt < 3) {
@@ -145,6 +169,7 @@ const ParticipantTile = memo(function ParticipantTile({
     participant.isCameraOff,
     participant.isScreenSharing,
     participant.isMuted,
+    preferredAudioOutputDeviceId,
   ]);
 
   // Full cleanup on unmount

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
 import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
+import type { BackgroundEffect } from "./messenger/videocall/BackgroundSelector";
 import { Loader2 } from "lucide-react";
 
 export default function VideoCallPage() {
@@ -14,7 +15,14 @@ export default function VideoCallPage() {
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
   const [joined, setJoined] = useState(false);
-  const [joinOpts, setJoinOpts] = useState<{ micOn: boolean; camOn: boolean }>({ micOn: true, camOn: true });
+  const [joinOpts, setJoinOpts] = useState<{
+    micOn: boolean;
+    camOn: boolean;
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+    audioOutputDeviceId?: string;
+    backgroundEffect?: BackgroundEffect;
+  }>({ micOn: true, camOn: true, backgroundEffect: "none" });
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-for-call", user?.id],
@@ -79,6 +87,10 @@ export default function VideoCallPage() {
         onLeave={handleLeave}
         initialMicOn={joinOpts.micOn}
         initialCamOn={joinOpts.camOn}
+        initialAudioDeviceId={joinOpts.audioDeviceId}
+        initialVideoDeviceId={joinOpts.videoDeviceId}
+        initialAudioOutputDeviceId={joinOpts.audioOutputDeviceId}
+        initialBackgroundEffect={joinOpts.backgroundEffect}
       />
     </div>
   );

@@ -42,6 +42,19 @@ interface DataMessage {
   payload: any;
 }
 
+interface ConnectOptions {
+  initialMicOn?: boolean;
+  initialCamOn?: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  audioOutputDeviceId?: string;
+  backgroundEffect?: BackgroundEffect;
+}
+
+function getDeviceConstraint(deviceId?: string) {
+  return deviceId ? ({ deviceId: { exact: deviceId } } as any) : undefined;
+}
+
 // ── Audio feedback helper ───────────────────────────────────────
 function playTone(frequency: number, duration: number, volume = 0.15) {
   try {
@@ -132,6 +145,12 @@ export function useLiveKit() {
   const [error, setError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const handRaisedMap = useRef<Record<string, boolean>>({});
+  const preferredDevicesRef = useRef<{
+    audioDeviceId?: string;
+    videoDeviceId?: string;
+    audioOutputDeviceId?: string;
+  }>({});
+  const backgroundEffectRef = useRef<BackgroundEffect>("none");
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -144,12 +163,12 @@ export function useLiveKit() {
       (t) => t.source === Track.Source.ScreenShare
     );
 
-    // For local tracks, isSubscribed doesn't exist — use isMuted + track presence only
+    const localParticipant = p as any;
     const micMuted = isLocal
-      ? (audioTrack ? audioTrack.isMuted : true)
+      ? (typeof localParticipant.isMicrophoneEnabled === "boolean" ? !localParticipant.isMicrophoneEnabled : (audioTrack ? audioTrack.isMuted : true))
       : (audioTrack ? audioTrack.isMuted || !audioTrack.isSubscribed : true);
     const camOff = isLocal
-      ? (videoTrack ? videoTrack.isMuted : true)
+      ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
       : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
 
     return {
@@ -201,7 +220,12 @@ export function useLiveKit() {
   }, [refreshParticipants]);
 
   // ── Connect ────────────────────────────────────────────────────
-  const connect = useCallback(async (roomName: string, participantName: string, isAdmin = false) => {
+  const connect = useCallback(async (
+    roomName: string,
+    participantName: string,
+    isAdmin = false,
+    options: ConnectOptions = {},
+  ) => {
     try {
       if (roomRef.current) {
         roomRef.current.disconnect();
@@ -212,6 +236,13 @@ export function useLiveKit() {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
+
+      preferredDevicesRef.current = {
+        audioDeviceId: options.audioDeviceId,
+        videoDeviceId: options.videoDeviceId,
+        audioOutputDeviceId: options.audioOutputDeviceId,
+      };
+      backgroundEffectRef.current = options.backgroundEffect || "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
@@ -369,13 +400,25 @@ export function useLiveKit() {
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
 
-      await room.localParticipant.enableCameraAndMicrophone();
+      const shouldEnableMic = options.initialMicOn ?? true;
+      const shouldEnableCam = options.initialCamOn ?? true;
+
+      await room.localParticipant.setMicrophoneEnabled(false);
+      await room.localParticipant.setCameraEnabled(false);
+
+      if (shouldEnableMic) {
+        await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
+      }
+
+      if (shouldEnableCam) {
+        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+      }
 
       // Try to start audio context immediately (for browsers that allow it)
       room.startAudio().catch(() => {});
 
-      setIsMicOn(true);
-      setIsCamOn(true);
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       playJoinSound();
       refreshParticipants();
 
@@ -416,38 +459,44 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return;
     try {
-      const newState = !isMicOn;
-      await room.localParticipant.setMicrophoneEnabled(newState);
-      setIsMicOn(newState);
-      debouncedRefresh();
+      const shouldEnable = !room.localParticipant.isMicrophoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(
+        shouldEnable,
+        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.audioDeviceId) : undefined,
+      );
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
+      setTimeout(() => refreshParticipants(), 180);
     } catch (err) {
       console.error("Mic toggle error:", err);
-      // If mic fails (permission denied, device unavailable), keep state in sync
-      const actualMicOn = room.localParticipant.isMicrophoneEnabled;
-      setIsMicOn(actualMicOn);
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
     }
-  }, [isMicOn, debouncedRefresh]);
+  }, [refreshParticipants]);
 
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
+
     try {
-      const newState = !isCamOn;
-      await room.localParticipant.setCameraEnabled(newState);
-      setIsCamOn(newState);
-      // Force multiple refreshes to catch track publication timing
+      const shouldEnable = !room.localParticipant.isCameraEnabled;
+      await room.localParticipant.setCameraEnabled(
+        shouldEnable,
+        shouldEnable ? getDeviceConstraint(preferredDevicesRef.current.videoDeviceId) : undefined,
+      );
+
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
       setTimeout(() => refreshParticipants(), 200);
       setTimeout(() => refreshParticipants(), 600);
+      setTimeout(() => refreshParticipants(), 1200);
     } catch (err) {
       console.error("Camera toggle error:", err);
-      // Sync state with actual device state
-      const actualCamOn = room.localParticipant.isCameraEnabled;
-      setIsCamOn(actualCamOn);
+      setIsCamOn(room.localParticipant.isCameraEnabled);
       refreshParticipants();
     }
-  }, [isCamOn, refreshParticipants]);
+  }, [refreshParticipants]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
@@ -546,6 +595,8 @@ export function useLiveKit() {
 
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
+    backgroundEffectRef.current = effect;
+
     const room = roomRef.current;
     if (!room) return;
 

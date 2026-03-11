@@ -19,14 +19,18 @@ interface LiveKitCallViewProps {
   onLeave: () => void;
   initialMicOn?: boolean;
   initialCamOn?: boolean;
+  initialAudioDeviceId?: string;
+  initialVideoDeviceId?: string;
+  initialAudioOutputDeviceId?: string;
+  initialBackgroundEffect?: BackgroundEffect;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
   const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
     setBgEffect(effect);
@@ -35,13 +39,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   // Connect on mount
   useEffect(() => {
-    lk.connect(roomName, displayName, isAdmin);
+    lk.connect(roomName, displayName, isAdmin, {
+      initialMicOn,
+      initialCamOn,
+      audioDeviceId: initialAudioDeviceId,
+      videoDeviceId: initialVideoDeviceId,
+      audioOutputDeviceId: initialAudioOutputDeviceId,
+      backgroundEffect: initialBackgroundEffect,
+    });
 
     return () => {
       lk.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, displayName, isAdmin]);
+  }, [roomName, displayName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
 
   const handleLeave = useCallback(() => {
     lk.disconnect();
@@ -53,6 +64,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     () => `${window.location.origin}/call/${encodeURIComponent(roomName)}`,
     [roomName]
   );
+
+  useEffect(() => {
+    if (lk.connectionState !== ConnectionState.Connected) return;
+    if (!lk.isCamOn || bgEffect === "none") return;
+    lk.setBackgroundEffect(bgEffect);
+  }, [lk.connectionState, lk.isCamOn, lk.setBackgroundEffect, bgEffect]);
 
   // Find screen sharer for spotlight
   const spotlightParticipant = useMemo(() => {
@@ -124,7 +141,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           {layout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {lk.participants.map((p) => (
-                <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} />
+                <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
               ))}
             </div>
           ) : (
@@ -136,6 +153,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     room={room}
                     large
                     className="h-full"
+                    preferredAudioOutputDeviceId={initialAudioOutputDeviceId}
                   />
                 </div>
               )}
@@ -145,7 +163,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0">
-                        <ParticipantTile participant={p} room={room} />
+                        <ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
                       </div>
                     ))}
                 </div>

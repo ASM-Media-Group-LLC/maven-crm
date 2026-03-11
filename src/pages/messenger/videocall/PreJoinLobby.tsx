@@ -5,12 +5,13 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
 
 interface PreJoinLobbyProps {
   roomName: string;
   displayName: string;
   callDisplayName?: string;
-  onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string }) => void;
+  onJoin: (opts: { micOn: boolean; camOn: boolean; audioDeviceId?: string; videoDeviceId?: string; audioOutputDeviceId?: string; backgroundEffect?: BackgroundEffect }) => void;
 }
 
 function getInitials(name: string) {
@@ -29,6 +30,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
 
   // Device lists
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
@@ -136,6 +138,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       camOn,
       audioDeviceId: selectedAudioInput || undefined,
       videoDeviceId: selectedVideoInput || undefined,
+      audioOutputDeviceId: selectedAudioOutput || undefined,
+      backgroundEffect: bgEffect,
     });
   };
 
@@ -149,6 +153,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const truncateLabel = (label: string, max = 18) =>
     label.length > max ? label.slice(0, max) + "…" : label;
+
+  const selectedBackgroundLabel =
+    bgEffect === "none"
+      ? "Sin fondo virtual"
+      : bgEffect === "soft-blur"
+        ? "Difuminado leve"
+        : bgEffect === "hard-blur"
+          ? "Difuminado fuerte"
+          : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   return (
     <div className="h-screen w-screen bg-[hsl(220_13%_95%)] dark:bg-[hsl(240_10%_6%)] flex items-center justify-center p-4">
@@ -248,7 +261,11 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               isOpen={openDropdown === "cam"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "cam" ? null : "cam"); }}
             />
+            <BackgroundSelector selected={bgEffect} onSelect={setBgEffect} />
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Fondo seleccionado: <span className="font-medium text-foreground">{selectedBackgroundLabel}</span>
+          </p>
         </div>
 
         {/* Right: Join panel */}
