@@ -169,6 +169,7 @@ const ParticipantTile = memo(function ParticipantTile({
     participant.isCameraOff,
     participant.isScreenSharing,
     participant.isMuted,
+    preferredAudioOutputDeviceId,
   ]);
 
   // Full cleanup on unmount
