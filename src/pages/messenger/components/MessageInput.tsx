@@ -95,12 +95,21 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   }), [addFilesInternal]);
 
   // XHR upload with progress for a single file
-  const uploadFileWithProgress = useCallback((file: File, path: string): Promise<{ error: string | null }> => {
-    return new Promise((resolve) => {
-      const supabaseUrl = "https://lsagslbkliprespbyhts.supabase.co";
-      const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzYWdzbGJrbGlwcmVzcGJ5aHRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODYzMjYsImV4cCI6MjA4MDg2MjMyNn0.4xDi5w0nKAE54OzVzR56XHMzXswQ8leXqzV-H21XrGw";
-      const url = `${supabaseUrl}/storage/v1/object/chat-files/${encodeURIComponent(path)}`;
+  const uploadFileWithProgress = useCallback(async (file: File, path: string): Promise<{ error: string | null }> => {
+    // Get session token BEFORE creating XHR to avoid race condition
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    
+    if (!token) {
+      return { error: "No auth session" };
+    }
 
+    const supabaseUrl = "https://lsagslbkliprespbyhts.supabase.co";
+    // Encode each path segment separately to handle special characters
+    const encodedPath = path.split("/").map(s => encodeURIComponent(s)).join("/");
+    const url = `${supabaseUrl}/storage/v1/object/chat-files/${encodedPath}`;
+
+    return new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       abortRef.current = xhr;
 
@@ -115,13 +124,19 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve({ error: null });
         } else {
-          resolve({ error: `Upload failed: ${xhr.status}` });
+          let detail = `${xhr.status}`;
+          try {
+            const body = JSON.parse(xhr.responseText);
+            detail = body.message || body.error || detail;
+          } catch {}
+          console.error("Upload failed:", xhr.status, xhr.responseText);
+          resolve({ error: `Upload failed: ${detail}` });
         }
       };
 
       xhr.onerror = () => {
         abortRef.current = null;
-        resolve({ error: "Network error" });
+        resolve({ error: "Network error — check your connection and try again" });
       };
 
       xhr.onabort = () => {
@@ -129,17 +144,18 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
         resolve({ error: "cancelled" });
       };
 
-      xhr.open("POST", url);
-      xhr.setRequestHeader("Authorization", `Bearer ${supabaseKey}`);
-      xhr.setRequestHeader("x-upsert", "false");
+      // Set timeout for very large files (10 min)
+      xhr.timeout = 600000;
+      xhr.ontimeout = () => {
+        abortRef.current = null;
+        resolve({ error: "Upload timed out — file may be too large for your connection" });
+      };
 
-      // Get the session token for authenticated uploads
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session?.access_token) {
-          xhr.setRequestHeader("Authorization", `Bearer ${data.session.access_token}`);
-        }
-        xhr.send(file);
-      });
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.setRequestHeader("x-upsert", "false");
+      xhr.send(file);
     });
   }, []);
 
