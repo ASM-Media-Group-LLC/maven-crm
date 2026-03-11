@@ -254,7 +254,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           return;
         }
         if (uploadError) {
-          toast.error(`Error al subir ${pf.file.name}`);
+          toast.error(`Error al subir ${pf.file.name}: ${uploadError}`);
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
