@@ -69,23 +69,39 @@ const ParticipantTile = memo(function ParticipantTile({
 
     // ── Video ────────────────────────────────────────────────
     const videoSource = participant.isScreenSharing ? Track.Source.ScreenShare : Track.Source.Camera;
-    const videoTrack = [...lkParticipant.videoTrackPublications.values()].find(
-      (t) => t.source === videoSource
-    );
-
-    const videoEl = videoRef.current;
-    if (videoTrack?.track && videoEl) {
-      // Only reattach if track changed
-      if (attachedVideoTrackRef.current !== videoTrack.track) {
-        if (attachedVideoTrackRef.current) {
+    
+    const attachVideo = () => {
+      const videoTrack = [...lkParticipant.videoTrackPublications.values()].find(
+        (t) => t.source === videoSource
+      );
+      const videoEl = videoRef.current;
+      
+      if (videoTrack?.track && videoEl) {
+        // Always detach old track first, then attach new one
+        if (attachedVideoTrackRef.current && attachedVideoTrackRef.current !== videoTrack.track) {
           attachedVideoTrackRef.current.detach(videoEl);
         }
-        videoTrack.track.attach(videoEl);
-        attachedVideoTrackRef.current = videoTrack.track;
+        if (attachedVideoTrackRef.current !== videoTrack.track) {
+          videoTrack.track.attach(videoEl);
+          attachedVideoTrackRef.current = videoTrack.track;
+        }
+        return true;
+      } else if (videoEl) {
+        // No track available — clean up
+        if (attachedVideoTrackRef.current) {
+          attachedVideoTrackRef.current.detach(videoEl);
+          attachedVideoTrackRef.current = null;
+        }
+        return !participant.isCameraOff; // retry if camera should be on
       }
-    } else if (attachedVideoTrackRef.current && videoEl) {
-      attachedVideoTrackRef.current.detach(videoEl);
-      attachedVideoTrackRef.current = null;
+      return false;
+    };
+    
+    const needsRetry = attachVideo();
+    // Retry attachment after a delay if camera just turned on but track wasn't ready
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    if (needsRetry && !participant.isCameraOff) {
+      retryTimer = setTimeout(() => attachVideo(), 500);
     }
 
     // ── Audio (remote only) ──────────────────────────────────
