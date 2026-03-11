@@ -170,8 +170,13 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       try {
         await previewBgProcessorRef.current?.switchTo({ mode: "disabled" });
       } catch {}
-    }
-  }, [preloadBackgroundTemplate]);
+
+      if (videoRef.current) {
+        try {
+          videoTrack.detach(videoRef.current);
+          videoTrack.attach(videoRef.current);
+        } catch {}
+      }
 
   // Start camera/mic preview
   const startPreview = useCallback(async () => {
