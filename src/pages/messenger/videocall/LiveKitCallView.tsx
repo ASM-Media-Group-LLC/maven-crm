@@ -34,6 +34,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // Connect on mount
   useEffect(() => {
     lk.connect(roomName, displayName, isAdmin);
+
+    return () => {
+      lk.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, displayName, isAdmin]);
 
