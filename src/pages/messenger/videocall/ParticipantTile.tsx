@@ -1,8 +1,8 @@
-import { useEffect, useRef, memo, useCallback } from "react";
+import { useEffect, useRef, memo } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { MicOff, Hand, Monitor, Wifi, WifiOff } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff } from "lucide-react";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 
