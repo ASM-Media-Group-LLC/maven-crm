@@ -192,11 +192,51 @@ export function useChat() {
       }
     };
 
+    // Inline update: when a new message arrives, update the sidebar without full reload
+    const updateConversationWithMessage = (msg: any) => {
+      setConversations(prev => {
+        const idx = prev.findIndex(c => c.id === msg.conversation_id);
+        if (idx === -1) {
+          // Unknown conversation — need full reload
+          scheduleConversationsReload(true);
+          return prev;
+        }
+        const conv = prev[idx];
+        const updated = {
+          ...conv,
+          lastMessage: msg as ChatMessage,
+          updated_at: msg.created_at,
+          unreadCount: msg.sender_id !== user.id
+            ? conv.unreadCount + 1
+            : conv.unreadCount,
+        };
+        // Move to top
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updated);
+        return next;
+      });
+    };
+
     const channel = supabase
       .channel("chat-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_messages" },
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          updateConversationWithMessage(payload.new);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_messages" },
+        () => {
+          scheduleConversationsReload();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_messages" },
         () => {
           scheduleConversationsReload();
         }
@@ -233,14 +273,13 @@ export function useChat() {
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          // Connected — reload to catch any missed events
           void loadConversations();
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // Retry by reloading conversations after a delay
           setTimeout(() => void loadConversations(), 2000);
         }
       });
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void loadConversations();
