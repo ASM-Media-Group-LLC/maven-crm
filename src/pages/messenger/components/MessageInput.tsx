@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from "react";
 import MentionAutocomplete from "./MentionAutocomplete";
-import { Smile, Paperclip, Send, X, Loader2, Image as ImageIcon, FileText, Mic } from "lucide-react";
+import { Smile, Paperclip, Send, X, Loader2, FileText, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import { ChatMessage, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,10 +22,21 @@ const MAX_FILES = 20;
 const MAX_FILE_SIZE_MB = 350;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 interface PendingFile {
   file: File;
   preview?: string;
   type: "image" | "file";
+}
+
+export interface MessageInputHandle {
+  addFiles: (files: File[]) => void;
 }
 
 interface MessageInputProps {
@@ -37,31 +49,133 @@ interface MessageInputProps {
   chatType?: string;
 }
 
-export default function MessageInput({
+const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   onSendMessage, onSendTyping, replyTo, profiles, onCancelReply,
   participants, chatType,
-}: MessageInputProps) {
+}, ref) => {
   const { user } = useAuth();
   const [cursorPosition, setCursorPosition] = useState(0);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout>>();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<XMLHttpRequest | null>(null);
+
+  const addFilesInternal = useCallback((files: File[]) => {
+    const totalFiles = pendingFiles.length + files.length;
+    if (totalFiles > MAX_FILES) {
+      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
+      return;
+    }
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized.length > 0) {
+      const names = oversized.map(f => f.name).join(", ");
+      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
+      return;
+    }
+    const newPending: PendingFile[] = files.map(file => {
+      const isImg = file.type.startsWith("image/");
+      return {
+        file,
+        preview: isImg ? URL.createObjectURL(file) : undefined,
+        type: isImg ? "image" as const : "file" as const,
+      };
+    });
+    setPendingFiles(prev => [...prev, ...newPending]);
+  }, [pendingFiles.length]);
+
+  // Expose addFiles to parent via ref
+  useImperativeHandle(ref, () => ({
+    addFiles: addFilesInternal,
+  }), [addFilesInternal]);
+
+  // XHR upload with progress for a single file
+  const uploadFileWithProgress = useCallback((file: File, path: string): Promise<{ error: string | null }> => {
+    return new Promise((resolve) => {
+      const supabaseUrl = "https://lsagslbkliprespbyhts.supabase.co";
+      const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzYWdzbGJrbGlwcmVzcGJ5aHRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODYzMjYsImV4cCI6MjA4MDg2MjMyNn0.4xDi5w0nKAE54OzVzR56XHMzXswQ8leXqzV-H21XrGw";
+      const url = `${supabaseUrl}/storage/v1/object/chat-files/${encodeURIComponent(path)}`;
+
+      const xhr = new XMLHttpRequest();
+      abortRef.current = xhr;
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          setUploadPercent(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        abortRef.current = null;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ error: null });
+        } else {
+          resolve({ error: `Upload failed: ${xhr.status}` });
+        }
+      };
+
+      xhr.onerror = () => {
+        abortRef.current = null;
+        resolve({ error: "Network error" });
+      };
+
+      xhr.onabort = () => {
+        abortRef.current = null;
+        resolve({ error: "cancelled" });
+      };
+
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Authorization", `Bearer ${supabaseKey}`);
+      xhr.setRequestHeader("x-upsert", "false");
+
+      // Get the session token for authenticated uploads
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.access_token) {
+          xhr.setRequestHeader("Authorization", `Bearer ${data.session.access_token}`);
+        }
+        xhr.send(file);
+      });
+    });
+  }, []);
+
+  const cancelUpload = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+  }, []);
 
   const handleSend = useCallback(async () => {
-    // Send pending files first
     if (pendingFiles.length > 0) {
       setUploading(true);
       for (let i = 0; i < pendingFiles.length; i++) {
         const pf = pendingFiles[i];
-        setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name}`);
+        setUploadProgress(`Subiendo ${i + 1}/${pendingFiles.length}: ${pf.file.name} (${formatFileSize(pf.file.size)})`);
+        setUploadPercent(0);
         const path = `${user!.id}/${Date.now()}-${pf.file.name}`;
-        const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
-        if (error) {
+
+        // Use XHR for files > 5MB for progress, SDK for small files
+        let uploadError: string | null = null;
+        if (pf.file.size > 5 * 1024 * 1024) {
+          const result = await uploadFileWithProgress(pf.file, path);
+          uploadError = result.error;
+        } else {
+          const { error } = await supabase.storage.from("chat-files").upload(path, pf.file);
+          uploadError = error?.message || null;
+        }
+
+        if (uploadError === "cancelled") {
+          toast("Subida cancelada");
+          setUploading(false);
+          setUploadProgress("");
+          setUploadPercent(0);
+          return;
+        }
+        if (uploadError) {
           toast.error(`Error al subir ${pf.file.name}`);
           continue;
         }
@@ -74,6 +188,7 @@ export default function MessageInput({
       onCancelReply();
       setUploading(false);
       setUploadProgress("");
+      setUploadPercent(0);
       inputRef.current?.focus();
       return;
     }
@@ -84,7 +199,7 @@ export default function MessageInput({
     onCancelReply();
     onSendTyping(false);
     inputRef.current?.focus();
-  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user]);
+  }, [text, replyTo, onSendMessage, onCancelReply, onSendTyping, pendingFiles, user, uploadFileWithProgress]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -109,35 +224,7 @@ export default function MessageInput({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    // Validate max files
-    const totalFiles = pendingFiles.length + files.length;
-    if (totalFiles > MAX_FILES) {
-      toast.error(`Máximo ${MAX_FILES} archivos adjuntos por envío`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    // Validate file sizes
-    const oversized = files.filter(f => f.size > MAX_FILE_SIZE_BYTES);
-    if (oversized.length > 0) {
-      const names = oversized.map(f => f.name).join(", ");
-      toast.error(`Archivos demasiado grandes (máx ${MAX_FILE_SIZE_MB}MB): ${names}`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    const newPending: PendingFile[] = files.map(file => {
-      const isImg = file.type.startsWith("image/");
-      return {
-        file,
-        preview: isImg ? URL.createObjectURL(file) : undefined,
-        type: isImg ? "image" as const : "file" as const,
-      };
-    });
-
-    setPendingFiles(prev => [...prev, ...newPending]);
+    if (files.length) addFilesInternal(files);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -153,7 +240,6 @@ export default function MessageInput({
   const handleVoiceNoteSend = useCallback(async (blob: Blob, durationSec: number) => {
     if (!user) return;
     setUploading(true);
-    // Derive extension from actual blob mimeType
     const mimeToExt: Record<string, string> = {
       "audio/webm": "webm",
       "audio/ogg": "ogg",
@@ -197,7 +283,7 @@ export default function MessageInput({
         </div>
       )}
 
-      {/* File previews */}
+      {/* File previews with sizes */}
       {pendingFiles.length > 0 && (
         <div className="border-b border-border bg-muted/20">
           <div className="flex items-center justify-between px-4 pt-2 pb-1">
@@ -231,17 +317,31 @@ export default function MessageInput({
                   <X className="h-2.5 w-2.5" />
                 </button>
                 <p className="text-[8px] text-muted-foreground truncate max-w-[64px] mt-0.5 text-center">{pf.file.name}</p>
+                <p className="text-[7px] text-muted-foreground/70 text-center">{formatFileSize(pf.file.size)}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Upload progress */}
+      {/* Upload progress with percentage and cancel */}
       {uploading && uploadProgress && (
-        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-primary/5">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-          <span className="text-[11px] text-primary font-medium truncate">{uploadProgress}</span>
+        <div className="px-4 py-2 border-b border-border bg-primary/5 space-y-1">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+            <span className="text-[11px] text-primary font-medium truncate flex-1">{uploadProgress}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 px-2 text-[10px] text-destructive hover:text-destructive"
+              onClick={cancelUpload}
+            >
+              Cancelar
+            </Button>
+          </div>
+          {uploadPercent > 0 && (
+            <Progress value={uploadPercent} className="h-1.5" indicatorClassName="bg-primary" />
+          )}
         </div>
       )}
 
@@ -337,4 +437,8 @@ export default function MessageInput({
       </div>
     </div>
   );
-}
+});
+
+MessageInput.displayName = "MessageInput";
+
+export default MessageInput;
