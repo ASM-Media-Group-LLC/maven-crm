@@ -177,6 +177,7 @@ export default function ChatSidebar({
               {[
                 { key: "all", icon: Home, label: "Todos", badge: 0 },
                 { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
+                { key: "mentions", icon: AtSign, label: "Menciones", badge: 0 },
                 { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
                 { key: "groups", icon: Users, label: "Grupos", badge: 0 },
               ].map(item => {
