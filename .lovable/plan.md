@@ -1,22 +1,21 @@
 
 
-## Problem
+## Upgrade ClosersKPICards to use DashboardMetricCard
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+The current `ClosersKPICards` uses plain cards with `border-t` styling. The reference image shows the `DashboardMetricCard` pattern: icon with colored background on the left, label/value/subtitle on the right, with hover effects. This is the same component already used across the system.
 
-## Solution
+### Changes
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
-
-## Changes
-
-**File: `src/pages/sales-performance/useEarningsData.ts`**
-
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+**Edit `src/pages/closers/components/ClosersKPICards.tsx`**:
+- Import `DashboardMetricCard` from `@/components/dashboard/DashboardMetricCard`
+- Import icons from lucide-react: `UserCheck`, `MessageSquare`, `CheckCircle`, `Trophy`, `DollarSign`, `TrendingUp`
+- Replace the manual Card rendering with a grid of `DashboardMetricCard` components
+- Map each KPI to the appropriate icon and color:
+  - Asignadas → `UserCheck`, primary
+  - En Negociación → `MessageSquare`, accent
+  - Confirmadas → `CheckCircle`, success
+  - Completadas → `Trophy`, success
+  - Monetización Est. → `DollarSign`, warning
+  - Revenue Agencia → `TrendingUp`, primary
+- Keep the same 6-column grid layout
 
