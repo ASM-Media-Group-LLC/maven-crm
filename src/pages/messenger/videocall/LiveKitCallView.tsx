@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
