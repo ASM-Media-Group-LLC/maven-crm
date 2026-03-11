@@ -138,6 +138,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       camOn,
       audioDeviceId: selectedAudioInput || undefined,
       videoDeviceId: selectedVideoInput || undefined,
+      audioOutputDeviceId: selectedAudioOutput || undefined,
+      backgroundEffect: bgEffect,
     });
   };
 
