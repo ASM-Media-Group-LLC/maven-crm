@@ -177,6 +177,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           videoTrack.attach(videoRef.current);
         } catch {}
       }
+    }
+  }, [preloadBackgroundTemplate]);
 
   // Start camera/mic preview
   const startPreview = useCallback(async () => {
