@@ -261,7 +261,11 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               isOpen={openDropdown === "cam"}
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "cam" ? null : "cam"); }}
             />
+            <BackgroundSelector selected={bgEffect} onSelect={setBgEffect} />
           </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Fondo seleccionado: <span className="font-medium text-foreground">{selectedBackgroundLabel}</span>
+          </p>
         </div>
 
         {/* Right: Join panel */}
