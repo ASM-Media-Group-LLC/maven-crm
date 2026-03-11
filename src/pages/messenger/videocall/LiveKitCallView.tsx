@@ -141,7 +141,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           {layout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
               {lk.participants.map((p) => (
-                <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} />
+                <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
               ))}
             </div>
           ) : (
