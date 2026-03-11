@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Search, Users, Video, Trash2, SearchCheck, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -81,15 +81,27 @@ export default function ChatSidebar({
   const [dmExpanded, setDmExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(false);
 
+  const currentUserName = user ? profiles[user.id]?.full_name : null;
+
+  const hasMention = useCallback((conv: ConversationWithDetails) => {
+    if (!currentUserName || !conv.lastMessage?.content) return false;
+    const content = conv.lastMessage.content.toLowerCase();
+    const name = currentUserName.toLowerCase();
+    // Check for @name or @firstName patterns
+    return content.includes(`@${name}`) || 
+           content.includes(`@${name.split(" ")[0]}`);
+  }, [currentUserName]);
+
   const filtered = useMemo(() => {
     return conversations.filter(c => {
       const matchesSearch = c.displayName.toLowerCase().includes(search.toLowerCase());
       if (tab === "unread") return matchesSearch && c.unreadCount > 0;
       if (tab === "groups") return matchesSearch && c.type === "group";
       if (tab === "pinned") return matchesSearch && isPinned(c.id);
+      if (tab === "mentions") return matchesSearch && c.type === "group" && hasMention(c);
       return matchesSearch;
     });
-  }, [conversations, search, tab, isPinned]);
+  }, [conversations, search, tab, isPinned, hasMention]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -177,6 +189,7 @@ export default function ChatSidebar({
               {[
                 { key: "all", icon: Home, label: "Todos", badge: 0 },
                 { key: "unread", icon: Mail, label: "No leídos", badge: unreadTotal },
+                { key: "mentions", icon: AtSign, label: "Menciones", badge: 0 },
                 { key: "pinned", icon: Star, label: "Fijados", badge: 0 },
                 { key: "groups", icon: Users, label: "Grupos", badge: 0 },
               ].map(item => {
