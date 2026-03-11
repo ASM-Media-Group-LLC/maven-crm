@@ -11,6 +11,7 @@ interface ParticipantTileProps {
   room: Room | null;
   large?: boolean;
   className?: string;
+  preferredAudioOutputDeviceId?: string;
 }
 
 function getInitials(name: string) {
