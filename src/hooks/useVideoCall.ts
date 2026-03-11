@@ -30,6 +30,14 @@ export function useVideoCall() {
   const [calling, setCalling] = useState(false);
   const ringingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Cleanup ringing timer helper ────────────────────────────────
+  const clearRingingTimer = useCallback(() => {
+    if (ringingTimerRef.current) {
+      clearTimeout(ringingTimerRef.current);
+      ringingTimerRef.current = null;
+    }
+  }, []);
+
   // ── Initiate a call ─────────────────────────────────────────────
   const initiateCall = useCallback(
     async (conversationId: string, receiverId: string, receiverName: string, callType: CallType = "video") => {
@@ -71,6 +79,7 @@ export function useVideoCall() {
       window.open(`/call/${encodeURIComponent(roomId)}?admin=1`, `call-${roomId}`, "noopener");
 
       // Auto-end after 30s if no answer
+      clearRingingTimer();
       ringingTimerRef.current = setTimeout(async () => {
         await (supabase.from("calls") as any)
           .update({ call_status: "ended", end_time: new Date().toISOString() })
@@ -80,7 +89,7 @@ export function useVideoCall() {
         setActiveCall(null);
       }, 30_000);
     },
-    [user]
+    [user, clearRingingTimer]
   );
 
   // ── Accept call ──────────────────────────────────────────────────
@@ -122,10 +131,7 @@ export function useVideoCall() {
   const endCall = useCallback(async () => {
     if (!activeCall || !user) return;
 
-    if (ringingTimerRef.current) {
-      clearTimeout(ringingTimerRef.current);
-      ringingTimerRef.current = null;
-    }
+    clearRingingTimer();
 
     await (supabase.from("calls") as any)
       .update({ call_status: "ended", end_time: new Date().toISOString() })
@@ -136,15 +142,21 @@ export function useVideoCall() {
       .eq("call_id", activeCall.id);
 
     setActiveCall(null);
-  }, [activeCall, user]);
+  }, [activeCall, user, clearRingingTimer]);
 
-  // ── Realtime listener for incoming calls ────────────────────────
+  // ── Cleanup ringing timer on unmount ────────────────────────────
+  useEffect(() => {
+    return () => {
+      clearRingingTimer();
+    };
+  }, [clearRingingTimer]);
+
+  // ── Realtime listener for incoming calls (stable deps) ─────────
   useEffect(() => {
     if (!user) return;
 
     // Initial check for any ringing calls
     const checkIncoming = async () => {
-      if (incomingCall || activeCall) return;
       const { data: directCalls } = await (supabase
         .from("calls") as any)
         .select("*")
@@ -161,9 +173,13 @@ export function useVideoCall() {
           .eq("id", call.caller_id)
           .single();
 
-        setIncomingCall({
-          ...call,
-          caller_name: profile?.full_name ?? "Usuario",
+        setIncomingCall((prev) => {
+          // Don't overwrite if we already have this call or any active call
+          if (prev?.id === call.id) return prev;
+          return {
+            ...call,
+            caller_name: profile?.full_name ?? "Usuario",
+          };
         });
       }
     };
@@ -202,7 +218,7 @@ export function useVideoCall() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, incomingCall, activeCall]);
+  }, [user]); // Removed incomingCall/activeCall from deps to avoid re-subscription churn
 
   // ── Realtime active call status tracking ───────────────────────
   useEffect(() => {
@@ -221,17 +237,11 @@ export function useVideoCall() {
         (payload) => {
           const call = payload.new as Call;
 
-          if (activeCall.call_status === "ringing" && call.call_status === "accepted") {
-            if (ringingTimerRef.current) {
-              clearTimeout(ringingTimerRef.current);
-              ringingTimerRef.current = null;
-            }
+          if (call.call_status === "accepted") {
+            clearRingingTimer();
             setActiveCall((prev) => prev ? { ...prev, call_status: "accepted" } : prev);
           } else if (call.call_status === "declined" || call.call_status === "ended") {
-            if (ringingTimerRef.current) {
-              clearTimeout(ringingTimerRef.current);
-              ringingTimerRef.current = null;
-            }
+            clearRingingTimer();
             setActiveCall(null);
           }
         }
@@ -241,7 +251,7 @@ export function useVideoCall() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeCall, user]);
+  }, [activeCall?.id, user, clearRingingTimer]); // Use activeCall.id for stable subscription
 
   return {
     incomingCall,

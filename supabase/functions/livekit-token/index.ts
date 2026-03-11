@@ -9,7 +9,14 @@ const corsHeaders = {
 
 // Minimal JWT-based LiveKit token generator (no external deps)
 function base64UrlEncode(data: Uint8Array): string {
-  let b64 = btoa(String.fromCharCode(...data));
+  // Process in chunks to avoid stack overflow with spread operator on large arrays
+  const CHUNK_SIZE = 8192;
+  let b64 = "";
+  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+    const chunk = data.subarray(i, i + CHUNK_SIZE);
+    b64 += String.fromCharCode(...chunk);
+  }
+  b64 = btoa(b64);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
@@ -57,7 +64,7 @@ async function createLiveKitToken(
     exp: now + ttlSeconds,
     name,
     video: grants,
-    metadata: JSON.stringify({ name }),
+    metadata: JSON.stringify({ name, isAdmin: !!grants.roomAdmin }),
   };
 
   const headerB64 = base64UrlEncode(strToBytes(JSON.stringify(header)));
@@ -107,6 +114,36 @@ serve(async (req) => {
       );
     }
 
+    // ── Server-side admin verification ────────────────────────────
+    // Only grant roomAdmin if the user actually has an admin/moderator role
+    let verifiedAdmin = false;
+    if (isAdmin) {
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      const { data: userRoles } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      const adminRoles = ["admin", "moderator"];
+      verifiedAdmin = (userRoles || []).some((r: any) => adminRoles.includes(r.role));
+
+      // Also check if the user is the caller of this room (they created the call)
+      if (!verifiedAdmin) {
+        const { data: callData } = await adminClient
+          .from("calls")
+          .select("caller_id")
+          .eq("room_id", roomName)
+          .eq("caller_id", userId)
+          .limit(1);
+
+        verifiedAdmin = (callData && callData.length > 0);
+      }
+    }
+
     const livekitUrl = Deno.env.get("LIVEKIT_URL")!;
     const apiKey = Deno.env.get("LIVEKIT_API_KEY")!;
     const apiSecret = Deno.env.get("LIVEKIT_API_SECRET")!;
@@ -122,7 +159,7 @@ serve(async (req) => {
       canPublish: true,
       canSubscribe: true,
       canPublishData: true,
-      roomAdmin: isAdmin,
+      roomAdmin: verifiedAdmin,
     };
 
     const lkToken = await createLiveKitToken(

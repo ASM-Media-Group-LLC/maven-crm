@@ -59,10 +59,27 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-// ── Audio feedback helper ───────────────────────────────────────
-function playTone(frequency: number, duration: number, volume = 0.15) {
+// ── Audio feedback helper (shared AudioContext to avoid exhaustion) ──
+let sharedAudioCtx: AudioContext | null = null;
+function getAudioContext(): AudioContext | null {
   try {
-    const ctx = new AudioContext();
+    if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+      sharedAudioCtx = new AudioContext();
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
+function playTone(frequency: number, duration: number, volume = 0.15) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    // Resume if suspended (browser autoplay policy)
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
@@ -72,7 +89,6 @@ function playTone(frequency: number, duration: number, volume = 0.15) {
     osc.connect(gain).connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
-    setTimeout(() => ctx.close(), (duration + 0.1) * 1000);
   } catch {
     // AudioContext not available — fail silently
   }
@@ -104,29 +120,28 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
   }
 }
 
+// ── Chat message cap to prevent unbounded memory growth ──────────
+const MAX_CHAT_MESSAGES = 500;
+
 // ── Production Room configuration ────────────────────────────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
-  // Video defaults
   videoCaptureDefaults: {
     resolution: VideoPresets.h720.resolution,
     facingMode: "user",
   },
-  // Audio defaults — enable all processing for production quality
   audioCaptureDefaults: {
     autoGainControl: true,
     echoCancellation: true,
     noiseSuppression: true,
-    // Advanced constraints for supported browsers
     channelCount: 1,
     sampleRate: 48000,
   },
-  // Publish defaults
   publishDefaults: {
-    dtx: true,                   // Discontinuous Transmission — saves bandwidth when silent
-    red: true,                   // Redundant Audio Data — recovery from packet loss
-    simulcast: true,             // Simulcast for adaptive quality
+    dtx: true,
+    red: true,
+    simulcast: true,
     videoSimulcastLayers: [
       VideoPresets.h180,
       VideoPresets.h360,
@@ -156,6 +171,8 @@ export function useLiveKit() {
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
   const bgApplyOpRef = useRef(0);
+  const connectingRef = useRef(false); // Guard against concurrent connect()
+  const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -361,6 +378,14 @@ export function useLiveKit() {
     }
   }, [disposeBackgroundProcessor]);
 
+  // ── Cleanup audio resume listeners ─────────────────────────────
+  const cleanupAudioResumeListeners = useCallback(() => {
+    if (audioResumeCleanupRef.current) {
+      audioResumeCleanupRef.current();
+      audioResumeCleanupRef.current = null;
+    }
+  }, []);
+
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (
     roomName: string,
@@ -368,12 +393,20 @@ export function useLiveKit() {
     isAdmin = false,
     options: ConnectOptions = {},
   ) => {
+    // Guard against concurrent connect calls
+    if (connectingRef.current) {
+      console.warn("[LiveKit] Connect already in progress, ignoring duplicate call");
+      return;
+    }
+    connectingRef.current = true;
+
     try {
       if (roomRef.current) {
         roomRef.current.disconnect();
         roomRef.current = null;
       }
       clearSyncInterval();
+      cleanupAudioResumeListeners();
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
@@ -463,22 +496,30 @@ export function useLiveKit() {
       // ── Handle autoplay policy (resume audio context) ────────
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
         if (!room.canPlaybackAudio) {
-          // Audio blocked by browser — try to resume on next user click
+          // Clean up any prior listeners first
+          cleanupAudioResumeListeners();
+
           const resumeAudio = () => {
             room.startAudio().then(() => {
               console.info("[LiveKit] Audio playback resumed");
-              // Re-play all audio elements that may have been blocked
               document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
                 if (el.paused && el.srcObject) {
                   el.play().catch(() => {});
                 }
               });
-              document.removeEventListener("click", resumeAudio);
-              document.removeEventListener("touchstart", resumeAudio);
+              // Clean up listeners on success
+              cleanupAudioResumeListeners();
             });
           };
-          document.addEventListener("click", resumeAudio, { once: false });
-          document.addEventListener("touchstart", resumeAudio, { once: false });
+
+          document.addEventListener("click", resumeAudio);
+          document.addEventListener("touchstart", resumeAudio);
+
+          // Store cleanup function
+          audioResumeCleanupRef.current = () => {
+            document.removeEventListener("click", resumeAudio);
+            document.removeEventListener("touchstart", resumeAudio);
+          };
         }
       });
 
@@ -487,16 +528,23 @@ export function useLiveKit() {
         try {
           const msg: DataMessage = JSON.parse(new TextDecoder().decode(payload));
           if (msg.type === "chat") {
-            setChatMessages((prev) => [
-              ...prev,
-              {
-                id: `${Date.now()}-${participant?.identity}`,
-                sender: participant?.identity || "unknown",
-                senderName: participant?.name || participant?.identity || "Unknown",
-                content: msg.payload.text,
-                timestamp: Date.now(),
-              },
-            ]);
+            setChatMessages((prev) => {
+              const newMessages = [
+                ...prev,
+                {
+                  id: `${Date.now()}-${participant?.identity}`,
+                  sender: participant?.identity || "unknown",
+                  senderName: participant?.name || participant?.identity || "Unknown",
+                  content: msg.payload.text,
+                  timestamp: Date.now(),
+                },
+              ];
+              // Cap chat messages to prevent unbounded memory growth
+              if (newMessages.length > MAX_CHAT_MESSAGES) {
+                return newMessages.slice(newMessages.length - MAX_CHAT_MESSAGES);
+              }
+              return newMessages;
+            });
           } else if (msg.type === "hand") {
             handRaisedMap.current[participant?.identity || ""] = msg.payload.raised;
             refreshParticipants();
@@ -517,20 +565,41 @@ export function useLiveKit() {
                 )
               );
             }, 3000);
-          } else if (msg.type === "moderation" && msg.payload?.action === "mute" && msg.payload?.target === room.localParticipant.identity) {
-            // Respond to remote mute request
-            room.localParticipant.setMicrophoneEnabled(false);
-            setIsMicOn(false);
-            refreshParticipants();
-          } else if (msg.type === "moderation" && msg.payload?.action === "remove" && msg.payload?.target === room.localParticipant.identity) {
-            setError("Has sido removido de la llamada por un moderador");
-            room.disconnect();
+          } else if (msg.type === "moderation") {
+            // Security: Verify the sender has roomAdmin permission via LiveKit metadata
+            // Only process moderation from participants with admin grants
+            const senderParticipant = participant ? room.remoteParticipants.get(participant.identity) || (participant.identity === room.localParticipant.identity ? room.localParticipant : null) : null;
+            const senderPermissions = senderParticipant?.permissions;
+            const isSenderAdmin = senderPermissions?.canPublish && senderPermissions?.canSubscribe;
+
+            // For additional security, check participant metadata for admin flag
+            let metadataAdmin = false;
+            try {
+              const meta = JSON.parse(senderParticipant?.metadata || "{}");
+              metadataAdmin = !!meta.isAdmin;
+            } catch {}
+
+            // Only accept moderation from participants who are admins (have roomAdmin grant in token)
+            if (!isSenderAdmin && !metadataAdmin) {
+              console.warn("[LiveKit] Ignoring moderation command from non-admin:", participant?.identity);
+              return;
+            }
+
+            if (msg.payload?.action === "mute" && msg.payload?.target === room.localParticipant.identity) {
+              room.localParticipant.setMicrophoneEnabled(false);
+              setIsMicOn(false);
+              refreshParticipants();
+            } else if (msg.payload?.action === "remove" && msg.payload?.target === room.localParticipant.identity) {
+              setError("Has sido removido de la llamada por un moderador");
+              room.disconnect();
+            }
           }
         } catch {}
       });
 
       room.on(RoomEvent.Disconnected, () => {
         clearSyncInterval();
+        cleanupAudioResumeListeners();
         void disposeBackgroundProcessor();
         setConnectionState(ConnectionState.Disconnected);
         setIsReconnecting(false);
@@ -582,15 +651,19 @@ export function useLiveKit() {
       setError(err.message || "Connection failed");
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
+    } finally {
+      connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
     clearSyncInterval();
+    cleanupAudioResumeListeners();
     void disposeBackgroundProcessor();
     roomRef.current?.disconnect();
     roomRef.current = null;
+    connectingRef.current = false;
     setParticipants([]);
     setChatMessages([]);
     setIsScreenSharing(false);
@@ -599,7 +672,7 @@ export function useLiveKit() {
     setActiveSpeaker(null);
     handRaisedMap.current = {};
     setConnectionState(ConnectionState.Disconnected);
-  }, [clearSyncInterval, disposeBackgroundProcessor]);
+  }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
   // ── Mic toggle ────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -652,7 +725,6 @@ export function useLiveKit() {
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      // Single delayed refresh to catch late track state changes
       setTimeout(() => refreshParticipants(), 400);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
@@ -663,18 +735,22 @@ export function useLiveKit() {
     }
   }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
-  // ── Screen share ──────────────────────────────────────────────
+  // ── Screen share (using ref to avoid stale closure) ───────────
+  const isScreenSharingRef = useRef(isScreenSharing);
+  isScreenSharingRef.current = isScreenSharing;
+
   const toggleScreenShare = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
     try {
-      await room.localParticipant.setScreenShareEnabled(!isScreenSharing);
-      setIsScreenSharing(!isScreenSharing);
+      const newState = !isScreenSharingRef.current;
+      await room.localParticipant.setScreenShareEnabled(newState);
+      setIsScreenSharing(newState);
       debouncedRefresh();
     } catch (err) {
       console.error("Screen share error:", err);
     }
-  }, [isScreenSharing, debouncedRefresh]);
+  }, [debouncedRefresh]);
 
   // ── Hand raise ────────────────────────────────────────────────
   const toggleHand = useCallback(() => {
@@ -723,16 +799,22 @@ export function useLiveKit() {
       new TextEncoder().encode(JSON.stringify(msg)),
       { reliable: true }
     );
-    setChatMessages((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}-local`,
-        sender: room.localParticipant.identity,
-        senderName: room.localParticipant.name || "Tú",
-        content: text,
-        timestamp: Date.now(),
-      },
-    ]);
+    setChatMessages((prev) => {
+      const newMessages = [
+        ...prev,
+        {
+          id: `${Date.now()}-local`,
+          sender: room.localParticipant.identity,
+          senderName: room.localParticipant.name || "Tú",
+          content: text,
+          timestamp: Date.now(),
+        },
+      ];
+      if (newMessages.length > MAX_CHAT_MESSAGES) {
+        return newMessages.slice(newMessages.length - MAX_CHAT_MESSAGES);
+      }
+      return newMessages;
+    });
   }, []);
 
   // ── Moderation ────────────────────────────────────────────────
@@ -768,11 +850,12 @@ export function useLiveKit() {
   useEffect(() => {
     return () => {
       clearSyncInterval();
+      cleanupAudioResumeListeners();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
     };
-  }, [clearSyncInterval, disposeBackgroundProcessor]);
+  }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
   return {
     connectionState,
