@@ -87,6 +87,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     }
   }, []);
 
+  const disposeBackgroundProcessor = useCallback(async () => {
+    bgOpRef.current += 1;
+    const processor = bgProcessorRef.current;
+    bgProcessorRef.current = null;
+    if (processor?.destroy) {
+      try { await processor.destroy(); } catch {}
+    }
+  }, []);
+
   // ── Background helpers ──────────────────────────────────────
   const preloadTemplate = useCallback(async (effect: BackgroundEffect) => {
     if (effect === "none" || effect === "soft-blur" || effect === "hard-blur") return;
