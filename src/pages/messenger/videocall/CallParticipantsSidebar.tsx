@@ -1,4 +1,4 @@
-import { X, MicOff, Hand, Crown, UserX } from "lucide-react";
+import { X, MicOff, Hand, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ export default function CallParticipantsSidebar({
         <div className="space-y-1">
           {handRaisedFirst.map((p) => (
             <div
-              key={p.sid}
+              key={`${p.identity}-${p.sid}`}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
                 p.isSpeaking && "bg-primary/10"

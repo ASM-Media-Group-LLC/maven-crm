@@ -3,15 +3,8 @@ import {
   Room,
   RoomEvent,
   Track,
-  RemoteParticipant,
-  LocalParticipant,
-  RemoteTrackPublication,
-  LocalTrackPublication,
   ConnectionState,
-  DataPacket_Kind,
   Participant,
-  ParticipantEvent,
-  createLocalTracks,
   VideoPresets,
   ConnectionQuality,
   RoomOptions,
@@ -176,16 +169,30 @@ export function useLiveKit() {
 
   // ── Debounced participant refresh ──────────────────────────────
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearSyncInterval = useCallback(() => {
+    if (syncIntervalRef.current) {
+      clearInterval(syncIntervalRef.current);
+      syncIntervalRef.current = null;
+    }
+  }, []);
 
   const refreshParticipants = useCallback(() => {
     const room = roomRef.current;
     if (!room) return;
-    const list: LKParticipant[] = [];
-    list.push(buildParticipant(room.localParticipant, true));
+
+    const participantMap = new Map<string, LKParticipant>();
+    const local = buildParticipant(room.localParticipant, true);
+    participantMap.set(local.identity || local.sid || "local", local);
+
     room.remoteParticipants.forEach((p) => {
-      list.push(buildParticipant(p, false));
+      const remote = buildParticipant(p, false);
+      const key = remote.identity || remote.sid;
+      if (key) participantMap.set(key, remote);
     });
-    setParticipants(list);
+
+    setParticipants(Array.from(participantMap.values()));
   }, [buildParticipant]);
 
   const debouncedRefresh = useCallback(() => {
@@ -196,8 +203,24 @@ export function useLiveKit() {
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (roomName: string, participantName: string, isAdmin = false) => {
     try {
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
+      }
+      clearSyncInterval();
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+
       setError(null);
       setConnectionState(ConnectionState.Connecting);
+      setParticipants([]);
+      setChatMessages([]);
+      setIsScreenSharing(false);
+      setIsHandRaised(false);
+      setActiveSpeaker(null);
+      handRaisedMap.current = {};
 
       const { data, error: fnErr } = await supabase.functions.invoke("livekit-token", {
         body: { roomName, participantName, isAdmin },
@@ -260,9 +283,7 @@ export function useLiveKit() {
       room.on(RoomEvent.ConnectionQualityChanged, debouncedRefresh);
 
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-        if (speakers.length > 0) {
-          setActiveSpeaker(speakers[0].identity);
-        }
+        setActiveSpeaker(speakers.length > 0 ? speakers[0].identity : null);
         debouncedRefresh();
       });
 
@@ -328,14 +349,19 @@ export function useLiveKit() {
             room.localParticipant.setMicrophoneEnabled(false);
             setIsMicOn(false);
             refreshParticipants();
+          } else if (msg.type === "moderation" && msg.payload?.action === "remove" && msg.payload?.target === room.localParticipant.identity) {
+            setError("Has sido removido de la llamada por un moderador");
+            room.disconnect();
           }
         } catch {}
       });
 
       room.on(RoomEvent.Disconnected, () => {
+        clearSyncInterval();
         setConnectionState(ConnectionState.Disconnected);
         setIsReconnecting(false);
         setParticipants([]);
+        setActiveSpeaker(null);
       });
 
       // ── Connect & publish tracks ────────────────────────────
@@ -352,15 +378,22 @@ export function useLiveKit() {
       setIsCamOn(true);
       playJoinSound();
       refreshParticipants();
+
+      clearSyncInterval();
+      syncIntervalRef.current = setInterval(() => {
+        refreshParticipants();
+      }, 1500);
     } catch (err: any) {
+      clearSyncInterval();
       setError(err.message || "Connection failed");
       setConnectionState(ConnectionState.Disconnected);
       console.error("LiveKit connect error:", err);
     }
-  }, [refreshParticipants, debouncedRefresh]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
+    clearSyncInterval();
     if (bgProcessorRef.current) {
       try {
         bgProcessorRef.current = null;
@@ -373,9 +406,10 @@ export function useLiveKit() {
     setIsScreenSharing(false);
     setIsHandRaised(false);
     setIsReconnecting(false);
+    setActiveSpeaker(null);
     handRaisedMap.current = {};
     setConnectionState(ConnectionState.Disconnected);
-  }, []);
+  }, [clearSyncInterval]);
 
   // ── Mic toggle ────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
@@ -546,10 +580,11 @@ export function useLiveKit() {
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
     return () => {
+      clearSyncInterval();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       roomRef.current?.disconnect();
     };
-  }, []);
+  }, [clearSyncInterval]);
 
   return {
     connectionState,

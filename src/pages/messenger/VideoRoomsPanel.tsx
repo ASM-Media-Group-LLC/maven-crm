@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Video, Plus, Copy, Link2, Users, Clock, X, Phone, PhoneOff, Mic, MicOff, Monitor, MonitorOff, Settings } from "lucide-react";
+import { Video, Plus, Copy, Link2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,17 +35,36 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
     const trimmed = value.trim();
     if (!trimmed) return "";
 
+    const directCode = trimmed.replace(/^\/+|\/+$/g, "");
+    if (!/^https?:\/\//i.test(trimmed) && !directCode.includes("/") && !directCode.includes("?")) {
+      return directCode;
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      const roomFromQuery = parsed.searchParams.get("room");
+      if (roomFromQuery) return decodeURIComponent(roomFromQuery).trim();
+
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      const callIndex = segments.findIndex((segment) => segment.toLowerCase() === "call");
+      if (callIndex !== -1 && segments[callIndex + 1]) {
+        return decodeURIComponent(segments[callIndex + 1]).trim();
+      }
+    } catch {
+      // Not an absolute URL, continue with regex fallback
+    }
+
     const roomParamMatch = trimmed.match(/[?&]room=([^&#]+)/i);
     if (roomParamMatch?.[1]) {
       return decodeURIComponent(roomParamMatch[1]).trim();
     }
 
-    const afterRoom = trimmed.split("room=")[1];
-    if (afterRoom) {
-      return decodeURIComponent(afterRoom.split("&")[0].split("#")[0]).trim();
+    const callPathMatch = trimmed.match(/\/call\/([^/?#]+)/i);
+    if (callPathMatch?.[1]) {
+      return decodeURIComponent(callPathMatch[1]).trim();
     }
 
-    return trimmed.replace(/^\/+|\/+$/g, "");
+    return directCode;
   };
 
   const handleJoinByLink = () => {
@@ -63,7 +82,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
         createdAt: new Date(),
         participants: [],
         isActive: true,
-        shareLink: `${window.location.origin}/messenger?room=${encodeURIComponent(roomId)}`,
+        shareLink: `${window.location.origin}/call/${encodeURIComponent(roomId)}`,
       });
       toast.success("Uniéndote por enlace...");
     }
