@@ -94,9 +94,8 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     addFiles: addFilesInternal,
   }), [addFilesInternal]);
 
-  // XHR upload with progress for a single file
+  // TUS resumable upload with progress for large files
   const uploadFileWithProgress = useCallback(async (file: File, path: string): Promise<{ error: string | null }> => {
-    // Get session token BEFORE creating XHR to avoid race condition
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     
@@ -105,58 +104,90 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     }
 
     const supabaseUrl = "https://lsagslbkliprespbyhts.supabase.co";
-    // Encode each path segment separately to handle special characters
-    const encodedPath = path.split("/").map(s => encodeURIComponent(s)).join("/");
-    const url = `${supabaseUrl}/storage/v1/object/chat-files/${encodedPath}`;
+    const tusEndpoint = `${supabaseUrl}/storage/v1/upload/resumable`;
 
-    return new Promise((resolve) => {
-      const xhr = new XMLHttpRequest();
-      abortRef.current = xhr;
+    // Base64 encode metadata values per TUS spec
+    const b64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
+    const uploadMetadata = [
+      `bucketName ${b64("chat-files")}`,
+      `objectName ${b64(path)}`,
+      `contentType ${b64(file.type || "application/octet-stream")}`,
+    ].join(",");
 
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          setUploadPercent(Math.round((e.loaded / e.total) * 100));
-        }
-      };
+    try {
+      // Step 1: Create the TUS upload
+      const createRes = await fetch(tusEndpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "x-upsert": "false",
+          "Upload-Length": String(file.size),
+          "Upload-Metadata": uploadMetadata,
+          "Tus-Resumable": "1.0.0",
+        },
+      });
 
-      xhr.onload = () => {
-        abortRef.current = null;
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve({ error: null });
-        } else {
-          let detail = `${xhr.status}`;
-          try {
-            const body = JSON.parse(xhr.responseText);
-            detail = body.message || body.error || detail;
-          } catch {}
-          console.error("Upload failed:", xhr.status, xhr.responseText);
-          resolve({ error: `Upload failed: ${detail}` });
-        }
-      };
+      if (!createRes.ok) {
+        let detail = `${createRes.status}`;
+        try { const body = await createRes.json(); detail = body.message || body.error || detail; } catch {}
+        console.error("TUS create failed:", createRes.status);
+        return { error: `Upload init failed: ${detail}` };
+      }
 
-      xhr.onerror = () => {
-        abortRef.current = null;
-        resolve({ error: "Network error — check your connection and try again" });
-      };
+      const location = createRes.headers.get("Location");
+      if (!location) {
+        return { error: "No upload location returned" };
+      }
 
-      xhr.onabort = () => {
-        abortRef.current = null;
-        resolve({ error: "cancelled" });
-      };
+      // Step 2: Upload the file data via PATCH with XHR for progress
+      return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        abortRef.current = xhr;
 
-      // Set timeout for very large files (10 min)
-      xhr.timeout = 600000;
-      xhr.ontimeout = () => {
-        abortRef.current = null;
-        resolve({ error: "Upload timed out — file may be too large for your connection" });
-      };
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadPercent(Math.round((e.loaded / e.total) * 100));
+          }
+        };
 
-      xhr.open("POST", url);
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-      xhr.setRequestHeader("x-upsert", "false");
-      xhr.send(file);
-    });
+        xhr.onload = () => {
+          abortRef.current = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ error: null });
+          } else {
+            let detail = `${xhr.status}`;
+            try { const body = JSON.parse(xhr.responseText); detail = body.message || body.error || detail; } catch {}
+            console.error("TUS PATCH failed:", xhr.status, xhr.responseText);
+            resolve({ error: `Upload failed: ${detail}` });
+          }
+        };
+
+        xhr.onerror = () => {
+          abortRef.current = null;
+          resolve({ error: "Network error — check your connection and try again" });
+        };
+
+        xhr.onabort = () => {
+          abortRef.current = null;
+          resolve({ error: "cancelled" });
+        };
+
+        xhr.timeout = 600000;
+        xhr.ontimeout = () => {
+          abortRef.current = null;
+          resolve({ error: "Upload timed out — file may be too large for your connection" });
+        };
+
+        xhr.open("PATCH", location);
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.setRequestHeader("Content-Type", "application/offset+octet-stream");
+        xhr.setRequestHeader("Upload-Offset", "0");
+        xhr.setRequestHeader("Tus-Resumable", "1.0.0");
+        xhr.send(file);
+      });
+    } catch (err: any) {
+      return { error: err.message || "Upload failed unexpectedly" };
+    }
   }, []);
 
   const cancelUpload = useCallback(() => {
