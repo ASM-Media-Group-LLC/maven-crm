@@ -87,6 +87,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       } catch {}
     }
     previewTracksRef.current = { video: null, audio: null };
+    previewBgTrackRef.current = null;
+    previewBgOpRef.current += 1;
 
     if (videoRef.current) {
       videoRef.current.srcObject = null;
