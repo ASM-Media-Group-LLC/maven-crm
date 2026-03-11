@@ -159,13 +159,21 @@ export function useChat() {
       } as ConversationWithDetails;
     });
 
-    enriched.sort((a, b) => {
+    // Filter: hide direct chats from the non-creator until a message is sent
+    const visible = enriched.filter(conv => {
+      if (conv.type === "direct" && conv.created_by !== user.id && !conv.lastMessage) {
+        return false;
+      }
+      return true;
+    });
+
+    visible.sort((a, b) => {
       const aTime = a.lastMessage?.created_at || a.updated_at;
       const bTime = b.lastMessage?.created_at || b.updated_at;
       return new Date(bTime).getTime() - new Date(aTime).getTime();
     });
 
-    setConversations(enriched);
+    setConversations(visible);
   }, [user]);
 
   useEffect(() => {
