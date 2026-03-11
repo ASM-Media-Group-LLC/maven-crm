@@ -65,14 +65,14 @@ export function useReadReceipts(conversationId: string | null, messageIds: strin
     };
   }, [conversationId, stableMessageIds, loadReceipts]);
 
-  // Batch mark messages as read
+  // Batch mark messages as read — single upsert instead of N inserts
   const markAsRead = useCallback(async (msgIds: string[]) => {
     if (!user || msgIds.length === 0) return;
-    const rows = msgIds.map(id => ({ message_id: id, user_id: user.id }));
-    // Insert all at once, ignore duplicates via individual error handling
-    await Promise.allSettled(
-      rows.map(row => supabase.from("chat_read_receipts").insert(row).maybeSingle())
-    );
+    const rows = msgIds.map(id => ({ message_id: id, user_id: user.id, read_at: new Date().toISOString() }));
+    // Batch upsert: single round-trip, ignores duplicates via onConflict
+    await supabase
+      .from("chat_read_receipts")
+      .upsert(rows, { onConflict: "message_id,user_id", ignoreDuplicates: true });
   }, [user]);
 
   // Auto-mark visible messages as read only when window is focused

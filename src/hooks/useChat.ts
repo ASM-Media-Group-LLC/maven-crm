@@ -48,8 +48,8 @@ export function useChat() {
     const lastReadMap: Record<string, string | null> = {};
     participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
 
-    // Batch: conversations, all participants, and last messages in parallel
-    const [convsResult, allParticipantsResult] = await Promise.all([
+    // Batch: conversations, all participants, and recent messages in parallel
+    const [convsResult, allParticipantsResult, recentMsgsResult] = await Promise.all([
       supabase
         .from("chat_conversations")
         .select("*")
@@ -59,6 +59,13 @@ export function useChat() {
         .from("chat_participants")
         .select("*")
         .in("conversation_id", convIds),
+      // Fetch recent messages for ALL conversations at once (limit high enough to cover 1 per conv)
+      supabase
+        .from("chat_messages")
+        .select("*")
+        .in("conversation_id", convIds)
+        .order("created_at", { ascending: false })
+        .limit(convIds.length * 2 > 1000 ? 1000 : convIds.length * 2),
     ]);
 
     const convs = convsResult.data;
@@ -69,44 +76,57 @@ export function useChat() {
       return;
     }
 
-    // Fetch last message per conversation reliably using parallel queries
-    const lastMessagePromises = convIds.map(async (convId) => {
-      const { data } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("conversation_id", convId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      return { convId, msg: data?.[0] as ChatMessage | undefined };
-    });
-
-    const lastMessageResults = await Promise.all(lastMessagePromises);
+    // Build last-message map from batch result (first occurrence per conv = latest)
     const lastMessageMap: Record<string, ChatMessage> = {};
-    lastMessageResults.forEach(({ convId, msg }) => {
-      if (msg) lastMessageMap[convId] = msg;
-    });
-
-    // Batch unread counts: for each conversation, count messages after last_read_at
-    // We'll do this in parallel with a single Promise.all
-    const unreadPromises = convIds.map(async (convId) => {
-      const lastRead = lastReadMap[convId];
-      let query = supabase
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", convId)
-        .neq("sender_id", user.id);
-
-      if (lastRead) {
-        query = query.gt("created_at", lastRead);
+    if (recentMsgsResult.data) {
+      for (const msg of recentMsgsResult.data as ChatMessage[]) {
+        if (!lastMessageMap[msg.conversation_id]) {
+          lastMessageMap[msg.conversation_id] = msg;
+        }
       }
+    }
 
-      const { count } = await query;
-      return { convId, count: count || 0 };
-    });
+    // For any conversations missing from batch (edge case: >1000 messages from other convs),
+    // fetch individually only for those missing
+    const missingConvIds = convIds.filter(id => !lastMessageMap[id]);
+    if (missingConvIds.length > 0 && missingConvIds.length <= 20) {
+      const fallbackResults = await Promise.all(
+        missingConvIds.map(convId =>
+          supabase.from("chat_messages").select("*")
+            .eq("conversation_id", convId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+        )
+      );
+      fallbackResults.forEach(({ data }, i) => {
+        if (data?.[0]) lastMessageMap[missingConvIds[i]] = data[0] as ChatMessage;
+      });
+    }
 
-    const unreadResults = await Promise.all(unreadPromises);
+    // Batch unread counts: single query, count per-conversation client-side
     const unreadMap: Record<string, number> = {};
-    unreadResults.forEach(r => { unreadMap[r.convId] = r.count; });
+    const oldestLastRead = Object.values(lastReadMap).filter(Boolean).sort()[0] || null;
+
+    let unreadQuery = supabase
+      .from("chat_messages")
+      .select("conversation_id, created_at")
+      .in("conversation_id", convIds)
+      .neq("sender_id", user.id);
+
+    if (oldestLastRead) {
+      unreadQuery = unreadQuery.gt("created_at", oldestLastRead);
+    }
+
+    const { data: unreadData } = await unreadQuery.limit(1000);
+
+    if (unreadData) {
+      for (const msg of unreadData as any[]) {
+        const convLastRead = lastReadMap[msg.conversation_id];
+        if (!convLastRead || msg.created_at > convLastRead) {
+          unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
+        }
+      }
+    }
 
     const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
       const convParticipants = (allParticipants || []).filter(
@@ -172,11 +192,51 @@ export function useChat() {
       }
     };
 
+    // Inline update: when a new message arrives, update the sidebar without full reload
+    const updateConversationWithMessage = (msg: any) => {
+      setConversations(prev => {
+        const idx = prev.findIndex(c => c.id === msg.conversation_id);
+        if (idx === -1) {
+          // Unknown conversation — need full reload
+          scheduleConversationsReload(true);
+          return prev;
+        }
+        const conv = prev[idx];
+        const updated = {
+          ...conv,
+          lastMessage: msg as ChatMessage,
+          updated_at: msg.created_at,
+          unreadCount: msg.sender_id !== user.id
+            ? conv.unreadCount + 1
+            : conv.unreadCount,
+        };
+        // Move to top
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updated);
+        return next;
+      });
+    };
+
     const channel = supabase
       .channel("chat-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_messages" },
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          updateConversationWithMessage(payload.new);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_messages" },
+        () => {
+          scheduleConversationsReload();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_messages" },
         () => {
           scheduleConversationsReload();
         }
@@ -213,14 +273,13 @@ export function useChat() {
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          // Connected — reload to catch any missed events
           void loadConversations();
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // Retry by reloading conversations after a delay
           setTimeout(() => void loadConversations(), 2000);
         }
       });
+
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         void loadConversations();
