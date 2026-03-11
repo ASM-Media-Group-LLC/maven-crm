@@ -153,6 +153,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                     room={room}
                     large
                     className="h-full"
+                    preferredAudioOutputDeviceId={initialAudioOutputDeviceId}
                   />
                 </div>
               )}
