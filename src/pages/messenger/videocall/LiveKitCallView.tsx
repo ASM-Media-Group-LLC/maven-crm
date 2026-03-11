@@ -54,6 +54,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, displayName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
 
+  // ── beforeunload: disconnect gracefully when tab/window closes ──
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      lk.disconnect();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [lk]);
+
   const handleLeave = useCallback(() => {
     lk.disconnect();
     onLeave();
