@@ -632,14 +632,20 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
+        await disposeBackgroundProcessor();
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
+
         if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          // Small delay so the track is fully ready before applying processor
-          await wait(100);
-          await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+          let applied = false;
+          for (const delayMs of [90, 180, 320, 480]) {
+            await wait(delayMs);
+            applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            if (applied) break;
+          }
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
+        await disposeBackgroundProcessor();
       }
 
       await wait(80);
@@ -655,7 +661,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery]);
+  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Screen share ──────────────────────────────────────────────
   const toggleScreenShare = useCallback(async () => {
