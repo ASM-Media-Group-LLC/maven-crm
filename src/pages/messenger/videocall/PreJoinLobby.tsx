@@ -352,7 +352,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
             Fondo seleccionado: <span className="font-medium text-foreground">{selectedBackgroundLabel}</span>
           </p>
           {backgroundPreviewUnsupported && bgEffect !== "none" && (
-            <p className="text-[11px] text-amber-600 text-center max-w-md">
+            <p className="text-[11px] text-muted-foreground text-center max-w-md">
               Tu navegador no soporta vista previa en tiempo real del fondo, pero se aplicará al entrar en la llamada.
             </p>
           )}
