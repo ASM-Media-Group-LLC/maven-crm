@@ -537,9 +537,9 @@ export function useLiveKit() {
       }
 
       if (shouldEnableCam) {
-        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(options.videoDeviceId));
+        const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none") {
           for (const delayMs of [120, 240, 420]) {
             await wait(delayMs);
             const applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
@@ -552,7 +552,7 @@ export function useLiveKit() {
       room.startAudio().catch(() => {});
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
-      setIsCamOn(room.localParticipant.isCameraEnabled);
+      setIsCamOn(hasActiveCameraPublication(room));
       playJoinSound();
       refreshParticipants();
 
