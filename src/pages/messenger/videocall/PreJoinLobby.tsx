@@ -203,7 +203,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
       if (videoRef.current && videoTrack) {
         videoTrack.attach(videoRef.current);
-        await applyPreviewBackground(videoTrack, bgEffectRef.current);
+        await applyPreviewBackground(videoTrack, bgEffectRef.current, previewSession);
       }
 
       await enumerateDevices();
