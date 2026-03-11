@@ -100,10 +100,20 @@ const ParticipantTile = memo(function ParticipantTile({
     };
     
     const needsRetry = attachVideo();
-    // Retry attachment after a delay if camera just turned on but track wasn't ready
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryAttempts = 0;
+
+    const scheduleAttachRetry = () => {
+      if (retryAttempts >= 5 || participant.isCameraOff) return;
+      retryTimer = setTimeout(() => {
+        retryAttempts += 1;
+        const stillNeedsRetry = attachVideo();
+        if (stillNeedsRetry) scheduleAttachRetry();
+      }, 250 * retryAttempts + 250);
+    };
+
     if (needsRetry && !participant.isCameraOff) {
-      retryTimer = setTimeout(() => attachVideo(), 500);
+      scheduleAttachRetry();
     }
 
     // ── Audio (remote only) ──────────────────────────────────
