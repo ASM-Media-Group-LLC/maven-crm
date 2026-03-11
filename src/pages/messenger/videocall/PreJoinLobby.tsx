@@ -178,6 +178,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   // ── Start video track (independent of audio) ────────────────
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
+    await disposeBackgroundProcessor();
     if (!camOn) return;
 
     try {
@@ -211,7 +212,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         setPermissionError("No se pudo acceder a la cámara.");
       }
     }
-  }, [camOn, selectedVideoInput, stopVideoTrack, applyBackground, enumerateDevices]);
+  }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, applyBackground, enumerateDevices]);
 
   // ── Start audio track (independent of video) ────────────────
   const startAudioTrack = useCallback(async () => {
