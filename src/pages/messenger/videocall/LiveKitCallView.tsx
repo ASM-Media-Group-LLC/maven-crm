@@ -30,7 +30,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
   const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
     setBgEffect(effect);
@@ -39,13 +39,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   // Connect on mount
   useEffect(() => {
-    lk.connect(roomName, displayName, isAdmin);
+    lk.connect(roomName, displayName, isAdmin, {
+      initialMicOn,
+      initialCamOn,
+      audioDeviceId: initialAudioDeviceId,
+      videoDeviceId: initialVideoDeviceId,
+      audioOutputDeviceId: initialAudioOutputDeviceId,
+      backgroundEffect: initialBackgroundEffect,
+    });
 
     return () => {
       lk.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, displayName, isAdmin]);
+  }, [roomName, displayName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
 
   const handleLeave = useCallback(() => {
     lk.disconnect();
