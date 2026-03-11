@@ -220,7 +220,12 @@ export function useLiveKit() {
   }, [refreshParticipants]);
 
   // ── Connect ────────────────────────────────────────────────────
-  const connect = useCallback(async (roomName: string, participantName: string, isAdmin = false) => {
+  const connect = useCallback(async (
+    roomName: string,
+    participantName: string,
+    isAdmin = false,
+    options: ConnectOptions = {},
+  ) => {
     try {
       if (roomRef.current) {
         roomRef.current.disconnect();
@@ -231,6 +236,13 @@ export function useLiveKit() {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
+
+      preferredDevicesRef.current = {
+        audioDeviceId: options.audioDeviceId,
+        videoDeviceId: options.videoDeviceId,
+        audioOutputDeviceId: options.audioOutputDeviceId,
+      };
+      backgroundEffectRef.current = options.backgroundEffect || "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
