@@ -329,6 +329,23 @@ export default function ChatSidebar({
   );
 }
 
+/* ── Collapsible Section Header ── */
+function CollapsibleSection({ label, defaultOpen = true, children }: { label: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-1.5 px-3 pb-0.5 pt-1 select-none hover:bg-muted/40 rounded transition-colors"
+      >
+        {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 /* ── Section Header (Google Chat style) ── */
 function SectionHeader({ label }: { label: string }) {
   return (
