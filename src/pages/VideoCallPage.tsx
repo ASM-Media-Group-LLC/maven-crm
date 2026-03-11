@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import LiveKitCallView from "./messenger/videocall/LiveKitCallView";
+import PreJoinLobby from "./messenger/videocall/PreJoinLobby";
 import { Loader2 } from "lucide-react";
 
 export default function VideoCallPage() {
@@ -12,6 +13,8 @@ export default function VideoCallPage() {
   const isAdmin = searchParams.get("admin") === "1";
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
+  const [joined, setJoined] = useState(false);
+  const [joinOpts, setJoinOpts] = useState<{ micOn: boolean; camOn: boolean }>({ micOn: true, camOn: true });
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-for-call", user?.id],
@@ -29,7 +32,6 @@ export default function VideoCallPage() {
 
   const handleLeave = () => {
     window.close();
-    // Fallback if window.close() is blocked (wasn't opened by script)
     setTimeout(() => {
       window.location.href = "/messenger";
     }, 300);
@@ -51,14 +53,32 @@ export default function VideoCallPage() {
     );
   }
 
+  const userName = profile.full_name || "Usuario";
+
+  if (!joined) {
+    return (
+      <PreJoinLobby
+        roomName={roomName}
+        displayName={userName}
+        callDisplayName={callDisplayName}
+        onJoin={(opts) => {
+          setJoinOpts(opts);
+          setJoined(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="h-screen w-screen overflow-hidden">
       <LiveKitCallView
         roomName={roomName}
-        displayName={profile.full_name || "Usuario"}
+        displayName={userName}
         callDisplayName={callDisplayName}
         isAdmin={isAdmin}
         onLeave={handleLeave}
+        initialMicOn={joinOpts.micOn}
+        initialCamOn={joinOpts.camOn}
       />
     </div>
   );
