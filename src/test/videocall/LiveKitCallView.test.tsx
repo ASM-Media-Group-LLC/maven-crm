@@ -3,23 +3,24 @@ import { render, screen } from "@testing-library/react";
 import { ConnectionState } from "livekit-client";
 
 // Default mock state
+const makeParticipant = (overrides: Record<string, any> = {}) => ({
+  sid: "local-sid",
+  identity: "user-1",
+  name: "Test User",
+  isSpeaking: false,
+  isMuted: false,
+  isCameraOff: true,
+  isScreenSharing: false,
+  isLocal: true,
+  handRaised: false,
+  reactions: [] as string[],
+  connectionQuality: "excellent" as string,
+  ...overrides,
+});
+
 const defaultLkState = {
   connectionState: ConnectionState.Connected,
-  participants: [
-    {
-      sid: "local-sid",
-      identity: "user-1",
-      name: "Test User",
-      isSpeaking: false,
-      isMuted: false,
-      isCameraOff: true,
-      isScreenSharing: false,
-      isLocal: true,
-      handRaised: false,
-      reactions: [],
-      connectionQuality: "excellent" as const,
-    },
-  ],
+  participants: [makeParticipant()],
   activeSpeaker: null,
   isMicOn: true,
   isCamOn: true,
