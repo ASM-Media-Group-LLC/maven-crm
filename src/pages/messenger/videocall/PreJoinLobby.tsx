@@ -196,27 +196,17 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   // Toggle mic in preview
   const handleToggleMic = () => {
-    if (streamRef.current) {
-      streamRef.current.getAudioTracks().forEach((t) => { t.enabled = !micOn ? true : false; });
-    }
     setMicOn((v) => !v);
   };
 
   // Toggle cam in preview
   const handleToggleCam = () => {
-    if (streamRef.current) {
-      streamRef.current.getVideoTracks().forEach((t) => { t.enabled = !camOn ? true : false; });
-    }
     setCamOn((v) => !v);
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     setJoining(true);
-    // Stop preview stream before joining (LiveKit will create its own)
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
+    await stopPreview();
     onJoin({
       micOn,
       camOn,
