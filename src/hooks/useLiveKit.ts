@@ -223,6 +223,62 @@ export function useLiveKit() {
     refreshTimerRef.current = setTimeout(() => refreshParticipants(), 50);
   }, [refreshParticipants]);
 
+  const camToggleInFlightRef = useRef(false);
+
+  const hasActiveCameraPublication = useCallback((room: Room) => {
+    const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+      (publication) => publication.source === Track.Source.Camera,
+    );
+
+    return !!cameraPublication?.track && !cameraPublication.isMuted;
+  }, []);
+
+  const applyBackgroundEffectToCurrentCamera = useCallback(async (effect: BackgroundEffect) => {
+    const room = roomRef.current;
+    if (!room) return false;
+
+    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
+      .find((publication) => publication.source === Track.Source.Camera)?.track;
+
+    if (!camTrack) {
+      return effect === "none";
+    }
+
+    try {
+      if (!bgProcessorRef.current) {
+        const processor = BackgroundProcessor({ mode: "disabled" });
+        await camTrack.setProcessor(processor);
+        bgProcessorRef.current = processor;
+      } else {
+        await camTrack.setProcessor(bgProcessorRef.current);
+      }
+
+      const processor = bgProcessorRef.current;
+
+      if (effect === "none") {
+        await processor.switchTo({ mode: "disabled" });
+      } else if (effect === "soft-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      } else if (effect === "hard-blur") {
+        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+      } else {
+        const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
+        const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
+        if (selectedTemplate) {
+          await processor.switchTo({
+            mode: "virtual-background",
+            imagePath: `${window.location.origin}${selectedTemplate.src}`,
+          });
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.error("Background processor error:", err);
+      return false;
+    }
+  }, []);
+
   // ── Connect ────────────────────────────────────────────────────
   const connect = useCallback(async (
     roomName: string,
