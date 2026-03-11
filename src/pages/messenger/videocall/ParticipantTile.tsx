@@ -129,8 +129,20 @@ const ParticipantTile = memo(function ParticipantTile({
           }
           audioTrack.track.attach(audioEl);
           attachedAudioTrackRef.current = audioTrack.track;
-          // Ensure playback — retry with exponential backoff if autoplay blocked
           audioEl.volume = 1;
+          const mediaEl = audioEl as HTMLAudioElement & {
+            setSinkId?: (deviceId: string) => Promise<void>;
+            sinkId?: string;
+          };
+
+          if (
+            preferredAudioOutputDeviceId &&
+            typeof mediaEl.setSinkId === "function" &&
+            mediaEl.sinkId !== preferredAudioOutputDeviceId
+          ) {
+            mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
+          }
+
           const tryPlay = (attempt = 0) => {
             audioEl.play().catch(() => {
               if (attempt < 3) {
