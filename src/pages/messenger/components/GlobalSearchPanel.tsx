@@ -22,7 +22,7 @@ function highlightKeyword(text: string, keyword: string) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-primary/20 text-primary font-semibold rounded px-0.5">{text.slice(idx, idx + keyword.length)}</mark>
+      <mark className="bg-yellow-300 dark:bg-yellow-400/80 text-foreground font-bold rounded px-0.5">{text.slice(idx, idx + keyword.length)}</mark>
       {text.slice(idx + keyword.length)}
     </>
   );
