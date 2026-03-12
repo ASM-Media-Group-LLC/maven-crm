@@ -801,7 +801,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, applyBackgroundEffectToCurrentCamera, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, hasActiveCameraPublication, queueBackgroundEffectApply, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
