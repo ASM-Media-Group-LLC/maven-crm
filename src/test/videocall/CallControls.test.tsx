@@ -12,6 +12,7 @@ describe("CallControls", () => {
     isHandRaised: false,
     isChatOpen: false,
     isParticipantsOpen: false,
+    isMetricsOpen: false,
     backgroundEffect: "none" as const,
     onToggleMic: vi.fn(),
     onToggleCam: vi.fn(),
@@ -19,6 +20,7 @@ describe("CallControls", () => {
     onToggleHand: vi.fn(),
     onToggleChat: vi.fn(),
     onToggleParticipants: vi.fn(),
+    onToggleMetrics: vi.fn(),
     onSendReaction: vi.fn(),
     onBackgroundChange: vi.fn(),
     onLeave: vi.fn(),
@@ -31,7 +33,8 @@ describe("CallControls", () => {
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
     expect(screen.getByTitle("Levantar mano")).toBeInTheDocument();
     expect(screen.getByTitle("Chat")).toBeInTheDocument();
-    expect(screen.getByTitle("Participantes")).toBeInTheDocument();
+    expect(screen.getAllByTitle("Participantes").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTitle("Métricas")).toBeInTheDocument();
     expect(screen.getByText("Salir")).toBeInTheDocument();
   });
 

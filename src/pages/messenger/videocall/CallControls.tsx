@@ -1,6 +1,6 @@
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
-  PhoneOff, Hand, MessageSquare, Smile, Users,
+  PhoneOff, Hand, MessageSquare, Smile, Users, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +14,7 @@ interface CallControlsProps {
   isHandRaised: boolean;
   isChatOpen: boolean;
   isParticipantsOpen: boolean;
+  isMetricsOpen: boolean;
   backgroundEffect: BackgroundEffect;
   onToggleMic: () => void;
   onToggleCam: () => void;
@@ -21,6 +22,7 @@ interface CallControlsProps {
   onToggleHand: () => void;
   onToggleChat: () => void;
   onToggleParticipants: () => void;
+  onToggleMetrics: () => void;
   onSendReaction: (emoji: string) => void;
   onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
@@ -55,10 +57,10 @@ function ControlBtn({
 }
 
 export default function CallControls({
-  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen,
+  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen, isMetricsOpen,
   backgroundEffect,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
-  onToggleChat, onToggleParticipants, onSendReaction, onBackgroundChange, onLeave,
+  onToggleChat, onToggleParticipants, onToggleMetrics, onSendReaction, onBackgroundChange, onLeave,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-2 md:gap-3 py-4 bg-[hsl(240_8%_10%)] flex-wrap px-2">
@@ -99,6 +101,8 @@ export default function CallControls({
 
       <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
       <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
+      <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
+      <ControlBtn icon={BarChart3} onClick={onToggleMetrics} label="Métricas" badge={isMetricsOpen} />
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
 
       <button

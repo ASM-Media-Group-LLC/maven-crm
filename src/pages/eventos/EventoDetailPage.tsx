@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Pencil, Share2, Lock, Clock,
+  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Pencil, Share2, Lock, Clock, PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +94,17 @@ const EventoDetailPage = () => {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
+            {(event as any).video_call_room_id && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  const roomId = (event as any).video_call_room_id;
+                  window.open(`/call/${encodeURIComponent(roomId)}?name=${encodeURIComponent(event.name)}`, `call-${roomId}`, "noopener");
+                }}
+              >
+                <PhoneCall className="h-4 w-4 mr-1" />Unirse a la llamada
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate(`/eventos/${id}/editar`)}>
               <Pencil className="h-4 w-4 mr-1" />Editar
             </Button>

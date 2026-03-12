@@ -20,6 +20,7 @@ export interface EventRow {
   updated_at: string;
   guest_count: number;
   external_token: string | null;
+  video_call_room_id: string | null;
 }
 
 export interface EventoFilters {

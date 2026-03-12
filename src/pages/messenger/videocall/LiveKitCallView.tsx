@@ -5,6 +5,7 @@ import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
+import CallMetricsPanel from "./CallMetricsPanel";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
   const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
@@ -216,6 +218,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             onClose={() => setParticipantsOpen(false)}
           />
         )}
+        {metricsOpen && (
+          <CallMetricsPanel
+            room={room}
+            participants={lk.participants}
+            onClose={() => setMetricsOpen(false)}
+          />
+        )}
       </div>
 
       <CallControls
@@ -225,13 +234,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
+        isMetricsOpen={metricsOpen}
         backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
         onToggleHand={lk.toggleHand}
-        onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
-        onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
+        onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) { setParticipantsOpen(false); setMetricsOpen(false); } }}
+        onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) { setChatOpen(false); setMetricsOpen(false); } }}
+        onToggleMetrics={() => { setMetricsOpen(!metricsOpen); if (!metricsOpen) { setChatOpen(false); setParticipantsOpen(false); } }}
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}

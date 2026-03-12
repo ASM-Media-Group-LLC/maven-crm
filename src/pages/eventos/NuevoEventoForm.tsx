@@ -80,6 +80,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const [locationSearch, setLocationSearch] = useState(event?.location ?? "");
   const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity?.toString() ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
+  const [includeVideoCall, setIncludeVideoCall] = useState(!!(event as any)?.video_call_room_id);
 
   // Guests
   const [guests, setGuests] = useState<LocalGuest[]>(existingGuests ?? []);
@@ -102,6 +103,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
       return;
     }
 
+    const videoCallRoomId = includeVideoCall ? `event-${isEditMode ? event.id : crypto.randomUUID()}` : null;
+
     const formData = {
       name: name.trim(),
       event_type: eventType,
@@ -114,6 +117,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
       location: location || null,
       max_capacity: maxCapacity ? parseInt(maxCapacity) : null,
       notes: notes || null,
+      video_call_room_id: videoCallRoomId,
     };
 
     try {
@@ -395,6 +399,18 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
                   <div className="space-y-2">
                     <Label>Notas</Label>
                     <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas adicionales…" rows={2} />
+                  </div>
+
+                  {/* Video call toggle */}
+                  <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-3">
+                      <Video className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">Videollamada</p>
+                        <p className="text-xs text-muted-foreground">Generar sala de videollamada para este evento</p>
+                      </div>
+                    </div>
+                    <Switch checked={includeVideoCall} onCheckedChange={setIncludeVideoCall} />
                   </div>
                 </CardContent>
               </Card>

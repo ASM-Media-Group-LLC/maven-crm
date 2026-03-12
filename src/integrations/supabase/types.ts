@@ -3176,6 +3176,7 @@ export type Database = {
           start_time: string | null
           status: string
           updated_at: string
+          video_call_room_id: string | null
         }
         Insert: {
           created_at?: string
@@ -3197,6 +3198,7 @@ export type Database = {
           start_time?: string | null
           status?: string
           updated_at?: string
+          video_call_room_id?: string | null
         }
         Update: {
           created_at?: string
@@ -3218,6 +3220,7 @@ export type Database = {
           start_time?: string | null
           status?: string
           updated_at?: string
+          video_call_room_id?: string | null
         }
         Relationships: []
       }
