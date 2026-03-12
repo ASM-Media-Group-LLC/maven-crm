@@ -22,6 +22,7 @@ import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import SpacesPanel from "./components/SpacesPanel";
 import { ChatSpace } from "@/hooks/useSpaces";
+import { useMentionedConversations } from "@/hooks/useMentionedConversations";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
