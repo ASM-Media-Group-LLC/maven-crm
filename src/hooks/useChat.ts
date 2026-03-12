@@ -19,6 +19,9 @@ export function useChat() {
   profilesRef.current = profiles;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
+  const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
+  const chatRealtimeRetryRef = useRef(0);
+  const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
@@ -171,29 +174,34 @@ export function useChat() {
   useEffect(() => {
     if (!user) return;
 
-    // Coalescing reload: merges all reload requests within a window into one
+    // Throttled reload: avoid debounce starvation under high event volume
     const pendingReloadRef = { timer: null as ReturnType<typeof setTimeout> | null };
     const scheduleConversationsReload = (immediate = false) => {
-      if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
-      const delay = immediate ? 50 : 500;
+      if (pendingReloadRef.timer) {
+        if (!immediate) return;
+        clearTimeout(pendingReloadRef.timer);
+        pendingReloadRef.timer = null;
+      }
+
+      const delay = immediate ? 50 : 350;
       pendingReloadRef.timer = setTimeout(() => {
         pendingReloadRef.timer = null;
         void loadConversations();
       }, delay);
     };
 
+    const isKnownConversation = (conversationId?: string | null) => {
+      if (!conversationId) return false;
+      return conversationsRef.current.some((c) => c.id === conversationId);
+    };
+
     // Inline update: when a new message arrives, update the sidebar without full reload
     const updateConversationWithMessage = (msg: any) => {
-      setConversations(prev => {
-        const idx = prev.findIndex(c => c.id === msg.conversation_id);
-        if (idx === -1) {
-          // Unknown conversation — schedule reload to pick it up
-          scheduleConversationsReload();
-          return prev;
-        }
+      if (!msg?.conversation_id || msg.is_deleted) return;
 
-        // Skip soft-deleted messages
-        if (msg.is_deleted) return prev;
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === msg.conversation_id);
+        if (idx === -1) return prev;
 
         const conv = prev[idx];
         const isMine = msg.sender_id === user.id;
@@ -201,10 +209,9 @@ export function useChat() {
           ...conv,
           lastMessage: msg as ChatMessage,
           updated_at: msg.created_at,
-          // Don't increment unread for own messages or if this is the active chat
           unreadCount: isMine ? conv.unreadCount : conv.unreadCount + 1,
         };
-        // Move to top
+
         const next = [...prev];
         next.splice(idx, 1);
         next.unshift(updated);
@@ -212,13 +219,26 @@ export function useChat() {
       });
     };
 
+    const scheduleChannelReconnect = () => {
+      if (chatRealtimeReconnectTimerRef.current) return;
+
+      chatRealtimeRetryRef.current += 1;
+      const delay = Math.min(1000 * Math.pow(2, chatRealtimeRetryRef.current), 15000);
+      chatRealtimeReconnectTimerRef.current = setTimeout(() => {
+        chatRealtimeReconnectTimerRef.current = null;
+        setChatRealtimeVersion((v) => v + 1);
+      }, delay);
+    };
+
     const channel = supabase
-      .channel("chat-realtime")
+      .channel(`chat-realtime-${user.id}-${chatRealtimeVersion}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages" },
         (payload) => {
-          updateConversationWithMessage(payload.new);
+          const msg = payload.new as any;
+          if (!isKnownConversation(msg?.conversation_id)) return;
+          updateConversationWithMessage(msg);
         }
       )
       .on(
@@ -226,20 +246,23 @@ export function useChat() {
         { event: "UPDATE", schema: "public", table: "chat_messages" },
         (payload) => {
           const msg = payload.new as any;
-          setConversations(prev => {
-            const conv = prev.find(c => c.id === msg.conversation_id);
+          if (!isKnownConversation(msg?.conversation_id)) return;
+
+          setConversations((prev) => {
+            const conv = prev.find((c) => c.id === msg.conversation_id);
             if (!conv) return prev;
 
-            // If this was the lastMessage and it got soft-deleted, reload
+            // If this was the lastMessage and it got soft-deleted, refresh latest message
             if (conv.lastMessage?.id === msg.id && msg.is_deleted) {
               scheduleConversationsReload();
               return prev;
             }
 
             if (conv.lastMessage?.id === msg.id) {
-              return prev.map(c => c.id === msg.conversation_id
-                ? { ...c, lastMessage: msg as ChatMessage }
-                : c
+              return prev.map((c) =>
+                c.id === msg.conversation_id
+                  ? { ...c, lastMessage: msg as ChatMessage }
+                  : c
               );
             }
             return prev;
@@ -251,8 +274,10 @@ export function useChat() {
         { event: "DELETE", schema: "public", table: "chat_messages" },
         (payload) => {
           const old = payload.old as any;
-          setConversations(prev => {
-            const affected = prev.find(c => c.lastMessage?.id === old.id);
+          if (!isKnownConversation(old?.conversation_id)) return;
+
+          setConversations((prev) => {
+            const affected = prev.find((c) => c.lastMessage?.id === old.id);
             if (affected) {
               scheduleConversationsReload();
             }
@@ -265,8 +290,33 @@ export function useChat() {
         { event: "INSERT", schema: "public", table: "chat_participants" },
         (payload) => {
           const newRow = payload.new as any;
-          const isForMe = newRow?.user_id === user.id;
-          scheduleConversationsReload(isForMe);
+          if (!newRow?.conversation_id) return;
+
+          const isForMe = newRow.user_id === user.id;
+          if (isForMe) {
+            scheduleConversationsReload(true);
+            return;
+          }
+
+          if (!isKnownConversation(newRow.conversation_id)) return;
+
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id !== newRow.conversation_id) return conv;
+              if (conv.participants.some((p) => p.user_id === newRow.user_id)) return conv;
+
+              return {
+                ...conv,
+                participants: [
+                  ...conv.participants,
+                  {
+                    ...newRow,
+                    profile: profilesRef.current[newRow.user_id],
+                  },
+                ],
+              };
+            })
+          );
         }
       )
       .on(
@@ -274,9 +324,25 @@ export function useChat() {
         { event: "DELETE", schema: "public", table: "chat_participants" },
         (payload) => {
           const old = payload.old as any;
-          if (old?.user_id === user.id) {
+          if (!old?.conversation_id) return;
+
+          if (old.user_id === user.id) {
             scheduleConversationsReload(true);
+            return;
           }
+
+          if (!isKnownConversation(old.conversation_id)) return;
+
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === old.conversation_id
+                ? {
+                    ...conv,
+                    participants: conv.participants.filter((p) => p.user_id !== old.user_id),
+                  }
+                : conv
+            )
+          );
         }
       )
       .on(
@@ -284,16 +350,37 @@ export function useChat() {
         { event: "UPDATE", schema: "public", table: "chat_participants" },
         (payload) => {
           const row = payload.new as any;
-          if (row?.user_id === user.id) {
+          if (!row?.conversation_id) return;
+
+          if (row.user_id === user.id) {
             const old = payload.old as any;
-            if (old && row.last_read_at !== old.last_read_at &&
-                row.is_muted === old.is_muted &&
-                row.notifications_mode === old.notifications_mode &&
-                row.role === old.role) {
-              return; // Skip — read receipt update only
+            if (
+              old &&
+              row.last_read_at !== old.last_read_at &&
+              row.is_muted === old.is_muted &&
+              row.notifications_mode === old.notifications_mode &&
+              row.role === old.role
+            ) {
+              return; // Skip read-receipt-only updates
             }
-            scheduleConversationsReload();
+            scheduleConversationsReload(true);
+            return;
           }
+
+          if (!isKnownConversation(row.conversation_id)) return;
+
+          setConversations((prev) =>
+            prev.map((conv) => {
+              if (conv.id !== row.conversation_id) return conv;
+
+              return {
+                ...conv,
+                participants: conv.participants.map((p) =>
+                  p.user_id === row.user_id ? { ...p, ...row } : p
+                ),
+              };
+            })
+          );
         }
       )
       .on(
@@ -301,10 +388,17 @@ export function useChat() {
         { event: "UPDATE", schema: "public", table: "chat_conversations" },
         (payload) => {
           const updated = payload.new as any;
-          setConversations(prev => {
-            const idx = prev.findIndex(c => c.id === updated.id);
+          if (!isKnownConversation(updated?.id)) return;
+
+          setConversations((prev) => {
+            const idx = prev.findIndex((c) => c.id === updated.id);
             if (idx === -1) return prev;
-            const patched = { ...prev[idx], name: updated.name, avatar_url: updated.avatar_url, description: updated.description };
+            const patched = {
+              ...prev[idx],
+              name: updated.name,
+              avatar_url: updated.avatar_url,
+              description: updated.description,
+            };
             if (patched.type === "group" && updated.name) patched.displayName = updated.name;
             const next = [...prev];
             next[idx] = patched;
@@ -317,15 +411,22 @@ export function useChat() {
         { event: "DELETE", schema: "public", table: "chat_conversations" },
         (payload) => {
           const old = payload.old as any;
-          setConversations(prev => prev.filter(c => c.id !== old.id));
+          setConversations((prev) => prev.filter((c) => c.id !== old.id));
         }
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          chatRealtimeRetryRef.current = 0;
+          if (chatRealtimeReconnectTimerRef.current) {
+            clearTimeout(chatRealtimeReconnectTimerRef.current);
+            chatRealtimeReconnectTimerRef.current = null;
+          }
           void loadConversations();
         }
+
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setTimeout(() => void loadConversations(), 3000);
+          scheduleConversationsReload(true);
+          scheduleChannelReconnect();
         }
       });
 
@@ -336,20 +437,24 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Reduced polling for scale
+    // Fallback sync in case websocket is temporarily unavailable
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 60_000);
+    }, 20_000);
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
+      if (chatRealtimeReconnectTimerRef.current) {
+        clearTimeout(chatRealtimeReconnectTimerRef.current);
+        chatRealtimeReconnectTimerRef.current = null;
+      }
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [user, loadConversations]);
+  }, [user, loadConversations, chatRealtimeVersion]);
 
   const createDirectChat = useCallback(
     (otherUserId: string): string | null => {
@@ -580,14 +685,25 @@ export function useChat() {
     [user]
   );
 
-  // Clear unread count locally when user opens a chat
+  // Clear unread count locally and persist read state immediately
   const markConversationRead = useCallback((conversationId: string) => {
-    setConversations(prev => prev.map(c =>
-      c.id === conversationId && c.unreadCount > 0
-        ? { ...c, unreadCount: 0 }
-        : c
-    ));
-  }, []);
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId && c.unreadCount > 0
+          ? { ...c, unreadCount: 0 }
+          : c
+      )
+    );
+
+    if (!user) return;
+
+    supabase
+      .from("chat_participants")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id)
+      .then();
+  }, [user]);
 
   return {
     conversations,
@@ -621,6 +737,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     fileName?: string;
     replyToId?: string;
   }>>([]);
+  const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
+  const messagesRealtimeRetryRef = useRef(0);
+  const messagesRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref for loadOlderMessages to avoid stale closure on `messages`
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
@@ -724,15 +843,26 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     return () => window.removeEventListener("online", handleOnline);
   }, [conversationId, user]);
 
-  // Realtime messages with proper reconnection
+  // Realtime messages with resilient reconnection
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     const userId = user.id;
-    let retryCount = 0;
-    const maxRetries = 5;
+
+    const scheduleMessagesReconnect = () => {
+      if (messagesRealtimeReconnectTimerRef.current) return;
+
+      messagesRealtimeRetryRef.current += 1;
+      const delay = Math.min(1000 * Math.pow(2, messagesRealtimeRetryRef.current), 15000);
+
+      messagesRealtimeReconnectTimerRef.current = setTimeout(() => {
+        messagesRealtimeReconnectTimerRef.current = null;
+        void loadMessagesRef.current?.();
+        setMessagesRealtimeVersion((v) => v + 1);
+      }, delay);
+    };
 
     const channel = supabase
-      .channel(`messages-${conversationId}`)
+      .channel(`messages-${conversationId}-${messagesRealtimeVersion}`)
       .on(
         "postgres_changes",
         {
@@ -744,10 +874,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           setMessages((prev) => {
-            // Skip if already exists
             if (prev.find((m) => m.id === newMsg.id)) return prev;
 
-            // Check for optimistic match
             const optimisticMatch = prev.find(
               (m) =>
                 optimisticIdsRef.current.has(m.id) &&
@@ -809,16 +937,15 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          retryCount = 0;
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (retryCount < maxRetries) {
-            retryCount++;
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-            setTimeout(() => {
-              void loadMessagesRef.current?.();
-            }, delay);
+          messagesRealtimeRetryRef.current = 0;
+          if (messagesRealtimeReconnectTimerRef.current) {
+            clearTimeout(messagesRealtimeReconnectTimerRef.current);
+            messagesRealtimeReconnectTimerRef.current = null;
           }
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          scheduleMessagesReconnect();
         }
       });
 
@@ -835,9 +962,10 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     // Typing indicator via presence
     const presenceChannel = supabase
-      .channel(`typing-${conversationId}`, {
-        config: { presence: { key: userId } },
-      })
+      .channel(`typing-${conversationId}`,
+        {
+          config: { presence: { key: userId } },
+        })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
@@ -860,13 +988,17 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     return () => {
       window.removeEventListener("focus", handleFocus);
+      if (messagesRealtimeReconnectTimerRef.current) {
+        clearTimeout(messagesRealtimeReconnectTimerRef.current);
+        messagesRealtimeReconnectTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
       if (typingChannelRef.current === presenceChannel) {
         typingChannelRef.current = null;
       }
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, messagesRealtimeVersion]);
 
   const sendMessage = useCallback(
     async (
