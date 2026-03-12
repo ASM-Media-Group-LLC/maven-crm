@@ -430,7 +430,7 @@ export function useLiveKit() {
           BACKGROUND_SWITCH_TIMEOUT_MS,
           "bg-hard-blur",
         );
-      } else {
+      } else if (isTemplateBackground(effect)) {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
         const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
 
