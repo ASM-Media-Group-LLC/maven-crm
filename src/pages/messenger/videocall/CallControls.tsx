@@ -22,6 +22,7 @@ interface CallControlsProps {
   onToggleHand: () => void;
   onToggleChat: () => void;
   onToggleParticipants: () => void;
+  onToggleMetrics: () => void;
   onSendReaction: (emoji: string) => void;
   onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
