@@ -26,7 +26,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useLeadGenEntries } from "./useLeadGen";
+import { useLeadGenEntries, useLeadGenProfiles } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 
@@ -50,26 +50,43 @@ const LeadGenBaseDatosContent = () => {
   const [activeTab, setActiveTab] = useState<"leads" | "analisis">("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterAgente, setFilterAgente] = useState("todos");
-  const [agentSelectOpen, setAgentSelectOpen] = useState(false);
-  const [filterCalidad, setFilterCalidad] = useState("todos");
-  const [filterEstado, setFilterEstado] = useState("todos");
+  const [filterAgencia, setFilterAgencia] = useState("");
+  const [agenciaSelectOpen, setAgenciaSelectOpen] = useState(false);
+  const [filterAgente, setFilterAgente] = useState("");
+  const [agenteSelectOpen, setAgenteSelectOpen] = useState(false);
+  const [filterCalidad, setFilterCalidad] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const { data: leads = [], isLoading } = useLeadGenEntries();
+  const { data: profiles = [] } = useLeadGenProfiles();
 
-  const agentes = useMemo(
-    () => [...new Set(leads.map((l) => l.company).filter(Boolean))].sort() as string[],
-    [leads]
-  );
+  const profilesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    profiles.forEach(p => { map[p.id] = p.full_name || "Sin nombre"; });
+    return map;
+  }, [profiles]);
+
+  const agentesUnicos = useMemo(() => {
+    const names = new Set<string>();
+    leads.forEach(l => {
+      const name = profilesMap[l.lg_user_id];
+      if (name) names.add(name);
+    });
+    return [...names].sort();
+  }, [leads, profilesMap]);
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
       if (searchTerm && !l.model_handle.toLowerCase().includes(searchTerm.toLowerCase()) && !(l.company || "").toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (filterAgente !== "todos" && l.company !== filterAgente) return false;
-      if (filterCalidad !== "todos" && l.quality?.toLowerCase() !== filterCalidad) return false;
-      if (filterEstado !== "todos" && l.status !== filterEstado) return false;
+      if (filterAgencia && l.company !== filterAgencia) return false;
+      if (filterAgente) {
+        const agentName = profilesMap[l.lg_user_id];
+        if (agentName !== filterAgente) return false;
+      }
+      if (filterCalidad && l.quality?.toLowerCase() !== filterCalidad) return false;
+      if (filterEstado && l.status !== filterEstado) return false;
       if (dateFrom) {
         const d = new Date(l.created_at);
         if (d < startOfDay(dateFrom)) return false;
@@ -82,7 +99,7 @@ const LeadGenBaseDatosContent = () => {
       }
       return true;
     });
-  }, [leads, searchTerm, filterAgente, filterCalidad, filterEstado, dateFrom, dateTo]);
+  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, filterEstado, dateFrom, dateTo]);
 
   const totalLeads = filtered.length;
   const conContacto = filtered.filter((l) => ["contactado", "cerrado"].includes(l.status)).length;
@@ -186,10 +203,10 @@ const LeadGenBaseDatosContent = () => {
             <Input placeholder="Buscar lead..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9" />
           </div>
 
-          <Popover open={agentSelectOpen} onOpenChange={setAgentSelectOpen}>
+          <Popover open={agenciaSelectOpen} onOpenChange={setAgenciaSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
-                {filterAgente === "todos" ? "Agencia" : filterAgente}
+                {filterAgencia || "Agencia"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -198,11 +215,36 @@ const LeadGenBaseDatosContent = () => {
                 <CommandInput placeholder="Buscar agencia..." />
                 <CommandList>
                   <CommandEmpty>No encontrado</CommandEmpty>
-                  <CommandItem onSelect={() => { setFilterAgente("todos"); setAgentSelectOpen(false); }}>
-                    Todas{filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
+                  <CommandItem onSelect={() => { setFilterAgencia(""); setAgenciaSelectOpen(false); }}>
+                    Todas{!filterAgencia && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
                   {LEADGEN_COMPANIES.map((a) => (
-                    <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgentSelectOpen(false); }}>
+                    <CommandItem key={a} onSelect={() => { setFilterAgencia(a); setAgenciaSelectOpen(false); }}>
+                      {a}{filterAgencia === a && <Check className="ml-auto h-4 w-4" />}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          <Popover open={agenteSelectOpen} onOpenChange={setAgenteSelectOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
+                {filterAgente || "Agente"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar agente..." />
+                <CommandList>
+                  <CommandEmpty>No encontrado</CommandEmpty>
+                  <CommandItem onSelect={() => { setFilterAgente(""); setAgenteSelectOpen(false); }}>
+                    Todos{!filterAgente && <Check className="ml-auto h-4 w-4" />}
+                  </CommandItem>
+                  {agentesUnicos.map((a) => (
+                    <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgenteSelectOpen(false); }}>
                       {a}{filterAgente === a && <Check className="ml-auto h-4 w-4" />}
                     </CommandItem>
                   ))}
@@ -211,20 +253,20 @@ const LeadGenBaseDatosContent = () => {
             </PopoverContent>
           </Popover>
 
-          <Select value={filterCalidad} onValueChange={setFilterCalidad}>
+          <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Calidad</SelectItem>
+              <SelectItem value="__all__">Todas</SelectItem>
               <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
               <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
               <SelectItem value="c">C</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={filterEstado} onValueChange={setFilterEstado}>
+          <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Estado</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="no_response">Sin Respuesta</SelectItem>
               <SelectItem value="contactado">Contactado</SelectItem>
               <SelectItem value="cerrado">Cerrado</SelectItem>
@@ -283,11 +325,12 @@ const LeadGenBaseDatosContent = () => {
                   <CardContent className="p-0">
                     <div className="max-h-[calc(100vh-28rem)] overflow-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-card">
+                         <TableHeader className="sticky top-0 z-10 bg-card">
                           <TableRow>
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Handle</TableHead>
                             <TableHead>Agente</TableHead>
+                            <TableHead>Agencia</TableHead>
                             <TableHead>Calidad</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead>País</TableHead>
@@ -300,6 +343,7 @@ const LeadGenBaseDatosContent = () => {
                             <TableRow key={lead.id}>
                               <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                               <TableCell className="font-medium text-sm max-w-[200px] truncate">@{lead.model_handle}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{profilesMap[lead.lg_user_id] || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>

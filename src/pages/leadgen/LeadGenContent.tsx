@@ -81,7 +81,7 @@ const LeadGenContent = () => {
 
   // Enrich leads with agent names
   const enrichedLeads = useMemo(() => {
-    return leads.map(l => ({ ...l, agent_name: profilesMap[l.lg_user_id] || l.company || "—" }));
+    return leads.map(l => ({ ...l, agent_name: profilesMap[l.lg_user_id] || "—" }));
   }, [leads, profilesMap]);
 
   // Tabs based on viewMode
