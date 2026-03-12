@@ -34,6 +34,7 @@ describe("CallControls", () => {
     expect(screen.getByTitle("Levantar mano")).toBeInTheDocument();
     expect(screen.getByTitle("Chat")).toBeInTheDocument();
     expect(screen.getByTitle("Participantes")).toBeInTheDocument();
+    expect(screen.getByTitle("Métricas")).toBeInTheDocument();
     expect(screen.getByText("Salir")).toBeInTheDocument();
   });
 
