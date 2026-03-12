@@ -184,20 +184,15 @@ export function useChat() {
   useEffect(() => {
     if (!user) return;
 
+    // Coalescing reload: merges all reload requests within a window into one
+    const pendingReloadRef = { timer: null as ReturnType<typeof setTimeout> | null };
     const scheduleConversationsReload = (immediate = false) => {
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
-
-      const delay = immediate ? 50 : 200;
-      refreshTimeoutRef.current = setTimeout(() => {
+      if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
+      const delay = immediate ? 50 : 500; // Increased debounce for 80+ user scale
+      pendingReloadRef.timer = setTimeout(() => {
+        pendingReloadRef.timer = null;
         void loadConversations();
       }, delay);
-
-      if (!immediate) {
-        delayedRefreshTimeoutRef.current = setTimeout(() => {
-          void loadConversations();
-        }, 1000);
-      }
     };
 
     // Inline update: when a new message arrives, update the sidebar without full reload
