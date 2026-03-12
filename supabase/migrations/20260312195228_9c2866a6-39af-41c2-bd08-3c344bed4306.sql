@@ -1,0 +1,2 @@
+ALTER TABLE public.events 
+ADD COLUMN IF NOT EXISTS video_call_room_id TEXT DEFAULT NULL;
