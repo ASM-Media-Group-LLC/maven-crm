@@ -58,5 +58,38 @@ export function useMentionedConversations(
     refresh();
   }, [refresh, currentUserName, conversationIds]);
 
+  // Subscribe to realtime inserts on chat_messages to catch new mentions
+  useEffect(() => {
+    if (!user || conversationIds.length === 0) return;
+
+    const channel = supabase
+      .channel("mentions-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload) => {
+          const msg = payload.new as any;
+          // Only refresh if the message is in one of our conversations,
+          // not from us, and contains an @ symbol
+          if (
+            conversationIds.includes(msg.conversation_id) &&
+            msg.sender_id !== user.id &&
+            msg.content?.includes("@")
+          ) {
+            refresh();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, conversationIds, refresh]);
+
   return { mentionedIds, refreshMentions: refresh };
 }
