@@ -1,22 +1,32 @@
 
 
-## Problem
+## Fix: DateRangePicker sidebar width + Agent vs Agency separation
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Issue 1: "Semana pasada" text cut off in DateRangePicker
+The preset sidebar has `w-[120px]` which is too narrow. Increase to `w-[140px]` to fit all preset labels.
 
-## Solution
+**File**: `src/components/ui/date-range-picker.tsx` (line 161)
+- Change `w-[120px]` to `w-[140px]`
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### Issue 2: Agent column shows agency name as fallback
+In `LeadGenContent.tsx` line 84, the `agent_name` enrichment falls back to `l.company` (the agency) when no profile is found. This means the "Agente" column sometimes shows the agency name instead of the actual user.
 
-## Changes
+**File**: `src/pages/leadgen/LeadGenContent.tsx` (line 84)
+- Change fallback from `l.company || "—"` to just `"—"`
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+### Issue 3: LeadGenBaseDatosContent uses LEADGEN_COMPANIES for "Agente" filter
+The database view (`LeadGenBaseDatosContent.tsx`) uses `LEADGEN_COMPANIES` to populate the "Agente" filter dropdown -- these are agencies, not agents. Need to:
+- Rename the filter to "Agencia" and keep using `LEADGEN_COMPANIES`
+- Add a separate "Agente" filter that pulls from `profiles` (the actual users)
+- Filter by `lg_user_id` for agent, by `company` for agency
 
-Replace the single `.select()` call with a paginated loop:
+**File**: `src/pages/leadgen/LeadGenBaseDatosContent.tsx`
+- Rename existing `filterAgente`/agent selector to `filterAgencia` with label "Agencia"
+- Add a new agent filter that uses `profilesMap` to list actual users
+- Update filter logic accordingly
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Files to modify
+- `src/components/ui/date-range-picker.tsx` -- widen sidebar
+- `src/pages/leadgen/LeadGenContent.tsx` -- fix agent_name fallback
+- `src/pages/leadgen/LeadGenBaseDatosContent.tsx` -- separate agent vs agency filters
 
