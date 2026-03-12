@@ -442,7 +442,7 @@ export function useChat() {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 10_000);
+    }, 5_000);
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
