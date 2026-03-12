@@ -50,19 +50,32 @@ const LeadGenBaseDatosContent = () => {
   const [activeTab, setActiveTab] = useState<"leads" | "analisis">("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterAgente, setFilterAgente] = useState("todos");
-  const [agentSelectOpen, setAgentSelectOpen] = useState(false);
-  const [filterCalidad, setFilterCalidad] = useState("todos");
-  const [filterEstado, setFilterEstado] = useState("todos");
+  const [filterAgencia, setFilterAgencia] = useState("");
+  const [agenciaSelectOpen, setAgenciaSelectOpen] = useState(false);
+  const [filterAgente, setFilterAgente] = useState("");
+  const [agenteSelectOpen, setAgenteSelectOpen] = useState(false);
+  const [filterCalidad, setFilterCalidad] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const { data: leads = [], isLoading } = useLeadGenEntries();
+  const { data: profiles = [] } = useLeadGenProfiles();
 
-  const agentes = useMemo(
-    () => [...new Set(leads.map((l) => l.company).filter(Boolean))].sort() as string[],
-    [leads]
-  );
+  const profilesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    profiles.forEach(p => { map[p.id] = p.full_name || "Sin nombre"; });
+    return map;
+  }, [profiles]);
+
+  const agentesUnicos = useMemo(() => {
+    const names = new Set<string>();
+    leads.forEach(l => {
+      const name = profilesMap[l.lg_user_id];
+      if (name) names.add(name);
+    });
+    return [...names].sort();
+  }, [leads, profilesMap]);
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
