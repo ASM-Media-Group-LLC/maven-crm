@@ -95,6 +95,13 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-4px)" },
         },
+        "reaction-float": {
+          "0%": { opacity: "0", transform: "translateY(30px) scale(0.5)" },
+          "15%": { opacity: "1", transform: "translateY(-10px) scale(1.15)" },
+          "30%": { opacity: "1", transform: "translateY(-20px) scale(1)" },
+          "70%": { opacity: "1", transform: "translateY(-40px) scale(1)" },
+          "100%": { opacity: "0", transform: "translateY(-60px) scale(0.8)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
