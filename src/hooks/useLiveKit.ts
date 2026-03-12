@@ -911,8 +911,8 @@ export function useLiveKit() {
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
-    await applyBackgroundEffectToCurrentCamera(effect);
-  }, [applyBackgroundEffectToCurrentCamera]);
+    await queueBackgroundEffectApply(effect);
+  }, [queueBackgroundEffectApply]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
