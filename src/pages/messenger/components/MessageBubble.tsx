@@ -394,4 +394,26 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 });
 
 MessageBubble.displayName = "MessageBubble";
-export default MessageBubble;
+
+// Memoize to prevent re-renders when parent state changes but this message didn't
+const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
+  // Re-render only when message-specific data changes
+  return (
+    prev.message === next.message &&
+    prev.isMe === next.isMe &&
+    prev.highlight === next.highlight &&
+    prev.showAvatar === next.showAvatar &&
+    prev.showSender === next.showSender &&
+    prev.isLastInGroup === next.isLastInGroup &&
+    prev.reactions === next.reactions &&
+    prev.readByUsers === next.readByUsers &&
+    prev.threadCount === next.threadCount &&
+    prev.unreadThreadCount === next.unreadThreadCount &&
+    prev.replyMessage === next.replyMessage &&
+    prev.adjacentImages === next.adjacentImages &&
+    prev.isGridLeader === next.isGridLeader &&
+    prev.isPartOfGrid === next.isPartOfGrid
+  );
+});
+
+export default MemoizedMessageBubble;
