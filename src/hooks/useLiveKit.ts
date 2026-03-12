@@ -173,6 +173,7 @@ export function useLiveKit() {
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
   const bgApplyOpRef = useRef(0);
+  const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const connectingRef = useRef(false); // Guard against concurrent connect()
   const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
 
