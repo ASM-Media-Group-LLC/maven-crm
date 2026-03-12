@@ -57,10 +57,10 @@ function ControlBtn({
 }
 
 export default function CallControls({
-  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen,
+  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen, isMetricsOpen,
   backgroundEffect,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
-  onToggleChat, onToggleParticipants, onSendReaction, onBackgroundChange, onLeave,
+  onToggleChat, onToggleParticipants, onToggleMetrics, onSendReaction, onBackgroundChange, onLeave,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-2 md:gap-3 py-4 bg-[hsl(240_8%_10%)] flex-wrap px-2">
