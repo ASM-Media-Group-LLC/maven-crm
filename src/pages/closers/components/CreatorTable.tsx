@@ -1,8 +1,13 @@
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Edit, Trash2, AlertCircle } from "lucide-react";
-import { CloserCreator } from "../useCloserCreators";
+import { Eye, Edit, Trash2, AlertCircle, MoreHorizontal, ArrowRight, Phone, XCircle } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
+  DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CloserCreator, STAGES } from "../useCloserCreators";
 import { differenceInDays } from "date-fns";
 
 interface Column {
@@ -17,6 +22,7 @@ interface Props {
   onView?: (c: CloserCreator) => void;
   onEdit?: (c: CloserCreator) => void;
   onDelete?: (c: CloserCreator) => void;
+  onStageChange?: (id: string, stage: string) => void;
   showActions?: boolean;
 }
 
@@ -31,6 +37,16 @@ const stageBadgeColor = (stage: string) => {
     case "No interesada": return "bg-destructive/10 text-destructive";
     default: return "";
   }
+};
+
+const NEXT_STAGE: Record<string, string | null> = {
+  "Asignada": "En negociación",
+  "En negociación": "Formulario enviado",
+  "Formulario enviado": "Acuerdo enviado",
+  "Acuerdo enviado": "Confirmada",
+  "Confirmada": "Completada",
+  "Completada": null,
+  "No interesada": null,
 };
 
 const needsReminder = (lastContact: string | null) => {
@@ -50,7 +66,7 @@ const defaultRender = (creator: CloserCreator, key: string): React.ReactNode => 
   return String(val);
 };
 
-const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, showActions = true }: Props) => {
+const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, onStageChange, showActions = true }: Props) => {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <Table>
@@ -88,6 +104,42 @@ const CreatorTable = ({ creators, columns, onView, onEdit, onDelete, showActions
                       {onView && <Button variant="ghost" size="icon" onClick={() => onView(c)}><Eye className="h-4 w-4" /></Button>}
                       {onEdit && <Button variant="ghost" size="icon" onClick={() => onEdit(c)}><Edit className="h-4 w-4" /></Button>}
                       {onDelete && <Button variant="ghost" size="icon" onClick={() => onDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+
+                      {onStageChange && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {NEXT_STAGE[c.stage] && (
+                              <DropdownMenuItem onClick={() => onStageChange(c.id, NEXT_STAGE[c.stage]!)}>
+                                <ArrowRight className="h-4 w-4 mr-2" />
+                                Avanzar a {NEXT_STAGE[c.stage]}
+                              </DropdownMenuItem>
+                            )}
+                            {c.stage !== "No interesada" && (
+                              <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Marcar No interesada
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <Phone className="h-4 w-4 mr-2" />
+                                Cambiar etapa
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {STAGES.filter((s) => s !== c.stage).map((s) => (
+                                  <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
+                                    {s}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </TableCell>
                 )}

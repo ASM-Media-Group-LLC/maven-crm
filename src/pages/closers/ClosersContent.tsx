@@ -49,7 +49,8 @@ const ClosersContent = () => {
           <>
             <ClosersKPICards creators={creators} />
             <Tabs defaultValue="mis-creators">
-              <TabsList className="flex-wrap">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
               <TabsTrigger value="completadas">Completadas</TabsTrigger>
@@ -58,7 +59,13 @@ const ClosersContent = () => {
             </TabsList>
 
             <TabsContent value="mis-creators">
-              <MisCreatorsTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} onDelete={setDeletingCreator} />
+              <MisCreatorsTab
+                creators={creators}
+                onView={setViewCreator}
+                onEdit={setEditCreator}
+                onDelete={setDeletingCreator}
+                onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
+              />
             </TabsContent>
             <TabsContent value="pipeline">
               <PipelineTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} />
