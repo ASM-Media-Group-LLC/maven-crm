@@ -123,9 +123,9 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
 
-const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
-const BACKGROUND_SWITCH_TIMEOUT_MS = 7000;
-const BACKGROUND_FAILURE_COOLDOWN_MS = 12000;
+const BACKGROUND_ATTACH_TIMEOUT_MS = 10000;
+const BACKGROUND_SWITCH_TIMEOUT_MS = 12000;
+const BACKGROUND_FAILURE_COOLDOWN_MS = 15000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
@@ -477,8 +477,9 @@ export function useLiveKit() {
 
       bgFailureCooldownUntilRef.current = Date.now() + BACKGROUND_FAILURE_COOLDOWN_MS;
 
+      // Clean up processor from the track
       try {
-        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 1500, "bg-stop");
+        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 2000, "bg-stop");
       } catch {
         // no-op
       }
@@ -487,9 +488,13 @@ export function useLiveKit() {
       bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
+      // Wait for GPU/ML pipeline to fully release
+      await wait(300);
+
       if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
         const recovered = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
         if (recovered) {
+          await wait(150);
           refreshParticipants();
         }
       }
@@ -541,10 +546,12 @@ export function useLiveKit() {
       return true;
     }
 
-    const cameraReady = await waitForCameraPublication(room, [120, 220, 360]);
+    // Wait for camera track to be fully published and stable
+    const cameraReady = await waitForCameraPublication(room, [150, 300, 500, 700]);
     if (!cameraReady) return false;
 
-    await wait(90);
+    // Extra stabilization for the track before attaching processor
+    await wait(200);
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
@@ -881,24 +888,36 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
+        // First dispose any stale processor before enabling camera
         await disposeBackgroundProcessor();
+        await wait(100);
+
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
+          // Let the camera track fully stabilize before applying background
+          await wait(300);
+          refreshParticipants();
           await applyConfiguredBackgroundIfNeeded(room);
         }
       } else {
-        await room.localParticipant.setCameraEnabled(false);
+        // Turning off: first remove processor, then disable camera
         await disposeBackgroundProcessor();
+        await wait(50);
+        await room.localParticipant.setCameraEnabled(false);
       }
 
-      await wait(80);
+      await wait(120);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 400);
+      setTimeout(() => refreshParticipants(), 500);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
+      // Recovery: ensure clean state
+      try {
+        await disposeBackgroundProcessor();
+      } catch {}
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } finally {
