@@ -111,9 +111,9 @@ describe("PreJoinLobby", () => {
     });
   });
 
-  it("falls back to roomName when callDisplayName is not provided", () => {
+  it("does not render callDisplayName or roomName (hidden by design)", () => {
     render(<PreJoinLobby {...defaultProps} callDisplayName={undefined} />);
-    expect(screen.getByText("test-room")).toBeInTheDocument();
+    expect(screen.queryByText("test-room")).not.toBeInTheDocument();
   });
 
   it("renders video element when camera is on (initial state)", () => {
