@@ -80,9 +80,13 @@ const LeadGenBaseDatosContent = () => {
   const filtered = useMemo(() => {
     return leads.filter((l) => {
       if (searchTerm && !l.model_handle.toLowerCase().includes(searchTerm.toLowerCase()) && !(l.company || "").toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      if (filterAgente !== "todos" && l.company !== filterAgente) return false;
-      if (filterCalidad !== "todos" && l.quality?.toLowerCase() !== filterCalidad) return false;
-      if (filterEstado !== "todos" && l.status !== filterEstado) return false;
+      if (filterAgencia && l.company !== filterAgencia) return false;
+      if (filterAgente) {
+        const agentName = profilesMap[l.lg_user_id];
+        if (agentName !== filterAgente) return false;
+      }
+      if (filterCalidad && l.quality?.toLowerCase() !== filterCalidad) return false;
+      if (filterEstado && l.status !== filterEstado) return false;
       if (dateFrom) {
         const d = new Date(l.created_at);
         if (d < startOfDay(dateFrom)) return false;
@@ -95,7 +99,7 @@ const LeadGenBaseDatosContent = () => {
       }
       return true;
     });
-  }, [leads, searchTerm, filterAgente, filterCalidad, filterEstado, dateFrom, dateTo]);
+  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, filterEstado, dateFrom, dateTo]);
 
   const totalLeads = filtered.length;
   const conContacto = filtered.filter((l) => ["contactado", "cerrado"].includes(l.status)).length;
