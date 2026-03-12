@@ -107,10 +107,11 @@ describe("LiveKitCallView", () => {
     expect(screen.getByText("Volver")).toBeInTheDocument();
   });
 
-  it("renders call top bar with room name", () => {
+  it("renders call top bar (room name hidden by design)", () => {
     lkState = { ...defaultLkState };
     render(<LiveKitCallView {...defaultProps} />);
-    expect(screen.getByText("My Call")).toBeInTheDocument();
+    // Room name is hidden; just verify top bar renders with participant count
+    expect(screen.getByText(/participante/)).toBeInTheDocument();
   });
 
   it("renders call controls with leave button", () => {
