@@ -569,9 +569,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
           <h1 className="text-2xl font-semibold text-foreground">
             ¿Listo para unirte?
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {callDisplayName || roomName}
-          </p>
+          {/* Room/call name hidden by design */}
 
           <button
             onClick={handleJoin}
