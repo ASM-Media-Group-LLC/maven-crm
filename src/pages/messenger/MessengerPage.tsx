@@ -117,9 +117,9 @@ export default function MessengerPage() {
   };
 
   const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
-    setActiveChatId(conversationId);
+    selectChat(conversationId);
     setGlobalSearchOpen(false);
-  }, []);
+  }, [selectChat]);
 
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
