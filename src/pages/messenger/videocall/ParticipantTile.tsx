@@ -262,7 +262,7 @@ const ParticipantTile = memo(function ParticipantTile({
           autoPlay
           playsInline
           muted={participant.isLocal}
-          className="absolute inset-0 w-full h-full object-cover z-[1]"
+          className={cn("absolute inset-0 w-full h-full z-[1]", participant.isScreenSharing ? "object-contain bg-black" : "object-cover")}
           style={{ transform: participant.isLocal && !participant.isScreenSharing ? "scaleX(-1)" : undefined }}
         />
       ) : (
