@@ -325,11 +325,12 @@ const LeadGenBaseDatosContent = () => {
                   <CardContent className="p-0">
                     <div className="max-h-[calc(100vh-28rem)] overflow-auto">
                       <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-card">
+                         <TableHeader className="sticky top-0 z-10 bg-card">
                           <TableRow>
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Handle</TableHead>
                             <TableHead>Agente</TableHead>
+                            <TableHead>Agencia</TableHead>
                             <TableHead>Calidad</TableHead>
                             <TableHead>Estado</TableHead>
                             <TableHead>País</TableHead>
@@ -342,6 +343,7 @@ const LeadGenBaseDatosContent = () => {
                             <TableRow key={lead.id}>
                               <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                               <TableCell className="font-medium text-sm max-w-[200px] truncate">@{lead.model_handle}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{profilesMap[lead.lg_user_id] || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>
