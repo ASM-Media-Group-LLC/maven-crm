@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
-  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Pencil, Share2, Lock, Clock,
+  ArrowLeft, CalendarDays, Camera, Mic, Users, Video, MapPin, Pencil, Share2, Lock, Clock, PhoneCall,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
