@@ -130,11 +130,22 @@ export function useMentionedConversations(
         },
         (payload) => {
           const msg = payload.new as any;
-          if (
-            msg.sender_id !== user.id &&
-            msg.content?.includes("@")
-          ) {
-            // Refresh to pick up new mentions
+          if (msg.sender_id !== user.id && msg.content?.includes("@")) {
+            refresh();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_participants",
+        },
+        (payload) => {
+          const row = payload.new as any;
+          // When current user's last_read_at changes, re-check mentions
+          if (row.user_id === user.id) {
             refresh();
           }
         },
