@@ -246,15 +246,25 @@ export function useChat() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_messages" },
         (payload) => {
-          // Inline update: refresh only the affected conversation's lastMessage
           const msg = payload.new as any;
-          setConversations(prev => prev.map(c => {
-            if (c.id !== msg.conversation_id) return c;
-            if (c.lastMessage?.id === msg.id) {
-              return { ...c, lastMessage: msg as ChatMessage };
+          setConversations(prev => {
+            const conv = prev.find(c => c.id === msg.conversation_id);
+            if (!conv) return prev; // Not our conversation, ignore
+
+            // If this was the lastMessage and it got soft-deleted, reload to find the real last message
+            if (conv.lastMessage?.id === msg.id && msg.is_deleted) {
+              scheduleConversationsReload();
+              return prev;
             }
-            return c;
-          }));
+
+            if (conv.lastMessage?.id === msg.id) {
+              return prev.map(c => c.id === msg.conversation_id
+                ? { ...c, lastMessage: msg as ChatMessage }
+                : c
+              );
+            }
+            return prev;
+          });
         }
       )
       .on(

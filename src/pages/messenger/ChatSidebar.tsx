@@ -392,11 +392,17 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   const hasUnread = conversation.unreadCount > 0;
 
   const lastMsgPreview = conversation.lastMessage
-    ? conversation.lastMessage.type === "file"
-      ? `📎 ${conversation.lastMessage.file_name}`
-      : conversation.lastMessage.type === "image"
-        ? "📷 Foto"
-        : conversation.lastMessage.content || ""
+    ? conversation.lastMessage.is_deleted
+      ? "🚫 Mensaje eliminado"
+      : conversation.lastMessage.type === "system"
+        ? `ℹ️ ${conversation.lastMessage.content || ""}`
+        : conversation.lastMessage.type === "file"
+          ? `📎 ${conversation.lastMessage.file_name}`
+          : conversation.lastMessage.type === "image"
+            ? "📷 Foto"
+            : conversation.lastMessage.type === "voice"
+              ? "🎤 Nota de voz"
+              : conversation.lastMessage.content || ""
     : "Sin mensajes";
 
   return (
