@@ -116,10 +116,6 @@ export default function MessengerPage() {
     return success;
   };
 
-  const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
-    selectChat(conversationId);
-    setGlobalSearchOpen(false);
-  }, [selectChat]);
 
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
