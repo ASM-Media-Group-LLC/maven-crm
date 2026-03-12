@@ -181,6 +181,7 @@ export function useLiveKit() {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [participants, setParticipants] = useState<LKParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<LKChatMessage[]>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
