@@ -31,9 +31,9 @@ describe("PreJoinLobby", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the call display name", () => {
+  it("does not render the call display name (hidden by design)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    expect(screen.getByText("Daily Standup")).toBeInTheDocument();
+    expect(screen.queryByText("Daily Standup")).not.toBeInTheDocument();
   });
 
   it("renders the user display name", () => {
@@ -111,9 +111,9 @@ describe("PreJoinLobby", () => {
     });
   });
 
-  it("falls back to roomName when callDisplayName is not provided", () => {
+  it("does not render callDisplayName or roomName (hidden by design)", () => {
     render(<PreJoinLobby {...defaultProps} callDisplayName={undefined} />);
-    expect(screen.getByText("test-room")).toBeInTheDocument();
+    expect(screen.queryByText("test-room")).not.toBeInTheDocument();
   });
 
   it("renders video element when camera is on (initial state)", () => {
