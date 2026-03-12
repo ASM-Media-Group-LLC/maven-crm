@@ -68,6 +68,33 @@ export default function ChatView({
     if (msg) setHighlightedMsgId(msg.id);
   }, [searchResults]);
 
+  // Messages that are thread replies (have reply_to_id pointing to a non-reply message)
+  // These should only show inside the ThreadPanel, not in the main chat
+  const threadParentIds = useMemo(() => {
+    const ids = new Set<string>();
+    messages.forEach(m => {
+      if (m.reply_to_id) ids.add(m.reply_to_id);
+    });
+    return ids;
+  }, [messages]);
+
+  const mainMessages = useMemo(() => {
+    // Show messages that are NOT thread replies.
+    // A message is a thread reply if it has reply_to_id AND that reply_to_id
+    // points to a root message (one without its own reply_to_id) that has other replies.
+    return messages.filter(m => {
+      if (!m.reply_to_id) return true;
+      // Check if the parent is a root message (not itself a reply)
+      const parent = messages.find(p => p.id === m.reply_to_id);
+      if (parent && !parent.reply_to_id) {
+        // This is a thread reply to a root message — hide from main chat
+        return false;
+      }
+      // If parent is not found or parent is also a reply, show it (legacy reply behavior)
+      return true;
+    });
+  }, [messages]);
+
   const threadReplies = useMemo(() => {
     if (!threadParent) return [];
     return messages.filter(m => m.reply_to_id === threadParent.id);
@@ -188,7 +215,7 @@ export default function ChatView({
         )}
 
         <MessageList
-          messages={messages}
+          messages={mainMessages}
           profiles={profiles}
           chatType={conversation.type}
           currentUserId={user?.id}
@@ -231,6 +258,7 @@ export default function ChatView({
           currentUserId={user?.id}
           onSendReply={handleSendThreadReply}
           onClose={() => setThreadParent(null)}
+          participants={conversation.participants}
         />
       )}
 
