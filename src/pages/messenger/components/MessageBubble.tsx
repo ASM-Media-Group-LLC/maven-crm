@@ -1,4 +1,4 @@
-import { forwardRef, useState, useMemo } from "react";
+import { forwardRef, useState, useMemo, memo } from "react";
 import {
   MoreVertical, File, Reply, Copy, Edit2, Trash2, MessageSquareText, Mic, Play,
 } from "lucide-react";
