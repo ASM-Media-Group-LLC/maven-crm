@@ -323,6 +323,6 @@ const ParticipantTile = memo(function ParticipantTile({
       </div>
     </div>
   );
-});
+}, areParticipantPropsEqual);
 
 export default ParticipantTile;
