@@ -101,28 +101,12 @@ export function useChat() {
       });
     }
 
-    // Batch unread counts: single query, count per-conversation client-side
+    // Server-side unread counts — single RPC call replaces client-side N+1
     const unreadMap: Record<string, number> = {};
-    const oldestLastRead = Object.values(lastReadMap).filter(Boolean).sort()[0] || null;
-
-    let unreadQuery = supabase
-      .from("chat_messages")
-      .select("conversation_id, created_at")
-      .in("conversation_id", convIds)
-      .neq("sender_id", user.id);
-
-    if (oldestLastRead) {
-      unreadQuery = unreadQuery.gt("created_at", oldestLastRead);
-    }
-
-    const { data: unreadData } = await unreadQuery.limit(1000);
-
+    const { data: unreadData } = await supabase.rpc("get_unread_counts", { _user_id: user.id });
     if (unreadData) {
-      for (const msg of unreadData as any[]) {
-        const convLastRead = lastReadMap[msg.conversation_id];
-        if (!convLastRead || msg.created_at > convLastRead) {
-          unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
-        }
+      for (const row of unreadData as any[]) {
+        unreadMap[row.conversation_id] = row.unread_count || 0;
       }
     }
 
