@@ -121,6 +121,9 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
           src={src}
           controls
           autoPlay
+          controlsList="nodownload noremoteplayback"
+          disablePictureInPicture
+          onContextMenu={(e) => e.preventDefault()}
           className="max-w-[90vw] max-h-[90vh] rounded-lg transition-transform duration-200 select-none"
           style={{
             transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
