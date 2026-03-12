@@ -880,10 +880,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
       }
 
-      await supabase
+      // Fire-and-forget: don't block UI for the updated_at bump
+      supabase
         .from("chat_conversations")
         .update({ updated_at: new Date().toISOString() })
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        .then();
     },
     [conversationId, user]
   );
