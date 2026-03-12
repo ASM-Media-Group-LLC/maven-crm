@@ -4,7 +4,7 @@ import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
-import GlobalSearchPanel from "./components/GlobalSearchPanel";
+
 import IncomingCallModal from "./components/IncomingCallModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
