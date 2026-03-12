@@ -780,7 +780,7 @@ export function useLiveKit() {
           let applied = false;
           for (const delayMs of [90, 180, 320, 480]) {
             await wait(delayMs);
-            applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
             if (applied) break;
           }
         }
