@@ -299,8 +299,8 @@ const ParticipantTile = memo(function ParticipantTile({
 
       {/* Hand raised */}
       {participant.handRaised && (
-        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-2 animate-pulse z-10">
-          <Hand className="h-6 w-6 text-white" />
+        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-2.5 animate-pulse z-10">
+          <Hand className="h-8 w-8 text-white" />
         </div>
       )}
 
