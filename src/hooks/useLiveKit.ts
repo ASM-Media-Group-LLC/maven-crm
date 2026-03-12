@@ -733,6 +733,7 @@ export function useLiveKit() {
               }
               return newMessages;
             });
+            setUnreadChatCount((c) => c + 1);
           } else if (msg.type === "hand") {
             handRaisedMap.current[participant?.identity || ""] = msg.payload.raised;
             refreshParticipants();
