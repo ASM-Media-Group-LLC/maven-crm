@@ -203,10 +203,10 @@ const LeadGenBaseDatosContent = () => {
             <Input placeholder="Buscar lead..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9" />
           </div>
 
-          <Popover open={agentSelectOpen} onOpenChange={setAgentSelectOpen}>
+          <Popover open={agenciaSelectOpen} onOpenChange={setAgenciaSelectOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
-                {filterAgente === "todos" ? "Agencia" : filterAgente}
+                {filterAgencia || "Agencia"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -215,11 +215,36 @@ const LeadGenBaseDatosContent = () => {
                 <CommandInput placeholder="Buscar agencia..." />
                 <CommandList>
                   <CommandEmpty>No encontrado</CommandEmpty>
-                  <CommandItem onSelect={() => { setFilterAgente("todos"); setAgentSelectOpen(false); }}>
-                    Todas{filterAgente === "todos" && <Check className="ml-auto h-4 w-4" />}
+                  <CommandItem onSelect={() => { setFilterAgencia(""); setAgenciaSelectOpen(false); }}>
+                    Todas{!filterAgencia && <Check className="ml-auto h-4 w-4" />}
                   </CommandItem>
                   {LEADGEN_COMPANIES.map((a) => (
-                    <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgentSelectOpen(false); }}>
+                    <CommandItem key={a} onSelect={() => { setFilterAgencia(a); setAgenciaSelectOpen(false); }}>
+                      {a}{filterAgencia === a && <Check className="ml-auto h-4 w-4" />}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          <Popover open={agenteSelectOpen} onOpenChange={setAgenteSelectOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[180px] h-9 justify-between font-normal">
+                {filterAgente || "Agente"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar agente..." />
+                <CommandList>
+                  <CommandEmpty>No encontrado</CommandEmpty>
+                  <CommandItem onSelect={() => { setFilterAgente(""); setAgenteSelectOpen(false); }}>
+                    Todos{!filterAgente && <Check className="ml-auto h-4 w-4" />}
+                  </CommandItem>
+                  {agentesUnicos.map((a) => (
+                    <CommandItem key={a} onSelect={() => { setFilterAgente(a); setAgenteSelectOpen(false); }}>
                       {a}{filterAgente === a && <Check className="ml-auto h-4 w-4" />}
                     </CommandItem>
                   ))}
@@ -228,10 +253,10 @@ const LeadGenBaseDatosContent = () => {
             </PopoverContent>
           </Popover>
 
-          <Select value={filterCalidad} onValueChange={setFilterCalidad}>
+          <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Calidad</SelectItem>
+              <SelectItem value="__all__">Todas</SelectItem>
               <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
               <SelectItem value="b+">B+</SelectItem><SelectItem value="b">B</SelectItem>
               <SelectItem value="c">C</SelectItem>
