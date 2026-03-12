@@ -200,7 +200,7 @@ const ParticipantTile = memo(function ParticipantTile({
     };
   }, []);
 
-  const showVideo = !participant.isCameraOff || participant.isScreenSharing;
+  // showVideo already declared above
 
   return (
     <div
