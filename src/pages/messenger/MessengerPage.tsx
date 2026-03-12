@@ -202,7 +202,7 @@ export default function MessengerPage() {
               onSendTyping={sendTyping}
               onEditMessage={editMessage}
               onDeleteMessage={deleteMessage}
-              onBack={() => setActiveChatId(null)}
+              onBack={() => selectChat(null)}
               onStartVideoCall={handleStartVideoCall}
               loading={msgsLoading}
               getReactionsForMessage={getReactionsForMessage}
