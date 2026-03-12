@@ -132,11 +132,11 @@ const LeadGenContent = () => {
         if (!matches) return false;
       }
       // Agency filter
-      if (agencyFilter !== "todos" && lead.company !== agencyFilter) return false;
+      if (agencyFilter && lead.company !== agencyFilter) return false;
       // Status filter
-      if (statusFilter !== "todos" && lead.status !== statusFilter) return false;
+      if (statusFilter && lead.status !== statusFilter) return false;
       // Quality filter
-      if (qualityFilter !== "todos" && lead.quality?.toLowerCase() !== qualityFilter) return false;
+      if (qualityFilter && lead.quality?.toLowerCase() !== qualityFilter) return false;
       // Card filters
       if (activeFilter.type === "categoria") return lead.quality?.toLowerCase() === activeFilter.value;
       if (activeFilter.type === "status") {
