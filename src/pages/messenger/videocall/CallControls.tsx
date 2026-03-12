@@ -64,7 +64,7 @@ function ControlBtn({
 }
 
 export default function CallControls({
-  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen, isMetricsOpen,
+  isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen, isMetricsOpen,
   isCaptionsOn, captionsLanguage, captionsSupported,
   backgroundEffect,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,

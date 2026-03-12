@@ -245,6 +245,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isScreenSharing={lk.isScreenSharing}
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
+        unreadChatCount={lk.unreadChatCount}
         isParticipantsOpen={participantsOpen}
         isMetricsOpen={metricsOpen}
         isCaptionsOn={captions.isActive}
