@@ -696,7 +696,7 @@ export function useLiveKit() {
         if (cameraEnabled && backgroundEffectRef.current !== "none") {
           for (const delayMs of [120, 240, 420]) {
             await wait(delayMs);
-            const applied = await applyBackgroundEffectToCurrentCamera(backgroundEffectRef.current);
+            const applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
             if (applied) break;
           }
         }
