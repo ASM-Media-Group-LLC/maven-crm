@@ -5448,6 +5448,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_conversation_cascade: {
+        Args: { _conversation_id: string }
+        Returns: undefined
+      }
       get_agenda_by_share_token: {
         Args: { p_token: string }
         Returns: {

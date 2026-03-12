@@ -448,7 +448,8 @@ export function useChat() {
           return;
         }
 
-        await loadConversations();
+        // No need for full reload — optimistic UI already shows the conversation
+        // Realtime will sync any missing details
       })();
 
       return newConvId;
@@ -461,11 +462,36 @@ export function useChat() {
       if (!user) return null;
 
       const newConvId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      // Optimistic UI — show instantly like Google Chat
+      const optimisticConv: ConversationWithDetails = {
+        id: newConvId,
+        type: "group",
+        name,
+        description: null,
+        avatar_url: null,
+        created_by: user.id,
+        created_at: now,
+        updated_at: now,
+        participants: [
+          { id: crypto.randomUUID(), conversation_id: newConvId, user_id: user.id, role: "admin", joined_at: now, last_read_at: now, is_muted: false, notifications_mode: "all", profile: profilesRef.current[user.id] },
+          ...memberIds.map(id => ({
+            id: crypto.randomUUID(), conversation_id: newConvId, user_id: id, role: "member" as const, joined_at: now, last_read_at: null, is_muted: false, notifications_mode: "all" as const, profile: profilesRef.current[id],
+          })),
+        ],
+        unreadCount: 0,
+        displayName: name,
+      };
+      setConversations(prev => [optimisticConv, ...prev]);
+
+      // Background persist
       const { error: createConvError } = await supabase
         .from("chat_conversations")
         .insert({ id: newConvId, type: "group", name, created_by: user.id });
 
       if (createConvError) {
+        setConversations(prev => prev.filter(c => c.id !== newConvId));
         toast.error("Error al crear grupo");
         return null;
       }
@@ -476,6 +502,7 @@ export function useChat() {
 
       if (addCreatorError) {
         await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        setConversations(prev => prev.filter(c => c.id !== newConvId));
         toast.error("Error al crear grupo");
         return null;
       }
@@ -490,76 +517,40 @@ export function useChat() {
         );
 
         if (addMembersError) {
+          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
+          setConversations(prev => prev.filter(c => c.id !== newConvId));
           toast.error("Error al crear grupo");
           return null;
         }
       }
 
-      await loadConversations();
       toast.success(`Grupo "${name}" creado`);
       return newConvId;
     },
-    [user, loadConversations]
+    [user]
   );
 
   const deleteConversation = useCallback(
     async (conversationId: string) => {
       if (!user) return false;
 
-      // Optimistic UI update — remove from list immediately
+      // Optimistic UI — remove instantly (Google Chat style)
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
 
       try {
-        // Step 1: Delete all child records that reference messages (reactions, read receipts)
-        // and conversation-level references (pinned, space_conversations) in parallel
-        const { data: msgIds } = await supabase
-          .from("chat_messages")
-          .select("id")
-          .eq("conversation_id", conversationId);
+        // Single server-side call — replaces 5+ round trips
+        const { error } = await supabase.rpc("delete_conversation_cascade", {
+          _conversation_id: conversationId,
+        });
 
-        const messageIdList = msgIds?.map((m: any) => m.id) || [];
-
-        if (messageIdList.length > 0) {
-          // Delete reactions and read receipts for all messages in parallel
-          const chunks: string[][] = [];
-          for (let i = 0; i < messageIdList.length; i += 100) {
-            chunks.push(messageIdList.slice(i, i + 100));
-          }
-          await Promise.all([
-            ...chunks.map(chunk =>
-              supabase.from("chat_reactions").delete().in("message_id", chunk)
-            ),
-            ...chunks.map(chunk =>
-              supabase.from("chat_read_receipts").delete().in("message_id", chunk)
-            ),
-          ]);
-        }
-
-        // Step 2: Delete pinned, space_conversations, messages, participants in parallel
-        await Promise.all([
-          supabase.from("chat_pinned").delete().eq("conversation_id", conversationId),
-          supabase.from("chat_space_conversations").delete().eq("conversation_id", conversationId),
-          supabase.from("chat_messages").delete().eq("conversation_id", conversationId),
-          supabase.from("chat_participants").delete().eq("conversation_id", conversationId),
-        ]);
-
-        // Step 3: Delete the conversation itself
-        const { error: convError } = await supabase
-          .from("chat_conversations")
-          .delete()
-          .eq("id", conversationId);
-
-        if (convError) {
-          throw convError;
-        }
+        if (error) throw error;
 
         toast.success("Conversación eliminada");
         return true;
       } catch (err) {
         console.error("Error deleting conversation:", err);
         toast.error("Error al eliminar conversación");
-        // Rollback: reload conversations
         await loadConversations();
         return false;
       }
@@ -890,10 +881,12 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         setMessages((prev) => prev.map((m) => m.id === optimisticId ? (data as ChatMessage) : m));
       }
 
-      await supabase
+      // Fire-and-forget: don't block UI for the updated_at bump
+      supabase
         .from("chat_conversations")
         .update({ updated_at: new Date().toISOString() })
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        .then();
     },
     [conversationId, user]
   );
