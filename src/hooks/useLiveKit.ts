@@ -803,12 +803,8 @@ export function useLiveKit() {
       if (shouldEnableCam) {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          for (const delayMs of [120, 240, 420]) {
-            await wait(delayMs);
-            const applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
-            if (applied) break;
-          }
+        if (cameraEnabled) {
+          await applyConfiguredBackgroundIfNeeded(room);
         }
       }
 
