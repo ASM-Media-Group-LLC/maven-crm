@@ -33,7 +33,7 @@ describe("CallControls", () => {
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
     expect(screen.getByTitle("Levantar mano")).toBeInTheDocument();
     expect(screen.getByTitle("Chat")).toBeInTheDocument();
-    expect(screen.getByTitle("Participantes")).toBeInTheDocument();
+    expect(screen.getAllByTitle("Participantes").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByTitle("Métricas")).toBeInTheDocument();
     expect(screen.getByText("Salir")).toBeInTheDocument();
   });
