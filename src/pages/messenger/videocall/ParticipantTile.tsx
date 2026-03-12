@@ -67,8 +67,11 @@ const ParticipantTile = memo(function ParticipantTile({
   useEffect(() => {
     if (!room) return;
 
-    // If the video element changed (remounted), reset the attached ref so we force reattach
+    // If the video element changed (remounted), detach from previous element and force reattach
     if (videoRef.current !== attachedVideoElRef.current) {
+      if (attachedVideoTrackRef.current && attachedVideoElRef.current) {
+        try { attachedVideoTrackRef.current.detach(attachedVideoElRef.current); } catch {}
+      }
       attachedVideoTrackRef.current = null;
       attachedVideoElRef.current = videoRef.current;
     }
@@ -89,17 +92,28 @@ const ParticipantTile = memo(function ParticipantTile({
       const videoEl = videoRef.current;
       
       if (videoTrack?.track && videoEl) {
-        // Always detach old track first, then attach new one
-        if (attachedVideoTrackRef.current && attachedVideoTrackRef.current !== videoTrack.track) {
-          try { attachedVideoTrackRef.current.detach(videoEl); } catch {}
+        try {
+          if (attachedVideoTrackRef.current && attachedVideoTrackRef.current !== videoTrack.track) {
+            attachedVideoTrackRef.current.detach(videoEl);
+          }
+
+          const shouldAttach =
+            attachedVideoTrackRef.current !== videoTrack.track ||
+            !(videoEl as HTMLVideoElement).srcObject;
+
+          if (shouldAttach) {
+            videoTrack.track.attach(videoEl);
+            attachedVideoTrackRef.current = videoTrack.track;
+            // Force play in case autoplay is blocked
+            videoEl.play?.().catch(() => {});
+          }
+
+          return false; // attached, no retry needed
+        } catch {
+          // Track can be transiently unavailable while processor/device switches
+          attachedVideoTrackRef.current = null;
+          return !participant.isCameraOff;
         }
-        if (attachedVideoTrackRef.current !== videoTrack.track) {
-          videoTrack.track.attach(videoEl);
-          attachedVideoTrackRef.current = videoTrack.track;
-          // Force play in case autoplay is blocked
-          videoEl.play?.().catch(() => {});
-        }
-        return false; // attached, no retry needed
       } else if (videoEl) {
         // No track available — clean up
         if (attachedVideoTrackRef.current) {
@@ -175,12 +189,7 @@ const ParticipantTile = memo(function ParticipantTile({
     };
   }, [
     room,
-    participant.sid,
-    participant.identity,
-    participant.isLocal,
-    participant.isCameraOff,
-    participant.isScreenSharing,
-    participant.isMuted,
+    participant,
     preferredAudioOutputDeviceId,
   ]);
 
