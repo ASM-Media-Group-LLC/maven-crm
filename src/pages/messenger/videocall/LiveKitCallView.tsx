@@ -234,6 +234,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
+        isMetricsOpen={metricsOpen}
         backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
