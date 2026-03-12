@@ -72,33 +72,66 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabType>("all");
 
+  const fetchSharedFiles = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    const [filesRes, textsRes] = await Promise.all([
+      supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .in("type", ["file", "image"])
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .eq("type", "text")
+        .eq("is_deleted", false)
+        .like("content", "%http%")
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
+    setFileMessages((filesRes.data as ChatMessage[]) || []);
+    setTextMessages((textsRes.data as ChatMessage[]) || []);
+    if (showLoader) setLoading(false);
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const [filesRes, textsRes] = await Promise.all([
-        supabase
-          .from("chat_messages")
-          .select("*")
-          .eq("conversation_id", conversationId)
-          .in("type", ["file", "image"])
-          .eq("is_deleted", false)
-          .order("created_at", { ascending: false })
-          .limit(200),
-        supabase
-          .from("chat_messages")
-          .select("*")
-          .eq("conversation_id", conversationId)
-          .eq("type", "text")
-          .eq("is_deleted", false)
-          .like("content", "%http%")
-          .order("created_at", { ascending: false })
-          .limit(200),
-      ]);
-      setFileMessages((filesRes.data as ChatMessage[]) || []);
-      setTextMessages((textsRes.data as ChatMessage[]) || []);
-      setLoading(false);
+    fetchSharedFiles();
+  }, [conversationId]);
+
+  // Real-time sync: refresh when messages change in this conversation
+  useEffect(() => {
+    const channel = supabase
+      .channel(`shared-files-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const msg = (payload.new || payload.old) as ChatMessage | undefined;
+          if (!msg) return;
+          // Only re-fetch if the message is relevant (file/image or text with link)
+          const isRelevant =
+            msg.type === "file" ||
+            msg.type === "image" ||
+            (msg.type === "text" && msg.content && /https?:\/\//i.test(msg.content));
+          if (isRelevant || payload.eventType === "DELETE") {
+            fetchSharedFiles(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
-    load();
   }, [conversationId]);
 
   const links = useMemo(() => extractLinks(textMessages), [textMessages]);
