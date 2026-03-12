@@ -843,15 +843,26 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     return () => window.removeEventListener("online", handleOnline);
   }, [conversationId, user]);
 
-  // Realtime messages with proper reconnection
+  // Realtime messages with resilient reconnection
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     const userId = user.id;
-    let retryCount = 0;
-    const maxRetries = 5;
+
+    const scheduleMessagesReconnect = () => {
+      if (messagesRealtimeReconnectTimerRef.current) return;
+
+      messagesRealtimeRetryRef.current += 1;
+      const delay = Math.min(1000 * Math.pow(2, messagesRealtimeRetryRef.current), 15000);
+
+      messagesRealtimeReconnectTimerRef.current = setTimeout(() => {
+        messagesRealtimeReconnectTimerRef.current = null;
+        void loadMessagesRef.current?.();
+        setMessagesRealtimeVersion((v) => v + 1);
+      }, delay);
+    };
 
     const channel = supabase
-      .channel(`messages-${conversationId}`)
+      .channel(`messages-${conversationId}-${messagesRealtimeVersion}`)
       .on(
         "postgres_changes",
         {
@@ -863,10 +874,8 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           setMessages((prev) => {
-            // Skip if already exists
             if (prev.find((m) => m.id === newMsg.id)) return prev;
 
-            // Check for optimistic match
             const optimisticMatch = prev.find(
               (m) =>
                 optimisticIdsRef.current.has(m.id) &&
@@ -928,16 +937,15 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          retryCount = 0;
-        }
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          if (retryCount < maxRetries) {
-            retryCount++;
-            const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
-            setTimeout(() => {
-              void loadMessagesRef.current?.();
-            }, delay);
+          messagesRealtimeRetryRef.current = 0;
+          if (messagesRealtimeReconnectTimerRef.current) {
+            clearTimeout(messagesRealtimeReconnectTimerRef.current);
+            messagesRealtimeReconnectTimerRef.current = null;
           }
+        }
+
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          scheduleMessagesReconnect();
         }
       });
 
@@ -954,9 +962,10 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     // Typing indicator via presence
     const presenceChannel = supabase
-      .channel(`typing-${conversationId}`, {
-        config: { presence: { key: userId } },
-      })
+      .channel(`typing-${conversationId}`,
+        {
+          config: { presence: { key: userId } },
+        })
       .on("presence", { event: "sync" }, () => {
         const state = presenceChannel.presenceState();
         const typing: string[] = [];
@@ -979,13 +988,17 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
     return () => {
       window.removeEventListener("focus", handleFocus);
+      if (messagesRealtimeReconnectTimerRef.current) {
+        clearTimeout(messagesRealtimeReconnectTimerRef.current);
+        messagesRealtimeReconnectTimerRef.current = null;
+      }
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
       if (typingChannelRef.current === presenceChannel) {
         typingChannelRef.current = null;
       }
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, messagesRealtimeVersion]);
 
   const sendMessage = useCallback(
     async (
