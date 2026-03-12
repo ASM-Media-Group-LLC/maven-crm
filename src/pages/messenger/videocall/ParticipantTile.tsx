@@ -67,8 +67,11 @@ const ParticipantTile = memo(function ParticipantTile({
   useEffect(() => {
     if (!room) return;
 
-    // If the video element changed (remounted), reset the attached ref so we force reattach
+    // If the video element changed (remounted), detach from previous element and force reattach
     if (videoRef.current !== attachedVideoElRef.current) {
+      if (attachedVideoTrackRef.current && attachedVideoElRef.current) {
+        try { attachedVideoTrackRef.current.detach(attachedVideoElRef.current); } catch {}
+      }
       attachedVideoTrackRef.current = null;
       attachedVideoElRef.current = videoRef.current;
     }
