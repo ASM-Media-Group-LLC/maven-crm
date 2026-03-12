@@ -7,15 +7,17 @@ import { useAuth } from "@/hooks/useAuth";
  * has been mentioned (@fullName or @firstName) in any message.
  */
 export function useMentionedConversations(
-  currentUserName: string | null,
+  currentUserName: string | null | undefined,
   conversationIds: string[],
 ) {
   const { user } = useAuth();
   const [mentionedIds, setMentionedIds] = useState<Set<string>>(new Set());
-  const prevKey = useRef("");
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelCounterRef = useRef(0);
 
-  // Stabilize conversationIds to avoid unnecessary re-renders
-  const stableConvIds = useMemo(() => conversationIds, [conversationIds.join(",")]);
+  // Stabilize conversationIds by joining into a string key
+  const convIdsKey = useMemo(() => conversationIds.join(","), [conversationIds]);
+  const stableConvIds = useMemo(() => conversationIds, [convIdsKey]);
 
   const refresh = useCallback(async () => {
     if (!user || !currentUserName || stableConvIds.length === 0) {
@@ -24,9 +26,12 @@ export function useMentionedConversations(
     }
 
     const name = currentUserName.trim();
+    if (!name) {
+      setMentionedIds(new Set());
+      return;
+    }
     const firstName = name.split(" ")[0];
 
-    // Query with two separate calls to avoid PostgREST OR filter issues
     const allMatchedConvIds = new Set<string>();
 
     // Query 1: match @fullName (case-insensitive)
@@ -63,24 +68,31 @@ export function useMentionedConversations(
       }
     }
 
-    console.log("[useMentionedConversations] user:", name, "matched conversations:", allMatchedConvIds.size, "from", stableConvIds.length, "total conversations");
+    console.log("[useMentionedConversations] user:", name, "matched:", allMatchedConvIds.size, "/", stableConvIds.length);
     setMentionedIds(allMatchedConvIds);
   }, [user, currentUserName, stableConvIds]);
 
-  // Refresh when conversations or user name change
+  // Refresh when dependencies change
   useEffect(() => {
-    const key = `${currentUserName}|${stableConvIds.join(",")}`;
-    if (key === prevKey.current) return;
-    prevKey.current = key;
     refresh();
-  }, [refresh, currentUserName, stableConvIds]);
+  }, [refresh]);
 
   // Subscribe to realtime inserts on chat_messages to catch new mentions
   useEffect(() => {
-    if (!user || stableConvIds.length === 0) return;
+    if (!user || stableConvIds.length === 0 || !currentUserName) return;
+
+    // Clean up previous channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Use unique channel name to prevent Supabase JS from reusing stale channel
+    channelCounterRef.current += 1;
+    const channelName = `mentions-rt-${user.id.slice(0, 8)}-${channelCounterRef.current}`;
 
     const channel = supabase
-      .channel("mentions-realtime")
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -91,21 +103,23 @@ export function useMentionedConversations(
         (payload) => {
           const msg = payload.new as any;
           if (
-            stableConvIds.includes(msg.conversation_id) &&
             msg.sender_id !== user.id &&
             msg.content?.includes("@")
           ) {
-            console.log("[useMentionedConversations] realtime mention detected, refreshing...");
+            // Refresh to pick up new mentions
             refresh();
           }
         },
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-  }, [user, stableConvIds, refresh]);
+  }, [user, currentUserName, stableConvIds, refresh]);
 
   return { mentionedIds, refreshMentions: refresh };
 }
