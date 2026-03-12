@@ -12,6 +12,7 @@ describe("CallControls", () => {
     isHandRaised: false,
     isChatOpen: false,
     isParticipantsOpen: false,
+    isMetricsOpen: false,
     backgroundEffect: "none" as const,
     onToggleMic: vi.fn(),
     onToggleCam: vi.fn(),
