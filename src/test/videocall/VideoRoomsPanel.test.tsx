@@ -61,10 +61,10 @@ describe("VideoRoomsPanel", () => {
     if (closeBtn) fireEvent.click(closeBtn);
   });
 
-  it("opens create dialog when 'Nueva sala' is clicked", () => {
+  it("calls onCreateRoom directly when 'Nueva sala' is clicked", () => {
     render(<VideoRoomsPanel {...defaultProps} />);
     fireEvent.click(screen.getByText("Nueva sala"));
-    expect(screen.getByText("Crear nueva sala de video")).toBeInTheDocument();
+    expect(defaultProps.onCreateRoom).toHaveBeenCalledTimes(1);
   });
 
   describe("extractRoomId (via join by link)", () => {
