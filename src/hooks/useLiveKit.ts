@@ -744,7 +744,7 @@ export function useLiveKit() {
                     : p
                 )
               );
-            }, 6000);
+            }, 10000);
           } else if (msg.type === "moderation") {
             // Security: Verify the sender has roomAdmin permission via LiveKit metadata
             // Only process moderation from participants with admin grants
