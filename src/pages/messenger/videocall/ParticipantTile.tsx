@@ -189,12 +189,7 @@ const ParticipantTile = memo(function ParticipantTile({
     };
   }, [
     room,
-    participant.sid,
-    participant.identity,
-    participant.isLocal,
-    participant.isCameraOff,
-    participant.isScreenSharing,
-    participant.isMuted,
+    participant,
     preferredAudioOutputDeviceId,
   ]);
 
