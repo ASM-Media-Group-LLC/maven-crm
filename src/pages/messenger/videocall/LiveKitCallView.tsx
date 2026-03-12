@@ -198,6 +198,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               </div>
             </div>
           )}
+
+          {/* Captions overlay */}
+          {captions.isActive && (
+            <CallCaptions captions={captions.captions} interimText={captions.interimText} />
+          )}
         </div>
 
         {/* Sidebars */}
@@ -235,6 +240,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
         isMetricsOpen={metricsOpen}
+        isCaptionsOn={captions.isActive}
+        captionsLanguage={captions.language}
+        captionsSupported={captions.isSupported}
         backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
@@ -243,6 +251,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) { setParticipantsOpen(false); setMetricsOpen(false); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) { setChatOpen(false); setMetricsOpen(false); } }}
         onToggleMetrics={() => { setMetricsOpen(!metricsOpen); if (!metricsOpen) { setChatOpen(false); setParticipantsOpen(false); } }}
+        onToggleCaptions={captions.toggle}
+        onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
