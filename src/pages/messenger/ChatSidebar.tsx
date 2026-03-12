@@ -381,28 +381,38 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   spaces: ChatSpace[];
   onAddToSpace: (spaceId: string, convId: string) => Promise<boolean>;
 }) {
+  const { user } = useAuth();
   const isGroup = conversation.type === "group";
   const { isOnline, getStatus } = useOnlinePresence();
 
   const otherParticipant = !isGroup
-    ? conversation.participants.find(p => p.user_id !== conversation.created_by)
+    ? conversation.participants.find(p => p.user_id !== user?.id)
     : null;
   const online = otherParticipant ? isOnline(otherParticipant.user_id) : false;
   const status = otherParticipant ? getStatus(otherParticipant.user_id) : null;
   const hasUnread = conversation.unreadCount > 0;
 
   const lastMsg = conversation.lastMessage;
-  const lastMsgPreview = lastMsg
-    ? lastMsg.is_deleted
-      ? "🚫 Mensaje eliminado"
-      : lastMsg.type === "system"
-        ? `ℹ️ ${lastMsg.content || ""}`
-        : lastMsg.type === "file"
-          ? `📎 ${lastMsg.file_name}`
-          : lastMsg.type === "image"
-            ? "📷 Foto"
-            : lastMsg.content || ""
-    : "Sin mensajes";
+  const getMessagePreview = () => {
+    if (!lastMsg) return "Sin mensajes";
+    if (lastMsg.is_deleted) return "🚫 Mensaje eliminado";
+    if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
+
+    let body = "";
+    if (lastMsg.type === "file") body = `📎 ${lastMsg.file_name}`;
+    else if (lastMsg.type === "image") body = "📷 Foto";
+    else body = lastMsg.content || "";
+
+    // In group chats, prefix sender name
+    if (isGroup && lastMsg.sender_id) {
+      const senderName = lastMsg.sender_id === user?.id
+        ? "Tú"
+        : (conversation.participants.find(p => p.user_id === lastMsg.sender_id)?.profile?.full_name?.split(" ")[0] || "");
+      if (senderName) return `${senderName}: ${body}`;
+    }
+    return body;
+  };
+  const lastMsgPreview = getMessagePreview();
 
   return (
     <ContextMenu>
