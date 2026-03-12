@@ -164,7 +164,15 @@ export default function CallControls({
       )}
 
       <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
-      <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
+      {/* Chat button with unread count */}
+      <div className="relative">
+        <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
+        {unreadChatCount > 0 && !isChatOpen && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1 z-10">
+            {unreadChatCount > 99 ? "99+" : unreadChatCount}
+          </span>
+        )}
+      </div>
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
       <ControlBtn icon={BarChart3} onClick={onToggleMetrics} label="Métricas" badge={isMetricsOpen} />
 
