@@ -14,6 +14,7 @@ interface CallControlsProps {
   isScreenSharing: boolean;
   isHandRaised: boolean;
   isChatOpen: boolean;
+  unreadChatCount: number;
   isParticipantsOpen: boolean;
   isMetricsOpen: boolean;
   isCaptionsOn: boolean;
