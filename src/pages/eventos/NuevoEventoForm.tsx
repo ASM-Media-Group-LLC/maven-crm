@@ -103,6 +103,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
       return;
     }
 
+    const videoCallRoomId = includeVideoCall ? `event-${isEditMode ? event.id : crypto.randomUUID()}` : null;
+
     const formData = {
       name: name.trim(),
       event_type: eventType,
@@ -115,6 +117,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
       location: location || null,
       max_capacity: maxCapacity ? parseInt(maxCapacity) : null,
       notes: notes || null,
+      video_call_room_id: videoCallRoomId,
     };
 
     try {
