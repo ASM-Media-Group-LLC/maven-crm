@@ -38,6 +38,8 @@ export default function GroupMembersPanel({
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const [removingUser, setRemovingUser] = useState<{ id: string; name: string } | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [leavingGroup, setLeavingGroup] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const isAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const memberIds = new Set(conversation.participants.map(p => p.user_id));
