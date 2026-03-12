@@ -474,13 +474,13 @@ export function useChat() {
   );
 
   const createGroupChat = useCallback(
-    async (name: string, memberIds: string[]) => {
+    (name: string, memberIds: string[]): string | null => {
       if (!user) return null;
 
       const newConvId = crypto.randomUUID();
       const now = new Date().toISOString();
 
-      // Optimistic UI
+      // Optimistic UI — instant navigation
       const optimisticConv: ConversationWithDetails = {
         id: newConvId,
         type: "group",
@@ -501,47 +501,50 @@ export function useChat() {
       };
       setConversations(prev => [optimisticConv, ...prev]);
 
-      // Background persist
-      const { error: createConvError } = await supabase
-        .from("chat_conversations")
-        .insert({ id: newConvId, type: "group", name, created_by: user.id });
+      // Background persist — fire and forget
+      (async () => {
+        const { error: createConvError } = await supabase
+          .from("chat_conversations")
+          .insert({ id: newConvId, type: "group", name, created_by: user.id });
 
-      if (createConvError) {
-        setConversations(prev => prev.filter(c => c.id !== newConvId));
-        toast.error("Error al crear grupo");
-        return null;
-      }
+        if (createConvError) {
+          setConversations(prev => prev.filter(c => c.id !== newConvId));
+          toast.error("Error al crear grupo");
+          return;
+        }
 
-      const { error: addCreatorError } = await supabase.from("chat_participants").insert(
-        { conversation_id: newConvId, user_id: user.id, role: "admin" }
-      );
-
-      if (addCreatorError) {
-        await supabase.from("chat_conversations").delete().eq("id", newConvId);
-        setConversations(prev => prev.filter(c => c.id !== newConvId));
-        toast.error("Error al crear grupo");
-        return null;
-      }
-
-      if (memberIds.length > 0) {
-        const { error: addMembersError } = await supabase.from("chat_participants").insert(
-          memberIds.map((id) => ({
-            conversation_id: newConvId,
-            user_id: id,
-            role: "member" as const,
-          }))
+        const { error: addCreatorError } = await supabase.from("chat_participants").insert(
+          { conversation_id: newConvId, user_id: user.id, role: "admin" }
         );
 
-        if (addMembersError) {
-          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
+        if (addCreatorError) {
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
           setConversations(prev => prev.filter(c => c.id !== newConvId));
           toast.error("Error al crear grupo");
-          return null;
+          return;
         }
-      }
 
-      toast.success(`Grupo "${name}" creado`);
+        if (memberIds.length > 0) {
+          const { error: addMembersError } = await supabase.from("chat_participants").insert(
+            memberIds.map((id) => ({
+              conversation_id: newConvId,
+              user_id: id,
+              role: "member" as const,
+            }))
+          );
+
+          if (addMembersError) {
+            await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
+            await supabase.from("chat_conversations").delete().eq("id", newConvId);
+            setConversations(prev => prev.filter(c => c.id !== newConvId));
+            toast.error("Error al crear grupo");
+            return;
+          }
+        }
+
+        toast.success(`Grupo "${name}" creado`);
+      })();
+
       return newConvId;
     },
     [user]
