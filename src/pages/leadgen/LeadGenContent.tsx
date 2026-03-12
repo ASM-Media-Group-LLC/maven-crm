@@ -113,10 +113,10 @@ const LeadGenContent = () => {
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("todos");
-  const [qualityFilter, setQualityFilter] = useState("todos");
-  const [qaFilter, setQaFilter] = useState("todos");
-  const [agencyFilter, setAgencyFilter] = useState("todos");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [qualityFilter, setQualityFilter] = useState("");
+  const [qaFilter, setQaFilter] = useState("");
+  const [agencyFilter, setAgencyFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState<{ type: "categoria" | "status" | null; value: string | null }>({ type: null, value: null });
 
   // Filter leads
