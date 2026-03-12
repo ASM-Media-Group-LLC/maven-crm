@@ -88,11 +88,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   }, [roomName, callDisplayName]);
 
-  useEffect(() => {
-    if (lk.connectionState !== ConnectionState.Connected) return;
-    void lk.setBackgroundEffect(bgEffect);
-  }, [lk.connectionState, lk.setBackgroundEffect, bgEffect]);
-
   // Find screen sharer for spotlight
   const spotlightParticipant = useMemo(() => {
     const screenSharer = lk.participants.find((p) => p.isScreenSharing);
