@@ -16,8 +16,6 @@ export function useChat() {
   const [loading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
-  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const delayedRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   profilesRef.current = profiles;
 
   const loadProfiles = useCallback(async () => {
@@ -103,28 +101,12 @@ export function useChat() {
       });
     }
 
-    // Batch unread counts: single query, count per-conversation client-side
+    // Server-side unread counts — single RPC call replaces client-side N+1
     const unreadMap: Record<string, number> = {};
-    const oldestLastRead = Object.values(lastReadMap).filter(Boolean).sort()[0] || null;
-
-    let unreadQuery = supabase
-      .from("chat_messages")
-      .select("conversation_id, created_at")
-      .in("conversation_id", convIds)
-      .neq("sender_id", user.id);
-
-    if (oldestLastRead) {
-      unreadQuery = unreadQuery.gt("created_at", oldestLastRead);
-    }
-
-    const { data: unreadData } = await unreadQuery.limit(1000);
-
+    const { data: unreadData } = await supabase.rpc("get_unread_counts", { _user_id: user.id });
     if (unreadData) {
-      for (const msg of unreadData as any[]) {
-        const convLastRead = lastReadMap[msg.conversation_id];
-        if (!convLastRead || msg.created_at > convLastRead) {
-          unreadMap[msg.conversation_id] = (unreadMap[msg.conversation_id] || 0) + 1;
-        }
+      for (const row of unreadData as any[]) {
+        unreadMap[row.conversation_id] = row.unread_count || 0;
       }
     }
 
@@ -184,20 +166,15 @@ export function useChat() {
   useEffect(() => {
     if (!user) return;
 
+    // Coalescing reload: merges all reload requests within a window into one
+    const pendingReloadRef = { timer: null as ReturnType<typeof setTimeout> | null };
     const scheduleConversationsReload = (immediate = false) => {
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
-
-      const delay = immediate ? 50 : 200;
-      refreshTimeoutRef.current = setTimeout(() => {
+      if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
+      const delay = immediate ? 50 : 500; // Increased debounce for 80+ user scale
+      pendingReloadRef.timer = setTimeout(() => {
+        pendingReloadRef.timer = null;
         void loadConversations();
       }, delay);
-
-      if (!immediate) {
-        delayedRefreshTimeoutRef.current = setTimeout(() => {
-          void loadConversations();
-        }, 1000);
-      }
     };
 
     // Inline update: when a new message arrives, update the sidebar without full reload
@@ -295,22 +272,58 @@ export function useChat() {
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "chat_participants" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          const old = payload.old as any;
+          // Only reload if this affects the current user
+          if (old?.user_id === user.id) {
+            scheduleConversationsReload(true);
+          }
         }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_participants" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          const row = payload.new as any;
+          // Only reload for the current user's own participation changes
+          // (e.g., mute toggle, notifications_mode change)
+          // Ignore other users' last_read_at updates — they cause reload storms at scale
+          if (row?.user_id === user.id) {
+            // Don't reload for last_read_at-only changes (we already track this locally)
+            const old = payload.old as any;
+            if (old && row.last_read_at !== old.last_read_at &&
+                row.is_muted === old.is_muted &&
+                row.notifications_mode === old.notifications_mode &&
+                row.role === old.role) {
+              return; // Skip — this is just a read receipt update
+            }
+            scheduleConversationsReload();
+          }
         }
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_conversations" },
-        () => {
-          scheduleConversationsReload();
+        { event: "UPDATE", schema: "public", table: "chat_conversations" },
+        (payload) => {
+          // Inline update: just patch name/avatar without full reload
+          const updated = payload.new as any;
+          setConversations(prev => {
+            const idx = prev.findIndex(c => c.id === updated.id);
+            if (idx === -1) return prev;
+            const patched = { ...prev[idx], name: updated.name, avatar_url: updated.avatar_url, description: updated.description };
+            if (patched.type === "group" && updated.name) patched.displayName = updated.name;
+            const next = [...prev];
+            next[idx] = patched;
+            return next;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_conversations" },
+        (payload) => {
+          const old = payload.old as any;
+          setConversations(prev => prev.filter(c => c.id !== old.id));
         }
       )
       .subscribe((status) => {
@@ -318,7 +331,7 @@ export function useChat() {
           void loadConversations();
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setTimeout(() => void loadConversations(), 2000);
+          setTimeout(() => void loadConversations(), 3000);
         }
       });
 
@@ -329,15 +342,15 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // Reduced polling: 60s instead of 30s for 80+ users
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 30_000);
+    }, 60_000);
 
     return () => {
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+      if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
