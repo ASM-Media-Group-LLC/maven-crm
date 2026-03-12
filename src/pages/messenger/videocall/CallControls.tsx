@@ -1,6 +1,6 @@
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
-  PhoneOff, Hand, MessageSquare, Smile, Users,
+  PhoneOff, Hand, MessageSquare, Smile, Users, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
