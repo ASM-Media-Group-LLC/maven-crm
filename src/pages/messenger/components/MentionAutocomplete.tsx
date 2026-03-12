@@ -52,7 +52,7 @@ export function renderTextWithMentions(text: string, participantNames: string[])
       parts.push(text.slice(lastIndex, match.index));
     }
     parts.push(
-      <span key={match.index} className="text-primary font-semibold">
+      <span key={match.index} className="font-bold">
         @{match[1]}
       </span>
     );

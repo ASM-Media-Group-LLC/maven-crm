@@ -1,13 +1,22 @@
 
 
-## Plan: Change mention style from blue to bold
+## Problem
 
-**What**: In `MentionAutocomplete.tsx`, line 55, the `renderTextWithMentions` function renders mentions with `className="text-primary font-semibold"` (blue + bold). Change this to just bold text without color change.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-**Change**:
-- File: `src/pages/messenger/components/MentionAutocomplete.tsx`, line 55
-- From: `className="text-primary font-semibold"`
-- To: `className="font-bold"`
+## Solution
 
-This ensures mentions in group chat bubbles appear as **@Name** in bold (inheriting the bubble's text color) instead of standing out in blue, which clashes with the primary-colored bubbles.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+
+## Changes
+
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
