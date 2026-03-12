@@ -290,15 +290,33 @@ export function useChat() {
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "chat_participants" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          const old = payload.old as any;
+          // Only reload if this affects the current user
+          if (old?.user_id === user.id) {
+            scheduleConversationsReload(true);
+          }
         }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_participants" },
-        () => {
-          scheduleConversationsReload();
+        (payload) => {
+          const row = payload.new as any;
+          // Only reload for the current user's own participation changes
+          // (e.g., mute toggle, notifications_mode change)
+          // Ignore other users' last_read_at updates — they cause reload storms at scale
+          if (row?.user_id === user.id) {
+            // Don't reload for last_read_at-only changes (we already track this locally)
+            const old = payload.old as any;
+            if (old && row.last_read_at !== old.last_read_at &&
+                row.is_muted === old.is_muted &&
+                row.notifications_mode === old.notifications_mode &&
+                row.role === old.role) {
+              return; // Skip — this is just a read receipt update
+            }
+            scheduleConversationsReload();
+          }
         }
       )
       .on(
