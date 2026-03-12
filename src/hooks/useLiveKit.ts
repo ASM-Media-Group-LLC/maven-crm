@@ -123,6 +123,29 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
 
+const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
+const BACKGROUND_SWITCH_TIMEOUT_MS = 7000;
+const BACKGROUND_FAILURE_COOLDOWN_MS = 12000;
+
+function isTemplateBackground(effect: BackgroundEffect) {
+  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+}
+
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      task,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}-timeout`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ── Production Room configuration ────────────────────────────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
