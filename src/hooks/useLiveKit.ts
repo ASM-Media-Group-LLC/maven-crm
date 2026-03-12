@@ -342,14 +342,18 @@ export function useLiveKit() {
         bgProcessorRef.current = processor;
       }
 
-      try {
-        await camTrack.setProcessor(processor);
-      } catch {
-        if (opId !== bgApplyOpRef.current) return false;
-        try { await processor?.destroy?.(); } catch {}
-        processor = BackgroundProcessor({ mode: "disabled" });
-        bgProcessorRef.current = processor;
-        await camTrack.setProcessor(processor);
+      // Only attach the processor if it's not already the active one on this track
+      const currentProcessor = (camTrack as any).getProcessor?.() ?? (camTrack as any).processor;
+      if (currentProcessor !== processor) {
+        try {
+          await camTrack.setProcessor(processor);
+        } catch {
+          if (opId !== bgApplyOpRef.current) return false;
+          try { await processor?.destroy?.(); } catch {}
+          processor = BackgroundProcessor({ mode: "disabled" });
+          bgProcessorRef.current = processor;
+          await camTrack.setProcessor(processor);
+        }
       }
 
       if (opId !== bgApplyOpRef.current) return false;
