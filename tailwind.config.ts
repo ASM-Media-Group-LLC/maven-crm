@@ -109,6 +109,7 @@ export default {
         "clari-pulse": "clari-pulse 2s ease-in-out infinite",
         "fade-in-up": "fade-in-up 0.6s ease-out both",
         "float": "float 3s ease-in-out infinite",
+        "reaction-float": "reaction-float 5s ease-out forwards",
       },
     },
   },

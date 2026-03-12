@@ -958,7 +958,7 @@ export function useLiveKit() {
           p.isLocal ? { ...p, reactions: p.reactions.slice(1) } : p
         )
       );
-    }, 3000);
+    }, 6000);
   }, []);
 
   // ── Chat ──────────────────────────────────────────────────────
