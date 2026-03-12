@@ -258,6 +258,7 @@ export default function ChatView({
           currentUserId={user?.id}
           onSendReply={handleSendThreadReply}
           onClose={() => setThreadParent(null)}
+          participants={conversation.participants}
         />
       )}
 
