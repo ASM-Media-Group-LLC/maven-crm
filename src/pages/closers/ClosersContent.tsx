@@ -59,7 +59,13 @@ const ClosersContent = () => {
             </TabsList>
 
             <TabsContent value="mis-creators">
-              <MisCreatorsTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} onDelete={setDeletingCreator} />
+              <MisCreatorsTab
+                creators={creators}
+                onView={setViewCreator}
+                onEdit={setEditCreator}
+                onDelete={setDeletingCreator}
+                onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
+              />
             </TabsContent>
             <TabsContent value="pipeline">
               <PipelineTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} />

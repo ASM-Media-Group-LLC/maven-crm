@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ArrowRight, Lightbulb } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,9 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { LeadGenEntry } from "./useLeadGen";
-
-const getTicketId = (entry: LeadGenEntry) =>
-  entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
 interface Props {
   open: boolean;
@@ -28,14 +24,30 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
     onOpenChange(false);
   };
 
-  const ticketId = getTicketId(lead);
-
   const convert = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      const { error: insertError } = await supabase.from("closers_contacts").insert({
+      // Insert into closer_creators (the actual pipeline table)
+      const { error: insertError } = await supabase.from("closer_creators").insert({
+        instagram_handle: lead.model_handle,
+        source_account: lead.company || null,
+        category: lead.quality || null,
+        phone: lead.phone_raw || null,
+        onlyfans_url: lead.source_link || null,
+        passed_date: lead.entry_date || new Date().toISOString().slice(0, 10),
+        stage: "Asignada",
+        estimated_monetization: 0,
+        agency_commission: 0,
+        created_by: user.id,
+        assigned_to: user.id,
+      });
+      if (insertError) throw insertError;
+
+      // Also insert into closers_contacts for traceability
+      const ticketId = lead.ticket_number || `#LG${lead.id.slice(-7).toUpperCase()}`;
+      await supabase.from("closers_contacts").insert({
         name: lead.model_handle,
         handle: lead.model_handle,
         platform: lead.platform,
@@ -45,8 +57,8 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         ticket_number: ticketId,
         created_by: user.id,
       });
-      if (insertError) throw insertError;
 
+      // Mark lead as "contactado"
       const { error: updateError } = await supabase
         .from("leadgen_entries")
         .update({ status: "contactado" } as any)
@@ -55,8 +67,10 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
-      toast({ title: "Lead convertido", description: "El contacto fue creado exitosamente." });
+      toast({ title: "Lead convertido", description: "El contacto fue creado y agregado al pipeline de Closers." });
       onConverted();
     },
     onError: () => {
@@ -67,9 +81,10 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
   const items = [
     { label: "Handle", value: `@${lead.model_handle}` },
     { label: "Plataforma", value: lead.platform },
-    { label: "País", value: lead.country_code || "—" },
-    { label: "Compañía", value: lead.company || "—" },
-    { label: "Ticket", value: ticketId },
+    { label: "Categoría", value: lead.quality || "—" },
+    { label: "Cuenta origen", value: lead.company || "—" },
+    { label: "Teléfono", value: lead.phone_raw || "—" },
+    { label: "Enlace", value: lead.source_link ? "✓ Incluido" : "—" },
   ];
 
   return (
@@ -78,10 +93,10 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ArrowRight className="h-5 w-5 text-primary" />
-            <DialogTitle>Convertir Lead a Contacto</DialogTitle>
+            <DialogTitle>Convertir Lead a Pipeline Closers</DialogTitle>
           </div>
           <DialogDescription>
-            Este lead será transferido al módulo de Closers como un contacto nuevo.
+            Este lead será transferido al pipeline de Closers como una creator nueva en etapa "Asignada".
           </DialogDescription>
         </DialogHeader>
 
@@ -103,7 +118,7 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
           <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            El lead quedará marcado como "contactado" y el contacto será asignado al módulo de Closers.
+            El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers.
           </p>
         </div>
 

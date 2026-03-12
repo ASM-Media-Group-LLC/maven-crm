@@ -11,9 +11,10 @@ interface Props {
   onView: (c: CloserCreator) => void;
   onEdit: (c: CloserCreator) => void;
   onDelete: (c: CloserCreator) => void;
+  onStageChange: (id: string, stage: string) => void;
 }
 
-const MisCreatorsTab = ({ creators, onView, onEdit, onDelete }: Props) => {
+const MisCreatorsTab = ({ creators, onView, onEdit, onDelete, onStageChange }: Props) => {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
 
@@ -28,6 +29,19 @@ const MisCreatorsTab = ({ creators, onView, onEdit, onDelete }: Props) => {
     { key: "category", label: "Categoría" },
     { key: "passed_date", label: "Fecha de paso" },
     { key: "source_account", label: "Cuenta origen" },
+    {
+      key: "contactada",
+      label: "Contactada?",
+      render: (c: CloserCreator) => (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+          c.last_contact_date
+            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+            : "bg-destructive/10 text-destructive"
+        }`}>
+          {c.last_contact_date ? "Sí" : "No"}
+        </span>
+      ),
+    },
     { key: "phone", label: "Número" },
     { key: "onlyfans_url", label: "OnlyFans" },
     { key: "estimated_monetization", label: "Monetización" },
@@ -55,7 +69,14 @@ const MisCreatorsTab = ({ creators, onView, onEdit, onDelete }: Props) => {
           </Button>
         )}
       </div>
-      <CreatorTable creators={filtered} columns={columns} onView={onView} onEdit={onEdit} onDelete={onDelete} />
+      <CreatorTable
+        creators={filtered}
+        columns={columns}
+        onView={onView}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onStageChange={onStageChange}
+      />
     </div>
   );
 };
