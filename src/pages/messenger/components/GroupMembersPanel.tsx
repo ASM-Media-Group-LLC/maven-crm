@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2 } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -38,6 +38,8 @@ export default function GroupMembersPanel({
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const [removingUser, setRemovingUser] = useState<{ id: string; name: string } | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [leavingGroup, setLeavingGroup] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const isAdmin = conversation.participants.find(p => p.user_id === user?.id)?.role === "admin";
   const memberIds = new Set(conversation.participants.map(p => p.user_id));
@@ -109,6 +111,31 @@ export default function GroupMembersPanel({
     }
     setRemoving(false);
     setRemovingUser(null);
+  };
+
+  const handleLeaveGroup = async () => {
+    setLeavingGroup(true);
+    const myName = profiles[user!.id]?.full_name || "Usuario";
+    const { error } = await supabase
+      .from("chat_participants")
+      .delete()
+      .eq("conversation_id", conversation.id)
+      .eq("user_id", user!.id);
+    if (error) {
+      toast.error("Error al salir del grupo");
+    } else {
+      await supabase.from("chat_messages").insert({
+        conversation_id: conversation.id,
+        sender_id: user!.id,
+        content: `${myName} salió del grupo`,
+        type: "system",
+      });
+      toast.success("Has salido del grupo");
+      onMembersChanged();
+      onClose();
+    }
+    setLeavingGroup(false);
+    setShowLeaveConfirm(false);
   };
 
   return (
@@ -250,6 +277,21 @@ export default function GroupMembersPanel({
         </div>
       </ScrollArea>
 
+      {/* Leave group button for non-admin */}
+      {!isAdmin && (
+        <div className="px-4 py-3 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setShowLeaveConfirm(true)}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Salir del grupo
+          </Button>
+        </div>
+      )}
+
       {/* Remove confirmation */}
       <AlertDialog open={!!removingUser} onOpenChange={() => setRemovingUser(null)}>
         <AlertDialogContent>
@@ -264,6 +306,25 @@ export default function GroupMembersPanel({
             <AlertDialogAction onClick={handleRemoveMember} disabled={removing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave group confirmation */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={() => setShowLeaveConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Salir del grupo</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres salir del grupo "{conversation.displayName}"? Ya no podrás ver los mensajes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leavingGroup}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLeaveGroup} disabled={leavingGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {leavingGroup ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
