@@ -446,6 +446,10 @@ export function useChat() {
 
     return () => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
+      if (chatRealtimeReconnectTimerRef.current) {
+        clearTimeout(chatRealtimeReconnectTimerRef.current);
+        chatRealtimeReconnectTimerRef.current = null;
+      }
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
