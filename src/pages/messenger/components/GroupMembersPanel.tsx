@@ -277,6 +277,21 @@ export default function GroupMembersPanel({
         </div>
       </ScrollArea>
 
+      {/* Leave group button for non-admin */}
+      {!isAdmin && (
+        <div className="px-4 py-3 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setShowLeaveConfirm(true)}
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Salir del grupo
+          </Button>
+        </div>
+      )}
+
       {/* Remove confirmation */}
       <AlertDialog open={!!removingUser} onOpenChange={() => setRemovingUser(null)}>
         <AlertDialogContent>
@@ -291,6 +306,25 @@ export default function GroupMembersPanel({
             <AlertDialogAction onClick={handleRemoveMember} disabled={removing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Leave group confirmation */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={() => setShowLeaveConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Salir del grupo</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que quieres salir del grupo "{conversation.displayName}"? Ya no podrás ver los mensajes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leavingGroup}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLeaveGroup} disabled={leavingGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {leavingGroup ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Salir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
