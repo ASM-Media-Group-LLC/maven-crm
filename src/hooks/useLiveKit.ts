@@ -626,6 +626,10 @@ export function useLiveKit() {
         setIsReconnecting(false);
         console.info("[LiveKit] Reconnected successfully");
         refreshParticipants();
+
+        if (backgroundEffectRef.current !== "none") {
+          void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
+        }
       });
 
       // Participant & track events
@@ -650,7 +654,13 @@ export function useLiveKit() {
       });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
-      room.on(RoomEvent.LocalTrackPublished, debouncedRefresh);
+      room.on(RoomEvent.LocalTrackPublished, (publication) => {
+        debouncedRefresh();
+
+        if (publication.source === Track.Source.Camera && backgroundEffectRef.current !== "none") {
+          void wait(150).then(() => queueBackgroundEffectApply(backgroundEffectRef.current));
+        }
+      });
       room.on(RoomEvent.LocalTrackUnpublished, debouncedRefresh);
 
       // Connection quality
