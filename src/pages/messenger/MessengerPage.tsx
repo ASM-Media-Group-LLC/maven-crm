@@ -112,7 +112,7 @@ export default function MessengerPage() {
 
   const handleDeleteChat = async (chatId: string) => {
     const success = await deleteConversation(chatId);
-    if (success && activeChatId === chatId) setActiveChatId(null);
+    if (success && activeChatId === chatId) selectChat(null);
     return success;
   };
 
