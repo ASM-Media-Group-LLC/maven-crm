@@ -18,6 +18,39 @@ function getInitials(name: string) {
   return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
+
+function areReactionsEqual(a: string[], b: string[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantTileProps) {
+  const prevP = prev.participant;
+  const nextP = next.participant;
+
+  return (
+    prev.room === next.room &&
+    prev.large === next.large &&
+    prev.className === next.className &&
+    prev.preferredAudioOutputDeviceId === next.preferredAudioOutputDeviceId &&
+    prevP.sid === nextP.sid &&
+    prevP.identity === nextP.identity &&
+    prevP.name === nextP.name &&
+    prevP.isSpeaking === nextP.isSpeaking &&
+    prevP.isMuted === nextP.isMuted &&
+    prevP.isCameraOff === nextP.isCameraOff &&
+    prevP.isScreenSharing === nextP.isScreenSharing &&
+    prevP.isLocal === nextP.isLocal &&
+    prevP.handRaised === nextP.handRaised &&
+    prevP.connectionQuality === nextP.connectionQuality &&
+    areReactionsEqual(prevP.reactions, nextP.reactions)
+  );
+}
+
 // Connection quality indicator
 function ConnectionIndicator({ quality }: { quality: string }) {
   const bars = quality === "excellent" ? 3 : quality === "good" ? 2 : quality === "poor" ? 1 : 0;
