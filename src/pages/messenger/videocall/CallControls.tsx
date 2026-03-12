@@ -14,6 +14,7 @@ interface CallControlsProps {
   isHandRaised: boolean;
   isChatOpen: boolean;
   isParticipantsOpen: boolean;
+  isMetricsOpen: boolean;
   backgroundEffect: BackgroundEffect;
   onToggleMic: () => void;
   onToggleCam: () => void;
