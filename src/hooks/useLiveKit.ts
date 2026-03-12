@@ -123,6 +123,29 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
 
+const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
+const BACKGROUND_SWITCH_TIMEOUT_MS = 7000;
+const BACKGROUND_FAILURE_COOLDOWN_MS = 12000;
+
+function isTemplateBackground(effect: BackgroundEffect) {
+  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+}
+
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      task,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}-timeout`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ── Production Room configuration ────────────────────────────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
@@ -172,8 +195,11 @@ export function useLiveKit() {
     audioOutputDeviceId?: string;
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
+  const bgLastAppliedEffectRef = useRef<BackgroundEffect>("none");
+  const bgRequestedEffectRef = useRef<BackgroundEffect>("none");
   const bgApplyOpRef = useRef(0);
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const bgFailureCooldownUntilRef = useRef(0);
   const connectingRef = useRef(false); // Guard against concurrent connect()
   const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
 
@@ -275,10 +301,11 @@ export function useLiveKit() {
     const processor = bgProcessorRef.current;
     bgProcessorRef.current = null;
     bgAttachedTrackRef.current = null;
+    bgLastAppliedEffectRef.current = "none";
 
     if (processor?.destroy) {
       try {
-        await processor.destroy();
+        await withTimeout(Promise.resolve(processor.destroy()), 2500, "bg-destroy");
       } catch {
         // no-op
       }
@@ -332,51 +359,78 @@ export function useLiveKit() {
       return false;
     }
 
+    if (effect !== "none" && Date.now() < bgFailureCooldownUntilRef.current) {
+      return false;
+    }
+
     const opId = ++bgApplyOpRef.current;
-    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((publication) => publication.source === Track.Source.Camera)?.track as any;
+    const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+      (publication) => publication.source === Track.Source.Camera,
+    );
+    const camTrack = cameraPublication?.track as any;
 
     if (!camTrack) {
       if (effect === "none") {
+        bgLastAppliedEffectRef.current = "none";
         await disposeBackgroundProcessor();
         return true;
       }
       return false;
     }
 
+    const effectAlreadyApplied = effect === bgLastAppliedEffectRef.current;
+    const needsProcessorAttach = effect !== "none" && bgAttachedTrackRef.current !== camTrack;
+
+    if (effectAlreadyApplied && !needsProcessorAttach) {
+      return true;
+    }
+
     try {
+      if (effect === "none") {
+        const existingProcessor = bgProcessorRef.current;
+        if (existingProcessor?.switchTo) {
+          await withTimeout(
+            Promise.resolve(existingProcessor.switchTo({ mode: "disabled" })),
+            BACKGROUND_SWITCH_TIMEOUT_MS,
+            "bg-disable",
+          );
+        }
+
+        bgLastAppliedEffectRef.current = "none";
+        refreshParticipants();
+        return true;
+      }
+
       let processor = bgProcessorRef.current;
       if (!processor) {
         processor = BackgroundProcessor({ mode: "disabled" });
         bgProcessorRef.current = processor;
       }
 
-      const currentProcessor =
-        (typeof camTrack.getProcessor === "function" ? camTrack.getProcessor() : (camTrack as any).processor) ?? null;
-
-      if (bgAttachedTrackRef.current !== camTrack || currentProcessor !== processor) {
-        try {
-          await camTrack.setProcessor(processor, true);
-          bgAttachedTrackRef.current = camTrack;
-        } catch {
-          if (opId !== bgApplyOpRef.current) return false;
-          try { await processor?.destroy?.(); } catch {}
-          processor = BackgroundProcessor({ mode: "disabled" });
-          bgProcessorRef.current = processor;
-          await camTrack.setProcessor(processor, true);
-          bgAttachedTrackRef.current = camTrack;
-        }
+      if (bgAttachedTrackRef.current !== camTrack) {
+        await withTimeout(
+          Promise.resolve(camTrack.setProcessor(processor, true)),
+          BACKGROUND_ATTACH_TIMEOUT_MS,
+          "bg-attach",
+        );
+        bgAttachedTrackRef.current = camTrack;
       }
 
       if (opId !== bgApplyOpRef.current) return false;
 
-      if (effect === "none") {
-        await processor.switchTo({ mode: "disabled" });
-      } else if (effect === "soft-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      if (effect === "soft-blur") {
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-soft-blur",
+        );
       } else if (effect === "hard-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
-      } else {
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-hard-blur",
+        );
+      } else if (isTemplateBackground(effect)) {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
         const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
 
@@ -395,28 +449,42 @@ export function useLiveKit() {
 
         if (opId !== bgApplyOpRef.current) return false;
 
-        await processor.switchTo({
-          mode: "virtual-background",
-          imagePath: templateUrl,
-        });
+        await withTimeout(
+          Promise.resolve(
+            processor.switchTo({
+              mode: "virtual-background",
+              imagePath: templateUrl,
+            }),
+          ),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-template",
+        );
+      } else {
+        return false;
       }
 
+      if (opId !== bgApplyOpRef.current) return false;
+
+      bgFailureCooldownUntilRef.current = 0;
+      bgLastAppliedEffectRef.current = effect;
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 180);
+      setTimeout(() => refreshParticipants(), 140);
       return true;
     } catch (err) {
       console.error("Background processor error:", err);
 
       if (opId !== bgApplyOpRef.current) return false;
 
+      bgFailureCooldownUntilRef.current = Date.now() + BACKGROUND_FAILURE_COOLDOWN_MS;
+
       try {
-        await camTrack.stopProcessor?.();
+        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 1500, "bg-stop");
       } catch {
         // no-op
       }
 
       bgAttachedTrackRef.current = null;
-      backgroundEffectRef.current = "none";
+      bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
       if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
@@ -431,20 +499,54 @@ export function useLiveKit() {
   }, [disposeBackgroundProcessor, hasActiveCameraPublication, enableCameraWithRecovery, refreshParticipants]);
 
   const queueBackgroundEffectApply = useCallback((effect: BackgroundEffect) => {
+    bgRequestedEffectRef.current = effect;
+
     bgApplyQueueRef.current = bgApplyQueueRef.current
       .catch(() => false)
       .then(async () => {
-        const room = roomRef.current;
-        if (!room) return false;
+        while (true) {
+          const room = roomRef.current;
+          if (!room) return false;
 
-        const camReady = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
-        if (!camReady) return effect === "none";
+          const nextEffect = bgRequestedEffectRef.current;
+          const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+            (publication) => publication.source === Track.Source.Camera,
+          );
+          const camTrack = cameraPublication?.track as any;
+          const camReady = !!camTrack || room.localParticipant.isCameraEnabled;
 
-        return applyBackgroundEffectToCurrentCamera(effect);
+          if (!camReady) {
+            bgLastAppliedEffectRef.current = "none";
+            return nextEffect === "none";
+          }
+
+          const processorAttached = !!camTrack && bgAttachedTrackRef.current === camTrack;
+          if (nextEffect === bgLastAppliedEffectRef.current && (nextEffect === "none" || processorAttached)) {
+            return true;
+          }
+
+          const applied = await applyBackgroundEffectToCurrentCamera(nextEffect);
+          if (bgRequestedEffectRef.current === nextEffect) {
+            return applied;
+          }
+        }
       });
 
     return bgApplyQueueRef.current;
-  }, [applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication]);
+  }, [applyBackgroundEffectToCurrentCamera]);
+
+  const applyConfiguredBackgroundIfNeeded = useCallback(async (room: Room) => {
+    if (backgroundEffectRef.current === "none") {
+      bgLastAppliedEffectRef.current = "none";
+      return true;
+    }
+
+    const cameraReady = await waitForCameraPublication(room, [120, 220, 360]);
+    if (!cameraReady) return false;
+
+    await wait(90);
+    return queueBackgroundEffectApply(backgroundEffectRef.current);
+  }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
   // ── Cleanup audio resume listeners ─────────────────────────────
   const cleanupAudioResumeListeners = useCallback(() => {
@@ -526,6 +628,10 @@ export function useLiveKit() {
         setIsReconnecting(false);
         console.info("[LiveKit] Reconnected successfully");
         refreshParticipants();
+
+        if (backgroundEffectRef.current !== "none") {
+          void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
+        }
       });
 
       // Participant & track events
@@ -550,7 +656,13 @@ export function useLiveKit() {
       });
       room.on(RoomEvent.TrackMuted, debouncedRefresh);
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
-      room.on(RoomEvent.LocalTrackPublished, debouncedRefresh);
+      room.on(RoomEvent.LocalTrackPublished, (publication) => {
+        debouncedRefresh();
+
+        if (publication.source === Track.Source.Camera && backgroundEffectRef.current !== "none") {
+          void wait(150).then(() => queueBackgroundEffectApply(backgroundEffectRef.current));
+        }
+      });
       room.on(RoomEvent.LocalTrackUnpublished, debouncedRefresh);
 
       // Connection quality
@@ -693,12 +805,8 @@ export function useLiveKit() {
       if (shouldEnableCam) {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          for (const delayMs of [120, 240, 420]) {
-            await wait(delayMs);
-            const applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
-            if (applied) break;
-          }
+        if (cameraEnabled) {
+          await applyConfiguredBackgroundIfNeeded(room);
         }
       }
 
@@ -722,7 +830,7 @@ export function useLiveKit() {
     } finally {
       connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, queueBackgroundEffectApply, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, queueBackgroundEffectApply, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -776,13 +884,8 @@ export function useLiveKit() {
         await disposeBackgroundProcessor();
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          let applied = false;
-          for (const delayMs of [90, 180, 320, 480]) {
-            await wait(delayMs);
-            applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
-            if (applied) break;
-          }
+        if (cameraEnabled) {
+          await applyConfiguredBackgroundIfNeeded(room);
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
@@ -801,7 +904,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, queueBackgroundEffectApply, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded]);
 
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
@@ -911,8 +1014,16 @@ export function useLiveKit() {
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
+    bgRequestedEffectRef.current = effect;
+
+    const room = roomRef.current;
+    if (!room) return;
+
+    const hasCamera = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
+    if (!hasCamera && effect !== "none") return;
+
     await queueBackgroundEffectApply(effect);
-  }, [queueBackgroundEffectApply]);
+  }, [queueBackgroundEffectApply, hasActiveCameraPublication]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {

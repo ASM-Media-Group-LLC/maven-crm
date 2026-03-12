@@ -36,7 +36,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);
-  }, []);
+
+    if (lk.connectionState === ConnectionState.Connected) {
+      void lk.setBackgroundEffect(effect);
+    }
+  }, [lk.connectionState, lk.setBackgroundEffect]);
 
   // Connect on mount
   useEffect(() => {
@@ -83,11 +87,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     const qs = params.toString();
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   }, [roomName, callDisplayName]);
-
-  useEffect(() => {
-    if (lk.connectionState !== ConnectionState.Connected) return;
-    void lk.setBackgroundEffect(bgEffect);
-  }, [lk.connectionState, lk.setBackgroundEffect, bgEffect]);
 
   // Find screen sharer for spotlight
   const spotlightParticipant = useMemo(() => {
