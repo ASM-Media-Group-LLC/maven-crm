@@ -181,6 +181,7 @@ export function useLiveKit() {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [participants, setParticipants] = useState<LKParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<LKChatMessage[]>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -732,6 +733,7 @@ export function useLiveKit() {
               }
               return newMessages;
             });
+            setUnreadChatCount((c) => c + 1);
           } else if (msg.type === "hand") {
             handRaisedMap.current[participant?.identity || ""] = msg.payload.raised;
             refreshParticipants();
@@ -751,7 +753,7 @@ export function useLiveKit() {
                     : p
                 )
               );
-            }, 10000);
+            }, 15000);
           } else if (msg.type === "moderation") {
             // Security: Verify the sender has roomAdmin permission via LiveKit metadata
             // Only process moderation from participants with admin grants
@@ -977,7 +979,7 @@ export function useLiveKit() {
           p.isLocal ? { ...p, reactions: p.reactions.slice(1) } : p
         )
       );
-    }, 10000);
+    }, 15000);
   }, []);
 
   // ── Chat ──────────────────────────────────────────────────────
@@ -1055,10 +1057,15 @@ export function useLiveKit() {
     };
   }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
+  const clearUnreadChat = useCallback(() => {
+    setUnreadChatCount(0);
+  }, []);
+
   return {
     connectionState,
     participants,
     chatMessages,
+    unreadChatCount,
     isMicOn,
     isCamOn,
     isScreenSharing,
@@ -1078,5 +1085,6 @@ export function useLiveKit() {
     removeParticipant,
     getRoom,
     setBackgroundEffect,
+    clearUnreadChat,
   };
 }

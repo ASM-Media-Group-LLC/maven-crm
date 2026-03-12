@@ -11,6 +11,7 @@ describe("CallControls", () => {
     isScreenSharing: false,
     isHandRaised: false,
     isChatOpen: false,
+    unreadChatCount: 0,
     isParticipantsOpen: false,
     isMetricsOpen: false,
     isCaptionsOn: false,

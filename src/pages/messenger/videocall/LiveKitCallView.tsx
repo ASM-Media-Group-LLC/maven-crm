@@ -37,6 +37,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
+  // Auto-clear unread chat messages when chat sidebar is open
+  useEffect(() => {
+    if (chatOpen && lk.unreadChatCount > 0) {
+      lk.clearUnreadChat();
+    }
+  }, [chatOpen, lk.unreadChatCount, lk.clearUnreadChat]);
+
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);
 
@@ -238,6 +245,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isScreenSharing={lk.isScreenSharing}
         isHandRaised={lk.isHandRaised}
         isChatOpen={chatOpen}
+        unreadChatCount={lk.unreadChatCount}
         isParticipantsOpen={participantsOpen}
         isMetricsOpen={metricsOpen}
         isCaptionsOn={captions.isActive}
@@ -248,7 +256,15 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
         onToggleHand={lk.toggleHand}
-        onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) { setParticipantsOpen(false); setMetricsOpen(false); } }}
+        onToggleChat={() => {
+          const willOpen = !chatOpen;
+          setChatOpen(willOpen);
+          if (willOpen) {
+            setParticipantsOpen(false);
+            setMetricsOpen(false);
+            lk.clearUnreadChat();
+          }
+        }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) { setChatOpen(false); setMetricsOpen(false); } }}
         onToggleMetrics={() => { setMetricsOpen(!metricsOpen); if (!metricsOpen) { setChatOpen(false); setParticipantsOpen(false); } }}
         onToggleCaptions={captions.toggle}
