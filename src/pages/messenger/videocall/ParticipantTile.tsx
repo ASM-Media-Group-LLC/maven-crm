@@ -57,11 +57,21 @@ const ParticipantTile = memo(function ParticipantTile({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const attachedVideoTrackRef = useRef<any>(null);
+  const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
+
+  // Reset attached track ref when video element changes (camera toggle unmounts/remounts <video>)
+  const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
   // Attach/detach tracks
   useEffect(() => {
     if (!room) return;
+
+    // If the video element changed (remounted), reset the attached ref so we force reattach
+    if (videoRef.current !== attachedVideoElRef.current) {
+      attachedVideoTrackRef.current = null;
+      attachedVideoElRef.current = videoRef.current;
+    }
 
     const lkParticipant = participant.isLocal
       ? room.localParticipant
@@ -81,17 +91,19 @@ const ParticipantTile = memo(function ParticipantTile({
       if (videoTrack?.track && videoEl) {
         // Always detach old track first, then attach new one
         if (attachedVideoTrackRef.current && attachedVideoTrackRef.current !== videoTrack.track) {
-          attachedVideoTrackRef.current.detach(videoEl);
+          try { attachedVideoTrackRef.current.detach(videoEl); } catch {}
         }
         if (attachedVideoTrackRef.current !== videoTrack.track) {
           videoTrack.track.attach(videoEl);
           attachedVideoTrackRef.current = videoTrack.track;
+          // Force play in case autoplay is blocked
+          videoEl.play?.().catch(() => {});
         }
-        return true;
+        return false; // attached, no retry needed
       } else if (videoEl) {
         // No track available — clean up
         if (attachedVideoTrackRef.current) {
-          attachedVideoTrackRef.current.detach(videoEl);
+          try { attachedVideoTrackRef.current.detach(videoEl); } catch {}
           attachedVideoTrackRef.current = null;
         }
         return !participant.isCameraOff; // retry if camera should be on
@@ -104,12 +116,12 @@ const ParticipantTile = memo(function ParticipantTile({
     let retryAttempts = 0;
 
     const scheduleAttachRetry = () => {
-      if (retryAttempts >= 5 || participant.isCameraOff) return;
+      if (retryAttempts >= 8 || participant.isCameraOff) return;
       retryTimer = setTimeout(() => {
         retryAttempts += 1;
         const stillNeedsRetry = attachVideo();
         if (stillNeedsRetry) scheduleAttachRetry();
-      }, 250 * retryAttempts + 250);
+      }, 200 * retryAttempts + 150);
     };
 
     if (needsRetry && !participant.isCameraOff) {
@@ -188,7 +200,7 @@ const ParticipantTile = memo(function ParticipantTile({
     };
   }, []);
 
-  const showVideo = !participant.isCameraOff || participant.isScreenSharing;
+  // showVideo already declared above
 
   return (
     <div
