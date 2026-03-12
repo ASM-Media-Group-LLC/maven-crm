@@ -321,9 +321,27 @@ export function useChat() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "chat_conversations" },
-        () => {
-          scheduleConversationsReload();
+        { event: "UPDATE", schema: "public", table: "chat_conversations" },
+        (payload) => {
+          // Inline update: just patch name/avatar without full reload
+          const updated = payload.new as any;
+          setConversations(prev => {
+            const idx = prev.findIndex(c => c.id === updated.id);
+            if (idx === -1) return prev;
+            const patched = { ...prev[idx], name: updated.name, avatar_url: updated.avatar_url, description: updated.description };
+            if (patched.type === "group" && updated.name) patched.displayName = updated.name;
+            const next = [...prev];
+            next[idx] = patched;
+            return next;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_conversations" },
+        (payload) => {
+          const old = payload.old as any;
+          setConversations(prev => prev.filter(c => c.id !== old.id));
         }
       )
       .subscribe((status) => {
@@ -331,7 +349,7 @@ export function useChat() {
           void loadConversations();
         }
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setTimeout(() => void loadConversations(), 2000);
+          setTimeout(() => void loadConversations(), 3000);
         }
       });
 
@@ -342,11 +360,12 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // Reduced polling: 60s instead of 30s for 80+ users
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
       }
-    }, 30_000);
+    }, 60_000);
 
     return () => {
       if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
