@@ -36,7 +36,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);
-  }, []);
+
+    if (lk.connectionState === ConnectionState.Connected) {
+      void lk.setBackgroundEffect(effect);
+    }
+  }, [lk.connectionState, lk.setBackgroundEffect]);
 
   // Connect on mount
   useEffect(() => {
