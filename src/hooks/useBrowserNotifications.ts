@@ -11,7 +11,7 @@ export function useNotificationPermission() {
 
 /** Show a browser notification when the tab is hidden */
 export function useBrowserNotifications() {
-  const enabled = useRef(true);
+  const enabled = useRef(typeof document !== "undefined" ? document.hidden : false);
 
   // Track tab visibility
   useEffect(() => {
