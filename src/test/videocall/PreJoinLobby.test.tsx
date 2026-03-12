@@ -31,9 +31,9 @@ describe("PreJoinLobby", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the call display name", () => {
+  it("does not render the call display name (hidden by design)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    expect(screen.getByText("Daily Standup")).toBeInTheDocument();
+    expect(screen.queryByText("Daily Standup")).not.toBeInTheDocument();
   });
 
   it("renders the user display name", () => {
