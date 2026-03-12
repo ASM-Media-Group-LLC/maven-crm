@@ -215,7 +215,7 @@ export default function ChatView({
         )}
 
         <MessageList
-          messages={messages}
+          messages={mainMessages}
           profiles={profiles}
           chatType={conversation.type}
           currentUserId={user?.id}
