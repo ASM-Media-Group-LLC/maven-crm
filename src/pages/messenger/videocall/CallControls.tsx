@@ -102,6 +102,8 @@ export default function CallControls({
       <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
       <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
+      <ControlBtn icon={BarChart3} onClick={onToggleMetrics} label="Métricas" badge={isMetricsOpen} />
+      <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
 
       <button
         onClick={onLeave}
