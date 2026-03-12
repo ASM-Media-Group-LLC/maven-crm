@@ -69,8 +69,8 @@ export default function MessengerPage() {
     if (convId) setActiveChatId(convId);
   }, [createDirectChat]);
 
-  const handleCreateGroup = async (name: string, memberIds: string[]) => {
-    const convId = await createGroupChat(name, memberIds);
+  const handleCreateGroup = (name: string, memberIds: string[]) => {
+    const convId = createGroupChat(name, memberIds);
     if (convId) setActiveChatId(convId);
     setNewGroupOpen(false);
   };
