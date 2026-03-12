@@ -5551,6 +5551,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_unread_counts: {
+        Args: { _user_id: string }
+        Returns: {
+          conversation_id: string
+          unread_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
