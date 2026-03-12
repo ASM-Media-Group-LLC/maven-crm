@@ -240,8 +240,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
         onToggleHand={lk.toggleHand}
-        onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) setParticipantsOpen(false); }}
-        onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
+        onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) { setParticipantsOpen(false); setMetricsOpen(false); } }}
+        onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) { setChatOpen(false); setMetricsOpen(false); } }}
+        onToggleMetrics={() => { setMetricsOpen(!metricsOpen); if (!metricsOpen) { setChatOpen(false); setParticipantsOpen(false); } }}
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}

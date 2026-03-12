@@ -20,6 +20,7 @@ describe("CallControls", () => {
     onToggleHand: vi.fn(),
     onToggleChat: vi.fn(),
     onToggleParticipants: vi.fn(),
+    onToggleMetrics: vi.fn(),
     onSendReaction: vi.fn(),
     onBackgroundChange: vi.fn(),
     onLeave: vi.fn(),
