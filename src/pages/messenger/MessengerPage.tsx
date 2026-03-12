@@ -80,8 +80,8 @@ export default function MessengerPage() {
 
   const handleSelectUser = useCallback((userId: string) => {
     const convId = createDirectChat(userId);
-    if (convId) setActiveChatId(convId);
-  }, [createDirectChat]);
+    if (convId) selectChat(convId);
+  }, [createDirectChat, selectChat]);
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);
