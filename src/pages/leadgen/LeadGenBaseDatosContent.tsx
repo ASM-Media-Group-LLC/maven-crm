@@ -263,10 +263,10 @@ const LeadGenBaseDatosContent = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filterEstado} onValueChange={setFilterEstado}>
+          <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Estado</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="no_response">Sin Respuesta</SelectItem>
               <SelectItem value="contactado">Contactado</SelectItem>
               <SelectItem value="cerrado">Cerrado</SelectItem>
