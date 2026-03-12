@@ -366,8 +366,7 @@ export function useChat() {
     }, 60_000);
 
     return () => {
-      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-      if (delayedRefreshTimeoutRef.current) clearTimeout(delayedRefreshTimeoutRef.current);
+      if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
