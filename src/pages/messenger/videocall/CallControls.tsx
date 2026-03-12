@@ -1,11 +1,12 @@
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
-  PhoneOff, Hand, MessageSquare, Smile, Users, BarChart3,
+  PhoneOff, Hand, MessageSquare, Smile, Users, BarChart3, Captions, CaptionsOff, ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect } from "./BackgroundSelector";
+import { CAPTION_LANGUAGES } from "@/hooks/useSpeechCaptions";
 
 interface CallControlsProps {
   isMicOn: boolean;
@@ -15,6 +16,9 @@ interface CallControlsProps {
   isChatOpen: boolean;
   isParticipantsOpen: boolean;
   isMetricsOpen: boolean;
+  isCaptionsOn: boolean;
+  captionsLanguage: string;
+  captionsSupported: boolean;
   backgroundEffect: BackgroundEffect;
   onToggleMic: () => void;
   onToggleCam: () => void;
@@ -23,6 +27,8 @@ interface CallControlsProps {
   onToggleChat: () => void;
   onToggleParticipants: () => void;
   onToggleMetrics: () => void;
+  onToggleCaptions: () => void;
+  onCaptionsLanguageChange: (lang: string) => void;
   onSendReaction: (emoji: string) => void;
   onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
