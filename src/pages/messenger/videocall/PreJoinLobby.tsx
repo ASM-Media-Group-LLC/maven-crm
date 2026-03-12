@@ -25,15 +25,44 @@ interface DeviceInfo {
   label: string;
 }
 
+const PREJOIN_BG_ATTACH_TIMEOUT_MS = 6000;
+const PREJOIN_BG_SWITCH_TIMEOUT_MS = 7000;
+const PREJOIN_BG_FAILURE_COOLDOWN_MS = 12000;
+
+function isTemplateBackground(effect: BackgroundEffect) {
+  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+}
+
+async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      task,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}-timeout`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export default function PreJoinLobby({ roomName, displayName, callDisplayName, onJoin }: PreJoinLobbyProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
+  const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const bgProcessorRef = useRef<any>(null);
+  const bgAttachedTrackRef = useRef<LocalVideoTrack | null>(null);
   const bgOpRef = useRef(0);
   const mountedRef = useRef(true);
   const preloadedRef = useRef<Set<string>>(new Set());
   const bgEffectRef = useRef<BackgroundEffect>("none");
+  const bgRequestedEffectRef = useRef<BackgroundEffect>("none");
+  const bgLastAppliedEffectRef = useRef<BackgroundEffect>("none");
+  const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const bgFailureCooldownUntilRef = useRef(0);
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -71,12 +100,24 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   // ── Stop individual tracks ──────────────────────────────────
   const stopVideoTrack = useCallback(() => {
     const track = videoTrackRef.current;
+    const activeVideoEl = attachedVideoElRef.current || videoRef.current;
+
     if (track) {
-      try { track.detach(); } catch {}
+      try {
+        if (activeVideoEl) {
+          track.detach(activeVideoEl);
+        } else {
+          track.detach();
+        }
+      } catch {}
       try { track.stop(); } catch {}
       videoTrackRef.current = null;
     }
+
     if (videoRef.current) videoRef.current.srcObject = null;
+    attachedVideoElRef.current = null;
+    bgAttachedTrackRef.current = null;
+    bgLastAppliedEffectRef.current = "none";
   }, []);
 
   const stopAudioTrack = useCallback(() => {
@@ -91,94 +132,185 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     bgOpRef.current += 1;
     const processor = bgProcessorRef.current;
     bgProcessorRef.current = null;
+    bgAttachedTrackRef.current = null;
+    bgLastAppliedEffectRef.current = "none";
+
     if (processor?.destroy) {
-      try { await processor.destroy(); } catch {}
+      try { await withTimeout(Promise.resolve(processor.destroy()), 2500, "prejoin-bg-destroy"); } catch {}
     }
   }, []);
 
   // ── Background helpers ──────────────────────────────────────
   const preloadTemplate = useCallback(async (effect: BackgroundEffect) => {
-    if (effect === "none" || effect === "soft-blur" || effect === "hard-blur") return;
+    if (!isTemplateBackground(effect)) return;
+
     const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-    if (!tpl || preloadedRef.current.has(tpl.src)) return;
+    if (!tpl) return;
+
+    const templateUrl = `${window.location.origin}${tpl.src}`;
+    if (preloadedRef.current.has(templateUrl)) return;
+
     await new Promise<void>((resolve, reject) => {
       const img = new Image();
-      img.src = tpl.src;
+      img.src = templateUrl;
       img.onload = () => resolve();
       img.onerror = () => reject(new Error("template-load-failed"));
     });
-    preloadedRef.current.add(tpl.src);
+
+    preloadedRef.current.add(templateUrl);
   }, []);
 
-  const applyBackground = useCallback(async (track: LocalVideoTrack | null, effect: BackgroundEffect) => {
-    if (!track || !mountedRef.current) return;
-
-    const opId = ++bgOpRef.current;
+  const applyBackgroundToTrack = useCallback(async (track: LocalVideoTrack, effect: BackgroundEffect) => {
+    if (!mountedRef.current) return false;
 
     if (effect !== "none" && !supportsBackgroundProcessors()) {
       setBackgroundPreviewUnsupported(true);
-      return;
+      return false;
     }
-    setBackgroundPreviewUnsupported(false);
+
+    if (effect !== "none" && Date.now() < bgFailureCooldownUntilRef.current) {
+      return false;
+    }
+
+    const opId = ++bgOpRef.current;
 
     try {
-      // Create processor if needed
-      if (!bgProcessorRef.current) {
-        bgProcessorRef.current = BackgroundProcessor({ mode: "disabled" });
+      if (effect === "none") {
+        const processor = bgProcessorRef.current;
+        if (processor?.switchTo) {
+          await withTimeout(
+            Promise.resolve(processor.switchTo({ mode: "disabled" })),
+            PREJOIN_BG_SWITCH_TIMEOUT_MS,
+            "prejoin-bg-disable",
+          );
+        }
+        bgLastAppliedEffectRef.current = "none";
+        setBackgroundPreviewUnsupported(false);
+        return true;
       }
 
-      // Attach processor to track if not already
-      try {
-        await track.setProcessor(bgProcessorRef.current, true);
-      } catch {
-        // Processor might already be set — that's fine
+      let processor = bgProcessorRef.current;
+      if (!processor) {
+        processor = BackgroundProcessor({ mode: "disabled" });
+        bgProcessorRef.current = processor;
       }
 
-      if (opId !== bgOpRef.current) return;
+      if (bgAttachedTrackRef.current !== track) {
+        await withTimeout(
+          Promise.resolve(track.setProcessor(processor, true)),
+          PREJOIN_BG_ATTACH_TIMEOUT_MS,
+          "prejoin-bg-attach",
+        );
+        bgAttachedTrackRef.current = track;
+      }
 
-      // Preload image template if applicable
-      if (effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur") {
+      if (opId !== bgOpRef.current) return false;
+
+      if (isTemplateBackground(effect)) {
         await preloadTemplate(effect);
       }
 
-      if (opId !== bgOpRef.current) return;
+      if (opId !== bgOpRef.current) return false;
 
-      // Switch effect
-      const processor = bgProcessorRef.current;
-      if (effect === "none") {
-        await processor.switchTo({ mode: "disabled" });
-      } else if (effect === "soft-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      if (effect === "soft-blur") {
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })),
+          PREJOIN_BG_SWITCH_TIMEOUT_MS,
+          "prejoin-bg-soft-blur",
+        );
       } else if (effect === "hard-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })),
+          PREJOIN_BG_SWITCH_TIMEOUT_MS,
+          "prejoin-bg-hard-blur",
+        );
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
-        if (tpl) {
-          await processor.switchTo({
-            mode: "virtual-background",
-            imagePath: `${window.location.origin}${tpl.src}`,
-          });
-        }
+        if (!tpl) return false;
+
+        await withTimeout(
+          Promise.resolve(
+            processor.switchTo({
+              mode: "virtual-background",
+              imagePath: `${window.location.origin}${tpl.src}`,
+            }),
+          ),
+          PREJOIN_BG_SWITCH_TIMEOUT_MS,
+          "prejoin-bg-template",
+        );
       }
+
+      if (opId !== bgOpRef.current) return false;
+
+      bgFailureCooldownUntilRef.current = 0;
+      bgLastAppliedEffectRef.current = effect;
+      setBackgroundPreviewUnsupported(false);
+      return true;
     } catch (err) {
       console.warn("[PreJoin] Background preview failed:", err);
-      if (opId === bgOpRef.current) {
-        setBackgroundPreviewUnsupported(effect !== "none");
-      }
-      // Recovery: re-attach raw track to video element
-      if (videoRef.current && track) {
+      if (opId !== bgOpRef.current) return false;
+
+      bgFailureCooldownUntilRef.current = Date.now() + PREJOIN_BG_FAILURE_COOLDOWN_MS;
+
+      try {
+        await withTimeout(Promise.resolve((track as any).stopProcessor?.()), 1500, "prejoin-bg-stop");
+      } catch {}
+
+      bgAttachedTrackRef.current = null;
+      bgLastAppliedEffectRef.current = "none";
+      await disposeBackgroundProcessor();
+
+      if (videoRef.current && track && mountedRef.current && videoTrackRef.current === track) {
         try {
-          track.detach(videoRef.current);
+          track.detach();
           track.attach(videoRef.current);
+          attachedVideoElRef.current = videoRef.current;
+          videoRef.current.play?.().catch(() => {});
         } catch {}
       }
+
+      setBackgroundPreviewUnsupported(effect !== "none");
+      return false;
     }
-  }, [preloadTemplate]);
+  }, [disposeBackgroundProcessor, preloadTemplate]);
+
+  const queueBackgroundApply = useCallback((effect: BackgroundEffect) => {
+    bgRequestedEffectRef.current = effect;
+
+    bgApplyQueueRef.current = bgApplyQueueRef.current
+      .catch(() => false)
+      .then(async () => {
+        while (mountedRef.current) {
+          const nextEffect = bgRequestedEffectRef.current;
+          const track = videoTrackRef.current;
+
+          if (!track || !camOn) {
+            bgLastAppliedEffectRef.current = "none";
+            return nextEffect === "none";
+          }
+
+          const processorAttached = bgAttachedTrackRef.current === track;
+          if (nextEffect === bgLastAppliedEffectRef.current && (nextEffect === "none" || processorAttached)) {
+            return true;
+          }
+
+          const applied = await applyBackgroundToTrack(track, nextEffect);
+          if (bgRequestedEffectRef.current === nextEffect) {
+            return applied;
+          }
+        }
+
+        return false;
+      });
+
+    return bgApplyQueueRef.current;
+  }, [applyBackgroundToTrack, camOn]);
 
   // ── Start video track (independent of audio) ────────────────
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
     await disposeBackgroundProcessor();
+
     if (!camOn) return;
 
     try {
@@ -197,10 +329,12 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
       if (videoRef.current && vTrack) {
         vTrack.attach(videoRef.current);
-        // Apply current background effect
-        if (bgEffectRef.current !== "none") {
-          await applyBackground(vTrack, bgEffectRef.current);
-        }
+        attachedVideoElRef.current = videoRef.current;
+        videoRef.current.play?.().catch(() => {});
+      }
+
+      if (vTrack) {
+        await queueBackgroundApply(bgEffectRef.current);
       }
 
       setPermissionError(null);
@@ -212,7 +346,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         setPermissionError("No se pudo acceder a la cámara.");
       }
     }
-  }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, applyBackground, enumerateDevices]);
+  }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, queueBackgroundApply, enumerateDevices]);
 
   // ── Start audio track (independent of video) ────────────────
   const startAudioTrack = useCallback(async () => {
@@ -256,17 +390,20 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   // ── Apply background when effect changes ────────────────────
   useEffect(() => {
     bgEffectRef.current = bgEffect;
-    const track = videoTrackRef.current;
-    if (track) {
-      applyBackground(track, bgEffect).catch(() => {});
+    bgRequestedEffectRef.current = bgEffect;
+
+    if (!camOn) return;
+    if (videoTrackRef.current) {
+      void queueBackgroundApply(bgEffect);
     }
-  }, [bgEffect, applyBackground]);
+  }, [bgEffect, camOn, queueBackgroundApply]);
 
   // ── Cleanup processor on unmount ────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      bgRequestedEffectRef.current = "none";
       void disposeBackgroundProcessor();
     };
   }, [disposeBackgroundProcessor]);
