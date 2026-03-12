@@ -209,6 +209,9 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
               className="rounded-lg max-w-full max-h-60 object-cover"
               preload="metadata"
               muted
+              controlsList="nodownload noremoteplayback"
+              disablePictureInPicture
+              onContextMenu={(e) => e.preventDefault()}
             />
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-100 group-hover/video:bg-black/50 transition-colors">
               <div className="h-12 w-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
