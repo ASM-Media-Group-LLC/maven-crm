@@ -205,10 +205,17 @@ export function useChat() {
       setConversations(prev => {
         const idx = prev.findIndex(c => c.id === msg.conversation_id);
         if (idx === -1) {
-          // Unknown conversation — need full reload
-          scheduleConversationsReload(true);
+          // Unknown conversation — the chat_participants INSERT handler
+          // will reload when the user is actually added to a new group.
+          // Don't trigger a full reload for every message from other conversations.
           return prev;
         }
+
+        // Skip soft-deleted messages as lastMessage — they shouldn't appear in preview
+        if (msg.is_deleted) return prev;
+
+        // Skip system messages that are member join/leave for sidebar preview bump
+        // (they still get handled but don't override a real lastMessage)
         const conv = prev[idx];
         const updated = {
           ...conv,
