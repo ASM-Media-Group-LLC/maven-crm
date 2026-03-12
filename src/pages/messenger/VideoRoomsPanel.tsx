@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { VideoRoom } from "./types";
 import { toast } from "sonner";
@@ -20,15 +19,11 @@ interface VideoRoomsPanelProps {
 }
 
 export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
-  const [showCreate, setShowCreate] = useState(false);
-  const [roomName, setRoomName] = useState("");
   const [joinLink, setJoinLink] = useState("");
 
   const handleCreate = () => {
-    if (!roomName.trim()) return;
-    onCreateRoom(roomName.trim());
-    setRoomName("");
-    setShowCreate(false);
+    const autoName = `Sala ${new Date().toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+    onCreateRoom(autoName);
   };
 
   const extractRoomId = (value: string) => {
@@ -110,7 +105,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       <div className="shrink-0 p-4 space-y-3">
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={() => setShowCreate(true)} className="h-auto py-3 flex-col gap-1">
+          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1">
             <Plus className="h-5 w-5" />
             <span className="text-xs">Nueva sala</span>
           </Button>
@@ -191,30 +186,6 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
         </div>
       </ScrollArea>
 
-      {/* Create room dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear nueva sala de video</DialogTitle>
-            <DialogDescription>Ingresa un nombre para tu nueva sala de videollamada.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nombre de la sala</Label>
-              <Input
-                placeholder="Ej: Standup diario, Revisión de sprint..."
-                value={roomName}
-                onChange={e => setRoomName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleCreate()}
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!roomName.trim()}>Crear sala</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
