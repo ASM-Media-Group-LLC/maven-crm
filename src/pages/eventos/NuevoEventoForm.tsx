@@ -80,6 +80,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const [locationSearch, setLocationSearch] = useState(event?.location ?? "");
   const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity?.toString() ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
+  const [includeVideoCall, setIncludeVideoCall] = useState(!!(event as any)?.video_call_room_id);
 
   // Guests
   const [guests, setGuests] = useState<LocalGuest[]>(existingGuests ?? []);
