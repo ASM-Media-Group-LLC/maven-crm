@@ -279,28 +279,28 @@ const LeadGenContent = () => {
           />
           {(activeTab === "leads" || activeTab === "leads-hora") && (
             <>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   {STATUS_OPTIONS.map(s => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={qualityFilter} onValueChange={setQualityFilter}>
+              <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Calidad</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   {QUALITY_OPTIONS.map(q => (
                     <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={agencyFilter} onValueChange={setAgencyFilter}>
+              <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todas las agencias</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   {LEADGEN_COMPANIES.map(c => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
