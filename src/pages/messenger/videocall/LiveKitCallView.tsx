@@ -5,6 +5,7 @@ import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
+import CallMetricsPanel from "./CallMetricsPanel";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
