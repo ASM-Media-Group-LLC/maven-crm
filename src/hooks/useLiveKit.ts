@@ -359,50 +359,77 @@ export function useLiveKit() {
       return false;
     }
 
+    if (effect !== "none" && Date.now() < bgFailureCooldownUntilRef.current) {
+      return false;
+    }
+
     const opId = ++bgApplyOpRef.current;
-    const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
-      .find((publication) => publication.source === Track.Source.Camera)?.track as any;
+    const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+      (publication) => publication.source === Track.Source.Camera,
+    );
+    const camTrack = cameraPublication?.track as any;
 
     if (!camTrack) {
       if (effect === "none") {
+        bgLastAppliedEffectRef.current = "none";
         await disposeBackgroundProcessor();
         return true;
       }
       return false;
     }
 
+    const effectAlreadyApplied = effect === bgLastAppliedEffectRef.current;
+    const needsProcessorAttach = effect !== "none" && bgAttachedTrackRef.current !== camTrack;
+
+    if (effectAlreadyApplied && !needsProcessorAttach) {
+      return true;
+    }
+
     try {
+      if (effect === "none") {
+        const existingProcessor = bgProcessorRef.current;
+        if (existingProcessor?.switchTo) {
+          await withTimeout(
+            Promise.resolve(existingProcessor.switchTo({ mode: "disabled" })),
+            BACKGROUND_SWITCH_TIMEOUT_MS,
+            "bg-disable",
+          );
+        }
+
+        bgLastAppliedEffectRef.current = "none";
+        refreshParticipants();
+        return true;
+      }
+
       let processor = bgProcessorRef.current;
       if (!processor) {
         processor = BackgroundProcessor({ mode: "disabled" });
         bgProcessorRef.current = processor;
       }
 
-      const currentProcessor =
-        (typeof camTrack.getProcessor === "function" ? camTrack.getProcessor() : (camTrack as any).processor) ?? null;
-
-      if (bgAttachedTrackRef.current !== camTrack || currentProcessor !== processor) {
-        try {
-          await camTrack.setProcessor(processor, true);
-          bgAttachedTrackRef.current = camTrack;
-        } catch {
-          if (opId !== bgApplyOpRef.current) return false;
-          try { await processor?.destroy?.(); } catch {}
-          processor = BackgroundProcessor({ mode: "disabled" });
-          bgProcessorRef.current = processor;
-          await camTrack.setProcessor(processor, true);
-          bgAttachedTrackRef.current = camTrack;
-        }
+      if (bgAttachedTrackRef.current !== camTrack) {
+        await withTimeout(
+          Promise.resolve(camTrack.setProcessor(processor, true)),
+          BACKGROUND_ATTACH_TIMEOUT_MS,
+          "bg-attach",
+        );
+        bgAttachedTrackRef.current = camTrack;
       }
 
       if (opId !== bgApplyOpRef.current) return false;
 
-      if (effect === "none") {
-        await processor.switchTo({ mode: "disabled" });
-      } else if (effect === "soft-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 10 });
+      if (effect === "soft-blur") {
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-soft-blur",
+        );
       } else if (effect === "hard-blur") {
-        await processor.switchTo({ mode: "background-blur", blurRadius: 25 });
+        await withTimeout(
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-hard-blur",
+        );
       } else {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
         const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
@@ -422,28 +449,40 @@ export function useLiveKit() {
 
         if (opId !== bgApplyOpRef.current) return false;
 
-        await processor.switchTo({
-          mode: "virtual-background",
-          imagePath: templateUrl,
-        });
+        await withTimeout(
+          Promise.resolve(
+            processor.switchTo({
+              mode: "virtual-background",
+              imagePath: templateUrl,
+            }),
+          ),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-template",
+        );
       }
 
+      if (opId !== bgApplyOpRef.current) return false;
+
+      bgFailureCooldownUntilRef.current = 0;
+      bgLastAppliedEffectRef.current = effect;
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 180);
+      setTimeout(() => refreshParticipants(), 140);
       return true;
     } catch (err) {
       console.error("Background processor error:", err);
 
       if (opId !== bgApplyOpRef.current) return false;
 
+      bgFailureCooldownUntilRef.current = Date.now() + BACKGROUND_FAILURE_COOLDOWN_MS;
+
       try {
-        await camTrack.stopProcessor?.();
+        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 1500, "bg-stop");
       } catch {
         // no-op
       }
 
       bgAttachedTrackRef.current = null;
-      backgroundEffectRef.current = "none";
+      bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
       if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
@@ -458,20 +497,54 @@ export function useLiveKit() {
   }, [disposeBackgroundProcessor, hasActiveCameraPublication, enableCameraWithRecovery, refreshParticipants]);
 
   const queueBackgroundEffectApply = useCallback((effect: BackgroundEffect) => {
+    bgRequestedEffectRef.current = effect;
+
     bgApplyQueueRef.current = bgApplyQueueRef.current
       .catch(() => false)
       .then(async () => {
-        const room = roomRef.current;
-        if (!room) return false;
+        while (true) {
+          const room = roomRef.current;
+          if (!room) return false;
 
-        const camReady = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
-        if (!camReady) return effect === "none";
+          const nextEffect = bgRequestedEffectRef.current;
+          const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+            (publication) => publication.source === Track.Source.Camera,
+          );
+          const camTrack = cameraPublication?.track as any;
+          const camReady = !!camTrack || room.localParticipant.isCameraEnabled;
 
-        return applyBackgroundEffectToCurrentCamera(effect);
+          if (!camReady) {
+            bgLastAppliedEffectRef.current = "none";
+            return nextEffect === "none";
+          }
+
+          const processorAttached = !!camTrack && bgAttachedTrackRef.current === camTrack;
+          if (nextEffect === bgLastAppliedEffectRef.current && (nextEffect === "none" || processorAttached)) {
+            return true;
+          }
+
+          const applied = await applyBackgroundEffectToCurrentCamera(nextEffect);
+          if (bgRequestedEffectRef.current === nextEffect) {
+            return applied;
+          }
+        }
       });
 
     return bgApplyQueueRef.current;
-  }, [applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication]);
+  }, [applyBackgroundEffectToCurrentCamera]);
+
+  const applyConfiguredBackgroundIfNeeded = useCallback(async (room: Room) => {
+    if (backgroundEffectRef.current === "none") {
+      bgLastAppliedEffectRef.current = "none";
+      return true;
+    }
+
+    const cameraReady = await waitForCameraPublication(room, [120, 220, 360]);
+    if (!cameraReady) return false;
+
+    await wait(90);
+    return queueBackgroundEffectApply(backgroundEffectRef.current);
+  }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
   // ── Cleanup audio resume listeners ─────────────────────────────
   const cleanupAudioResumeListeners = useCallback(() => {
