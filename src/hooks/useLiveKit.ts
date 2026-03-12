@@ -881,24 +881,36 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
+        // First dispose any stale processor before enabling camera
         await disposeBackgroundProcessor();
+        await wait(100);
+
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
+          // Let the camera track fully stabilize before applying background
+          await wait(300);
+          refreshParticipants();
           await applyConfiguredBackgroundIfNeeded(room);
         }
       } else {
-        await room.localParticipant.setCameraEnabled(false);
+        // Turning off: first remove processor, then disable camera
         await disposeBackgroundProcessor();
+        await wait(50);
+        await room.localParticipant.setCameraEnabled(false);
       }
 
-      await wait(80);
+      await wait(120);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 400);
+      setTimeout(() => refreshParticipants(), 500);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
+      // Recovery: ensure clean state
+      try {
+        await disposeBackgroundProcessor();
+      } catch {}
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } finally {
