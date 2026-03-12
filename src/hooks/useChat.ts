@@ -461,11 +461,36 @@ export function useChat() {
       if (!user) return null;
 
       const newConvId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      // Optimistic UI — show instantly like Google Chat
+      const optimisticConv: ConversationWithDetails = {
+        id: newConvId,
+        type: "group",
+        name,
+        description: null,
+        avatar_url: null,
+        created_by: user.id,
+        created_at: now,
+        updated_at: now,
+        participants: [
+          { id: crypto.randomUUID(), conversation_id: newConvId, user_id: user.id, role: "admin", joined_at: now, last_read_at: now, is_muted: false, notifications_mode: "all", profile: profilesRef.current[user.id] },
+          ...memberIds.map(id => ({
+            id: crypto.randomUUID(), conversation_id: newConvId, user_id: id, role: "member" as const, joined_at: now, last_read_at: null, is_muted: false, notifications_mode: "all" as const, profile: profilesRef.current[id],
+          })),
+        ],
+        unreadCount: 0,
+        displayName: name,
+      };
+      setConversations(prev => [optimisticConv, ...prev]);
+
+      // Background persist
       const { error: createConvError } = await supabase
         .from("chat_conversations")
         .insert({ id: newConvId, type: "group", name, created_by: user.id });
 
       if (createConvError) {
+        setConversations(prev => prev.filter(c => c.id !== newConvId));
         toast.error("Error al crear grupo");
         return null;
       }
@@ -476,6 +501,7 @@ export function useChat() {
 
       if (addCreatorError) {
         await supabase.from("chat_conversations").delete().eq("id", newConvId);
+        setConversations(prev => prev.filter(c => c.id !== newConvId));
         toast.error("Error al crear grupo");
         return null;
       }
@@ -490,17 +516,18 @@ export function useChat() {
         );
 
         if (addMembersError) {
+          await supabase.from("chat_participants").delete().eq("conversation_id", newConvId);
           await supabase.from("chat_conversations").delete().eq("id", newConvId);
+          setConversations(prev => prev.filter(c => c.id !== newConvId));
           toast.error("Error al crear grupo");
           return null;
         }
       }
 
-      await loadConversations();
       toast.success(`Grupo "${name}" creado`);
       return newConvId;
     },
-    [user, loadConversations]
+    [user]
   );
 
   const deleteConversation = useCallback(
