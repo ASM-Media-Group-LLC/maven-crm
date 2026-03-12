@@ -722,7 +722,7 @@ export function useLiveKit() {
     } finally {
       connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, applyBackgroundEffectToCurrentCamera, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, queueBackgroundEffectApply, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
