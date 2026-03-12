@@ -218,6 +218,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             onClose={() => setParticipantsOpen(false)}
           />
         )}
+        {metricsOpen && (
+          <CallMetricsPanel
+            room={room}
+            participants={lk.participants}
+            onClose={() => setMetricsOpen(false)}
+          />
+        )}
       </div>
 
       <CallControls
