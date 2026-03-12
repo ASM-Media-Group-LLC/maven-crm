@@ -84,21 +84,34 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     );
   }
 
+  const linkifyText = (text: string): React.ReactNode[] => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80 break-all">
+          {part}
+        </a>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
+  };
+
   const highlightText = (text: string) => {
     if (!highlight) {
-      // Render mentions
       if (chatType === "group") {
         return renderTextWithMentions(text, participantNames);
       }
-      return text;
+      return linkifyText(text);
     }
     const idx = text.toLowerCase().indexOf(highlight);
-    if (idx === -1) return text;
+    if (idx === -1) return linkifyText(text);
     return (
       <>
-        {text.slice(0, idx)}
+        {linkifyText(text.slice(0, idx))}
         <mark className="bg-warning/30 text-foreground rounded px-0.5">{text.slice(idx, idx + highlight.length)}</mark>
-        {text.slice(idx + highlight.length)}
+        {linkifyText(text.slice(idx + highlight.length))}
       </>
     );
   };
