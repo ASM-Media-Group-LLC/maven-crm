@@ -13,10 +13,12 @@ import { toast } from "sonner";
 export function useChat() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
   profilesRef.current = profiles;
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
 
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
@@ -32,130 +34,133 @@ export function useChat() {
   const loadConversations = useCallback(async () => {
     if (!user) return;
 
-    const { data: participations } = await supabase
-      .from("chat_participants")
-      .select("conversation_id, last_read_at")
-      .eq("user_id", user.id);
-
-    if (!participations || participations.length === 0) {
-      setConversations([]);
-      return;
-    }
-
-    const convIds = participations.map((p: any) => p.conversation_id);
-    const lastReadMap: Record<string, string | null> = {};
-    participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
-
-    // Batch: conversations, all participants, and recent messages in parallel
-    const [convsResult, allParticipantsResult, recentMsgsResult] = await Promise.all([
-      supabase
-        .from("chat_conversations")
-        .select("*")
-        .in("id", convIds)
-        .order("updated_at", { ascending: false }),
-      supabase
+    setLoading(true);
+    try {
+      const { data: participations } = await supabase
         .from("chat_participants")
-        .select("*")
-        .in("conversation_id", convIds),
-      // Fetch recent messages for ALL conversations at once (limit high enough to cover 1 per conv)
-      supabase
-        .from("chat_messages")
-        .select("*")
-        .in("conversation_id", convIds)
-        .order("created_at", { ascending: false })
-        .limit(convIds.length * 2 > 1000 ? 1000 : convIds.length * 2),
-    ]);
+        .select("conversation_id, last_read_at")
+        .eq("user_id", user.id);
 
-    const convs = convsResult.data;
-    const allParticipants = allParticipantsResult.data;
+      if (!participations || participations.length === 0) {
+        setConversations([]);
+        return;
+      }
 
-    if (!convs) {
-      setConversations([]);
-      return;
-    }
+      const convIds = participations.map((p: any) => p.conversation_id);
+      const lastReadMap: Record<string, string | null> = {};
+      participations.forEach((p: any) => { lastReadMap[p.conversation_id] = p.last_read_at; });
 
-    // Build last-message map from batch result (first occurrence per conv = latest)
-    const lastMessageMap: Record<string, ChatMessage> = {};
-    if (recentMsgsResult.data) {
-      for (const msg of recentMsgsResult.data as ChatMessage[]) {
-        if (!lastMessageMap[msg.conversation_id]) {
-          lastMessageMap[msg.conversation_id] = msg;
+      // Batch: conversations, all participants, and recent messages in parallel
+      const [convsResult, allParticipantsResult, recentMsgsResult] = await Promise.all([
+        supabase
+          .from("chat_conversations")
+          .select("*")
+          .in("id", convIds)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("chat_participants")
+          .select("*")
+          .in("conversation_id", convIds),
+        supabase
+          .from("chat_messages")
+          .select("*")
+          .in("conversation_id", convIds)
+          .order("created_at", { ascending: false })
+          .limit(convIds.length * 2 > 1000 ? 1000 : convIds.length * 2),
+      ]);
+
+      const convs = convsResult.data;
+      const allParticipants = allParticipantsResult.data;
+
+      if (!convs) {
+        setConversations([]);
+        return;
+      }
+
+      // Build last-message map from batch result (first occurrence per conv = latest)
+      const lastMessageMap: Record<string, ChatMessage> = {};
+      if (recentMsgsResult.data) {
+        for (const msg of recentMsgsResult.data as ChatMessage[]) {
+          if (!lastMessageMap[msg.conversation_id]) {
+            lastMessageMap[msg.conversation_id] = msg;
+          }
         }
       }
-    }
 
-    // For any conversations missing from batch (edge case: >1000 messages from other convs),
-    // fetch individually only for those missing
-    const missingConvIds = convIds.filter(id => !lastMessageMap[id]);
-    if (missingConvIds.length > 0 && missingConvIds.length <= 20) {
-      const fallbackResults = await Promise.all(
-        missingConvIds.map(convId =>
-          supabase.from("chat_messages").select("*")
-            .eq("conversation_id", convId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-        )
-      );
-      fallbackResults.forEach(({ data }, i) => {
-        if (data?.[0]) lastMessageMap[missingConvIds[i]] = data[0] as ChatMessage;
-      });
-    }
-
-    // Server-side unread counts — single RPC call replaces client-side N+1
-    const unreadMap: Record<string, number> = {};
-    const { data: unreadData } = await supabase.rpc("get_unread_counts", { _user_id: user.id });
-    if (unreadData) {
-      for (const row of unreadData as any[]) {
-        unreadMap[row.conversation_id] = row.unread_count || 0;
-      }
-    }
-
-    const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
-      const convParticipants = (allParticipants || []).filter(
-        (p: any) => p.conversation_id === conv.id
-      );
-
-      const lastMessage = lastMessageMap[conv.id];
-
-      let displayName = conv.name || "";
-      if (conv.type === "direct") {
-        const otherParticipant = convParticipants.find(
-          (p: any) => p.user_id !== user.id
+      // For any conversations missing from batch, fetch individually
+      const missingConvIds = convIds.filter(id => !lastMessageMap[id]);
+      if (missingConvIds.length > 0 && missingConvIds.length <= 20) {
+        const fallbackResults = await Promise.all(
+          missingConvIds.map(convId =>
+            supabase.from("chat_messages").select("*")
+              .eq("conversation_id", convId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+          )
         );
-        if (otherParticipant) {
-          displayName =
-            profilesRef.current[otherParticipant.user_id]?.full_name ||
-            "Usuario";
+        fallbackResults.forEach(({ data }, i) => {
+          if (data?.[0]) lastMessageMap[missingConvIds[i]] = data[0] as ChatMessage;
+        });
+      }
+
+      // Server-side unread counts — single RPC call
+      const unreadMap: Record<string, number> = {};
+      const { data: unreadData } = await supabase.rpc("get_unread_counts", { _user_id: user.id });
+      if (unreadData) {
+        for (const row of unreadData as any[]) {
+          unreadMap[row.conversation_id] = row.unread_count || 0;
         }
       }
 
-      return {
-        ...conv,
-        participants: convParticipants.map((p: any) => ({
-          ...p,
-          profile: profilesRef.current[p.user_id],
-        })),
-        lastMessage,
-        unreadCount: unreadMap[conv.id] || 0,
-        displayName,
-      } as ConversationWithDetails;
-    });
+      const enriched: ConversationWithDetails[] = convs.map((conv: any) => {
+        const convParticipants = (allParticipants || []).filter(
+          (p: any) => p.conversation_id === conv.id
+        );
 
-    // Filter: hide direct chats from the non-creator until a message is sent
-    const visible = enriched.filter(conv => {
-      if (conv.type === "direct" && conv.created_by !== user.id && !conv.lastMessage) {
-        return false;
-      }
-      return true;
-    });
+        const lastMessage = lastMessageMap[conv.id];
 
-    visible.sort((a, b) => {
-      const aTime = a.lastMessage?.created_at || a.updated_at;
-      const bTime = b.lastMessage?.created_at || b.updated_at;
-      return new Date(bTime).getTime() - new Date(aTime).getTime();
-    });
+        let displayName = conv.name || "";
+        if (conv.type === "direct") {
+          const otherParticipant = convParticipants.find(
+            (p: any) => p.user_id !== user.id
+          );
+          if (otherParticipant) {
+            displayName =
+              profilesRef.current[otherParticipant.user_id]?.full_name ||
+              "Usuario";
+          }
+        }
 
-    setConversations(visible);
+        return {
+          ...conv,
+          participants: convParticipants.map((p: any) => ({
+            ...p,
+            profile: profilesRef.current[p.user_id],
+          })),
+          lastMessage,
+          unreadCount: unreadMap[conv.id] || 0,
+          displayName,
+        } as ConversationWithDetails;
+      });
+
+      // Filter: hide direct chats from the non-creator until a message is sent
+      const visible = enriched.filter(conv => {
+        if (conv.type === "direct" && conv.created_by !== user.id && !conv.lastMessage) {
+          return false;
+        }
+        return true;
+      });
+
+      visible.sort((a, b) => {
+        const aTime = a.lastMessage?.created_at || a.updated_at;
+        const bTime = b.lastMessage?.created_at || b.updated_at;
+        return new Date(bTime).getTime() - new Date(aTime).getTime();
+      });
+
+      setConversations(visible);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -170,7 +175,7 @@ export function useChat() {
     const pendingReloadRef = { timer: null as ReturnType<typeof setTimeout> | null };
     const scheduleConversationsReload = (immediate = false) => {
       if (pendingReloadRef.timer) clearTimeout(pendingReloadRef.timer);
-      const delay = immediate ? 50 : 500; // Increased debounce for 80+ user scale
+      const delay = immediate ? 50 : 500;
       pendingReloadRef.timer = setTimeout(() => {
         pendingReloadRef.timer = null;
         void loadConversations();
@@ -182,17 +187,14 @@ export function useChat() {
       setConversations(prev => {
         const idx = prev.findIndex(c => c.id === msg.conversation_id);
         if (idx === -1) {
-          // Unknown conversation — the chat_participants INSERT handler
-          // will reload when the user is actually added to a new group.
-          // Don't trigger a full reload for every message from other conversations.
+          // Unknown conversation — schedule reload to pick it up
+          scheduleConversationsReload();
           return prev;
         }
 
-        // Skip soft-deleted messages as lastMessage — they shouldn't appear in preview
+        // Skip soft-deleted messages
         if (msg.is_deleted) return prev;
 
-        // Skip system messages that are member join/leave for sidebar preview bump
-        // (they still get handled but don't override a real lastMessage)
         const conv = prev[idx];
         const updated = {
           ...conv,
@@ -226,9 +228,9 @@ export function useChat() {
           const msg = payload.new as any;
           setConversations(prev => {
             const conv = prev.find(c => c.id === msg.conversation_id);
-            if (!conv) return prev; // Not our conversation, ignore
+            if (!conv) return prev;
 
-            // If this was the lastMessage and it got soft-deleted, reload to find the real last message
+            // If this was the lastMessage and it got soft-deleted, reload
             if (conv.lastMessage?.id === msg.id && msg.is_deleted) {
               scheduleConversationsReload();
               return prev;
@@ -248,12 +250,10 @@ export function useChat() {
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "chat_messages" },
         (payload) => {
-          // Only reload if the deleted message was a lastMessage
           const old = payload.old as any;
           setConversations(prev => {
             const affected = prev.find(c => c.lastMessage?.id === old.id);
             if (affected) {
-              // Need full reload to determine new lastMessage
               scheduleConversationsReload();
             }
             return prev;
@@ -274,7 +274,6 @@ export function useChat() {
         { event: "DELETE", schema: "public", table: "chat_participants" },
         (payload) => {
           const old = payload.old as any;
-          // Only reload if this affects the current user
           if (old?.user_id === user.id) {
             scheduleConversationsReload(true);
           }
@@ -285,17 +284,13 @@ export function useChat() {
         { event: "UPDATE", schema: "public", table: "chat_participants" },
         (payload) => {
           const row = payload.new as any;
-          // Only reload for the current user's own participation changes
-          // (e.g., mute toggle, notifications_mode change)
-          // Ignore other users' last_read_at updates — they cause reload storms at scale
           if (row?.user_id === user.id) {
-            // Don't reload for last_read_at-only changes (we already track this locally)
             const old = payload.old as any;
             if (old && row.last_read_at !== old.last_read_at &&
                 row.is_muted === old.is_muted &&
                 row.notifications_mode === old.notifications_mode &&
                 row.role === old.role) {
-              return; // Skip — this is just a read receipt update
+              return; // Skip — read receipt update only
             }
             scheduleConversationsReload();
           }
@@ -305,7 +300,6 @@ export function useChat() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "chat_conversations" },
         (payload) => {
-          // Inline update: just patch name/avatar without full reload
           const updated = payload.new as any;
           setConversations(prev => {
             const idx = prev.findIndex(c => c.id === updated.id);
@@ -342,7 +336,7 @@ export function useChat() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Reduced polling: 60s instead of 30s for 80+ users
+    // Reduced polling for scale
     const pollInterval = setInterval(() => {
       if (document.visibilityState === "visible") {
         void loadConversations();
@@ -361,7 +355,9 @@ export function useChat() {
     (otherUserId: string): string | null => {
       if (!user) return null;
 
-      const existing = conversations.find(
+      // Use ref for up-to-date conversations (avoid stale closures)
+      const currentConvs = conversationsRef.current;
+      const existing = currentConvs.find(
         (c) =>
           c.type === "direct" &&
           c.participants.some((p) => p.user_id === otherUserId)
@@ -412,20 +408,30 @@ export function useChat() {
       setConversations((prev) => [optimisticConv, ...prev]);
 
       (async () => {
-        const { data: otherP } = await supabase
+        // Check server-side for existing direct chat with this user
+        const { data: myParticipations } = await supabase
           .from("chat_participants")
-          .select("conversation_id, chat_conversations!inner(type)")
-          .eq("user_id", otherUserId)
-          .eq("chat_conversations.type", "direct")
-          .in(
-            "conversation_id",
-            conversations.map((c) => c.id)
-          )
-          .limit(1);
+          .select("conversation_id")
+          .eq("user_id", user.id);
 
-        if (otherP && otherP.length > 0) {
-          setConversations((prev) => prev.filter((c) => c.id !== newConvId));
-          return;
+        if (myParticipations && myParticipations.length > 0) {
+          const myConvIds = myParticipations.map((p: any) => p.conversation_id);
+          
+          // Find if otherUserId is in any of my direct conversations
+          const { data: otherP } = await supabase
+            .from("chat_participants")
+            .select("conversation_id, chat_conversations!inner(type)")
+            .eq("user_id", otherUserId)
+            .eq("chat_conversations.type", "direct")
+            .in("conversation_id", myConvIds)
+            .limit(1);
+
+          if (otherP && otherP.length > 0) {
+            // Already exists — replace optimistic with real one
+            const existingConvId = otherP[0].conversation_id;
+            setConversations((prev) => prev.filter((c) => c.id !== newConvId));
+            return;
+          }
         }
 
         const { error: createConvError } = await supabase
@@ -460,14 +466,11 @@ export function useChat() {
           toast.error("Error al crear conversación");
           return;
         }
-
-        // No need for full reload — optimistic UI already shows the conversation
-        // Realtime will sync any missing details
       })();
 
       return newConvId;
     },
-    [user, conversations, loadConversations]
+    [user]
   );
 
   const createGroupChat = useCallback(
@@ -477,7 +480,7 @@ export function useChat() {
       const newConvId = crypto.randomUUID();
       const now = new Date().toISOString();
 
-      // Optimistic UI — show instantly like Google Chat
+      // Optimistic UI
       const optimisticConv: ConversationWithDetails = {
         id: newConvId,
         type: "group",
@@ -548,11 +551,13 @@ export function useChat() {
     async (conversationId: string) => {
       if (!user) return false;
 
-      // Optimistic UI — remove instantly (Google Chat style)
+      // Save for rollback
+      const prevConversations = conversationsRef.current;
+
+      // Optimistic UI — remove instantly
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
 
       try {
-        // Single server-side call — replaces 5+ round trips
         const { error } = await supabase.rpc("delete_conversation_cascade", {
           _conversation_id: conversationId,
         });
@@ -564,11 +569,12 @@ export function useChat() {
       } catch (err) {
         console.error("Error deleting conversation:", err);
         toast.error("Error al eliminar conversación");
-        await loadConversations();
+        // Rollback: restore previous state
+        setConversations(prevConversations);
         return false;
       }
     },
-    [user, loadConversations]
+    [user]
   );
 
   return {
@@ -587,7 +593,7 @@ const PAGE_SIZE = 50;
 export function useMessages(conversationId: string | null, onNewMessage?: (msg: ChatMessage) => void) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
@@ -602,6 +608,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     fileName?: string;
     replyToId?: string;
   }>>([]);
+  // Ref for loadOlderMessages to avoid stale closure on `messages`
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
   onNewMessageRef.current = onNewMessage;
 
   // Load initial messages
@@ -611,55 +620,66 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       setHasMore(true);
       return;
     }
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE);
-
-    const sorted = ((data as ChatMessage[]) || []).reverse();
-    setMessages(sorted);
-    setHasMore((data?.length || 0) >= PAGE_SIZE);
-    optimisticIdsRef.current.clear();
-
-    // Mark as read
-    if (user) {
-      await supabase
-        .from("chat_participants")
-        .update({ last_read_at: new Date().toISOString() })
+    setLoading(true);
+    try {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
         .eq("conversation_id", conversationId)
-        .eq("user_id", user.id);
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
+
+      const sorted = ((data as ChatMessage[]) || []).reverse();
+      setMessages(sorted);
+      setHasMore((data?.length || 0) >= PAGE_SIZE);
+      optimisticIdsRef.current.clear();
+
+      // Mark as read
+      if (user) {
+        supabase
+          .from("chat_participants")
+          .update({ last_read_at: new Date().toISOString() })
+          .eq("conversation_id", conversationId)
+          .eq("user_id", user.id)
+          .then();
+      }
+    } finally {
+      setLoading(false);
     }
   }, [conversationId, user]);
 
   // Keep ref updated for use inside effects without triggering re-subscriptions
   loadMessagesRef.current = loadMessages;
 
-  // Load older messages (infinite scroll)
+  // Load older messages (infinite scroll) — uses ref to avoid re-creation
   const loadOlderMessages = useCallback(async () => {
-    if (!conversationId || loadingMore || !hasMore || messages.length === 0) return;
+    if (!conversationId || loadingMore) return;
+    const currentMessages = messagesRef.current;
+    if (currentMessages.length === 0) return;
     
     setLoadingMore(true);
-    const oldestMessage = messages[0];
+    const oldestMessage = currentMessages[0];
     
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .lt("created_at", oldestMessage.created_at)
-      .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE);
+    try {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .lt("created_at", oldestMessage.created_at)
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
 
-    if (data && data.length > 0) {
-      const older = (data as ChatMessage[]).reverse();
-      setMessages(prev => [...older, ...prev]);
-      setHasMore(data.length >= PAGE_SIZE);
-    } else {
-      setHasMore(false);
+      if (data && data.length > 0) {
+        const older = (data as ChatMessage[]).reverse();
+        setMessages(prev => [...older, ...prev]);
+        setHasMore(data.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
     }
-    setLoadingMore(false);
-  }, [conversationId, loadingMore, hasMore, messages]);
+  }, [conversationId, loadingMore]);
 
   useEffect(() => {
     loadMessages();
@@ -711,11 +731,10 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           setMessages((prev) => {
-            // Skip if already exists (exact ID match)
+            // Skip if already exists
             if (prev.find((m) => m.id === newMsg.id)) return prev;
 
-            // Check if this is a message we sent optimistically — replace it
-            // The optimistic message has a different ID but same content/sender/timestamp (within 5s)
+            // Check for optimistic match
             const optimisticMatch = prev.find(
               (m) =>
                 optimisticIdsRef.current.has(m.id) &&
@@ -784,7 +803,6 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
             retryCount++;
             const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
             setTimeout(() => {
-              // Reload messages to catch any missed during downtime
               void loadMessagesRef.current?.();
             }, delay);
           }
@@ -916,6 +934,7 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
 
   const editMessage = useCallback(
     async (messageId: string, newContent: string) => {
+      // Optimistic update
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: newContent, is_edited: true } : m));
       const { error } = await supabase
         .from("chat_messages")
@@ -923,13 +942,14 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
         .eq("id", messageId);
       if (error) {
         toast.error("Error al editar mensaje");
-        loadMessages();
+        void loadMessagesRef.current?.();
       }
     },
-    [loadMessages]
+    []
   );
 
   const deleteMessage = useCallback(async (messageId: string) => {
+    // Optimistic soft delete
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, is_deleted: true, content: null } : m));
     const { error } = await supabase
       .from("chat_messages")
@@ -937,9 +957,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
       .eq("id", messageId);
     if (error) {
       toast.error("Error al eliminar mensaje");
-      loadMessages();
+      void loadMessagesRef.current?.();
     }
-  }, [loadMessages]);
+  }, []);
 
   return {
     messages,
