@@ -187,30 +187,6 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
         </div>
       </ScrollArea>
 
-      {/* Create room dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Crear nueva sala de video</DialogTitle>
-            <DialogDescription>Ingresa un nombre para tu nueva sala de videollamada.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nombre de la sala</Label>
-              <Input
-                placeholder="Ej: Standup diario, Revisión de sprint..."
-                value={roomName}
-                onChange={e => setRoomName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleCreate()}
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!roomName.trim()}>Crear sala</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
