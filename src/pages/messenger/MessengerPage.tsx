@@ -156,12 +156,6 @@ export default function MessengerPage() {
             onClose={() => setShowVideoRooms(false)}
           />
         ) : (
-          <>
-            <GlobalSearchPanel
-              open={globalSearchOpen}
-              onClose={() => setGlobalSearchOpen(false)}
-              onSelectResult={handleGlobalSearchResult}
-            />
             <ChatSidebar
               conversations={conversations}
               activeChatId={activeChatId}
@@ -171,7 +165,6 @@ export default function MessengerPage() {
               onSelectContact={handleSelectUser}
               onDeleteChat={handleDeleteChat}
               loading={loading}
-              onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
               profiles={profiles}
               isPinned={isPinned}
               onTogglePin={togglePin}
@@ -182,7 +175,6 @@ export default function MessengerPage() {
               onAddConversationToSpace={addConversationToSpace}
               onRemoveConversationFromSpace={removeConversationFromSpace}
             />
-          </>
         )}
       </div>
 
