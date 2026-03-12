@@ -1014,8 +1014,16 @@ export function useLiveKit() {
   // ── Background effect ─────────────────────────────────────────
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
+    bgRequestedEffectRef.current = effect;
+
+    const room = roomRef.current;
+    if (!room) return;
+
+    const hasCamera = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
+    if (!hasCamera && effect !== "none") return;
+
     await queueBackgroundEffectApply(effect);
-  }, [queueBackgroundEffectApply]);
+  }, [queueBackgroundEffectApply, hasActiveCameraPublication]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
