@@ -685,14 +685,25 @@ export function useChat() {
     [user]
   );
 
-  // Clear unread count locally when user opens a chat
+  // Clear unread count locally and persist read state immediately
   const markConversationRead = useCallback((conversationId: string) => {
-    setConversations(prev => prev.map(c =>
-      c.id === conversationId && c.unreadCount > 0
-        ? { ...c, unreadCount: 0 }
-        : c
-    ));
-  }, []);
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conversationId && c.unreadCount > 0
+          ? { ...c, unreadCount: 0 }
+          : c
+      )
+    );
+
+    if (!user) return;
+
+    supabase
+      .from("chat_participants")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id)
+      .then();
+  }, [user]);
 
   return {
     conversations,
