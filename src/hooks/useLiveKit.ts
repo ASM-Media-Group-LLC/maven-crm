@@ -123,9 +123,9 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
 
-const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
-const BACKGROUND_SWITCH_TIMEOUT_MS = 7000;
-const BACKGROUND_FAILURE_COOLDOWN_MS = 12000;
+const BACKGROUND_ATTACH_TIMEOUT_MS = 10000;
+const BACKGROUND_SWITCH_TIMEOUT_MS = 12000;
+const BACKGROUND_FAILURE_COOLDOWN_MS = 15000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
