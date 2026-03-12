@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
+import { useSpeechCaptions } from "@/hooks/useSpeechCaptions";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import CallMetricsPanel from "./CallMetricsPanel";
+import CallCaptions from "./CallCaptions";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,7 @@ interface LiveKitCallViewProps {
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
+  const captions = useSpeechCaptions();
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
@@ -195,6 +198,11 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               </div>
             </div>
           )}
+
+          {/* Captions overlay */}
+          {captions.isActive && (
+            <CallCaptions captions={captions.captions} interimText={captions.interimText} />
+          )}
         </div>
 
         {/* Sidebars */}
@@ -232,6 +240,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isChatOpen={chatOpen}
         isParticipantsOpen={participantsOpen}
         isMetricsOpen={metricsOpen}
+        isCaptionsOn={captions.isActive}
+        captionsLanguage={captions.language}
+        captionsSupported={captions.isSupported}
         backgroundEffect={bgEffect}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
@@ -240,6 +251,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleChat={() => { setChatOpen(!chatOpen); if (!chatOpen) { setParticipantsOpen(false); setMetricsOpen(false); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) { setChatOpen(false); setMetricsOpen(false); } }}
         onToggleMetrics={() => { setMetricsOpen(!metricsOpen); if (!metricsOpen) { setChatOpen(false); setParticipantsOpen(false); } }}
+        onToggleCaptions={captions.toggle}
+        onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
