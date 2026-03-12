@@ -4,7 +4,7 @@ import ChatSidebar from "./ChatSidebar";
 import ChatView from "./ChatView";
 import VideoRoomsPanel from "./VideoRoomsPanel";
 import NewChatModal from "./NewChatModal";
-import GlobalSearchPanel from "./components/GlobalSearchPanel";
+
 import IncomingCallModal from "./components/IncomingCallModal";
 import { ConversationWithDetails, ChatMessage, VideoRoom } from "./types";
 import { useChat, useMessages } from "@/hooks/useChat";
@@ -41,7 +41,7 @@ export default function MessengerPage() {
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  
   const joinedFromLinkRef = useRef(false);
 
   // Wrap setActiveChatId to also clear unread
@@ -116,10 +116,6 @@ export default function MessengerPage() {
     return success;
   };
 
-  const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
-    selectChat(conversationId);
-    setGlobalSearchOpen(false);
-  }, [selectChat]);
 
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
@@ -156,12 +152,6 @@ export default function MessengerPage() {
             onClose={() => setShowVideoRooms(false)}
           />
         ) : (
-          <>
-            <GlobalSearchPanel
-              open={globalSearchOpen}
-              onClose={() => setGlobalSearchOpen(false)}
-              onSelectResult={handleGlobalSearchResult}
-            />
             <ChatSidebar
               conversations={conversations}
               activeChatId={activeChatId}
@@ -171,7 +161,6 @@ export default function MessengerPage() {
               onSelectContact={handleSelectUser}
               onDeleteChat={handleDeleteChat}
               loading={loading}
-              onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
               profiles={profiles}
               isPinned={isPinned}
               onTogglePin={togglePin}
@@ -182,7 +171,6 @@ export default function MessengerPage() {
               onAddConversationToSpace={addConversationToSpace}
               onRemoveConversationFromSpace={removeConversationFromSpace}
             />
-          </>
         )}
       </div>
 

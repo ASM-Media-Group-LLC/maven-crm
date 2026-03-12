@@ -1,5 +1,8 @@
-import { useState, useMemo } from "react";
-import { Search, Users, Video, Trash2, SearchCheck, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Search, Users, Video, Trash2, SearchCheck, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare } from "lucide-react";
+import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,7 +36,7 @@ interface ChatSidebarProps {
   onSelectContact: (userId: string) => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
-  onOpenGlobalSearch?: () => void;
+  
   profiles: Record<string, import("./types").UserProfile>;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
@@ -67,7 +70,7 @@ function truncate(text: string, max: number) {
 
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewGroup, onOpenVideoRooms,
-  onSelectContact, onDeleteChat, loading, onOpenGlobalSearch, profiles,
+  onSelectContact, onDeleteChat, loading, profiles,
   isPinned, onTogglePin,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
   onAddConversationToSpace, onRemoveConversationFromSpace,
@@ -76,6 +79,16 @@ export default function ChatSidebar({
   const { isOnline, getStatus } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
+  const { results: globalResults, searching: globalSearching, search: globalSearch, clearResults: clearGlobalResults } = useGlobalSearch();
+
+  // Trigger global search when query has 2+ chars
+  useEffect(() => {
+    if (search.trim().length >= 2) {
+      globalSearch(search);
+    } else {
+      clearGlobalResults();
+    }
+  }, [search, globalSearch, clearGlobalResults]);
   const [deleteTarget, setDeleteTarget] = useState<ConversationWithDetails | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [draggingChatId, setDraggingChatId] = useState<string | null>(null);
@@ -150,11 +163,6 @@ export default function ChatSidebar({
             <StatusPicker />
           </div>
           <div className="flex gap-0.5">
-            {onOpenGlobalSearch && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenGlobalSearch} title="Buscar en todo">
-                <SearchCheck className="h-4 w-4" />
-              </Button>
-            )}
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
@@ -168,11 +176,19 @@ export default function ChatSidebar({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar chats..."
-            className="pl-9 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
+            placeholder="Buscar en todos los chats…"
+            className="pl-9 pr-8 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -257,6 +273,61 @@ export default function ChatSidebar({
               </>
             )}
           </div>
+
+          {/* Global message search results */}
+          {search.trim().length >= 2 && (
+            <div className="mt-1 px-2">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <Search className="h-3.5 w-3.5" />
+                <span>Resultados en mensajes</span>
+              </div>
+              {globalSearching && globalResults.length === 0 && (
+                <div className="flex items-center justify-center gap-2 py-4">
+                  <div className="h-3.5 w-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p className="text-[11px] text-muted-foreground">Buscando…</p>
+                </div>
+              )}
+              {!globalSearching && globalResults.length === 0 && (
+                <p className="text-[11px] text-muted-foreground px-3 py-2">No se encontraron mensajes</p>
+              )}
+              {(() => {
+                const grouped = globalResults.reduce<Record<string, { title: string; results: GlobalSearchResult[] }>>((acc, r) => {
+                  if (!acc[r.conversationId]) acc[r.conversationId] = { title: r.conversationTitle, results: [] };
+                  acc[r.conversationId].results.push(r);
+                  return acc;
+                }, {});
+                return Object.entries(grouped).map(([convId, group]) => (
+                  <div key={convId} className="mb-1">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-muted/30">
+                      <MessageSquare className="h-3 w-3 text-primary shrink-0" />
+                      <span className="text-[11px] font-semibold text-foreground truncate">{group.title}</span>
+                      <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[9px] rounded-full ml-auto">
+                        {group.results.length}
+                      </Badge>
+                    </div>
+                    {group.results.map((r) => (
+                      <button
+                        key={r.messageId}
+                        onClick={() => onSelectChat(r.conversationId)}
+                        className="w-full text-left px-3 py-1.5 hover:bg-accent/50 transition-colors rounded-md"
+                      >
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="text-[11px] font-medium text-foreground">{r.senderName}</span>
+                          <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                            {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true, locale: es })}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed truncate">
+                          {r.content}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
 
           {/* Spaces section */}
           <div className="mt-1 px-1">
