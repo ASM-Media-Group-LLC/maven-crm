@@ -9,7 +9,7 @@ import {
   ConnectionQuality,
   RoomOptions,
 } from "livekit-client";
-import { BackgroundProcessor } from "@livekit/track-processors";
+import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 
@@ -153,6 +153,8 @@ const ROOM_OPTIONS: RoomOptions = {
 export function useLiveKit() {
   const roomRef = useRef<Room | null>(null);
   const bgProcessorRef = useRef<any>(null);
+  const bgAttachedTrackRef = useRef<any>(null);
+  const preloadedBackgroundsRef = useRef<Set<string>>(new Set());
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [participants, setParticipants] = useState<LKParticipant[]>([]);
   const [chatMessages, setChatMessages] = useState<LKChatMessage[]>([]);
@@ -271,6 +273,7 @@ export function useLiveKit() {
     bgApplyOpRef.current += 1;
     const processor = bgProcessorRef.current;
     bgProcessorRef.current = null;
+    bgAttachedTrackRef.current = null;
 
     if (processor?.destroy) {
       try {
@@ -323,6 +326,11 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return false;
 
+    if (effect !== "none" && !supportsBackgroundProcessors()) {
+      console.warn("[LiveKit] Background processors are not supported in this browser.");
+      return false;
+    }
+
     const opId = ++bgApplyOpRef.current;
     const camTrack = Array.from(room.localParticipant.videoTrackPublications.values())
       .find((publication) => publication.source === Track.Source.Camera)?.track as any;
@@ -342,17 +350,17 @@ export function useLiveKit() {
         bgProcessorRef.current = processor;
       }
 
-      // Only attach the processor if it's not already the active one on this track
-      const currentProcessor = (camTrack as any).getProcessor?.() ?? (camTrack as any).processor;
-      if (currentProcessor !== processor) {
+      if (bgAttachedTrackRef.current !== camTrack) {
         try {
-          await camTrack.setProcessor(processor);
+          await camTrack.setProcessor(processor, true);
+          bgAttachedTrackRef.current = camTrack;
         } catch {
           if (opId !== bgApplyOpRef.current) return false;
           try { await processor?.destroy?.(); } catch {}
           processor = BackgroundProcessor({ mode: "disabled" });
           bgProcessorRef.current = processor;
-          await camTrack.setProcessor(processor);
+          await camTrack.setProcessor(processor, true);
+          bgAttachedTrackRef.current = camTrack;
         }
       }
 
@@ -367,20 +375,65 @@ export function useLiveKit() {
       } else {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
         const selectedTemplate = BACKGROUND_TEMPLATES.find((template) => template.id === effect);
-        if (selectedTemplate) {
-          await processor.switchTo({
-            mode: "virtual-background",
-            imagePath: `${window.location.origin}${selectedTemplate.src}`,
+
+        if (!selectedTemplate) return false;
+
+        const templateUrl = `${window.location.origin}${selectedTemplate.src}`;
+        if (!preloadedBackgroundsRef.current.has(templateUrl)) {
+          await new Promise<void>((resolve, reject) => {
+            const image = new Image();
+            image.src = templateUrl;
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error("template-load-failed"));
           });
+          preloadedBackgroundsRef.current.add(templateUrl);
         }
+
+        if (opId !== bgApplyOpRef.current) return false;
+
+        await processor.switchTo({
+          mode: "virtual-background",
+          imagePath: templateUrl,
+        });
       }
+
+      const attachedElements = Array.isArray((camTrack as any).attachedElements)
+        ? ((camTrack as any).attachedElements as HTMLMediaElement[])
+        : [];
+
+      attachedElements.forEach((el) => {
+        try {
+          camTrack.detach(el);
+          camTrack.attach(el);
+          el.play?.().catch(() => {});
+        } catch {
+          // no-op
+        }
+      });
 
       return true;
     } catch (err) {
       console.error("Background processor error:", err);
+
+      if (opId !== bgApplyOpRef.current) return false;
+
+      try {
+        await camTrack.stopProcessor?.(true);
+      } catch {
+        // no-op
+      }
+
+      bgAttachedTrackRef.current = null;
+      backgroundEffectRef.current = "none";
+      await disposeBackgroundProcessor();
+
+      if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
+        await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
+      }
+
       return false;
     }
-  }, [disposeBackgroundProcessor]);
+  }, [disposeBackgroundProcessor, hasActiveCameraPublication, enableCameraWithRecovery]);
 
   // ── Cleanup audio resume listeners ─────────────────────────────
   const cleanupAudioResumeListeners = useCallback(() => {
