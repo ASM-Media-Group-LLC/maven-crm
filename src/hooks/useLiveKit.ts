@@ -273,6 +273,7 @@ export function useLiveKit() {
     bgApplyOpRef.current += 1;
     const processor = bgProcessorRef.current;
     bgProcessorRef.current = null;
+    bgAttachedTrackRef.current = null;
 
     if (processor?.destroy) {
       try {
