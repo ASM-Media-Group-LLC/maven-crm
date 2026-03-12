@@ -580,6 +580,15 @@ export function useChat() {
     [user]
   );
 
+  // Clear unread count locally when user opens a chat
+  const markConversationRead = useCallback((conversationId: string) => {
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId && c.unreadCount > 0
+        ? { ...c, unreadCount: 0 }
+        : c
+    ));
+  }, []);
+
   return {
     conversations,
     loading,
@@ -588,6 +597,7 @@ export function useChat() {
     createGroupChat,
     deleteConversation,
     loadConversations,
+    markConversationRead,
   };
 }
 
