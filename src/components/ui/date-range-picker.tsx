@@ -158,7 +158,7 @@ function DateRangePicker({
       <PopoverContent className="w-auto p-0 max-w-[calc(100vw-32px)]" align="center" sideOffset={4} collisionPadding={16}>
         <div className="flex max-h-[80vh] overflow-auto">
           {/* Presets sidebar */}
-          <div className="border-r border-border p-2 space-y-0.5 w-[120px] shrink-0 hidden sm:block">
+          <div className="border-r border-border p-2 space-y-0.5 w-[140px] shrink-0 hidden sm:block">
             <p className="text-xs font-medium text-muted-foreground mb-2">Acceso rápido</p>
             {presets.map((preset) => (
               <Button

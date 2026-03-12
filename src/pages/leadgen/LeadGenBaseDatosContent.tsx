@@ -26,7 +26,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useLeadGenEntries } from "./useLeadGen";
+import { useLeadGenEntries, useLeadGenProfiles } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 
