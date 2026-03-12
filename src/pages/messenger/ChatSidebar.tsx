@@ -500,13 +500,16 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             </ContextMenuSubContent>
           </ContextMenuSub>
         )}
-        <ContextMenuItem
-          onClick={onDelete}
-          className="text-destructive focus:text-destructive focus:bg-destructive/10"
-        >
-          <span className="h-3.5 w-3.5 mr-2">🗑</span>
-          Eliminar {isGroup ? "grupo" : "chat"}
-        </ContextMenuItem>
+        {/* Only show delete for DMs or if user is group admin */}
+        {(!isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
+          <ContextMenuItem
+            onClick={onDelete}
+            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+          >
+            <span className="h-3.5 w-3.5 mr-2">🗑</span>
+            Eliminar {isGroup ? "grupo" : "chat"}
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
