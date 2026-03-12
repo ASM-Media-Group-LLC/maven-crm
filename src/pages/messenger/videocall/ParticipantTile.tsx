@@ -116,12 +116,12 @@ const ParticipantTile = memo(function ParticipantTile({
     let retryAttempts = 0;
 
     const scheduleAttachRetry = () => {
-      if (retryAttempts >= 5 || participant.isCameraOff) return;
+      if (retryAttempts >= 8 || participant.isCameraOff) return;
       retryTimer = setTimeout(() => {
         retryAttempts += 1;
         const stillNeedsRetry = attachVideo();
         if (stillNeedsRetry) scheduleAttachRetry();
-      }, 250 * retryAttempts + 250);
+      }, 200 * retryAttempts + 150);
     };
 
     if (needsRetry && !participant.isCameraOff) {
