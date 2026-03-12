@@ -31,6 +31,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
   const handleBgChange = useCallback(async (effect: BackgroundEffect) => {
