@@ -9,7 +9,7 @@ import {
   ConnectionQuality,
   RoomOptions,
 } from "livekit-client";
-import { BackgroundProcessor } from "@livekit/track-processors";
+import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
 
