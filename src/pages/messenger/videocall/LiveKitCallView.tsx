@@ -37,6 +37,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
 
+  // Auto-clear unread chat messages when chat sidebar is open
+  useEffect(() => {
+    if (chatOpen && lk.unreadChatCount > 0) {
+      lk.clearUnreadChat();
+    }
+  }, [chatOpen, lk.unreadChatCount, lk.clearUnreadChat]);
+
   const handleBgChange = useCallback((effect: BackgroundEffect) => {
     setBgEffect(effect);
 
