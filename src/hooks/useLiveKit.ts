@@ -1057,10 +1057,15 @@ export function useLiveKit() {
     };
   }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
+  const clearUnreadChat = useCallback(() => {
+    setUnreadChatCount(0);
+  }, []);
+
   return {
     connectionState,
     participants,
     chatMessages,
+    unreadChatCount,
     isMicOn,
     isCamOn,
     isScreenSharing,
@@ -1080,5 +1085,6 @@ export function useLiveKit() {
     removeParticipant,
     getRoom,
     setBackgroundEffect,
+    clearUnreadChat,
   };
 }
