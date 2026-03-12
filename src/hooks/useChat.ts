@@ -448,8 +448,8 @@ export function useChat() {
           return;
         }
 
-        await loadConversations();
-      })();
+        // No need for full reload — optimistic UI already shows the conversation
+        // Realtime will sync any missing details
 
       return newConvId;
     },
