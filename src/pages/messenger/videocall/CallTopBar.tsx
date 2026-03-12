@@ -38,7 +38,7 @@ export default function CallTopBar({
   return (
     <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-[hsl(240_8%_10%)]">
       <div className="flex items-center gap-3">
-        <h2 className="font-semibold text-sm text-[hsl(0_0%_96%)]">{roomName}</h2>
+        {/* Room name hidden by design */}
         <Badge variant="outline" className="text-[10px] border-[hsl(0_0%_96%/0.2)] text-[hsl(0_0%_96%/0.7)]">
           {formatTime(elapsed)}
         </Badge>
