@@ -1,34 +1,22 @@
 
 
-## Fix: Select Filters Default Text in LeadGen
+## Problem
 
-### Problem
-The select filters show "Todos los estados", "Calidad", "Todas las agencias" as their selected value when in the default (unfiltered) state. The user wants the placeholder text to show instead (e.g., "Estado", "Agencia", "Calidad") — no "Todos" wording.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Changes in `src/pages/leadgen/LeadGenContent.tsx`
+## Solution
 
-1. **Change default filter values** from `"todos"` to `""` (empty string):
-   - `statusFilter`: `""` instead of `"todos"`
-   - `qualityFilter`: `""` instead of `"todos"`
-   - `qaFilter`: `""` instead of `"todos"`
-   - `agencyFilter`: `""` instead of `"todos"`
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-2. **Update filter logic** — replace `!== "todos"` checks with `!== ""` in the `filteredLeads` memo.
+## Changes
 
-3. **Update Select components** — use `value={statusFilter || undefined}` so the placeholder shows when empty, and change `onValueChange` to map `"__all__"` back to `""`:
-   ```tsx
-   <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-     <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
-     <SelectContent>
-       <SelectItem value="__all__">Todos</SelectItem>
-       {STATUS_OPTIONS.map(...)}
-     </SelectContent>
-   </Select>
-   ```
-   Same pattern for `qualityFilter` (placeholder: "Calidad") and `agencyFilter` (placeholder: "Agencia").
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-4. **DateRangePicker** — already has `placeholder="Selecciona fechas"` and it works correctly when `from`/`to` are undefined. The current issue is that `dateFrom` and `dateTo` default to `new Date()` (today), so the picker always shows today's date. No change needed here since the user specifically wants date filtering to default to today.
+Replace the single `.select()` call with a paginated loop:
 
-### Files to modify
-- `src/pages/leadgen/LeadGenContent.tsx` — 3 select filters: update default values, filter logic, and Select component patterns
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
