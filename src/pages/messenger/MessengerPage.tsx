@@ -29,7 +29,7 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 }
 
 export default function MessengerPage() {
-  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations } = useChat();
+  const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
@@ -37,20 +37,34 @@ export default function MessengerPage() {
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin } = usePinnedChats();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const activeChatIdRef = useRef<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const joinedFromLinkRef = useRef(false);
 
+  // Wrap setActiveChatId to also clear unread
+  const selectChat = useCallback((chatId: string | null) => {
+    setActiveChatId(chatId);
+    activeChatIdRef.current = chatId;
+    if (chatId) markConversationRead(chatId);
+  }, [markConversationRead]);
+
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
 
   const handleNewMessage = useCallback((msg: ChatMessage) => {
+    // Don't notify for messages in the currently active chat
+    if (activeChatIdRef.current === msg.conversation_id) {
+      // But still clear unread for the active chat
+      markConversationRead(msg.conversation_id);
+      return;
+    }
     const senderName = profiles[msg.sender_id]?.full_name || "Nuevo mensaje";
     notify(senderName, msg.content || "📎 Archivo", () => {
-      setActiveChatId(msg.conversation_id);
+      selectChat(msg.conversation_id);
     });
-  }, [profiles, notify]);
+  }, [profiles, notify, selectChat, markConversationRead]);
 
   const {
     messages, loading: msgsLoading, typingUsers,
@@ -66,12 +80,12 @@ export default function MessengerPage() {
 
   const handleSelectUser = useCallback((userId: string) => {
     const convId = createDirectChat(userId);
-    if (convId) setActiveChatId(convId);
-  }, [createDirectChat]);
+    if (convId) selectChat(convId);
+  }, [createDirectChat, selectChat]);
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);
-    if (convId) setActiveChatId(convId);
+    if (convId) selectChat(convId);
     setNewGroupOpen(false);
   };
 
@@ -98,19 +112,19 @@ export default function MessengerPage() {
 
   const handleDeleteChat = async (chatId: string) => {
     const success = await deleteConversation(chatId);
-    if (success && activeChatId === chatId) setActiveChatId(null);
+    if (success && activeChatId === chatId) selectChat(null);
     return success;
   };
 
   const handleGlobalSearchResult = useCallback((conversationId: string, _messageId: string) => {
-    setActiveChatId(conversationId);
+    selectChat(conversationId);
     setGlobalSearchOpen(false);
-  }, []);
+  }, [selectChat]);
 
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
     if (chatParam && !activeChatId) {
-      setActiveChatId(chatParam);
+      selectChat(chatParam);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [activeChatId]);
@@ -151,7 +165,7 @@ export default function MessengerPage() {
             <ChatSidebar
               conversations={conversations}
               activeChatId={activeChatId}
-              onSelectChat={setActiveChatId}
+              onSelectChat={selectChat}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
               onSelectContact={handleSelectUser}
@@ -188,7 +202,7 @@ export default function MessengerPage() {
               onSendTyping={sendTyping}
               onEditMessage={editMessage}
               onDeleteMessage={deleteMessage}
-              onBack={() => setActiveChatId(null)}
+              onBack={() => selectChat(null)}
               onStartVideoCall={handleStartVideoCall}
               loading={msgsLoading}
               getReactionsForMessage={getReactionsForMessage}

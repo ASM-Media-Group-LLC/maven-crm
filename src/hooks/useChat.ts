@@ -196,13 +196,13 @@ export function useChat() {
         if (msg.is_deleted) return prev;
 
         const conv = prev[idx];
+        const isMine = msg.sender_id === user.id;
         const updated = {
           ...conv,
           lastMessage: msg as ChatMessage,
           updated_at: msg.created_at,
-          unreadCount: msg.sender_id !== user.id
-            ? conv.unreadCount + 1
-            : conv.unreadCount,
+          // Don't increment unread for own messages or if this is the active chat
+          unreadCount: isMine ? conv.unreadCount : conv.unreadCount + 1,
         };
         // Move to top
         const next = [...prev];
@@ -580,6 +580,15 @@ export function useChat() {
     [user]
   );
 
+  // Clear unread count locally when user opens a chat
+  const markConversationRead = useCallback((conversationId: string) => {
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId && c.unreadCount > 0
+        ? { ...c, unreadCount: 0 }
+        : c
+    ));
+  }, []);
+
   return {
     conversations,
     loading,
@@ -588,6 +597,7 @@ export function useChat() {
     createGroupChat,
     deleteConversation,
     loadConversations,
+    markConversationRead,
   };
 }
 
