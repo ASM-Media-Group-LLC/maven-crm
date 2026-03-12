@@ -84,14 +84,8 @@ export default function ChatSidebar({
 
   const currentUserName = user ? profiles[user.id]?.full_name : null;
 
-  const hasMention = useCallback((conv: ConversationWithDetails) => {
-    if (!currentUserName || !conv.lastMessage?.content) return false;
-    const content = conv.lastMessage.content.toLowerCase();
-    const name = currentUserName.toLowerCase();
-    // Check for @name or @firstName patterns
-    return content.includes(`@${name}`) || 
-           content.includes(`@${name.split(" ")[0]}`);
-  }, [currentUserName]);
+  const convIds = useMemo(() => conversations.map(c => c.id), [conversations]);
+  const { mentionedIds } = useMentionedConversations(currentUserName, convIds);
 
   const filtered = useMemo(() => {
     return conversations.filter(c => {
@@ -99,10 +93,10 @@ export default function ChatSidebar({
       if (tab === "unread") return matchesSearch && c.unreadCount > 0;
       if (tab === "groups") return matchesSearch && c.type === "group";
       if (tab === "pinned") return matchesSearch && isPinned(c.id);
-      if (tab === "mentions") return matchesSearch && c.type === "group" && hasMention(c);
+      if (tab === "mentions") return matchesSearch && mentionedIds.has(c.id);
       return matchesSearch;
     });
-  }, [conversations, search, tab, isPinned, hasMention]);
+  }, [conversations, search, tab, isPinned, mentionedIds]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
