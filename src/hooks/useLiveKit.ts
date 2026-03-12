@@ -459,6 +459,8 @@ export function useLiveKit() {
           BACKGROUND_SWITCH_TIMEOUT_MS,
           "bg-template",
         );
+      } else {
+        return false;
       }
 
       if (opId !== bgApplyOpRef.current) return false;
