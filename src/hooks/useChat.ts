@@ -737,6 +737,9 @@ export function useMessages(conversationId: string | null, onNewMessage?: (msg: 
     fileName?: string;
     replyToId?: string;
   }>>([]);
+  const [messagesRealtimeVersion, setMessagesRealtimeVersion] = useState(0);
+  const messagesRealtimeRetryRef = useRef(0);
+  const messagesRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref for loadOlderMessages to avoid stale closure on `messages`
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
