@@ -60,7 +60,7 @@ export default function CallMetricsPanel({ room, participants, onClose }: CallMe
 
     for (const pub of local.videoTrackPublications.values()) {
       if (pub.source === Track.Source.Camera && pub.track) {
-        const trackStats = pub.track.getStats?.();
+        const trackStats = (pub.track as any).getStats?.();
         if (trackStats && Array.isArray(trackStats)) {
           for (const s of trackStats) {
             if ((s as any).frameWidth && (s as any).frameHeight) {
