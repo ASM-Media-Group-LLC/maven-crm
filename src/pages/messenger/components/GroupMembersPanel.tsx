@@ -113,6 +113,31 @@ export default function GroupMembersPanel({
     setRemovingUser(null);
   };
 
+  const handleLeaveGroup = async () => {
+    setLeavingGroup(true);
+    const myName = profiles[user!.id]?.full_name || "Usuario";
+    const { error } = await supabase
+      .from("chat_participants")
+      .delete()
+      .eq("conversation_id", conversation.id)
+      .eq("user_id", user!.id);
+    if (error) {
+      toast.error("Error al salir del grupo");
+    } else {
+      await supabase.from("chat_messages").insert({
+        conversation_id: conversation.id,
+        sender_id: user!.id,
+        content: `${myName} salió del grupo`,
+        type: "system",
+      });
+      toast.success("Has salido del grupo");
+      onMembersChanged();
+      onClose();
+    }
+    setLeavingGroup(false);
+    setShowLeaveConfirm(false);
+  };
+
   return (
     <div className="w-full md:w-[360px] shrink-0 border-l border-border bg-card flex flex-col h-full">
       {/* Header */}
