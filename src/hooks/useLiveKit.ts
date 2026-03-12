@@ -301,10 +301,11 @@ export function useLiveKit() {
     const processor = bgProcessorRef.current;
     bgProcessorRef.current = null;
     bgAttachedTrackRef.current = null;
+    bgLastAppliedEffectRef.current = "none";
 
     if (processor?.destroy) {
       try {
-        await processor.destroy();
+        await withTimeout(Promise.resolve(processor.destroy()), 2500, "bg-destroy");
       } catch {
         // no-op
       }
