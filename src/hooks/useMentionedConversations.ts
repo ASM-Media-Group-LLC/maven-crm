@@ -32,43 +32,71 @@ export function useMentionedConversations(
     }
     const firstName = name.split(" ")[0];
 
+    // First, get the user's last_read_at per conversation
+    const { data: participants, error: partErr } = await supabase
+      .from("chat_participants")
+      .select("conversation_id, last_read_at")
+      .eq("user_id", user.id)
+      .in("conversation_id", stableConvIds);
+
+    if (partErr) {
+      console.error("[useMentionedConversations] participants query error:", partErr);
+      setMentionedIds(new Set());
+      return;
+    }
+
+    const lastReadMap = new Map<string, string | null>();
+    (participants || []).forEach((p: any) => {
+      lastReadMap.set(p.conversation_id, p.last_read_at);
+    });
+
     const allMatchedConvIds = new Set<string>();
 
-    // Query 1: match @fullName (case-insensitive)
-    const { data: data1, error: err1 } = await supabase
-      .from("chat_messages")
-      .select("conversation_id")
-      .in("conversation_id", stableConvIds)
-      .eq("is_deleted", false)
-      .neq("sender_id", user.id)
-      .ilike("content", `%@${name}%`);
+    // For each conversation, only find mentions AFTER last_read_at
+    for (const convId of stableConvIds) {
+      const lastRead = lastReadMap.get(convId);
 
-    if (err1) {
-      console.error("[useMentionedConversations] query error (fullName):", err1);
-    }
-    if (data1) {
-      data1.forEach((r: any) => allMatchedConvIds.add(r.conversation_id));
-    }
-
-    // Query 2: match @firstName if different from fullName
-    if (firstName.toLowerCase() !== name.toLowerCase()) {
-      const { data: data2, error: err2 } = await supabase
+      let q1 = supabase
         .from("chat_messages")
-        .select("conversation_id")
-        .in("conversation_id", stableConvIds)
+        .select("id")
+        .eq("conversation_id", convId)
         .eq("is_deleted", false)
         .neq("sender_id", user.id)
-        .ilike("content", `%@${firstName}%`);
+        .ilike("content", `%@${name}%`)
+        .limit(1);
 
-      if (err2) {
-        console.error("[useMentionedConversations] query error (firstName):", err2);
+      if (lastRead) {
+        q1 = q1.gt("created_at", lastRead);
       }
-      if (data2) {
-        data2.forEach((r: any) => allMatchedConvIds.add(r.conversation_id));
+
+      const { data: d1 } = await q1;
+      if (d1 && d1.length > 0) {
+        allMatchedConvIds.add(convId);
+        continue; // already matched, skip firstName query
+      }
+
+      // Query 2: @firstName
+      if (firstName.toLowerCase() !== name.toLowerCase()) {
+        let q2 = supabase
+          .from("chat_messages")
+          .select("id")
+          .eq("conversation_id", convId)
+          .eq("is_deleted", false)
+          .neq("sender_id", user.id)
+          .ilike("content", `%@${firstName}%`)
+          .limit(1);
+
+        if (lastRead) {
+          q2 = q2.gt("created_at", lastRead);
+        }
+
+        const { data: d2 } = await q2;
+        if (d2 && d2.length > 0) {
+          allMatchedConvIds.add(convId);
+        }
       }
     }
 
-    console.log("[useMentionedConversations] user:", name, "matched:", allMatchedConvIds.size, "/", stableConvIds.length);
     setMentionedIds(allMatchedConvIds);
   }, [user, currentUserName, stableConvIds]);
 
