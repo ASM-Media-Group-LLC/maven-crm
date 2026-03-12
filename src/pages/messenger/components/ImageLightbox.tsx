@@ -102,9 +102,11 @@ export default function ImageLightbox({ src, alt, isOpen, onClose, type = "image
             <RotateCw className="h-5 w-5" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload}>
-          <Download className="h-5 w-5" />
-        </Button>
+        {type === "image" && (
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={handleDownload}>
+            <Download className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-9 w-9 text-white/80 hover:text-white hover:bg-white/10" onClick={onClose}>
           <X className="h-5 w-5" />
         </Button>
