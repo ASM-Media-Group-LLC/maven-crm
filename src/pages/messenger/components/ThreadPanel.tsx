@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X, MessageSquareText, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
+import MentionAutocomplete, { renderTextWithMentions } from "./MentionAutocomplete";
 
 interface ThreadPanelProps {
   parentMessage: ChatMessage;
@@ -14,6 +15,7 @@ interface ThreadPanelProps {
   currentUserId?: string;
   onSendReply: (content: string) => void;
   onClose: () => void;
+  participants?: { user_id: string; profile?: UserProfile }[];
 }
 
 function getInitials(name: string) {
@@ -35,10 +37,12 @@ function formatDate(d: string) {
 }
 
 export default function ThreadPanel({
-  parentMessage, replies, profiles, currentUserId, onSendReply, onClose,
+  parentMessage, replies, profiles, currentUserId, onSendReply, onClose, participants,
 }: ThreadPanelProps) {
   const [text, setText] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -51,6 +55,21 @@ export default function ThreadPanel({
     onSendReply(text.trim());
     setText("");
   };
+
+  const handleTextChange = (val: string) => {
+    setText(val);
+    setCursorPosition(inputRef.current?.selectionStart || val.length);
+  };
+
+  const handleMentionSelect = useCallback((newText: string, _userId: string) => {
+    setText(newText);
+    setCursorPosition(newText.length);
+    inputRef.current?.focus();
+  }, []);
+
+  const participantNames = (participants || [])
+    .map(p => p.profile?.full_name)
+    .filter(Boolean) as string[];
 
   const parentSender = profiles[parentMessage.sender_id]?.full_name || "Usuario";
 
@@ -80,7 +99,7 @@ export default function ThreadPanel({
               <span className="text-[10px] text-muted-foreground">{formatDate(parentMessage.created_at)} {formatTime(parentMessage.created_at)}</span>
             </div>
             <p className="text-sm text-foreground/90 mt-0.5 whitespace-pre-wrap break-words">
-              {parentMessage.content}
+              {renderTextWithMentions(parentMessage.content || "", participantNames)}
             </p>
           </div>
         </div>
@@ -116,7 +135,7 @@ export default function ThreadPanel({
                       <p className="text-[13px] text-foreground/90 mt-0.5 whitespace-pre-wrap break-words">
                         {msg.is_deleted ? (
                           <span className="italic text-muted-foreground">Mensaje eliminado</span>
-                        ) : msg.content}
+                        ) : renderTextWithMentions(msg.content || "", participantNames)}
                       </p>
                     </div>
                   </div>
@@ -127,16 +146,28 @@ export default function ThreadPanel({
         )}
       </div>
 
-      {/* Reply input */}
+      {/* Reply input with @mentions */}
       <div className="shrink-0 border-t border-border px-3 py-2.5">
-        <div className="flex items-end gap-1.5">
+        <div className="relative flex items-end gap-1.5">
+          {participants && participants.length > 0 && (
+            <MentionAutocomplete
+              text={text}
+              cursorPosition={cursorPosition}
+              participants={participants}
+              currentUserId={currentUserId}
+              onSelect={handleMentionSelect}
+            />
+          )}
           <Textarea
+            ref={inputRef}
             placeholder="Responder en hilo..."
             className="min-h-[36px] max-h-[80px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-xl px-3 py-2 text-sm flex-1"
             rows={1}
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={e => handleTextChange(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onClick={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
+            onKeyUp={() => setCursorPosition(inputRef.current?.selectionStart || 0)}
           />
           <Button
             size="icon"
