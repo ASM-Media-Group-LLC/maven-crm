@@ -23,23 +23,11 @@ export function useReactions(conversationId: string | null) {
   const messageIdsRef = useRef<Set<string>>(new Set());
   const reactionsRef = useRef<Reaction[]>([]);
 
-  // Keep ref in sync for synchronous reads in toggleReaction
   useEffect(() => { reactionsRef.current = reactions; }, [reactions]);
 
-  const loadReactions = useCallback(async () => {
-    if (!conversationId) { setReactions([]); messageIdsRef.current = new Set(); return; }
-
-    const { data: msgs } = await supabase
-      .from("chat_messages")
-      .select("id")
-      .eq("conversation_id", conversationId);
-
-    if (!msgs || msgs.length === 0) { setReactions([]); messageIdsRef.current = new Set(); return; }
-
-    const msgIds = msgs.map((m: any) => m.id);
-    messageIdsRef.current = new Set(msgIds);
-
-    const allReactions: Reaction[] = [];
+  // Load reactions only for tracked message IDs (not all messages in conversation)
+  const loadReactionsForMessages = useCallback(async (msgIds: string[]) => {
+    if (msgIds.length === 0) return;
     const chunks: string[][] = [];
     for (let i = 0; i < msgIds.length; i += 100) {
       chunks.push(msgIds.slice(i, i + 100));
@@ -49,13 +37,22 @@ export function useReactions(conversationId: string | null) {
         supabase.from("chat_reactions").select("*").in("message_id", chunk)
       )
     );
+    const allReactions: Reaction[] = [];
     for (const { data } of results) {
       if (data) allReactions.push(...(data as Reaction[]));
     }
     setReactions(allReactions);
-  }, [conversationId]);
+  }, []);
 
-  useEffect(() => { loadReactions(); }, [loadReactions]);
+  // When conversation changes, clear and reload
+  useEffect(() => {
+    if (!conversationId) {
+      setReactions([]);
+      messageIdsRef.current = new Set();
+      return;
+    }
+    // Reactions will load when addMessageId is called with the visible messages
+  }, [conversationId]);
 
   // Realtime: apply payloads inline instead of full refresh
   useEffect(() => {
@@ -65,10 +62,8 @@ export function useReactions(conversationId: string | null) {
       .channel(`reactions-${conversationId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_reactions" }, (payload) => {
         const newReaction = payload.new as Reaction;
-        // Only apply if it belongs to a message in this conversation
         if (!messageIdsRef.current.has(newReaction.message_id)) return;
         setReactions(prev => {
-          // Avoid duplicates (e.g. from our own optimistic add)
           if (prev.some(r => r.id === newReaction.id)) return prev;
           return [...prev, newReaction];
         });
@@ -78,17 +73,10 @@ export function useReactions(conversationId: string | null) {
         if (!oldReaction.id) return;
         setReactions(prev => prev.filter(r => r.id !== oldReaction.id));
       })
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          // Fallback: full reload on error
-          void loadReactions();
-        }
-      });
+      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [conversationId, loadReactions]);
+    return () => { supabase.removeChannel(channel); };
+  }, [conversationId]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
@@ -99,7 +87,6 @@ export function useReactions(conversationId: string | null) {
     );
 
     if (existing) {
-      // Optimistic remove
       setReactions(prev => prev.filter(r => r.id !== existing.id));
       const { error } = await supabase.from("chat_reactions").delete().eq("id", existing.id);
       if (error) {
@@ -110,7 +97,6 @@ export function useReactions(conversationId: string | null) {
       return;
     }
 
-    // Optimistic add
     const tempId = crypto.randomUUID();
     const tempReaction: Reaction = {
       id: tempId,
@@ -139,9 +125,23 @@ export function useReactions(conversationId: string | null) {
     }
   }, [user]);
 
+  // Track message IDs and trigger initial load when batch is complete
+  const pendingIdsRef = useRef<string[]>([]);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const addMessageId = useCallback((msgId: string) => {
+    if (messageIdsRef.current.has(msgId)) return;
     messageIdsRef.current.add(msgId);
-  }, []);
+    pendingIdsRef.current.push(msgId);
+
+    // Debounce: wait for batch of addMessageId calls to finish, then load
+    if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+    loadTimerRef.current = setTimeout(() => {
+      const ids = Array.from(messageIdsRef.current);
+      pendingIdsRef.current = [];
+      loadReactionsForMessages(ids);
+    }, 100);
+  }, [loadReactionsForMessages]);
 
   const getReactionsForMessage = useCallback((messageId: string): ReactionGroup[] => {
     const msgReactions = reactions.filter(r => r.message_id === messageId);

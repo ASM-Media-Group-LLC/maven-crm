@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Returns the total number of unread chat messages across all conversations.
- * Subscribes to realtime updates so the count stays fresh.
+ * Uses a single server-side function instead of N+1 queries.
  */
 export function useUnreadChatCount() {
   const { user } = useAuth();
@@ -13,29 +13,13 @@ export function useUnreadChatCount() {
   const refresh = useCallback(async () => {
     if (!user) { setCount(0); return; }
 
-    // Get all conversations the user participates in
-    const { data: participations } = await supabase
-      .from("chat_participants")
-      .select("conversation_id, last_read_at")
-      .eq("user_id", user.id);
+    const { data, error } = await supabase.rpc("get_unread_counts", {
+      _user_id: user.id,
+    });
 
-    if (!participations || participations.length === 0) { setCount(0); return; }
+    if (error || !data) { setCount(0); return; }
 
-    let total = 0;
-    for (const p of participations) {
-      let query = supabase
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("conversation_id", p.conversation_id)
-        .neq("sender_id", user.id);
-
-      if (p.last_read_at) {
-        query = query.gt("created_at", p.last_read_at);
-      }
-
-      const { count: c } = await query;
-      total += c || 0;
-    }
+    const total = (data as any[]).reduce((sum, row) => sum + (row.unread_count || 0), 0);
     setCount(total);
   }, [user]);
 
