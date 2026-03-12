@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.notification-automations]
 verify_jwt = false
+
+[functions.send-call-invitation]
+verify_jwt = false
