@@ -16,8 +16,6 @@ export function useChat() {
   const [loading] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const profilesRef = useRef(profiles);
-  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const delayedRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   profilesRef.current = profiles;
 
   const loadProfiles = useCallback(async () => {
