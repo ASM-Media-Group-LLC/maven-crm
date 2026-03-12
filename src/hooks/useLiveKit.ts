@@ -902,7 +902,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, queueBackgroundEffectApply, enableCameraWithRecovery, disposeBackgroundProcessor]);
+  }, [refreshParticipants, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded]);
 
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
