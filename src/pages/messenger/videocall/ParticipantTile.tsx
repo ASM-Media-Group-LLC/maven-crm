@@ -288,17 +288,19 @@ const ParticipantTile = memo(function ParticipantTile({
 
       {/* Reactions */}
       {participant.reactions.length > 0 && (
-        <div className="absolute top-3 right-3 flex gap-1 animate-bounce z-10">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-2 z-10 pointer-events-none">
           {participant.reactions.map((emoji, i) => (
-            <span key={i} className="text-2xl drop-shadow-lg">{emoji}</span>
+            <span key={`${emoji}-${i}-${Date.now()}`} className="text-4xl drop-shadow-lg animate-reaction-float">
+              {emoji}
+            </span>
           ))}
         </div>
       )}
 
       {/* Hand raised */}
       {participant.handRaised && (
-        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-1.5 animate-pulse z-10">
-          <Hand className="h-4 w-4 text-white" />
+        <div className="absolute top-3 left-3 bg-amber-500/90 rounded-full p-2 animate-pulse z-10">
+          <Hand className="h-6 w-6 text-white" />
         </div>
       )}
 

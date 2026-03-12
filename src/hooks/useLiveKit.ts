@@ -744,7 +744,7 @@ export function useLiveKit() {
                     : p
                 )
               );
-            }, 3000);
+            }, 6000);
           } else if (msg.type === "moderation") {
             // Security: Verify the sender has roomAdmin permission via LiveKit metadata
             // Only process moderation from participants with admin grants
@@ -958,7 +958,7 @@ export function useLiveKit() {
           p.isLocal ? { ...p, reactions: p.reactions.slice(1) } : p
         )
       );
-    }, 3000);
+    }, 6000);
   }, []);
 
   // ── Chat ──────────────────────────────────────────────────────
