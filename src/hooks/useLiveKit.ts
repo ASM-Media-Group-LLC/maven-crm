@@ -882,13 +882,8 @@ export function useLiveKit() {
         await disposeBackgroundProcessor();
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
-          let applied = false;
-          for (const delayMs of [90, 180, 320, 480]) {
-            await wait(delayMs);
-            applied = await queueBackgroundEffectApply(backgroundEffectRef.current);
-            if (applied) break;
-          }
+        if (cameraEnabled) {
+          await applyConfiguredBackgroundIfNeeded(room);
         }
       } else {
         await room.localParticipant.setCameraEnabled(false);
