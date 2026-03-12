@@ -85,7 +85,7 @@ export default function MessengerPage() {
 
   const handleCreateGroup = (name: string, memberIds: string[]) => {
     const convId = createGroupChat(name, memberIds);
-    if (convId) setActiveChatId(convId);
+    if (convId) selectChat(convId);
     setNewGroupOpen(false);
   };
 
