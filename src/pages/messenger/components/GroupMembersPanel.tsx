@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2 } from "lucide-react";
+import { X, UserPlus, UserMinus, Search, Shield, Crown, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
