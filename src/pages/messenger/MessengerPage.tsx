@@ -124,7 +124,7 @@ export default function MessengerPage() {
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
     if (chatParam && !activeChatId) {
-      setActiveChatId(chatParam);
+      selectChat(chatParam);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [activeChatId]);
