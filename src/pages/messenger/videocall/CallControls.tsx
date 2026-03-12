@@ -64,9 +64,12 @@ function ControlBtn({
 
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, isParticipantsOpen, isMetricsOpen,
+  isCaptionsOn, captionsLanguage, captionsSupported,
   backgroundEffect,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
-  onToggleChat, onToggleParticipants, onToggleMetrics, onSendReaction, onBackgroundChange, onLeave,
+  onToggleChat, onToggleParticipants, onToggleMetrics,
+  onToggleCaptions, onCaptionsLanguageChange,
+  onSendReaction, onBackgroundChange, onLeave,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-2 md:gap-3 py-4 bg-[hsl(240_8%_10%)] flex-wrap px-2">
@@ -105,11 +108,64 @@ export default function CallControls({
         </PopoverContent>
       </Popover>
 
+      {/* Captions with language selector */}
+      {captionsSupported && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              title="Subtítulos"
+              className={cn(
+                "relative h-12 w-12 rounded-full flex items-center justify-center transition-colors",
+                isCaptionsOn
+                  ? "bg-primary/30 text-primary hover:bg-primary/40"
+                  : "bg-[hsl(0_0%_100%/0.1)] text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.2)]"
+              )}
+            >
+              {isCaptionsOn ? <Captions className="h-5 w-5" /> : <CaptionsOff className="h-5 w-5" />}
+              {isCaptionsOn && (
+                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary border-2 border-[hsl(240_8%_10%)]" />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" className="w-56 p-3" align="center">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Subtítulos</span>
+                <button
+                  onClick={onToggleCaptions}
+                  className={cn(
+                    "text-xs px-2.5 py-1 rounded-full font-medium transition-colors",
+                    isCaptionsOn
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {isCaptionsOn ? "Activado" : "Desactivado"}
+                </button>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Idioma</label>
+                <select
+                  value={captionsLanguage}
+                  onChange={(e) => onCaptionsLanguageChange(e.target.value)}
+                  className="w-full text-sm bg-muted border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {CAPTION_LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
       <BackgroundSelector selected={backgroundEffect} onSelect={onBackgroundChange} />
       <ControlBtn icon={MessageSquare} onClick={onToggleChat} label="Chat" badge={isChatOpen} />
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
       <ControlBtn icon={BarChart3} onClick={onToggleMetrics} label="Métricas" badge={isMetricsOpen} />
-      <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
 
       <button
         onClick={onLeave}
