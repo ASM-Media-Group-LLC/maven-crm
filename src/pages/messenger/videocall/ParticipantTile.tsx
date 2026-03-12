@@ -222,7 +222,10 @@ const ParticipantTile = memo(function ParticipantTile({
     };
   }, [
     room,
-    participant,
+    participant.identity,
+    participant.isLocal,
+    participant.isCameraOff,
+    participant.isScreenSharing,
     preferredAudioOutputDeviceId,
   ]);
 
