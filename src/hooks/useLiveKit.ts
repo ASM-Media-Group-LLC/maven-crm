@@ -195,8 +195,11 @@ export function useLiveKit() {
     audioOutputDeviceId?: string;
   }>({});
   const backgroundEffectRef = useRef<BackgroundEffect>("none");
+  const bgLastAppliedEffectRef = useRef<BackgroundEffect>("none");
+  const bgRequestedEffectRef = useRef<BackgroundEffect>("none");
   const bgApplyOpRef = useRef(0);
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const bgFailureCooldownUntilRef = useRef(0);
   const connectingRef = useRef(false); // Guard against concurrent connect()
   const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
 
