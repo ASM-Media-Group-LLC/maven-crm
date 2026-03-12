@@ -19,6 +19,9 @@ export function useChat() {
   profilesRef.current = profiles;
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
+  const [chatRealtimeVersion, setChatRealtimeVersion] = useState(0);
+  const chatRealtimeRetryRef = useRef(0);
+  const chatRealtimeReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadProfiles = useCallback(async () => {
     const { data } = await supabase
