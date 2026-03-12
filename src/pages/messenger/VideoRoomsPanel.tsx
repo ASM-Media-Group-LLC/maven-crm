@@ -20,15 +20,11 @@ interface VideoRoomsPanelProps {
 }
 
 export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClose }: VideoRoomsPanelProps) {
-  const [showCreate, setShowCreate] = useState(false);
-  const [roomName, setRoomName] = useState("");
   const [joinLink, setJoinLink] = useState("");
 
   const handleCreate = () => {
-    if (!roomName.trim()) return;
-    onCreateRoom(roomName.trim());
-    setRoomName("");
-    setShowCreate(false);
+    const autoName = `Sala ${new Date().toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`;
+    onCreateRoom(autoName);
   };
 
   const extractRoomId = (value: string) => {
