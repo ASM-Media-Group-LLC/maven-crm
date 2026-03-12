@@ -541,10 +541,12 @@ export function useLiveKit() {
       return true;
     }
 
-    const cameraReady = await waitForCameraPublication(room, [120, 220, 360]);
+    // Wait for camera track to be fully published and stable
+    const cameraReady = await waitForCameraPublication(room, [150, 300, 500, 700]);
     if (!cameraReady) return false;
 
-    await wait(90);
+    // Extra stabilization for the track before attaching processor
+    await wait(200);
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
