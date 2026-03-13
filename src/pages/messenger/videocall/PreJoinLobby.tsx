@@ -137,7 +137,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     if (!isTemplateBackground(effect)) return;
     const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
     if (!tpl) return;
-    const templateUrl = `${window.location.origin}${tpl.src}`;
+    // Use low-res version for processor (480px is sufficient for ML segmentation)
+    const templateUrl = `${window.location.origin}${tpl.lowSrc || tpl.src}`;
     if (preloadedRef.current.has(templateUrl)) return;
     await new Promise<void>((resolve, reject) => {
       const img = new Image();
@@ -185,7 +186,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (!tpl) return false;
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: `${window.location.origin}${tpl.src}` })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-template");
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: `${window.location.origin}${tpl.lowSrc || tpl.src}` })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-template");
       }
       if (opId !== bgOpRef.current) return false;
       bgFailureCooldownUntilRef.current = 0;

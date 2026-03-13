@@ -6,14 +6,14 @@ import { cn } from "@/lib/utils";
 export type BackgroundEffect = "none" | "soft-blur" | "hard-blur" | string;
 
 export const BACKGROUND_TEMPLATES = [
-  { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg" },
-  { id: "tpl-bookshelf", label: "Biblioteca", src: "/backgrounds/bg-bookshelf.jpg" },
-  { id: "tpl-beach", label: "Playa", src: "/backgrounds/bg-beach.jpg" },
-  { id: "tpl-mountains", label: "Montañas", src: "/backgrounds/bg-mountains.jpg" },
-  { id: "tpl-cafe", label: "Café", src: "/backgrounds/bg-cafe.jpg" },
-  { id: "tpl-livingroom", label: "Sala", src: "/backgrounds/bg-livingroom.jpg" },
-  { id: "tpl-forest", label: "Bosque", src: "/backgrounds/bg-forest.jpg" },
-  { id: "tpl-abstract", label: "Abstracto", src: "/backgrounds/bg-abstract.jpg" },
+  { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg", lowSrc: "/backgrounds/low/bg-office.jpg" },
+  { id: "tpl-bookshelf", label: "Biblioteca", src: "/backgrounds/bg-bookshelf.jpg", lowSrc: "/backgrounds/low/bg-bookshelf.jpg" },
+  { id: "tpl-beach", label: "Playa", src: "/backgrounds/bg-beach.jpg", lowSrc: "/backgrounds/low/bg-beach.jpg" },
+  { id: "tpl-mountains", label: "Montañas", src: "/backgrounds/bg-mountains.jpg", lowSrc: "/backgrounds/low/bg-mountains.jpg" },
+  { id: "tpl-cafe", label: "Café", src: "/backgrounds/bg-cafe.jpg", lowSrc: "/backgrounds/low/bg-cafe.jpg" },
+  { id: "tpl-livingroom", label: "Sala", src: "/backgrounds/bg-livingroom.jpg", lowSrc: "/backgrounds/low/bg-livingroom.jpg" },
+  { id: "tpl-forest", label: "Bosque", src: "/backgrounds/bg-forest.jpg", lowSrc: "/backgrounds/low/bg-forest.jpg" },
+  { id: "tpl-abstract", label: "Abstracto", src: "/backgrounds/bg-abstract.jpg", lowSrc: "/backgrounds/low/bg-abstract.jpg" },
 ];
 
 interface BackgroundSelectorProps {

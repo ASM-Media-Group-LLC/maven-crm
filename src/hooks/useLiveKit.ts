@@ -439,15 +439,16 @@ export function useLiveKit() {
 
         if (!selectedTemplate) return false;
 
-        const templateUrl = `${window.location.origin}${selectedTemplate.src}`;
-        if (!preloadedBackgroundsRef.current.has(templateUrl)) {
+        // Use low-res image for the ML processor (480px is enough for segmentation)
+        const processorUrl = `${window.location.origin}${selectedTemplate.lowSrc || selectedTemplate.src}`;
+        if (!preloadedBackgroundsRef.current.has(processorUrl)) {
           await new Promise<void>((resolve, reject) => {
             const image = new Image();
-            image.src = templateUrl;
+            image.src = processorUrl;
             image.onload = () => resolve();
             image.onerror = () => reject(new Error("template-load-failed"));
           });
-          preloadedBackgroundsRef.current.add(templateUrl);
+          preloadedBackgroundsRef.current.add(processorUrl);
         }
 
         if (opId !== bgApplyOpRef.current) return false;
@@ -456,7 +457,7 @@ export function useLiveKit() {
           Promise.resolve(
             processor.switchTo({
               mode: "virtual-background",
-              imagePath: templateUrl,
+              imagePath: processorUrl,
             }),
           ),
           BACKGROUND_SWITCH_TIMEOUT_MS,
@@ -548,12 +549,10 @@ export function useLiveKit() {
       return true;
     }
 
-    // Wait for camera track to be fully published and stable
+    // Wait for camera track to be fully published
     const cameraReady = await waitForCameraPublication(room, [80, 150, 300]);
     if (!cameraReady) return false;
 
-    // Brief stabilization for the track before attaching processor
-    await wait(100);
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
@@ -891,7 +890,10 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
-        // Only dispose if a processor actually exists (avoids unnecessary delay)
+        // Optimistic UI: show cam on immediately
+        setIsCamOn(true);
+
+        // Only dispose if a processor actually exists
         if (bgProcessorRef.current) {
           await disposeBackgroundProcessor();
         }
@@ -899,23 +901,26 @@ export function useLiveKit() {
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
-          // Brief stabilization before applying background
-          await wait(120);
           refreshParticipants();
-          await applyConfiguredBackgroundIfNeeded(room);
+          // Apply background without blocking the UI
+          applyConfiguredBackgroundIfNeeded(room).catch(() => {});
+        } else {
+          setIsCamOn(false);
         }
       } else {
-        // Turning off: dispose processor and disable camera in parallel where safe
-        const disposePromise = bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve();
-        await disposePromise;
-        await room.localParticipant.setCameraEnabled(false);
+        // Optimistic UI: show cam off immediately
+        setIsCamOn(false);
+
+        // Turning off: dispose processor and disable camera in parallel
+        await Promise.all([
+          bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve(),
+          room.localParticipant.setCameraEnabled(false),
+        ]);
       }
 
-      await wait(50);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 300);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
       try {
