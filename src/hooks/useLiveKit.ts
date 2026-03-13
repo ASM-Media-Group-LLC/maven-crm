@@ -281,9 +281,15 @@ export function useLiveKit() {
     const micMuted = isLocal
       ? (typeof localParticipant.isMicrophoneEnabled === "boolean" ? !localParticipant.isMicrophoneEnabled : (audioTrack ? audioTrack.isMuted : true))
       : (audioTrack ? audioTrack.isMuted || !audioTrack.isSubscribed : true);
-    const camOff = isLocal
-      ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
-      : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
+
+    const shouldHoldLocalVideo =
+      isLocal && holdLocalVideoUntilBackgroundRef.current && backgroundEffectRef.current !== "none";
+
+    const camOff = shouldHoldLocalVideo
+      ? true
+      : isLocal
+        ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
+        : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
 
     return {
       sid: p.sid,
