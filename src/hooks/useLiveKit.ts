@@ -1279,36 +1279,53 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return;
     preferredDevicesRef.current.videoDeviceId = deviceId;
+    const hasBackgroundEffect = backgroundEffectRef.current !== "none";
+
     try {
+      // Stop processor on current track before replacing camera source
+      // to avoid orphaned ML pipelines that can freeze camera refresh.
+      const currentCamTrack = getLocalCameraTrack(room);
+      if (currentCamTrack && bgAttachedTrackRef.current === currentCamTrack) {
+        try {
+          await withTimeout(Promise.resolve(currentCamTrack.stopProcessor?.()), 1200, "bg-stop-before-video-switch");
+        } catch {}
+      }
+
       bgAttachedTrackRef.current = null;
+      bgLastAppliedEffectRef.current = "none";
       // Device switch is user-driven, so allow background application again.
       skipAutoBackgroundRestoreRef.current = false;
-      // Use switchActiveDevice for seamless video switching
-      await room.switchActiveDevice("videoinput", deviceId);
-      await wait(200); // Brief wait for the new track to be ready
-      const isReady = await waitForCameraPublication(room, [80, 150, 300]);
-      if (isReady && backgroundEffectRef.current !== "none") {
-        await applyConfiguredBackgroundIfNeeded(room);
+
+      if (hasBackgroundEffect) {
+        // Deterministic restart with safe constraints is more stable than hot-switching
+        // when a background processor is active.
+        await room.localParticipant.setCameraEnabled(false);
+        await wait(80);
+        await room.localParticipant.setCameraEnabled(true, getVideoConstraint(deviceId, true));
+      } else {
+        // No background effect: keep seamless switch path.
+        await room.switchActiveDevice("videoinput", deviceId);
       }
+
+      const isReady = await waitForCameraPublication(room, [80, 150, 300]);
+      if (isReady && hasBackgroundEffect) {
+        scheduleDeferredBackgroundReapply(room, 260);
+      }
+
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     } catch (err) {
       console.error("[LiveKit] Video input switch error:", err);
-      // Fallback: disable/re-enable
-      try {
-        await room.localParticipant.setCameraEnabled(false);
-        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(deviceId));
-        const isReady = await waitForCameraPublication(room, [80, 150, 300]);
-        if (isReady && backgroundEffectRef.current !== "none") {
-          await applyConfiguredBackgroundIfNeeded(room);
-        }
-        setIsCamOn(hasActiveCameraPublication(room));
-        refreshParticipants();
-      } catch (fallbackErr) {
-        console.error("[LiveKit] Video input fallback switch error:", fallbackErr);
+
+      // Fallback: full camera recovery with profile-aware constraints.
+      const cameraEnabled = await enableCameraWithRecovery(room, deviceId);
+      if (cameraEnabled && backgroundEffectRef.current !== "none") {
+        scheduleDeferredBackgroundReapply(room, 300);
       }
+      setIsCamOn(hasActiveCameraPublication(room));
+      refreshParticipants();
     }
-  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, applyConfiguredBackgroundIfNeeded]);
+  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, scheduleDeferredBackgroundReapply]);
 
   return {
     connectionState,
