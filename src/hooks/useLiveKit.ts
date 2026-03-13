@@ -696,6 +696,33 @@ export function useLiveKit() {
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
+  const applyBackgroundBeforeLocalVideoVisible = useCallback(async (room: Room, timeoutMs = 2200) => {
+    if (backgroundEffectRef.current === "none") {
+      holdLocalVideoUntilBackgroundRef.current = false;
+      refreshParticipants();
+      return true;
+    }
+
+    if (skipAutoBackgroundRestoreRef.current) {
+      holdLocalVideoUntilBackgroundRef.current = false;
+      refreshParticipants();
+      return false;
+    }
+
+    holdLocalVideoUntilBackgroundRef.current = true;
+    refreshParticipants();
+
+    try {
+      return await Promise.race([
+        applyConfiguredBackgroundIfNeeded(room),
+        wait(timeoutMs).then(() => false),
+      ]);
+    } finally {
+      holdLocalVideoUntilBackgroundRef.current = false;
+      refreshParticipants();
+    }
+  }, [applyConfiguredBackgroundIfNeeded, refreshParticipants]);
+
   // ── Cleanup audio resume listeners ─────────────────────────────
   const cleanupAudioResumeListeners = useCallback(() => {
     if (audioResumeCleanupRef.current) {
