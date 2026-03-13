@@ -728,6 +728,7 @@ export function useLiveKit() {
         roomRef.current = null;
       }
       clearSyncInterval();
+      clearBackgroundReapplyTimer();
       cleanupAudioResumeListeners();
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
