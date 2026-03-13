@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import CreatorTable from "../components/CreatorTable";
 import { CloserCreator, STAGES } from "../useCloserCreators";
 
@@ -17,12 +18,25 @@ interface Props {
 const MisCreatorsTab = ({ creators, onView, onEdit, onDelete, onStageChange }: Props) => {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const filtered = creators.filter((c) => {
     if (search && !c.instagram_handle.toLowerCase().includes(search.toLowerCase())) return false;
     if (stageFilter && c.stage !== stageFilter) return false;
+    if (dateFrom && c.passed_date) {
+      if (new Date(c.passed_date) < dateFrom) return false;
+    }
+    if (dateTo && c.passed_date) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      if (new Date(c.passed_date) > end) return false;
+    }
+    if ((dateFrom || dateTo) && !c.passed_date) return false;
     return true;
   });
+
+  const hasFilters = search || stageFilter || dateFrom || dateTo;
 
   const columns = [
     { key: "instagram_handle", label: "Instagram" },
@@ -63,8 +77,14 @@ const MisCreatorsTab = ({ creators, onView, onEdit, onDelete, onStageChange }: P
             {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        {(search || stageFilter) && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setStageFilter(""); }}>
+        <DateRangePicker
+          from={dateFrom}
+          to={dateTo}
+          onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
+          placeholder="Fecha de paso"
+        />
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setStageFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
             <X className="mr-1.5 h-4 w-4" /> Limpiar
           </Button>
         )}
