@@ -1226,6 +1226,8 @@ export function useLiveKit() {
     preferredDevicesRef.current.videoDeviceId = deviceId;
     try {
       bgAttachedTrackRef.current = null;
+      // Device switch is user-driven, so allow background application again.
+      skipAutoBackgroundRestoreRef.current = false;
       // Use switchActiveDevice for seamless video switching
       await room.switchActiveDevice("videoinput", deviceId);
       await wait(200); // Brief wait for the new track to be ready
