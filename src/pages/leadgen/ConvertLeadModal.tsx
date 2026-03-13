@@ -29,7 +29,7 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Insert into closer_creators (the actual pipeline table)
+      // Insert into closer_creators with leadgen_entry_id for traceability
       const { error: insertError } = await supabase.from("closer_creators").insert({
         instagram_handle: lead.model_handle,
         source_account: lead.company || null,
@@ -42,7 +42,8 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         agency_commission: 0,
         created_by: user.id,
         assigned_to: user.id,
-      });
+        leadgen_entry_id: lead.id,
+      } as any);
       if (insertError) throw insertError;
 
       // Also insert into closers_contacts for traceability
@@ -118,7 +119,7 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
         <div className="flex items-start gap-2.5 rounded-lg bg-primary/10 p-3">
           <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers.
+            El lead quedará marcado como "contactado" y la creator aparecerá en el módulo de Closers con referencia al lead original.
           </p>
         </div>
 

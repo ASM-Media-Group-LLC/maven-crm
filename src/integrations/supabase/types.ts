@@ -928,6 +928,7 @@ export type Database = {
           id: string
           instagram_handle: string
           last_contact_date: string | null
+          leadgen_entry_id: string | null
           monthly_monetization: number | null
           notes: string | null
           onlyfans_url: string | null
@@ -951,6 +952,7 @@ export type Database = {
           id?: string
           instagram_handle: string
           last_contact_date?: string | null
+          leadgen_entry_id?: string | null
           monthly_monetization?: number | null
           notes?: string | null
           onlyfans_url?: string | null
@@ -974,6 +976,7 @@ export type Database = {
           id?: string
           instagram_handle?: string
           last_contact_date?: string | null
+          leadgen_entry_id?: string | null
           monthly_monetization?: number | null
           notes?: string | null
           onlyfans_url?: string | null
@@ -990,6 +993,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closer_creators_leadgen_entry_id_fkey"
+            columns: ["leadgen_entry_id"]
+            isOneToOne: false
+            referencedRelation: "leadgen_entries"
             referencedColumns: ["id"]
           },
         ]

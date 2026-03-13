@@ -12,17 +12,16 @@ import { getMiamiDateStr } from "./timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { Phone, Upload, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { normalizeHandle } from "@/lib/handle-utils";
+import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 const leadSchema = z.object({
-  model_handle: z.string().min(1, "Handle requerido"),
+  source_link: z.string().url("URL de perfil requerida"),
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Calidad requerida"),
   company: z.string().min(1, "Compañía requerida"),
   country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
-  source_link: z.string().url("URL inválida").optional().or(z.literal("")),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -43,15 +42,23 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
     defaultValues: {
-      model_handle: "",
+      source_link: "",
       platform: "",
       quality: "",
       company: "",
       country_code: "",
       notes: "",
-      source_link: "",
     },
   });
+
+  // Auto-detect platform when URL changes
+  const handleUrlChange = (value: string, onChange: (v: string) => void) => {
+    onChange(value);
+    const detected = detectPlatformFromUrl(value);
+    if (detected) {
+      form.setValue("platform", detected);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
@@ -73,10 +80,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Normalize handle
-      const normalizedHandle = normalizeHandle(data.model_handle);
+      // Extract handle from URL
+      const normalizedHandle = normalizeHandle(data.source_link);
       if (!normalizedHandle) {
-        toast({ title: "Handle inválido", description: "El handle ingresado no es válido.", variant: "destructive" });
+        toast({ title: "URL inválida", description: "No se pudo extraer un handle de la URL proporcionada.", variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
@@ -140,7 +147,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         company: data.company,
         country_code: data.country_code || null,
         notes: data.notes || null,
-        source_link: data.source_link || null,
+        source_link: data.source_link,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
@@ -194,27 +201,23 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
             <div className="overflow-y-auto max-h-[60vh] space-y-4 pr-1">
               <FormField
                 control={form.control}
-                name="model_handle"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Handle / Usuario *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="@usuario" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="source_link"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>URL del Perfil</FormLabel>
+                    <FormLabel>URL del Perfil *</FormLabel>
                     <FormControl>
-                      <Input placeholder="https://instagram.com/..." {...field} />
+                      <Input
+                        placeholder="https://instagram.com/usuario"
+                        value={field.value}
+                        onChange={(e) => handleUrlChange(e.target.value, field.onChange)}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      El handle se detectará automáticamente de la URL
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
