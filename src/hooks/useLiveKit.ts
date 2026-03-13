@@ -161,6 +161,15 @@ function scheduleWhenIdle(cb: () => void, delay = 100) {
   }
 }
 
+function isReloadNavigation() {
+  try {
+    const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    return navigationEntry?.type === "reload";
+  } catch {
+    return false;
+  }
+}
+
 // ── Production Room configuration (Google Meet-inspired) ─────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
