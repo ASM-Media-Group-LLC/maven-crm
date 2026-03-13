@@ -14,7 +14,7 @@ interface CallTopBarProps {
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, layout, onToggleLayout, shareLink,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -37,7 +37,6 @@ export default function CallTopBar({
   return (
     <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-[hsl(240_8%_10%)]">
       <div className="flex items-center gap-3">
-        {/* Room name hidden by design */}
         <Badge variant="outline" className="text-[10px] border-[hsl(0_0%_96%/0.2)] text-[hsl(0_0%_96%/0.7)]">
           {formatTime(elapsed)}
         </Badge>
@@ -64,9 +63,10 @@ export default function CallTopBar({
           variant="ghost"
           size="icon"
           className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]"
-          onClick={onToggleLayout}
+          onClick={onOpenAdjustView}
+          title="Ajustar vista"
         >
-          {layout === "grid" ? <Grid3X3 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+          <SlidersHorizontal className="h-4 w-4" />
         </Button>
       </div>
     </div>
