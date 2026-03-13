@@ -1008,6 +1008,7 @@ export function useLiveKit() {
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
     clearSyncInterval();
+    clearBackgroundReapplyTimer();
     cleanupAudioResumeListeners();
     void disposeBackgroundProcessor();
     roomRef.current?.disconnect();
