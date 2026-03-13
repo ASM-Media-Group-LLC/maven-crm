@@ -1323,6 +1323,8 @@ export function useLiveKit() {
       clearSyncInterval();
       clearBackgroundReapplyTimer();
       cleanupAudioResumeListeners();
+      bgQueueInFlightRef.current = false;
+      bgApplyQueueRef.current = Promise.resolve(true);
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
