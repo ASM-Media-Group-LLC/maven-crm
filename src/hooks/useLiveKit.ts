@@ -76,7 +76,6 @@ function playTone(frequency: number, duration: number, volume = 0.15) {
   const ctx = getAudioContext();
   if (!ctx) return;
   try {
-    // Resume if suspended (browser autoplay policy)
     if (ctx.state === "suspended") {
       ctx.resume().catch(() => {});
     }
@@ -123,9 +122,13 @@ function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
 // ── Chat message cap to prevent unbounded memory growth ──────────
 const MAX_CHAT_MESSAGES = 500;
 
-const BACKGROUND_ATTACH_TIMEOUT_MS = 10000;
-const BACKGROUND_SWITCH_TIMEOUT_MS = 12000;
-const BACKGROUND_FAILURE_COOLDOWN_MS = 15000;
+// ── Background processor timeouts (reduced for responsiveness) ───
+const BACKGROUND_ATTACH_TIMEOUT_MS = 6000;
+const BACKGROUND_SWITCH_TIMEOUT_MS = 8000;
+const BACKGROUND_FAILURE_COOLDOWN_MS = 10000;
+
+// ── Sync interval — Google Meet polls ~3-5s for participant state ─
+const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
@@ -146,10 +149,25 @@ async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string
   }
 }
 
-// ── Production Room configuration ────────────────────────────────
+/**
+ * Schedules a callback to run when the browser is idle.
+ * Falls back to setTimeout(cb, delay) if requestIdleCallback is unavailable.
+ */
+function scheduleWhenIdle(cb: () => void, delay = 100) {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(cb, { timeout: delay + 500 });
+  } else {
+    setTimeout(cb, delay);
+  }
+}
+
+// ── Production Room configuration (Google Meet-inspired) ─────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
+  // Keep local tracks alive when unpublished — avoids getUserMedia re-calls
+  // during quick toggling which causes visible camera flashes
+  stopLocalTrackOnUnpublish: false,
   videoCaptureDefaults: {
     resolution: VideoPresets.h1080.resolution,
     facingMode: "user",
@@ -162,9 +180,9 @@ const ROOM_OPTIONS: RoomOptions = {
     sampleRate: 48000,
   },
   publishDefaults: {
-    dtx: true,
-    red: true,
-    simulcast: true,
+    dtx: true,          // Discontinuous transmission — saves bandwidth on silence
+    red: true,          // Redundant encoding — better packet loss resilience
+    simulcast: true,    // SFU-style adaptive quality layers
     videoSimulcastLayers: [
       VideoPresets.h180,
       VideoPresets.h360,
@@ -173,6 +191,15 @@ const ROOM_OPTIONS: RoomOptions = {
     videoCodec: "vp9",
   },
   disconnectOnPageLeave: true,
+  // Reconnection resilience — Google Meet reconnects transparently
+  reconnectPolicy: {
+    nextRetryDelayInMs: (context) => {
+      // Exponential backoff: 300ms, 600ms, 1.2s, 2.4s, capped at 5s
+      // Attempt up to 7 times (~20s total before giving up)
+      if (context.retryCount >= 7) return null; // give up
+      return Math.min(300 * Math.pow(2, context.retryCount), 5000);
+    },
+  },
 };
 
 export function useLiveKit() {
@@ -203,9 +230,10 @@ export function useLiveKit() {
   const bgApplyOpRef = useRef(0);
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const bgFailureCooldownUntilRef = useRef(0);
-  const connectingRef = useRef(false); // Guard against concurrent connect()
-  const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
-  const skipAutoBackgroundRestoreRef = useRef(false);
+  const connectingRef = useRef(false);
+  const audioResumeCleanupRef = useRef<(() => void) | null>(null);
+  // Track whether the initial background has been applied for this session
+  const bgInitialApplyDoneRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -407,6 +435,7 @@ export function useLiveKit() {
         return true;
       }
 
+      // Lazy-create the processor — the constructor loads the ML model
       let processor = bgProcessorRef.current;
       if (!processor) {
         processor = BackgroundProcessor({ mode: "disabled" });
@@ -509,7 +538,9 @@ export function useLiveKit() {
     bgApplyQueueRef.current = bgApplyQueueRef.current
       .catch(() => false)
       .then(async () => {
-        while (true) {
+        // Bounded loop (max 3 iterations) to prevent infinite spinning
+        let iterations = 0;
+        while (iterations++ < 3) {
           const room = roomRef.current;
           if (!room) return false;
 
@@ -534,11 +565,44 @@ export function useLiveKit() {
           if (bgRequestedEffectRef.current === nextEffect) {
             return applied;
           }
+          // Effect changed mid-apply — loop once more to apply the new one
         }
+        return false;
       });
 
     return bgApplyQueueRef.current;
   }, [applyBackgroundEffectToCurrentCamera]);
+
+  /**
+   * Non-blocking background apply: schedules via requestIdleCallback
+   * so the ML model initialization doesn't freeze the main thread on page load.
+   * This is the key fix for the "page not responding" freeze on reload.
+   */
+  const scheduleBackgroundApply = useCallback((room: Room) => {
+    if (backgroundEffectRef.current === "none") return;
+    if (bgInitialApplyDoneRef.current) return;
+    bgInitialApplyDoneRef.current = true;
+
+    scheduleWhenIdle(() => {
+      // Double-check room is still valid after idle delay
+      if (roomRef.current !== room) return;
+      if (backgroundEffectRef.current === "none") return;
+
+      const hasTrack = Array.from(room.localParticipant.videoTrackPublications.values()).some(
+        (p) => p.source === Track.Source.Camera && p.track,
+      );
+
+      if (hasTrack) {
+        queueBackgroundEffectApply(backgroundEffectRef.current);
+      } else {
+        // Camera track not ready yet — wait and retry once
+        wait(400).then(() => {
+          if (roomRef.current !== room || backgroundEffectRef.current === "none") return;
+          queueBackgroundEffectApply(backgroundEffectRef.current);
+        });
+      }
+    }, 800); // Give the page 800ms to render before starting ML
+  }, [queueBackgroundEffectApply]);
 
   const applyConfiguredBackgroundIfNeeded = useCallback(async (room: Room) => {
     if (backgroundEffectRef.current === "none") {
@@ -551,7 +615,6 @@ export function useLiveKit() {
       (p) => p.source === Track.Source.Camera && p.track,
     );
     if (!hasTrack) {
-      // Brief wait with tight intervals — camera should be ready almost immediately
       const cameraReady = await waitForCameraPublication(room, [40, 80, 150]);
       if (!cameraReady) return false;
     }
@@ -565,6 +628,18 @@ export function useLiveKit() {
       audioResumeCleanupRef.current();
       audioResumeCleanupRef.current = null;
     }
+  }, []);
+
+  // ── Kick all audio elements (used after connect and reconnect) ─
+  const kickAudioPlayback = useCallback((room: Room) => {
+    room.startAudio().then(() => {
+      console.info("[LiveKit] Audio context started successfully");
+      document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+        if (el.paused && el.srcObject) {
+          el.play().catch(() => {});
+        }
+      });
+    }).catch(() => {});
   }, []);
 
   // ── Connect ────────────────────────────────────────────────────
@@ -599,8 +674,7 @@ export function useLiveKit() {
         audioOutputDeviceId: options.audioOutputDeviceId,
       };
       backgroundEffectRef.current = options.backgroundEffect || "none";
-      const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-      skipAutoBackgroundRestoreRef.current = navigationEntry?.type === "reload" && backgroundEffectRef.current !== "none";
+      bgInitialApplyDoneRef.current = false;
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
@@ -643,16 +717,14 @@ export function useLiveKit() {
         refreshParticipants();
 
         // Force audio re-kick after reconnection
-        room.startAudio().then(() => {
-          document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-            if (el.srcObject) {
-              el.play().catch(() => {});
-            }
-          });
-        }).catch(() => {});
+        kickAudioPlayback(room);
 
-        if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
-          void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
+        // Re-apply background if needed (non-blocking)
+        if (backgroundEffectRef.current !== "none") {
+          scheduleWhenIdle(() => {
+            if (roomRef.current !== room) return;
+            applyConfiguredBackgroundIfNeeded(room);
+          }, 300);
         }
       });
 
@@ -674,7 +746,6 @@ export function useLiveKit() {
         // Force audio playback for newly subscribed audio tracks
         if (track.kind === "audio") {
           room.startAudio().catch(() => {});
-          // Kick all audio elements to play after a brief delay
           setTimeout(() => {
             document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
               if (el.paused && el.srcObject) {
@@ -693,14 +764,9 @@ export function useLiveKit() {
       room.on(RoomEvent.TrackUnmuted, debouncedRefresh);
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         debouncedRefresh();
-
-        if (
-          publication.source === Track.Source.Camera &&
-          backgroundEffectRef.current !== "none" &&
-          !skipAutoBackgroundRestoreRef.current
-        ) {
-          void wait(150).then(() => queueBackgroundEffectApply(backgroundEffectRef.current));
-        }
+        // NOTE: Background is handled by scheduleBackgroundApply on connect
+        // and applyConfiguredBackgroundIfNeeded on explicit toggleCam.
+        // We do NOT trigger background apply here to avoid duplicate races.
       });
       room.on(RoomEvent.LocalTrackUnpublished, debouncedRefresh);
 
@@ -715,7 +781,6 @@ export function useLiveKit() {
       // ── Handle autoplay policy (resume audio context) ────────
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
         if (!room.canPlaybackAudio) {
-          // Clean up any prior listeners first
           cleanupAudioResumeListeners();
 
           const resumeAudio = () => {
@@ -726,7 +791,6 @@ export function useLiveKit() {
                   el.play().catch(() => {});
                 }
               });
-              // Clean up listeners on success
               cleanupAudioResumeListeners();
             });
           };
@@ -734,7 +798,6 @@ export function useLiveKit() {
           document.addEventListener("click", resumeAudio);
           document.addEventListener("touchstart", resumeAudio);
 
-          // Store cleanup function
           audioResumeCleanupRef.current = () => {
             document.removeEventListener("click", resumeAudio);
             document.removeEventListener("touchstart", resumeAudio);
@@ -758,7 +821,6 @@ export function useLiveKit() {
                   timestamp: Date.now(),
                 },
               ];
-              // Cap chat messages to prevent unbounded memory growth
               if (newMessages.length > MAX_CHAT_MESSAGES) {
                 return newMessages.slice(newMessages.length - MAX_CHAT_MESSAGES);
               }
@@ -786,20 +848,16 @@ export function useLiveKit() {
               );
             }, 15000);
           } else if (msg.type === "moderation") {
-            // Security: Verify the sender has roomAdmin permission via LiveKit metadata
-            // Only process moderation from participants with admin grants
             const senderParticipant = participant ? room.remoteParticipants.get(participant.identity) || (participant.identity === room.localParticipant.identity ? room.localParticipant : null) : null;
             const senderPermissions = senderParticipant?.permissions;
             const isSenderAdmin = senderPermissions?.canPublish && senderPermissions?.canSubscribe;
 
-            // For additional security, check participant metadata for admin flag
             let metadataAdmin = false;
             try {
               const meta = JSON.parse(senderParticipant?.metadata || "{}");
               metadataAdmin = !!meta.isAdmin;
             } catch {}
 
-            // Only accept moderation from participants who are admins (have roomAdmin grant in token)
             if (!isSenderAdmin && !metadataAdmin) {
               console.warn("[LiveKit] Ignoring moderation command from non-admin:", participant?.identity);
               return;
@@ -845,34 +903,17 @@ export function useLiveKit() {
       if (shouldEnableCam) {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
-          // Defer background processing so the page can render first
-          setTimeout(() => {
-            applyConfiguredBackgroundIfNeeded(room);
-          }, 600);
+        if (cameraEnabled) {
+          // Schedule background apply via requestIdleCallback — never blocks the main thread
+          scheduleBackgroundApply(room);
         }
       }
 
       // Aggressively start audio context and ensure all audio elements play
-      room.startAudio().then(() => {
-        console.info("[LiveKit] Audio context started successfully");
-        // Kick all existing audio elements
-        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-          if (el.paused && el.srcObject) {
-            el.play().catch(() => {});
-          }
-        });
-      }).catch(() => {});
+      kickAudioPlayback(room);
 
       // Second attempt after a delay (catches late track subscriptions)
-      setTimeout(() => {
-        room.startAudio().catch(() => {});
-        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
-          if (el.paused && el.srcObject) {
-            el.play().catch(() => {});
-          }
-        });
-      }, 1500);
+      setTimeout(() => kickAudioPlayback(room), 1500);
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       setIsCamOn(hasActiveCameraPublication(room));
@@ -882,7 +923,7 @@ export function useLiveKit() {
       clearSyncInterval();
       syncIntervalRef.current = setInterval(() => {
         refreshParticipants();
-      }, 1500);
+      }, PARTICIPANT_SYNC_INTERVAL_MS);
     } catch (err: any) {
       clearSyncInterval();
       setError(err.message || "Connection failed");
@@ -891,7 +932,7 @@ export function useLiveKit() {
     } finally {
       connectingRef.current = false;
     }
-  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, queueBackgroundEffectApply, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded]);
+  }, [refreshParticipants, debouncedRefresh, clearSyncInterval, cleanupAudioResumeListeners, queueBackgroundEffectApply, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyConfiguredBackgroundIfNeeded, scheduleBackgroundApply, kickAudioPlayback]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const disconnect = useCallback(() => {
@@ -946,9 +987,6 @@ export function useLiveKit() {
         setIsCamOn(true);
 
         // DON'T dispose the processor when turning ON — we'll reuse or re-attach it
-        // to the new track. This avoids the destroy→recreate cycle that causes a
-        // visible flash of the raw camera feed.
-        // Just detach the stale track reference so applyBackground re-attaches.
         bgAttachedTrackRef.current = null;
 
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
@@ -1102,7 +1140,6 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
-    skipAutoBackgroundRestoreRef.current = false; // user explicitly requested effect apply
 
     const room = roomRef.current;
     if (!room) return;
@@ -1134,12 +1171,21 @@ export function useLiveKit() {
     if (!room) return;
     preferredDevicesRef.current.audioDeviceId = deviceId;
     try {
-      await room.localParticipant.setMicrophoneEnabled(false);
-      await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(deviceId));
+      // Use switchActiveDevice for seamless audio switching (no gap)
+      await room.switchActiveDevice("audioinput", deviceId);
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       refreshParticipants();
     } catch (err) {
       console.error("[LiveKit] Audio input switch error:", err);
+      // Fallback: disable/re-enable
+      try {
+        await room.localParticipant.setMicrophoneEnabled(false);
+        await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(deviceId));
+        setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+        refreshParticipants();
+      } catch (fallbackErr) {
+        console.error("[LiveKit] Audio input fallback switch error:", fallbackErr);
+      }
     }
   }, [refreshParticipants]);
 
@@ -1160,8 +1206,9 @@ export function useLiveKit() {
     preferredDevicesRef.current.videoDeviceId = deviceId;
     try {
       bgAttachedTrackRef.current = null;
-      await room.localParticipant.setCameraEnabled(false);
-      await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(deviceId));
+      // Use switchActiveDevice for seamless video switching
+      await room.switchActiveDevice("videoinput", deviceId);
+      await wait(200); // Brief wait for the new track to be ready
       const isReady = await waitForCameraPublication(room, [80, 150, 300]);
       if (isReady && backgroundEffectRef.current !== "none") {
         await applyConfiguredBackgroundIfNeeded(room);
@@ -1170,6 +1217,19 @@ export function useLiveKit() {
       refreshParticipants();
     } catch (err) {
       console.error("[LiveKit] Video input switch error:", err);
+      // Fallback: disable/re-enable
+      try {
+        await room.localParticipant.setCameraEnabled(false);
+        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(deviceId));
+        const isReady = await waitForCameraPublication(room, [80, 150, 300]);
+        if (isReady && backgroundEffectRef.current !== "none") {
+          await applyConfiguredBackgroundIfNeeded(room);
+        }
+        setIsCamOn(hasActiveCameraPublication(room));
+        refreshParticipants();
+      } catch (fallbackErr) {
+        console.error("[LiveKit] Video input fallback switch error:", fallbackErr);
+      }
     }
   }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, applyConfiguredBackgroundIfNeeded]);
 
