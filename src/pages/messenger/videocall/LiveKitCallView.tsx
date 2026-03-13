@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
-import { useSpeechCaptions } from "@/hooks/useSpeechCaptions";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
-import CallCaptions from "./CallCaptions";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
@@ -46,7 +44,6 @@ interface LiveKitCallViewProps {
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
-  const captions = useSpeechCaptions();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
@@ -187,7 +184,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
-          {captions.isActive && <CallCaptions captions={captions.captions} interimText={captions.interimText} />}
+          
         </div>
 
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
@@ -202,9 +199,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isChatOpen={chatOpen}
         unreadChatCount={lk.unreadChatCount}
         isParticipantsOpen={participantsOpen}
-        isCaptionsOn={captions.isActive}
-        captionsLanguage={captions.language}
-        captionsSupported={captions.isSupported}
         currentAudioInputId={audioInputId}
         currentAudioOutputId={audioOutputId}
         currentVideoInputId={videoInputId}
@@ -214,8 +208,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleHand={lk.toggleHand}
         onToggleChat={() => { const w = !chatOpen; setChatOpen(w); if (w) { setParticipantsOpen(false); lk.clearUnreadChat(); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
-        onToggleCaptions={captions.toggle}
-        onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onLeave={handleLeave}
         onAudioInputChange={handleAudioInputChange}
