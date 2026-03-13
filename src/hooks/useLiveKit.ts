@@ -688,6 +688,9 @@ export function useLiveKit() {
       };
       backgroundEffectRef.current = options.backgroundEffect || "none";
       bgInitialApplyDoneRef.current = false;
+      // On page reload with active background, skip auto-restore to keep startup smooth.
+      skipAutoBackgroundRestoreRef.current =
+        isReloadNavigation() && backgroundEffectRef.current !== "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
