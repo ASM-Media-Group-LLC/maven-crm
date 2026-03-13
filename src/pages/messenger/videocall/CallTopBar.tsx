@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link2, SlidersHorizontal, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Link2, SlidersHorizontal, Shield, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -35,39 +33,40 @@ export default function CallTopBar({
   };
 
   return (
-    <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-[hsl(240_8%_10%)]">
+    <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-[hsl(220_3%_14%)]">
       <div className="flex items-center gap-3">
-        <Badge variant="outline" className="text-[10px] border-[hsl(0_0%_96%/0.2)] text-[hsl(0_0%_96%/0.7)]">
-          {formatTime(elapsed)}
-        </Badge>
+        <span className="text-sm font-medium text-[hsl(220_3%_80%)]">{roomName}</span>
+        <div className="h-4 w-px bg-[hsl(220_3%_28%)]" />
+        <div className="flex items-center gap-1.5 text-[hsl(220_3%_55%)]">
+          <Clock className="h-3 w-3" />
+          <span className="text-xs tabular-nums">{formatTime(elapsed)}</span>
+        </div>
         {isEncrypted && (
-          <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-400 gap-1">
-            <Shield className="h-3 w-3" /> E2E
-          </Badge>
+          <div className="flex items-center gap-1 text-[hsl(145_63%_49%)]">
+            <Shield className="h-3 w-3" />
+            <span className="text-[10px] font-medium">E2E</span>
+          </div>
         )}
-        <Badge variant="outline" className="text-[10px] border-[hsl(0_0%_96%/0.2)] text-[hsl(0_0%_96%/0.5)]">
-          {participantCount} participante{participantCount !== 1 ? "s" : ""}
-        </Badge>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)] gap-1.5 text-xs"
+
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-[hsl(220_3%_55%)] mr-2">
+          {participantCount} participante{participantCount !== 1 ? "s" : ""}
+        </span>
+        <button
           onClick={copyLink}
+          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
         >
           <Link2 className="h-3.5 w-3.5" />
-          Copiar enlace
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]"
+          <span className="hidden md:inline">Copiar enlace</span>
+        </button>
+        <button
           onClick={onOpenAdjustView}
           title="Ajustar vista"
+          className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_70%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
         >
           <SlidersHorizontal className="h-4 w-4" />
-        </Button>
+        </button>
       </div>
     </div>
   );

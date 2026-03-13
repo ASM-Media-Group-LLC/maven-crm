@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { X, LayoutGrid, Grid3X3, Presentation, PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -45,29 +44,25 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
-      {/* Dialog */}
-      <div className="relative w-full max-w-md mx-4 rounded-2xl bg-[hsl(240_8%_12%)] border border-[hsl(0_0%_100%/0.08)] shadow-2xl text-[hsl(0_0%_96%)]">
+      <div className="relative w-full max-w-md mx-4 rounded-2xl bg-[hsl(220_3%_17%)] border border-[hsl(220_3%_25%)] shadow-2xl text-[hsl(220_3%_85%)]">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 pt-6 pb-2">
+        <div className="flex items-start justify-between px-6 pt-5 pb-1">
           <div>
-            <h2 className="text-lg font-semibold">Ajustar vista</h2>
-            <p className="text-xs text-[hsl(0_0%_96%/0.5)] mt-0.5">
-              La selección se guarda para futuras llamadas
-            </p>
+            <h2 className="text-base font-medium">Ajustar vista</h2>
+            <p className="text-xs text-[hsl(220_3%_50%)] mt-0.5">La selección se guarda para futuras llamadas</p>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-[hsl(0_0%_100%/0.1)] transition-colors text-[hsl(0_0%_96%/0.6)] hover:text-[hsl(0_0%_96%)]"
+            className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-[hsl(220_3%_25%)] transition-colors text-[hsl(220_3%_55%)]"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Layout options */}
-        <div className="px-6 py-3 space-y-1">
+        <div className="px-5 py-3 space-y-1">
           {LAYOUT_OPTIONS.map((opt) => {
             const isActive = settings.layout === opt.value;
             const Icon = opt.icon;
@@ -78,85 +73,64 @@ export default function AdjustViewDialog({ open, onClose, settings, onSettingsCh
                 className={cn(
                   "w-full flex items-center gap-4 rounded-xl px-4 py-3 transition-all text-left",
                   isActive
-                    ? "bg-primary/15 ring-1 ring-primary/40"
-                    : "hover:bg-[hsl(0_0%_100%/0.05)]"
+                    ? "bg-[hsl(214_82%_51%/0.12)]"
+                    : "hover:bg-[hsl(220_3%_22%)]"
                 )}
               >
-                {/* Radio indicator */}
-                <div
-                  className={cn(
-                    "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                    isActive ? "border-primary" : "border-[hsl(0_0%_100%/0.3)]"
-                  )}
-                >
-                  {isActive && <div className="h-2.5 w-2.5 rounded-full bg-primary" />}
+                <div className={cn(
+                  "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                  isActive ? "border-[hsl(214_82%_51%)]" : "border-[hsl(220_3%_40%)]"
+                )}>
+                  {isActive && <div className="h-2.5 w-2.5 rounded-full bg-[hsl(214_82%_51%)]" />}
                 </div>
-
-                {/* Text */}
                 <div className="flex-1 min-w-0">
-                  <p className={cn("text-sm font-medium", isActive ? "text-primary" : "text-[hsl(0_0%_96%)]")}>
-                    {opt.label}
-                  </p>
-                  <p className="text-xs text-[hsl(0_0%_96%/0.45)]">{opt.description}</p>
+                  <p className={cn("text-sm", isActive ? "text-[hsl(214_82%_65%)]" : "text-[hsl(220_3%_85%)]")}>{opt.label}</p>
+                  <p className="text-xs text-[hsl(220_3%_50%)]">{opt.description}</p>
                 </div>
-
-                {/* Icon preview */}
-                <div
-                  className={cn(
-                    "h-10 w-14 rounded-lg flex items-center justify-center shrink-0 transition-colors",
-                    isActive ? "bg-primary/20" : "bg-[hsl(0_0%_100%/0.05)]"
-                  )}
-                >
-                  <Icon
-                    className={cn("h-5 w-5", isActive ? "text-primary" : "text-[hsl(0_0%_96%/0.4)]")}
-                  />
+                <div className={cn(
+                  "h-9 w-12 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                  isActive ? "bg-[hsl(214_82%_51%/0.15)]" : "bg-[hsl(220_3%_22%)]"
+                )}>
+                  <Icon className={cn("h-4 w-4", isActive ? "text-[hsl(214_82%_51%)]" : "text-[hsl(220_3%_50%)]")} />
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Divider */}
-        <div className="mx-6 border-t border-[hsl(0_0%_100%/0.08)]" />
+        <div className="mx-5 border-t border-[hsl(220_3%_25%)]" />
 
-        {/* Max tiles slider */}
+        {/* Max tiles */}
         <div className="px-6 py-4 space-y-3">
           <div>
-            <p className="text-sm font-medium">Mosaicos</p>
-            <p className="text-xs text-[hsl(0_0%_96%/0.45)]">
-              Máximo de mosaicos a mostrar (depende del tamaño de ventana)
-            </p>
+            <p className="text-sm">Mosaicos</p>
+            <p className="text-xs text-[hsl(220_3%_50%)]">Máximo de mosaicos a mostrar</p>
           </div>
           <div className="flex items-center gap-3">
-            <Grid3X3 className="h-4 w-4 text-[hsl(0_0%_96%/0.5)] shrink-0" />
+            <Grid3X3 className="h-4 w-4 text-[hsl(220_3%_50%)] shrink-0" />
             <Slider
               value={[sliderIndex]}
               min={0}
               max={TILE_STEPS.length - 1}
               step={1}
-              onValueChange={([idx]) => {
-                onSettingsChange({ ...settings, maxTiles: TILE_STEPS[idx] });
-              }}
+              onValueChange={([idx]) => onSettingsChange({ ...settings, maxTiles: TILE_STEPS[idx] })}
               className="flex-1"
             />
-            <LayoutGrid className="h-4 w-4 text-[hsl(0_0%_96%/0.5)] shrink-0" />
+            <LayoutGrid className="h-4 w-4 text-[hsl(220_3%_50%)] shrink-0" />
           </div>
-          <p className="text-center text-xs font-medium text-primary">
+          <p className="text-center text-xs font-medium text-[hsl(214_82%_65%)]">
             {getTileLabel(settings.maxTiles)} mosaicos
           </p>
         </div>
 
-        {/* Divider */}
-        <div className="mx-6 border-t border-[hsl(0_0%_100%/0.08)]" />
+        <div className="mx-5 border-t border-[hsl(220_3%_25%)]" />
 
         {/* Hide no video */}
         <div className="px-6 py-4 flex items-center justify-between">
-          <p className="text-sm text-[hsl(0_0%_96%)]">Ocultar mosaicos sin video</p>
+          <p className="text-sm text-[hsl(220_3%_85%)]">Ocultar mosaicos sin video</p>
           <Switch
             checked={settings.hideNoVideo}
-            onCheckedChange={(checked) =>
-              onSettingsChange({ ...settings, hideNoVideo: checked })
-            }
+            onCheckedChange={(checked) => onSettingsChange({ ...settings, hideNoVideo: checked })}
           />
         </div>
       </div>
