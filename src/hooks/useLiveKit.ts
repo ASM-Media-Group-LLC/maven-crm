@@ -696,7 +696,7 @@ export function useLiveKit() {
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
-  const applyBackgroundBeforeLocalVideoVisible = useCallback(async (room: Room, timeoutMs = 2200) => {
+  const applyBackgroundBeforeLocalVideoVisible = useCallback(async (room: Room) => {
     if (backgroundEffectRef.current === "none") {
       holdLocalVideoUntilBackgroundRef.current = false;
       refreshParticipants();
@@ -713,10 +713,7 @@ export function useLiveKit() {
     refreshParticipants();
 
     try {
-      return await Promise.race([
-        applyConfiguredBackgroundIfNeeded(room),
-        wait(timeoutMs).then(() => false),
-      ]);
+      return await applyConfiguredBackgroundIfNeeded(room);
     } finally {
       holdLocalVideoUntilBackgroundRef.current = false;
       refreshParticipants();
