@@ -79,7 +79,7 @@ export default function CallParticipantsSidebar({
                   </div>
                 )}
 
-                {isAdmin && !p.isLocal && (
+                {!p.isLocal && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="h-7 w-7 rounded-full flex items-center justify-center text-[hsl(220_3%_55%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
@@ -87,12 +87,16 @@ export default function CallParticipantsSidebar({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]">
-                      <DropdownMenuItem onClick={() => onMuteParticipant(p.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
-                        <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onRemoveParticipant(p.identity)} className="text-[hsl(0_72%_65%)] focus:bg-[hsl(220_3%_28%)]">
-                        <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
-                      </DropdownMenuItem>
+                      {!p.isMuted && (
+                        <DropdownMenuItem onClick={() => onMuteParticipant(p.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
+                          <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
+                        </DropdownMenuItem>
+                      )}
+                      {isAdmin && (
+                        <DropdownMenuItem onClick={() => onRemoveParticipant(p.identity)} className="text-[hsl(0_72%_65%)] focus:bg-[hsl(220_3%_28%)]">
+                          <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
