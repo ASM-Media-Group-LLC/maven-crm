@@ -1135,7 +1135,6 @@ export function useLiveKit() {
         } else if (shouldGateVideoUntilBackground) {
           holdLocalVideoUntilBackgroundRef.current = false;
           refreshParticipants();
-        }
         } else {
           setIsCamOn(false);
         }
