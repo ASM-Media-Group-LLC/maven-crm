@@ -48,7 +48,7 @@ vi.mock("livekit-client", () => ({
   },
   Track: { Source: { Camera: "camera", Microphone: "microphone", ScreenShare: "screen_share" } },
   ConnectionState: { Disconnected: "disconnected", Connecting: "connecting", Connected: "connected" },
-  VideoPresets: { h720: { resolution: { width: 1280, height: 720 } }, h180: {}, h360: {} },
+  VideoPresets: { h1080: { resolution: { width: 1920, height: 1080 } }, h720: { resolution: { width: 1280, height: 720 } }, h180: {}, h360: {} },
   ConnectionQuality: { Excellent: 3, Good: 2, Poor: 1, Lost: 0, Unknown: -1 },
   createLocalTracks: vi.fn().mockResolvedValue([]),
   LocalAudioTrack: vi.fn(),

@@ -151,7 +151,7 @@ const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
   videoCaptureDefaults: {
-    resolution: VideoPresets.h720.resolution,
+    resolution: VideoPresets.h1080.resolution,
     facingMode: "user",
   },
   audioCaptureDefaults: {
@@ -168,7 +168,9 @@ const ROOM_OPTIONS: RoomOptions = {
     videoSimulcastLayers: [
       VideoPresets.h180,
       VideoPresets.h360,
+      VideoPresets.h720,
     ],
+    videoCodec: "vp9",
   },
   disconnectOnPageLeave: true,
 };
