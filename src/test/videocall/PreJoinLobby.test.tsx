@@ -26,6 +26,8 @@ describe("PreJoinLobby", () => {
     callDisplayName: "Daily Standup",
     onJoin: vi.fn(),
   };
+  const roomStorageKey = "call-prejoin-settings:v1:test-room";
+  const globalStorageKey = "call-prejoin-settings:v1:global";
 
   beforeEach(() => {
     vi.clearAllMocks();
