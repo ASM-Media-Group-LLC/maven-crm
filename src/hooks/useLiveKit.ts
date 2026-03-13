@@ -304,9 +304,11 @@ export function useLiveKit() {
     bgAttachedTrackRef.current = null;
     bgLastAppliedEffectRef.current = "none";
 
-    if (processor?.destroy) {
+    if (!processor) return; // Fast path: nothing to dispose
+
+    if (processor.destroy) {
       try {
-        await withTimeout(Promise.resolve(processor.destroy()), 2500, "bg-destroy");
+        await withTimeout(Promise.resolve(processor.destroy()), 1500, "bg-destroy");
       } catch {
         // no-op
       }
@@ -318,7 +320,7 @@ export function useLiveKit() {
       // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
       try {
         await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(preferredVideoDeviceId));
-        const isReady = await waitForCameraPublication(room, [150, 250, 400, 600]);
+        const isReady = await waitForCameraPublication(room, [80, 150, 300]);
         if (isReady) {
           refreshParticipants();
           return true;
@@ -331,9 +333,9 @@ export function useLiveKit() {
       try {
         await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
-        await wait(180);
+        await wait(80);
         await room.localParticipant.setCameraEnabled(true);
-        const isReady = await waitForCameraPublication(room, [200, 350, 500]);
+        const isReady = await waitForCameraPublication(room, [100, 200, 400]);
         if (isReady) {
           refreshParticipants();
           return true;
@@ -480,7 +482,7 @@ export function useLiveKit() {
 
       // Clean up processor from the track
       try {
-        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 2000, "bg-stop");
+        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 1200, "bg-stop");
       } catch {
         // no-op
       }
@@ -489,13 +491,12 @@ export function useLiveKit() {
       bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
-      // Wait for GPU/ML pipeline to fully release
-      await wait(300);
+      // Brief wait for GPU/ML pipeline release
+      await wait(150);
 
       if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
         const recovered = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
         if (recovered) {
-          await wait(150);
           refreshParticipants();
         }
       }
@@ -548,11 +549,11 @@ export function useLiveKit() {
     }
 
     // Wait for camera track to be fully published and stable
-    const cameraReady = await waitForCameraPublication(room, [150, 300, 500, 700]);
+    const cameraReady = await waitForCameraPublication(room, [80, 150, 300]);
     if (!cameraReady) return false;
 
-    // Extra stabilization for the track before attaching processor
-    await wait(200);
+    // Brief stabilization for the track before attaching processor
+    await wait(100);
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
@@ -890,33 +891,33 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
-        // First dispose any stale processor before enabling camera
-        await disposeBackgroundProcessor();
-        await wait(100);
+        // Only dispose if a processor actually exists (avoids unnecessary delay)
+        if (bgProcessorRef.current) {
+          await disposeBackgroundProcessor();
+        }
 
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
-          // Let the camera track fully stabilize before applying background
-          await wait(300);
+          // Brief stabilization before applying background
+          await wait(120);
           refreshParticipants();
           await applyConfiguredBackgroundIfNeeded(room);
         }
       } else {
-        // Turning off: first remove processor, then disable camera
-        await disposeBackgroundProcessor();
-        await wait(50);
+        // Turning off: dispose processor and disable camera in parallel where safe
+        const disposePromise = bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve();
+        await disposePromise;
         await room.localParticipant.setCameraEnabled(false);
       }
 
-      await wait(120);
+      await wait(50);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 500);
+      setTimeout(() => refreshParticipants(), 300);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
-      // Recovery: ensure clean state
       try {
         await disposeBackgroundProcessor();
       } catch {}

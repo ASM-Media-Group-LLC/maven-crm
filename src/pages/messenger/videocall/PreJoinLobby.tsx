@@ -25,9 +25,9 @@ interface DeviceInfo {
   label: string;
 }
 
-const PREJOIN_BG_ATTACH_TIMEOUT_MS = 6000;
-const PREJOIN_BG_SWITCH_TIMEOUT_MS = 7000;
-const PREJOIN_BG_FAILURE_COOLDOWN_MS = 12000;
+const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
+const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
+const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
@@ -126,8 +126,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     bgProcessorRef.current = null;
     bgAttachedTrackRef.current = null;
     bgLastAppliedEffectRef.current = "none";
-    if (processor?.destroy) {
-      try { await withTimeout(Promise.resolve(processor.destroy()), 2500, "prejoin-bg-destroy"); } catch {}
+    if (!processor) return; // Fast path: nothing to dispose
+    if (processor.destroy) {
+      try { await withTimeout(Promise.resolve(processor.destroy()), 1500, "prejoin-bg-destroy"); } catch {}
     }
   }, []);
 
@@ -228,7 +229,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
-    await disposeBackgroundProcessor();
+    // Only dispose if a processor actually exists (avoids blocking wait)
+    if (bgProcessorRef.current) {
+      await disposeBackgroundProcessor();
+    }
     if (!camOn) return;
     try {
       const tracks = await createLocalTracks({ video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true, audio: false });
