@@ -205,6 +205,7 @@ export function useLiveKit() {
   const bgFailureCooldownUntilRef = useRef(0);
   const connectingRef = useRef(false); // Guard against concurrent connect()
   const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
+  const skipAutoBackgroundRestoreRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
