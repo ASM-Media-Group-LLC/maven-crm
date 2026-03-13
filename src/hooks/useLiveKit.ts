@@ -893,16 +893,17 @@ export function useLiveKit() {
         // Optimistic UI: show cam on immediately
         setIsCamOn(true);
 
-        // Only dispose if a processor actually exists
-        if (bgProcessorRef.current) {
-          await disposeBackgroundProcessor();
-        }
+        // DON'T dispose the processor when turning ON — we'll reuse or re-attach it
+        // to the new track. This avoids the destroy→recreate cycle that causes a
+        // visible flash of the raw camera feed.
+        // Just detach the stale track reference so applyBackground re-attaches.
+        bgAttachedTrackRef.current = null;
 
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
           refreshParticipants();
-          // Apply background without blocking the UI
+          // Apply background without blocking the UI — processor is reused
           applyConfiguredBackgroundIfNeeded(room).catch(() => {});
         } else {
           setIsCamOn(false);
@@ -911,11 +912,18 @@ export function useLiveKit() {
         // Optimistic UI: show cam off immediately
         setIsCamOn(false);
 
-        // Turning off: dispose processor and disable camera in parallel
-        await Promise.all([
-          bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve(),
-          room.localParticipant.setCameraEnabled(false),
-        ]);
+        // Turning off: disable camera first (instant), then dispose processor
+        // in the background so the UI doesn't wait for ML teardown.
+        const processorToDispose = bgProcessorRef.current;
+        bgAttachedTrackRef.current = null;
+        bgLastAppliedEffectRef.current = "none";
+
+        await room.localParticipant.setCameraEnabled(false);
+
+        // Fire-and-forget disposal — no need to block the toggle
+        if (processorToDispose) {
+          disposeBackgroundProcessor().catch(() => {});
+        }
       }
 
       const camActive = hasActiveCameraPublication(room);
