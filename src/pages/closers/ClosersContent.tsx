@@ -8,6 +8,7 @@ import ConfirmadasTab from "./tabs/ConfirmadasTab";
 import CompletadasTab from "./tabs/CompletadasTab";
 import NoInteresadasTab from "./tabs/NoInteresadasTab";
 import AsignacionTab from "./tabs/AsignacionTab";
+import LeadsDisponiblesTab from "./tabs/LeadsDisponiblesTab";
 import EditCreatorModal from "./components/EditCreatorModal";
 import ViewCreatorModal from "./components/ViewCreatorModal";
 import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
