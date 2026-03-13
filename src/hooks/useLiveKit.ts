@@ -1462,6 +1462,11 @@ export function useLiveKit() {
         } catch (err) {
           console.error("[LiveKit] Video input switch error:", err);
 
+          // Last-resort recovery: recycle processor only after a real switch failure.
+          if (backgroundEffectRef.current !== "none") {
+            await disposeBackgroundProcessor();
+          }
+
           // Fallback: full camera recovery with profile-aware constraints.
           const cameraEnabled = await enableCameraWithRecovery(room, nextDeviceId);
           if (cameraEnabled && backgroundEffectRef.current !== "none") {
