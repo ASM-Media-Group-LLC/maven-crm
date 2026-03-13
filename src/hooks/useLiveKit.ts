@@ -992,6 +992,8 @@ export function useLiveKit() {
         clearSyncInterval();
         clearBackgroundReapplyTimer();
         cleanupAudioResumeListeners();
+        bgQueueInFlightRef.current = false;
+        bgApplyQueueRef.current = Promise.resolve(true);
         void disposeBackgroundProcessor();
         holdLocalVideoUntilBackgroundRef.current = false;
         setConnectionState(ConnectionState.Disconnected);
