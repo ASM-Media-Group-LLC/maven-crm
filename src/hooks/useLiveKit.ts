@@ -482,7 +482,7 @@ export function useLiveKit() {
 
       // Clean up processor from the track
       try {
-        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 2000, "bg-stop");
+        await withTimeout(Promise.resolve(camTrack.stopProcessor?.()), 1200, "bg-stop");
       } catch {
         // no-op
       }
@@ -491,13 +491,12 @@ export function useLiveKit() {
       bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
-      // Wait for GPU/ML pipeline to fully release
-      await wait(300);
+      // Brief wait for GPU/ML pipeline release
+      await wait(150);
 
       if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
         const recovered = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
         if (recovered) {
-          await wait(150);
           refreshParticipants();
         }
       }
