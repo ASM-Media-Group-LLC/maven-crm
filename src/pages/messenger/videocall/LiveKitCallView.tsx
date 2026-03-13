@@ -208,8 +208,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onToggleHand={lk.toggleHand}
         onToggleChat={() => { const w = !chatOpen; setChatOpen(w); if (w) { setParticipantsOpen(false); lk.clearUnreadChat(); } }}
         onToggleParticipants={() => { setParticipantsOpen(!participantsOpen); if (!participantsOpen) setChatOpen(false); }}
-        onToggleCaptions={captions.toggle}
-        onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onLeave={handleLeave}
         onAudioInputChange={handleAudioInputChange}
