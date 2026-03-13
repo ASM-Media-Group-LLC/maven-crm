@@ -1,0 +1,27 @@
+INSERT INTO project_members (project_id, user_id)
+VALUES
+('3f8b32f1-5c4c-44df-977f-3f29ef9cb489','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('3f8b32f1-5c4c-44df-977f-3f29ef9cb489','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('62a67e23-ce41-43db-be1c-aaac0d667df8','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('62a67e23-ce41-43db-be1c-aaac0d667df8','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('753b7177-bfbf-4544-8d96-d3bbd4a57a6e','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('753b7177-bfbf-4544-8d96-d3bbd4a57a6e','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('375895c8-6854-41e3-a449-3345eb5b941d','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('375895c8-6854-41e3-a449-3345eb5b941d','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('8feacf34-5e3f-440f-b7db-8196fa23e454','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('8feacf34-5e3f-440f-b7db-8196fa23e454','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('84228b4b-2757-4298-9231-c54a9214df32','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('84228b4b-2757-4298-9231-c54a9214df32','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('8eefdcd6-5170-4c62-aa8b-86ae7cc5811a','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('8eefdcd6-5170-4c62-aa8b-86ae7cc5811a','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('d4b6647b-e199-40d9-84b8-71262644f49f','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('d4b6647b-e199-40d9-84b8-71262644f49f','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('ef6a5a74-8c07-4371-9e89-ca4366f1153b','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('ef6a5a74-8c07-4371-9e89-ca4366f1153b','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('ca952906-4457-4622-bb26-68eefc0f63a6','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('ca952906-4457-4622-bb26-68eefc0f63a6','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('2400083c-0abf-4b70-b974-c175ca9d8488','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('2400083c-0abf-4b70-b974-c175ca9d8488','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289'),
+('cd9ef9ce-406a-4af9-a268-18c156df4b9e','4bb5a67b-f16c-4e09-bf5a-21d1c2c8f72b'),
+('cd9ef9ce-406a-4af9-a268-18c156df4b9e','7aa4fd5c-d75b-4c2d-b681-566e4fb2f289')
+ON CONFLICT (project_id, user_id) DO NOTHING;
