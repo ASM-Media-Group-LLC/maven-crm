@@ -549,9 +549,15 @@ export function useLiveKit() {
       return true;
     }
 
-    // Wait for camera track to be fully published
-    const cameraReady = await waitForCameraPublication(room, [80, 150, 300]);
-    if (!cameraReady) return false;
+    // Fast-check: if track is already available, skip polling entirely
+    const hasTrack = Array.from(room.localParticipant.videoTrackPublications.values()).some(
+      (p) => p.source === Track.Source.Camera && p.track,
+    );
+    if (!hasTrack) {
+      // Brief wait with tight intervals — camera should be ready almost immediately
+      const cameraReady = await waitForCameraPublication(room, [40, 80, 150]);
+      if (!cameraReady) return false;
+    }
 
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
