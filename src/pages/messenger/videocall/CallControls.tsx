@@ -183,12 +183,17 @@ export default function CallControls({
 
       {/* Center controls */}
       <div className="flex items-center gap-2">
-        {/* Mic with audio popover */}
-        <div className="flex flex-col items-center gap-0.5">
+        {/* Mic with audio popover — Google Meet grouped style */}
+        <div className="flex items-center">
           <Popover open={audioPopoverOpen} onOpenChange={setAudioPopoverOpen}>
             <PopoverTrigger asChild>
-              <button className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
-                <ChevronUp className="h-3 w-3" />
+              <button className={cn(
+                "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                isMicOn
+                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
+                  : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+              )}>
+                <ChevronUp className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
             <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
@@ -198,15 +203,31 @@ export default function CallControls({
               </div>
             </PopoverContent>
           </Popover>
-          <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label="Micrófono" />
+          <button
+            onClick={onToggleMic}
+            title="Micrófono"
+            className={cn(
+              "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+              isMicOn
+                ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+            )}
+          >
+            {isMicOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
+          </button>
         </div>
 
-        {/* Cam with video popover */}
-        <div className="flex flex-col items-center gap-0.5">
+        {/* Cam with video popover — Google Meet grouped style */}
+        <div className="flex items-center">
           <Popover open={videoPopoverOpen} onOpenChange={setVideoPopoverOpen}>
             <PopoverTrigger asChild>
-              <button className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
-                <ChevronUp className="h-3 w-3" />
+              <button className={cn(
+                "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                isCamOn
+                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
+                  : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+              )}>
+                <ChevronUp className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
             <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
@@ -222,7 +243,18 @@ export default function CallControls({
               </div>
             </PopoverContent>
           </Popover>
-          <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label="Cámara" />
+          <button
+            onClick={onToggleCam}
+            title="Cámara"
+            className={cn(
+              "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+              isCamOn
+                ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+            )}
+          >
+            {isCamOn ? <VideoIcon className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
+          </button>
         </div>
 
         <ControlBtn
