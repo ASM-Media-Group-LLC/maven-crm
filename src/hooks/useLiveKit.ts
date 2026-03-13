@@ -645,6 +645,15 @@ export function useLiveKit() {
         console.info("[LiveKit] Reconnected successfully");
         refreshParticipants();
 
+        // Force audio re-kick after reconnection
+        room.startAudio().then(() => {
+          document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+            if (el.srcObject) {
+              el.play().catch(() => {});
+            }
+          });
+        }).catch(() => {});
+
         if (backgroundEffectRef.current !== "none") {
           void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
         }
