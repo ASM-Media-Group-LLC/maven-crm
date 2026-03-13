@@ -146,6 +146,8 @@ const BACKGROUND_FAILURE_COOLDOWN_MS = 10000;
 
 // ── Sync interval — Google Meet polls ~3-5s for participant state ─
 const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
+// Prevent burst camera-refresh operations from stacking expensive media reconfigurations.
+const VIDEO_SWITCH_MIN_INTERVAL_MS = 420;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
