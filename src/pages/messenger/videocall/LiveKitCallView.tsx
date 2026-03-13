@@ -271,7 +271,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
           {lk.participants.length <= 1 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center px-4">
-              <div className="rounded-full bg-background/80 border border-border px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">
+              <div className="rounded-full bg-[hsl(220_3%_20%/0.9)] border border-[hsl(220_3%_30%)] px-3 py-1.5 text-xs text-[hsl(220_3%_60%)] backdrop-blur-sm">
                 Esperando a que otros participantes se unan...
               </div>
             </div>
