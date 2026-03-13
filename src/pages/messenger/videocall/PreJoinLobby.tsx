@@ -302,6 +302,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
+    setIsPreparingBackgroundFirstFrame(false);
+
     // When restarting with a background active, keep the processor alive
     // and just clear the track reference so it re-attaches to the new track.
     // Only dispose if we're turning the camera OFF or have no effect.
@@ -311,19 +313,51 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       bgAttachedTrackRef.current = null;
       bgLastAppliedEffectRef.current = "none";
     }
+
     if (!camOn) return;
+
+    const requestedEffect = bgEffectRef.current;
+    const shouldPrepareBackgroundFirst = requestedEffect !== "none";
+    if (shouldPrepareBackgroundFirst) {
+      setIsPreparingBackgroundFirstFrame(true);
+    }
+
     try {
-      const tracks = await createLocalTracks({ video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true, audio: false });
-      if (!mountedRef.current) { tracks.forEach((t) => t.stop()); return; }
+      const tracks = await createLocalTracks({
+        video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true,
+        audio: false,
+      });
+      if (!mountedRef.current) {
+        tracks.forEach((t) => t.stop());
+        return;
+      }
+
       const vTrack = tracks.find((t): t is LocalVideoTrack => t.kind === "video") || null;
       videoTrackRef.current = vTrack;
-      if (videoRef.current && vTrack) { vTrack.attach(videoRef.current); attachedVideoElRef.current = videoRef.current; videoRef.current.play?.().catch(() => {}); }
-      if (vTrack) await queueBackgroundApply(bgEffectRef.current);
+
+      // Guarantee processor application happens before exposing the refreshed video frame.
+      if (vTrack && shouldPrepareBackgroundFirst) {
+        await queueBackgroundApply(requestedEffect);
+      }
+
+      if (videoRef.current && vTrack) {
+        vTrack.attach(videoRef.current);
+        attachedVideoElRef.current = videoRef.current;
+        videoRef.current.play?.().catch(() => {});
+      }
+
       setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
-      if (err.name === "NotAllowedError") { setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador."); }
-      else { setPermissionError("No se pudo acceder a la cámara."); }
+      if (err.name === "NotAllowedError") {
+        setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador.");
+      } else {
+        setPermissionError("No se pudo acceder a la cámara.");
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsPreparingBackgroundFirstFrame(false);
+      }
     }
   }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, queueBackgroundApply, enumerateDevices]);
 
