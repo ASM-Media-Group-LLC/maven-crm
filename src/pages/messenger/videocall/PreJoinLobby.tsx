@@ -29,6 +29,7 @@ const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 const PREJOIN_STORAGE_KEY_PREFIX = "call-prejoin-settings:v1";
+const PREJOIN_GLOBAL_STORAGE_KEY = `${PREJOIN_STORAGE_KEY_PREFIX}:global`;
 
 interface PersistedPreJoinSettings {
   micOn: boolean;
@@ -47,11 +48,10 @@ function getPreJoinStorageKey(roomName: string) {
   return `${PREJOIN_STORAGE_KEY_PREFIX}:${roomName}`;
 }
 
-function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
-  try {
-    const raw = localStorage.getItem(getPreJoinStorageKey(roomName));
-    if (!raw) return null;
+function parsePreJoinSettings(raw: string | null): PersistedPreJoinSettings | null {
+  if (!raw) return null;
 
+  try {
     const parsed = JSON.parse(raw) as Partial<PersistedPreJoinSettings>;
     return {
       micOn: typeof parsed.micOn === "boolean" ? parsed.micOn : true,
@@ -66,9 +66,17 @@ function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null 
   }
 }
 
+function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
+  const roomSettings = parsePreJoinSettings(localStorage.getItem(getPreJoinStorageKey(roomName)));
+  if (roomSettings) return roomSettings;
+  return parsePreJoinSettings(localStorage.getItem(PREJOIN_GLOBAL_STORAGE_KEY));
+}
+
 function savePreJoinSettings(roomName: string, settings: PersistedPreJoinSettings) {
   try {
-    localStorage.setItem(getPreJoinStorageKey(roomName), JSON.stringify(settings));
+    const serialized = JSON.stringify(settings);
+    localStorage.setItem(getPreJoinStorageKey(roomName), serialized);
+    localStorage.setItem(PREJOIN_GLOBAL_STORAGE_KEY, serialized);
   } catch {
     // no-op
   }
