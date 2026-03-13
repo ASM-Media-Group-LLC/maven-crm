@@ -90,6 +90,7 @@ export const useCloserLeads = () => {
       if (error) throw error;
       return (data || []) as CloserLead[];
     },
+    placeholderData: keepPreviousData,
   });
 
   // Counts per status for KPIs
