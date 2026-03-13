@@ -1022,7 +1022,7 @@ export function useLiveKit() {
     setActiveSpeaker(null);
     handRaisedMap.current = {};
     setConnectionState(ConnectionState.Disconnected);
-  }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
+  }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
   // ── Mic toggle ────────────────────────────────────────────────
   const toggleMic = useCallback(async () => {
