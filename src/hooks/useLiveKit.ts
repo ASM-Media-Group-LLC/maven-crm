@@ -423,17 +423,11 @@ export function useLiveKit() {
 
       if (opId !== bgApplyOpRef.current) return false;
 
-      if (effect === "soft-blur") {
+      if (effect === "blur") {
         await withTimeout(
-          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })),
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })),
           BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-soft-blur",
-        );
-      } else if (effect === "hard-blur") {
-        await withTimeout(
-          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })),
-          BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-hard-blur",
+          "bg-blur",
         );
       } else if (isTemplateBackground(effect)) {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
