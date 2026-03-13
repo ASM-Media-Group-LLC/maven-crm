@@ -225,6 +225,7 @@ const ParticipantTile = memo(function ParticipantTile({
     participant.identity,
     participant.isLocal,
     participant.isCameraOff,
+    participant.isMuted,
     participant.isScreenSharing,
     preferredAudioOutputDeviceId,
   ]);
