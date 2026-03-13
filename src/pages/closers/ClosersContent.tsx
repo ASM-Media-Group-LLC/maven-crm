@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCloserCreators, CloserCreator } from "./useCloserCreators";
 import ClosersKPICards from "./components/ClosersKPICards";
@@ -10,18 +8,16 @@ import ConfirmadasTab from "./tabs/ConfirmadasTab";
 import CompletadasTab from "./tabs/CompletadasTab";
 import NoInteresadasTab from "./tabs/NoInteresadasTab";
 import AsignacionTab from "./tabs/AsignacionTab";
-import NewCreatorModal from "./components/NewCreatorModal";
 import EditCreatorModal from "./components/EditCreatorModal";
 import ViewCreatorModal from "./components/ViewCreatorModal";
 import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, createCreator, updateCreator, updateStage,
+    creators, isLoading, updateCreator, updateStage,
     deleteCreator, assignCreator, isAdmin,
   } = useCloserCreators();
 
-  const [showNew, setShowNew] = useState(false);
   const [viewCreator, setViewCreator] = useState<CloserCreator | null>(null);
   const [editCreator, setEditCreator] = useState<CloserCreator | null>(null);
   const [deletingCreator, setDeletingCreator] = useState<CloserCreator | null>(null);
@@ -34,11 +30,6 @@ const ClosersContent = () => {
             <h1 className="text-2xl font-bold">Closers</h1>
             <p className="text-sm text-muted-foreground">Gestión de creators desde LeadGen</p>
           </div>
-          {isAdmin && (
-            <Button onClick={() => setShowNew(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Nueva Creator
-            </Button>
-          )}
         </div>
       </header>
 
@@ -92,12 +83,6 @@ const ClosersContent = () => {
         )}
       </div>
 
-      <NewCreatorModal
-        open={showNew}
-        onOpenChange={setShowNew}
-        onSubmit={(data) => createCreator.mutate(data, { onSuccess: () => setShowNew(false) })}
-        isLoading={createCreator.isPending}
-      />
       <ViewCreatorModal creator={viewCreator} open={!!viewCreator} onOpenChange={(o) => !o && setViewCreator(null)} />
       <EditCreatorModal
         creator={editCreator}
