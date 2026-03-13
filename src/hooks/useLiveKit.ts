@@ -1272,8 +1272,18 @@ export function useLiveKit() {
     const hasCamera = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
     if (!hasCamera && effect !== "none") return;
 
-    await queueBackgroundEffectApply(effect);
-  }, [queueBackgroundEffectApply, hasActiveCameraPublication]);
+    if (effect === "none") {
+      holdLocalVideoUntilBackgroundRef.current = false;
+      refreshParticipants();
+      await queueBackgroundEffectApply(effect);
+      return;
+    }
+
+    const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+    if (!applied) {
+      scheduleDeferredBackgroundReapply(room, 240);
+    }
+  }, [queueBackgroundEffectApply, hasActiveCameraPublication, refreshParticipants, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
