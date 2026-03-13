@@ -550,11 +550,11 @@ export function useLiveKit() {
     }
 
     // Wait for camera track to be fully published and stable
-    const cameraReady = await waitForCameraPublication(room, [150, 300, 500, 700]);
+    const cameraReady = await waitForCameraPublication(room, [80, 150, 300]);
     if (!cameraReady) return false;
 
-    // Extra stabilization for the track before attaching processor
-    await wait(200);
+    // Brief stabilization for the track before attaching processor
+    await wait(100);
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
