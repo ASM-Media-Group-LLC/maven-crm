@@ -985,6 +985,7 @@ export function useLiveKit() {
         clearBackgroundReapplyTimer();
         cleanupAudioResumeListeners();
         void disposeBackgroundProcessor();
+        holdLocalVideoUntilBackgroundRef.current = false;
         setConnectionState(ConnectionState.Disconnected);
         setIsReconnecting(false);
         setParticipants([]);
