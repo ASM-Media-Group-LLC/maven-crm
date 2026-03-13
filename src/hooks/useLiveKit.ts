@@ -845,12 +845,11 @@ export function useLiveKit() {
       if (shouldEnableCam) {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           // Defer background processing so the page can render first
-          // This prevents "page not responding" on refresh with active bg effect
           setTimeout(() => {
             applyConfiguredBackgroundIfNeeded(room);
-          }, 500);
+          }, 600);
         }
       }
 
