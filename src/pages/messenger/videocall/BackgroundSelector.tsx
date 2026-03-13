@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ImageIcon, Check, Ban, Cloudy, Cloud } from "lucide-react";
+import { ImageIcon, Check, Ban, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type BackgroundEffect = "none" | "soft-blur" | "hard-blur" | string;
+export type BackgroundEffect = "none" | "blur" | string;
 
 export const BACKGROUND_TEMPLATES = [
   { id: "tpl-office", label: "Oficina", src: "/backgrounds/bg-office.jpg", lowSrc: "/backgrounds/low/bg-office.jpg" },
@@ -47,7 +47,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
         </button>
       </PopoverTrigger>
       <PopoverContent side="top" align="center" className="w-80 p-3 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_25%)]">
-        <p className="text-xs font-medium text-[hsl(220_3%_85%)] mb-3">Fondo virtual</p>
+        <p className="text-xs font-medium text-[hsl(220_3%_85%)] mb-3">Fondos y efectos</p>
 
         {/* Effect options */}
         <div className="flex gap-2 mb-3">
@@ -56,12 +56,7 @@ export default function BackgroundSelector({ selected, onSelect }: BackgroundSel
               <Ban className="h-4 w-4 text-[hsl(220_3%_55%)]" />
             </div>
           </EffectOption>
-          <EffectOption label="Difuminado leve" active={isSelected("soft-blur")} onClick={() => onSelect("soft-blur")}>
-            <div className="w-full h-full rounded bg-[hsl(220_3%_22%)] flex items-center justify-center">
-              <Cloudy className="h-4 w-4 text-[hsl(220_3%_55%)]" />
-            </div>
-          </EffectOption>
-          <EffectOption label="Difuminado fuerte" active={isSelected("hard-blur")} onClick={() => onSelect("hard-blur")}>
+          <EffectOption label="Difuminar fondo" active={isSelected("blur")} onClick={() => onSelect("blur")}>
             <div className="w-full h-full rounded bg-[hsl(220_3%_28%)] flex items-center justify-center">
               <Cloud className="h-4 w-4 text-[hsl(220_3%_55%)]" />
             </div>
