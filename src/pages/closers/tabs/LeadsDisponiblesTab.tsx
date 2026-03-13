@@ -44,10 +44,9 @@ const LeadsDisponiblesTab = () => {
           </SelectContent>
         </Select>
         <DateRangePicker
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
+          from={dateFrom}
+          to={dateTo}
+          onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
         />
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setQualityFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>

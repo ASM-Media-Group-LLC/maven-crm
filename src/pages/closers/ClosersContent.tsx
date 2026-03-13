@@ -51,6 +51,9 @@ const ClosersContent = () => {
               {isAdmin && <TabsTrigger value="asignacion">Asignación</TabsTrigger>}
             </TabsList>
 
+            <TabsContent value="leads">
+              <LeadsDisponiblesTab />
+            </TabsContent>
             <TabsContent value="mis-creators">
               <MisCreatorsTab
                 creators={creators}

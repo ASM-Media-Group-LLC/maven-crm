@@ -1,12 +1,13 @@
-import { UserCheck, MessageSquare, CheckCircle, Trophy, DollarSign, TrendingUp } from "lucide-react";
+import { Inbox, UserCheck, MessageSquare, CheckCircle, Trophy, DollarSign, TrendingUp } from "lucide-react";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import { CloserCreator } from "../useCloserCreators";
 
 interface Props {
   creators: CloserCreator[];
+  leadsDisponibles?: number;
 }
 
-const ClosersKPICards = ({ creators }: Props) => {
+const ClosersKPICards = ({ creators, leadsDisponibles }: Props) => {
   const asignadas = creators.filter((c) => c.stage === "Asignada").length;
   const enNegociacion = creators.filter((c) => ["En negociación", "Formulario enviado", "Acuerdo enviado"].includes(c.stage)).length;
   const confirmadas = creators.filter((c) => c.stage === "Confirmada").length;
