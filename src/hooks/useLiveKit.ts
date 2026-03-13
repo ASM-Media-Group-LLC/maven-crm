@@ -648,6 +648,24 @@ export function useLiveKit() {
     }, 800); // Give the page 800ms to render before starting ML
   }, [queueBackgroundEffectApply]);
 
+  const scheduleDeferredBackgroundReapply = useCallback((room: Room, delayMs = 320) => {
+    if (backgroundEffectRef.current === "none") return;
+    if (skipAutoBackgroundRestoreRef.current) return;
+
+    clearBackgroundReapplyTimer();
+    const expectedEffect = backgroundEffectRef.current;
+
+    bgReapplyTimerRef.current = setTimeout(() => {
+      bgReapplyTimerRef.current = null;
+      scheduleWhenIdle(() => {
+        if (roomRef.current !== room) return;
+        if (skipAutoBackgroundRestoreRef.current) return;
+        if (backgroundEffectRef.current !== expectedEffect) return;
+        void queueBackgroundEffectApply(expectedEffect);
+      }, 250);
+    }, delayMs);
+  }, [clearBackgroundReapplyTimer, queueBackgroundEffectApply]);
+
   const applyConfiguredBackgroundIfNeeded = useCallback(async (room: Room) => {
     if (backgroundEffectRef.current === "none") {
       bgLastAppliedEffectRef.current = "none";
