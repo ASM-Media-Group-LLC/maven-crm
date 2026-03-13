@@ -18,7 +18,6 @@ const ClosersContent = () => {
     deleteCreator, assignCreator, isAdmin,
   } = useCloserCreators();
 
-  const [showNew, setShowNew] = useState(false);
   const [viewCreator, setViewCreator] = useState<CloserCreator | null>(null);
   const [editCreator, setEditCreator] = useState<CloserCreator | null>(null);
   const [deletingCreator, setDeletingCreator] = useState<CloserCreator | null>(null);
