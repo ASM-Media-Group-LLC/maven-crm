@@ -947,6 +947,7 @@ export function useLiveKit() {
 
       room.on(RoomEvent.Disconnected, () => {
         clearSyncInterval();
+        clearBackgroundReapplyTimer();
         cleanupAudioResumeListeners();
         void disposeBackgroundProcessor();
         setConnectionState(ConnectionState.Disconnected);
