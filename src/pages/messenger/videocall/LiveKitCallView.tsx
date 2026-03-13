@@ -136,7 +136,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const visibleParticipants = useMemo(() => {
     let list = lk.participants;
     if (viewSettings.hideNoVideo) {
-      list = list.filter((p) => p.isCamOn || p.isScreenSharing || p.isLocal);
+      list = list.filter((p) => !p.isCameraOff || p.isScreenSharing || p.isLocal);
     }
     if (list.length > viewSettings.maxTiles) {
       list = list.slice(0, viewSettings.maxTiles);
