@@ -340,13 +340,20 @@ export function useLiveKit() {
 
   const camToggleInFlightRef = useRef(false);
 
-  const hasActiveCameraPublication = useCallback((room: Room) => {
-    const cameraPublication = Array.from(room.localParticipant.videoTrackPublications.values()).find(
+  const getLocalCameraPublication = useCallback((room: Room) => {
+    return Array.from(room.localParticipant.videoTrackPublications.values()).find(
       (publication) => publication.source === Track.Source.Camera,
     );
-
-    return !!cameraPublication?.track && !cameraPublication.isMuted;
   }, []);
+
+  const hasActiveCameraPublication = useCallback((room: Room) => {
+    const cameraPublication = getLocalCameraPublication(room);
+    return !!cameraPublication?.track && !cameraPublication.isMuted;
+  }, [getLocalCameraPublication]);
+
+  const getLocalCameraTrack = useCallback((room: Room) => {
+    return (getLocalCameraPublication(room)?.track as any) || null;
+  }, [getLocalCameraPublication]);
 
   const waitForCameraPublication = useCallback(
     async (room: Room, delays: number[]) => {
