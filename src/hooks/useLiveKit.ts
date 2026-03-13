@@ -585,12 +585,17 @@ export function useLiveKit() {
   const queueBackgroundEffectApply = useCallback((effect: BackgroundEffect) => {
     bgRequestedEffectRef.current = effect;
 
-    bgApplyQueueRef.current = bgApplyQueueRef.current
-      .catch(() => false)
-      .then(async () => {
-        // Bounded loop (max 3 iterations) to prevent infinite spinning
+    if (bgQueueInFlightRef.current) {
+      return bgApplyQueueRef.current;
+    }
+
+    bgQueueInFlightRef.current = true;
+    bgApplyQueueRef.current = (async () => {
+      try {
+        // Coalesced loop: process only the latest requested effect.
+        // This avoids an ever-growing promise chain under rapid camera refreshes.
         let iterations = 0;
-        while (iterations++ < 3) {
+        while (iterations++ < 6) {
           const room = roomRef.current;
           if (!room) return false;
 
@@ -615,10 +620,13 @@ export function useLiveKit() {
           if (bgRequestedEffectRef.current === nextEffect) {
             return applied;
           }
-          // Effect changed mid-apply — loop once more to apply the new one
         }
+
         return false;
-      });
+      } finally {
+        bgQueueInFlightRef.current = false;
+      }
+    })();
 
     return bgApplyQueueRef.current;
   }, [applyBackgroundEffectToCurrentCamera]);
