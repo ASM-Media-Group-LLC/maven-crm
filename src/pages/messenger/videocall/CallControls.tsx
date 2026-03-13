@@ -1,6 +1,7 @@
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users, BarChart3, Captions, CaptionsOff,
+  Settings,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ interface CallControlsProps {
   onSendReaction: (emoji: string) => void;
   onBackgroundChange: (effect: BackgroundEffect) => void;
   onLeave: () => void;
+  onOpenSettings: () => void;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
@@ -67,7 +69,7 @@ export default function CallControls({
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants, onToggleMetrics,
   onToggleCaptions, onCaptionsLanguageChange,
-  onSendReaction, onBackgroundChange, onLeave,
+  onSendReaction, onBackgroundChange, onLeave, onOpenSettings,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-2 md:gap-3 py-3 bg-[hsl(220_3%_14%)] flex-wrap px-3">
@@ -171,6 +173,9 @@ export default function CallControls({
       </div>
       <ControlBtn icon={Users} onClick={onToggleParticipants} label="Participantes" badge={isParticipantsOpen} />
       <ControlBtn icon={BarChart3} onClick={onToggleMetrics} label="Métricas" badge={isMetricsOpen} />
+
+      {/* Settings */}
+      <ControlBtn icon={Settings} onClick={onOpenSettings} label="Configuración" />
 
       {/* Divider */}
       <div className="h-7 w-px bg-[hsl(220_3%_28%)] mx-1 hidden md:block" />
