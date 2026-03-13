@@ -1375,6 +1375,12 @@ export function useLiveKit() {
       skipAutoBackgroundRestoreRef.current = false;
 
       if (hasBackgroundEffect) {
+        bgFailureCooldownUntilRef.current = 0;
+        holdLocalVideoUntilBackgroundRef.current = true;
+        refreshParticipants();
+      }
+
+      if (hasBackgroundEffect) {
         // Deterministic restart with safe constraints is more stable than hot-switching
         // when a background processor is active.
         await room.localParticipant.setCameraEnabled(false);
@@ -1387,10 +1393,13 @@ export function useLiveKit() {
 
       const isReady = await waitForCameraPublication(room, [80, 150, 300]);
       if (isReady && hasBackgroundEffect) {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
         if (!applied) {
           scheduleDeferredBackgroundReapply(room, 260);
         }
+      } else if (hasBackgroundEffect) {
+        holdLocalVideoUntilBackgroundRef.current = false;
+        refreshParticipants();
       }
 
       setIsCamOn(hasActiveCameraPublication(room));
@@ -1401,10 +1410,13 @@ export function useLiveKit() {
       // Fallback: full camera recovery with profile-aware constraints.
       const cameraEnabled = await enableCameraWithRecovery(room, deviceId);
       if (cameraEnabled && backgroundEffectRef.current !== "none") {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
         if (!applied) {
           scheduleDeferredBackgroundReapply(room, 300);
         }
+      } else if (backgroundEffectRef.current !== "none") {
+        holdLocalVideoUntilBackgroundRef.current = false;
+        refreshParticipants();
       }
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
