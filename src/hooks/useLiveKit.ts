@@ -128,7 +128,7 @@ const BACKGROUND_SWITCH_TIMEOUT_MS = 12000;
 const BACKGROUND_FAILURE_COOLDOWN_MS = 15000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+  return effect !== "none" && effect !== "blur";
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
