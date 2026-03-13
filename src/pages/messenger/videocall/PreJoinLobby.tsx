@@ -230,9 +230,14 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
-    // Only dispose if a processor actually exists (avoids blocking wait)
-    if (bgProcessorRef.current) {
+    // When restarting with a background active, keep the processor alive
+    // and just clear the track reference so it re-attaches to the new track.
+    // Only dispose if we're turning the camera OFF or have no effect.
+    if (bgProcessorRef.current && bgEffectRef.current === "none") {
       await disposeBackgroundProcessor();
+    } else {
+      bgAttachedTrackRef.current = null;
+      bgLastAppliedEffectRef.current = "none";
     }
     if (!camOn) return;
     try {
