@@ -22,6 +22,7 @@ const ClosersKPICards = ({ creators, leadsDisponibles }: Props) => {
     .reduce((sum, c) => sum + Number(c.estimated_monetization || 0) * (Number(c.agency_commission || 0) / 100), 0);
 
   const cards = [
+    { label: "Leads Disponibles", value: (leadsDisponibles ?? 0).toString(), subtitle: "Sin reclamar", icon: Inbox, color: "accent" as const },
     { label: "Asignadas", value: asignadas.toString(), subtitle: "Pendientes de contacto", icon: UserCheck, color: "primary" as const },
     { label: "En Negociación", value: enNegociacion.toString(), subtitle: "En proceso activo", icon: MessageSquare, color: "accent" as const },
     { label: "Confirmadas", value: confirmadas.toString(), subtitle: "Listas para onboarding", icon: CheckCircle, color: "success" as const },
