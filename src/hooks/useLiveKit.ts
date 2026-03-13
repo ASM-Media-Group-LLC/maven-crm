@@ -645,6 +645,15 @@ export function useLiveKit() {
         console.info("[LiveKit] Reconnected successfully");
         refreshParticipants();
 
+        // Force audio re-kick after reconnection
+        room.startAudio().then(() => {
+          document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+            if (el.srcObject) {
+              el.play().catch(() => {});
+            }
+          });
+        }).catch(() => {});
+
         if (backgroundEffectRef.current !== "none") {
           void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
         }
@@ -661,9 +670,22 @@ export function useLiveKit() {
         playLeaveSound();
         refreshParticipants();
       });
-      room.on(RoomEvent.TrackSubscribed, (_track, _pub, participant) => {
-        console.info("[LiveKit] Track subscribed from:", participant.identity);
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        console.info("[LiveKit] Track subscribed from:", participant.identity, "kind:", track.kind);
         debouncedRefresh();
+
+        // Force audio playback for newly subscribed audio tracks
+        if (track.kind === "audio") {
+          room.startAudio().catch(() => {});
+          // Kick all audio elements to play after a brief delay
+          setTimeout(() => {
+            document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+              if (el.paused && el.srcObject) {
+                el.play().catch(() => {});
+              }
+            });
+          }, 200);
+        }
       });
       room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
       room.on(RoomEvent.TrackPublished, (_pub, participant) => {
@@ -827,8 +849,26 @@ export function useLiveKit() {
         }
       }
 
-      // Try to start audio context immediately (for browsers that allow it)
-      room.startAudio().catch(() => {});
+      // Aggressively start audio context and ensure all audio elements play
+      room.startAudio().then(() => {
+        console.info("[LiveKit] Audio context started successfully");
+        // Kick all existing audio elements
+        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+          if (el.paused && el.srcObject) {
+            el.play().catch(() => {});
+          }
+        });
+      }).catch(() => {});
+
+      // Second attempt after a delay (catches late track subscriptions)
+      setTimeout(() => {
+        room.startAudio().catch(() => {});
+        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+          if (el.paused && el.srcObject) {
+            el.play().catch(() => {});
+          }
+        });
+      }, 1500);
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       setIsCamOn(hasActiveCameraPublication(room));

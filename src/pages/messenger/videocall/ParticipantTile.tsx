@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from "react";
+import { useEffect, useRef, memo, useCallback } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MicOff, Hand, Monitor, WifiOff } from "lucide-react";
@@ -84,6 +84,58 @@ const ParticipantTile = memo(function ParticipantTile({
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
+  // ── Robust audio attachment helper ─────────────────────────────
+  const attachAudioTrack = useCallback(() => {
+    if (participant.isLocal || !room) return;
+
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+
+    const lkParticipant = room.remoteParticipants.get(participant.identity);
+    if (!lkParticipant) return;
+
+    const audioTrack = [...lkParticipant.audioTrackPublications.values()].find(
+      (t) => t.source === Track.Source.Microphone
+    );
+
+    if (audioTrack?.track) {
+      // Only re-attach if the track changed or the element lost its source
+      const needsAttach =
+        attachedAudioTrackRef.current !== audioTrack.track ||
+        !audioEl.srcObject ||
+        (audioEl.srcObject instanceof MediaStream && audioEl.srcObject.getAudioTracks().length === 0);
+
+      if (needsAttach) {
+        // Detach old track if different
+        if (attachedAudioTrackRef.current && attachedAudioTrackRef.current !== audioTrack.track) {
+          try { attachedAudioTrackRef.current.detach(audioEl); } catch {}
+        }
+
+        audioTrack.track.attach(audioEl);
+        attachedAudioTrackRef.current = audioTrack.track;
+        audioEl.volume = 1;
+
+        // Set audio output device
+        const mediaEl = audioEl as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void>; sinkId?: string };
+        if (preferredAudioOutputDeviceId && typeof mediaEl.setSinkId === "function" && mediaEl.sinkId !== preferredAudioOutputDeviceId) {
+          mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
+        }
+
+        // Robust play with retries
+        const tryPlay = (attempt = 0) => {
+          audioEl.play().catch(() => {
+            if (attempt < 5) setTimeout(() => tryPlay(attempt + 1), 300 * Math.pow(2, attempt));
+          });
+        };
+        tryPlay();
+      }
+    } else if (attachedAudioTrackRef.current && audioEl) {
+      try { attachedAudioTrackRef.current.detach(audioEl); } catch {}
+      attachedAudioTrackRef.current = null;
+    }
+  }, [room, participant.identity, participant.isLocal, preferredAudioOutputDeviceId]);
+
+  // ── Video attachment effect ────────────────────────────────────
   useEffect(() => {
     if (!room) return;
 
@@ -147,33 +199,42 @@ const ParticipantTile = memo(function ParticipantTile({
 
     if (needsRetry && !participant.isCameraOff) scheduleAttachRetry();
 
-    const audioEl = audioRef.current;
-    if (!participant.isLocal && audioEl) {
-      const audioTrack = [...lkParticipant.audioTrackPublications.values()].find((t) => t.source === Track.Source.Microphone);
-      if (audioTrack?.track) {
-        if (attachedAudioTrackRef.current !== audioTrack.track) {
-          if (attachedAudioTrackRef.current) attachedAudioTrackRef.current.detach(audioEl);
-          audioTrack.track.attach(audioEl);
-          attachedAudioTrackRef.current = audioTrack.track;
-          audioEl.volume = 1;
-          const mediaEl = audioEl as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void>; sinkId?: string };
-          if (preferredAudioOutputDeviceId && typeof mediaEl.setSinkId === "function" && mediaEl.sinkId !== preferredAudioOutputDeviceId) {
-            mediaEl.setSinkId(preferredAudioOutputDeviceId).catch(() => {});
-          }
-          const tryPlay = (attempt = 0) => {
-            audioEl.play().catch(() => { if (attempt < 3) setTimeout(() => tryPlay(attempt + 1), 500 * Math.pow(2, attempt)); });
-          };
-          tryPlay();
-        }
-      } else if (attachedAudioTrackRef.current && audioEl) {
-        attachedAudioTrackRef.current.detach(audioEl);
-        attachedAudioTrackRef.current = null;
-      }
+    return () => { if (retryTimer) clearTimeout(retryTimer); };
+  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing]);
+
+  // ── Audio attachment effect (separate from video) ──────────────
+  useEffect(() => {
+    attachAudioTrack();
+
+    // Also set up a retry: sometimes the track arrives slightly after the
+    // participant state updates, so poll a few times.
+    if (participant.isLocal) return;
+
+    let retryCount = 0;
+    const maxRetries = 6;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRetry = () => {
+      if (retryCount >= maxRetries) return;
+      retryTimer = setTimeout(() => {
+        retryCount++;
+        attachAudioTrack();
+        // Keep retrying if we still don't have audio attached
+        if (!attachedAudioTrackRef.current) scheduleRetry();
+      }, 300 * (retryCount + 1));
+    };
+
+    // If no track attached yet, schedule retries
+    if (!attachedAudioTrackRef.current) {
+      scheduleRetry();
     }
 
-    return () => { if (retryTimer) clearTimeout(retryTimer); };
-  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isMuted, participant.isScreenSharing, preferredAudioOutputDeviceId]);
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [attachAudioTrack, participant.isLocal, participant.isMuted]);
 
+  // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => {
     const videoElRef = videoRef;
     const audioElRef = audioRef;
