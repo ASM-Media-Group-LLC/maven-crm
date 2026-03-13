@@ -1102,6 +1102,7 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
+    skipAutoBackgroundRestoreRef.current = false; // user explicitly requested effect apply
 
     const room = roomRef.current;
     if (!room) return;
