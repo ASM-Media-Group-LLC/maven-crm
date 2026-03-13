@@ -1,5 +1,6 @@
-import { Inbox, UserCheck, MessageSquare, CheckCircle, Trophy, XCircle, Users } from "lucide-react";
-import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import { Inbox, UserCheck, MessageSquare, CheckCircle, Trophy, Users } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Props {
   statusCounts: Record<string, number>;
@@ -16,27 +17,29 @@ const ClosersKPICards = ({ statusCounts }: Props) => {
 
   const total = sinContactar + contactados + interesadas + enNegociacion + confirmadas + completadas + noInteresadas;
 
-  const cards = [
-    { label: "Total Leads", value: total.toLocaleString(), subtitle: "En el sistema", icon: Users, color: "muted" as const },
-    { label: "Sin Contactar", value: sinContactar.toLocaleString(), subtitle: "Pendientes", icon: Inbox, color: "accent" as const },
-    { label: "Contactados", value: contactados.toLocaleString(), subtitle: "En seguimiento", icon: UserCheck, color: "primary" as const },
-    { label: "Interesadas", value: interesadas.toLocaleString(), subtitle: "Con interés", icon: MessageSquare, color: "accent" as const },
-    { label: "En Negociación", value: enNegociacion.toLocaleString(), subtitle: "En proceso", icon: MessageSquare, color: "warning" as const },
-    { label: "Confirmadas", value: confirmadas.toLocaleString(), subtitle: "Listas", icon: CheckCircle, color: "success" as const },
-    { label: "Completadas", value: completadas.toLocaleString(), subtitle: "Finalizadas", icon: Trophy, color: "success" as const },
+  const cards: { label: string; value: number; icon: LucideIcon; iconClass: string }[] = [
+    { label: "Total Leads", value: total, icon: Users, iconClass: "text-muted-foreground" },
+    { label: "Sin Contactar", value: sinContactar, icon: Inbox, iconClass: "text-accent-foreground" },
+    { label: "Contactados", value: contactados, icon: UserCheck, iconClass: "text-primary" },
+    { label: "Interesadas", value: interesadas, icon: MessageSquare, iconClass: "text-accent-foreground" },
+    { label: "En Negociación", value: enNegociacion, icon: MessageSquare, iconClass: "text-warning" },
+    { label: "Confirmadas", value: confirmadas, icon: CheckCircle, iconClass: "text-success" },
+    { label: "Completadas", value: completadas, icon: Trophy, iconClass: "text-success" },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3">
       {cards.map((card) => (
-        <DashboardMetricCard
+        <div
           key={card.label}
-          label={card.label}
-          value={card.value}
-          subtitle={card.subtitle}
-          icon={card.icon}
-          color={card.color}
-        />
+          className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/50"
+        >
+          <card.icon className={cn("h-5 w-5 shrink-0", card.iconClass)} />
+          <div className="min-w-0">
+            <p className="text-lg font-bold leading-tight">{card.value.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground truncate">{card.label}</p>
+          </div>
+        </div>
       ))}
     </div>
   );
