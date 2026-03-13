@@ -1370,7 +1370,10 @@ export function useLiveKit() {
 
       const isReady = await waitForCameraPublication(room, [80, 150, 300]);
       if (isReady && hasBackgroundEffect) {
-        scheduleDeferredBackgroundReapply(room, 260);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        if (!applied) {
+          scheduleDeferredBackgroundReapply(room, 260);
+        }
       }
 
       setIsCamOn(hasActiveCameraPublication(room));
