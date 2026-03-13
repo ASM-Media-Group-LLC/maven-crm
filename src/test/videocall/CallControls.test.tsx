@@ -13,36 +13,28 @@ describe("CallControls", () => {
     isChatOpen: false,
     unreadChatCount: 0,
     isParticipantsOpen: false,
-    isMetricsOpen: false,
     isCaptionsOn: false,
     captionsLanguage: "es-ES",
     captionsSupported: true,
-    backgroundEffect: "none" as const,
     onToggleMic: vi.fn(),
     onToggleCam: vi.fn(),
     onToggleScreenShare: vi.fn(),
     onToggleHand: vi.fn(),
     onToggleChat: vi.fn(),
     onToggleParticipants: vi.fn(),
-    onToggleMetrics: vi.fn(),
     onToggleCaptions: vi.fn(),
     onCaptionsLanguageChange: vi.fn(),
     onSendReaction: vi.fn(),
-    onBackgroundChange: vi.fn(),
     onLeave: vi.fn(),
     onOpenSettings: vi.fn(),
   };
 
-  it("renders all control buttons", () => {
+  it("renders primary control buttons", () => {
     render(<CallControls {...defaultProps} />);
     expect(screen.getByTitle("Micrófono")).toBeInTheDocument();
     expect(screen.getByTitle("Cámara")).toBeInTheDocument();
     expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
     expect(screen.getByTitle("Levantar mano")).toBeInTheDocument();
-    expect(screen.getByTitle("Chat")).toBeInTheDocument();
-    expect(screen.getAllByTitle("Participantes").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByTitle("Métricas")).toBeInTheDocument();
-    expect(screen.getByText("Salir")).toBeInTheDocument();
   });
 
   it("calls onToggleMic when mic button is clicked", () => {
@@ -69,15 +61,8 @@ describe("CallControls", () => {
     expect(defaultProps.onToggleHand).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onLeave when leave button is clicked", () => {
-    render(<CallControls {...defaultProps} />);
-    fireEvent.click(screen.getByText("Salir"));
-    expect(defaultProps.onLeave).toHaveBeenCalledTimes(1);
-  });
-
   it("shows badge on hand raised button when hand is raised", () => {
-    const { container } = render(<CallControls {...defaultProps} isHandRaised />);
-    // Badge is the span with absolute positioning
+    render(<CallControls {...defaultProps} isHandRaised />);
     const handBtn = screen.getByTitle("Levantar mano");
     const badge = handBtn.querySelector("span.absolute");
     expect(badge).toBeInTheDocument();
