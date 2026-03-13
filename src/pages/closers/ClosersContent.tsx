@@ -40,8 +40,9 @@ const ClosersContent = () => {
         ) : (
           <>
             <ClosersKPICards creators={creators} />
-            <Tabs defaultValue="mis-creators">
+            <Tabs defaultValue="leads">
             <TabsList className="flex-wrap">
+              <TabsTrigger value="leads">Leads</TabsTrigger>
               <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
               <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
               <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
