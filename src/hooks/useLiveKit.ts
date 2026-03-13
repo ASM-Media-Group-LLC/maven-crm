@@ -304,9 +304,11 @@ export function useLiveKit() {
     bgAttachedTrackRef.current = null;
     bgLastAppliedEffectRef.current = "none";
 
-    if (processor?.destroy) {
+    if (!processor) return; // Fast path: nothing to dispose
+
+    if (processor.destroy) {
       try {
-        await withTimeout(Promise.resolve(processor.destroy()), 2500, "bg-destroy");
+        await withTimeout(Promise.resolve(processor.destroy()), 1500, "bg-destroy");
       } catch {
         // no-op
       }
