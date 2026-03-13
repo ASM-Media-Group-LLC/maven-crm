@@ -158,11 +158,9 @@ function useDevices(open: boolean) {
 
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
-  isCaptionsOn, captionsLanguage, captionsSupported,
   currentAudioInputId, currentAudioOutputId, currentVideoInputId,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
-  onToggleCaptions, onCaptionsLanguageChange,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
   onOpenVideoSettings, onOpenMetrics,
