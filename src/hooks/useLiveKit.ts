@@ -1230,12 +1230,13 @@ export function useLiveKit() {
   useEffect(() => {
     return () => {
       clearSyncInterval();
+      clearBackgroundReapplyTimer();
       cleanupAudioResumeListeners();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
     };
-  }, [clearSyncInterval, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
+  }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
   const clearUnreadChat = useCallback(() => {
     setUnreadChatCount(0);
