@@ -320,7 +320,7 @@ export function useLiveKit() {
       // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
       try {
         await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(preferredVideoDeviceId));
-        const isReady = await waitForCameraPublication(room, [150, 250, 400, 600]);
+        const isReady = await waitForCameraPublication(room, [80, 150, 300]);
         if (isReady) {
           refreshParticipants();
           return true;
@@ -333,9 +333,9 @@ export function useLiveKit() {
       try {
         await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
-        await wait(180);
+        await wait(80);
         await room.localParticipant.setCameraEnabled(true);
-        const isReady = await waitForCameraPublication(room, [200, 350, 500]);
+        const isReady = await waitForCameraPublication(room, [100, 200, 400]);
         if (isReady) {
           refreshParticipants();
           return true;
