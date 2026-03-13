@@ -26,7 +26,9 @@ describe("CallControls", () => {
     onCaptionsLanguageChange: vi.fn(),
     onSendReaction: vi.fn(),
     onLeave: vi.fn(),
-    onOpenAudioSettings: vi.fn(),
+    onAudioInputChange: vi.fn(),
+    onAudioOutputChange: vi.fn(),
+    onVideoInputChange: vi.fn(),
     onOpenVideoSettings: vi.fn(),
     onOpenMetrics: vi.fn(),
   };

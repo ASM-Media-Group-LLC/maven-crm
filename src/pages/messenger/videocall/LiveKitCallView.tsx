@@ -8,7 +8,6 @@ import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import CallCaptions from "./CallCaptions";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
-import AudioSettingsDialog from "./AudioSettingsDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
@@ -50,12 +49,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const captions = useSpeechCaptions();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
-  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
+  const [audioInputId, setAudioInputId] = useState(initialAudioDeviceId);
+  const [audioOutputId, setAudioOutputId] = useState(initialAudioOutputDeviceId);
+  const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
 
   const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); saveViewSettings(s); }, []);
 
@@ -79,6 +80,10 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk]);
 
   const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); toast.info("Llamada finalizada"); }, [lk, onLeave]);
+
+  const handleAudioInputChange = useCallback((id: string) => { setAudioInputId(id); lk.switchAudioInput?.(id); }, [lk]);
+  const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);
+  const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk]);
 
   const shareLink = useMemo(() => {
     const params = new URLSearchParams();
@@ -150,26 +155,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         <div className="relative flex-1 p-3 overflow-hidden">
           {effectiveLayout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
-              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />)}
+              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} />)}
             </div>
           ) : effectiveLayout === "sidebar" ? (
             <div className="flex h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={initialAudioOutputDeviceId} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} /></div>
                   ))}
                 </div>
               )}
             </div>
           ) : (
             <div className="flex flex-col h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={initialAudioOutputDeviceId} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} /></div>
                   ))}
                 </div>
               )}
@@ -200,6 +205,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isCaptionsOn={captions.isActive}
         captionsLanguage={captions.language}
         captionsSupported={captions.isSupported}
+        currentAudioInputId={audioInputId}
+        currentAudioOutputId={audioOutputId}
+        currentVideoInputId={videoInputId}
         onToggleMic={lk.toggleMic}
         onToggleCam={lk.toggleCam}
         onToggleScreenShare={lk.toggleScreenShare}
@@ -210,27 +218,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onLeave={handleLeave}
-        onOpenAudioSettings={() => setAudioSettingsOpen(true)}
+        onAudioInputChange={handleAudioInputChange}
+        onAudioOutputChange={handleAudioOutputChange}
+        onVideoInputChange={handleVideoInputChange}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />
 
-      <AudioSettingsDialog
-        open={audioSettingsOpen}
-        onClose={() => setAudioSettingsOpen(false)}
-        currentAudioInputId={initialAudioDeviceId}
-        currentAudioOutputId={initialAudioOutputDeviceId}
-        onAudioInputChange={(id) => lk.switchAudioInput?.(id)}
-        onAudioOutputChange={(id) => lk.switchAudioOutput?.(id)}
-      />
-
       <VideoSettingsDialog
         open={videoSettingsOpen}
         onClose={() => setVideoSettingsOpen(false)}
-        currentVideoInputId={initialVideoDeviceId}
-        onVideoInputChange={(id) => lk.switchVideoInput?.(id)}
+        currentVideoInputId={videoInputId}
+        onVideoInputChange={handleVideoInputChange}
         backgroundEffect={bgEffect}
         onBackgroundChange={handleBgChange}
       />

@@ -1,11 +1,17 @@
+import { useState, useEffect, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users, Captions, CaptionsOff,
-  BarChart3, ChevronUp, MoreVertical, Info,
+  ChevronUp, MoreVertical, Info, Settings, Volume2, ChevronDown, Check,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CAPTION_LANGUAGES } from "@/hooks/useSpeechCaptions";
+
+interface DeviceInfo {
+  deviceId: string;
+  label: string;
+}
 
 interface CallControlsProps {
   isMicOn: boolean;
@@ -18,6 +24,9 @@ interface CallControlsProps {
   isCaptionsOn: boolean;
   captionsLanguage: string;
   captionsSupported: boolean;
+  currentAudioInputId?: string;
+  currentAudioOutputId?: string;
+  currentVideoInputId?: string;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleScreenShare: () => void;
@@ -28,7 +37,9 @@ interface CallControlsProps {
   onCaptionsLanguageChange: (lang: string) => void;
   onSendReaction: (emoji: string) => void;
   onLeave: () => void;
-  onOpenAudioSettings: () => void;
+  onAudioInputChange: (id: string) => void;
+  onAudioOutputChange: (id: string) => void;
+  onVideoInputChange: (id: string) => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
 }
@@ -60,19 +71,6 @@ function ControlBtn({
   );
 }
 
-/** Small chevron pointing up, like Google Meet */
-function MiniChevron({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
-    >
-      <ChevronUp className="h-3 w-3" />
-    </button>
-  );
-}
-
-/** Right-side panel toggle button (smaller, no bg) */
 function PanelBtn({
   icon: Icon, active, onClick, label, badge,
 }: {
@@ -99,34 +97,134 @@ function PanelBtn({
   );
 }
 
+/** Pill-shaped device selector like Google Meet */
+function DevicePill({ icon: Icon, devices, selectedId, onSelect }: {
+  icon: any;
+  devices: DeviceInfo[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = devices.find((d) => d.deviceId === selectedId);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[hsl(220_3%_22%)] border border-[hsl(220_3%_30%)] text-xs text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors max-w-[200px]"
+      >
+        <Icon className="h-3.5 w-3.5 shrink-0 text-[hsl(220_3%_65%)]" />
+        <span className="truncate">{selected?.label || "Seleccionar"}</span>
+        <ChevronDown className={cn("h-3 w-3 shrink-0 text-[hsl(220_3%_55%)] transition-transform", open && "rotate-180")} />
+      </button>
+      {open && devices.length > 0 && (
+        <div className="absolute bottom-full mb-1 left-0 z-50 rounded-lg bg-[hsl(220_3%_20%)] border border-[hsl(220_3%_28%)] shadow-xl p-1 min-w-[220px] max-h-48 overflow-y-auto">
+          {devices.map((d) => (
+            <button
+              key={d.deviceId}
+              onClick={() => { onSelect(d.deviceId); setOpen(false); }}
+              className={cn(
+                "w-full flex items-center gap-2 text-left text-xs px-3 py-2 rounded-md transition-colors",
+                d.deviceId === selectedId
+                  ? "bg-[hsl(214_82%_51%/0.12)] text-[hsl(214_82%_65%)]"
+                  : "text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_28%)]"
+              )}
+            >
+              <span className="truncate flex-1">{d.label}</span>
+              {d.deviceId === selectedId && <Check className="h-3 w-3 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Hook to enumerate media devices */
+function useDevices(open: boolean) {
+  const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
+  const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
+
+  const enumerate = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputs(devices.filter((d) => d.kind === "audioinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Micrófono ${d.deviceId.slice(0, 5)}` })));
+      setAudioOutputs(devices.filter((d) => d.kind === "audiooutput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Altavoz ${d.deviceId.slice(0, 5)}` })));
+      setVideoInputs(devices.filter((d) => d.kind === "videoinput" && d.deviceId).map((d) => ({ deviceId: d.deviceId, label: d.label || `Cámara ${d.deviceId.slice(0, 5)}` })));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (open) enumerate();
+  }, [open, enumerate]);
+
+  return { audioInputs, audioOutputs, videoInputs };
+}
+
 export default function CallControls({
   isMicOn, isCamOn, isScreenSharing, isHandRaised, isChatOpen, unreadChatCount, isParticipantsOpen,
   isCaptionsOn, captionsLanguage, captionsSupported,
+  currentAudioInputId, currentAudioOutputId, currentVideoInputId,
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
   onToggleCaptions, onCaptionsLanguageChange,
-  onSendReaction, onLeave, onOpenAudioSettings, onOpenVideoSettings, onOpenMetrics,
+  onSendReaction, onLeave,
+  onAudioInputChange, onAudioOutputChange, onVideoInputChange,
+  onOpenVideoSettings, onOpenMetrics,
 }: CallControlsProps) {
+  const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
+  const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
+  const devices = useDevices(audioPopoverOpen || videoPopoverOpen);
+
   return (
     <div className="shrink-0 flex items-center py-3 bg-[hsl(220_3%_14%)] px-4">
-      {/* Left spacer for balance */}
       <div className="flex-1" />
 
       {/* Center controls */}
       <div className="flex items-center gap-2">
-        {/* Mic with audio settings chevron */}
+        {/* Mic with audio popover */}
         <div className="flex flex-col items-center gap-0.5">
-          <MiniChevron onClick={onOpenAudioSettings} />
+          <Popover open={audioPopoverOpen} onOpenChange={setAudioPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
+                <ChevronUp className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+              <div className="flex items-center gap-2">
+                <DevicePill icon={Mic} devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} />
+                <DevicePill icon={Volume2} devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} />
+              </div>
+            </PopoverContent>
+          </Popover>
           <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label="Micrófono" />
         </div>
 
-        {/* Cam with video settings chevron */}
+        {/* Cam with video popover */}
         <div className="flex flex-col items-center gap-0.5">
-          <MiniChevron onClick={onOpenVideoSettings} />
+          <Popover open={videoPopoverOpen} onOpenChange={setVideoPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
+                <ChevronUp className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+              <div className="flex items-center gap-2">
+                <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
+                <button
+                  onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
+                  title="Configuración de vídeo"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label="Cámara" />
         </div>
 
-        {/* Screen share */}
         <ControlBtn
           icon={isScreenSharing ? MonitorOff : Monitor}
           active={!isScreenSharing ? undefined : true}
@@ -137,10 +235,7 @@ export default function CallControls({
         {/* Reactions */}
         <Popover>
           <PopoverTrigger asChild>
-            <button
-              title="Reacciones"
-              className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
-            >
+            <button title="Reacciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
               <Smile className="h-[18px] w-[18px]" />
             </button>
           </PopoverTrigger>
@@ -204,21 +299,20 @@ export default function CallControls({
           </Popover>
         )}
 
-        {/* Hand raise */}
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
 
         {/* More options */}
         <Popover>
           <PopoverTrigger asChild>
-            <button
-              title="Más opciones"
-              className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
-            >
+            <button title="Más opciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
               <MoreVertical className="h-[18px] w-[18px]" />
             </button>
           </PopoverTrigger>
           <PopoverContent side="top" className="w-48 p-1 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
-            <MoreMenuItem icon={Captions} label="Subtítulos" onClick={onToggleCaptions} />
+            <button onClick={onToggleCaptions} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]">
+              <Captions className="h-4 w-4" />
+              <span className="flex-1 text-left">Subtítulos</span>
+            </button>
           </PopoverContent>
         </Popover>
 
@@ -244,19 +338,5 @@ export default function CallControls({
         />
       </div>
     </div>
-  );
-}
-
-function MoreMenuItem({ icon: Icon, label, onClick }: {
-  icon: any; label: string; onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-    >
-      <Icon className="h-4 w-4" />
-      <span className="flex-1 text-left">{label}</span>
-    </button>
   );
 }
