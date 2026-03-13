@@ -30,11 +30,6 @@ const ClosersContent = () => {
             <h1 className="text-2xl font-bold">Closers</h1>
             <p className="text-sm text-muted-foreground">Gestión de creators desde LeadGen</p>
           </div>
-          {isAdmin && (
-            <Button onClick={() => setShowNew(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Nueva Creator
-            </Button>
-          )}
         </div>
       </header>
 
