@@ -243,6 +243,8 @@ export function useLiveKit() {
   const audioResumeCleanupRef = useRef<(() => void) | null>(null);
   // Track whether the initial background has been applied for this session
   const bgInitialApplyDoneRef = useRef(false);
+  // Prevent automatic background restoration after reload/failure (user can re-enable manually)
+  const skipAutoBackgroundRestoreRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
