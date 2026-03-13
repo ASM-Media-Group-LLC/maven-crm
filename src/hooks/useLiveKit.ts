@@ -146,6 +146,8 @@ const BACKGROUND_FAILURE_COOLDOWN_MS = 10000;
 
 // ── Sync interval — Google Meet polls ~3-5s for participant state ─
 const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
+// Prevent burst camera-refresh operations from stacking expensive media reconfigurations.
+const VIDEO_SWITCH_MIN_INTERVAL_MS = 420;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
@@ -350,6 +352,7 @@ export function useLiveKit() {
   const camToggleInFlightRef = useRef(false);
   const videoSwitchInFlightRef = useRef(false);
   const pendingVideoSwitchDeviceIdRef = useRef<string | null>(null);
+  const lastVideoSwitchAtRef = useRef(0);
 
   const getLocalCameraPublication = useCallback((room: Room) => {
     return Array.from(room.localParticipant.videoTrackPublications.values()).find(
@@ -1159,18 +1162,26 @@ export function useLiveKit() {
         // Optimistic UI: show cam off immediately
         setIsCamOn(false);
 
-        // Turning off: disable camera first (instant), then dispose processor
-        // in the background so the UI doesn't wait for ML teardown.
-        const processorToDispose = bgProcessorRef.current;
+        // Keep processor warm (disabled mode) so repeated camera refreshes
+        // don't constantly rebuild ML resources and freeze the tab.
+        const processor = bgProcessorRef.current;
+        const currentCamTrack = getLocalCameraTrack(room);
+        if (currentCamTrack && bgAttachedTrackRef.current === currentCamTrack) {
+          try {
+            await withTimeout(Promise.resolve(currentCamTrack.stopProcessor?.()), 1000, "bg-stop-on-cam-off");
+          } catch {}
+        }
+
         bgAttachedTrackRef.current = null;
         bgLastAppliedEffectRef.current = "none";
 
-        await room.localParticipant.setCameraEnabled(false);
-
-        // Fire-and-forget disposal — no need to block the toggle
-        if (processorToDispose) {
-          disposeBackgroundProcessor().catch(() => {});
+        if (processor?.switchTo) {
+          try {
+            await withTimeout(Promise.resolve(processor.switchTo({ mode: "disabled" })), 1200, "bg-disable-on-cam-off");
+          } catch {}
         }
+
+        await room.localParticipant.setCameraEnabled(false);
       }
 
       const camActive = hasActiveCameraPublication(room);
@@ -1186,7 +1197,7 @@ export function useLiveKit() {
     } finally {
       camToggleInFlightRef.current = false;
     }
-  }, [refreshParticipants, hasActiveCameraPublication, enableCameraWithRecovery, disposeBackgroundProcessor, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
+  }, [refreshParticipants, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, disposeBackgroundProcessor, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
 
   // ── Screen share (using ref to avoid stale closure) ───────────
   const isScreenSharingRef = useRef(isScreenSharing);
@@ -1386,6 +1397,12 @@ export function useLiveKit() {
         const room = roomRef.current;
         if (!room) break;
 
+        const elapsedSinceLastSwitch = Date.now() - lastVideoSwitchAtRef.current;
+        if (elapsedSinceLastSwitch < VIDEO_SWITCH_MIN_INTERVAL_MS) {
+          await wait(VIDEO_SWITCH_MIN_INTERVAL_MS - elapsedSinceLastSwitch);
+        }
+        lastVideoSwitchAtRef.current = Date.now();
+
         preferredDevicesRef.current.videoDeviceId = nextDeviceId;
         const hasBackgroundEffect = backgroundEffectRef.current !== "none";
 
@@ -1399,13 +1416,17 @@ export function useLiveKit() {
             } catch {}
           }
 
-          if (hasBackgroundEffect) {
-            // Hard-recycle processor on refresh to release leaked GPU/ML resources.
-            await disposeBackgroundProcessor();
-          } else {
-            bgAttachedTrackRef.current = null;
-            bgLastAppliedEffectRef.current = "none";
+          // Keep processor instance alive and only disable its mode before re-attaching.
+          // Re-creating the processor on every refresh spikes CPU/GPU and can hang the page.
+          const processor = bgProcessorRef.current;
+          if (processor?.switchTo) {
+            try {
+              await withTimeout(Promise.resolve(processor.switchTo({ mode: "disabled" })), 1200, "bg-disable-before-video-switch");
+            } catch {}
           }
+
+          bgAttachedTrackRef.current = null;
+          bgLastAppliedEffectRef.current = "none";
 
           // Device switch is user-driven, so allow background application again.
           skipAutoBackgroundRestoreRef.current = false;
@@ -1416,15 +1437,13 @@ export function useLiveKit() {
             refreshParticipants();
           }
 
-          if (hasBackgroundEffect) {
-            // Deterministic restart with safe constraints is more stable than hot-switching
-            // when a background processor is active.
-            await room.localParticipant.setCameraEnabled(false);
-            await wait(80);
-            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, true));
-          } else {
-            // No background effect: keep seamless switch path.
+          // Try seamless device switch first; fallback to deterministic restart only if needed.
+          try {
             await room.switchActiveDevice("videoinput", nextDeviceId);
+          } catch {
+            await room.localParticipant.setCameraEnabled(false);
+            await wait(70);
+            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, hasBackgroundEffect));
           }
 
           const isReady = await waitForCameraPublication(room, [80, 150, 300]);
@@ -1442,6 +1461,11 @@ export function useLiveKit() {
           refreshParticipants();
         } catch (err) {
           console.error("[LiveKit] Video input switch error:", err);
+
+          // Last-resort recovery: recycle processor only after a real switch failure.
+          if (backgroundEffectRef.current !== "none") {
+            await disposeBackgroundProcessor();
+          }
 
           // Fallback: full camera recovery with profile-aware constraints.
           const cameraEnabled = await enableCameraWithRecovery(room, nextDeviceId);
