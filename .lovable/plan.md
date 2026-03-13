@@ -1,22 +1,24 @@
 
 
-## Problem
+## Plan: Alinear ClosersKPICards con el diseño de ContactosKPICards
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+Closers usa `div` con layout inline compacto. Contactos usa `Card`/`CardContent` con icon arriba-derecha, label arriba-izquierda, valor grande abajo, subtitle, hover con scale+gradient. Hay que replicar ese patrón exacto.
 
-## Solution
+### Cambio único: `src/pages/closers/components/ClosersKPICards.tsx`
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+Reescribir para usar el mismo patrón visual de Contactos:
+- `Card` + `CardContent` de shadcn
+- Layout: label (arriba-izq) + icon en badge colored (arriba-der) + valor `text-2xl font-bold` + subtitle
+- Grid: `grid-cols-2 md:grid-cols-4` (con 7 cards se distribuyen en 2 filas)
+- Hover: `hover:scale-[1.03] hover:bg-gradient-to-br hover:from-{color}/15`
+- Cada card con su `colorClass`, `bgClass`, `hoverClass` y `subtitle`
 
-## Changes
-
-**File: `src/pages/sales-performance/useEarningsData.ts`**
-
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+Cards (7 total, 4+3 layout):
+1. Total Leads — muted — "Registrados"
+2. Sin Contactar — primary — "Pendientes"
+3. Contactados — accent — "Respondieron"
+4. Interesadas — warning — "Con interés"
+5. En Negociación — warning — "En proceso"
+6. Confirmadas — success — "Listas"
+7. Completadas — success — "Finalizadas"
 
