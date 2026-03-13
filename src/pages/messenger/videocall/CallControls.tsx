@@ -1,7 +1,7 @@
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users, Captions, CaptionsOff,
-  Settings, ChevronUp, ChevronDown, MoreVertical,
+  BarChart3, ChevronLeft, MoreVertical,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,9 @@ interface CallControlsProps {
   onCaptionsLanguageChange: (lang: string) => void;
   onSendReaction: (emoji: string) => void;
   onLeave: () => void;
-  onOpenSettings: () => void;
+  onOpenAudioSettings: () => void;
+  onOpenVideoSettings: () => void;
+  onOpenMetrics: () => void;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
@@ -58,15 +60,14 @@ function ControlBtn({
   );
 }
 
-/** Small chevron button attached to a primary control */
-function MiniChevron({ onClick, direction = "up" }: { onClick: () => void; direction?: "up" | "down" }) {
-  const Icon = direction === "up" ? ChevronUp : ChevronDown;
+/** Small chevron pointing left, positioned to the left of a control button */
+function MiniChevron({ onClick }: { onClick: () => void }) {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
       className="h-5 w-5 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] transition-colors"
     >
-      <Icon className="h-3 w-3" />
+      <ChevronLeft className="h-3 w-3" />
     </button>
   );
 }
@@ -77,19 +78,19 @@ export default function CallControls({
   onToggleMic, onToggleCam, onToggleScreenShare, onToggleHand,
   onToggleChat, onToggleParticipants,
   onToggleCaptions, onCaptionsLanguageChange,
-  onSendReaction, onLeave, onOpenSettings,
+  onSendReaction, onLeave, onOpenAudioSettings, onOpenVideoSettings, onOpenMetrics,
 }: CallControlsProps) {
   return (
     <div className="shrink-0 flex items-center justify-center gap-2 py-3 bg-[hsl(220_3%_14%)] px-3">
-      {/* Mic with settings chevron */}
-      <div className="flex flex-col items-center gap-0.5">
-        <MiniChevron onClick={onOpenSettings} />
+      {/* Mic with audio settings chevron */}
+      <div className="flex items-center gap-0.5">
+        <MiniChevron onClick={onOpenAudioSettings} />
         <ControlBtn icon={isMicOn ? Mic : MicOff} active={isMicOn} onClick={onToggleMic} label="Micrófono" />
       </div>
 
-      {/* Cam with settings chevron */}
-      <div className="flex flex-col items-center gap-0.5">
-        <MiniChevron onClick={onOpenSettings} />
+      {/* Cam with video settings chevron */}
+      <div className="flex items-center gap-0.5">
+        <MiniChevron onClick={onOpenVideoSettings} />
         <ControlBtn icon={isCamOn ? VideoIcon : VideoOff} active={isCamOn} onClick={onToggleCam} label="Cámara" />
       </div>
 
@@ -174,7 +175,10 @@ export default function CallControls({
       {/* Hand raise */}
       <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
 
-      {/* More options: Chat, Participants, Settings */}
+      {/* Metrics */}
+      <ControlBtn icon={BarChart3} onClick={onOpenMetrics} label="Métricas" />
+
+      {/* More options: Chat, Participants */}
       <Popover>
         <PopoverTrigger asChild>
           <button
@@ -190,7 +194,6 @@ export default function CallControls({
         <PopoverContent side="top" className="w-48 p-1 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
           <MoreMenuItem icon={MessageSquare} label="Chat" badge={unreadChatCount > 0 && !isChatOpen ? unreadChatCount : undefined} onClick={onToggleChat} />
           <MoreMenuItem icon={Users} label="Participantes" active={isParticipantsOpen} onClick={onToggleParticipants} />
-          <MoreMenuItem icon={Settings} label="Configuración" onClick={onOpenSettings} />
         </PopoverContent>
       </Popover>
 

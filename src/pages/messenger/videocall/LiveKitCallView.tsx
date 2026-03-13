@@ -8,7 +8,9 @@ import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import CallCaptions from "./CallCaptions";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
-import InCallSettingsDialog from "./InCallSettingsDialog";
+import AudioSettingsDialog from "./AudioSettingsDialog";
+import VideoSettingsDialog from "./VideoSettingsDialog";
+import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,7 +50,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const captions = useSpeechCaptions();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
+  const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
@@ -206,22 +210,34 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onCaptionsLanguageChange={captions.changeLanguage}
         onSendReaction={lk.sendReaction}
         onLeave={handleLeave}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenAudioSettings={() => setAudioSettingsOpen(true)}
+        onOpenVideoSettings={() => setVideoSettingsOpen(true)}
+        onOpenMetrics={() => setMetricsOpen(true)}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />
 
-      <InCallSettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        backgroundEffect={bgEffect}
-        onBackgroundChange={handleBgChange}
+      <AudioSettingsDialog
+        open={audioSettingsOpen}
+        onClose={() => setAudioSettingsOpen(false)}
         currentAudioInputId={initialAudioDeviceId}
         currentAudioOutputId={initialAudioOutputDeviceId}
-        currentVideoInputId={initialVideoDeviceId}
         onAudioInputChange={(id) => lk.switchAudioInput?.(id)}
         onAudioOutputChange={(id) => lk.switchAudioOutput?.(id)}
+      />
+
+      <VideoSettingsDialog
+        open={videoSettingsOpen}
+        onClose={() => setVideoSettingsOpen(false)}
+        currentVideoInputId={initialVideoDeviceId}
         onVideoInputChange={(id) => lk.switchVideoInput?.(id)}
+        backgroundEffect={bgEffect}
+        onBackgroundChange={handleBgChange}
+      />
+
+      <MetricsDialog
+        open={metricsOpen}
+        onClose={() => setMetricsOpen(false)}
         room={room}
         participants={lk.participants}
       />
