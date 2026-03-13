@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
-import { useSpeechCaptions } from "@/hooks/useSpeechCaptions";
 import CallTopBar from "./CallTopBar";
 import CallControls from "./CallControls";
 import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
-import CallCaptions from "./CallCaptions";
 import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
