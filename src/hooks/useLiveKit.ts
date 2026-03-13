@@ -348,6 +348,8 @@ export function useLiveKit() {
   }, [refreshParticipants]);
 
   const camToggleInFlightRef = useRef(false);
+  const videoSwitchInFlightRef = useRef(false);
+  const pendingVideoSwitchDeviceIdRef = useRef<string | null>(null);
 
   const getLocalCameraPublication = useCallback((room: Room) => {
     return Array.from(room.localParticipant.videoTrackPublications.values()).find(
