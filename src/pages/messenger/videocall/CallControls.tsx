@@ -20,9 +20,6 @@ interface CallControlsProps {
   isChatOpen: boolean;
   unreadChatCount: number;
   isParticipantsOpen: boolean;
-  isCaptionsOn: boolean;
-  captionsLanguage: string;
-  captionsSupported: boolean;
   currentAudioInputId?: string;
   currentAudioOutputId?: string;
   currentVideoInputId?: string;
