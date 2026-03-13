@@ -8,11 +8,28 @@ import CallChatSidebar from "./CallChatSidebar";
 import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import CallMetricsPanel from "./CallMetricsPanel";
 import CallCaptions from "./CallCaptions";
+import AdjustViewDialog, { type ViewSettings, type LayoutMode } from "./AdjustViewDialog";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BackgroundEffect } from "./BackgroundSelector";
+
+const STORAGE_KEY = "call-view-settings";
+
+function loadViewSettings(): ViewSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { layout: "auto", maxTiles: 49, hideNoVideo: false };
+}
+
+function saveViewSettings(s: ViewSettings) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  } catch {}
+}
 
 interface LiveKitCallViewProps {
   roomName: string;
@@ -31,11 +48,17 @@ interface LiveKitCallViewProps {
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const captions = useSpeechCaptions();
-  const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
+  const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
+  const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialBackgroundEffect);
+
+  const handleViewSettingsChange = useCallback((s: ViewSettings) => {
+    setViewSettings(s);
+    saveViewSettings(s);
+  }, []);
 
   // Auto-clear unread chat messages when chat sidebar is open
   useEffect(() => {
@@ -98,11 +121,34 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   }, [roomName, callDisplayName]);
 
+  // ── Resolve effective layout based on settings ──
+  const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
+    const mode = viewSettings.layout;
+    if (mode === "spotlight") return "spotlight";
+    if (mode === "sidebar") return "sidebar";
+    if (mode === "tiled") return "grid";
+    // auto: use spotlight if screen sharing, otherwise grid
+    const hasScreenShare = lk.participants.some((p) => p.isScreenSharing);
+    return hasScreenShare ? "spotlight" : "grid";
+  }, [viewSettings.layout, lk.participants]);
+
+  // ── Filter participants based on view settings ──
+  const visibleParticipants = useMemo(() => {
+    let list = lk.participants;
+    if (viewSettings.hideNoVideo) {
+      list = list.filter((p) => !p.isCameraOff || p.isScreenSharing || p.isLocal);
+    }
+    if (list.length > viewSettings.maxTiles) {
+      list = list.slice(0, viewSettings.maxTiles);
+    }
+    return list;
+  }, [lk.participants, viewSettings.hideNoVideo, viewSettings.maxTiles]);
+
   // Find screen sharer for spotlight
   const spotlightParticipant = useMemo(() => {
-    const screenSharer = lk.participants.find((p) => p.isScreenSharing);
-    return screenSharer || lk.participants.find((p) => p.identity === lk.activeSpeaker) || lk.participants[0];
-  }, [lk.participants, lk.activeSpeaker]);
+    const screenSharer = visibleParticipants.find((p) => p.isScreenSharing);
+    return screenSharer || visibleParticipants.find((p) => p.identity === lk.activeSpeaker) || visibleParticipants[0];
+  }, [visibleParticipants, lk.activeSpeaker]);
 
   const room = lk.getRoom();
 
@@ -134,13 +180,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   // ── Grid columns ───────────────────────────────────────────────
   const gridCols =
-    lk.participants.length <= 1
+    visibleParticipants.length <= 1
       ? "grid-cols-1"
-      : lk.participants.length <= 2
+      : visibleParticipants.length <= 2
         ? "grid-cols-1 md:grid-cols-2"
-        : lk.participants.length <= 4
+        : visibleParticipants.length <= 4
           ? "grid-cols-2"
-          : lk.participants.length <= 9
+          : visibleParticipants.length <= 9
             ? "grid-cols-2 md:grid-cols-3"
             : "grid-cols-3 md:grid-cols-4";
 
@@ -149,8 +195,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <CallTopBar
         roomName={callDisplayName || roomName}
         participantCount={lk.participants.length}
-        layout={layout}
-        onToggleLayout={() => setLayout((l) => (l === "grid" ? "spotlight" : "grid"))}
+        onOpenAdjustView={() => setAdjustViewOpen(true)}
         shareLink={shareLink}
       />
 
@@ -165,13 +210,39 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       <div className="flex-1 flex overflow-hidden">
         {/* Video area */}
         <div className="relative flex-1 p-3 overflow-hidden">
-          {layout === "grid" ? (
+          {effectiveLayout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
-              {lk.participants.map((p) => (
+              {visibleParticipants.map((p) => (
                 <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
               ))}
             </div>
+          ) : effectiveLayout === "sidebar" ? (
+            <div className="flex h-full gap-2">
+              {spotlightParticipant && (
+                <div className="flex-1">
+                  <ParticipantTile
+                    participant={spotlightParticipant}
+                    room={room}
+                    large
+                    className="h-full"
+                    preferredAudioOutputDeviceId={initialAudioOutputDeviceId}
+                  />
+                </div>
+              )}
+              {visibleParticipants.length > 1 && (
+                <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
+                  {visibleParticipants
+                    .filter((p) => p.sid !== spotlightParticipant?.sid)
+                    .map((p) => (
+                      <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0">
+                        <ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={initialAudioOutputDeviceId} />
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           ) : (
+            /* spotlight */
             <div className="flex flex-col h-full gap-2">
               {spotlightParticipant && (
                 <div className="flex-1">
@@ -184,9 +255,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
                   />
                 </div>
               )}
-              {lk.participants.length > 1 && (
+              {visibleParticipants.length > 1 && (
                 <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
-                  {lk.participants
+                  {visibleParticipants
                     .filter((p) => p.sid !== spotlightParticipant?.sid)
                     .map((p) => (
                       <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0">
@@ -272,6 +343,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
+      />
+
+      {/* Adjust View Dialog */}
+      <AdjustViewDialog
+        open={adjustViewOpen}
+        onClose={() => setAdjustViewOpen(false)}
+        settings={viewSettings}
+        onSettingsChange={handleViewSettingsChange}
       />
     </div>
   );
