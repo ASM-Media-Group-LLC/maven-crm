@@ -444,6 +444,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;
+  const showBackgroundWarmupOverlay = camOn && isPreparingBackgroundFirstFrame && bgEffect !== "none";
 
   return (
     <div className="h-screen w-screen bg-[hsl(220_3%_14%)] flex items-center justify-center p-4 md:p-8">
@@ -453,12 +454,23 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         <div className="flex flex-col items-center gap-5 flex-1 w-full max-w-[640px]">
           <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-[hsl(220_3%_20%)]">
             {/* Background template preview fallback */}
-            {selectedBackgroundTemplate && backgroundPreviewUnsupported && (
+            {selectedBackgroundTemplate && (backgroundPreviewUnsupported || showBackgroundWarmupOverlay) && (
               <img src={selectedBackgroundTemplate.src} alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             )}
 
+            {showBackgroundWarmupOverlay && !selectedBackgroundTemplate && (
+              <div className="absolute inset-0 bg-[hsl(220_3%_18%)]" />
+            )}
+
             {camOn ? (
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-150", showBackgroundWarmupOverlay && "opacity-0")}
+                style={{ transform: "scaleX(-1)" }}
+              />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_20%)]">
                 <Avatar className="h-20 w-20 md:h-24 md:w-24">
@@ -466,6 +478,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                     {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
+              </div>
+            )}
+
+            {showBackgroundWarmupOverlay && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-[hsl(220_3%_14%/0.45)] backdrop-blur-[2px]">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-[hsl(220_3%_85%)] border border-[hsl(220_3%_28%)]">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Aplicando fondo…
+                </div>
               </div>
             )}
 
