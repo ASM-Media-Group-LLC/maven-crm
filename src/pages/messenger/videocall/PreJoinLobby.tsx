@@ -133,11 +133,18 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setAudioInputs(ai);
       setVideoInputs(vi);
       setAudioOutputs(ao);
-      if (ai.length && !selectedAudioInput) setSelectedAudioInput(ai[0].deviceId);
-      if (vi.length && !selectedVideoInput) setSelectedVideoInput(vi[0].deviceId);
-      if (ao.length && !selectedAudioOutput) setSelectedAudioOutput(ao[0].deviceId);
+
+      setSelectedAudioInput((prev) =>
+        ai.some((d) => d.deviceId === prev) ? prev : (ai[0]?.deviceId || "")
+      );
+      setSelectedVideoInput((prev) =>
+        vi.some((d) => d.deviceId === prev) ? prev : (vi[0]?.deviceId || "")
+      );
+      setSelectedAudioOutput((prev) =>
+        ao.some((d) => d.deviceId === prev) ? prev : (ao[0]?.deviceId || "")
+      );
     } catch {}
-  }, [selectedAudioInput, selectedVideoInput, selectedAudioOutput]);
+  }, []);
 
   // ── Stop individual tracks ──────────────────────────────────
   const stopVideoTrack = useCallback(() => {
