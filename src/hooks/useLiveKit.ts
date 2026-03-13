@@ -1011,8 +1011,15 @@ export function useLiveKit() {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
         if (cameraEnabled) {
-          // Schedule background apply via requestIdleCallback — never blocks the main thread
-          scheduleBackgroundApply(room);
+          if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2300);
+            if (!applied) {
+              scheduleDeferredBackgroundReapply(room, 260);
+            }
+          } else {
+            // Fallback path when no effect is active or auto-restore is skipped.
+            scheduleBackgroundApply(room);
+          }
         }
       }
 
