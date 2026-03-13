@@ -155,9 +155,9 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // ── Loading state ──────────────────────────────────────────────
   if (lk.connectionState === ConnectionState.Connecting) {
     return (
-      <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)] items-center justify-center gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm text-[hsl(0_0%_96%/0.7)]">Conectando a la sala...</p>
+      <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)] items-center justify-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-[hsl(214_82%_51%)]" />
+        <p className="text-sm text-[hsl(220_3%_60%)]">Conectando a la sala...</p>
       </div>
     );
   }
