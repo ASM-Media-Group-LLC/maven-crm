@@ -128,7 +128,7 @@ const BACKGROUND_SWITCH_TIMEOUT_MS = 12000;
 const BACKGROUND_FAILURE_COOLDOWN_MS = 15000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+  return effect !== "none" && effect !== "blur";
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -423,17 +423,11 @@ export function useLiveKit() {
 
       if (opId !== bgApplyOpRef.current) return false;
 
-      if (effect === "soft-blur") {
+      if (effect === "blur") {
         await withTimeout(
-          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })),
+          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })),
           BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-soft-blur",
-        );
-      } else if (effect === "hard-blur") {
-        await withTimeout(
-          Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })),
-          BACKGROUND_SWITCH_TIMEOUT_MS,
-          "bg-hard-blur",
+          "bg-blur",
         );
       } else if (isTemplateBackground(effect)) {
         const { BACKGROUND_TEMPLATES } = await import("@/pages/messenger/videocall/BackgroundSelector");
@@ -1123,6 +1117,51 @@ export function useLiveKit() {
     setUnreadChatCount(0);
   }, []);
 
+  // ── Device switching (in-call) ──────────────────────────────────
+  const switchAudioInput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.audioDeviceId = deviceId;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(false);
+      await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(deviceId));
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
+    } catch (err) {
+      console.error("[LiveKit] Audio input switch error:", err);
+    }
+  }, [refreshParticipants]);
+
+  const switchAudioOutput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.audioOutputDeviceId = deviceId;
+    try {
+      await room.switchActiveDevice("audiooutput", deviceId);
+    } catch (err) {
+      console.error("[LiveKit] Audio output switch error:", err);
+    }
+  }, []);
+
+  const switchVideoInput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.videoDeviceId = deviceId;
+    try {
+      bgAttachedTrackRef.current = null;
+      await room.localParticipant.setCameraEnabled(false);
+      await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(deviceId));
+      const isReady = await waitForCameraPublication(room, [80, 150, 300]);
+      if (isReady && backgroundEffectRef.current !== "none") {
+        await applyConfiguredBackgroundIfNeeded(room);
+      }
+      setIsCamOn(hasActiveCameraPublication(room));
+      refreshParticipants();
+    } catch (err) {
+      console.error("[LiveKit] Video input switch error:", err);
+    }
+  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, applyConfiguredBackgroundIfNeeded]);
+
   return {
     connectionState,
     participants,
@@ -1148,5 +1187,8 @@ export function useLiveKit() {
     getRoom,
     setBackgroundEffect,
     clearUnreadChat,
+    switchAudioInput,
+    switchAudioOutput,
+    switchVideoInput,
   };
 }

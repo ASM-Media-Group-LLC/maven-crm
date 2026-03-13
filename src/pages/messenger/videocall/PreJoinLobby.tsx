@@ -30,7 +30,7 @@ const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
+  return effect !== "none" && effect !== "blur";
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -179,10 +179,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       if (opId !== bgOpRef.current) return false;
       if (isTemplateBackground(effect)) await preloadTemplate(effect);
       if (opId !== bgOpRef.current) return false;
-      if (effect === "soft-blur") {
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-soft-blur");
-      } else if (effect === "hard-blur") {
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-hard-blur");
+      if (effect === "blur") {
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (!tpl) return false;
@@ -308,8 +306,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const selectedBackgroundLabel =
     bgEffect === "none" ? "Sin fondo virtual"
-    : bgEffect === "soft-blur" ? "Difuminado leve"
-    : bgEffect === "hard-blur" ? "Difuminado fuerte"
+    : bgEffect === "blur" ? "Difuminar fondo"
     : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;

@@ -9,6 +9,7 @@ import CallParticipantsSidebar from "./CallParticipantsSidebar";
 import CallMetricsPanel from "./CallMetricsPanel";
 import CallCaptions from "./CallCaptions";
 import AdjustViewDialog, { type ViewSettings, type LayoutMode } from "./AdjustViewDialog";
+import InCallSettingsDialog from "./InCallSettingsDialog";
 import ParticipantTile from "./ParticipantTile";
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const captions = useSpeechCaptions();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
@@ -343,6 +345,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onSendReaction={lk.sendReaction}
         onBackgroundChange={handleBgChange}
         onLeave={handleLeave}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Adjust View Dialog */}
@@ -351,6 +354,20 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onClose={() => setAdjustViewOpen(false)}
         settings={viewSettings}
         onSettingsChange={handleViewSettingsChange}
+      />
+
+      {/* In-call Settings Dialog */}
+      <InCallSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        backgroundEffect={bgEffect}
+        onBackgroundChange={handleBgChange}
+        currentAudioInputId={initialAudioDeviceId}
+        currentAudioOutputId={initialAudioOutputDeviceId}
+        currentVideoInputId={initialVideoDeviceId}
+        onAudioInputChange={(id) => lk.switchAudioInput?.(id)}
+        onAudioOutputChange={(id) => lk.switchAudioOutput?.(id)}
+        onVideoInputChange={(id) => lk.switchVideoInput?.(id)}
       />
     </div>
   );
