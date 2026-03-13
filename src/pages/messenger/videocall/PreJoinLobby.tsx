@@ -28,9 +28,50 @@ interface DeviceInfo {
 const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
+const PREJOIN_STORAGE_KEY_PREFIX = "call-prejoin-settings:v1";
+
+interface PersistedPreJoinSettings {
+  micOn: boolean;
+  camOn: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  audioOutputDeviceId?: string;
+  backgroundEffect: BackgroundEffect;
+}
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
+}
+
+function getPreJoinStorageKey(roomName: string) {
+  return `${PREJOIN_STORAGE_KEY_PREFIX}:${roomName}`;
+}
+
+function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
+  try {
+    const raw = localStorage.getItem(getPreJoinStorageKey(roomName));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<PersistedPreJoinSettings>;
+    return {
+      micOn: typeof parsed.micOn === "boolean" ? parsed.micOn : true,
+      camOn: typeof parsed.camOn === "boolean" ? parsed.camOn : true,
+      audioDeviceId: typeof parsed.audioDeviceId === "string" ? parsed.audioDeviceId : undefined,
+      videoDeviceId: typeof parsed.videoDeviceId === "string" ? parsed.videoDeviceId : undefined,
+      audioOutputDeviceId: typeof parsed.audioOutputDeviceId === "string" ? parsed.audioOutputDeviceId : undefined,
+      backgroundEffect: typeof parsed.backgroundEffect === "string" ? parsed.backgroundEffect : "none",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePreJoinSettings(roomName: string, settings: PersistedPreJoinSettings) {
+  try {
+    localStorage.setItem(getPreJoinStorageKey(roomName), JSON.stringify(settings));
+  } catch {
+    // no-op
+  }
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -63,18 +104,21 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const bgFailureCooldownUntilRef = useRef(0);
 
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const initialSettingsRef = useRef<PersistedPreJoinSettings | null>(loadPreJoinSettings(roomName));
+
+  const [micOn, setMicOn] = useState(initialSettingsRef.current?.micOn ?? true);
+  const [camOn, setCamOn] = useState(initialSettingsRef.current?.camOn ?? true);
   const [joining, setJoining] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialSettingsRef.current?.backgroundEffect ?? "none");
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
+  const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
 
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
-  const [selectedAudioInput, setSelectedAudioInput] = useState<string>("");
-  const [selectedVideoInput, setSelectedVideoInput] = useState<string>("");
-  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
+  const [selectedAudioInput, setSelectedAudioInput] = useState<string>(initialSettingsRef.current?.audioDeviceId ?? "");
+  const [selectedVideoInput, setSelectedVideoInput] = useState<string>(initialSettingsRef.current?.videoDeviceId ?? "");
+  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>(initialSettingsRef.current?.audioOutputDeviceId ?? "");
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -89,11 +133,41 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       setAudioInputs(ai);
       setVideoInputs(vi);
       setAudioOutputs(ao);
-      if (ai.length && !selectedAudioInput) setSelectedAudioInput(ai[0].deviceId);
-      if (vi.length && !selectedVideoInput) setSelectedVideoInput(vi[0].deviceId);
-      if (ao.length && !selectedAudioOutput) setSelectedAudioOutput(ao[0].deviceId);
+
+      setSelectedAudioInput((prev) =>
+        ai.some((d) => d.deviceId === prev) ? prev : (ai[0]?.deviceId || "")
+      );
+      setSelectedVideoInput((prev) =>
+        vi.some((d) => d.deviceId === prev) ? prev : (vi[0]?.deviceId || "")
+      );
+      setSelectedAudioOutput((prev) =>
+        ao.some((d) => d.deviceId === prev) ? prev : (ao[0]?.deviceId || "")
+      );
     } catch {}
-  }, [selectedAudioInput, selectedVideoInput, selectedAudioOutput]);
+  }, []);
+
+  useEffect(() => {
+    const persisted = loadPreJoinSettings(roomName);
+    if (!persisted) return;
+
+    setMicOn(persisted.micOn);
+    setCamOn(persisted.camOn);
+    setBgEffect(persisted.backgroundEffect || "none");
+    setSelectedAudioInput(persisted.audioDeviceId || "");
+    setSelectedVideoInput(persisted.videoDeviceId || "");
+    setSelectedAudioOutput(persisted.audioOutputDeviceId || "");
+  }, [roomName]);
+
+  useEffect(() => {
+    savePreJoinSettings(roomName, {
+      micOn,
+      camOn,
+      audioDeviceId: selectedAudioInput || undefined,
+      videoDeviceId: selectedVideoInput || undefined,
+      audioOutputDeviceId: selectedAudioOutput || undefined,
+      backgroundEffect: bgEffect,
+    });
+  }, [roomName, micOn, camOn, selectedAudioInput, selectedVideoInput, selectedAudioOutput, bgEffect]);
 
   // ── Stop individual tracks ──────────────────────────────────
   const stopVideoTrack = useCallback(() => {
@@ -228,6 +302,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
+    setIsPreparingBackgroundFirstFrame(false);
+
     // When restarting with a background active, keep the processor alive
     // and just clear the track reference so it re-attaches to the new track.
     // Only dispose if we're turning the camera OFF or have no effect.
@@ -237,19 +313,51 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       bgAttachedTrackRef.current = null;
       bgLastAppliedEffectRef.current = "none";
     }
+
     if (!camOn) return;
+
+    const requestedEffect = bgEffectRef.current;
+    const shouldPrepareBackgroundFirst = requestedEffect !== "none";
+    if (shouldPrepareBackgroundFirst) {
+      setIsPreparingBackgroundFirstFrame(true);
+    }
+
     try {
-      const tracks = await createLocalTracks({ video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true, audio: false });
-      if (!mountedRef.current) { tracks.forEach((t) => t.stop()); return; }
+      const tracks = await createLocalTracks({
+        video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true,
+        audio: false,
+      });
+      if (!mountedRef.current) {
+        tracks.forEach((t) => t.stop());
+        return;
+      }
+
       const vTrack = tracks.find((t): t is LocalVideoTrack => t.kind === "video") || null;
       videoTrackRef.current = vTrack;
-      if (videoRef.current && vTrack) { vTrack.attach(videoRef.current); attachedVideoElRef.current = videoRef.current; videoRef.current.play?.().catch(() => {}); }
-      if (vTrack) await queueBackgroundApply(bgEffectRef.current);
+
+      // Guarantee processor application happens before exposing the refreshed video frame.
+      if (vTrack && shouldPrepareBackgroundFirst) {
+        await queueBackgroundApply(requestedEffect);
+      }
+
+      if (videoRef.current && vTrack) {
+        vTrack.attach(videoRef.current);
+        attachedVideoElRef.current = videoRef.current;
+        videoRef.current.play?.().catch(() => {});
+      }
+
       setPermissionError(null);
       await enumerateDevices();
     } catch (err: any) {
-      if (err.name === "NotAllowedError") { setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador."); }
-      else { setPermissionError("No se pudo acceder a la cámara."); }
+      if (err.name === "NotAllowedError") {
+        setPermissionError("Permiso de cámara denegado. Habilítalo en la configuración del navegador.");
+      } else {
+        setPermissionError("No se pudo acceder a la cámara.");
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsPreparingBackgroundFirstFrame(false);
+      }
     }
   }, [camOn, selectedVideoInput, stopVideoTrack, disposeBackgroundProcessor, queueBackgroundApply, enumerateDevices]);
 
@@ -274,17 +382,43 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   useEffect(() => {
     bgEffectRef.current = bgEffect;
     bgRequestedEffectRef.current = bgEffect;
-    if (!camOn) return;
-    if (videoTrackRef.current) void queueBackgroundApply(bgEffect);
+
+    if (!camOn) {
+      setIsPreparingBackgroundFirstFrame(false);
+      return;
+    }
+
+    if (!videoTrackRef.current) return;
+
+    const shouldPrepareBackgroundFirst = bgEffect !== "none";
+    if (shouldPrepareBackgroundFirst) {
+      setIsPreparingBackgroundFirstFrame(true);
+    }
+
+    void queueBackgroundApply(bgEffect).finally(() => {
+      if (mountedRef.current) {
+        setIsPreparingBackgroundFirstFrame(false);
+      }
+    });
   }, [bgEffect, camOn, queueBackgroundApply]);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; bgRequestedEffectRef.current = "none"; void disposeBackgroundProcessor(); };
+    return () => {
+      mountedRef.current = false;
+      bgRequestedEffectRef.current = "none";
+      void disposeBackgroundProcessor();
+    };
   }, [disposeBackgroundProcessor]);
 
   const handleToggleMic = () => setMicOn((v) => !v);
-  const handleToggleCam = () => setCamOn((v) => !v);
+  const handleToggleCam = () => setCamOn((v) => {
+    const next = !v;
+    if (!next) {
+      setIsPreparingBackgroundFirstFrame(false);
+    }
+    return next;
+  });
 
   const handleJoin = async () => {
     setJoining(true);
@@ -310,6 +444,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;
+  const showBackgroundWarmupOverlay = camOn && isPreparingBackgroundFirstFrame && bgEffect !== "none";
 
   return (
     <div className="h-screen w-screen bg-[hsl(220_3%_14%)] flex items-center justify-center p-4 md:p-8">
@@ -319,12 +454,23 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
         <div className="flex flex-col items-center gap-5 flex-1 w-full max-w-[640px]">
           <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-[hsl(220_3%_20%)]">
             {/* Background template preview fallback */}
-            {selectedBackgroundTemplate && backgroundPreviewUnsupported && (
+            {selectedBackgroundTemplate && (backgroundPreviewUnsupported || showBackgroundWarmupOverlay) && (
               <img src={selectedBackgroundTemplate.src} alt={`Vista previa del fondo ${selectedBackgroundTemplate.label}`} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             )}
 
+            {showBackgroundWarmupOverlay && !selectedBackgroundTemplate && (
+              <div className="absolute inset-0 bg-[hsl(220_3%_18%)]" />
+            )}
+
             {camOn ? (
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={cn("absolute inset-0 w-full h-full object-cover transition-opacity duration-150", showBackgroundWarmupOverlay && "opacity-0")}
+                style={{ transform: "scaleX(-1)" }}
+              />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-[hsl(220_3%_20%)]">
                 <Avatar className="h-20 w-20 md:h-24 md:w-24">
@@ -332,6 +478,15 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
                     {getInitials(displayName)}
                   </AvatarFallback>
                 </Avatar>
+              </div>
+            )}
+
+            {showBackgroundWarmupOverlay && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-[hsl(220_3%_14%/0.45)] backdrop-blur-[2px]">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[hsl(220_3%_14%/0.8)] px-3 py-1.5 text-xs text-[hsl(220_3%_85%)] border border-[hsl(220_3%_28%)]">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Aplicando fondo…
+                </div>
               </div>
             )}
 

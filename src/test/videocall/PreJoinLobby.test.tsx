@@ -29,6 +29,7 @@ describe("PreJoinLobby", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("does not render the call display name (hidden by design)", () => {
