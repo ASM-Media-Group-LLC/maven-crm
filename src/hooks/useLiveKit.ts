@@ -892,7 +892,10 @@ export function useLiveKit() {
       const currentlyEnabled = hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled;
 
       if (!currentlyEnabled) {
-        // Only dispose if a processor actually exists (avoids unnecessary delay)
+        // Optimistic UI: show cam on immediately
+        setIsCamOn(true);
+
+        // Only dispose if a processor actually exists
         if (bgProcessorRef.current) {
           await disposeBackgroundProcessor();
         }
@@ -900,23 +903,26 @@ export function useLiveKit() {
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
-          // Brief stabilization before applying background
-          await wait(120);
           refreshParticipants();
-          await applyConfiguredBackgroundIfNeeded(room);
+          // Apply background without blocking the UI
+          applyConfiguredBackgroundIfNeeded(room).catch(() => {});
+        } else {
+          setIsCamOn(false);
         }
       } else {
-        // Turning off: dispose processor and disable camera in parallel where safe
-        const disposePromise = bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve();
-        await disposePromise;
-        await room.localParticipant.setCameraEnabled(false);
+        // Optimistic UI: show cam off immediately
+        setIsCamOn(false);
+
+        // Turning off: dispose processor and disable camera in parallel
+        await Promise.all([
+          bgProcessorRef.current ? disposeBackgroundProcessor() : Promise.resolve(),
+          room.localParticipant.setCameraEnabled(false),
+        ]);
       }
 
-      await wait(50);
       const camActive = hasActiveCameraPublication(room);
       setIsCamOn(camActive);
       refreshParticipants();
-      setTimeout(() => refreshParticipants(), 300);
     } catch (err) {
       console.error("[LiveKit] Camera toggle error:", err);
       try {
