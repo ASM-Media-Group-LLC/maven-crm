@@ -736,7 +736,7 @@ export function useLiveKit() {
         kickAudioPlayback(room);
 
         // Re-apply background if needed (non-blocking)
-        if (backgroundEffectRef.current !== "none") {
+        if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           scheduleWhenIdle(() => {
             if (roomRef.current !== room) return;
             applyConfiguredBackgroundIfNeeded(room);
