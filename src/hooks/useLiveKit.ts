@@ -309,6 +309,13 @@ export function useLiveKit() {
     }
   }, []);
 
+  const clearBackgroundReapplyTimer = useCallback(() => {
+    if (bgReapplyTimerRef.current) {
+      clearTimeout(bgReapplyTimerRef.current);
+      bgReapplyTimerRef.current = null;
+    }
+  }, []);
+
   const refreshParticipants = useCallback(() => {
     const room = roomRef.current;
     if (!room) return;
