@@ -1297,7 +1297,7 @@ export function useLiveKit() {
       return;
     }
 
-    const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+    const applied = await applyBackgroundBeforeLocalVideoVisible(room);
     if (!applied) {
       scheduleDeferredBackgroundReapply(room, 240);
     }
