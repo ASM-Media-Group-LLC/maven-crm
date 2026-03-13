@@ -306,8 +306,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const selectedBackgroundLabel =
     bgEffect === "none" ? "Sin fondo virtual"
-    : bgEffect === "soft-blur" ? "Difuminado leve"
-    : bgEffect === "hard-blur" ? "Difuminado fuerte"
+    : bgEffect === "blur" ? "Difuminar fondo"
     : BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect)?.label || "Fondo virtual";
 
   const selectedBackgroundTemplate = BACKGROUND_TEMPLATES.find((tpl) => tpl.id === bgEffect) || null;

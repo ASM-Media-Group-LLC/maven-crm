@@ -30,6 +30,7 @@ describe("CallControls", () => {
     onSendReaction: vi.fn(),
     onBackgroundChange: vi.fn(),
     onLeave: vi.fn(),
+    onOpenSettings: vi.fn(),
   };
 
   it("renders all control buttons", () => {

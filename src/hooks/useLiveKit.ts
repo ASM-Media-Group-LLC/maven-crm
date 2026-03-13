@@ -1117,6 +1117,51 @@ export function useLiveKit() {
     setUnreadChatCount(0);
   }, []);
 
+  // ── Device switching (in-call) ──────────────────────────────────
+  const switchAudioInput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.audioDeviceId = deviceId;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(false);
+      await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(deviceId));
+      setIsMicOn(room.localParticipant.isMicrophoneEnabled);
+      refreshParticipants();
+    } catch (err) {
+      console.error("[LiveKit] Audio input switch error:", err);
+    }
+  }, [refreshParticipants]);
+
+  const switchAudioOutput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.audioOutputDeviceId = deviceId;
+    try {
+      await room.switchActiveDevice("audiooutput", deviceId);
+    } catch (err) {
+      console.error("[LiveKit] Audio output switch error:", err);
+    }
+  }, []);
+
+  const switchVideoInput = useCallback(async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room) return;
+    preferredDevicesRef.current.videoDeviceId = deviceId;
+    try {
+      bgAttachedTrackRef.current = null;
+      await room.localParticipant.setCameraEnabled(false);
+      await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(deviceId));
+      const isReady = await waitForCameraPublication(room, [80, 150, 300]);
+      if (isReady && backgroundEffectRef.current !== "none") {
+        await applyConfiguredBackgroundIfNeeded(room);
+      }
+      setIsCamOn(hasActiveCameraPublication(room));
+      refreshParticipants();
+    } catch (err) {
+      console.error("[LiveKit] Video input switch error:", err);
+    }
+  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, applyConfiguredBackgroundIfNeeded]);
+
   return {
     connectionState,
     participants,
@@ -1142,5 +1187,8 @@ export function useLiveKit() {
     getRoom,
     setBackgroundEffect,
     clearUnreadChat,
+    switchAudioInput,
+    switchAudioOutput,
+    switchVideoInput,
   };
 }
