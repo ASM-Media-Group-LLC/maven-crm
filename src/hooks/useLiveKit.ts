@@ -586,6 +586,7 @@ export function useLiveKit() {
    */
   const scheduleBackgroundApply = useCallback((room: Room) => {
     if (backgroundEffectRef.current === "none") return;
+    if (skipAutoBackgroundRestoreRef.current) return;
     if (bgInitialApplyDoneRef.current) return;
     bgInitialApplyDoneRef.current = true;
 
@@ -593,6 +594,7 @@ export function useLiveKit() {
       // Double-check room is still valid after idle delay
       if (roomRef.current !== room) return;
       if (backgroundEffectRef.current === "none") return;
+      if (skipAutoBackgroundRestoreRef.current) return;
 
       const hasTrack = Array.from(room.localParticipant.videoTrackPublications.values()).some(
         (p) => p.source === Track.Source.Camera && p.track,
@@ -604,6 +606,7 @@ export function useLiveKit() {
         // Camera track not ready yet — wait and retry once
         wait(400).then(() => {
           if (roomRef.current !== room || backgroundEffectRef.current === "none") return;
+          if (skipAutoBackgroundRestoreRef.current) return;
           queueBackgroundEffectApply(backgroundEffectRef.current);
         });
       }
@@ -614,6 +617,10 @@ export function useLiveKit() {
     if (backgroundEffectRef.current === "none") {
       bgLastAppliedEffectRef.current = "none";
       return true;
+    }
+
+    if (skipAutoBackgroundRestoreRef.current) {
+      return false;
     }
 
     // Fast-check: if track is already available, skip polling entirely
