@@ -1,34 +1,29 @@
-import { Inbox, UserCheck, MessageSquare, CheckCircle, Trophy, DollarSign, TrendingUp } from "lucide-react";
+import { Inbox, UserCheck, MessageSquare, CheckCircle, Trophy, XCircle, Users } from "lucide-react";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import { CloserCreator } from "../useCloserCreators";
 
 interface Props {
-  creators: CloserCreator[];
-  leadsDisponibles?: number;
+  statusCounts: Record<string, number>;
 }
 
-const ClosersKPICards = ({ creators, leadsDisponibles }: Props) => {
-  const asignadas = creators.filter((c) => c.stage === "Asignada").length;
-  const enNegociacion = creators.filter((c) => ["En negociación", "Formulario enviado", "Acuerdo enviado"].includes(c.stage)).length;
-  const confirmadas = creators.filter((c) => c.stage === "Confirmada").length;
-  const completadas = creators.filter((c) => c.stage === "Completada").length;
+const ClosersKPICards = ({ statusCounts }: Props) => {
+  const sinContactar = statusCounts["no_response"] || 0;
+  const contactados = (statusCounts["contactado"] || 0) + (statusCounts["replied"] || 0);
+  const interesadas = statusCounts["interested"] || 0;
+  const enNegociacion = statusCounts["meeting_set"] || 0;
+  const confirmadas = statusCounts["confirmed"] || 0;
+  const completadas = statusCounts["completed"] || 0;
+  const noInteresadas = statusCounts["not_interested"] || 0;
 
-  const monetizacionTotal = creators
-    .filter((c) => !["No interesada"].includes(c.stage))
-    .reduce((sum, c) => sum + Number(c.estimated_monetization || 0), 0);
-
-  const revenueAgencia = creators
-    .filter((c) => ["Confirmada", "Completada"].includes(c.stage))
-    .reduce((sum, c) => sum + Number(c.estimated_monetization || 0) * (Number(c.agency_commission || 0) / 100), 0);
+  const total = sinContactar + contactados + interesadas + enNegociacion + confirmadas + completadas + noInteresadas;
 
   const cards = [
-    { label: "Leads Disponibles", value: (leadsDisponibles ?? 0).toString(), subtitle: "Sin reclamar", icon: Inbox, color: "accent" as const },
-    { label: "Asignadas", value: asignadas.toString(), subtitle: "Pendientes de contacto", icon: UserCheck, color: "primary" as const },
-    { label: "En Negociación", value: enNegociacion.toString(), subtitle: "En proceso activo", icon: MessageSquare, color: "accent" as const },
-    { label: "Confirmadas", value: confirmadas.toString(), subtitle: "Listas para onboarding", icon: CheckCircle, color: "success" as const },
-    { label: "Completadas", value: completadas.toString(), subtitle: "Proceso finalizado", icon: Trophy, color: "success" as const },
-    { label: "Monetización Est.", value: `$${monetizacionTotal.toLocaleString()}`, subtitle: "Total estimado", icon: DollarSign, color: "warning" as const },
-    { label: "Revenue Agencia", value: `$${revenueAgencia.toLocaleString()}`, subtitle: "Confirmadas + Completadas", icon: TrendingUp, color: "primary" as const },
+    { label: "Total Leads", value: total.toLocaleString(), subtitle: "En el sistema", icon: Users, color: "muted" as const },
+    { label: "Sin Contactar", value: sinContactar.toLocaleString(), subtitle: "Pendientes", icon: Inbox, color: "accent" as const },
+    { label: "Contactados", value: contactados.toLocaleString(), subtitle: "En seguimiento", icon: UserCheck, color: "primary" as const },
+    { label: "Interesadas", value: interesadas.toLocaleString(), subtitle: "Con interés", icon: MessageSquare, color: "accent" as const },
+    { label: "En Negociación", value: enNegociacion.toLocaleString(), subtitle: "En proceso", icon: MessageSquare, color: "warning" as const },
+    { label: "Confirmadas", value: confirmadas.toLocaleString(), subtitle: "Listas", icon: CheckCircle, color: "success" as const },
+    { label: "Completadas", value: completadas.toLocaleString(), subtitle: "Finalizadas", icon: Trophy, color: "success" as const },
   ];
 
   return (

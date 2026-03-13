@@ -1,53 +1,56 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
-import { useCloserCreators, CloserCreator } from "./useCloserCreators";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, X } from "lucide-react";
+import { useCloserLeads, CloserLead, TAB_STATUS_MAP } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
-import MisCreatorsTab from "./tabs/MisCreatorsTab";
-import PipelineTab from "./tabs/PipelineTab";
-import ConfirmadasTab from "./tabs/ConfirmadasTab";
-import CompletadasTab from "./tabs/CompletadasTab";
-import NoInteresadasTab from "./tabs/NoInteresadasTab";
-import AsignacionTab from "./tabs/AsignacionTab";
-import LeadsDisponiblesTab from "./tabs/LeadsDisponiblesTab";
-import EditCreatorModal from "./components/EditCreatorModal";
-import ViewCreatorModal from "./components/ViewCreatorModal";
-import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
+import LeadTable from "./components/LeadTable";
+
+const QUALITIES = ["A+", "A", "B", "C"];
+
+const TABS = [
+  { value: "todos", label: "Todos" },
+  { value: "sin_contactar", label: "Sin contactar" },
+  { value: "contactados", label: "Contactados" },
+  { value: "interesadas", label: "Interesadas" },
+  { value: "negociacion", label: "En negociación" },
+  { value: "confirmadas", label: "Confirmadas" },
+  { value: "completadas", label: "Completadas" },
+  { value: "no_interesadas", label: "No Interesadas" },
+];
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, updateCreator, updateStage,
-    deleteCreator, assignCreator, isAdmin,
-  } = useCloserCreators();
+    leads, isLoading, statusCounts,
+    search, setSearch,
+    qualityFilter, setQualityFilter,
+    dateFrom, setDateFrom, dateTo, setDateTo,
+    activeTab, setActiveTab,
+    updateStatus, updateNotes,
+  } = useCloserLeads();
 
-  const [viewCreator, setViewCreator] = useState<CloserCreator | null>(null);
-  const [editCreator, setEditCreator] = useState<CloserCreator | null>(null);
-  const [deletingCreator, setDeletingCreator] = useState<CloserCreator | null>(null);
+  const [editingNotes, setEditingNotes] = useState<CloserLead | null>(null);
+  const [notesText, setNotesText] = useState("");
 
-  // Count of leads not yet converted
-  const { data: convertedIds = [] } = useQuery({
-    queryKey: ["closer-creators-leadgen-ids"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("closer_creators")
-        .select("leadgen_entry_id")
-        .not("leadgen_entry_id", "is", null);
-      return (data || []).map((r) => r.leadgen_entry_id as string);
-    },
-  });
+  const hasFilters = search || qualityFilter || dateFrom || dateTo;
 
-  const { data: totalLeads = 0 } = useQuery({
-    queryKey: ["leads-disponibles-count"],
-    queryFn: async () => {
-      const { count } = await supabase
-        .from("leadgen_entries")
-        .select("id", { count: "exact", head: true });
-      return count || 0;
-    },
-  });
+  const handleEditNotes = (lead: CloserLead) => {
+    setEditingNotes(lead);
+    setNotesText(lead.notes || "");
+  };
 
-  const leadsDisponibles = totalLeads - convertedIds.length;
+  const handleSaveNotes = () => {
+    if (editingNotes) {
+      updateNotes.mutate({ id: editingNotes.id, notes: notesText }, {
+        onSuccess: () => setEditingNotes(null),
+      });
+    }
+  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -55,7 +58,7 @@ const ClosersContent = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Closers</h1>
-            <p className="text-sm text-muted-foreground">Gestión de creators desde LeadGen</p>
+            <p className="text-sm text-muted-foreground">Gestión de leads desde LeadGen</p>
           </div>
         </div>
       </header>
@@ -65,69 +68,86 @@ const ClosersContent = () => {
           <p className="text-sm text-muted-foreground">Cargando...</p>
         ) : (
           <>
-            <ClosersKPICards creators={creators} leadsDisponibles={leadsDisponibles} />
-            <Tabs defaultValue="leads">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="leads">Leads</TabsTrigger>
-              <TabsTrigger value="mis-creators">Mis Creators</TabsTrigger>
-              <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-              <TabsTrigger value="confirmadas">Confirmadas</TabsTrigger>
-              <TabsTrigger value="completadas">Completadas</TabsTrigger>
-              <TabsTrigger value="no-interesadas">No Interesadas</TabsTrigger>
-              {isAdmin && <TabsTrigger value="asignacion">Asignación</TabsTrigger>}
-            </TabsList>
+            <ClosersKPICards statusCounts={statusCounts} />
 
-            <TabsContent value="leads">
-              <LeadsDisponiblesTab />
-            </TabsContent>
-            <TabsContent value="mis-creators">
-              <MisCreatorsTab
-                creators={creators}
-                onView={setViewCreator}
-                onEdit={setEditCreator}
-                onDelete={setDeletingCreator}
-                onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
-              />
-            </TabsContent>
-            <TabsContent value="pipeline">
-              <PipelineTab creators={creators} onView={setViewCreator} onEdit={setEditCreator} />
-            </TabsContent>
-            <TabsContent value="confirmadas">
-              <ConfirmadasTab creators={creators} onView={setViewCreator} />
-            </TabsContent>
-            <TabsContent value="completadas">
-              <CompletadasTab creators={creators} onView={setViewCreator} />
-            </TabsContent>
-            <TabsContent value="no-interesadas">
-              <NoInteresadasTab creators={creators} onView={setViewCreator} />
-            </TabsContent>
-            {isAdmin && (
-              <TabsContent value="asignacion">
-                <AsignacionTab
-                  creators={creators}
-                  onAssign={(id, to) => assignCreator.mutate({ id, assigned_to: to })}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="flex-wrap">
+                {TABS.map((tab) => (
+                  <TabsTrigger key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {/* Shared filters */}
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por handle..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={qualityFilter} onValueChange={setQualityFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Calidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {QUALITIES.map((q) => (
+                      <SelectItem key={q} value={q}>{q}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <DateRangePicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
                 />
-              </TabsContent>
-            )}
-          </Tabs>
+                {hasFilters && (
+                  <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setQualityFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+                    <X className="h-4 w-4 mr-1" /> Limpiar
+                  </Button>
+                )}
+              </div>
+
+              {/* All tabs share the same table — filtering is done by the hook */}
+              {TABS.map((tab) => (
+                <TabsContent key={tab.value} value={tab.value}>
+                  <LeadTable
+                    leads={leads}
+                    onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
+                    onEditNotes={handleEditNotes}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Mostrando {leads.length} leads
+                  </p>
+                </TabsContent>
+              ))}
+            </Tabs>
           </>
         )}
       </div>
 
-      <ViewCreatorModal creator={viewCreator} open={!!viewCreator} onOpenChange={(o) => !o && setViewCreator(null)} />
-      <EditCreatorModal
-        creator={editCreator}
-        open={!!editCreator}
-        onOpenChange={(o) => !o && setEditCreator(null)}
-        onSubmit={(id, data) => updateCreator.mutate({ id, ...data }, { onSuccess: () => setEditCreator(null) })}
-        isLoading={updateCreator.isPending}
-      />
-      <DeleteCreatorDialog
-        creator={deletingCreator}
-        open={!!deletingCreator}
-        onOpenChange={(o) => !o && setDeletingCreator(null)}
-        onConfirm={(id) => deleteCreator.mutate(id, { onSuccess: () => setDeletingCreator(null) })}
-      />
+      {/* Notes edit dialog */}
+      <Dialog open={!!editingNotes} onOpenChange={(o) => !o && setEditingNotes(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notas — @{editingNotes?.model_handle}</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            rows={4}
+            placeholder="Agregar notas..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingNotes(null)}>Cancelar</Button>
+            <Button onClick={handleSaveNotes} disabled={updateNotes.isPending}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
