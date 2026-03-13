@@ -1111,8 +1111,13 @@ export function useLiveKit() {
           refreshParticipants();
           // User-driven camera ON: allow background apply attempts again.
           skipAutoBackgroundRestoreRef.current = false;
-          // Never block camera refresh on ML startup; defer re-apply.
-          scheduleDeferredBackgroundReapply(room, 280);
+
+          if (backgroundEffectRef.current !== "none") {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+            if (!applied) {
+              scheduleDeferredBackgroundReapply(room, 280);
+            }
+          }
         } else {
           setIsCamOn(false);
         }
