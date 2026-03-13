@@ -230,18 +230,23 @@ const ParticipantTile = memo(function ParticipantTile({
     preferredAudioOutputDeviceId,
   ]);
 
-  // Full cleanup on unmount
+  // Full cleanup on unmount — detach all tracks to prevent leaks
   useEffect(() => {
+    const videoElRef = videoRef;
+    const audioElRef = audioRef;
+    const attachedVideo = attachedVideoTrackRef;
+    const attachedAudio = attachedAudioTrackRef;
+
     return () => {
-      const videoEl = videoRef.current;
-      const audioEl = audioRef.current;
-      if (attachedVideoTrackRef.current && videoEl) {
-        attachedVideoTrackRef.current.detach(videoEl);
-        attachedVideoTrackRef.current = null;
+      if (attachedVideo.current) {
+        try { attachedVideo.current.detach(videoElRef.current!); } catch {}
+        try { attachedVideo.current.detach(); } catch {}
+        attachedVideo.current = null;
       }
-      if (attachedAudioTrackRef.current && audioEl) {
-        attachedAudioTrackRef.current.detach(audioEl);
-        attachedAudioTrackRef.current = null;
+      if (attachedAudio.current) {
+        try { attachedAudio.current.detach(audioElRef.current!); } catch {}
+        try { attachedAudio.current.detach(); } catch {}
+        attachedAudio.current = null;
       }
     };
   }, []);
