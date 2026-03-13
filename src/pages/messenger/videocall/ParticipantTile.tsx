@@ -267,7 +267,7 @@ const ParticipantTile = memo(function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-lg overflow-hidden flex items-center justify-center h-full transition-all duration-200",
+        "group relative rounded-lg overflow-hidden flex items-center justify-center h-full transition-all duration-200",
         participant.isSpeaking && "ring-2 ring-[hsl(214_82%_51%)] ring-offset-1 ring-offset-[hsl(220_3%_14%)]",
         className
       )}
@@ -292,6 +292,59 @@ const ParticipantTile = memo(function ParticipantTile({
 
       {!participant.isLocal && (
         <audio ref={audioRef} autoPlay playsInline data-lk-audio="true" style={{ display: "none" }} />
+      )}
+
+      {/* Google Meet-style hover overlay */}
+      {!participant.isLocal && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="flex items-center gap-1 pointer-events-auto">
+            {onPinParticipant && (
+              <button
+                onClick={() => onPinParticipant(participant.identity)}
+                className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                title="Fijar participante"
+              >
+                <Pin className="h-4 w-4" />
+              </button>
+            )}
+            {onMuteParticipant && !participant.isMuted && (
+              <button
+                onClick={() => onMuteParticipant(participant.identity)}
+                className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                title="Silenciar"
+              >
+                <MicOff className="h-4 w-4" />
+              </button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                  title={`Más opciones para ${participant.name}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]">
+                {onMuteParticipant && !participant.isMuted && (
+                  <DropdownMenuItem onClick={() => onMuteParticipant(participant.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
+                    <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
+                  </DropdownMenuItem>
+                )}
+                {onPinParticipant && (
+                  <DropdownMenuItem onClick={() => onPinParticipant(participant.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
+                    <Pin className="h-3.5 w-3.5 mr-2" /> Fijar
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && onRemoveParticipant && (
+                  <DropdownMenuItem onClick={() => onRemoveParticipant(participant.identity)} className="text-[hsl(0_72%_65%)] focus:bg-[hsl(220_3%_28%)]">
+                    <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       )}
 
       {/* Reactions */}
