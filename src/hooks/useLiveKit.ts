@@ -1009,6 +1009,8 @@ export function useLiveKit() {
 
         if (cameraEnabled) {
           refreshParticipants();
+          // User-driven camera ON: allow background apply attempts again.
+          skipAutoBackgroundRestoreRef.current = false;
           // Apply background without blocking the UI — processor is reused
           applyConfiguredBackgroundIfNeeded(room).catch(() => {});
         } else {
