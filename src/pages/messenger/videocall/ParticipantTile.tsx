@@ -1,7 +1,8 @@
-import { useEffect, useRef, memo, useCallback } from "react";
+import { useEffect, useRef, memo, useCallback, useState } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MicOff, Hand, Monitor, WifiOff } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff, Pin, MoreVertical, UserX } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,10 @@ interface ParticipantTileProps {
   large?: boolean;
   className?: string;
   preferredAudioOutputDeviceId?: string;
+  onMuteParticipant?: (identity: string) => void;
+  onRemoveParticipant?: (identity: string) => void;
+  onPinParticipant?: (identity: string) => void;
+  isAdmin?: boolean;
 }
 
 function getInitials(name: string) {
