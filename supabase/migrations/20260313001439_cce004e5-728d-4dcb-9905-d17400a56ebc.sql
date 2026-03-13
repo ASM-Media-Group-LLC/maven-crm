@@ -1,0 +1,1 @@
+ALTER TABLE public.closer_creators ADD COLUMN leadgen_entry_id uuid REFERENCES public.leadgen_entries(id);
