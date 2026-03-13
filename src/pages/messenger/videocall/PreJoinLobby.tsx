@@ -382,17 +382,43 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   useEffect(() => {
     bgEffectRef.current = bgEffect;
     bgRequestedEffectRef.current = bgEffect;
-    if (!camOn) return;
-    if (videoTrackRef.current) void queueBackgroundApply(bgEffect);
+
+    if (!camOn) {
+      setIsPreparingBackgroundFirstFrame(false);
+      return;
+    }
+
+    if (!videoTrackRef.current) return;
+
+    const shouldPrepareBackgroundFirst = bgEffect !== "none";
+    if (shouldPrepareBackgroundFirst) {
+      setIsPreparingBackgroundFirstFrame(true);
+    }
+
+    void queueBackgroundApply(bgEffect).finally(() => {
+      if (mountedRef.current) {
+        setIsPreparingBackgroundFirstFrame(false);
+      }
+    });
   }, [bgEffect, camOn, queueBackgroundApply]);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; bgRequestedEffectRef.current = "none"; void disposeBackgroundProcessor(); };
+    return () => {
+      mountedRef.current = false;
+      bgRequestedEffectRef.current = "none";
+      void disposeBackgroundProcessor();
+    };
   }, [disposeBackgroundProcessor]);
 
   const handleToggleMic = () => setMicOn((v) => !v);
-  const handleToggleCam = () => setCamOn((v) => !v);
+  const handleToggleCam = () => setCamOn((v) => {
+    const next = !v;
+    if (!next) {
+      setIsPreparingBackgroundFirstFrame(false);
+    }
+    return next;
+  });
 
   const handleJoin = async () => {
     setJoining(true);
