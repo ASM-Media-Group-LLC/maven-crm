@@ -1057,6 +1057,7 @@ export function useLiveKit() {
     roomRef.current?.disconnect();
     roomRef.current = null;
     connectingRef.current = false;
+    holdLocalVideoUntilBackgroundRef.current = false;
     setParticipants([]);
     setChatMessages([]);
     setIsScreenSharing(false);
