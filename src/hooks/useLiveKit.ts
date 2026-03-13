@@ -161,6 +161,15 @@ function scheduleWhenIdle(cb: () => void, delay = 100) {
   }
 }
 
+function isReloadNavigation() {
+  try {
+    const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    return navigationEntry?.type === "reload";
+  } catch {
+    return false;
+  }
+}
+
 // ── Production Room configuration (Google Meet-inspired) ─────────
 const ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
@@ -234,6 +243,8 @@ export function useLiveKit() {
   const audioResumeCleanupRef = useRef<(() => void) | null>(null);
   // Track whether the initial background has been applied for this session
   const bgInitialApplyDoneRef = useRef(false);
+  // Prevent automatic background restoration after reload/failure (user can re-enable manually)
+  const skipAutoBackgroundRestoreRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -518,19 +529,14 @@ export function useLiveKit() {
       bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
-      // Brief wait for GPU/ML pipeline release
-      await wait(150);
-
-      if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
-        const recovered = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
-        if (recovered) {
-          refreshParticipants();
-        }
-      }
+      // Critical stability guard: never force camera restart when background ML fails.
+      // Keep camera stream alive and disable only automatic background re-apply.
+      skipAutoBackgroundRestoreRef.current = effect !== "none";
+      refreshParticipants();
 
       return false;
     }
-  }, [disposeBackgroundProcessor, hasActiveCameraPublication, enableCameraWithRecovery, refreshParticipants]);
+  }, [disposeBackgroundProcessor, refreshParticipants]);
 
   const queueBackgroundEffectApply = useCallback((effect: BackgroundEffect) => {
     bgRequestedEffectRef.current = effect;
@@ -580,6 +586,7 @@ export function useLiveKit() {
    */
   const scheduleBackgroundApply = useCallback((room: Room) => {
     if (backgroundEffectRef.current === "none") return;
+    if (skipAutoBackgroundRestoreRef.current) return;
     if (bgInitialApplyDoneRef.current) return;
     bgInitialApplyDoneRef.current = true;
 
@@ -587,6 +594,7 @@ export function useLiveKit() {
       // Double-check room is still valid after idle delay
       if (roomRef.current !== room) return;
       if (backgroundEffectRef.current === "none") return;
+      if (skipAutoBackgroundRestoreRef.current) return;
 
       const hasTrack = Array.from(room.localParticipant.videoTrackPublications.values()).some(
         (p) => p.source === Track.Source.Camera && p.track,
@@ -598,6 +606,7 @@ export function useLiveKit() {
         // Camera track not ready yet — wait and retry once
         wait(400).then(() => {
           if (roomRef.current !== room || backgroundEffectRef.current === "none") return;
+          if (skipAutoBackgroundRestoreRef.current) return;
           queueBackgroundEffectApply(backgroundEffectRef.current);
         });
       }
@@ -608,6 +617,10 @@ export function useLiveKit() {
     if (backgroundEffectRef.current === "none") {
       bgLastAppliedEffectRef.current = "none";
       return true;
+    }
+
+    if (skipAutoBackgroundRestoreRef.current) {
+      return false;
     }
 
     // Fast-check: if track is already available, skip polling entirely
@@ -675,6 +688,9 @@ export function useLiveKit() {
       };
       backgroundEffectRef.current = options.backgroundEffect || "none";
       bgInitialApplyDoneRef.current = false;
+      // On page reload with active background, skip auto-restore to keep startup smooth.
+      skipAutoBackgroundRestoreRef.current =
+        isReloadNavigation() && backgroundEffectRef.current !== "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
@@ -720,7 +736,7 @@ export function useLiveKit() {
         kickAudioPlayback(room);
 
         // Re-apply background if needed (non-blocking)
-        if (backgroundEffectRef.current !== "none") {
+        if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           scheduleWhenIdle(() => {
             if (roomRef.current !== room) return;
             applyConfiguredBackgroundIfNeeded(room);
@@ -993,6 +1009,8 @@ export function useLiveKit() {
 
         if (cameraEnabled) {
           refreshParticipants();
+          // User-driven camera ON: allow background apply attempts again.
+          skipAutoBackgroundRestoreRef.current = false;
           // Apply background without blocking the UI — processor is reused
           applyConfiguredBackgroundIfNeeded(room).catch(() => {});
         } else {
@@ -1140,6 +1158,8 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
+    // Manual user action always re-enables background processing path.
+    skipAutoBackgroundRestoreRef.current = false;
 
     const room = roomRef.current;
     if (!room) return;
@@ -1206,6 +1226,8 @@ export function useLiveKit() {
     preferredDevicesRef.current.videoDeviceId = deviceId;
     try {
       bgAttachedTrackRef.current = null;
+      // Device switch is user-driven, so allow background application again.
+      skipAutoBackgroundRestoreRef.current = false;
       // Use switchActiveDevice for seamless video switching
       await room.switchActiveDevice("videoinput", deviceId);
       await wait(200); // Brief wait for the new track to be ready
