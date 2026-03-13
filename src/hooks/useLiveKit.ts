@@ -966,26 +966,31 @@ export function useLiveKit() {
               );
             }, 15000);
           } else if (msg.type === "moderation") {
-            const senderParticipant = participant ? room.remoteParticipants.get(participant.identity) || (participant.identity === room.localParticipant.identity ? room.localParticipant : null) : null;
-            const senderPermissions = senderParticipant?.permissions;
-            const isSenderAdmin = senderPermissions?.canPublish && senderPermissions?.canSubscribe;
+            const action = msg.payload?.action;
+            const target = msg.payload?.target;
 
-            let metadataAdmin = false;
-            try {
-              const meta = JSON.parse(senderParticipant?.metadata || "{}");
-              metadataAdmin = !!meta.isAdmin;
-            } catch {}
+            if (target !== room.localParticipant.identity) return;
 
-            if (!isSenderAdmin && !metadataAdmin) {
-              console.warn("[LiveKit] Ignoring moderation command from non-admin:", participant?.identity);
-              return;
-            }
-
-            if (msg.payload?.action === "mute" && msg.payload?.target === room.localParticipant.identity) {
+            if (action === "mute") {
+              // Any participant can mute others
               room.localParticipant.setMicrophoneEnabled(false);
               setIsMicOn(false);
               refreshParticipants();
-            } else if (msg.payload?.action === "remove" && msg.payload?.target === room.localParticipant.identity) {
+            } else if (action === "remove") {
+              // Only admins can remove — validate sender
+              const senderParticipant = participant ? room.remoteParticipants.get(participant.identity) || (participant.identity === room.localParticipant.identity ? room.localParticipant : null) : null;
+              let metadataAdmin = false;
+              try {
+                const meta = JSON.parse(senderParticipant?.metadata || "{}");
+                metadataAdmin = !!meta.isAdmin;
+              } catch {}
+              const senderPermissions = senderParticipant?.permissions;
+              const isSenderAdmin = (senderPermissions?.canPublish && senderPermissions?.canSubscribe) || metadataAdmin;
+
+              if (!isSenderAdmin) {
+                console.warn("[LiveKit] Ignoring remove command from non-admin:", participant?.identity);
+                return;
+              }
               setError("Has sido removido de la llamada por un moderador");
               room.disconnect();
             }
