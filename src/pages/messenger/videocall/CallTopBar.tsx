@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link2, Grid3X3, LayoutGrid, Shield } from "lucide-react";
+import { Link2, SlidersHorizontal, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -9,8 +9,7 @@ interface CallTopBarProps {
   roomName: string;
   participantCount: number;
   isEncrypted?: boolean;
-  layout: "grid" | "spotlight";
-  onToggleLayout: () => void;
+  onOpenAdjustView: () => void;
   shareLink: string;
 }
 
