@@ -32,7 +32,7 @@ const ClosersKPICards = ({ creators, leadsDisponibles }: Props) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
       {cards.map((card) => (
         <DashboardMetricCard
           key={card.label}
