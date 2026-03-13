@@ -694,7 +694,11 @@ export function useLiveKit() {
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         debouncedRefresh();
 
-        if (publication.source === Track.Source.Camera && backgroundEffectRef.current !== "none") {
+        if (
+          publication.source === Track.Source.Camera &&
+          backgroundEffectRef.current !== "none" &&
+          !skipAutoBackgroundRestoreRef.current
+        ) {
           void wait(150).then(() => queueBackgroundEffectApply(backgroundEffectRef.current));
         }
       });
