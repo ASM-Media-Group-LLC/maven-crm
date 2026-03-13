@@ -83,12 +83,6 @@ const ClosersContent = () => {
         )}
       </div>
 
-      <NewCreatorModal
-        open={showNew}
-        onOpenChange={setShowNew}
-        onSubmit={(data) => createCreator.mutate(data, { onSuccess: () => setShowNew(false) })}
-        isLoading={createCreator.isPending}
-      />
       <ViewCreatorModal creator={viewCreator} open={!!viewCreator} onOpenChange={(o) => !o && setViewCreator(null)} />
       <EditCreatorModal
         creator={editCreator}
