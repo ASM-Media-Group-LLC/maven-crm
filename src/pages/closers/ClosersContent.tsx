@@ -25,6 +25,30 @@ const ClosersContent = () => {
   const [editCreator, setEditCreator] = useState<CloserCreator | null>(null);
   const [deletingCreator, setDeletingCreator] = useState<CloserCreator | null>(null);
 
+  // Count of leads not yet converted
+  const { data: convertedIds = [] } = useQuery({
+    queryKey: ["closer-creators-leadgen-ids"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("closer_creators")
+        .select("leadgen_entry_id")
+        .not("leadgen_entry_id", "is", null);
+      return (data || []).map((r) => r.leadgen_entry_id as string);
+    },
+  });
+
+  const { data: totalLeads = 0 } = useQuery({
+    queryKey: ["leads-disponibles-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("leadgen_entries")
+        .select("id", { count: "exact", head: true });
+      return count || 0;
+    },
+  });
+
+  const leadsDisponibles = totalLeads - convertedIds.length;
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
