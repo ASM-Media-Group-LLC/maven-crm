@@ -696,7 +696,7 @@ export function useLiveKit() {
     return queueBackgroundEffectApply(backgroundEffectRef.current);
   }, [queueBackgroundEffectApply, waitForCameraPublication]);
 
-  const applyBackgroundBeforeLocalVideoVisible = useCallback(async (room: Room, timeoutMs = 2200) => {
+  const applyBackgroundBeforeLocalVideoVisible = useCallback(async (room: Room) => {
     if (backgroundEffectRef.current === "none") {
       holdLocalVideoUntilBackgroundRef.current = false;
       refreshParticipants();
@@ -713,10 +713,7 @@ export function useLiveKit() {
     refreshParticipants();
 
     try {
-      return await Promise.race([
-        applyConfiguredBackgroundIfNeeded(room),
-        wait(timeoutMs).then(() => false),
-      ]);
+      return await applyConfiguredBackgroundIfNeeded(room);
     } finally {
       holdLocalVideoUntilBackgroundRef.current = false;
       refreshParticipants();
@@ -1008,11 +1005,18 @@ export function useLiveKit() {
       }
 
       if (shouldEnableCam) {
+        const shouldGateVideoUntilBackground = backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current;
+        if (shouldGateVideoUntilBackground) {
+          bgFailureCooldownUntilRef.current = 0;
+          holdLocalVideoUntilBackgroundRef.current = true;
+          refreshParticipants();
+        }
+
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
         if (cameraEnabled) {
-          if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
-            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2300);
+          if (shouldGateVideoUntilBackground) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
             if (!applied) {
               scheduleDeferredBackgroundReapply(room, 260);
             }
@@ -1020,6 +1024,9 @@ export function useLiveKit() {
             // Fallback path when no effect is active or auto-restore is skipped.
             scheduleBackgroundApply(room);
           }
+        } else if (shouldGateVideoUntilBackground) {
+          holdLocalVideoUntilBackgroundRef.current = false;
+          refreshParticipants();
         }
       }
 
@@ -1105,6 +1112,13 @@ export function useLiveKit() {
         // DON'T dispose the processor when turning ON — we'll reuse or re-attach it
         bgAttachedTrackRef.current = null;
 
+        const shouldGateVideoUntilBackground = backgroundEffectRef.current !== "none";
+        if (shouldGateVideoUntilBackground) {
+          bgFailureCooldownUntilRef.current = 0;
+          holdLocalVideoUntilBackgroundRef.current = true;
+          refreshParticipants();
+        }
+
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
@@ -1112,12 +1126,15 @@ export function useLiveKit() {
           // User-driven camera ON: allow background apply attempts again.
           skipAutoBackgroundRestoreRef.current = false;
 
-          if (backgroundEffectRef.current !== "none") {
-            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+          if (shouldGateVideoUntilBackground) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
             if (!applied) {
               scheduleDeferredBackgroundReapply(room, 280);
             }
           }
+        } else if (shouldGateVideoUntilBackground) {
+          holdLocalVideoUntilBackgroundRef.current = false;
+          refreshParticipants();
         } else {
           setIsCamOn(false);
         }
@@ -1279,7 +1296,7 @@ export function useLiveKit() {
       return;
     }
 
-    const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+    const applied = await applyBackgroundBeforeLocalVideoVisible(room);
     if (!applied) {
       scheduleDeferredBackgroundReapply(room, 240);
     }
@@ -1358,6 +1375,12 @@ export function useLiveKit() {
       skipAutoBackgroundRestoreRef.current = false;
 
       if (hasBackgroundEffect) {
+        bgFailureCooldownUntilRef.current = 0;
+        holdLocalVideoUntilBackgroundRef.current = true;
+        refreshParticipants();
+      }
+
+      if (hasBackgroundEffect) {
         // Deterministic restart with safe constraints is more stable than hot-switching
         // when a background processor is active.
         await room.localParticipant.setCameraEnabled(false);
@@ -1370,10 +1393,13 @@ export function useLiveKit() {
 
       const isReady = await waitForCameraPublication(room, [80, 150, 300]);
       if (isReady && hasBackgroundEffect) {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
         if (!applied) {
           scheduleDeferredBackgroundReapply(room, 260);
         }
+      } else if (hasBackgroundEffect) {
+        holdLocalVideoUntilBackgroundRef.current = false;
+        refreshParticipants();
       }
 
       setIsCamOn(hasActiveCameraPublication(room));
@@ -1384,10 +1410,13 @@ export function useLiveKit() {
       // Fallback: full camera recovery with profile-aware constraints.
       const cameraEnabled = await enableCameraWithRecovery(room, deviceId);
       if (cameraEnabled && backgroundEffectRef.current !== "none") {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
         if (!applied) {
           scheduleDeferredBackgroundReapply(room, 300);
         }
+      } else if (backgroundEffectRef.current !== "none") {
+        holdLocalVideoUntilBackgroundRef.current = false;
+        refreshParticipants();
       }
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();

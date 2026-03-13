@@ -26,6 +26,8 @@ describe("PreJoinLobby", () => {
     callDisplayName: "Daily Standup",
     onJoin: vi.fn(),
   };
+  const roomStorageKey = "call-prejoin-settings:v1:test-room";
+  const globalStorageKey = "call-prejoin-settings:v1:global";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,6 +112,26 @@ describe("PreJoinLobby", () => {
         expect.objectContaining({ micOn: false, camOn: true, backgroundEffect: "none" })
       );
     });
+  });
+
+  it("loads mic/cam presets from global storage when room-specific settings are missing", () => {
+    localStorage.setItem(globalStorageKey, JSON.stringify({ micOn: false, camOn: false, backgroundEffect: "none" }));
+
+    const { container } = render(<PreJoinLobby {...defaultProps} roomName="another-room" />);
+
+    expect(screen.getByTitle("Activar micrófono")).toBeInTheDocument();
+    expect(screen.getByTitle("Activar cámara")).toBeInTheDocument();
+    expect(container.querySelector("video")).not.toBeInTheDocument();
+  });
+
+  it("prioritizes room-specific presets over global settings", () => {
+    localStorage.setItem(globalStorageKey, JSON.stringify({ micOn: false, camOn: false, backgroundEffect: "none" }));
+    localStorage.setItem(roomStorageKey, JSON.stringify({ micOn: true, camOn: false, backgroundEffect: "none" }));
+
+    render(<PreJoinLobby {...defaultProps} />);
+
+    expect(screen.getByTitle("Desactivar micrófono")).toBeInTheDocument();
+    expect(screen.getByTitle("Activar cámara")).toBeInTheDocument();
   });
 
   it("does not render callDisplayName or roomName (hidden by design)", () => {
