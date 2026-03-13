@@ -199,9 +199,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         isChatOpen={chatOpen}
         unreadChatCount={lk.unreadChatCount}
         isParticipantsOpen={participantsOpen}
-        isCaptionsOn={captions.isActive}
-        captionsLanguage={captions.language}
-        captionsSupported={captions.isSupported}
         currentAudioInputId={audioInputId}
         currentAudioOutputId={audioOutputId}
         currentVideoInputId={videoInputId}
