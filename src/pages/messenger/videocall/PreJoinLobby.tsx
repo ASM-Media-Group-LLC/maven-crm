@@ -179,10 +179,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       if (opId !== bgOpRef.current) return false;
       if (isTemplateBackground(effect)) await preloadTemplate(effect);
       if (opId !== bgOpRef.current) return false;
-      if (effect === "soft-blur") {
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 10 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-soft-blur");
-      } else if (effect === "hard-blur") {
-        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 25 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-hard-blur");
+      if (effect === "blur") {
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (!tpl) return false;
