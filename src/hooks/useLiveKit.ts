@@ -439,15 +439,16 @@ export function useLiveKit() {
 
         if (!selectedTemplate) return false;
 
-        const templateUrl = `${window.location.origin}${selectedTemplate.src}`;
-        if (!preloadedBackgroundsRef.current.has(templateUrl)) {
+        // Use low-res image for the ML processor (480px is enough for segmentation)
+        const processorUrl = `${window.location.origin}${selectedTemplate.lowSrc || selectedTemplate.src}`;
+        if (!preloadedBackgroundsRef.current.has(processorUrl)) {
           await new Promise<void>((resolve, reject) => {
             const image = new Image();
-            image.src = templateUrl;
+            image.src = processorUrl;
             image.onload = () => resolve();
             image.onerror = () => reject(new Error("template-load-failed"));
           });
-          preloadedBackgroundsRef.current.add(templateUrl);
+          preloadedBackgroundsRef.current.add(processorUrl);
         }
 
         if (opId !== bgApplyOpRef.current) return false;
@@ -456,7 +457,7 @@ export function useLiveKit() {
           Promise.resolve(
             processor.switchTo({
               mode: "virtual-background",
-              imagePath: templateUrl,
+              imagePath: processorUrl,
             }),
           ),
           BACKGROUND_SWITCH_TIMEOUT_MS,
