@@ -391,9 +391,12 @@ export function useLiveKit() {
 
   const enableCameraWithRecovery = useCallback(
     async (room: Room, preferredVideoDeviceId?: string) => {
-      // Attempt 1: with preferred device (uses "ideal" so it gracefully falls back)
+      const useBackgroundSafeProfile = backgroundEffectRef.current !== "none";
+      const videoConstraint = getVideoConstraint(preferredVideoDeviceId, useBackgroundSafeProfile);
+
+      // Attempt 1: preferred device + profile-aware constraints
       try {
-        await room.localParticipant.setCameraEnabled(true, getDeviceConstraint(preferredVideoDeviceId));
+        await room.localParticipant.setCameraEnabled(true, videoConstraint);
         const isReady = await waitForCameraPublication(room, [80, 150, 300]);
         if (isReady) {
           refreshParticipants();
@@ -403,12 +406,12 @@ export function useLiveKit() {
         console.warn("[LiveKit] Camera enable attempt 1 failed:", err);
       }
 
-      // Attempt 2: hard reset camera + processor, then enable using browser default
+      // Attempt 2: hard reset camera + processor, then enable using fallback constraints
       try {
         await disposeBackgroundProcessor();
         await room.localParticipant.setCameraEnabled(false);
         await wait(80);
-        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setCameraEnabled(true, getVideoConstraint(undefined, useBackgroundSafeProfile));
         const isReady = await waitForCameraPublication(room, [100, 200, 400]);
         if (isReady) {
           refreshParticipants();
