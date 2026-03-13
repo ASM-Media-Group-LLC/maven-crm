@@ -1112,6 +1112,13 @@ export function useLiveKit() {
         // DON'T dispose the processor when turning ON — we'll reuse or re-attach it
         bgAttachedTrackRef.current = null;
 
+        const shouldGateVideoUntilBackground = backgroundEffectRef.current !== "none";
+        if (shouldGateVideoUntilBackground) {
+          bgFailureCooldownUntilRef.current = 0;
+          holdLocalVideoUntilBackgroundRef.current = true;
+          refreshParticipants();
+        }
+
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
         if (cameraEnabled) {
@@ -1119,12 +1126,16 @@ export function useLiveKit() {
           // User-driven camera ON: allow background apply attempts again.
           skipAutoBackgroundRestoreRef.current = false;
 
-          if (backgroundEffectRef.current !== "none") {
-            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+          if (shouldGateVideoUntilBackground) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
             if (!applied) {
               scheduleDeferredBackgroundReapply(room, 280);
             }
           }
+        } else if (shouldGateVideoUntilBackground) {
+          holdLocalVideoUntilBackgroundRef.current = false;
+          refreshParticipants();
+        }
         } else {
           setIsCamOn(false);
         }
