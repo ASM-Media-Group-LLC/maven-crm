@@ -333,20 +333,6 @@ export default function CallControls({
 
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
 
-        {/* More options */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button title="Más opciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
-              <MoreVertical className="h-[18px] w-[18px]" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" className="w-48 p-1 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
-            <button onClick={onToggleCaptions} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]">
-              <Captions className="h-4 w-4" />
-              <span className="flex-1 text-left">Subtítulos</span>
-            </button>
-          </PopoverContent>
-        </Popover>
 
         {/* Leave */}
         <button
