@@ -26,7 +26,9 @@ describe("CallControls", () => {
     onCaptionsLanguageChange: vi.fn(),
     onSendReaction: vi.fn(),
     onLeave: vi.fn(),
-    onOpenSettings: vi.fn(),
+    onOpenAudioSettings: vi.fn(),
+    onOpenVideoSettings: vi.fn(),
+    onOpenMetrics: vi.fn(),
   };
 
   it("renders primary control buttons", () => {
