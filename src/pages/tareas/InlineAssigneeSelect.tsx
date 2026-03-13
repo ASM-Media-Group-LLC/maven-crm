@@ -2,6 +2,7 @@ import { useState } from "react";
 import { User, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 interface InlineAssigneeSelectProps {
@@ -39,27 +40,31 @@ const InlineAssigneeSelect = ({ taskId, currentAssignees, profiles, onUpdateAssi
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="start">
-        <div className="max-h-48 overflow-auto">
-          {profiles.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => toggle(p.id)}
-              className={cn(
-                "flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
-                currentAssignees.includes(p.id) && "bg-accent/50"
-              )}
-            >
-              <div className={cn(
-                "h-4 w-4 rounded border border-border flex items-center justify-center shrink-0",
-                currentAssignees.includes(p.id) && "bg-primary border-primary"
-              )}>
-                {currentAssignees.includes(p.id) && <Check className="h-3 w-3 text-primary-foreground" />}
-              </div>
-              <span className="truncate">{p.full_name || "Sin nombre"}</span>
-            </button>
-          ))}
-        </div>
+      <PopoverContent className="w-56 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar usuario..." />
+          <CommandList>
+            <CommandEmpty>Sin resultados</CommandEmpty>
+            <CommandGroup>
+              {profiles.map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={p.full_name || "Sin nombre"}
+                  onSelect={() => toggle(p.id)}
+                  className="cursor-pointer"
+                >
+                  <div className={cn(
+                    "h-4 w-4 rounded border border-border flex items-center justify-center shrink-0 mr-2",
+                    currentAssignees.includes(p.id) && "bg-primary border-primary"
+                  )}>
+                    {currentAssignees.includes(p.id) && <Check className="h-3 w-3 text-primary-foreground" />}
+                  </div>
+                  <span className="truncate">{p.full_name || "Sin nombre"}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );

@@ -12,6 +12,8 @@ import InlineAssigneeSelect from "./InlineAssigneeSelect";
 import InlinePrioritySelect from "./InlinePrioritySelect";
 import InlineDateTimeEdit from "./InlineDateTimeEdit";
 import type { Task } from "./useTareas";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface TaskListRowProps {
   task: Task;
@@ -66,11 +68,22 @@ const getStatusTransitions = (status: string, isOverdue: boolean, hasOverdueReas
   }
 };
 
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "—";
+  try {
+    return format(new Date(dateStr), "dd MMM", { locale: es });
+  } catch {
+    return "—";
+  }
+};
+
 const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees }: TaskListRowProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { display, isOverdue, isWarning } = useCountdown(task.due_at);
   const [expanded, setExpanded] = useState(false);
+
+  const profileMap = new Map(profiles.map((p) => [p.id, p.full_name || "Sin nombre"]));
 
   const isCompleted = task.status === "completed";
   const effectiveStatus = isCompleted ? "completed" : isOverdue && task.status !== "overdue" ? "overdue" : task.status;
@@ -109,7 +122,7 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
     <Collapsible open={expanded} onOpenChange={setExpanded}>
       <div className={`group border-b border-border hover:bg-muted/30 transition-colors ${isOverdue && !isCompleted ? "bg-destructive/5" : ""}`}>
         {/* Main row */}
-        <div className="grid grid-cols-[1fr_140px_140px_100px_120px_40px] items-center px-3 py-2.5 gap-2">
+        <div className="grid grid-cols-[1fr_110px_120px_110px_80px_80px_100px_40px] items-center px-3 py-2.5 gap-2">
           {/* Name column with status dropdown */}
           <div className="flex items-center gap-2 min-w-0">
             <CollapsibleTrigger asChild>
@@ -147,6 +160,13 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
             </span>
           </div>
 
+          {/* Assigned by column */}
+          <div className="min-w-0">
+            <span className="text-xs text-muted-foreground truncate block">
+              {profileMap.get(task.created_by) || "—"}
+            </span>
+          </div>
+
           {/* Assignee column */}
           <InlineAssigneeSelect
             taskId={task.id}
@@ -155,29 +175,22 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
             onUpdateAssignees={onUpdateAssignees}
           />
 
-          {/* Due date column */}
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <InlineDateTimeEdit
-              taskId={task.id}
-              field="start_at"
-              currentValue={task.start_at}
-              onPatch={onPatchTask}
-            />
-            <InlineDateTimeEdit
-              taskId={task.id}
-              field="due_at"
-              currentValue={task.due_at}
-              onPatch={onPatchTask}
-              colorClass={countdownColor}
-            />
-          </div>
-
           {/* Priority column */}
           <InlinePrioritySelect
             taskId={task.id}
             currentPriority={task.priority}
             onPatch={onPatchTask}
           />
+
+          {/* Start date column */}
+          <div className="text-center">
+            <span className="text-xs text-muted-foreground">{formatDate(task.start_at)}</span>
+          </div>
+
+          {/* Due date column */}
+          <div className="text-center">
+            <span className={`text-xs ${countdownColor}`}>{formatDate(task.due_at)}</span>
+          </div>
 
           {/* Countdown column */}
           <div className="text-right">

@@ -9,8 +9,10 @@ import InlineAssigneeSelect from "./InlineAssigneeSelect";
 import InlinePrioritySelect from "./InlinePrioritySelect";
 import InlineDateTimeEdit from "./InlineDateTimeEdit";
 import type { Task } from "./useTareas";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
-type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start";
+type SortKey = "title" | "assigned" | "due" | "status" | "priority" | "start" | "assigned_by" | "due_date";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -110,6 +112,15 @@ const StatusCell = ({ task, onComplete, onJustify, onStatusChange }: {
   );
 };
 
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "—";
+  try {
+    return format(new Date(dateStr), "dd MMM yyyy", { locale: es });
+  } catch {
+    return "—";
+  }
+};
+
 const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, onStatusChange, onPatchTask, onUpdateAssignees }: TasksTableProps) => {
   const [sortKey, setSortKey] = useState<SortKey>("due");
   const [sortAsc, setSortAsc] = useState(true);
@@ -127,7 +138,9 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
     let diff = 0;
     if (sortKey === "title") diff = a.title.localeCompare(b.title);
     else if (sortKey === "assigned") diff = (profileMap.get(a.assignees?.[0] || a.assigned_to) || "").localeCompare(profileMap.get(b.assignees?.[0] || b.assigned_to) || "");
+    else if (sortKey === "assigned_by") diff = (profileMap.get(a.created_by) || "").localeCompare(profileMap.get(b.created_by) || "");
     else if (sortKey === "due") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+    else if (sortKey === "due_date") diff = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
     else if (sortKey === "start") diff = (a.start_at ? new Date(a.start_at).getTime() : 0) - (b.start_at ? new Date(b.start_at).getTime() : 0);
     else if (sortKey === "priority") diff = (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2);
     else diff = a.status.localeCompare(b.status);
@@ -146,9 +159,11 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Título" col="title" /></TableHead>
-            <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado" col="assigned" /></TableHead>
+            <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado por" col="assigned_by" /></TableHead>
+            <TableHead className="hidden sm:table-cell"><SortHeader label="Asignado a" col="assigned" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Prioridad" col="priority" /></TableHead>
-            <TableHead className="text-center"><SortHeader label="Inicio" col="start" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Fecha inicio" col="start" /></TableHead>
+            <TableHead className="text-center"><SortHeader label="Fecha fin" col="due_date" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Countdown" col="due" /></TableHead>
             <TableHead className="text-center"><SortHeader label="Estado" col="status" /></TableHead>
             <TableHead className="w-12" />
@@ -160,6 +175,9 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
               <TableCell>
                 <div className="font-medium text-sm">{task.title}</div>
                 {task.description && <div className="text-xs text-muted-foreground truncate max-w-[200px]">{task.description}</div>}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                <span className="text-xs text-muted-foreground">{profileMap.get(task.created_by) || "—"}</span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <InlineAssigneeSelect
@@ -177,12 +195,10 @@ const TasksTable = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete, 
                 />
               </TableCell>
               <TableCell className="text-center">
-                <InlineDateTimeEdit
-                  taskId={task.id}
-                  field="start_at"
-                  currentValue={task.start_at}
-                  onPatch={onPatchTask}
-                />
+                <span className="text-xs text-muted-foreground">{formatDate(task.start_at)}</span>
+              </TableCell>
+              <TableCell className="text-center">
+                <span className="text-xs text-muted-foreground">{formatDate(task.due_at)}</span>
               </TableCell>
               <TableCell className="text-center"><CountdownCell dueAt={task.due_at} status={task.status} /></TableCell>
               <TableCell className="text-center">
