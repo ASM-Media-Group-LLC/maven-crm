@@ -83,15 +83,15 @@ describe("CallControls", () => {
     expect(badge).toBeInTheDocument();
   });
 
-  it("applies destructive styling when mic is off", () => {
+  it("applies red styling when mic is off", () => {
     render(<CallControls {...defaultProps} isMicOn={false} />);
     const micBtn = screen.getByTitle("Micrófono");
-    expect(micBtn.className).toContain("destructive");
+    expect(micBtn.className).toContain("0_72%");
   });
 
-  it("applies destructive styling when cam is off", () => {
+  it("applies red styling when cam is off", () => {
     render(<CallControls {...defaultProps} isCamOn={false} />);
     const camBtn = screen.getByTitle("Cámara");
-    expect(camBtn.className).toContain("destructive");
+    expect(camBtn.className).toContain("0_72%");
   });
 });
