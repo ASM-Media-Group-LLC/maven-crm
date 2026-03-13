@@ -89,9 +89,6 @@ const ParticipantTile = memo(function ParticipantTile({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const attachedVideoTrackRef = useRef<any>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
 
