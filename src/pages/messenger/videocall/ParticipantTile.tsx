@@ -49,7 +49,11 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prevP.isLocal === nextP.isLocal &&
     prevP.handRaised === nextP.handRaised &&
     prevP.connectionQuality === nextP.connectionQuality &&
-    areReactionsEqual(prevP.reactions, nextP.reactions)
+    areReactionsEqual(prevP.reactions, nextP.reactions) &&
+    prev.isAdmin === next.isAdmin &&
+    prev.onMuteParticipant === next.onMuteParticipant &&
+    prev.onRemoveParticipant === next.onRemoveParticipant &&
+    prev.onPinParticipant === next.onPinParticipant
   );
 }
 
