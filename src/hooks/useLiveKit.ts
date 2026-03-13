@@ -529,19 +529,14 @@ export function useLiveKit() {
       bgLastAppliedEffectRef.current = "none";
       await disposeBackgroundProcessor();
 
-      // Brief wait for GPU/ML pipeline release
-      await wait(150);
-
-      if (hasActiveCameraPublication(room) || room.localParticipant.isCameraEnabled) {
-        const recovered = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
-        if (recovered) {
-          refreshParticipants();
-        }
-      }
+      // Critical stability guard: never force camera restart when background ML fails.
+      // Keep camera stream alive and disable only automatic background re-apply.
+      skipAutoBackgroundRestoreRef.current = effect !== "none";
+      refreshParticipants();
 
       return false;
     }
-  }, [disposeBackgroundProcessor, hasActiveCameraPublication, enableCameraWithRecovery, refreshParticipants]);
+  }, [disposeBackgroundProcessor, refreshParticipants]);
 
   const queueBackgroundEffectApply = useCallback((effect: BackgroundEffect) => {
     bgRequestedEffectRef.current = effect;
