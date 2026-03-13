@@ -55,6 +55,23 @@ function getDeviceConstraint(deviceId?: string) {
   return deviceId ? ({ deviceId: { ideal: deviceId } } as any) : undefined;
 }
 
+const BACKGROUND_SAFE_VIDEO_CONSTRAINTS = {
+  width: { ideal: 1280, max: 1280 },
+  height: { ideal: 720, max: 720 },
+  frameRate: { ideal: 24, max: 24 },
+} as const;
+
+function getVideoConstraint(deviceId?: string, backgroundSafeProfile = false) {
+  const constraint: Record<string, any> = {};
+  if (deviceId) constraint.deviceId = { ideal: deviceId };
+  if (backgroundSafeProfile) {
+    constraint.width = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.width;
+    constraint.height = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.height;
+    constraint.frameRate = BACKGROUND_SAFE_VIDEO_CONSTRAINTS.frameRate;
+  }
+  return Object.keys(constraint).length ? (constraint as any) : undefined;
+}
+
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
