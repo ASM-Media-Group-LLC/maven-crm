@@ -274,54 +274,6 @@ export default function CallControls({
           </PopoverContent>
         </Popover>
 
-        {/* Captions */}
-        {captionsSupported && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                title="Subtítulos"
-                className={cn(
-                  "relative h-11 w-11 rounded-full flex items-center justify-center transition-colors",
-                  isCaptionsOn
-                    ? "bg-[hsl(214_82%_51%/0.2)] text-[hsl(214_82%_65%)] hover:bg-[hsl(214_82%_51%/0.3)]"
-                    : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
-                )}
-              >
-                {isCaptionsOn ? <Captions className="h-[18px] w-[18px]" /> : <CaptionsOff className="h-[18px] w-[18px]" />}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" className="w-56 p-3 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[hsl(220_3%_85%)]">Subtítulos</span>
-                  <button
-                    onClick={onToggleCaptions}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-full font-medium transition-colors",
-                      isCaptionsOn
-                        ? "bg-[hsl(214_82%_51%)] text-white"
-                        : "bg-[hsl(220_3%_30%)] text-[hsl(220_3%_70%)] hover:bg-[hsl(220_3%_35%)]"
-                    )}
-                  >
-                    {isCaptionsOn ? "Activado" : "Desactivado"}
-                  </button>
-                </div>
-                <div>
-                  <label className="text-xs text-[hsl(220_3%_55%)] mb-1.5 block">Idioma</label>
-                  <select
-                    value={captionsLanguage}
-                    onChange={(e) => onCaptionsLanguageChange(e.target.value)}
-                    className="w-full text-sm bg-[hsl(220_3%_18%)] border border-[hsl(220_3%_30%)] rounded-md px-2 py-1.5 text-[hsl(220_3%_85%)] focus:outline-none focus:ring-1 focus:ring-[hsl(214_82%_51%)]"
-                  >
-                    {CAPTION_LANGUAGES.map((l) => (
-                      <option key={l.code} value={l.code}>{l.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
 
         <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
 
