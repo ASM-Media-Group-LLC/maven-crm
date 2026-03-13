@@ -14,7 +14,7 @@ import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, createCreator, updateCreator, updateStage,
+    creators, isLoading, updateCreator, updateStage,
     deleteCreator, assignCreator, isAdmin,
   } = useCloserCreators();
 
