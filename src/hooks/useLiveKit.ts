@@ -1373,74 +1373,96 @@ export function useLiveKit() {
   }, []);
 
   const switchVideoInput = useCallback(async (deviceId: string) => {
-    const room = roomRef.current;
-    if (!room) return;
-    preferredDevicesRef.current.videoDeviceId = deviceId;
-    const hasBackgroundEffect = backgroundEffectRef.current !== "none";
+    pendingVideoSwitchDeviceIdRef.current = deviceId;
+    if (videoSwitchInFlightRef.current) return;
+
+    videoSwitchInFlightRef.current = true;
 
     try {
-      // Stop processor on current track before replacing camera source
-      // to avoid orphaned ML pipelines that can freeze camera refresh.
-      const currentCamTrack = getLocalCameraTrack(room);
-      if (currentCamTrack && bgAttachedTrackRef.current === currentCamTrack) {
+      while (pendingVideoSwitchDeviceIdRef.current) {
+        const nextDeviceId = pendingVideoSwitchDeviceIdRef.current;
+        pendingVideoSwitchDeviceIdRef.current = null;
+
+        const room = roomRef.current;
+        if (!room) break;
+
+        preferredDevicesRef.current.videoDeviceId = nextDeviceId;
+        const hasBackgroundEffect = backgroundEffectRef.current !== "none";
+
         try {
-          await withTimeout(Promise.resolve(currentCamTrack.stopProcessor?.()), 1200, "bg-stop-before-video-switch");
-        } catch {}
-      }
+          // Stop processor on current track before replacing camera source
+          // to avoid orphaned ML pipelines that can freeze camera refresh.
+          const currentCamTrack = getLocalCameraTrack(room);
+          if (currentCamTrack && bgAttachedTrackRef.current === currentCamTrack) {
+            try {
+              await withTimeout(Promise.resolve(currentCamTrack.stopProcessor?.()), 1200, "bg-stop-before-video-switch");
+            } catch {}
+          }
 
-      bgAttachedTrackRef.current = null;
-      bgLastAppliedEffectRef.current = "none";
-      // Device switch is user-driven, so allow background application again.
-      skipAutoBackgroundRestoreRef.current = false;
+          if (hasBackgroundEffect) {
+            // Hard-recycle processor on refresh to release leaked GPU/ML resources.
+            await disposeBackgroundProcessor();
+          } else {
+            bgAttachedTrackRef.current = null;
+            bgLastAppliedEffectRef.current = "none";
+          }
 
-      if (hasBackgroundEffect) {
-        bgFailureCooldownUntilRef.current = 0;
-        holdLocalVideoUntilBackgroundRef.current = true;
-        refreshParticipants();
-      }
+          // Device switch is user-driven, so allow background application again.
+          skipAutoBackgroundRestoreRef.current = false;
 
-      if (hasBackgroundEffect) {
-        // Deterministic restart with safe constraints is more stable than hot-switching
-        // when a background processor is active.
-        await room.localParticipant.setCameraEnabled(false);
-        await wait(80);
-        await room.localParticipant.setCameraEnabled(true, getVideoConstraint(deviceId, true));
-      } else {
-        // No background effect: keep seamless switch path.
-        await room.switchActiveDevice("videoinput", deviceId);
-      }
+          if (hasBackgroundEffect) {
+            bgFailureCooldownUntilRef.current = 0;
+            holdLocalVideoUntilBackgroundRef.current = true;
+            refreshParticipants();
+          }
 
-      const isReady = await waitForCameraPublication(room, [80, 150, 300]);
-      if (isReady && hasBackgroundEffect) {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
-        if (!applied) {
-          scheduleDeferredBackgroundReapply(room, 260);
+          if (hasBackgroundEffect) {
+            // Deterministic restart with safe constraints is more stable than hot-switching
+            // when a background processor is active.
+            await room.localParticipant.setCameraEnabled(false);
+            await wait(80);
+            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, true));
+          } else {
+            // No background effect: keep seamless switch path.
+            await room.switchActiveDevice("videoinput", nextDeviceId);
+          }
+
+          const isReady = await waitForCameraPublication(room, [80, 150, 300]);
+          if (isReady && hasBackgroundEffect) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
+            if (!applied) {
+              scheduleDeferredBackgroundReapply(room, 260);
+            }
+          } else if (hasBackgroundEffect) {
+            holdLocalVideoUntilBackgroundRef.current = false;
+            refreshParticipants();
+          }
+
+          setIsCamOn(hasActiveCameraPublication(room));
+          refreshParticipants();
+        } catch (err) {
+          console.error("[LiveKit] Video input switch error:", err);
+
+          // Fallback: full camera recovery with profile-aware constraints.
+          const cameraEnabled = await enableCameraWithRecovery(room, nextDeviceId);
+          if (cameraEnabled && backgroundEffectRef.current !== "none") {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
+            if (!applied) {
+              scheduleDeferredBackgroundReapply(room, 300);
+            }
+          } else if (backgroundEffectRef.current !== "none") {
+            holdLocalVideoUntilBackgroundRef.current = false;
+            refreshParticipants();
+          }
+          setIsCamOn(hasActiveCameraPublication(room));
+          refreshParticipants();
         }
-      } else if (hasBackgroundEffect) {
-        holdLocalVideoUntilBackgroundRef.current = false;
-        refreshParticipants();
       }
-
-      setIsCamOn(hasActiveCameraPublication(room));
-      refreshParticipants();
-    } catch (err) {
-      console.error("[LiveKit] Video input switch error:", err);
-
-      // Fallback: full camera recovery with profile-aware constraints.
-      const cameraEnabled = await enableCameraWithRecovery(room, deviceId);
-      if (cameraEnabled && backgroundEffectRef.current !== "none") {
-        const applied = await applyBackgroundBeforeLocalVideoVisible(room);
-        if (!applied) {
-          scheduleDeferredBackgroundReapply(room, 300);
-        }
-      } else if (backgroundEffectRef.current !== "none") {
-        holdLocalVideoUntilBackgroundRef.current = false;
-        refreshParticipants();
-      }
-      setIsCamOn(hasActiveCameraPublication(room));
-      refreshParticipants();
+    } finally {
+      videoSwitchInFlightRef.current = false;
+      pendingVideoSwitchDeviceIdRef.current = null;
     }
-  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
+  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, disposeBackgroundProcessor, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
 
   return {
     connectionState,
