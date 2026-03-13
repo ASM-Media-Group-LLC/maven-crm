@@ -670,9 +670,22 @@ export function useLiveKit() {
         playLeaveSound();
         refreshParticipants();
       });
-      room.on(RoomEvent.TrackSubscribed, (_track, _pub, participant) => {
-        console.info("[LiveKit] Track subscribed from:", participant.identity);
+      room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        console.info("[LiveKit] Track subscribed from:", participant.identity, "kind:", track.kind);
         debouncedRefresh();
+
+        // Force audio playback for newly subscribed audio tracks
+        if (track.kind === "audio") {
+          room.startAudio().catch(() => {});
+          // Kick all audio elements to play after a brief delay
+          setTimeout(() => {
+            document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+              if (el.paused && el.srcObject) {
+                el.play().catch(() => {});
+              }
+            });
+          }, 200);
+        }
       });
       room.on(RoomEvent.TrackUnsubscribed, debouncedRefresh);
       room.on(RoomEvent.TrackPublished, (_pub, participant) => {
