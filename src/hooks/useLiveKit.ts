@@ -849,8 +849,26 @@ export function useLiveKit() {
         }
       }
 
-      // Try to start audio context immediately (for browsers that allow it)
-      room.startAudio().catch(() => {});
+      // Aggressively start audio context and ensure all audio elements play
+      room.startAudio().then(() => {
+        console.info("[LiveKit] Audio context started successfully");
+        // Kick all existing audio elements
+        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+          if (el.paused && el.srcObject) {
+            el.play().catch(() => {});
+          }
+        });
+      }).catch(() => {});
+
+      // Second attempt after a delay (catches late track subscriptions)
+      setTimeout(() => {
+        room.startAudio().catch(() => {});
+        document.querySelectorAll<HTMLAudioElement>("audio[data-lk-audio]").forEach((el) => {
+          if (el.paused && el.srcObject) {
+            el.play().catch(() => {});
+          }
+        });
+      }, 1500);
 
       setIsMicOn(room.localParticipant.isMicrophoneEnabled);
       setIsCamOn(hasActiveCameraPublication(room));
