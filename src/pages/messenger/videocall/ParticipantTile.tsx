@@ -1,7 +1,8 @@
-import { useEffect, useRef, memo, useCallback } from "react";
+import { useEffect, useRef, memo, useCallback, useState } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MicOff, Hand, Monitor, WifiOff } from "lucide-react";
+import { MicOff, Hand, Monitor, WifiOff, Pin, MoreVertical, UserX } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,10 @@ interface ParticipantTileProps {
   large?: boolean;
   className?: string;
   preferredAudioOutputDeviceId?: string;
+  onMuteParticipant?: (identity: string) => void;
+  onRemoveParticipant?: (identity: string) => void;
+  onPinParticipant?: (identity: string) => void;
+  isAdmin?: boolean;
 }
 
 function getInitials(name: string) {
@@ -44,7 +49,11 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prevP.isLocal === nextP.isLocal &&
     prevP.handRaised === nextP.handRaised &&
     prevP.connectionQuality === nextP.connectionQuality &&
-    areReactionsEqual(prevP.reactions, nextP.reactions)
+    areReactionsEqual(prevP.reactions, nextP.reactions) &&
+    prev.isAdmin === next.isAdmin &&
+    prev.onMuteParticipant === next.onMuteParticipant &&
+    prev.onRemoveParticipant === next.onRemoveParticipant &&
+    prev.onPinParticipant === next.onPinParticipant
   );
 }
 
@@ -75,6 +84,7 @@ function ConnectionIndicator({ quality }: { quality: string }) {
 
 const ParticipantTile = memo(function ParticipantTile({
   participant, room, large, className, preferredAudioOutputDeviceId,
+  onMuteParticipant, onRemoveParticipant, onPinParticipant, isAdmin,
 }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -257,7 +267,7 @@ const ParticipantTile = memo(function ParticipantTile({
   return (
     <div
       className={cn(
-        "relative rounded-lg overflow-hidden flex items-center justify-center h-full transition-all duration-200",
+        "group relative rounded-lg overflow-hidden flex items-center justify-center h-full transition-all duration-200",
         participant.isSpeaking && "ring-2 ring-[hsl(214_82%_51%)] ring-offset-1 ring-offset-[hsl(220_3%_14%)]",
         className
       )}
@@ -282,6 +292,59 @@ const ParticipantTile = memo(function ParticipantTile({
 
       {!participant.isLocal && (
         <audio ref={audioRef} autoPlay playsInline data-lk-audio="true" style={{ display: "none" }} />
+      )}
+
+      {/* Google Meet-style hover overlay */}
+      {!participant.isLocal && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="flex items-center gap-1 pointer-events-auto">
+            {onPinParticipant && (
+              <button
+                onClick={() => onPinParticipant(participant.identity)}
+                className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                title="Fijar participante"
+              >
+                <Pin className="h-4 w-4" />
+              </button>
+            )}
+            {onMuteParticipant && !participant.isMuted && (
+              <button
+                onClick={() => onMuteParticipant(participant.identity)}
+                className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                title="Silenciar"
+              >
+                <MicOff className="h-4 w-4" />
+              </button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-10 w-10 rounded-full bg-[hsl(220_3%_18%/0.85)] backdrop-blur-sm flex items-center justify-center text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_25%/0.95)] transition-colors"
+                  title={`Más opciones para ${participant.name}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]">
+                {onMuteParticipant && !participant.isMuted && (
+                  <DropdownMenuItem onClick={() => onMuteParticipant(participant.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
+                    <MicOff className="h-3.5 w-3.5 mr-2" /> Silenciar
+                  </DropdownMenuItem>
+                )}
+                {onPinParticipant && (
+                  <DropdownMenuItem onClick={() => onPinParticipant(participant.identity)} className="text-[hsl(220_3%_85%)] focus:bg-[hsl(220_3%_28%)]">
+                    <Pin className="h-3.5 w-3.5 mr-2" /> Fijar
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && onRemoveParticipant && (
+                  <DropdownMenuItem onClick={() => onRemoveParticipant(participant.identity)} className="text-[hsl(0_72%_65%)] focus:bg-[hsl(220_3%_28%)]">
+                    <UserX className="h-3.5 w-3.5 mr-2" /> Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       )}
 
       {/* Reactions */}

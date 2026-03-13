@@ -155,26 +155,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         <div className="relative flex-1 p-3 overflow-hidden">
           {effectiveLayout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
-              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} />)}
+              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} />)}
             </div>
           ) : effectiveLayout === "sidebar" ? (
             <div className="flex h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>
                   ))}
                 </div>
               )}
             </div>
           ) : (
             <div className="flex flex-col h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>
                   ))}
                 </div>
               )}
