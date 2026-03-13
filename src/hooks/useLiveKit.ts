@@ -1158,6 +1158,8 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
+    // Manual user action always re-enables background processing path.
+    skipAutoBackgroundRestoreRef.current = false;
 
     const room = roomRef.current;
     if (!room) return;
