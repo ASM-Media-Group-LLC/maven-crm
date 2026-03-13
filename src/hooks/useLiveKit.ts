@@ -1005,11 +1005,18 @@ export function useLiveKit() {
       }
 
       if (shouldEnableCam) {
+        const shouldGateVideoUntilBackground = backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current;
+        if (shouldGateVideoUntilBackground) {
+          bgFailureCooldownUntilRef.current = 0;
+          holdLocalVideoUntilBackgroundRef.current = true;
+          refreshParticipants();
+        }
+
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
         if (cameraEnabled) {
-          if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
-            const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2300);
+          if (shouldGateVideoUntilBackground) {
+            const applied = await applyBackgroundBeforeLocalVideoVisible(room);
             if (!applied) {
               scheduleDeferredBackgroundReapply(room, 260);
             }
@@ -1017,6 +1024,9 @@ export function useLiveKit() {
             // Fallback path when no effect is active or auto-restore is skipped.
             scheduleBackgroundApply(room);
           }
+        } else if (shouldGateVideoUntilBackground) {
+          holdLocalVideoUntilBackgroundRef.current = false;
+          refreshParticipants();
         }
       }
 
