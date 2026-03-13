@@ -229,7 +229,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
 
   const startVideoTrack = useCallback(async () => {
     stopVideoTrack();
-    await disposeBackgroundProcessor();
+    // Only dispose if a processor actually exists (avoids blocking wait)
+    if (bgProcessorRef.current) {
+      await disposeBackgroundProcessor();
+    }
     if (!camOn) return;
     try {
       const tracks = await createLocalTracks({ video: selectedVideoInput ? { deviceId: { ideal: selectedVideoInput } } : true, audio: false });
