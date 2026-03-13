@@ -1162,18 +1162,26 @@ export function useLiveKit() {
         // Optimistic UI: show cam off immediately
         setIsCamOn(false);
 
-        // Turning off: disable camera first (instant), then dispose processor
-        // in the background so the UI doesn't wait for ML teardown.
-        const processorToDispose = bgProcessorRef.current;
+        // Keep processor warm (disabled mode) so repeated camera refreshes
+        // don't constantly rebuild ML resources and freeze the tab.
+        const processor = bgProcessorRef.current;
+        const currentCamTrack = getLocalCameraTrack(room);
+        if (currentCamTrack && bgAttachedTrackRef.current === currentCamTrack) {
+          try {
+            await withTimeout(Promise.resolve(currentCamTrack.stopProcessor?.()), 1000, "bg-stop-on-cam-off");
+          } catch {}
+        }
+
         bgAttachedTrackRef.current = null;
         bgLastAppliedEffectRef.current = "none";
 
-        await room.localParticipant.setCameraEnabled(false);
-
-        // Fire-and-forget disposal — no need to block the toggle
-        if (processorToDispose) {
-          disposeBackgroundProcessor().catch(() => {});
+        if (processor?.switchTo) {
+          try {
+            await withTimeout(Promise.resolve(processor.switchTo({ mode: "disabled" })), 1200, "bg-disable-on-cam-off");
+          } catch {}
         }
+
+        await room.localParticipant.setCameraEnabled(false);
       }
 
       const camActive = hasActiveCameraPublication(room);
