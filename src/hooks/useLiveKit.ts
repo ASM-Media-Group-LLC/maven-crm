@@ -1063,15 +1063,15 @@ export function useLiveKit() {
 
         const cameraEnabled = await enableCameraWithRecovery(room, preferredDevicesRef.current.videoDeviceId);
 
-          if (cameraEnabled) {
-            refreshParticipants();
-            // User-driven camera ON: allow background apply attempts again.
-            skipAutoBackgroundRestoreRef.current = false;
-            // Never block camera refresh on ML startup; defer re-apply.
-            scheduleDeferredBackgroundReapply(room, 280);
-          } else {
-            setIsCamOn(false);
-          }
+        if (cameraEnabled) {
+          refreshParticipants();
+          // User-driven camera ON: allow background apply attempts again.
+          skipAutoBackgroundRestoreRef.current = false;
+          // Never block camera refresh on ML startup; defer re-apply.
+          scheduleDeferredBackgroundReapply(room, 280);
+        } else {
+          setIsCamOn(false);
+        }
       } else {
         // Optimistic UI: show cam off immediately
         setIsCamOn(false);
