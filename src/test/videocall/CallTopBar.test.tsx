@@ -14,8 +14,7 @@ describe("CallTopBar", () => {
   const defaultProps = {
     roomName: "Reunión de equipo",
     participantCount: 3,
-    layout: "grid" as const,
-    onToggleLayout: vi.fn(),
+    onOpenAdjustView: vi.fn(),
     shareLink: "https://example.com/call/test-room",
   };
 
@@ -39,14 +38,13 @@ describe("CallTopBar", () => {
     expect(screen.getByText("00:00")).toBeInTheDocument();
   });
 
-  it("calls onToggleLayout when layout button clicked", () => {
+  it("calls onOpenAdjustView when adjust view button clicked", () => {
     render(<CallTopBar {...defaultProps} />);
-    const layoutButton = screen.getByRole("button", { name: "" }); // icon button
-    // Find by the Grid icon
     const buttons = screen.getAllByRole("button");
-    const layoutBtn = buttons.find(b => !b.textContent?.includes("Copiar"));
-    if (layoutBtn) {
-      fireEvent.click(layoutBtn);
+    const adjustBtn = buttons.find(b => b.getAttribute("title") === "Ajustar vista");
+    if (adjustBtn) {
+      fireEvent.click(adjustBtn);
+      expect(defaultProps.onOpenAdjustView).toHaveBeenCalled();
     }
   });
 
