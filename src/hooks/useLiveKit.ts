@@ -205,6 +205,7 @@ export function useLiveKit() {
   const bgFailureCooldownUntilRef = useRef(0);
   const connectingRef = useRef(false); // Guard against concurrent connect()
   const audioResumeCleanupRef = useRef<(() => void) | null>(null); // Track audio resume listeners
+  const skipAutoBackgroundRestoreRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -598,6 +599,8 @@ export function useLiveKit() {
         audioOutputDeviceId: options.audioOutputDeviceId,
       };
       backgroundEffectRef.current = options.backgroundEffect || "none";
+      const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      skipAutoBackgroundRestoreRef.current = navigationEntry?.type === "reload" && backgroundEffectRef.current !== "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
@@ -648,7 +651,7 @@ export function useLiveKit() {
           });
         }).catch(() => {});
 
-        if (backgroundEffectRef.current !== "none") {
+        if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
         }
       });
@@ -691,7 +694,11 @@ export function useLiveKit() {
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         debouncedRefresh();
 
-        if (publication.source === Track.Source.Camera && backgroundEffectRef.current !== "none") {
+        if (
+          publication.source === Track.Source.Camera &&
+          backgroundEffectRef.current !== "none" &&
+          !skipAutoBackgroundRestoreRef.current
+        ) {
           void wait(150).then(() => queueBackgroundEffectApply(backgroundEffectRef.current));
         }
       });
@@ -838,12 +845,11 @@ export function useLiveKit() {
       if (shouldEnableCam) {
         const cameraEnabled = await enableCameraWithRecovery(room, options.videoDeviceId);
 
-        if (cameraEnabled && backgroundEffectRef.current !== "none") {
+        if (cameraEnabled && backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           // Defer background processing so the page can render first
-          // This prevents "page not responding" on refresh with active bg effect
           setTimeout(() => {
             applyConfiguredBackgroundIfNeeded(room);
-          }, 500);
+          }, 600);
         }
       }
 
@@ -1096,6 +1102,7 @@ export function useLiveKit() {
   const setBackgroundEffect = useCallback(async (effect: BackgroundEffect) => {
     backgroundEffectRef.current = effect;
     bgRequestedEffectRef.current = effect;
+    skipAutoBackgroundRestoreRef.current = false; // user explicitly requested effect apply
 
     const room = roomRef.current;
     if (!room) return;
