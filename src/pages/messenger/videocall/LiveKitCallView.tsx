@@ -191,7 +191,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             : "grid-cols-3 md:grid-cols-4";
 
   return (
-    <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)]">
+    <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)]">
       <CallTopBar
         roomName={callDisplayName || roomName}
         participantCount={lk.participants.length}
