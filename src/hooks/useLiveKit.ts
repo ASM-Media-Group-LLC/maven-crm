@@ -263,6 +263,8 @@ export function useLiveKit() {
   const bgInitialApplyDoneRef = useRef(false);
   // Prevent automatic background restoration after reload/failure (user can re-enable manually)
   const skipAutoBackgroundRestoreRef = useRef(false);
+  // Hide local camera tile while a background effect is being prepared for the current track.
+  const holdLocalVideoUntilBackgroundRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
