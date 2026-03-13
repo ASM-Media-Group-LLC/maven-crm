@@ -29,8 +29,6 @@ interface CallControlsProps {
   onToggleHand: () => void;
   onToggleChat: () => void;
   onToggleParticipants: () => void;
-  onToggleCaptions: () => void;
-  onCaptionsLanguageChange: (lang: string) => void;
   onSendReaction: (emoji: string) => void;
   onLeave: () => void;
   onAudioInputChange: (id: string) => void;
