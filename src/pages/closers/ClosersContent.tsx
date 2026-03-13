@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCloserCreators, CloserCreator } from "./useCloserCreators";
 import ClosersKPICards from "./components/ClosersKPICards";
@@ -10,7 +8,6 @@ import ConfirmadasTab from "./tabs/ConfirmadasTab";
 import CompletadasTab from "./tabs/CompletadasTab";
 import NoInteresadasTab from "./tabs/NoInteresadasTab";
 import AsignacionTab from "./tabs/AsignacionTab";
-import NewCreatorModal from "./components/NewCreatorModal";
 import EditCreatorModal from "./components/EditCreatorModal";
 import ViewCreatorModal from "./components/ViewCreatorModal";
 import DeleteCreatorDialog from "./components/DeleteCreatorDialog";
