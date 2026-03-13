@@ -599,6 +599,8 @@ export function useLiveKit() {
         audioOutputDeviceId: options.audioOutputDeviceId,
       };
       backgroundEffectRef.current = options.backgroundEffect || "none";
+      const navigationEntry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+      skipAutoBackgroundRestoreRef.current = navigationEntry?.type === "reload" && backgroundEffectRef.current !== "none";
 
       setError(null);
       setConnectionState(ConnectionState.Connecting);
