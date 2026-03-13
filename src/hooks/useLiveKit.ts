@@ -256,6 +256,7 @@ export function useLiveKit() {
   const bgApplyOpRef = useRef(0);
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const bgFailureCooldownUntilRef = useRef(0);
+  const bgReapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectingRef = useRef(false);
   const audioResumeCleanupRef = useRef<(() => void) | null>(null);
   // Track whether the initial background has been applied for this session
