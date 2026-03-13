@@ -1397,6 +1397,12 @@ export function useLiveKit() {
         const room = roomRef.current;
         if (!room) break;
 
+        const elapsedSinceLastSwitch = Date.now() - lastVideoSwitchAtRef.current;
+        if (elapsedSinceLastSwitch < VIDEO_SWITCH_MIN_INTERVAL_MS) {
+          await wait(VIDEO_SWITCH_MIN_INTERVAL_MS - elapsedSinceLastSwitch);
+        }
+        lastVideoSwitchAtRef.current = Date.now();
+
         preferredDevicesRef.current.videoDeviceId = nextDeviceId;
         const hasBackgroundEffect = backgroundEffectRef.current !== "none";
 
@@ -1410,13 +1416,17 @@ export function useLiveKit() {
             } catch {}
           }
 
-          if (hasBackgroundEffect) {
-            // Hard-recycle processor on refresh to release leaked GPU/ML resources.
-            await disposeBackgroundProcessor();
-          } else {
-            bgAttachedTrackRef.current = null;
-            bgLastAppliedEffectRef.current = "none";
+          // Keep processor instance alive and only disable its mode before re-attaching.
+          // Re-creating the processor on every refresh spikes CPU/GPU and can hang the page.
+          const processor = bgProcessorRef.current;
+          if (processor?.switchTo) {
+            try {
+              await withTimeout(Promise.resolve(processor.switchTo({ mode: "disabled" })), 1200, "bg-disable-before-video-switch");
+            } catch {}
           }
+
+          bgAttachedTrackRef.current = null;
+          bgLastAppliedEffectRef.current = "none";
 
           // Device switch is user-driven, so allow background application again.
           skipAutoBackgroundRestoreRef.current = false;
@@ -1427,15 +1437,13 @@ export function useLiveKit() {
             refreshParticipants();
           }
 
-          if (hasBackgroundEffect) {
-            // Deterministic restart with safe constraints is more stable than hot-switching
-            // when a background processor is active.
-            await room.localParticipant.setCameraEnabled(false);
-            await wait(80);
-            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, true));
-          } else {
-            // No background effect: keep seamless switch path.
+          // Try seamless device switch first; fallback to deterministic restart only if needed.
+          try {
             await room.switchActiveDevice("videoinput", nextDeviceId);
+          } catch {
+            await room.localParticipant.setCameraEnabled(false);
+            await wait(70);
+            await room.localParticipant.setCameraEnabled(true, getVideoConstraint(nextDeviceId, hasBackgroundEffect));
           }
 
           const isReady = await waitForCameraPublication(room, [80, 150, 300]);
