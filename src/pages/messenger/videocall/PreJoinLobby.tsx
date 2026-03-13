@@ -25,9 +25,9 @@ interface DeviceInfo {
   label: string;
 }
 
-const PREJOIN_BG_ATTACH_TIMEOUT_MS = 6000;
-const PREJOIN_BG_SWITCH_TIMEOUT_MS = 7000;
-const PREJOIN_BG_FAILURE_COOLDOWN_MS = 12000;
+const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
+const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
+const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "soft-blur" && effect !== "hard-blur";
