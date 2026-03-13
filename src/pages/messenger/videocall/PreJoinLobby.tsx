@@ -126,8 +126,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     bgProcessorRef.current = null;
     bgAttachedTrackRef.current = null;
     bgLastAppliedEffectRef.current = "none";
-    if (processor?.destroy) {
-      try { await withTimeout(Promise.resolve(processor.destroy()), 2500, "prejoin-bg-destroy"); } catch {}
+    if (!processor) return; // Fast path: nothing to dispose
+    if (processor.destroy) {
+      try { await withTimeout(Promise.resolve(processor.destroy()), 1500, "prejoin-bg-destroy"); } catch {}
     }
   }, []);
 
