@@ -255,6 +255,7 @@ export function useLiveKit() {
   const bgRequestedEffectRef = useRef<BackgroundEffect>("none");
   const bgApplyOpRef = useRef(0);
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const bgQueueInFlightRef = useRef(false);
   const bgFailureCooldownUntilRef = useRef(0);
   const bgReapplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectingRef = useRef(false);
