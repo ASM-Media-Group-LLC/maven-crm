@@ -1,22 +1,24 @@
 
 
-## Problem
+## Diagnóstico: Salto al cambiar de tab en Closers
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+El "salto" ocurre porque cada cambio de tab dispara una nueva query a Supabase (el `activeTab` está en el `queryKey`). Mientras la nueva data se carga, la tabla se desmonta momentáneamente (el contenido anterior desaparece y aparece el nuevo). Esto causa un flash visual.
 
-## Solution
+### Solución
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+**Archivo:** `src/pages/closers/hooks/useCloserLeads.ts`
 
-## Changes
+Agregar `placeholderData: keepPreviousData` (de TanStack Query) a la query de leads. Esto mantiene la data anterior visible mientras la nueva se carga, eliminando el salto.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+```typescript
+import { keepPreviousData } from "@tanstack/react-query";
 
-Replace the single `.select()` call with a paginated loop:
+const { data: leads = [], isLoading } = useQuery({
+  queryKey: [...],
+  queryFn: async () => { ... },
+  placeholderData: keepPreviousData,  // ← agregar esto
+});
+```
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+Cambio mínimo de 1 línea + 1 import. No requiere modificar ningún otro archivo.
 
