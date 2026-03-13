@@ -1392,7 +1392,7 @@ export function useLiveKit() {
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
     }
-  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, scheduleDeferredBackgroundReapply]);
+  }, [refreshParticipants, waitForCameraPublication, hasActiveCameraPublication, enableCameraWithRecovery, getLocalCameraTrack, applyBackgroundBeforeLocalVideoVisible, scheduleDeferredBackgroundReapply]);
 
   return {
     connectionState,
