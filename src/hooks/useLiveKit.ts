@@ -1384,7 +1384,10 @@ export function useLiveKit() {
       // Fallback: full camera recovery with profile-aware constraints.
       const cameraEnabled = await enableCameraWithRecovery(room, deviceId);
       if (cameraEnabled && backgroundEffectRef.current !== "none") {
-        scheduleDeferredBackgroundReapply(room, 300);
+        const applied = await applyBackgroundBeforeLocalVideoVisible(room, 2200);
+        if (!applied) {
+          scheduleDeferredBackgroundReapply(room, 300);
+        }
       }
       setIsCamOn(hasActiveCameraPublication(room));
       refreshParticipants();
