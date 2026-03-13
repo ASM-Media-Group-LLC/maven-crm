@@ -137,7 +137,8 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     if (!isTemplateBackground(effect)) return;
     const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
     if (!tpl) return;
-    const templateUrl = `${window.location.origin}${tpl.src}`;
+    // Use low-res version for processor (480px is sufficient for ML segmentation)
+    const templateUrl = `${window.location.origin}${tpl.lowSrc || tpl.src}`;
     if (preloadedRef.current.has(templateUrl)) return;
     await new Promise<void>((resolve, reject) => {
       const img = new Image();
