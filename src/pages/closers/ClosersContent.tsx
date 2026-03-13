@@ -65,7 +65,7 @@ const ClosersContent = () => {
           <p className="text-sm text-muted-foreground">Cargando...</p>
         ) : (
           <>
-            <ClosersKPICards creators={creators} />
+            <ClosersKPICards creators={creators} leadsDisponibles={leadsDisponibles} />
             <Tabs defaultValue="leads">
             <TabsList className="flex-wrap">
               <TabsTrigger value="leads">Leads</TabsTrigger>
