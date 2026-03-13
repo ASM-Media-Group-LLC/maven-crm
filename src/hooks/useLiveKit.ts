@@ -651,7 +651,7 @@ export function useLiveKit() {
           });
         }).catch(() => {});
 
-        if (backgroundEffectRef.current !== "none") {
+        if (backgroundEffectRef.current !== "none" && !skipAutoBackgroundRestoreRef.current) {
           void wait(220).then(() => applyConfiguredBackgroundIfNeeded(room));
         }
       });
