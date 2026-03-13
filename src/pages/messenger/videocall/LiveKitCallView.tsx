@@ -165,12 +165,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   // ── Error state ────────────────────────────────────────────────
   if (lk.error) {
     return (
-      <div className="flex flex-col h-full bg-[hsl(240_10%_6%)] text-[hsl(0_0%_96%)] items-center justify-center gap-4">
-        <p className="text-destructive font-medium">Error de conexión</p>
-        <p className="text-sm text-[hsl(0_0%_96%/0.5)] max-w-md text-center">{lk.error}</p>
+      <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)] items-center justify-center gap-4">
+        <p className="text-[hsl(0_72%_65%)] font-medium">Error de conexión</p>
+        <p className="text-sm text-[hsl(220_3%_55%)] max-w-md text-center">{lk.error}</p>
         <button
           onClick={handleLeave}
-          className="mt-4 px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm"
+          className="mt-4 px-4 py-2 rounded-full bg-[hsl(214_82%_51%)] text-white text-sm hover:bg-[hsl(214_82%_45%)]"
         >
           Volver
         </button>
