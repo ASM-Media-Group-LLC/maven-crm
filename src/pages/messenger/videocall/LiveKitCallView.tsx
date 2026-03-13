@@ -44,7 +44,6 @@ interface LiveKitCallViewProps {
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none" }: LiveKitCallViewProps) {
   const lk = useLiveKit();
-  const captions = useSpeechCaptions();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
