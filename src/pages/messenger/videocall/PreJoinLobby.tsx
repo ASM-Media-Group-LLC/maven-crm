@@ -28,9 +28,50 @@ interface DeviceInfo {
 const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
+const PREJOIN_STORAGE_KEY_PREFIX = "call-prejoin-settings:v1";
+
+interface PersistedPreJoinSettings {
+  micOn: boolean;
+  camOn: boolean;
+  audioDeviceId?: string;
+  videoDeviceId?: string;
+  audioOutputDeviceId?: string;
+  backgroundEffect: BackgroundEffect;
+}
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
+}
+
+function getPreJoinStorageKey(roomName: string) {
+  return `${PREJOIN_STORAGE_KEY_PREFIX}:${roomName}`;
+}
+
+function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
+  try {
+    const raw = localStorage.getItem(getPreJoinStorageKey(roomName));
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<PersistedPreJoinSettings>;
+    return {
+      micOn: typeof parsed.micOn === "boolean" ? parsed.micOn : true,
+      camOn: typeof parsed.camOn === "boolean" ? parsed.camOn : true,
+      audioDeviceId: typeof parsed.audioDeviceId === "string" ? parsed.audioDeviceId : undefined,
+      videoDeviceId: typeof parsed.videoDeviceId === "string" ? parsed.videoDeviceId : undefined,
+      audioOutputDeviceId: typeof parsed.audioOutputDeviceId === "string" ? parsed.audioOutputDeviceId : undefined,
+      backgroundEffect: typeof parsed.backgroundEffect === "string" ? parsed.backgroundEffect : "none",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePreJoinSettings(roomName: string, settings: PersistedPreJoinSettings) {
+  try {
+    localStorage.setItem(getPreJoinStorageKey(roomName), JSON.stringify(settings));
+  } catch {
+    // no-op
+  }
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
