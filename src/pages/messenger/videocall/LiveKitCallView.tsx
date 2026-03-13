@@ -184,7 +184,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
-          {captions.isActive && <CallCaptions captions={captions.captions} interimText={captions.interimText} />}
+          
         </div>
 
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
