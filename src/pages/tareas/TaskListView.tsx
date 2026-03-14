@@ -105,11 +105,13 @@ const TaskListView = ({ tasks, profiles, onComplete, onJustify, onEdit, onDelete
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-card">
       {/* Column headers */}
-      <div className="grid grid-cols-[1fr_140px_140px_100px_120px_40px] items-center px-3 py-2 gap-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
+      <div className="grid grid-cols-[1fr_110px_120px_110px_80px_80px_100px_40px] items-center px-3 py-2 gap-2 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground">
         <span className="pl-8">Nombre</span>
-        <span className="flex items-center gap-1"><User className="h-3 w-3" /> Asignado</span>
-        <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" /> Fecha límite</span>
+        <span className="flex items-center gap-1"><User className="h-3 w-3" /> Asignado por</span>
+        <span className="flex items-center gap-1"><User className="h-3 w-3" /> Asignado a</span>
         <span className="flex items-center gap-1"><Flag className="h-3 w-3" /> Prioridad</span>
+        <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" /> Inicio</span>
+        <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" /> Fin</span>
         <span className="flex items-center gap-1 justify-end"><Clock className="h-3 w-3" /> Tiempo</span>
         <span></span>
       </div>
