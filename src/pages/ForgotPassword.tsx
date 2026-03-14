@@ -69,12 +69,14 @@ const ForgotPassword = () => {
           </form>
         )}
 
-        <div className="flex flex-col items-center gap-2 text-sm">
-          <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
-            <ArrowLeft className="h-4 w-4" />
-            Volver a iniciar sesión
-          </Link>
-        </div>
+        {!sent && (
+          <div className="flex flex-col items-center gap-2 text-sm">
+            <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
+              <ArrowLeft className="h-4 w-4" />
+              Volver a iniciar sesión
+            </Link>
+          </div>
+        )}
       </div>
     </AuthLayout>
   );
