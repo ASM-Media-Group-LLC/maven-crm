@@ -1,33 +1,22 @@
 
 
-## Plan: Tabla inline editable para Closers
+## Problem
 
-### Problema actual
-La tabla `LeadTable` es de solo lectura — para cambiar categoría, estado o contacto el usuario debe abrir un dropdown de acciones. Necesitas edición directa en celda (inline editing).
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Cambios
+## Solution
 
-**Archivo: `src/pages/closers/components/LeadTable.tsx`**
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-1. **Columna "Categoría" (quality)** — Reemplazar el Badge estático por un `Select` inline que permita cambiar entre A+, A, B, C directamente en la celda.
+## Changes
 
-2. **Columna "Contactada?"** — Actualmente muestra el estado como badge. Convertirla en un `Select` inline con opciones claras: "Sí" / "No" (mapeando a `contactado` / `no_response`).
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-3. **Columna "Estado"** — Agregar una nueva columna visible con un `Select` inline mostrando todos los estados posibles (Sin contactar, Contactado, Interesada, En negociación, Confirmada, Completada, No interesada). El usuario puede cambiar el estado directamente desde la celda.
+Replace the single `.select()` call with a paginated loop:
 
-4. **Columna "Notas"** — Hacer el campo clickeable para editar inline (input que aparece al hacer click, se guarda con Enter/blur).
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-**Archivo: `src/pages/closers/hooks/useCloserLeads.ts`**
-
-5. Agregar mutation `updateField` genérica que permita actualizar cualquier campo individual (`quality`, `status`, `notes`, `phone_raw`) en `leadgen_entries`.
-
-**Archivo: `src/pages/closers/ClosersContent.tsx`**
-
-6. Pasar el nuevo `updateField` al `LeadTable` y conectar los callbacks de cada celda editable.
-
-### Comportamiento UX
-- Los selects inline se ven como badges/texto normal hasta que el usuario interactúa — al hacer click se abre el selector.
-- El cambio se guarda inmediatamente al seleccionar una opción (no requiere botón de guardar).
-- Las notas se editan con click → input aparece → Enter o blur para guardar.
-- Se mantiene el menú de acciones (⋯) para acciones rápidas como "Avanzar estado".
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
