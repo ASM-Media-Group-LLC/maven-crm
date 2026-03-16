@@ -158,20 +158,6 @@ export const useCloserLeads = () => {
     },
   });
 
-  const updateNotes = useMutation({
-    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
-      const { error } = await supabase
-        .from("leadgen_entries")
-        .update({ notes } as any)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
-      toast({ title: "Notas actualizadas" });
-    },
-  });
-
   return {
     leads: filtered,
     isLoading,
@@ -182,6 +168,6 @@ export const useCloserLeads = () => {
     dateTo, setDateTo,
     activeTab, setActiveTab,
     updateStatus,
-    updateNotes,
+    updateField,
   };
 };
