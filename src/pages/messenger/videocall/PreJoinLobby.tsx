@@ -8,6 +8,7 @@ import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/trac
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
+import { loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
 interface PreJoinLobbyProps {
   roomName: string;
