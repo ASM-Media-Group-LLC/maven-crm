@@ -188,7 +188,7 @@ const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-background">
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead>Instagram</TableHead>

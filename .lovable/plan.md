@@ -1,20 +1,22 @@
 
 
-## Plan: Headers fijos en Closers
+## Problem
 
-### Problema
-1. El header de página ("Closers") ya es `shrink-0` pero todo el contenido debajo (KPIs, tabs, filtros, tabla) está dentro de un solo `div.overflow-auto`, así que al hacer scroll se pierden los tabs y filtros.
-2. El `<thead>` de la tabla no es sticky — al scrollear filas se pierde la referencia de las columnas.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Cambios
+## Solution
 
-**`src/pages/closers/ClosersContent.tsx`**
-- Mover las KPIs, TabsList y filtros fuera del div scrollable, haciéndolos `shrink-0` para que queden fijos.
-- Solo el contenido de la tabla (TabsContent) queda dentro del área scrollable.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-**`src/pages/closers/components/LeadTable.tsx`**
-- Agregar `sticky top-0 z-10 bg-background` al `<TableHeader>` para que los encabezados de columna permanezcan visibles al hacer scroll dentro de la tabla.
+## Changes
 
-**`src/components/ui/table.tsx`**
-- No se modifica — el sticky se aplica directamente en LeadTable.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
