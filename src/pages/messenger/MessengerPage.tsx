@@ -90,6 +90,11 @@ export default function MessengerPage() {
   };
 
   const handleCreateRoom = (name: string) => {
+    const myRooms = videoRooms.filter(r => r.createdBy === "me");
+    if (myRooms.length >= 10) {
+      toast.error("Has alcanzado el máximo de 10 salas. Elimina una existente para crear otra.");
+      return;
+    }
     const roomId = `room-${Date.now()}`;
     const newRoom: VideoRoom = {
       id: roomId, name, createdBy: "me", createdAt: new Date(),
