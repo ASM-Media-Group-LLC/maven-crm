@@ -53,6 +53,8 @@ export const TAB_STATUS_MAP: Record<string, string[]> = {
   no_interesadas: ["not_interested"],
 };
 
+const PAGE_SIZE = 100;
+
 export const useCloserLeads = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,16 +64,20 @@ export const useCloserLeads = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [activeTab, setActiveTab] = useState("todos");
+  const [page, setPage] = useState(0);
 
-  // Fetch leads with pagination (up to 5000 for the active filter)
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ["closer-leads", activeTab, dateFrom?.toISOString(), dateTo?.toISOString(), qualityFilter],
+  // Reset page when filters change
+  const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
+
+  // Fetch leads with pagination
+  const { data: leadsData, isLoading } = useQuery({
+    queryKey: ["closer-leads", activeTab, dateFrom?.toISOString(), dateTo?.toISOString(), qualityFilter, page],
     queryFn: async () => {
       const statusFilter = TAB_STATUS_MAP[activeTab] || [];
 
       let query = supabase
         .from("leadgen_entries")
-        .select("id, model_handle, platform, quality, company, phone_raw, source_link, entry_date, country_code, status, notes, ticket_number")
+        .select("id, model_handle, platform, quality, company, phone_raw, source_link, entry_date, country_code, status, notes, ticket_number", { count: "exact" })
         .order("entry_date", { ascending: false });
 
       if (statusFilter.length === 1) {
@@ -84,34 +90,35 @@ export const useCloserLeads = () => {
       if (dateTo) query = query.lte("entry_date", dateTo.toISOString().slice(0, 10));
       if (qualityFilter) query = query.eq("quality", qualityFilter);
 
-      query = query.limit(500);
+      const from = page * PAGE_SIZE;
+      query = query.range(from, from + PAGE_SIZE - 1);
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return (data || []) as CloserLead[];
+      return { leads: (data || []) as CloserLead[], total: count || 0 };
     },
     placeholderData: keepPreviousData,
   });
 
-  // Counts per status for KPIs
+  const leads = leadsData?.leads || [];
+  const totalCount = leadsData?.total || 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Single query for all status counts
   const { data: statusCounts = {} } = useQuery({
     queryKey: ["closer-leads-counts"],
     queryFn: async () => {
-      const counts: Record<string, number> = {};
-      
-      // Fetch counts for each relevant status
-      const statuses = ["no_response", "contactado", "replied", "interested", "meeting_set", "confirmed", "completed", "not_interested"];
-      
-      await Promise.all(
-        statuses.map(async (status) => {
-          const { count } = await supabase
-            .from("leadgen_entries")
-            .select("id", { count: "exact", head: true })
-            .eq("status", status);
-          counts[status] = count || 0;
-        })
-      );
+      const { data, error } = await supabase
+        .from("leadgen_entries")
+        .select("status");
 
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      for (const row of data || []) {
+        const s = row.status || "no_response";
+        counts[s] = (counts[s] || 0) + 1;
+      }
       return counts;
     },
     staleTime: 30_000,
@@ -122,6 +129,20 @@ export const useCloserLeads = () => {
     ? leads.filter((l) => l.model_handle.toLowerCase().includes(search.toLowerCase()))
     : leads;
 
+  // Optimistic update helper
+  const optimisticUpdate = (id: string, updates: Partial<CloserLead>) => {
+    queryClient.setQueryData(
+      ["closer-leads", activeTab, dateFrom?.toISOString(), dateTo?.toISOString(), qualityFilter, page],
+      (old: { leads: CloserLead[]; total: number } | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          leads: old.leads.map((l) => (l.id === id ? { ...l, ...updates } : l)),
+        };
+      }
+    );
+  };
+
   const updateField = useMutation({
     mutationFn: async ({ id, field, value }: { id: string; field: string; value: string | null }) => {
       const { error } = await supabase
@@ -130,12 +151,16 @@ export const useCloserLeads = () => {
         .eq("id", id);
       if (error) throw error;
     },
+    onMutate: ({ id, field, value }) => {
+      optimisticUpdate(id, { [field]: value } as Partial<CloserLead>);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      // Only refresh counts, not the full list (already optimistically updated)
       queryClient.invalidateQueries({ queryKey: ["closer-leads-counts"] });
-      toast({ title: "Actualizado" });
     },
     onError: (e: Error) => {
+      // Revert on error
+      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
@@ -148,12 +173,14 @@ export const useCloserLeads = () => {
         .eq("id", id);
       if (error) throw error;
     },
+    onMutate: ({ id, status }) => {
+      optimisticUpdate(id, { status });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
       queryClient.invalidateQueries({ queryKey: ["closer-leads-counts"] });
-      toast({ title: "Estado actualizado" });
     },
     onError: (e: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
@@ -162,11 +189,14 @@ export const useCloserLeads = () => {
     leads: filtered,
     isLoading,
     statusCounts,
+    totalCount,
+    totalPages,
+    page, setPage,
     search, setSearch,
     qualityFilter, setQualityFilter,
     dateFrom, setDateFrom,
     dateTo, setDateTo,
-    activeTab, setActiveTab,
+    activeTab, setActiveTab: handleTabChange,
     updateStatus,
     updateField,
   };
