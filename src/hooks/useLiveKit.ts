@@ -1151,6 +1151,39 @@ export function useLiveKit() {
     }
   }, [refreshParticipants]);
 
+  // ── Noise Cancellation toggle ─────────────────────────────────
+  const toggleNoiseCancellation = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const newState = !ncEnabledRef.current;
+    ncEnabledRef.current = newState;
+    setIsNoiseCancellationOn(newState);
+    saveNCPreference(newState);
+    const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+      (pub) => pub.source === Track.Source.Microphone,
+    );
+    const localAudioTrack = micPub?.track;
+    if (!localAudioTrack) return;
+    if (newState) {
+      if (!supportsNoiseSuppression()) { ncEnabledRef.current = false; setIsNoiseCancellationOn(false); return; }
+      try {
+        const processor = new NoiseSuppresionTrackProcessor();
+        ncProcessorRef.current = processor;
+        await (localAudioTrack as any).setProcessor(processor);
+        console.info("[LiveKit] Noise cancellation enabled");
+      } catch (err) {
+        console.error("[LiveKit] NC toggle error:", err);
+        ncProcessorRef.current = null;
+        ncEnabledRef.current = false;
+        setIsNoiseCancellationOn(false);
+      }
+    } else {
+      try { await (localAudioTrack as any).stopProcessor(); } catch {}
+      if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch {} ncProcessorRef.current = null; }
+      console.info("[LiveKit] Noise cancellation disabled");
+    }
+  }, []);
+
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
     const room = roomRef.current;
