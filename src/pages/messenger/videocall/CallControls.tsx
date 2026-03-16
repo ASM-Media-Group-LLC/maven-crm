@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
   PhoneOff, Hand, MessageSquare, Smile, Users,
-  ChevronUp, Info, Settings, Volume2, ChevronDown, Check, AudioLines,
+  ChevronUp, Info, Settings, Volume2, ChevronDown, Check,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -34,8 +34,6 @@ interface CallControlsProps {
   onAudioInputChange: (id: string) => void;
   onAudioOutputChange: (id: string) => void;
   onVideoInputChange: (id: string) => void;
-  isNoiseCancellationOn: boolean;
-  onToggleNoiseCancellation: () => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
 }
@@ -165,7 +163,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  isNoiseCancellationOn, onToggleNoiseCancellation,
+  
   onOpenVideoSettings, onOpenMetrics,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
@@ -212,13 +210,6 @@ export default function CallControls({
           </button>
         </div>
 
-        {/* Noise cancellation toggle */}
-        <ControlBtn
-          icon={AudioLines}
-          active={isNoiseCancellationOn ? true : undefined}
-          onClick={onToggleNoiseCancellation}
-          label={isNoiseCancellationOn ? "Desactivar cancelación de ruido" : "Activar cancelación de ruido"}
-        />
 
         {/* Cam with video popover — Google Meet grouped style */}
         <div className="flex items-center">
