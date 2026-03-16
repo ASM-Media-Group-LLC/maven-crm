@@ -1,13 +1,10 @@
-import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Search, X } from "lucide-react";
-import { useCloserLeads, CloserLead, TAB_STATUS_MAP } from "./hooks/useCloserLeads";
+import { useCloserLeads } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import LeadTable from "./components/LeadTable";
 
@@ -31,26 +28,10 @@ const ClosersContent = () => {
     qualityFilter, setQualityFilter,
     dateFrom, setDateFrom, dateTo, setDateTo,
     activeTab, setActiveTab,
-    updateStatus, updateNotes,
+    updateStatus, updateField,
   } = useCloserLeads();
 
-  const [editingNotes, setEditingNotes] = useState<CloserLead | null>(null);
-  const [notesText, setNotesText] = useState("");
-
   const hasFilters = search || qualityFilter || dateFrom || dateTo;
-
-  const handleEditNotes = (lead: CloserLead) => {
-    setEditingNotes(lead);
-    setNotesText(lead.notes || "");
-  };
-
-  const handleSaveNotes = () => {
-    if (editingNotes) {
-      updateNotes.mutate({ id: editingNotes.id, notes: notesText }, {
-        onSuccess: () => setEditingNotes(null),
-      });
-    }
-  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -79,7 +60,6 @@ const ClosersContent = () => {
                 ))}
               </TabsList>
 
-              {/* Shared filters */}
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -112,13 +92,12 @@ const ClosersContent = () => {
                 )}
               </div>
 
-              {/* All tabs share the same table — filtering is done by the hook */}
               {TABS.map((tab) => (
                 <TabsContent key={tab.value} value={tab.value}>
                   <LeadTable
                     leads={leads}
                     onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
-                    onEditNotes={handleEditNotes}
+                    onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     Mostrando {leads.length} leads
@@ -129,25 +108,6 @@ const ClosersContent = () => {
           </>
         )}
       </div>
-
-      {/* Notes edit dialog */}
-      <Dialog open={!!editingNotes} onOpenChange={(o) => !o && setEditingNotes(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Notas — @{editingNotes?.model_handle}</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            value={notesText}
-            onChange={(e) => setNotesText(e.target.value)}
-            rows={4}
-            placeholder="Agregar notas..."
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingNotes(null)}>Cancelar</Button>
-            <Button onClick={handleSaveNotes} disabled={updateNotes.isPending}>Guardar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 };
