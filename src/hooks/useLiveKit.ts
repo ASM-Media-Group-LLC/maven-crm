@@ -1026,6 +1026,28 @@ export function useLiveKit() {
 
       if (shouldEnableMic) {
         await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
+        // Apply noise cancellation if saved preference is on
+        if (loadNCPreference() && supportsNoiseSuppression()) {
+          ncEnabledRef.current = true;
+          setIsNoiseCancellationOn(true);
+          try {
+            await wait(80);
+            const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+              (p) => p.source === Track.Source.Microphone,
+            );
+            const localAudioTrack = micPub?.track;
+            if (localAudioTrack) {
+              const processor = new NoiseSuppresionTrackProcessor();
+              ncProcessorRef.current = processor;
+              await (localAudioTrack as any).setProcessor(processor);
+              console.info("[LiveKit] Noise cancellation applied on connect");
+            }
+          } catch (err) {
+            console.warn("[LiveKit] NC init error:", err);
+            ncEnabledRef.current = false;
+            setIsNoiseCancellationOn(false);
+          }
+        }
       }
 
       if (shouldEnableCam) {
