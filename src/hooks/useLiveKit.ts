@@ -1549,5 +1549,7 @@ export function useLiveKit() {
     switchAudioInput,
     switchAudioOutput,
     switchVideoInput,
+    isNoiseCancellationOn,
+    toggleNoiseCancellation,
   };
 }
