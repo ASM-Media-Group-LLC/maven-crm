@@ -258,5 +258,25 @@ export const useCreateQAReview = () => {
   });
 };
 
+/** Generic field update for leadgen_entries */
+export const useUpdateLeadField = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, field, value }: { id: string; field: string; value: string | null }) => {
+      const { error } = await supabase
+        .from("leadgen_entries")
+        .update({ [field]: value } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onMutate: async ({ id, field, value }) => {
+      optimisticEntryUpdate(queryClient, id, { [field]: value } as any);
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
+    },
+  });
+};
+
 // Legacy alias
 export const useUpdateLeadCategoria = useUpdateLeadQuality;

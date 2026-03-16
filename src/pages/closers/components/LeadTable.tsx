@@ -1,10 +1,10 @@
-import { useState, useCallback, memo } from "react";
+import { useState, memo } from "react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MoreHorizontal, ArrowRight, XCircle, ExternalLink } from "lucide-react";
+import { MoreHorizontal, ArrowRight, XCircle, ExternalLink, ChevronDown, Phone } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
@@ -57,14 +57,18 @@ const NEXT_STATUS: Record<string, string | null> = {
 
 const ALL_STATUSES = ["no_response", "contactado", "replied", "interested", "meeting_set", "confirmed", "completed", "not_interested"];
 
+const cleanPhoneForWhatsApp = (phone: string) =>
+  phone.replace(/[^\d]/g, "");
+
 // Click-to-edit popover for quality
 const QualityCell = memo(({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
           <Badge className={qualityColor(value)}>{value || "—"}</Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1" align="start">
@@ -91,10 +95,11 @@ const StatusCell = memo(({ value, onChange }: { value: string; onChange: (v: str
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
           <Badge className={statusColor(value)}>
             {STATUS_LABELS[value] || value}
           </Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1" align="start">
@@ -122,10 +127,11 @@ const ContactedCell = memo(({ isContacted, onToggle }: { isContacted: boolean; o
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
           <Badge className={isContacted ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}>
             {isContacted ? "Sí" : "No"}
           </Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1" align="start">
@@ -183,6 +189,42 @@ const InlineNotes = memo(({ value, onSave }: { value: string | null; onSave: (v:
   );
 });
 InlineNotes.displayName = "InlineNotes";
+
+// Inline editable source/company cell
+const InlineSourceCell = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value || "");
+
+  const save = () => {
+    setEditing(false);
+    const newVal = text.trim();
+    if (newVal !== (value || "")) onSave(newVal || null);
+  };
+
+  if (!editing) {
+    return (
+      <span
+        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[140px] truncate text-sm"
+        onClick={() => { setText(value || ""); setEditing(true); }}
+        title={value || "Click para editar"}
+      >
+        {value || "—"}
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+      onBlur={save}
+      autoFocus
+      className="h-7 text-sm w-36"
+    />
+  );
+});
+InlineSourceCell.displayName = "InlineSourceCell";
 
 const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
   return (
@@ -245,7 +287,13 @@ const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
                   </TableCell>
 
                   <TableCell className="text-sm">{lead.entry_date}</TableCell>
-                  <TableCell className="text-sm">{lead.company || "—"}</TableCell>
+
+                  <TableCell>
+                    <InlineSourceCell
+                      value={lead.company}
+                      onSave={(v) => onFieldChange(lead.id, "company", v)}
+                    />
+                  </TableCell>
 
                   <TableCell>
                     <ContactedCell
@@ -260,7 +308,21 @@ const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
                     />
                   </TableCell>
 
-                  <TableCell className="text-sm">{lead.phone_raw || "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    {lead.phone_raw ? (
+                      <a
+                        href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_raw)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <Phone className="h-3 w-3" />
+                        <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
 
                   <TableCell>
                     <InlineNotes

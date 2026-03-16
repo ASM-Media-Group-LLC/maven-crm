@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from "react";
-import { ArrowUpDown, ExternalLink, Eye } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Input } from "@/components/ui/input";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUpdateLeadQuality, useUpdateLeadStatus } from "./useLeadGen";
+import { useUpdateLeadQuality, useUpdateLeadStatus, useUpdateLeadField } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 
 const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
@@ -66,6 +67,9 @@ const getPlatformIcon = (platform: string) => {
   return <ExternalLink className="h-4 w-4 text-muted-foreground" />;
 };
 
+const cleanPhoneForWhatsApp = (phone: string) =>
+  phone.replace(/[^\d]/g, "");
+
 type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "estado" | "pais" | "contacto" | "qa";
 
 interface Props {
@@ -84,12 +88,13 @@ const QualityCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="cursor-pointer hover:opacity-80 transition-opacity"
+          className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5"
           onClick={(e) => e.stopPropagation()}
         >
           <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
             {lead.quality.toUpperCase()}
           </Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1.5" align="start" onClick={(e) => e.stopPropagation()}>
@@ -122,12 +127,13 @@ const StatusCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="cursor-pointer hover:opacity-80 transition-opacity"
+          className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5"
           onClick={(e) => e.stopPropagation()}
         >
           <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
             {statusLabels[lead.status] || lead.status}
           </Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1.5" align="start" onClick={(e) => e.stopPropagation()}>
@@ -150,6 +156,46 @@ const StatusCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
   );
 });
 StatusCell.displayName = "StatusCell";
+
+// Inline editable company/source cell
+const InlineSourceCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(lead.company || "");
+  const updateField = useUpdateLeadField();
+
+  const save = () => {
+    setEditing(false);
+    const newVal = text.trim();
+    if (newVal !== (lead.company || "")) {
+      updateField.mutate({ id: lead.id, field: "company", value: newVal || null });
+    }
+  };
+
+  if (!editing) {
+    return (
+      <span
+        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[140px] truncate text-sm text-muted-foreground"
+        onClick={(e) => { e.stopPropagation(); setText(lead.company || ""); setEditing(true); }}
+        title={lead.company || "Click para editar"}
+      >
+        {lead.company || "—"}
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+      onBlur={save}
+      onClick={(e) => e.stopPropagation()}
+      autoFocus
+      className="h-7 text-sm w-36"
+    />
+  );
+});
+InlineSourceCell.displayName = "InlineSourceCell";
 
 const buildProfileUrl = (entry: LeadGenEntry) => {
   if (entry.source_link) return entry.source_link;
@@ -185,11 +231,27 @@ const LeadRow = React.memo(({ lead, onView }: { lead: LeadGenEntry; onView?: (le
       </a>
     </TableCell>
     <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
-    <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
+    <TableCell onClick={(e) => e.stopPropagation()}>
+      <InlineSourceCell lead={lead} />
+    </TableCell>
     <TableCell><QualityCell lead={lead} /></TableCell>
     <TableCell><StatusCell lead={lead} /></TableCell>
     <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
-    <TableCell className="text-sm text-muted-foreground">{lead.phone_raw ? "📞" : "—"}</TableCell>
+    <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+      {lead.phone_raw ? (
+        <a
+          href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_e164 || lead.phone_raw)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-primary hover:underline"
+        >
+          <Phone className="h-3 w-3" />
+          <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )}
+    </TableCell>
     <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
     <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
