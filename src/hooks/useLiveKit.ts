@@ -12,6 +12,7 @@ import {
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
+import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
