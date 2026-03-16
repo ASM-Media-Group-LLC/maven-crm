@@ -122,6 +122,24 @@ export const useCloserLeads = () => {
     ? leads.filter((l) => l.model_handle.toLowerCase().includes(search.toLowerCase()))
     : leads;
 
+  const updateField = useMutation({
+    mutationFn: async ({ id, field, value }: { id: string; field: string; value: string | null }) => {
+      const { error } = await supabase
+        .from("leadgen_entries")
+        .update({ [field]: value } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-leads-counts"] });
+      toast({ title: "Actualizado" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase
