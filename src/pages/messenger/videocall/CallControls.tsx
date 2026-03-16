@@ -212,13 +212,6 @@ export default function CallControls({
           </button>
         </div>
 
-        {/* Noise cancellation toggle */}
-        <ControlBtn
-          icon={AudioLines}
-          active={isNoiseCancellationOn ? true : undefined}
-          onClick={onToggleNoiseCancellation}
-          label={isNoiseCancellationOn ? "Desactivar cancelación de ruido" : "Activar cancelación de ruido"}
-        />
 
         {/* Cam with video popover — Google Meet grouped style */}
         <div className="flex items-center">
