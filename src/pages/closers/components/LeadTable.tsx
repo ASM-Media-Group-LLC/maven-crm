@@ -311,7 +311,7 @@ const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
                   <TableCell className="text-sm">
                     {lead.phone_raw ? (
                       <a
-                        href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_e164 || lead.phone_raw)}`}
+                        href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_raw)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-primary hover:underline"
