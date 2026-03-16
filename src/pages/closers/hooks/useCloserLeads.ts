@@ -1,56 +1,79 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 
-export interface CloserLead {
+export interface CloserCreatorRow {
   id: string;
-  model_handle: string;
-  platform: string;
-  quality: string;
-  company: string | null;
-  phone_raw: string | null;
-  source_link: string | null;
-  entry_date: string;
-  country_code: string | null;
-  status: string | null;
+  instagram_handle: string;
+  category: string | null;
+  passed_date: string | null;
+  source_account: string | null;
+  phone: string | null;
   notes: string | null;
-  ticket_number: string | null;
+  onlyfans_url: string | null;
+  estimated_monetization: number | null;
+  agency_commission: number | null;
+  stage: string;
+  assigned_to: string | null;
+  rejection_reason: string | null;
+  confirmed_date: string | null;
+  completed_date: string | null;
+  last_contact_date: string | null;
+  monthly_monetization: number | null;
+  main_platform: string | null;
+  extras: number | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  agent_name: string | null;
+  contact_count: number;
 }
 
-export const LEAD_STATUSES = [
-  "no_response",
-  "contactado",
-  "replied",
-  "interested",
-  "meeting_set",
-  "confirmed",
-  "completed",
-  "not_interested",
+export const CLOSER_STAGES = [
+  "Asignada",
+  "Confirmada",
+  "Completada",
+  "No interesada",
 ] as const;
 
-export type LeadStatus = (typeof LEAD_STATUSES)[number];
-
-export const STATUS_LABELS: Record<string, string> = {
-  no_response: "Sin contactar",
-  contactado: "Contactado",
-  replied: "Contactado",
-  interested: "Interesada",
-  meeting_set: "En negociación",
-  confirmed: "Confirmada",
-  completed: "Completada",
-  not_interested: "No interesada",
+export const STAGE_LABELS: Record<string, string> = {
+  Asignada: "Asignada",
+  Confirmada: "Confirmada",
+  Completada: "Completada",
+  "No interesada": "No interesada",
 };
 
-export const TAB_STATUS_MAP: Record<string, string[]> = {
-  todos: [],
-  sin_contactar: ["no_response"],
-  contactados: ["contactado", "replied"],
-  interesadas: ["interested"],
-  negociacion: ["meeting_set"],
-  confirmadas: ["confirmed"],
-  completadas: ["completed"],
-  no_interesadas: ["not_interested"],
+export const TAB_STAGE_MAP: Record<string, string[]> = {
+  todas: [],
+  asignadas: ["Asignada"],
+  confirmadas: ["Confirmada"],
+  completadas: ["Completada"],
+  no_interesadas: ["No interesada"],
+};
+
+export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "Otra"] as const;
+export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
+export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
+
+// Contact follow-up sequence: days from passed_date
+const CONTACT_SEQUENCE = [1, 3, 5, 8, 15, 29];
+
+export const getNextContactDate = (passedDate: string | null, contactCount: number): Date | null => {
+  if (!passedDate || contactCount >= 6) return null;
+  const base = new Date(passedDate);
+  const dayOffset = CONTACT_SEQUENCE[contactCount] || 29;
+  const next = new Date(base);
+  next.setDate(next.getDate() + dayOffset);
+  return next;
+};
+
+export const isFollowUpPending = (lastContactDate: string | null): boolean => {
+  if (!lastContactDate) return true;
+  const diff = Date.now() - new Date(lastContactDate).getTime();
+  return diff > 3 * 24 * 60 * 60 * 1000; // >3 days
 };
 
 const PAGE_SIZE = 100;
@@ -58,146 +81,216 @@ const PAGE_SIZE = 100;
 export const useCloserLeads = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { isAdmin, isManager, role } = useUserRole();
 
   const [search, setSearch] = useState("");
-  const [qualityFilter, setQualityFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
-  const [activeTab, setActiveTab] = useState("todos");
+  const [activeTab, setActiveTab] = useState("todas");
   const [page, setPage] = useState(0);
 
-  // Reset page when filters change
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
 
-  // Fetch leads with pagination
-  const { data: leadsData, isLoading } = useQuery({
-    queryKey: ["closer-leads", activeTab, dateFrom?.toISOString(), dateTo?.toISOString(), qualityFilter, page],
+  // Main query: closer_creators with agent profile join + contact count
+  const { data: creatorsData, isLoading } = useQuery({
+    queryKey: ["closer-creators-list", activeTab, page, user?.id, role],
     queryFn: async () => {
-      const statusFilter = TAB_STATUS_MAP[activeTab] || [];
+      const stageFilter = TAB_STAGE_MAP[activeTab] || [];
 
+      // Fetch creators
       let query = supabase
-        .from("leadgen_entries")
-        .select("id, model_handle, platform, quality, company, phone_raw, source_link, entry_date, country_code, status, notes, ticket_number", { count: "exact" })
-        .order("entry_date", { ascending: false });
+        .from("closer_creators")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false });
 
-      if (statusFilter.length === 1) {
-        query = query.eq("status", statusFilter[0]);
-      } else if (statusFilter.length > 1) {
-        query = query.in("status", statusFilter);
+      if (stageFilter.length === 1) {
+        query = query.eq("stage", stageFilter[0]);
+      } else if (stageFilter.length > 1) {
+        query = query.in("stage", stageFilter);
       }
 
-      if (dateFrom) query = query.gte("entry_date", dateFrom.toISOString().slice(0, 10));
-      if (dateTo) query = query.lte("entry_date", dateTo.toISOString().slice(0, 10));
-      if (qualityFilter) query = query.eq("quality", qualityFilter);
+      // Role-based filter: closers only see assigned
+      if (!isAdmin && !isManager && user?.id) {
+        query = query.eq("assigned_to", user.id);
+      }
 
       const from = page * PAGE_SIZE;
       query = query.range(from, from + PAGE_SIZE - 1);
 
       const { data, error, count } = await query;
       if (error) throw error;
-      return { leads: (data || []) as CloserLead[], total: count || 0 };
+
+      const creators = data || [];
+
+      // Fetch agent profiles for assigned_to
+      const agentIds = [...new Set(creators.map((c) => c.assigned_to).filter(Boolean))] as string[];
+      let profilesMap: Record<string, string> = {};
+      if (agentIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", agentIds);
+        for (const p of profiles || []) {
+          profilesMap[p.id] = p.full_name || "Sin nombre";
+        }
+      }
+
+      // Fetch contact counts per creator
+      const creatorIds = creators.map((c) => c.id);
+      let contactCountMap: Record<string, number> = {};
+      if (creatorIds.length > 0) {
+        const { data: contacts } = await supabase
+          .from("closer_contact_history")
+          .select("creator_id")
+          .in("creator_id", creatorIds);
+        for (const c of contacts || []) {
+          contactCountMap[c.creator_id] = (contactCountMap[c.creator_id] || 0) + 1;
+        }
+      }
+
+      const enriched: CloserCreatorRow[] = creators.map((c) => ({
+        ...c,
+        estimated_monetization: c.estimated_monetization ?? 0,
+        agency_commission: c.agency_commission ?? 0,
+        extras: (c as any).extras ?? 0,
+        main_platform: (c as any).main_platform ?? null,
+        agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
+        contact_count: contactCountMap[c.id] || 0,
+      }));
+
+      return { creators: enriched, total: count || 0 };
     },
     placeholderData: keepPreviousData,
+    enabled: !!user?.id && !!role,
   });
 
-  const leads = leadsData?.leads || [];
-  const totalCount = leadsData?.total || 0;
+  const creators = creatorsData?.creators || [];
+  const totalCount = creatorsData?.total || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Single query for all status counts
+  // Status counts for KPIs
   const { data: statusCounts = {} } = useQuery({
-    queryKey: ["closer-leads-counts"],
+    queryKey: ["closer-creators-counts", user?.id, role],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leadgen_entries")
-        .select("status");
-
+      let query = supabase.from("closer_creators").select("stage");
+      if (!isAdmin && !isManager && user?.id) {
+        query = query.eq("assigned_to", user.id);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-
       const counts: Record<string, number> = {};
       for (const row of data || []) {
-        const s = row.status || "no_response";
+        const s = row.stage || "Asignada";
         counts[s] = (counts[s] || 0) + 1;
       }
       return counts;
     },
+    enabled: !!user?.id && !!role,
     staleTime: 30_000,
   });
 
-  // Client-side search filter
-  const filtered = search
-    ? leads.filter((l) => l.model_handle.toLowerCase().includes(search.toLowerCase()))
-    : leads;
+  // Revenue by platform
+  const { data: platformRevenue = {} } = useQuery({
+    queryKey: ["closer-platform-revenue", user?.id, role],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("closer_platform_sales")
+        .select("platform, price");
+      if (error) throw error;
+      const rev: Record<string, number> = {};
+      for (const row of data || []) {
+        rev[row.platform] = (rev[row.platform] || 0) + Number(row.price || 0);
+      }
+      return rev;
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+  });
 
-  // Optimistic update helper
-  const optimisticUpdate = (id: string, updates: Partial<CloserLead>) => {
+  // Client-side search
+  const filtered = search
+    ? creators.filter((c) => c.instagram_handle.toLowerCase().includes(search.toLowerCase()))
+    : creators;
+
+  // Optimistic update
+  const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
-      ["closer-leads", activeTab, dateFrom?.toISOString(), dateTo?.toISOString(), qualityFilter, page],
-      (old: { leads: CloserLead[]; total: number } | undefined) => {
+      ["closer-creators-list", activeTab, page, user?.id, role],
+      (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
         if (!old) return old;
         return {
           ...old,
-          leads: old.leads.map((l) => (l.id === id ? { ...l, ...updates } : l)),
+          creators: old.creators.map((c) => (c.id === id ? { ...c, ...updates } : c)),
         };
       }
     );
   };
 
   const updateField = useMutation({
-    mutationFn: async ({ id, field, value }: { id: string; field: string; value: string | null }) => {
+    mutationFn: async ({ id, field, value }: { id: string; field: string; value: any }) => {
       const { error } = await supabase
-        .from("leadgen_entries")
+        .from("closer_creators")
         .update({ [field]: value } as any)
         .eq("id", id);
       if (error) throw error;
     },
     onMutate: ({ id, field, value }) => {
-      optimisticUpdate(id, { [field]: value } as Partial<CloserLead>);
+      optimisticUpdate(id, { [field]: value } as any);
     },
     onSuccess: () => {
-      // Only refresh counts, not the full list (already optimistically updated)
-      queryClient.invalidateQueries({ queryKey: ["closer-leads-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
     },
     onError: (e: Error) => {
-      // Revert on error
-      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase
-        .from("leadgen_entries")
-        .update({ status } as any)
-        .eq("id", id);
+  const updateStage = useMutation({
+    mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
+      const updates: Record<string, unknown> = { stage };
+      if (stage === "Confirmada") updates.confirmed_date = new Date().toISOString();
+      if (stage === "Completada") updates.completed_date = new Date().toISOString();
+      const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
       if (error) throw error;
     },
-    onMutate: ({ id, status }) => {
-      optimisticUpdate(id, { status });
+    onMutate: ({ id, stage }) => {
+      optimisticUpdate(id, { stage } as any);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["closer-leads-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
     },
     onError: (e: Error) => {
-      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const assignCreator = useMutation({
+    mutationFn: async ({ id, assigned_to }: { id: string; assigned_to: string }) => {
+      const { error } = await supabase.from("closer_creators").update({ assigned_to }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      toast({ title: "Creator asignada" });
     },
   });
 
   return {
-    leads: filtered,
+    creators: filtered,
     isLoading,
     statusCounts,
+    platformRevenue,
     totalCount,
     totalPages,
     page, setPage,
     search, setSearch,
-    qualityFilter, setQualityFilter,
-    dateFrom, setDateFrom,
-    dateTo, setDateTo,
     activeTab, setActiveTab: handleTabChange,
-    updateStatus,
     updateField,
+    updateStage,
+    assignCreator,
+    isAdmin,
+    isManager,
   };
 };

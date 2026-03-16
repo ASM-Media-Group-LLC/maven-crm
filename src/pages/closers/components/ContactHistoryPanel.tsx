@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useContactHistory } from "../useContactHistory";
-import { CHANNELS, RESULTS } from "../useCloserCreators";
+import { CHANNELS, RESULTS } from "../hooks/useCloserLeads";
 import { format } from "date-fns";
 
 interface Props {

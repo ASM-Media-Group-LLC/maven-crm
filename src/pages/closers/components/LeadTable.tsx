@@ -4,175 +4,95 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MoreHorizontal, ArrowRight, XCircle, ExternalLink, ChevronDown, Phone } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
-  DropdownMenuSubTrigger, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CloserLead, STATUS_LABELS } from "../hooks/useCloserLeads";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ChevronRight } from "lucide-react";
+import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
+import ContactQuickForm from "./ContactQuickForm";
+import PlatformSalesPanel from "./PlatformSalesPanel";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface Props {
-  leads: CloserLead[];
-  onStatusChange: (id: string, status: string) => void;
-  onFieldChange: (id: string, field: string, value: string | null) => void;
+  creators: CloserCreatorRow[];
+  activeTab: string;
+  onStageChange: (id: string, stage: string) => void;
+  onFieldChange: (id: string, field: string, value: any) => void;
+  onAssign: (id: string, currentAssignee: string | null) => void;
+  isAdmin: boolean;
 }
 
-const QUALITIES = ["A+", "A", "B", "C"];
-
-const qualityColor = (q: string) => {
-  switch (q) {
-    case "A+": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "A": return "bg-primary/10 text-primary";
-    case "B": return "bg-accent/10 text-accent-foreground";
-    case "C": return "bg-muted text-muted-foreground";
-    default: return "";
-  }
-};
-
-const statusColor = (s: string | null) => {
+const stageColor = (s: string) => {
   switch (s) {
-    case "no_response": return "bg-muted text-muted-foreground";
-    case "contactado":
-    case "replied": return "bg-primary/10 text-primary";
-    case "interested": return "bg-accent/10 text-accent-foreground";
-    case "meeting_set": return "bg-accent/20 text-accent-foreground";
-    case "confirmed": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "completed": return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-300";
-    case "not_interested": return "bg-destructive/10 text-destructive";
-    default: return "";
+    case "Asignada": return "bg-primary/10 text-primary";
+    case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+    case "Completada": return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-300";
+    case "No interesada": return "bg-destructive/10 text-destructive";
+    default: return "bg-muted text-muted-foreground";
   }
 };
 
-const NEXT_STATUS: Record<string, string | null> = {
-  no_response: "contactado",
-  contactado: "interested",
-  replied: "interested",
-  interested: "meeting_set",
-  meeting_set: "confirmed",
-  confirmed: "completed",
-  completed: null,
-  not_interested: null,
-};
+const cleanPhoneForWhatsApp = (phone: string) => phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
 
-const ALL_STATUSES = ["no_response", "contactado", "replied", "interested", "meeting_set", "confirmed", "completed", "not_interested"];
-
-const cleanPhoneForWhatsApp = (phone: string) =>
-  phone.replace(/[^\d]/g, "");
-
-// Click-to-edit popover for quality
-const QualityCell = memo(({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
-          <Badge className={qualityColor(value)}>{value || "—"}</Badge>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-1" align="start">
-        <div className="flex flex-col gap-0.5">
-          {QUALITIES.map((q) => (
-            <button
-              key={q}
-              className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${q === value ? "bg-muted font-medium" : ""}`}
-              onClick={() => { onChange(q); setOpen(false); }}
-            >
-              <Badge className={qualityColor(q)}>{q}</Badge>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-});
-QualityCell.displayName = "QualityCell";
-
-// Click-to-edit popover for status
-const StatusCell = memo(({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
-          <Badge className={statusColor(value)}>
-            {STATUS_LABELS[value] || value}
-          </Badge>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-1" align="start">
-        <div className="flex flex-col gap-0.5">
-          {ALL_STATUSES.map((s) => (
-            <button
-              key={s}
-              className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left flex items-center gap-2 ${s === value ? "bg-muted font-medium" : ""}`}
-              onClick={() => { onChange(s); setOpen(false); }}
-            >
-              <span className={`w-2 h-2 rounded-full ${statusColor(s).split(" ")[0]}`} />
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-});
-StatusCell.displayName = "StatusCell";
-
-// Click-to-edit popover for contacted
-const ContactedCell = memo(({ isContacted, onToggle }: { isContacted: boolean; onToggle: (contacted: boolean) => void }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5">
-          <Badge className={isContacted ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}>
-            {isContacted ? "Sí" : "No"}
-          </Badge>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-1" align="start">
-        <div className="flex flex-col gap-0.5">
-          <button
-            className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${isContacted ? "bg-muted font-medium" : ""}`}
-            onClick={() => { onToggle(true); setOpen(false); }}
-          >
-            Sí
-          </button>
-          <button
-            className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${!isContacted ? "bg-muted font-medium" : ""}`}
-            onClick={() => { onToggle(false); setOpen(false); }}
-          >
-            No
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-});
-ContactedCell.displayName = "ContactedCell";
-
-// Inline editable notes cell
-const InlineNotes = memo(({ value, onSave }: { value: string | null; onSave: (v: string) => void }) => {
+// Inline editable number cell
+const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }: { value: number | null; onSave: (v: number) => void; prefix?: string; suffix?: string }) => {
   const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(value || "");
+  const [text, setText] = useState(String(value || 0));
 
   const save = () => {
     setEditing(false);
-    if (text !== (value || "")) onSave(text);
+    const num = Number(text) || 0;
+    if (num !== (value || 0)) onSave(num);
   };
 
   if (!editing) {
     return (
       <span
-        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[200px] truncate text-sm"
-        onClick={() => { setText(value || ""); setEditing(true); }}
-        title={value || "Click para agregar notas"}
+        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm font-medium"
+        onClick={() => { setText(String(value || 0)); setEditing(true); }}
       >
-        {value || "—"}
+        {prefix}{Number(value || 0).toLocaleString()}{suffix}
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      type="number"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+      onBlur={save}
+      autoFocus
+      className="h-7 text-sm w-24"
+    />
+  );
+});
+InlineNumber.displayName = "InlineNumber";
+
+// Inline text cell
+const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string | null; onSave: (v: string | null) => void; placeholder?: string }) => {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value || "");
+
+  const save = () => {
+    setEditing(false);
+    const v = text.trim();
+    if (v !== (value || "")) onSave(v || null);
+  };
+
+  if (!editing) {
+    return (
+      <span
+        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[180px] truncate text-sm"
+        onClick={() => { setText(value || ""); setEditing(true); }}
+        title={value || placeholder}
+      >
+        {value || placeholder}
       </span>
     );
   }
@@ -184,211 +104,349 @@ const InlineNotes = memo(({ value, onSave }: { value: string | null; onSave: (v:
       onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
       onBlur={save}
       autoFocus
-      className="h-7 text-sm w-48"
+      className="h-7 text-sm w-44"
     />
   );
 });
-InlineNotes.displayName = "InlineNotes";
+InlineText.displayName = "InlineText";
 
-// Inline editable source/company cell
-const InlineSourceCell = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(value || "");
+const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssign, isAdmin }: Props) => {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const save = () => {
-    setEditing(false);
-    const newVal = text.trim();
-    if (newVal !== (value || "")) onSave(newVal || null);
+  // Compute revenue for completadas footer
+  const completadasTotals = activeTab === "completadas" ? creators.reduce(
+    (acc, c) => {
+      const rev = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+      return {
+        monetization: acc.monetization + Number(c.estimated_monetization || 0),
+        revenue: acc.revenue + rev,
+        count: acc.count + 1,
+      };
+    },
+    { monetization: 0, revenue: 0, count: 0 }
+  ) : null;
+
+  const renderHeaders = () => {
+    switch (activeTab) {
+      case "asignadas":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Fecha asignación</TableHead>
+            <TableHead>Agente</TableHead>
+            <TableHead># Contactos</TableHead>
+            <TableHead>Último contacto</TableHead>
+            <TableHead>Alertas</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        );
+      case "confirmadas":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Agente</TableHead>
+            <TableHead>Monetización</TableHead>
+            <TableHead>% Comisión</TableHead>
+            <TableHead>Extras</TableHead>
+            <TableHead>Plataforma</TableHead>
+            <TableHead>Revenue</TableHead>
+            <TableHead className="w-10"></TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        );
+      case "completadas":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Agente</TableHead>
+            <TableHead>Monetización</TableHead>
+            <TableHead>% Comisión</TableHead>
+            <TableHead>Extras</TableHead>
+            <TableHead>Revenue</TableHead>
+          </TableRow>
+        );
+      case "no_interesadas":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Closer</TableHead>
+            <TableHead>Último contacto</TableHead>
+            <TableHead>Motivo rechazo</TableHead>
+            <TableHead>Notas</TableHead>
+          </TableRow>
+        );
+      default: // todas
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Agente</TableHead>
+            <TableHead>Fecha asignación</TableHead>
+            <TableHead># Contactos</TableHead>
+            <TableHead>Teléfono</TableHead>
+            <TableHead>Notas</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        );
+    }
   };
 
-  if (!editing) {
-    return (
-      <span
-        className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 block max-w-[140px] truncate text-sm"
-        onClick={() => { setText(value || ""); setEditing(true); }}
-        title={value || "Click para editar"}
-      >
-        {value || "—"}
-      </span>
+  const renderRow = (c: CloserCreatorRow, idx: number) => {
+    const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+    const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
+    const isLastAttempt = c.contact_count >= 6;
+    const nextDate = getNextContactDate(c.passed_date, c.contact_count);
+
+    const igLink = (
+      <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+        className="text-primary hover:underline flex items-center gap-1 font-medium">
+        @{c.instagram_handle}
+        <ExternalLink className="h-3 w-3" />
+      </a>
     );
-  }
 
-  return (
-    <Input
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
-      onBlur={save}
-      autoFocus
-      className="h-7 text-sm w-36"
-    />
-  );
-});
-InlineSourceCell.displayName = "InlineSourceCell";
+    switch (activeTab) {
+      case "asignadas":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
+            <TableCell>
+              <Badge variant="outline">{c.contact_count}/6</Badge>
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
+              {nextDate && (
+                <p className="text-[10px] text-muted-foreground/70">
+                  Próximo: {format(nextDate, "dd/MM")}
+                </p>
+              )}
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-1">
+                {followUpPending && (
+                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5">
+                    <AlertTriangle className="h-3 w-3" /> Follow-up
+                  </Badge>
+                )}
+                {isLastAttempt && (
+                  <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5">
+                    <Clock className="h-3 w-3" /> Último intento
+                  </Badge>
+                )}
+              </div>
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="flex items-center justify-end gap-1">
+                <ContactQuickForm creatorId={c.id} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onStageChange(c.id, "Confirmada")}>
+                      Mover a Confirmada
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
+                      Marcar No interesada
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                          <UserPlus className="h-4 w-4 mr-2" /> Reasignar
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TableCell>
+          </TableRow>
+        );
 
-const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
+      case "confirmadas":
+        return (
+          <>
+            <TableRow key={c.id}>
+              <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+              <TableCell>{igLink}</TableCell>
+              <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
+              <TableCell>
+                <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} />
+              </TableCell>
+              <TableCell>
+                <InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} />
+              </TableCell>
+              <TableCell>
+                <InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} />
+              </TableCell>
+              <TableCell>
+                <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
+                  <SelectTrigger className="h-7 w-28 text-xs">
+                    <SelectValue placeholder="Plataforma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
+              <TableCell>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
+                </Button>
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onStageChange(c.id, "Completada")}>
+                      Mover a Completada
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                      Volver a Asignada
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+            {expandedId === c.id && (
+              <TableRow>
+                <TableCell colSpan={10} className="bg-muted/30 p-4">
+                  <PlatformSalesPanel creatorId={c.id} />
+                </TableCell>
+              </TableRow>
+            )}
+          </>
+        );
+
+      case "completadas":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
+            <TableCell className="text-sm">${Number(c.estimated_monetization || 0).toLocaleString()}</TableCell>
+            <TableCell className="text-sm">{Number(c.agency_commission || 0)}%</TableCell>
+            <TableCell className="text-sm">${Number(c.extras || 0).toLocaleString()}</TableCell>
+            <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
+          </TableRow>
+        );
+
+      case "no_interesadas":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
+            </TableCell>
+            <TableCell>
+              <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="Sin motivo" />
+            </TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+          </TableRow>
+        );
+
+      default: // todas
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell>
+              <Badge className={stageColor(c.stage)}>{c.stage}</Badge>
+            </TableCell>
+            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
+            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>
+              <Badge variant="outline">{c.contact_count}/6</Badge>
+            </TableCell>
+            <TableCell className="text-sm">
+              {c.phone ? (
+                <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-primary hover:underline">
+                  <Phone className="h-3 w-3" />
+                  <span className="truncate max-w-[100px]">{c.phone}</span>
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="flex items-center justify-end gap-1">
+                <ContactQuickForm creatorId={c.id} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {CLOSER_STAGES.filter((s) => s !== c.stage).map((s) => (
+                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
+                        Mover a {s}
+                      </DropdownMenuItem>
+                    ))}
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                          <UserPlus className="h-4 w-4 mr-2" /> Asignar
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TableCell>
+          </TableRow>
+        );
+    }
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-background">
-          <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Categoría</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Fecha de paso</TableHead>
-            <TableHead>Cuenta origen</TableHead>
-            <TableHead>Contactada?</TableHead>
-            <TableHead>Número</TableHead>
-            <TableHead>Notas</TableHead>
-            <TableHead>Onlyfans</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
-          </TableRow>
+          {renderHeaders()}
         </TableHeader>
         <TableBody>
-          {leads.length === 0 ? (
+          {creators.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                 Sin registros
               </TableCell>
             </TableRow>
           ) : (
-            leads.map((lead, idx) => {
-              const currentStatus = lead.status || "no_response";
-              const isContacted = currentStatus !== "no_response";
-
-              return (
-                <TableRow key={lead.id}>
-                  <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-                  <TableCell className="font-medium">
-                    <a
-                      href={`https://instagram.com/${lead.model_handle}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline flex items-center gap-1"
-                    >
-                      @{lead.model_handle}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </TableCell>
-
-                  <TableCell>
-                    <QualityCell
-                      value={lead.quality || ""}
-                      onChange={(v) => onFieldChange(lead.id, "quality", v)}
-                    />
-                  </TableCell>
-
-                  <TableCell>
-                    <StatusCell
-                      value={currentStatus}
-                      onChange={(v) => onStatusChange(lead.id, v)}
-                    />
-                  </TableCell>
-
-                  <TableCell className="text-sm">{lead.entry_date}</TableCell>
-
-                  <TableCell>
-                    <InlineSourceCell
-                      value={lead.company}
-                      onSave={(v) => onFieldChange(lead.id, "company", v)}
-                    />
-                  </TableCell>
-
-                  <TableCell>
-                    <ContactedCell
-                      isContacted={isContacted}
-                      onToggle={(contacted) => {
-                        if (!contacted && currentStatus !== "no_response") {
-                          onStatusChange(lead.id, "no_response");
-                        } else if (contacted && currentStatus === "no_response") {
-                          onStatusChange(lead.id, "contactado");
-                        }
-                      }}
-                    />
-                  </TableCell>
-
-                  <TableCell className="text-sm">
-                    {lead.phone_raw ? (
-                      <a
-                        href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_raw)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-primary hover:underline"
-                      >
-                        <Phone className="h-3 w-3" />
-                        <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell>
-                    <InlineNotes
-                      value={lead.notes}
-                      onSave={(v) => onFieldChange(lead.id, "notes", v)}
-                    />
-                  </TableCell>
-
-                  <TableCell>
-                    {lead.source_link ? (
-                      <a
-                        href={lead.source_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline flex items-center gap-1 text-sm"
-                      >
-                        Link <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {NEXT_STATUS[currentStatus] && (
-                          <DropdownMenuItem onClick={() => onStatusChange(lead.id, NEXT_STATUS[currentStatus]!)}>
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Avanzar a {STATUS_LABELS[NEXT_STATUS[currentStatus]!]}
-                          </DropdownMenuItem>
-                        )}
-                        {currentStatus !== "not_interested" && (
-                          <DropdownMenuItem onClick={() => onStatusChange(lead.id, "not_interested")}>
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Marcar No interesada
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Cambiar estado
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {ALL_STATUSES.filter((s) => s !== currentStatus).map((s) => (
-                              <DropdownMenuItem key={s} onClick={() => onStatusChange(lead.id, s)}>
-                                {STATUS_LABELS[s]}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })
+            creators.map((c, idx) => renderRow(c, idx))
           )}
         </TableBody>
       </Table>
+
+      {/* Footer totals for completadas */}
+      {completadasTotals && completadasTotals.count > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm">
+          <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
+          <div className="flex gap-6">
+            <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+            <span>Revenue: <strong className="text-primary">${completadasTotals.revenue.toLocaleString()}</strong></span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default LeadTable;
+export default CloserTable;
