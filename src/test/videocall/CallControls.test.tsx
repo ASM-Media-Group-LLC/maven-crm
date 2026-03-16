@@ -26,6 +26,8 @@ describe("CallControls", () => {
     onVideoInputChange: vi.fn(),
     onOpenVideoSettings: vi.fn(),
     onOpenMetrics: vi.fn(),
+    isNoiseCancellationOn: false,
+    onToggleNoiseCancellation: vi.fn(),
   };
 
   it("renders primary control buttons", () => {
