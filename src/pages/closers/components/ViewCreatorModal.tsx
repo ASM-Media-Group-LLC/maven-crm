@@ -1,14 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { CloserCreator } from "../useCloserCreators";
-import ContactHistoryPanel from "./ContactHistoryPanel";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { FileText } from "lucide-react";
+import ContactHistoryPanel from "./ContactHistoryPanel";
+import ActivityTimeline from "./ActivityTimeline";
+
+interface Creator {
+  id: string;
+  instagram_handle: string;
+  category: string | null;
+  passed_date: string | null;
+  source_account: string | null;
+  phone: string | null;
+  notes: string | null;
+  onlyfans_url: string | null;
+  estimated_monetization: number | null;
+  agency_commission: number | null;
+  stage: string;
+  confirmed_date: string | null;
+  completed_date: string | null;
+  rejection_reason: string | null;
+  monthly_monetization: number | null;
+  main_platform: string | null;
+  extras: number | null;
+}
 
 interface Props {
-  creator: CloserCreator | null;
+  creator: Creator | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -25,7 +45,6 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
 
   const leadgenEntryId = (creator as any).leadgen_entry_id as string | null;
 
-  // Fetch original lead data if linked
   const { data: leadOrigin } = useQuery({
     queryKey: ["leadgen-origin", leadgenEntryId],
     queryFn: async () => {
@@ -41,7 +60,6 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
     enabled: !!leadgenEntryId && open,
   });
 
-  // Fetch agent name for the lead
   const { data: agentProfile } = useQuery({
     queryKey: ["lead-agent-profile", leadOrigin?.lg_user_id],
     queryFn: async () => {
@@ -56,7 +74,7 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
     enabled: !!leadOrigin?.lg_user_id && open,
   });
 
-  const revenue = Number(creator.estimated_monetization || 0) * Number(creator.agency_commission || 0) / 100;
+  const revenue = (Number(creator.estimated_monetization || 0) * Number(creator.agency_commission || 0) / 100) + Number(creator.extras || 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,9 +93,11 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
           <Field label="Cuenta origen" value={creator.source_account} />
           <Field label="Teléfono" value={creator.phone} />
           <Field label="OnlyFans" value={creator.onlyfans_url} />
+          <Field label="Plataforma principal" value={creator.main_platform} />
           <Field label="Monetización estimada" value={`$${Number(creator.estimated_monetization || 0).toLocaleString()}`} />
-          <Field label="Comisión agencia" value={`${creator.agency_commission}%`} />
-          <Field label="Revenue estimado" value={`$${revenue.toLocaleString()}`} />
+          <Field label="Comisión agencia" value={`${Number(creator.agency_commission || 0)}%`} />
+          <Field label="Extras" value={`$${Number(creator.extras || 0).toLocaleString()}`} />
+          <Field label="Revenue" value={`$${revenue.toLocaleString()}`} />
           <Field label="Monetización mensual" value={creator.monthly_monetization ? `$${Number(creator.monthly_monetization).toLocaleString()}` : null} />
           {creator.rejection_reason && <Field label="Motivo rechazo" value={creator.rejection_reason} />}
         </div>
@@ -89,7 +109,6 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
           </div>
         )}
 
-        {/* Lead origin traceability */}
         {leadOrigin && (
           <>
             <Separator />
@@ -118,6 +137,18 @@ const ViewCreatorModal = ({ creator, open, onOpenChange }: Props) => {
             </div>
           </>
         )}
+
+        <Separator />
+        <div>
+          <p className="text-sm font-semibold mb-3">Timeline de actividad</p>
+          <ActivityTimeline
+            creatorId={creator.id}
+            passedDate={creator.passed_date}
+            confirmedDate={creator.confirmed_date}
+            completedDate={creator.completed_date}
+            stage={creator.stage}
+          />
+        </div>
 
         <Separator />
         <ContactHistoryPanel creatorId={creator.id} />
