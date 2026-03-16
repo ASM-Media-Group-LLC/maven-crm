@@ -1109,6 +1109,10 @@ export function useLiveKit() {
     bgQueueInFlightRef.current = false;
     bgApplyQueueRef.current = Promise.resolve(true);
     void disposeBackgroundProcessor();
+    try { ncProcessorRef.current?.destroy(); } catch {}
+    ncProcessorRef.current = null;
+    ncEnabledRef.current = false;
+    setIsNoiseCancellationOn(false);
     roomRef.current?.disconnect();
     roomRef.current = null;
     connectingRef.current = false;
