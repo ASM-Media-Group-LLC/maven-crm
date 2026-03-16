@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+
+// Only the columns we actually use
+const ENTRY_COLUMNS = "id,lg_user_id,model_handle,platform,status,quality,notes,source_link,created_at,updated_at,phone_raw,phone_e164,country_code,created_creator_id,entry_date,ticket_number,state,city,company";
 
 // Shared type matching leadgen_entries schema
 export type LeadGenEntry = {
@@ -63,7 +65,7 @@ async function fetchAllEntries(): Promise<LeadGenEntry[]> {
   while (hasMore) {
     const { data, error } = await supabase
       .from("leadgen_entries")
-      .select("*")
+      .select(ENTRY_COLUMNS)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
@@ -92,7 +94,7 @@ async function fetchEntriesByDateRange(
   while (hasMore) {
     let query = supabase
       .from("leadgen_entries")
-      .select("*")
+      .select(ENTRY_COLUMNS)
       .gte("entry_date", dateFrom)
       .lte("entry_date", dateTo)
       .order("created_at", { ascending: false })
@@ -156,7 +158,6 @@ export const useLeadGenQA = (entryIds: string[]) =>
     queryKey: ["leadgen-qa", entryIds.slice(0, 5)],
     queryFn: async () => {
       if (entryIds.length === 0) return [];
-      // Fetch in batches if needed
       const PAGE_SIZE = 500;
       let allData: any[] = [];
       for (let i = 0; i < entryIds.length; i += PAGE_SIZE) {
@@ -175,6 +176,21 @@ export const useLeadGenQA = (entryIds: string[]) =>
     staleTime: 2 * 60 * 1000,
   });
 
+// Helper to optimistically update cached entries
+function optimisticEntryUpdate(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+  patch: Partial<LeadGenEntry>
+) {
+  // Update all matching query caches
+  for (const key of ["leadgen-entries", "leadgen-entries-range"]) {
+    queryClient.setQueriesData<LeadGenEntry[]>(
+      { queryKey: [key] },
+      (old) => old?.map((e) => (e.id === id ? { ...e, ...patch } : e))
+    );
+  }
+}
+
 export const useUpdateLeadQuality = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -185,8 +201,10 @@ export const useUpdateLeadQuality = () => {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+    onMutate: async ({ id, quality }) => {
+      optimisticEntryUpdate(queryClient, id, { quality });
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
     },
   });
@@ -202,8 +220,10 @@ export const useUpdateLeadStatus = () => {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
+    onMutate: async ({ id, status }) => {
+      optimisticEntryUpdate(queryClient, id, { status });
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
     },
   });
@@ -223,7 +243,6 @@ export const useCreateQAReview = () => {
           comment: review.comment || null,
         });
       if (error) throw error;
-      // If quality change was requested, update the entry
       if (review.quality) {
         const { error: updateErr } = await supabase
           .from("leadgen_entries")
@@ -234,7 +253,6 @@ export const useCreateQAReview = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-qa"] });
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
     },
   });

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowUpDown, ExternalLink, Eye, MoreHorizontal, Pencil, ChevronDown } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import { ArrowUpDown, ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -11,10 +11,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useUpdateLeadQuality } from "./useLeadGen";
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { useUpdateLeadQuality, useUpdateLeadStatus } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+
+const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
+const STATUS_OPTIONS = [
+  { value: "no_response", label: "Sin resp." },
+  { value: "contactado", label: "Contactado" },
+  { value: "en_llamada", label: "En llamada" },
+  { value: "cerrado", label: "Cerrado" },
+  { value: "rechazado", label: "Rechazado" },
+] as const;
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "a+": "success-soft",
@@ -27,6 +36,7 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
 const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
   no_response: "primary-soft",
   contactado: "warning-soft",
+  en_llamada: "warning-soft",
   cerrado: "success-soft",
   rechazado: "destructive-soft",
 };
@@ -64,15 +74,146 @@ interface Props {
   onEdit?: (lead: LeadGenEntry) => void;
 }
 
+// Inline quality editor
+const QualityCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
+  const [open, setOpen] = useState(false);
+  const updateQuality = useUpdateLeadQuality();
+  const cat = lead.quality.toLowerCase();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
+            {lead.quality.toUpperCase()}
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1.5" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-0.5">
+          {QUALITY_OPTIONS.map((q) => (
+            <button
+              key={q}
+              className="flex items-center px-2 py-1.5 rounded-md hover:bg-muted transition-colors text-left"
+              onClick={() => {
+                updateQuality.mutate({ id: lead.id, quality: q });
+                setOpen(false);
+              }}
+            >
+              <Badge variant={calidadVariant[q] ?? "secondary-soft"}>{q.toUpperCase()}</Badge>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+QualityCell.displayName = "QualityCell";
+
+// Inline status editor
+const StatusCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
+  const [open, setOpen] = useState(false);
+  const updateStatus = useUpdateLeadStatus();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
+            {statusLabels[lead.status] || lead.status}
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1.5" align="start" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col gap-0.5">
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s.value}
+              className="flex items-center px-2 py-1.5 rounded-md hover:bg-muted transition-colors text-left"
+              onClick={() => {
+                updateStatus.mutate({ id: lead.id, status: s.value });
+                setOpen(false);
+              }}
+            >
+              <Badge variant={statusVariant[s.value] ?? "secondary-soft"}>{s.label}</Badge>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+StatusCell.displayName = "StatusCell";
+
+const buildProfileUrl = (entry: LeadGenEntry) => {
+  if (entry.source_link) return entry.source_link;
+  const p = entry.platform.toLowerCase();
+  if (p.includes("instagram")) return `https://instagram.com/${entry.model_handle}`;
+  if (p.includes("tiktok")) return `https://tiktok.com/@${entry.model_handle}`;
+  if (p.includes("twitter") || p.includes("x")) return `https://x.com/${entry.model_handle}`;
+  return `https://${entry.model_handle}`;
+};
+
+// Memoized row
+const LeadRow = React.memo(({ lead, onView }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void }) => (
+  <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
+    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+      {format(new Date(lead.created_at), "hh:mm a", { locale: es })}
+    </TableCell>
+    <TableCell>
+      <Badge variant="outline" className="font-mono text-xs">
+        {getTicketId(lead)}
+      </Badge>
+    </TableCell>
+    <TableCell>
+      <a
+        href={buildProfileUrl(lead)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        {getPlatformIcon(lead.platform)}
+        <span className="truncate max-w-[140px]">@{lead.model_handle}</span>
+        <ExternalLink className="h-3 w-3" />
+      </a>
+    </TableCell>
+    <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
+    <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
+    <TableCell><QualityCell lead={lead} /></TableCell>
+    <TableCell><StatusCell lead={lead} /></TableCell>
+    <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
+    <TableCell className="text-sm text-muted-foreground">{lead.phone_raw ? "📞" : "—"}</TableCell>
+    <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
+    <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
+        <Eye className="h-4 w-4" />
+      </Button>
+    </TableCell>
+  </TableRow>
+));
+LeadRow.displayName = "LeadRow";
+
 const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
-  const updateQuality = useUpdateLeadQuality();
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(true); }
-  };
+  const handleSort = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortAsc((a) => !a);
+        return prev;
+      }
+      setSortAsc(true);
+      return key;
+    });
+  }, []);
 
   const sorted = [...leads].sort((a, b) => {
     let va = "", vb = "";
@@ -98,15 +239,6 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
     </Button>
   );
 
-  const buildProfileUrl = (entry: LeadGenEntry) => {
-    if (entry.source_link) return entry.source_link;
-    const p = entry.platform.toLowerCase();
-    if (p.includes("instagram")) return `https://instagram.com/${entry.model_handle}`;
-    if (p.includes("tiktok")) return `https://tiktok.com/@${entry.model_handle}`;
-    if (p.includes("twitter") || p.includes("x")) return `https://x.com/${entry.model_handle}`;
-    return `https://${entry.model_handle}`;
-  };
-
   return (
     <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
       <Table>
@@ -126,84 +258,9 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((lead) => {
-            const cat = lead.quality.toLowerCase();
-            return (
-              <TableRow key={lead.id} className="cursor-pointer" onClick={() => onView?.(lead)}>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {format(new Date(lead.created_at), "hh:mm a", { locale: es })}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {getTicketId(lead)}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <a
-                    href={buildProfileUrl(lead)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    {getPlatformIcon(lead.platform)}
-                    <span className="truncate max-w-[140px]">@{lead.model_handle}</span>
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
-                <TableCell>
-                  <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                    {lead.quality.toUpperCase()}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="sm" className="h-8 -ml-2" onClick={() => onView?.(lead)}>
-                    <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
-                      {statusLabels[lead.status] || lead.status}
-                    </Badge>
-                  </Button>
-                </TableCell>
-                <TableCell className="text-center text-lg">
-                  {countryToFlag(lead.country_code)}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {lead.phone_raw ? "📞" : "—"}
-                </TableCell>
-                <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
-                <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 flex items-center gap-1">
-                          <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
-                            {lead.quality.toUpperCase()}
-                          </Badge>
-                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {["a+", "a", "b+", "b", "c"].map((c) => (
-                          <DropdownMenuItem
-                            key={c}
-                            onClick={() => updateQuality.mutate({ id: lead.id, quality: c })}
-                          >
-                            <Badge variant={calidadVariant[c] ?? "secondary-soft"} className="mr-2">
-                              {c.toUpperCase()}
-                            </Badge>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {sorted.map((lead) => (
+            <LeadRow key={lead.id} lead={lead} onView={onView} />
+          ))}
           {sorted.length === 0 && (
             <TableRow>
               <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
