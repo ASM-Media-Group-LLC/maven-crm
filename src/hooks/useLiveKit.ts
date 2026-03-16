@@ -12,6 +12,7 @@ import {
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { supabase } from "@/integrations/supabase/client";
 import type { BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
+import { NoiseSuppresionTrackProcessor, supportsNoiseSuppression, loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
 export type ConnectionQualityLevel = "excellent" | "good" | "poor" | "lost" | "unknown";
 
@@ -268,6 +269,10 @@ export function useLiveKit() {
   const skipAutoBackgroundRestoreRef = useRef(false);
   // Hide local camera tile while a background effect is being prepared for the current track.
   const holdLocalVideoUntilBackgroundRef = useRef(false);
+  // ── Noise cancellation ──────────────────────────────────────────
+  const [isNoiseCancellationOn, setIsNoiseCancellationOn] = useState(false);
+  const ncProcessorRef = useRef<NoiseSuppresionTrackProcessor | null>(null);
+  const ncEnabledRef = useRef(false);
 
   const buildParticipant = useCallback((p: Participant, isLocal: boolean): LKParticipant => {
     const audioTrack = Array.from(p.audioTrackPublications.values()).find(
@@ -1025,6 +1030,28 @@ export function useLiveKit() {
 
       if (shouldEnableMic) {
         await room.localParticipant.setMicrophoneEnabled(true, getDeviceConstraint(options.audioDeviceId));
+        // Apply noise cancellation if saved preference is on
+        if (loadNCPreference() && supportsNoiseSuppression()) {
+          ncEnabledRef.current = true;
+          setIsNoiseCancellationOn(true);
+          try {
+            await wait(80);
+            const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+              (p) => p.source === Track.Source.Microphone,
+            );
+            const localAudioTrack = micPub?.track;
+            if (localAudioTrack) {
+              const processor = new NoiseSuppresionTrackProcessor();
+              ncProcessorRef.current = processor;
+              await (localAudioTrack as any).setProcessor(processor);
+              console.info("[LiveKit] Noise cancellation applied on connect");
+            }
+          } catch (err) {
+            console.warn("[LiveKit] NC init error:", err);
+            ncEnabledRef.current = false;
+            setIsNoiseCancellationOn(false);
+          }
+        }
       }
 
       if (shouldEnableCam) {
@@ -1086,6 +1113,10 @@ export function useLiveKit() {
     bgQueueInFlightRef.current = false;
     bgApplyQueueRef.current = Promise.resolve(true);
     void disposeBackgroundProcessor();
+    try { ncProcessorRef.current?.destroy(); } catch {}
+    ncProcessorRef.current = null;
+    ncEnabledRef.current = false;
+    setIsNoiseCancellationOn(false);
     roomRef.current?.disconnect();
     roomRef.current = null;
     connectingRef.current = false;
@@ -1119,6 +1150,39 @@ export function useLiveKit() {
       refreshParticipants();
     }
   }, [refreshParticipants]);
+
+  // ── Noise Cancellation toggle ─────────────────────────────────
+  const toggleNoiseCancellation = useCallback(async () => {
+    const room = roomRef.current;
+    if (!room) return;
+    const newState = !ncEnabledRef.current;
+    ncEnabledRef.current = newState;
+    setIsNoiseCancellationOn(newState);
+    saveNCPreference(newState);
+    const micPub = Array.from(room.localParticipant.audioTrackPublications.values()).find(
+      (pub) => pub.source === Track.Source.Microphone,
+    );
+    const localAudioTrack = micPub?.track;
+    if (!localAudioTrack) return;
+    if (newState) {
+      if (!supportsNoiseSuppression()) { ncEnabledRef.current = false; setIsNoiseCancellationOn(false); return; }
+      try {
+        const processor = new NoiseSuppresionTrackProcessor();
+        ncProcessorRef.current = processor;
+        await (localAudioTrack as any).setProcessor(processor);
+        console.info("[LiveKit] Noise cancellation enabled");
+      } catch (err) {
+        console.error("[LiveKit] NC toggle error:", err);
+        ncProcessorRef.current = null;
+        ncEnabledRef.current = false;
+        setIsNoiseCancellationOn(false);
+      }
+    } else {
+      try { await (localAudioTrack as any).stopProcessor(); } catch {}
+      if (ncProcessorRef.current) { try { await ncProcessorRef.current.destroy(); } catch {} ncProcessorRef.current = null; }
+      console.info("[LiveKit] Noise cancellation disabled");
+    }
+  }, []);
 
   // ── Camera toggle ─────────────────────────────────────────────
   const toggleCam = useCallback(async () => {
@@ -1344,6 +1408,7 @@ export function useLiveKit() {
       bgQueueInFlightRef.current = false;
       bgApplyQueueRef.current = Promise.resolve(true);
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      try { ncProcessorRef.current?.destroy(); } catch {}
       void disposeBackgroundProcessor();
       roomRef.current?.disconnect();
     };
@@ -1521,5 +1586,7 @@ export function useLiveKit() {
     switchAudioInput,
     switchAudioOutput,
     switchVideoInput,
+    isNoiseCancellationOn,
+    toggleNoiseCancellation,
   };
 }

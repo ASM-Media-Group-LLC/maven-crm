@@ -213,6 +213,8 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onAudioInputChange={handleAudioInputChange}
         onAudioOutputChange={handleAudioOutputChange}
         onVideoInputChange={handleVideoInputChange}
+        isNoiseCancellationOn={lk.isNoiseCancellationOn}
+        onToggleNoiseCancellation={lk.toggleNoiseCancellation}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
       />

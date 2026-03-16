@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
-  ChevronDown, Monitor, Volume2, Loader2, Settings,
+  ChevronDown, Monitor, Volume2, Loader2, Settings, AudioLines,
 } from "lucide-react";
 import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
+import { loadNCPreference, saveNCPreference } from "@/lib/noise-suppression-processor";
 
 interface PreJoinLobbyProps {
   roomName: string;
@@ -118,6 +119,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [camOn, setCamOn] = useState(initialSettingsRef.current?.camOn ?? true);
   const [joining, setJoining] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialSettingsRef.current?.backgroundEffect ?? "none");
+  const [ncEnabled, setNcEnabled] = useState(() => loadNCPreference());
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
 
@@ -578,6 +580,19 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
               onToggle={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === "cam" ? null : "cam"); }}
             />
             <BackgroundSelector selected={bgEffect} onSelect={setBgEffect} />
+            <button
+              onClick={() => { const next = !ncEnabled; setNcEnabled(next); saveNCPreference(next); }}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-2 rounded-full text-xs transition-colors border",
+                ncEnabled
+                  ? "bg-[hsl(214_82%_51%/0.15)] text-[hsl(214_82%_65%)] border-[hsl(214_82%_51%/0.3)]"
+                  : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_30%)]"
+              )}
+              title={ncEnabled ? "Desactivar cancelación de ruido" : "Activar cancelación de ruido"}
+            >
+              <AudioLines className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-w-[120px] truncate">{ncEnabled ? "NC activa" : "Cancelar ruido"}</span>
+            </button>
           </div>
 
           {bgEffect !== "none" && (
