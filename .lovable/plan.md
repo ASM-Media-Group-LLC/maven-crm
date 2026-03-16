@@ -1,22 +1,35 @@
 
 
-## Problem
+## Diagnóstico: Por qué se siente pesado el sistema
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+Identifiqué varios problemas de rendimiento:
 
-## Solution
+### Problemas encontrados
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+1. **8 queries separadas para contar status (KPIs)**: El hook hace 8 llamadas HEAD individuales a Supabase para contar cada estado. Esto genera 8 requests de red en paralelo cada vez que se carga la pagina.
 
-## Changes
+2. **500 filas renderizando Select components**: La tabla carga hasta 500 leads y cada fila renderiza 3 `Select` (Radix UI) con su `SelectContent` y `SelectTrigger`. Esto significa ~1500 componentes Select montados simultáneamente, cada uno con portales y listeners del DOM. Es extremadamente pesado.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+3. **Invalidación agresiva**: Cada cambio de campo o estado invalida TODAS las queries (`closer-leads` + `closer-leads-counts`), refetcheando los 500 leads y los 8 counts de nuevo.
 
-Replace the single `.select()` call with a paginated loop:
+4. **No hay virtualización**: Las 500 filas se renderizan todas en el DOM simultáneamente.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### Plan de optimización
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+**1. Reemplazar Selects inline con click-to-edit (LeadTable.tsx)**
+- En lugar de montar 1500 componentes Select permanentemente, mostrar Badges estáticos que al hacer click abren un `Popover` con opciones. Solo 1 popover abierto a la vez.
+- Esto reduce de ~1500 componentes Radix a ~500 badges estáticos + 1 popover activo.
+
+**2. Consolidar queries de conteo (useCloserLeads.ts)**
+- Reemplazar las 8 llamadas HEAD por una sola query RPC o un `.select("status")` agrupado para obtener todos los counts en una sola llamada.
+
+**3. Actualización optimista (useCloserLeads.ts)**
+- En las mutations, actualizar el cache local inmediatamente (`queryClient.setQueryData`) sin esperar el refetch. Eliminar la invalidación de la query principal (solo invalidar counts).
+
+**4. Reducir el límite de carga inicial**
+- Bajar de 500 a 100 leads por defecto con paginación "cargar más" o scroll infinito.
+
+### Archivos a modificar
+- `src/pages/closers/components/LeadTable.tsx` — Click-to-edit en lugar de Select permanente
+- `src/pages/closers/hooks/useCloserLeads.ts` — Consolidar counts, updates optimistas, reducir limit
 
