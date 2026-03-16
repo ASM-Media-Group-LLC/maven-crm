@@ -119,6 +119,7 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [camOn, setCamOn] = useState(initialSettingsRef.current?.camOn ?? true);
   const [joining, setJoining] = useState(false);
   const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialSettingsRef.current?.backgroundEffect ?? "none");
+  const [ncEnabled, setNcEnabled] = useState(() => loadNCPreference());
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
 
