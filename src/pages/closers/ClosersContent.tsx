@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Search, X } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCloserLeads } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import LeadTable from "./components/LeadTable";
@@ -24,6 +24,7 @@ const TABS = [
 const ClosersContent = () => {
   const {
     leads, isLoading, statusCounts,
+    totalCount, totalPages, page, setPage,
     search, setSearch,
     qualityFilter, setQualityFilter,
     dateFrom, setDateFrom, dateTo, setDateTo,
@@ -99,9 +100,34 @@ const ClosersContent = () => {
                     onStatusChange={(id, status) => updateStatus.mutate({ id, status })}
                     onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Mostrando {leads.length} leads
-                  </p>
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-xs text-muted-foreground">
+                      Mostrando {leads.length} de {totalCount} leads
+                    </p>
+                    {totalPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page === 0}
+                          onClick={() => setPage(page - 1)}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          {page + 1} / {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page >= totalPages - 1}
+                          onClick={() => setPage(page + 1)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
               ))}
             </Tabs>

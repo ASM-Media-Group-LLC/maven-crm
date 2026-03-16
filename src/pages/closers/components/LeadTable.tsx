@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoreHorizontal, ArrowRight, XCircle, ExternalLink, Check, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MoreHorizontal, ArrowRight, XCircle, ExternalLink } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent,
@@ -57,13 +57,100 @@ const NEXT_STATUS: Record<string, string | null> = {
 
 const ALL_STATUSES = ["no_response", "contactado", "replied", "interested", "meeting_set", "confirmed", "completed", "not_interested"];
 
-const CONTACTED_OPTIONS = [
-  { value: "contactado", label: "Sí" },
-  { value: "no_response", label: "No" },
-];
+// Click-to-edit popover for quality
+const QualityCell = memo(({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+          <Badge className={qualityColor(value)}>{value || "—"}</Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align="start">
+        <div className="flex flex-col gap-0.5">
+          {QUALITIES.map((q) => (
+            <button
+              key={q}
+              className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${q === value ? "bg-muted font-medium" : ""}`}
+              onClick={() => { onChange(q); setOpen(false); }}
+            >
+              <Badge className={qualityColor(q)}>{q}</Badge>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+QualityCell.displayName = "QualityCell";
+
+// Click-to-edit popover for status
+const StatusCell = memo(({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+          <Badge className={statusColor(value)}>
+            {STATUS_LABELS[value] || value}
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align="start">
+        <div className="flex flex-col gap-0.5">
+          {ALL_STATUSES.map((s) => (
+            <button
+              key={s}
+              className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left flex items-center gap-2 ${s === value ? "bg-muted font-medium" : ""}`}
+              onClick={() => { onChange(s); setOpen(false); }}
+            >
+              <span className={`w-2 h-2 rounded-full ${statusColor(s).split(" ")[0]}`} />
+              {STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+StatusCell.displayName = "StatusCell";
+
+// Click-to-edit popover for contacted
+const ContactedCell = memo(({ isContacted, onToggle }: { isContacted: boolean; onToggle: (contacted: boolean) => void }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="cursor-pointer hover:opacity-80 transition-opacity">
+          <Badge className={isContacted ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}>
+            {isContacted ? "Sí" : "No"}
+          </Badge>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-1" align="start">
+        <div className="flex flex-col gap-0.5">
+          <button
+            className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${isContacted ? "bg-muted font-medium" : ""}`}
+            onClick={() => { onToggle(true); setOpen(false); }}
+          >
+            Sí
+          </button>
+          <button
+            className={`px-3 py-1.5 text-sm rounded hover:bg-muted text-left ${!isContacted ? "bg-muted font-medium" : ""}`}
+            onClick={() => { onToggle(false); setOpen(false); }}
+          >
+            No
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+ContactedCell.displayName = "ContactedCell";
 
 // Inline editable notes cell
-const InlineNotes = ({ value, onSave }: { value: string | null; onSave: (v: string) => void }) => {
+const InlineNotes = memo(({ value, onSave }: { value: string | null; onSave: (v: string) => void }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(value || "");
 
@@ -85,18 +172,17 @@ const InlineNotes = ({ value, onSave }: { value: string | null; onSave: (v: stri
   }
 
   return (
-    <div className="flex items-center gap-1">
-      <Input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
-        onBlur={save}
-        autoFocus
-        className="h-7 text-sm w-48"
-      />
-    </div>
+    <Input
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+      onBlur={save}
+      autoFocus
+      className="h-7 text-sm w-48"
+    />
   );
-};
+});
+InlineNotes.displayName = "InlineNotes";
 
 const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
   return (
@@ -144,78 +230,38 @@ const LeadTable = ({ leads, onStatusChange, onFieldChange }: Props) => {
                     </a>
                   </TableCell>
 
-                  {/* Inline quality select */}
                   <TableCell>
-                    <Select
+                    <QualityCell
                       value={lead.quality || ""}
-                      onValueChange={(v) => onFieldChange(lead.id, "quality", v)}
-                    >
-                      <SelectTrigger className="h-7 w-16 border-0 bg-transparent p-0 shadow-none hover:bg-muted/50 focus:ring-0">
-                        <Badge className={qualityColor(lead.quality)}>{lead.quality || "—"}</Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {QUALITIES.map((q) => (
-                          <SelectItem key={q} value={q}>{q}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => onFieldChange(lead.id, "quality", v)}
+                    />
                   </TableCell>
 
-                  {/* Inline status select */}
                   <TableCell>
-                    <Select
+                    <StatusCell
                       value={currentStatus}
-                      onValueChange={(v) => onStatusChange(lead.id, v)}
-                    >
-                      <SelectTrigger className="h-7 w-auto min-w-[120px] border-0 bg-transparent p-0 shadow-none hover:bg-muted/50 focus:ring-0">
-                        <Badge className={statusColor(currentStatus)}>
-                          {STATUS_LABELS[currentStatus] || currentStatus}
-                        </Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALL_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            <span className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${statusColor(s).split(" ")[0]}`} />
-                              {STATUS_LABELS[s]}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => onStatusChange(lead.id, v)}
+                    />
                   </TableCell>
 
                   <TableCell className="text-sm">{lead.entry_date}</TableCell>
                   <TableCell className="text-sm">{lead.company || "—"}</TableCell>
 
-                  {/* Inline contacted select */}
                   <TableCell>
-                    <Select
-                      value={isContacted ? "contactado" : "no_response"}
-                      onValueChange={(v) => {
-                        if (v === "no_response" && currentStatus !== "no_response") {
+                    <ContactedCell
+                      isContacted={isContacted}
+                      onToggle={(contacted) => {
+                        if (!contacted && currentStatus !== "no_response") {
                           onStatusChange(lead.id, "no_response");
-                        } else if (v === "contactado" && currentStatus === "no_response") {
+                        } else if (contacted && currentStatus === "no_response") {
                           onStatusChange(lead.id, "contactado");
                         }
                       }}
-                    >
-                      <SelectTrigger className="h-7 w-16 border-0 bg-transparent p-0 shadow-none hover:bg-muted/50 focus:ring-0">
-                        <Badge className={isContacted ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}>
-                          {isContacted ? "Sí" : "No"}
-                        </Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CONTACTED_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </TableCell>
 
                   <TableCell className="text-sm">{lead.phone_raw || "—"}</TableCell>
 
-                  {/* Inline editable notes */}
                   <TableCell>
                     <InlineNotes
                       value={lead.notes}
