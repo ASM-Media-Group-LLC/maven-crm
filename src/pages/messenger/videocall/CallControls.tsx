@@ -34,6 +34,8 @@ interface CallControlsProps {
   onAudioInputChange: (id: string) => void;
   onAudioOutputChange: (id: string) => void;
   onVideoInputChange: (id: string) => void;
+  isNoiseCancellationOn: boolean;
+  onToggleNoiseCancellation: () => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
 }
