@@ -925,10 +925,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           estimated_monetization: number | null
+          extras: number | null
           id: string
           instagram_handle: string
           last_contact_date: string | null
           leadgen_entry_id: string | null
+          main_platform: string | null
           monthly_monetization: number | null
           notes: string | null
           onlyfans_url: string | null
@@ -949,10 +951,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           estimated_monetization?: number | null
+          extras?: number | null
           id?: string
           instagram_handle: string
           last_contact_date?: string | null
           leadgen_entry_id?: string | null
+          main_platform?: string | null
           monthly_monetization?: number | null
           notes?: string | null
           onlyfans_url?: string | null
@@ -973,10 +977,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           estimated_monetization?: number | null
+          extras?: number | null
           id?: string
           instagram_handle?: string
           last_contact_date?: string | null
           leadgen_entry_id?: string | null
+          main_platform?: string | null
           monthly_monetization?: number | null
           notes?: string | null
           onlyfans_url?: string | null
@@ -1000,6 +1006,44 @@ export type Database = {
             columns: ["leadgen_entry_id"]
             isOneToOne: false
             referencedRelation: "leadgen_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closer_platform_sales: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          creator_id: string
+          id: string
+          platform: string
+          price: number | null
+          product: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          creator_id: string
+          id?: string
+          platform: string
+          price?: number | null
+          product?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          creator_id?: string
+          id?: string
+          platform?: string
+          price?: number | null
+          product?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closer_platform_sales_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "closer_creators"
             referencedColumns: ["id"]
           },
         ]
