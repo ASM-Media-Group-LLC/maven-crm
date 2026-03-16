@@ -30,15 +30,12 @@ export interface CloserCreator {
 
 export const STAGES = [
   "Asignada",
-  "En negociación",
-  "Formulario enviado",
-  "Acuerdo enviado",
   "Confirmada",
   "Completada",
   "No interesada",
 ] as const;
 
-export const CHANNELS = ["WhatsApp", "Instagram DM", "Llamada", "Email", "Otro"] as const;
+export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
 
 export type NewCreatorData = {
