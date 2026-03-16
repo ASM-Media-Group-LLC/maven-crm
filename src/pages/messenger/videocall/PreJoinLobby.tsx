@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
-  ChevronDown, Monitor, Volume2, Loader2, Settings, AudioLines,
+  ChevronDown, Monitor, Volume2, Loader2, Settings,
 } from "lucide-react";
 import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-client";
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
