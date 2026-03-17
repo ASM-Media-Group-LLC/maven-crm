@@ -30,7 +30,7 @@ const ClosersContent = () => {
     dateFrom, setDateFrom,
     dateTo, setDateTo,
     dateField, setDateField,
-    updateField, updateStage, assignCreator,
+    updateField, updateStage, assignCreator, convertLeadgenEntry,
     isAdmin, isManager,
   } = useCloserLeads();
 
