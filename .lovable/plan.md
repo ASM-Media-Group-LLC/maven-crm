@@ -1,37 +1,22 @@
 
 
-## Plan: Upgrade Company Selector in AddLeadModal
+## Problem
 
-### What needs to change
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-The company/cuenta de origen field in the "Nuevo Lead" modal (lines 345-368 of `AddLeadModal.tsx`) currently uses a basic `Select` with a hardcoded list missing some companies (e.g., "ORA"). It needs:
+## Solution
 
-1. **Add "ORA" (Ora Miami)** to the company list
-2. **Replace the basic Select with a searchable Combobox** (Popover + Command pattern, same as the country selector already in this file)
-3. **Add "Agregar nueva" option** that lets users type a custom company name inline if it does not exist in the list
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-### Implementation details
+## Changes
 
-**1. Update `LEADGEN_COMPANIES` in `leadgenConstants.ts`**
-- Add `"Ora Miami"` to the list (it is referenced in the constant but the modal has its own hardcoded list — we will unify them)
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-**2. Refactor company field in `AddLeadModal.tsx` (lines 345-368)**
-- Replace the `<Select>` with the same `Popover` + `Command` pattern already used for the country selector (lines 378-403)
-- Source the options from `LEADGEN_COMPANIES` constant instead of hardcoded `SelectItem`s
-- Add a `CommandInput` for search/filtering
-- Add a special "Agregar nueva compañía" `CommandItem` at the bottom that, when selected, shows an inline `Input` to type a custom company name
-- Use local state (`customCompany` / `isAddingNew`) to handle the "add new" flow
-- When the user types a custom name and confirms, set `field.onChange(customName)` directly
+Replace the single `.select()` call with a paginated loop:
 
-**3. Sync the hardcoded values**
-- The modal currently uses different values (`"kash-agency"`, `"blue-app"`, etc.) vs `LEADGEN_COMPANIES` which uses display names (`"KASH Agency"`, `"Blu app"`). We will unify to use the display names from `LEADGEN_COMPANIES` as both value and label (matching existing DB data).
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-### Files to modify
-- `src/pages/leadgen/leadgenConstants.ts` — add "Ora Miami" if not present (it is already there, but ensure consistency)
-- `src/pages/leadgen/AddLeadModal.tsx` — replace company Select with searchable Combobox + "add new" option
-
-### Technical notes
-- The country selector in the same file already uses the exact Popover+Command+CommandList pattern, so this is consistent with existing code
-- The `LEADGEN_COMPANIES` array already contains `"Ora Miami"` — the modal just was not using it
-- No DB changes needed; the `company` column is a free-text field
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
