@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { differenceInCalendarDays, setYear } from "date-fns";
-import { ArrowLeft, Phone, Cake, Download } from "lucide-react";
+import { ArrowLeft, Phone, Cake, Download, LogOut, ChevronRight } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
