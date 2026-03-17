@@ -108,7 +108,7 @@ export function useCoworkSession(sessionId: string | null) {
       const { data: hReqs } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
       setHostRequests((hReqs as HostRequest[]) || []);
 
-      const { data: ssReqs } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending"]).order("created_at", { ascending: false });
+      const { data: ssReqs } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending", "approved"]).order("created_at", { ascending: false });
       setScreenShareRequests((ssReqs as ScreenShareRequest[]) || []);
 
       const userIds = (mems as CoworkMembership[])?.map(m => m.user_id) || [];
