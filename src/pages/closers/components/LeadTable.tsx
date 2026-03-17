@@ -744,7 +744,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {isCloser && CLOSER_STAGES.filter((s) => s !== c.stage).map((s) => (
+                    {isCloser && CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
                       <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
                         Mover a {s}
                       </DropdownMenuItem>
