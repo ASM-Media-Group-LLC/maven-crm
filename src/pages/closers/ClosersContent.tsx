@@ -8,9 +8,9 @@ import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 
-const TABS = [
+const ALL_TABS = [
   { value: "todas", label: "Todas" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
@@ -39,6 +39,23 @@ const ClosersContent = () => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
+
+  const TABS = useMemo(() =>
+    (isAdmin || isManager) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
+    [isAdmin, isManager]
+  );
+
+  const sourceAccounts = useMemo(() =>
+    [...new Set(creators.map(c => c.source_account).filter(Boolean))] as string[],
+    [creators]
+  );
+
+  // Redirect to "todas" when admin/manager role resolves
+  useEffect(() => {
+    if ((isAdmin || isManager) && activeTab === "asignadas") {
+      setActiveTab("todas");
+    }
+  }, [isAdmin, isManager]);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -180,6 +197,7 @@ const ClosersContent = () => {
             {TABS.map((tab) => (
               <TabsContent key={tab.value} value={tab.value} className="mt-0">
                 <CloserTable
+                  sourceAccounts={sourceAccounts}
                   creators={creators}
                   activeTab={activeTab}
                   viewMode={viewMode}

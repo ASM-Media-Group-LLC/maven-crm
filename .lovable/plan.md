@@ -1,45 +1,22 @@
 
 
-## Plan: Selects inline para Categoría/Cuenta origen/Estado + Contactos como popover + Restricción de tabs por rol
+## Problem
 
-### Resumen
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-Tres bloques de cambios:
-1. Reemplazar campos de texto editables (`InlineText`) por selects inline para Categoría, Cuenta de origen y Estado
-2. Convertir el badge "# Contactos" en un popover clickeable con historial + formulario de registro
-3. Restringir tab "Todas" solo a admin/manager; closers ven solo sus propios tabs
+## Solution
 
-### Cambios detallados
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-**1. `src/pages/closers/components/LeadTable.tsx`**
+## Changes
 
-- **InlineCategorySelect**: Nuevo componente — Popover con badges clickeables para opciones fijas `["A+", "A", "B+", "B", "C"]`. Reemplaza `InlineText` de `category` en tabs "todas" y "asignadas".
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-- **InlineSourceSelect**: Nuevo componente — Popover con lista de valores únicos existentes de `source_account` (extraídos del array `creators` via prop) + input para agregar una nueva. Reemplaza `InlineText` de `source_account`.
+Replace the single `.select()` call with a paginated loop:
 
-- **InlineStageSelect**: Nuevo componente — Select con las opciones de `CLOSER_STAGES` coloreadas con `stageColor()`. Reemplaza el `<Badge>` estático del estado en tab "todas". Solo habilitado para filas `_source === "closer"` (las de LeadGen con "Pendiente LG" quedan como badge estático).
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-- **ContactCountCell**: Nuevo componente — el badge `X/6` se convierte en un Popover clickeable que muestra:
-  - Mini historial de contactos (fecha, canal, resultado) usando `useContactHistory`
-  - Formulario rápido abajo (Canal, Resultado, Notas) — misma lógica que `ContactQuickForm` pero integrado
-  - Se aplica en tabs "todas" y "asignadas"
-
-- **Limpieza**: Eliminar import y uso de `ContactQuickForm` en las filas (su funcionalidad queda integrada en `ContactCountCell`).
-
-- Pasar prop `sourceAccounts: string[]` al componente para alimentar `InlineSourceSelect`.
-
-**2. `src/pages/closers/ClosersContent.tsx`**
-
-- Filtrar `TABS` dinámicamente: solo incluir `{ value: "todas", label: "Todas" }` si `isAdmin || isManager`.
-- Computar `sourceAccounts` como valores únicos de `source_account` del array `creators` y pasarlo como prop a `CloserTable`.
-
-**3. `src/pages/closers/hooks/useCloserLeads.ts`**
-
-- Cambiar `useState("todas")` por `useState("asignadas")` como default.
-- Agregar `useEffect`: cuando `isAdmin || isManager` se resuelva a `true` y el tab actual es "asignadas", cambiar a "todas".
-
-### Archivos a modificar
-- `src/pages/closers/components/LeadTable.tsx` — Nuevos componentes inline, ContactCountCell, eliminar ContactQuickForm
-- `src/pages/closers/ClosersContent.tsx` — Filtrar tabs por rol, pasar sourceAccounts
-- `src/pages/closers/hooks/useCloserLeads.ts` — Default tab según rol
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
