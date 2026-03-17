@@ -76,8 +76,45 @@ function computeAge(birthDate: string): number | null {
   if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
   return age;
 }
+const STATUS_OFFBOARDING: Record<string, { label: string; variant: string }> = {
+  en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
+  pendiente_aprobacion: { label: "Pend. Aprobación", variant: "bg-warning/15 text-warning border-warning/30" },
+  pendiente_cierre: { label: "Pend. Cierre", variant: "bg-accent/15 text-accent-foreground border-accent/30" },
+  finalizado: { label: "Finalizado", variant: "bg-muted text-muted-foreground border-border" },
+};
 
-const CreadorProfileContent = () => {
+function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
+  const { offboarding, approvals } = useOffboarding(creatorId);
+  if (!offboarding) return null;
+  const st = STATUS_OFFBOARDING[offboarding.status] ?? STATUS_OFFBOARDING.en_proceso;
+  const approvalCount = approvals.filter((a) => a.approved).length;
+  const checkDone = [offboarding.check_pagos, offboarding.check_material, offboarding.check_campanas, offboarding.check_accesos, offboarding.check_documentacion].filter(Boolean).length;
+
+  return (
+    <div className="mx-6 mt-4">
+      <Link
+        to={`/creadores/offboarding/${offboarding.id}`}
+        className="flex items-center gap-4 rounded-lg border border-border p-4 hover:bg-muted/40 transition-colors group"
+      >
+        <div className="h-9 w-9 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+          <LogOut className="h-4 w-4 text-destructive" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">Offboarding</span>
+            <Badge variant="outline" className={`text-[10px] ${st.variant}`}>{st.label}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Aprobaciones: {approvalCount}/2 · Checklist: {checkDone}/5
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+      </Link>
+    </div>
+  );
+}
+
+
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
