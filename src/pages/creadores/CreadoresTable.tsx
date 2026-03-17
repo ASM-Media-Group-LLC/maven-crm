@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -80,6 +82,7 @@ const CreadoresTable = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
+  const navigate = useNavigate();
   const { isAgent, isAdmin, isManager } = useUserRole();
   const canSeeAllData = isAdmin || isManager || !isAgent;
 
@@ -322,6 +325,36 @@ const CreadoresTable = ({ creators }: Props) => {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {(c.status === "leaving" || c.status === "terminated") && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-warning"
+                            onClick={async () => {
+                              const { data } = await supabase
+                                .from("creator_offboardings")
+                                .select("id")
+                                .eq("creator_id", c.id)
+                                .order("created_at", { ascending: false })
+                                .limit(1)
+                                .maybeSingle();
+                              if (data?.id) {
+                                navigate(`/creadores/offboarding/${data.id}`);
+                              } else {
+                                toast("No se encontró proceso de offboarding para esta creadora.");
+                              }
+                            }}
+                          >
+                            <LogOut className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver Offboarding</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </TableCell>
             </TableRow>

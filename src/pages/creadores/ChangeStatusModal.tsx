@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -50,6 +51,7 @@ const ChangeStatusModal = ({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const currentOption = statusOptions.find((s) => s.value === currentStatus);
@@ -97,9 +99,10 @@ const ChangeStatusModal = ({
       if (noteErr) throw noteErr;
 
       // Auto-create offboarding record when status changes to 'leaving'
+      let offboardingId: string | null = null;
       if (newStatus === "leaving" && user?.id) {
         try {
-          await createOffboardingRecord(creatorId, user.id);
+          offboardingId = await createOffboardingRecord(creatorId, user.id);
         } catch (offErr: any) {
           // Ignore duplicate — offboarding may already exist
           console.warn("Offboarding creation skipped:", offErr.message);
@@ -112,7 +115,15 @@ const ChangeStatusModal = ({
       queryClient.invalidateQueries({ queryKey: ["creator_notes", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["creator_offboarding", creatorId] });
 
-      toast({ title: "Estado actualizado exitosamente" });
+      toast({
+        title: "Estado actualizado exitosamente",
+        description: offboardingId ? "Se creó el proceso de offboarding." : undefined,
+        action: offboardingId ? (
+          <Button variant="outline" size="sm" onClick={() => navigate(`/creadores/offboarding/${offboardingId}`)}>
+            Ver Offboarding
+          </Button>
+        ) : undefined,
+      });
       resetAndClose();
     } catch (err: any) {
       toast({

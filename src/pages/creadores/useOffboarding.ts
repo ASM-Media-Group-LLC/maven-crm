@@ -302,12 +302,13 @@ export function useAllOffboardings() {
   });
 }
 
-export async function createOffboardingRecord(creatorId: string, createdBy: string) {
-  const { error } = await supabase.from("creator_offboardings").insert({
+export async function createOffboardingRecord(creatorId: string, createdBy: string): Promise<string> {
+  const { data, error } = await supabase.from("creator_offboardings").insert({
     creator_id: creatorId,
     status: "en_proceso",
     exit_date: new Date().toISOString().split("T")[0],
     created_by: createdBy,
-  });
+  }).select("id").single();
   if (error) throw error;
+  return data.id;
 }
