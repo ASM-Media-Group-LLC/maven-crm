@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateEvento } from "../useEventos";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 
 interface Props {
   eventId: string;
