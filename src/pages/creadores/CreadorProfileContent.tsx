@@ -22,6 +22,7 @@ import OperacionesTabContent from "./OperacionesTabContent";
 import { generateCreatorPdf } from "./generateCreatorPdf";
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
+import OffboardingSection from "./OffboardingSection";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const statusLabel: Record<string, string> = {
