@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag } from "lucide-react";
+import { Users, UserCheck, Clock, PauseCircle, LogOut, XCircle, TrendingUp, Globe, Tag, DollarSign, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useCreadores } from "./useCreadores";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -22,6 +24,35 @@ const statusConfig = [
 const CreadorasDashboardContent = () => {
   const navigate = useNavigate();
   const { allCreators, isLoading } = useCreadores(emptyFilters);
+
+  // Offboarding metrics
+  const offboardingQuery = useQuery({
+    queryKey: ["offboarding_dashboard_metrics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_offboardings")
+        .select("id, status, categoria, estimated_lost_revenue");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const offboardingMetrics = useMemo(() => {
+    const items = offboardingQuery.data ?? [];
+    const finalized = items.filter((i) => i.status === "finalizado");
+    const totalLostRevenue = items.reduce((sum, i) => sum + (i.estimated_lost_revenue ?? 0), 0);
+    const byCategoria: Record<string, number> = {};
+    for (const i of items) {
+      const cat = i.categoria ?? "Sin categoría";
+      byCategoria[cat] = (byCategoria[cat] ?? 0) + 1;
+    }
+    return {
+      totalFinalized: finalized.length,
+      totalInProgress: items.length - finalized.length,
+      totalLostRevenue,
+      byCategoria: Object.entries(byCategoria).sort((a, b) => b[1] - a[1]),
+    };
+  }, [offboardingQuery.data]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0 };
@@ -291,6 +322,61 @@ const CreadorasDashboardContent = () => {
                     </span>
                   </div>
                 </button>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Section 4 — Offboarding Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-t-[3px] border-t-destructive cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-destructive/10 hover:to-transparent">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Modelos Perdidas</p>
+                  <p className="text-3xl font-bold mt-1 text-destructive">{offboardingMetrics.totalFinalized}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{offboardingMetrics.totalInProgress} en proceso</p>
+                </div>
+                <div className="p-2 rounded-lg bg-destructive/10 shrink-0">
+                  <LogOut className="h-5 w-5 text-destructive" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-t-[3px] border-t-warning cursor-pointer transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium">Revenue Perdido</p>
+                  <p className="text-3xl font-bold mt-1 text-warning">
+                    ${offboardingMetrics.totalLostRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Estimado 12 meses</p>
+                </div>
+                <div className="p-2 rounded-lg bg-warning/10 shrink-0">
+                  <DollarSign className="h-5 w-5 text-warning" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="transition-all duration-200 hover:shadow-md hover:border-destructive/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                Motivos de Salida
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {offboardingMetrics.byCategoria.length === 0 && (
+                <p className="text-xs text-muted-foreground">Sin datos</p>
+              )}
+              {offboardingMetrics.byCategoria.map(([cat, count]) => (
+                <div key={cat} className="flex items-center justify-between text-xs">
+                  <span className="capitalize font-medium text-foreground">{cat.replace("_", " ")}</span>
+                  <Badge variant="outline" className="text-[10px]">{count}</Badge>
+                </div>
               ))}
             </CardContent>
           </Card>

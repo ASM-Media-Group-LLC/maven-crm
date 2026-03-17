@@ -22,6 +22,7 @@ import OperacionesTabContent from "./OperacionesTabContent";
 import { generateCreatorPdf } from "./generateCreatorPdf";
 import ChangeStatusModal from "./ChangeStatusModal";
 import VerificationSection from "./VerificationSection";
+import OffboardingSection from "./OffboardingSection";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const statusLabel: Record<string, string> = {
@@ -194,6 +195,15 @@ const CreadorProfileContent = () => {
 
       {c.status && !isAgent && (
         <VerificationSection creatorId={id!} creatorName={c.name} currentStatus={c.status} />
+      )}
+
+      {(c.status === "leaving" || c.status === "terminated") && !isAgent && (
+        <OffboardingSection
+          creatorId={id!}
+          creatorName={c.name}
+          artisticName={c.artistic_name}
+          instagramHandle={c.instagram_handle}
+        />
       )}
 
       <div className="px-6 mt-4 pb-6">

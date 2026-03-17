@@ -1950,6 +1950,121 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_offboarding_approvals: {
+        Row: {
+          approved: boolean | null
+          approved_at: string | null
+          approver_id: string
+          created_at: string | null
+          id: string
+          offboarding_id: string
+        }
+        Insert: {
+          approved?: boolean | null
+          approved_at?: string | null
+          approver_id: string
+          created_at?: string | null
+          id?: string
+          offboarding_id: string
+        }
+        Update: {
+          approved?: boolean | null
+          approved_at?: string | null
+          approver_id?: string
+          created_at?: string | null
+          id?: string
+          offboarding_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_offboarding_approvals_offboarding_id_fkey"
+            columns: ["offboarding_id"]
+            isOneToOne: false
+            referencedRelation: "creator_offboardings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_offboardings: {
+        Row: {
+          avg_monthly_revenue: number | null
+          categoria: string | null
+          check_accesos: boolean | null
+          check_campanas: boolean | null
+          check_documentacion: boolean | null
+          check_material: boolean | null
+          check_pagos: boolean | null
+          comentarios: string | null
+          comunicado_generado: string | null
+          created_at: string | null
+          created_by: string | null
+          creator_id: string
+          estimated_lost_revenue: number | null
+          exit_date: string | null
+          id: string
+          last_revenue: number | null
+          motivo_comercial: string | null
+          motivo_final: string | null
+          motivo_operativo: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          avg_monthly_revenue?: number | null
+          categoria?: string | null
+          check_accesos?: boolean | null
+          check_campanas?: boolean | null
+          check_documentacion?: boolean | null
+          check_material?: boolean | null
+          check_pagos?: boolean | null
+          comentarios?: string | null
+          comunicado_generado?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          creator_id: string
+          estimated_lost_revenue?: number | null
+          exit_date?: string | null
+          id?: string
+          last_revenue?: number | null
+          motivo_comercial?: string | null
+          motivo_final?: string | null
+          motivo_operativo?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          avg_monthly_revenue?: number | null
+          categoria?: string | null
+          check_accesos?: boolean | null
+          check_campanas?: boolean | null
+          check_documentacion?: boolean | null
+          check_material?: boolean | null
+          check_pagos?: boolean | null
+          comentarios?: string | null
+          comunicado_generado?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          creator_id?: string
+          estimated_lost_revenue?: number | null
+          exit_date?: string | null
+          id?: string
+          last_revenue?: number | null
+          motivo_comercial?: string | null
+          motivo_final?: string | null
+          motivo_operativo?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_offboardings_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_payments: {
         Row: {
           amount: number

@@ -30,7 +30,7 @@ import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
-import ProspectosPage from "./pages/creadores/prospectos/ProspectosPage";
+
 import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
 import OnboardingWizardPage from "./pages/creadores/onboarding/OnboardingWizardPage";
 import CreadorasDashboardPage from "./pages/creadores/CreadorasDashboardPage";
@@ -150,7 +150,7 @@ const App = () => (
               <Route path="/contactos/nuevo" element={<PermissionRoute module="Contactos"><NuevoContacto /></PermissionRoute>} />
               <Route path="/creadores/dashboard" element={<PermissionRoute module="Creadores"><CreadorasDashboardPage /></PermissionRoute>} />
               <Route path="/creadores" element={<PermissionRoute module="Creadores"><Creadores /></PermissionRoute>} />
-              <Route path="/creadores/prospectos" element={<PermissionRoute module="Creadores"><ProspectosPage /></PermissionRoute>} />
+              
               <Route path="/creadores/onboarding" element={<PermissionRoute module="Creadores"><OnboardingPage /></PermissionRoute>} />
               <Route path="/creadores/onboarding/nuevo" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
               <Route path="/creadores/onboarding/:id" element={<PermissionRoute module="Creadores"><OnboardingWizardPage /></PermissionRoute>} />
