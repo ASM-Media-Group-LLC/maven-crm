@@ -119,11 +119,11 @@ InlineText.displayName = "InlineText";
 const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1">
+        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 bg-transparent border-0">
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </span>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
         <div className="flex flex-wrap gap-1.5">
