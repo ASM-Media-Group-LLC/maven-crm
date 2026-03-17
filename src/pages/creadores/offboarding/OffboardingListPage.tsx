@@ -22,8 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LogOut, Search, Filter, ExternalLink } from "lucide-react";
+import { LogOut, Search, Filter, ExternalLink, Plus } from "lucide-react";
 import { useAllOffboardings } from "../useOffboarding";
+import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
 
 const STATUS_LABELS: Record<string, { label: string; variant: string }> = {
   en_proceso: { label: "En Proceso", variant: "bg-primary/15 text-primary border-primary/30" },
