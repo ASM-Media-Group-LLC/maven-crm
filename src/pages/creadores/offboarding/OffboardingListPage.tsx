@@ -43,10 +43,11 @@ const CATEGORIAS = [
 
 const OffboardingListPage = () => {
   const navigate = useNavigate();
-  const { data: offboardings, isLoading } = useAllOffboardings();
+  const { data: offboardings, isLoading, refetch } = useAllOffboardings();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [initiateOpen, setInitiateOpen] = useState(false);
 
   const filtered = (offboardings ?? []).filter((o) => {
     if (statusFilter !== "all" && o.status !== statusFilter) return false;
