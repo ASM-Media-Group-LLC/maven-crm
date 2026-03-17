@@ -100,19 +100,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-blue-400 hover:text-blue-300"
-                title="Copiar enlace de participante"
-                onClick={() => {
-                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}`;
-                  navigator.clipboard.writeText(url);
-                  toast.success("Enlace de participante copiado");
-                }}
-              >
-                <Users2 className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
                 className="h-7 w-7 text-red-400 hover:text-red-300"
                 onClick={async () => {
                   await cowork.endSession();
