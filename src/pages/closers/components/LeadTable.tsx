@@ -1,4 +1,5 @@
 import { useState, memo, useMemo } from "react";
+import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,27 +116,36 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
+// ─── Category color map ───
+const CATEGORY_BADGE_COLORS: Record<string, string> = {
+  "A+": "border-emerald-500 text-emerald-500 bg-emerald-500/10",
+  "A": "border-amber-500 text-amber-500 bg-amber-500/10",
+  "B+": "border-blue-500 text-blue-500 bg-blue-500/10",
+  "B": "border-muted-foreground text-muted-foreground bg-muted/30",
+  "C": "border-destructive text-destructive bg-destructive/10",
+};
+
 // ─── InlineCategorySelect ───
 const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
+  const colorClass = value ? (CATEGORY_BADGE_COLORS[value] || "") : "";
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 bg-transparent border-0">
-          {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        <button className={`cursor-pointer hover:opacity-80 rounded-full px-2.5 py-0.5 text-xs font-semibold inline-flex items-center gap-1 border ${colorClass || "border-border text-muted-foreground bg-transparent"}`}>
+          {value || "—"} <ChevronDown className="h-3 w-3" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
         <div className="flex flex-wrap gap-1.5">
           {CATEGORY_OPTIONS.map((cat) => (
-            <Badge
+            <button
               key={cat}
-              variant={cat === value ? "default" : "outline"}
-              className="cursor-pointer text-xs px-2 py-0.5 hover:bg-primary/10"
+              className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all hover:opacity-80 ${CATEGORY_BADGE_COLORS[cat]} ${cat === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50" : ""}`}
               onClick={() => { onSave(cat); setOpen(false); }}
             >
               {cat}
-            </Badge>
+            </button>
           ))}
         </div>
       </PopoverContent>
@@ -542,18 +552,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
-              ) : (
-                <span className="text-sm">{c.source_account || "—"}</span>
-              )}
+              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-              ) : (
-                <span className="text-sm">{c.category || "—"}</span>
-              )}
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
@@ -714,18 +716,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!isCloser} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
-              ) : (
-                <span className="text-sm">{c.source_account || "—"}</span>
-              )}
+              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-              ) : (
-                <span className="text-sm">{c.category || "—"}</span>
-              )}
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
@@ -741,11 +735,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              ) : (
-                <span className="text-sm">{c.notes || "—"}</span>
-              )}
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
