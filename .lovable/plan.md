@@ -1,28 +1,22 @@
 
 
-## Plan: Corregir acciones, popovers y ContactCountCell
+## Problem
 
-### Problemas identificados
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-1. **"Mover a Asignada" en acciones**: En tab "todas" (línea 747), `CLOSER_STAGES` incluye "Asignada" como opción de cambio de estado. No tiene sentido — si se asigna, ya se mueve automáticamente. Hay que excluirla del dropdown.
+## Solution
 
-2. **ContactCountCell no funcional**: El error en consola dice `Function components cannot be given refs` — el `<Badge>` dentro de `<PopoverTrigger asChild>` no acepta `ref`. Además, los `<Select>` de Canal/Resultado dentro del Popover cierran el Popover al interactuar (conflicto Radix Select + Popover). Solución: usar `<button>` en vez de `<Badge>` como trigger, y agregar `modal={true}` al Popover para que no se cierre al interactuar con Selects internos.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-3. **Inline selects para todas las filas**: Los Popovers usan Portal así que no deberían cortarse. El problema potencial es que `InlineStageSelect` usa `<Select>` de Radix que podría tener conflictos de z-index dentro de tablas con `overflow-x-auto`. Verificar que `SelectContent` tenga `position="popper"` y z-index adecuado.
+## Changes
 
-### Cambios
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-**`src/pages/closers/components/LeadTable.tsx`**
+Replace the single `.select()` call with a paginated loop:
 
-- **Línea 747**: Filtrar "Asignada" del dropdown de acciones en tab "todas": `CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada")`
-- **Línea 585-591 (tab asignadas)**: Verificar que no haya opción redundante de "Mover a Asignada" (ya está bien, solo tiene Confirmada y No interesada)
-- **ContactCountCell (líneas 231-319)**: 
-  - Cambiar `<Badge>` trigger por un `<button>` con estilos de badge para que acepte ref
-  - Agregar `modal` al `<Popover>` para evitar que los Select internos cierren el popover
-  - Esto soluciona tanto el error de ref como la interacción con los selects de Canal/Resultado
-- **InlineStageSelect**: Agregar `side="bottom"` y `position="popper"` al `SelectContent` para asegurar que se despliegue hacia abajo correctamente
-- **InlineCategorySelect / InlineSourceSelect**: Agregar `side="bottom"` al `PopoverContent` para forzar despliegue hacia abajo
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-### Archivos a modificar
-- `src/pages/closers/components/LeadTable.tsx` — Todos los fixes descritos arriba
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
