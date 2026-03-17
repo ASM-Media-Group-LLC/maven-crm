@@ -87,6 +87,8 @@ export const useCloserLeads = () => {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("todas");
   const [page, setPage] = useState(0);
+  const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null);
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
 
