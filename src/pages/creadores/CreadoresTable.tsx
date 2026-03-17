@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowUpDown, Building2, Pencil, Eye, ChevronDown, Globe, LogOut } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
