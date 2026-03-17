@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import EventosCalendar from "./EventosCalendar";
 import EventosFilters from "./EventosFilters";
 import EventosTable from "./EventosTable";
