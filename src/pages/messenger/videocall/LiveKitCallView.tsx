@@ -162,7 +162,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
 
   return (
     <div className="flex flex-col h-full bg-[hsl(220_3%_14%)] text-[hsl(220_3%_85%)]">
-      <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} />
+      <CallTopBar roomName={callDisplayName || roomName} participantCount={lk.participants.length} onOpenAdjustView={() => setAdjustViewOpen(true)} shareLink={shareLink} hideShareLink={hideShareLink} />
 
       {lk.isReconnecting && (
         <div className="shrink-0 flex items-center justify-center gap-2 py-1.5 bg-[hsl(40_96%_50%/0.15)] text-[hsl(40_96%_60%)] text-xs font-medium">
