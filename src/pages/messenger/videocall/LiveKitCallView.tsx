@@ -103,13 +103,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   }, [roomName, callDisplayName]);
 
+  // Clear pin if participant left
+  useEffect(() => {
+    if (pinnedSid && !lk.participants.some((p) => p.sid === pinnedSid)) {
+      setPinnedSid(null);
+    }
+  }, [lk.participants, pinnedSid]);
+
   const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
+    if (pinnedSid) return "spotlight"; // pinned always forces spotlight
     const mode = viewSettings.layout;
     if (mode === "spotlight") return "spotlight";
     if (mode === "sidebar") return "sidebar";
     if (mode === "tiled") return "grid";
     return lk.participants.some((p) => p.isScreenSharing) ? "spotlight" : "grid";
-  }, [viewSettings.layout, lk.participants]);
+  }, [viewSettings.layout, lk.participants, pinnedSid]);
 
   const visibleParticipants = useMemo(() => {
     let list = lk.participants;
@@ -119,9 +127,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk.participants, viewSettings.hideNoVideo, viewSettings.maxTiles]);
 
   const spotlightParticipant = useMemo(() => {
+    if (pinnedSid) {
+      const pinned = visibleParticipants.find((p) => p.sid === pinnedSid);
+      if (pinned) return pinned;
+    }
     const ss = visibleParticipants.find((p) => p.isScreenSharing);
     return ss || visibleParticipants.find((p) => p.identity === lk.activeSpeaker) || visibleParticipants[0];
-  }, [visibleParticipants, lk.activeSpeaker]);
+  }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
 
   const room = lk.getRoom();
 
