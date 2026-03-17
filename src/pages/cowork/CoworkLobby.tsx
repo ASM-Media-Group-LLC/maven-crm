@@ -26,7 +26,7 @@ export default function CoworkLobby({ sessionId, session, roomId, onJoin }: Prop
     setLoading(true);
     setError("");
     try {
-      await onJoin(role, role === "host" ? hostCode : undefined);
+      await onJoin(role, role === "host" ? hostCode : undefined, role !== "host" ? (roomId || undefined) : undefined);
     } catch (e: any) {
       setError(e.message || "Error al unirse");
     } finally {

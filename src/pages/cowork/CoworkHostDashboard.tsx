@@ -184,14 +184,29 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       <p className="text-[10px] text-white/30 italic">Sin participantes</p>
                     )}
 
-                    <Button
-                      variant={isActive ? "destructive" : "secondary"}
-                      size="sm"
-                      className="w-full h-7 text-xs gap-1"
-                      onClick={() => isActive ? leaveActiveRoom() : enterRoom(room.id)}
-                    >
-                      {isActive ? "Salir" : <><LogIn className="h-3 w-3" /> Entrar</>}
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant={isActive ? "destructive" : "secondary"}
+                        size="sm"
+                        className="flex-1 h-7 text-xs gap-1"
+                        onClick={() => isActive ? leaveActiveRoom() : enterRoom(room.id)}
+                      >
+                        {isActive ? "Salir" : <><LogIn className="h-3 w-3" /> Entrar</>}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-blue-400 hover:text-blue-300"
+                        title="Copiar enlace de participante para esta sala"
+                        onClick={() => {
+                          const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success(`Enlace de ${room.name} copiado`);
+                        }}
+                      >
+                        <Link2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );

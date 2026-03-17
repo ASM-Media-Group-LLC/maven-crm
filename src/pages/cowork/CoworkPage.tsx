@@ -86,13 +86,15 @@ export default function CoworkPage() {
   }
 
   // Not a member yet → lobby to join
+  const roomFromUrl = searchParams.get("room");
   if (!cowork.myMembership) {
     return (
       <CoworkLobby
         sessionId={sessionId}
         session={cowork.session}
-        onJoin={async (role, hostCode) => {
-          await cowork.joinSession(sessionId, role, hostCode);
+        roomId={roomFromUrl}
+        onJoin={async (role, hostCode, roomId) => {
+          await cowork.joinSession(sessionId, role, hostCode, roomId);
           cowork.refetch();
         }}
       />

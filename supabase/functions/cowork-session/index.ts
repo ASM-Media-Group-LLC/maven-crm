@@ -124,7 +124,7 @@ serve(async (req) => {
     // JOIN SESSION (as participant or host)
     // ═══════════════════════════════════════════════════════════════
     if (action === "joinSession") {
-      const { sessionId, role, hostCode } = body;
+      const { sessionId, role, hostCode, roomId } = body;
       if (!sessionId) return err("sessionId required");
 
       // Check session exists and is active
@@ -148,6 +148,17 @@ serve(async (req) => {
         session_id: sessionId, user_id: userId, role: memberRole,
       }).select().single();
       if (memErr) return err(memErr.message, 500);
+
+      // Auto-assign participant to room if roomId provided
+      if (memberRole === "participant" && roomId) {
+        // Verify room belongs to this session
+        const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", roomId).eq("session_id", sessionId).single();
+        if (roomCheck) {
+          await admin.from("cowork_room_assignments").insert({
+            session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+          });
+        }
+      }
 
       return json({ membership, alreadyJoined: false });
     }
