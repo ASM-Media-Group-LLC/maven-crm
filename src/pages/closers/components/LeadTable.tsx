@@ -552,18 +552,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
-              ) : (
-                <span className="text-sm">{c.source_account || "—"}</span>
-              )}
+              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-              ) : (
-                <span className="text-sm">{c.category || "—"}</span>
-              )}
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
