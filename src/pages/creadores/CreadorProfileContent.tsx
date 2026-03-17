@@ -115,6 +115,7 @@ function OffboardingSummaryCard({ creatorId }: { creatorId: string }) {
 }
 
 
+const CreadorProfileContent = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: creator, isLoading } = useCreadorById(id ?? "");
