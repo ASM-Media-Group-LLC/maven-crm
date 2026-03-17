@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ConnectionState } from "livekit-client";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import CallTopBar from "./CallTopBar";
@@ -66,11 +66,14 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     if (lk.connectionState === ConnectionState.Connected) void lk.setBackgroundEffect(effect);
   }, [lk.connectionState, lk.setBackgroundEffect]);
 
+  const displayNameRef = useRef(displayName);
+  displayNameRef.current = displayName;
+
   useEffect(() => {
-    lk.connect(roomName, displayName, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect });
+    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect });
     return () => { lk.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, displayName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
+  }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
 
   useEffect(() => {
     const h = () => { lk.disconnect(); };

@@ -1,41 +1,22 @@
 
 
-## Diagnóstico: Por qué apareces duplicado en el Host Hub
+## Problem
 
-**Causa raíz**: En `CoworkHostDashboard.tsx` (líneas 29-36), `displayName` se inicializa como `"Host"` y luego se actualiza asincrónicamente al cargar el perfil:
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-```
-const [displayName, setDisplayName] = useState("Host");  // ← valor inicial
+## Solution
 
-useEffect(() => {
-  supabase.auth.getUser().then(async ({ data }) => {
-    // ... perfil carga y actualiza a "NombreReal"
-    setDisplayName(profile?.full_name || "Host");
-  });
-}, []);
-```
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-El `LiveKitCallView` del Host Hub se monta inmediatamente (porque `hubConnected` se pone en `true` al detectar `host_hub_livekit_room`). Esto causa:
+## Changes
 
-1. **Mount inicial** → `LiveKitCallView` llama `lk.connect(room, "Host", ...)` → participante 1
-2. **Perfil carga** → `displayName` cambia a nombre real → useEffect en `LiveKitCallView` (línea 69-73) detecta cambio en deps (`displayName`) → `disconnect()` + `connect(room, "NombreReal", ...)` → participante 2
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-El `disconnect()` del cliente local es instantáneo, pero el servidor LiveKit puede tardar unos segundos en limpiar la sesión anterior, causando que aparezcan **2 participantes** temporalmente (o permanentemente si el disconnect no se propaga bien).
+Replace the single `.select()` call with a paginated loop:
 
-## Plan
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-### 1. No renderizar el Hub hasta tener el nombre real (CoworkHostDashboard.tsx)
-
-- Mover la carga del perfil a un estado con flag `profileLoaded`
-- Condicionar el render del `LiveKitCallView` del Hub a `profileLoaded === true`
-- Esto elimina la doble conexión porque `displayName` ya será estable cuando el componente se monte
-
-### 2. Guard adicional: no reconectar por cambio de displayName (LiveKitCallView.tsx)
-
-- Usar un `ref` para `displayName` dentro del useEffect de conexión en vez de incluirlo en las dependencias del effect
-- Esto previene reconexiones innecesarias si el nombre cambia después de la conexión inicial (el nombre ya se envió al servidor al conectar)
-
-### Archivos a modificar
-- `src/pages/cowork/CoworkHostDashboard.tsx` — esperar a que cargue el perfil antes de renderizar Hub
-- `src/pages/messenger/videocall/LiveKitCallView.tsx` — usar ref para displayName y removerlo de deps del connect effect
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
