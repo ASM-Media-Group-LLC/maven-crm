@@ -84,6 +84,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);
   const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk]);
 
+  const handlePinParticipant = useCallback((sid: string) => {
+    setPinnedSid((prev) => {
+      if (prev === sid) {
+        toast.info("Tile desanclado");
+        return null;
+      }
+      toast.info("Tile anclado");
+      return sid;
+    });
+  }, []);
+
   const shareLink = useMemo(() => {
     const params = new URLSearchParams();
     const n = (callDisplayName || roomName).trim();
