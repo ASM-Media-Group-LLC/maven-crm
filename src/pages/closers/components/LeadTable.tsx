@@ -1,16 +1,19 @@
-import { useState, memo } from "react";
+import { useState, memo, useMemo } from "react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus } from "lucide-react";
-import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
-import ContactQuickForm from "./ContactQuickForm";
+import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
+import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
 
@@ -22,7 +25,10 @@ interface Props {
   onFieldChange: (id: string, field: string, value: any) => void;
   onAssign: (id: string, currentAssignee: string | null) => void;
   isAdmin: boolean;
+  sourceAccounts: string[];
 }
+
+const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
 
 const stageColor = (s: string) => {
   switch (s) {
@@ -37,7 +43,7 @@ const stageColor = (s: string) => {
 
 const cleanPhoneForWhatsApp = (phone: string) => phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
 
-// Inline editable number cell
+// ─── Inline editable number cell ───
 const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }: { value: number | null; onSave: (v: number) => void; prefix?: string; suffix?: string }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(String(value || 0));
@@ -73,7 +79,7 @@ const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }: { value:
 });
 InlineNumber.displayName = "InlineNumber";
 
-// Inline text cell
+// ─── Inline text cell (kept for notes/rejection) ───
 const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string | null; onSave: (v: string | null) => void; placeholder?: string }) => {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(value || "");
@@ -109,6 +115,209 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
+// ─── InlineCategorySelect ───
+const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1">
+          {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        </span>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-2" align="start">
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_OPTIONS.map((cat) => (
+            <Badge
+              key={cat}
+              variant={cat === value ? "default" : "outline"}
+              className="cursor-pointer text-xs px-2 py-0.5 hover:bg-primary/10"
+              onClick={() => { onSave(cat); setOpen(false); }}
+            >
+              {cat}
+            </Badge>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+});
+InlineCategorySelect.displayName = "InlineCategorySelect";
+
+// ─── InlineSourceSelect ───
+const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | null; onSave: (v: string | null) => void; options: string[] }) => {
+  const [open, setOpen] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
+  const [customText, setCustomText] = useState("");
+
+  const saveCustom = () => {
+    const v = customText.trim();
+    if (v) { onSave(v); }
+    setCustomMode(false);
+    setCustomText("");
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setCustomMode(false); setCustomText(""); } }}>
+      <PopoverTrigger asChild>
+        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 max-w-[160px] truncate" title={value || "—"}>
+          {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+        </span>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-2 space-y-1" align="start">
+        {!customMode ? (
+          <>
+            <div className="max-h-40 overflow-y-auto space-y-0.5">
+              {options.map((opt) => (
+                <div
+                  key={opt}
+                  className={`text-sm px-2 py-1 rounded cursor-pointer hover:bg-muted ${opt === value ? "bg-primary/10 font-medium" : ""}`}
+                  onClick={() => { onSave(opt); setOpen(false); }}
+                >
+                  {opt}
+                </div>
+              ))}
+            </div>
+            <Button variant="ghost" size="sm" className="w-full text-xs mt-1" onClick={() => setCustomMode(true)}>
+              Otra...
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <Input
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveCustom(); if (e.key === "Escape") { setCustomMode(false); setCustomText(""); } }}
+              placeholder="Nueva cuenta..."
+              autoFocus
+              className="h-8 text-sm"
+            />
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setCustomMode(false); setCustomText(""); }}>Cancelar</Button>
+              <Button size="sm" className="h-7 text-xs" onClick={saveCustom} disabled={!customText.trim()}>Guardar</Button>
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+});
+InlineSourceSelect.displayName = "InlineSourceSelect";
+
+// ─── InlineStageSelect ───
+const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; onSave: (v: string) => void; disabled?: boolean }) => {
+  if (disabled) {
+    return <Badge className={stageColor(value)}>{value}</Badge>;
+  }
+  return (
+    <Select value={value} onValueChange={onSave}>
+      <SelectTrigger className={`h-7 w-36 text-xs border-0 ${stageColor(value)}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {[...CLOSER_STAGES, "Pendiente LG" as const].map((s) => (
+          <SelectItem key={s} value={s}>
+            <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${stageColor(s)}`}>{s}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+});
+InlineStageSelect.displayName = "InlineStageSelect";
+
+// ─── ContactCountCell (popover with history + quick form) ───
+const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: number }) => {
+  const [open, setOpen] = useState(false);
+  const { history, isLoading, addContact, maxReached } = useContactHistory(open ? creatorId : null);
+  const [channel, setChannel] = useState("");
+  const [result, setResult] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = () => {
+    if (!channel) return;
+    addContact.mutate(
+      { creator_id: creatorId, channel, result: result || undefined, notes: notes || undefined },
+      {
+        onSuccess: () => {
+          setChannel("");
+          setResult("");
+          setNotes("");
+        },
+      }
+    );
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Badge variant="outline" className="cursor-pointer hover:bg-muted/50 gap-0.5">
+          {count}/6 <ChevronDown className="h-3 w-3" />
+        </Badge>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3 space-y-3" align="start">
+        <p className="text-sm font-semibold">Historial de contactos</p>
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Cargando...</p>
+        ) : history.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sin contactos registrados</p>
+        ) : (
+          <div className="max-h-36 overflow-y-auto space-y-1.5">
+            {history.map((h) => (
+              <div key={h.id} className="text-xs border-b border-border pb-1.5 last:border-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{h.channel}</span>
+                  <span className="text-muted-foreground">{format(new Date(h.contact_date), "dd/MM/yy")}</span>
+                </div>
+                {h.result && <span className="text-muted-foreground">{h.result}</span>}
+                {h.notes && <p className="text-muted-foreground/70 truncate">{h.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!maxReached && (
+          <>
+            <div className="border-t border-border pt-2">
+              <p className="text-xs font-medium mb-2">Nuevo contacto</p>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-xs">Canal *</Label>
+                  <Select value={channel} onValueChange={setChannel}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>
+                      {CHANNELS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Resultado</Label>
+                  <Select value={result} onValueChange={setResult}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>
+                      {RESULTS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Notas</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="text-sm" />
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleSubmit} disabled={!channel || addContact.isPending}>
+                    {addContact.isPending ? "..." : "Guardar"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   if (!phone) return <span className="text-muted-foreground">—</span>;
   return (
@@ -120,10 +329,9 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
-const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, isAdmin }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, isAdmin, sourceAccounts }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Compute revenue for completadas footer
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
       const rev = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
@@ -325,14 +533,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>{igLink}</TableCell>
             <TableCell>
               {isCloser ? (
-                <InlineText value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} />
+                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
               ) : (
                 <span className="text-sm">{c.source_account || "—"}</span>
               )}
             </TableCell>
             <TableCell>
               {isCloser ? (
-                <InlineText value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
               ) : (
                 <span className="text-sm">{c.category || "—"}</span>
               )}
@@ -340,7 +548,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
-              <Badge variant="outline">{c.contact_count}/6</Badge>
+              <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
@@ -367,7 +575,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
-                {isCloser && <ContactQuickForm creatorId={c.id} />}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -494,25 +701,25 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              <Badge className={stageColor(c.stage)}>{c.stage}</Badge>
+              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!isCloser} />
             </TableCell>
             <TableCell>
               {isCloser ? (
-                <InlineText value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} />
+                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
               ) : (
                 <span className="text-sm">{c.source_account || "—"}</span>
               )}
             </TableCell>
             <TableCell>
               {isCloser ? (
-                <InlineText value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
               ) : (
                 <span className="text-sm">{c.category || "—"}</span>
               )}
             </TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
-              <Badge variant="outline">{c.contact_count}/6</Badge>
+              <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell className="text-sm">
@@ -532,7 +739,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
-                {isCloser && <ContactQuickForm creatorId={c.id} />}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -579,7 +785,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         </TableBody>
       </Table>
 
-      {/* Footer totals for completadas */}
       {completadasTotals && completadasTotals.count > 0 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm">
           <span className="font-medium">{completadasTotals.count} modelos cerradas</span>

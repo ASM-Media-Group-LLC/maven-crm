@@ -10,7 +10,7 @@ import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useState } from "react";
 
-const TABS = [
+const ALL_TABS = [
   { value: "todas", label: "Todas" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
