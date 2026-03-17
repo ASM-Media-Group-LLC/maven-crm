@@ -14,7 +14,7 @@ export default function CoworkPage() {
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
+  
   const [userId, setUserId] = useState<string | null>(null);
 
   const cowork = useCoworkSession(sessionId);
