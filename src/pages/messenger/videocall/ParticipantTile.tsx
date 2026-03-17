@@ -14,7 +14,8 @@ interface ParticipantTileProps {
   preferredAudioOutputDeviceId?: string;
   onMuteParticipant?: (identity: string) => void;
   onRemoveParticipant?: (identity: string) => void;
-  onPinParticipant?: (identity: string) => void;
+  onPinParticipant?: (sid: string) => void;
+  pinnedSid?: string | null;
   isAdmin?: boolean;
 }
 
