@@ -80,4 +80,14 @@ describe("CallControls", () => {
     const camBtn = screen.getByTitle("Cámara");
     expect(camBtn.className).toContain("0_72%");
   });
+
+  it("hides screen share button when hideScreenShare is true", () => {
+    render(<CallControls {...defaultProps} hideScreenShare />);
+    expect(screen.queryByTitle("Compartir pantalla")).not.toBeInTheDocument();
+  });
+
+  it("shows screen share button when hideScreenShare is false", () => {
+    render(<CallControls {...defaultProps} hideScreenShare={false} />);
+    expect(screen.getByTitle("Compartir pantalla")).toBeInTheDocument();
+  });
 });

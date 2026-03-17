@@ -1,51 +1,22 @@
 
 
-## Hide Screen Share Button & Fix Screen Share Request Flow
+## Problem
 
-### Problem
-1. **Participant's LiveKit `CallControls`** shows a "Compartir pantalla" button that doesn't work — their token restricts publishing to camera/microphone only (`canPublishSources: ["camera", "microphone"]`).
-2. **Screen share approval is broken**: When the host approves a request, the new token (with screen share permission) is returned in the host's API response. The participant has no way to receive it — there's no mechanism to deliver the approved token to the participant.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Changes
+## Solution
 
-**1. Add `hideScreenShare` prop to `CallControls` and `LiveKitCallView`**
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-- Add optional `hideScreenShare?: boolean` to both components
-- When true, hide the screen share `ControlBtn` in `CallControls`
-- Pass from `LiveKitCallView` → `CallControls`
+## Changes
 
-**2. `CoworkParticipantView.tsx` — pass `hideScreenShare={true}` to `LiveKitCallView`**
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-This removes the non-functional native screen share button from the participant's video controls.
+Replace the single `.select()` call with a paginated loop:
 
-**3. Fix the screen share approval flow — participant polls for approval**
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-The participant already sees realtime updates on `cowork_screenshare_requests`. When their request status changes to `"approved"`, we need to:
-- Detect the change in `CoworkParticipantView`
-- Call a new edge function action `claimScreenShareToken` to get a fresh token with screen share permissions
-- Reconnect to the LiveKit room with the new token (or use `useLiveKit` to update permissions)
-
-**New edge function action: `claimScreenShareToken`**
-- Participant calls with their approved request ID
-- Server verifies the request is approved and belongs to the caller
-- Returns a new LiveKit token with `canPublish: true` (no source restrictions)
-- Marks the request as `"claimed"` to prevent reuse
-
-**Participant view changes:**
-- Watch `cowork.screenShareRequests` for own request changing to `"approved"`
-- Auto-call `claimScreenShareToken`, get new token
-- Reconnect LiveKit with the new token (which allows screen sharing)
-- Show toast: "Pantalla compartida aprobada"
-
-**4. Update the "Compartir pantalla" button in participant top bar**
-
-Currently the top-bar button sends the request but has no follow-through. After approval detection and token claim, enable native screen share via LiveKit.
-
-### Files to modify
-- `src/pages/messenger/videocall/CallControls.tsx` — add `hideScreenShare` prop
-- `src/pages/messenger/videocall/LiveKitCallView.tsx` — pass `hideScreenShare` through
-- `src/pages/cowork/CoworkParticipantView.tsx` — pass prop + add approval detection logic
-- `src/hooks/useCoworkSession.ts` — add `claimScreenShareToken` action
-- `supabase/functions/cowork-session/index.ts` — add `claimScreenShareToken` action
-- `src/test/videocall/CallControls.test.tsx` — test hideScreenShare prop
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

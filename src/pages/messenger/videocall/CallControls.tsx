@@ -36,6 +36,7 @@ interface CallControlsProps {
   onVideoInputChange: (id: string) => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
+  hideScreenShare?: boolean;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
@@ -163,8 +164,7 @@ export default function CallControls({
   onToggleChat, onToggleParticipants,
   onSendReaction, onLeave,
   onAudioInputChange, onAudioOutputChange, onVideoInputChange,
-  
-  onOpenVideoSettings, onOpenMetrics,
+  onOpenVideoSettings, onOpenMetrics, hideScreenShare,
 }: CallControlsProps) {
   const [audioPopoverOpen, setAudioPopoverOpen] = useState(false);
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
@@ -251,12 +251,14 @@ export default function CallControls({
           </button>
         </div>
 
-        <ControlBtn
-          icon={isScreenSharing ? MonitorOff : Monitor}
-          active={!isScreenSharing ? undefined : true}
-          onClick={onToggleScreenShare}
-          label="Compartir pantalla"
-        />
+        {!hideScreenShare && (
+          <ControlBtn
+            icon={isScreenSharing ? MonitorOff : Monitor}
+            active={!isScreenSharing ? undefined : true}
+            onClick={onToggleScreenShare}
+            label="Compartir pantalla"
+          />
+        )}
 
         {/* Reactions */}
         <Popover>

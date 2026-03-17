@@ -209,6 +209,10 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("approveScreenShare", { requestId, approve });
   }, []);
 
+  const claimScreenShareToken = useCallback(async (requestId: string) => {
+    return invokeCowork("claimScreenShareToken", { requestId });
+  }, []);
+
   const endSession = useCallback(async () => {
     return invokeCowork("endSession", { sessionId });
   }, [sessionId]);
@@ -218,6 +222,6 @@ export function useCoworkSession(sessionId: string | null) {
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, endSession, getHostCode, refetch: fetchData,
+    requestScreenShare, approveScreenShare, claimScreenShareToken, endSession, getHostCode, refetch: fetchData,
   };
 }
