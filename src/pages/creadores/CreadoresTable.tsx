@@ -81,6 +81,7 @@ const CreadoresTable = ({ creators }: Props) => {
   const [viewingCreator, setViewingCreator] = useState<CreatorWithBusiness | null>(null);
   const [statusChangeCreator, setStatusChangeCreator] = useState<CreatorWithBusiness | null>(null);
   const updateCreador = useUpdateCreador();
+  const navigate = useNavigate();
   const { isAgent, isAdmin, isManager } = useUserRole();
   const canSeeAllData = isAdmin || isManager || !isAgent;
 
