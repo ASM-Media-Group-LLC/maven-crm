@@ -18,9 +18,14 @@ describe("CallTopBar", () => {
     shareLink: "https://example.com/call/test-room",
   };
 
-  it("does not render room name (hidden by design)", () => {
+  it("renders room name", () => {
     render(<CallTopBar {...defaultProps} />);
-    expect(screen.queryByText("Reunión de equipo")).not.toBeInTheDocument();
+    expect(screen.getByText("Reunión de equipo")).toBeInTheDocument();
+  });
+
+  it("hides share link when hideShareLink is true", () => {
+    render(<CallTopBar {...defaultProps} hideShareLink />);
+    expect(screen.queryByText("Copiar enlace")).not.toBeInTheDocument();
   });
 
   it("renders participant count", () => {
