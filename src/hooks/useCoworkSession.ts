@@ -162,8 +162,8 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("createSession", { name, roomNames, description });
   }, []);
 
-  const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string) => {
-    return invokeCowork("joinSession", { sessionId: sid, role, hostCode });
+  const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string, roomId?: string) => {
+    return invokeCowork("joinSession", { sessionId: sid, role, hostCode, roomId });
   }, []);
 
   const getHostCode = useCallback(async () => {

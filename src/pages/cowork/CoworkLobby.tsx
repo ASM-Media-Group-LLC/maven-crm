@@ -8,10 +8,11 @@ import { useSearchParams } from "react-router-dom";
 interface Props {
   sessionId: string;
   session: any;
-  onJoin: (role: string, hostCode?: string) => Promise<void>;
+  roomId?: string | null;
+  onJoin: (role: string, hostCode?: string, roomId?: string) => Promise<void>;
 }
 
-export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
+export default function CoworkLobby({ sessionId, session, roomId, onJoin }: Props) {
   const [searchParams] = useSearchParams();
   const suggestedRole = searchParams.get("role");
   const codeFromUrl = searchParams.get("code") || "";
@@ -25,7 +26,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
     setLoading(true);
     setError("");
     try {
-      await onJoin(role, role === "host" ? hostCode : undefined);
+      await onJoin(role, role === "host" ? hostCode : undefined, role !== "host" ? (roomId || undefined) : undefined);
     } catch (e: any) {
       setError(e.message || "Error al unirse");
     } finally {
