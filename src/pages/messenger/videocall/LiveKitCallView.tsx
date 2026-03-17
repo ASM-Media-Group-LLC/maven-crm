@@ -185,7 +185,19 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
-          
+          {/* PiP self-view when sharing screen */}
+          {lk.isScreenSharing && (() => {
+            const localP = lk.participants.find((p) => p.isLocal);
+            return localP ? (
+              <SelfViewPip
+                room={room}
+                name={localP.name}
+                isMuted={localP.isMuted}
+                isCameraOff={localP.isCameraOff}
+              />
+            ) : null;
+          })()}
+
         </div>
 
         {chatOpen && <CallChatSidebar messages={lk.chatMessages} onSend={lk.sendChatMessage} onClose={() => setChatOpen(false)} localIdentity={room?.localParticipant.identity || ""} />}
