@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUpdateEvento } from "../useEventos";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 
 interface Props {
   eventId: string;
@@ -19,7 +20,7 @@ const LinksTab = ({ eventId, internalToken, externalToken, externalLinkExpiresAt
 
   const baseUrl = window.location.origin;
   const internalLink = `${baseUrl}/eventos/${eventId}`;
-  const externalLink = externalToken ? `${baseUrl}/eventos/share/${externalToken}` : null;
+  const externalLink = externalToken ? `${getPublicBaseUrl()}/eventos/share/${externalToken}` : null;
 
   const copyLink = (link: string, label: string) => {
     navigator.clipboard.writeText(link);

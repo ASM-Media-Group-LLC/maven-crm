@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCountdown } from "./useCountdown";
 import { useAuth } from "@/hooks/useAuth";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useToast } from "@/hooks/use-toast";
 import { priorityConfig } from "./PrioritySelect";
 import SubtasksPanel from "./SubtasksPanel";
@@ -77,7 +78,7 @@ const TaskCard = ({ task, onComplete, onJustify, onEdit, onDelete, onStatusChang
   const priority = priorityConfig[task.priority] || priorityConfig.medium;
 
   const handleShare = () => {
-    const url = `${window.location.origin}/tareas/share/${task.share_token}`;
+    const url = `${getPublicBaseUrl()}/tareas/share/${task.share_token}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copiado", description: "El enlace fue copiado al portapapeles." });
   };

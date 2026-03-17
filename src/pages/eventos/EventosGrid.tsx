@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel, statusVariant, projectTypeColor, type EventRow } from "./useEventos";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import ViewEventoModal from "./ViewEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import DeleteEventoDialog from "./DeleteEventoDialog";
@@ -27,7 +28,7 @@ function copySharelink(e: EventRow, toast: ReturnType<typeof useToast>["toast"])
     toast({ title: "No hay sharelink disponible", variant: "destructive" });
     return;
   }
-  const link = `${window.location.origin}/eventos/share/${e.external_token}`;
+  const link = `${getPublicBaseUrl()}/eventos/share/${e.external_token}`;
   navigator.clipboard.writeText(link);
   toast({ title: "Sharelink copiado al portapapeles" });
 }

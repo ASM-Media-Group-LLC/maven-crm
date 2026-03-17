@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { Plus, FolderOpen, Clock, AlertTriangle, LayoutGrid, List, MoreHorizontal, Pencil, Trash2, Search, Play, Pause, CheckSquare, Archive, RotateCcw, Share2, Flag, Crown, ChevronDown, ChevronRight, FolderPlus, FolderInput, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -99,7 +100,7 @@ const ProjectsListContent = () => {
 
   const handleShare = (project: TaskProject) => {
     if (project.share_token) {
-      const url = `${window.location.origin}/tareas/project-share/${project.share_token}`;
+      const url = `${getPublicBaseUrl()}/tareas/project-share/${project.share_token}`;
       navigator.clipboard.writeText(url);
       toast({ title: "Link copiado", description: "El enlace público fue copiado al portapapeles." });
     }
