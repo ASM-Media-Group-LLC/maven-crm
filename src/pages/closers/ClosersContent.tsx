@@ -3,10 +3,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, List } from "lucide-react";
-import { useCloserLeads, PLATFORMS } from "./hooks/useCloserLeads";
+import { useCloserLeads, PLATFORMS, type DateFieldType } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useState } from "react";
 
 const TABS = [
@@ -26,6 +27,9 @@ const ClosersContent = () => {
     agentFilter, setAgentFilter,
     platformFilter, setPlatformFilter,
     agentList,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    dateField, setDateField,
     updateField, updateStage, assignCreator,
     isAdmin, isManager,
   } = useCloserLeads();
@@ -33,6 +37,8 @@ const ClosersContent = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -120,8 +126,31 @@ const ClosersContent = () => {
                 </SelectContent>
               </Select>
 
-              {(search || agentFilter || platformFilter) && (
-                <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setPlatformFilter(null); }}>
+              <Select
+                value={dateField}
+                onValueChange={(v) => setDateField(v as DateFieldType)}
+              >
+                <SelectTrigger className="w-44 h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="passed_date">Fecha de paso</SelectItem>
+                  <SelectItem value="lg_entry_date">Fecha LeadGen</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onApply={(from, to) => {
+                  setDateFrom(from);
+                  setDateTo(to);
+                }}
+                placeholder="Seleccionar fechas"
+              />
+
+              {hasFilters && (
+                <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setPlatformFilter(null); setDateFrom(undefined); setDateTo(undefined); }}>
                   <X className="h-4 w-4 mr-1" /> Limpiar
                 </Button>
               )}

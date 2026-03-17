@@ -27,9 +27,17 @@ export interface CloserCreatorRow {
   extras: number | null;
   created_at: string;
   updated_at: string;
+  leadgen_entry_id: string | null;
   // Joined fields
   agent_name: string | null;
   contact_count: number;
+  // LeadGen enriched fields
+  lg_entry_date: string | null;
+  lg_platform: string | null;
+  lg_quality: string | null;
+  lg_source_link: string | null;
+  lg_company: string | null;
+  lg_agent_name: string | null;
 }
 
 export const CLOSER_STAGES = [
@@ -76,6 +84,8 @@ export const isFollowUpPending = (lastContactDate: string | null): boolean => {
   return diff > 3 * 24 * 60 * 60 * 1000; // >3 days
 };
 
+export type DateFieldType = "passed_date" | "lg_entry_date";
+
 const PAGE_SIZE = 100;
 
 export const useCloserLeads = () => {
@@ -89,19 +99,22 @@ export const useCloserLeads = () => {
   const [page, setPage] = useState(0);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [dateField, setDateField] = useState<DateFieldType>("passed_date");
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
 
-  // Main query: closer_creators with agent profile join + contact count
+  // Main query: closer_creators with agent profile join + contact count + leadgen enrichment
   const { data: creatorsData, isLoading } = useQuery({
-    queryKey: ["closer-creators-list", activeTab, page, user?.id, role],
+    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
     queryFn: async () => {
       const stageFilter = TAB_STAGE_MAP[activeTab] || [];
 
       // Fetch creators
       let query = supabase
         .from("closer_creators")
-        .select("*", { count: "exact" })
+        .select("*, leadgen_entries!leadgen_entry_id(entry_date, platform, quality, source_link, company, lg_user_id)", { count: "exact" })
         .order("created_at", { ascending: false });
 
       if (stageFilter.length === 1) {
@@ -115,22 +128,39 @@ export const useCloserLeads = () => {
         query = query.eq("assigned_to", user.id);
       }
 
+      // Date filter (server-side for passed_date only; lg_entry_date filtered client-side)
+      if (dateFrom && dateTo && dateField === "passed_date") {
+        const fromStr = dateFrom.toISOString().split("T")[0];
+        const toStr = dateTo.toISOString().split("T")[0];
+        query = query.gte("passed_date", fromStr).lte("passed_date", toStr);
+      }
+
       const from = page * PAGE_SIZE;
       query = query.range(from, from + PAGE_SIZE - 1);
 
       const { data, error, count } = await query;
       if (error) throw error;
 
-      const creators = data || [];
+      const creators = (data || []) as any[];
 
       // Fetch agent profiles for assigned_to
       const agentIds = [...new Set(creators.map((c) => c.assigned_to).filter(Boolean))] as string[];
       let profilesMap: Record<string, string> = {};
-      if (agentIds.length > 0) {
+
+      // Also collect lg_user_ids for LeadGen agent names
+      const lgUserIds = [...new Set(
+        creators
+          .map((c) => c.leadgen_entries?.lg_user_id)
+          .filter(Boolean)
+      )] as string[];
+
+      const allProfileIds = [...new Set([...agentIds, ...lgUserIds])];
+
+      if (allProfileIds.length > 0) {
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, full_name")
-          .in("id", agentIds);
+          .in("id", allProfileIds);
         for (const p of profiles || []) {
           profilesMap[p.id] = p.full_name || "Sin nombre";
         }
@@ -149,15 +179,25 @@ export const useCloserLeads = () => {
         }
       }
 
-      const enriched: CloserCreatorRow[] = creators.map((c) => ({
-        ...c,
-        estimated_monetization: c.estimated_monetization ?? 0,
-        agency_commission: c.agency_commission ?? 0,
-        extras: (c as any).extras ?? 0,
-        main_platform: (c as any).main_platform ?? null,
-        agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
-        contact_count: contactCountMap[c.id] || 0,
-      }));
+      const enriched: CloserCreatorRow[] = creators.map((c) => {
+        const lg = c.leadgen_entries || null;
+        return {
+          ...c,
+          leadgen_entry_id: c.leadgen_entry_id ?? null,
+          estimated_monetization: c.estimated_monetization ?? 0,
+          agency_commission: c.agency_commission ?? 0,
+          extras: c.extras ?? 0,
+          main_platform: c.main_platform ?? null,
+          agent_name: c.assigned_to ? (profilesMap[c.assigned_to] || null) : null,
+          contact_count: contactCountMap[c.id] || 0,
+          lg_entry_date: lg?.entry_date ?? null,
+          lg_platform: lg?.platform ?? null,
+          lg_quality: lg?.quality ?? null,
+          lg_source_link: lg?.source_link ?? null,
+          lg_company: lg?.company ?? null,
+          lg_agent_name: lg?.lg_user_id ? (profilesMap[lg.lg_user_id] || null) : null,
+        };
+      });
 
       return { creators: enriched, total: count || 0 };
     },
@@ -213,18 +253,26 @@ export const useCloserLeads = () => {
     creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
   )].map(([id, name]) => ({ id, name }));
 
-  // Client-side search + filters
+  // Client-side search + filters + date filter for lg_entry_date
   const filtered = creators.filter((c) => {
     if (search && !c.instagram_handle.toLowerCase().includes(search.toLowerCase())) return false;
     if (agentFilter && c.assigned_to !== agentFilter) return false;
     if (platformFilter && c.main_platform !== platformFilter) return false;
+    // Client-side date filter for lg_entry_date
+    if (dateFrom && dateTo && dateField === "lg_entry_date") {
+      if (!c.lg_entry_date) return false;
+      const entryDate = c.lg_entry_date; // format: YYYY-MM-DD
+      const fromStr = dateFrom.toISOString().split("T")[0];
+      const toStr = dateTo.toISOString().split("T")[0];
+      if (entryDate < fromStr || entryDate > toStr) return false;
+    }
     return true;
   });
 
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
-      ["closer-creators-list", activeTab, page, user?.id, role],
+      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
       (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
         if (!old) return old;
         return {
@@ -300,6 +348,9 @@ export const useCloserLeads = () => {
     agentFilter, setAgentFilter,
     platformFilter, setPlatformFilter,
     agentList,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    dateField, setDateField,
     updateField,
     updateStage,
     assignCreator,

@@ -163,6 +163,18 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       <p className="text-[10px] uppercase text-muted-foreground">Contactos</p>
                       <p className="font-medium">{c.contact_count}/6</p>
                     </div>
+                    {c.lg_platform && (
+                      <div>
+                        <p className="text-[10px] uppercase text-muted-foreground">Plataforma LG</p>
+                        <p className="font-medium truncate">{c.lg_platform}</p>
+                      </div>
+                    )}
+                    {c.lg_quality && (
+                      <div>
+                        <p className="text-[10px] uppercase text-muted-foreground">Calidad LG</p>
+                        <p className="font-medium truncate">{c.lg_quality}</p>
+                      </div>
+                    )}
                     {(c.stage === "Confirmada" || c.stage === "Completada") && (
                       <>
                         <div>
