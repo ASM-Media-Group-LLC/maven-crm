@@ -202,7 +202,7 @@ const ParticipantTile = memo(function ParticipantTile({
     let retryAttempts = 0;
 
     const scheduleAttachRetry = () => {
-      if (retryAttempts >= 8 || participant.isCameraOff) return;
+      if (retryAttempts >= 8 || (participant.isCameraOff && !participant.isScreenSharing)) return;
       retryTimer = setTimeout(() => {
         retryAttempts += 1;
         const stillNeedsRetry = attachVideo();
@@ -210,7 +210,7 @@ const ParticipantTile = memo(function ParticipantTile({
       }, 200 * retryAttempts + 150);
     };
 
-    if (needsRetry && !participant.isCameraOff) scheduleAttachRetry();
+    if (needsRetry && (!participant.isCameraOff || participant.isScreenSharing)) scheduleAttachRetry();
 
     return () => { if (retryTimer) clearTimeout(retryTimer); };
   }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing]);
