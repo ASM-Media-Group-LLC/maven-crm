@@ -42,6 +42,7 @@ interface LiveKitCallViewProps {
   initialAudioOutputDeviceId?: string;
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
+  hideScreenShare?: boolean;
 }
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink }: LiveKitCallViewProps) {
