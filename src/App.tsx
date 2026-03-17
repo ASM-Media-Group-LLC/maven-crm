@@ -104,6 +104,7 @@ import CollectionsPage from "./pages/finanzas/collections/CollectionsPage";
 import HorasVariablesPage from "./pages/finanzas/horas-variables/HorasVariablesPage";
 import PersonalizadosPage from "./pages/creadores/personalizados/PersonalizadosPage";
 import VideoCallPage from "./pages/VideoCallPage";
+import CoworkPage from "./pages/cowork/CoworkPage";
 
 const queryClient = new QueryClient();
 
@@ -169,6 +170,7 @@ const App = () => (
               <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
               <Route path="/messenger" element={<ProtectedRoute><Messenger /></ProtectedRoute>} />
               <Route path="/call/:roomName" element={<ProtectedRoute><VideoCallPage /></ProtectedRoute>} />
+              <Route path="/cowork" element={<ProtectedRoute><CoworkPage /></ProtectedRoute>} />
               <Route path="/notificaciones" element={<ProtectedRoute><Notificaciones /></ProtectedRoute>} />
               <Route path="/ajustes/notificaciones" element={<ProtectedRoute><NotificacionesSettings /></ProtectedRoute>} />
               <Route path="/creadores/personalizados" element={<PermissionRoute module="Creadores"><PersonalizadosPage /></PermissionRoute>} />

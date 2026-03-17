@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.send-call-invitation]
 verify_jwt = false
+
+[functions.cowork-session]
+verify_jwt = false
