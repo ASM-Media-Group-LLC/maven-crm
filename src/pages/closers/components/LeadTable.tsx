@@ -116,27 +116,36 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
+// ─── Category color map ───
+const CATEGORY_BADGE_COLORS: Record<string, string> = {
+  "A+": "border-emerald-500 text-emerald-500 bg-emerald-500/10",
+  "A": "border-amber-500 text-amber-500 bg-amber-500/10",
+  "B+": "border-blue-500 text-blue-500 bg-blue-500/10",
+  "B": "border-muted-foreground text-muted-foreground bg-muted/30",
+  "C": "border-destructive text-destructive bg-destructive/10",
+};
+
 // ─── InlineCategorySelect ───
 const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
+  const colorClass = value ? (CATEGORY_BADGE_COLORS[value] || "") : "";
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 bg-transparent border-0">
-          {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        <button className={`cursor-pointer hover:opacity-80 rounded-full px-2.5 py-0.5 text-xs font-semibold inline-flex items-center gap-1 border ${colorClass || "border-border text-muted-foreground bg-transparent"}`}>
+          {value || "—"} <ChevronDown className="h-3 w-3" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
         <div className="flex flex-wrap gap-1.5">
           {CATEGORY_OPTIONS.map((cat) => (
-            <Badge
+            <button
               key={cat}
-              variant={cat === value ? "default" : "outline"}
-              className="cursor-pointer text-xs px-2 py-0.5 hover:bg-primary/10"
+              className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all hover:opacity-80 ${CATEGORY_BADGE_COLORS[cat]} ${cat === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50" : ""}`}
               onClick={() => { onSave(cat); setOpen(false); }}
             >
               {cat}
-            </Badge>
+            </button>
           ))}
         </div>
       </PopoverContent>
