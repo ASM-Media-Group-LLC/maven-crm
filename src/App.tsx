@@ -30,7 +30,6 @@ import AiSales from "./pages/AiSales";
 import AiSalesConfig from "./pages/AiSalesConfig";
 import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
-
 import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
 import OnboardingWizardPage from "./pages/creadores/onboarding/OnboardingWizardPage";
 import CreadorasDashboardPage from "./pages/creadores/CreadorasDashboardPage";
