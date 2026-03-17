@@ -25,6 +25,35 @@ const CreadorasDashboardContent = () => {
   const navigate = useNavigate();
   const { allCreators, isLoading } = useCreadores(emptyFilters);
 
+  // Offboarding metrics
+  const offboardingQuery = useQuery({
+    queryKey: ["offboarding_dashboard_metrics"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_offboardings")
+        .select("id, status, categoria, estimated_lost_revenue");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const offboardingMetrics = useMemo(() => {
+    const items = offboardingQuery.data ?? [];
+    const finalized = items.filter((i) => i.status === "finalizado");
+    const totalLostRevenue = items.reduce((sum, i) => sum + (i.estimated_lost_revenue ?? 0), 0);
+    const byCategoria: Record<string, number> = {};
+    for (const i of items) {
+      const cat = i.categoria ?? "Sin categoría";
+      byCategoria[cat] = (byCategoria[cat] ?? 0) + 1;
+    }
+    return {
+      totalFinalized: finalized.length,
+      totalInProgress: items.length - finalized.length,
+      totalLostRevenue,
+      byCategoria: Object.entries(byCategoria).sort((a, b) => b[1] - a[1]),
+    };
+  }, [offboardingQuery.data]);
+
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { active: 0, onboarding: 0, paused: 0, leaving: 0, terminated: 0 };
     for (const c of allCreators) {
