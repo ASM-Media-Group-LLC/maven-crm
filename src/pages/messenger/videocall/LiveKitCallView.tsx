@@ -196,7 +196,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               {visibleParticipants.length > 1 && (
                 <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
                   ))}
                 </div>
               )}
