@@ -1,22 +1,41 @@
 
 
-## Problem
+## Diagnóstico
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+El problema **no es de z-index ni de Popover**. La edición solo funciona en la fila 1 porque las filas 2 y 3 tienen `_source: "leadgen"` (estado "Pendiente LG"), y el código usa `isCloserRow(c)` para decidir si renderiza un selector inline o un `<span>` plano:
 
-## Solution
+```typescript
+// Líneas 717-721 — solo filas "closer" obtienen selectores
+{isCloser ? (
+  <InlineSourceSelect ... />
+) : (
+  <span>{c.source_account || "—"}</span>  // ← filas leadgen quedan sin edición
+)}
+```
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+Esto afecta las columnas Estado, Cuenta origen, Categoría y Notas en el tab "Todas", y Cuenta origen + Categoría en "Asignadas".
 
-## Changes
+## Plan
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+### 1. Hacer editables TODAS las filas (LeadTable.tsx)
 
-Replace the single `.select()` call with a paginated loop:
+Eliminar la condición `isCloser` para los selectores inline de **Categoría**, **Cuenta origen**, **Estado** y **Notas**. Todas las filas deben ser editables independientemente de `_source`. La condición `isCloser` solo debe usarse para las acciones del DropdownMenu (mover estado, reasignar) que solo aplican a registros `closer_creators`.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### 2. Rediseñar InlineCategorySelect con badges de colores (imagen de referencia)
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+Cambiar los badges del selector de categoría para que cada opción tenga un color distinto, como muestra la imagen:
+- **A+** → verde brillante (border + text green)
+- **A** → amarillo/dorado
+- **B+** → azul
+- **B** → gris/default
+- **C** → rojo
+
+El badge del trigger también debe mostrar el color correspondiente.
+
+### 3. Cuenta origen: usar LEADGEN_COMPANIES como opciones
+
+Reemplazar el uso del prop `sourceAccounts` (que puede estar incompleto) por `LEADGEN_COMPANIES` importado de `leadgenConstants.ts`, que ya incluye todas las agencias/plataformas (UNLOK, Blu app, Trafix, LeakHunter, etc.). Mantener la opción "Otra..." para agregar nuevas.
+
+### Archivos a modificar
+- `src/pages/closers/components/LeadTable.tsx` — eliminar condición `isCloser` en selectores inline, rediseñar colores de categoría, importar y usar `LEADGEN_COMPANIES` para cuenta origen
 
