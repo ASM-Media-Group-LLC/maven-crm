@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { Room } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
+import { supabase } from "@/integrations/supabase/client";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -19,70 +19,41 @@ interface Props {
 }
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
-  const [hubRoom, setHubRoom] = useState<Room | null>(null);
-  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+  const [displayName, setDisplayName] = useState("Host");
+  const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [connectingHub, setConnectingHub] = useState(false);
-  const [connectingRoom, setConnectingRoom] = useState<string | null>(null);
+  const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
+  const [hubConnected, setHubConnected] = useState(false);
   const [moveTarget, setMoveTarget] = useState<Record<string, string>>({});
 
-  // Connect to Host Hub
-  const connectHub = useCallback(async () => {
-    if (connectingHub || hubRoom) return;
-    setConnectingHub(true);
-    try {
-      const result = await cowork.issueLiveKitToken("join_host_hub");
-      const r = new Room({ adaptiveStream: true, dynacast: true });
-      await r.connect(result.url, result.token);
-      setHubRoom(r);
-      toast.success("Conectado al Host Hub");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setConnectingHub(false);
-    }
-  }, [cowork, connectingHub, hubRoom]);
-
-  // Auto-connect to hub
   useEffect(() => {
-    connectHub();
-    return () => { hubRoom?.disconnect(true); };
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data.user.id).single();
+        setDisplayName(profile?.full_name || "Host");
+      }
+    });
   }, []);
 
-  // Enter a cowork room
-  const enterRoom = useCallback(async (roomId: string) => {
-    if (connectingRoom) return;
-    setConnectingRoom(roomId);
-    try {
-      if (activeRoom) {
-        await activeRoom.disconnect(true);
-        setActiveRoom(null);
-        setActiveRoomId(null);
-      }
-      const result = await cowork.issueLiveKitToken("join_room", roomId);
-      const r = new Room({ adaptiveStream: true, dynacast: true });
-      await r.connect(result.url, result.token);
-      setActiveRoom(r);
-      setActiveRoomId(roomId);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setConnectingRoom(null);
+  // Auto-connect to Hub
+  useEffect(() => {
+    if (cowork.session?.host_hub_livekit_room) {
+      setHubConnected(true);
     }
-  }, [cowork, activeRoom, connectingRoom]);
+  }, [cowork.session?.host_hub_livekit_room]);
+
+  const enterRoom = useCallback((roomId: string) => {
+    const room = cowork.rooms.find(r => r.id === roomId);
+    if (!room) return;
+    setActiveRoomLk(room.livekit_room_name);
+    setActiveRoomId(roomId);
+    setActiveRoomName(room.name);
+  }, [cowork.rooms]);
 
   const leaveActiveRoom = useCallback(() => {
-    activeRoom?.disconnect(true);
-    setActiveRoom(null);
+    setActiveRoomLk(null);
     setActiveRoomId(null);
-  }, [activeRoom]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      hubRoom?.disconnect(true);
-      activeRoom?.disconnect(true);
-    };
+    setActiveRoomName(null);
   }, []);
 
   const getRoomParticipants = (roomId: string) =>
@@ -131,13 +102,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         <ScrollArea className="flex-1">
           {/* Host Hub indicator */}
           <div className="p-3 border-b border-white/5">
-            <div className="flex items-center gap-2 text-xs text-white/50 mb-2">
-              <Radio className="h-3 w-3 text-green-400" /> Host Hub
-              {!hubRoom && (
-                <Button variant="ghost" size="sm" className="h-5 text-xs ml-auto" onClick={connectHub} disabled={connectingHub}>
-                  {connectingHub ? <Loader2 className="h-3 w-3 animate-spin" /> : "Conectar"}
-                </Button>
-              )}
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              <Radio className={`h-3 w-3 ${hubConnected ? "text-green-400" : "text-white/30"}`} />
+              <span>Host Hub</span>
+              {hubConnected && <Badge variant="secondary" className="text-[9px]">Activo</Badge>}
             </div>
           </div>
 
@@ -158,7 +126,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 pt-1 space-y-2">
-                    {/* Participants in this room */}
                     {participants.length > 0 ? (
                       <div className="space-y-1">
                         {participants.map((a) => (
@@ -208,16 +175,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       variant={isActive ? "destructive" : "secondary"}
                       size="sm"
                       className="w-full h-7 text-xs gap-1"
-                      disabled={!!connectingRoom}
                       onClick={() => isActive ? leaveActiveRoom() : enterRoom(room.id)}
                     >
-                      {connectingRoom === room.id ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : isActive ? (
-                        <>Salir</>
-                      ) : (
-                        <><LogIn className="h-3 w-3" /> Entrar</>
-                      )}
+                      {isActive ? "Salir" : <><LogIn className="h-3 w-3" /> Entrar</>}
                     </Button>
                   </CardContent>
                 </Card>
@@ -306,31 +266,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                     <div className="flex gap-1 mt-1">
                       <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 text-[10px] text-green-400 gap-0.5"
+                        size="sm" variant="ghost" className="h-5 text-[10px] text-green-400 gap-0.5"
                         onClick={async () => {
-                          try {
-                            await cowork.approveScreenShare(req.id, true);
-                            toast.success("Screen share aprobado");
-                          } catch (e: any) {
-                            toast.error(e.message);
-                          }
+                          try { await cowork.approveScreenShare(req.id, true); toast.success("Aprobado"); } catch (e: any) { toast.error(e.message); }
                         }}
                       >
                         <Check className="h-2.5 w-2.5" /> Aprobar
                       </Button>
                       <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 text-[10px] text-red-400 gap-0.5"
+                        size="sm" variant="ghost" className="h-5 text-[10px] text-red-400 gap-0.5"
                         onClick={async () => {
-                          try {
-                            await cowork.approveScreenShare(req.id, false);
-                            toast.info("Screen share denegado");
-                          } catch (e: any) {
-                            toast.error(e.message);
-                          }
+                          try { await cowork.approveScreenShare(req.id, false); toast.info("Denegado"); } catch (e: any) { toast.error(e.message); }
                         }}
                       >
                         <X className="h-2.5 w-2.5" /> Denegar
@@ -346,11 +292,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* Active room media */}
-        {activeRoom ? (
+        {activeRoomLk ? (
           <div className="flex-1 min-h-0">
             <LiveKitCallView
-              room={activeRoom}
+              roomName={activeRoomLk}
+              displayName={displayName}
+              callDisplayName={activeRoomName || undefined}
               isAdmin={true}
               onLeave={leaveActiveRoom}
             />
@@ -360,26 +307,24 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             <div className="text-center text-white/30 space-y-2">
               <Users2 className="h-16 w-16 mx-auto" />
               <p className="text-sm">Selecciona una sala para entrar</p>
-              <p className="text-xs">El Host Hub está {hubRoom ? "activo" : "desconectado"} en segundo plano</p>
             </div>
           </div>
         )}
 
-        {/* Host Hub mini view (always visible when connected) */}
-        {hubRoom && (
-          <div className="h-32 border-t border-white/10 bg-[#1a1a1d]">
+        {/* Host Hub mini view */}
+        {hubConnected && cowork.session?.host_hub_livekit_room && !activeRoomLk && (
+          <div className="border-t border-white/10 bg-[#1a1a1d] flex-1 min-h-0">
             <div className="flex items-center gap-2 px-3 py-1 text-xs text-white/40">
               <Crown className="h-3 w-3 text-amber-400" />
               <span>Host Hub</span>
             </div>
-            <div className="h-[calc(100%-24px)] overflow-hidden">
+            <div className="h-[calc(100%-24px)]">
               <LiveKitCallView
-                room={hubRoom}
+                roomName={cowork.session.host_hub_livekit_room}
+                displayName={displayName}
+                callDisplayName="Host Hub"
                 isAdmin={true}
-                onLeave={() => {
-                  hubRoom.disconnect(true);
-                  setHubRoom(null);
-                }}
+                onLeave={() => setHubConnected(false)}
               />
             </div>
           </div>

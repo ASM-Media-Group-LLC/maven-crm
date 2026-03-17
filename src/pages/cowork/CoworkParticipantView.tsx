@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Room, RoomEvent, ConnectionState } from "livekit-client";
 import { Button } from "@/components/ui/button";
 import { Hand, Monitor, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
@@ -12,64 +12,30 @@ interface Props {
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
-  const [room, setRoom] = useState<Room | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const [displayName, setDisplayName] = useState("User");
   const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
+  // We track the room's livekit_room_name to pass to LiveKitCallView
+  const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
 
-  // Connect to assigned room
-  const connectToRoom = useCallback(async (roomId: string) => {
-    if (connecting) return;
-    setConnecting(true);
-    try {
-      // Disconnect from current
-      if (room) {
-        await room.disconnect(true);
-        setRoom(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data.user.id).single();
+        setDisplayName(profile?.full_name || "User");
       }
-
-      const result = await cowork.issueLiveKitToken("join_room", roomId);
-
-      const newRoom = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-        videoCaptureDefaults: { resolution: { width: 1280, height: 720, frameRate: 30 } },
-      });
-
-      await newRoom.connect(result.url, result.token);
-      setRoom(newRoom);
-      setCurrentRoomId(roomId);
-    } catch (e: any) {
-      toast.error("Error al conectar: " + e.message);
-    } finally {
-      setConnecting(false);
-    }
-  }, [room, cowork, connecting]);
-
-  // Auto-connect when assigned to a room
-  useEffect(() => {
-    if (myAssignment?.room_id && myAssignment.room_id !== currentRoomId) {
-      connectToRoom(myAssignment.room_id);
-    }
-  }, [myAssignment?.room_id]);
-
-  // Listen for room reassignment (move) via Realtime
-  useEffect(() => {
-    if (!myAssignment) return;
-    // When assignment changes, the useEffect above will reconnect
-  }, [myAssignment]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      room?.disconnect(true);
-    };
+    });
   }, []);
 
-  // Check screenshare request status
+  // When assignment changes, update the connected room
+  useEffect(() => {
+    if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
+      setConnectedLkRoom(myRoom.livekit_room_name);
+    }
+  }, [myRoom?.livekit_room_name]);
+
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
   );
@@ -86,8 +52,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   return (
     <div className="flex flex-col h-screen bg-[#202124]">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#202124] border-b border-white/10">
+      {/* Top bar with cowork-specific actions */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#202124] border-b border-white/10 z-10">
         <div className="flex items-center gap-3">
           <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
           <span className="text-white/40 text-xs">{cowork.session?.name}</span>
@@ -128,22 +94,21 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         </div>
       </div>
 
-      {/* Video area */}
+      {/* Video area using existing LiveKitCallView */}
       <div className="flex-1 min-h-0">
-        {room ? (
+        {connectedLkRoom ? (
           <LiveKitCallView
-            room={room}
+            roomName={connectedLkRoom}
+            displayName={displayName}
+            callDisplayName={myRoom?.name}
             isAdmin={false}
-            onLeave={() => {
-              room.disconnect(true);
-              setRoom(null);
-            }}
+            onLeave={() => setConnectedLkRoom(null)}
           />
-        ) : connecting ? (
+        ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-white/60" />
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
