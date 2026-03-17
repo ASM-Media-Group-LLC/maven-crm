@@ -20,6 +20,7 @@ interface Props {
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [displayName, setDisplayName] = useState("Host");
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
@@ -32,15 +33,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", data.user.id).single();
         setDisplayName(profile?.full_name || "Host");
       }
+      setProfileLoaded(true);
     });
   }, []);
 
-  // Auto-connect to Hub
+  // Auto-connect to Hub only after profile is loaded
   useEffect(() => {
-    if (cowork.session?.host_hub_livekit_room) {
+    if (profileLoaded && cowork.session?.host_hub_livekit_room) {
       setHubConnected(true);
     }
-  }, [cowork.session?.host_hub_livekit_room]);
+  }, [profileLoaded, cowork.session?.host_hub_livekit_room]);
 
   const enterRoom = useCallback((roomId: string) => {
     const room = cowork.rooms.find(r => r.id === roomId);
