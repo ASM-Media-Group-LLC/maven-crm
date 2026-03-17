@@ -1,22 +1,24 @@
 
 
-## Problem
+## Plan: Agregar LeakHunter + Reestructurar Revenue Cards
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Cambios
 
-## Solution
+**1. Agregar "LeakHunter" a PLATFORMS y LEADGEN_COMPANIES**
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+- `src/pages/closers/hooks/useCloserLeads.ts` línea 61: cambiar PLATFORMS a `["OnlyFans", "Trafix", "Blu", "Piclink", "LeakHunter", "ORA", "Otra"]`
+- `src/pages/leadgen/leadgenConstants.ts` línea 44: agregar `"LeakHunter"` al array LEADGEN_COMPANIES (orden alfabético)
 
-## Changes
+**2. Reestructurar revenue cards en `ClosersKPICards.tsx`**
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+Reemplazar la card "Revenue Total" por dos cards resumen:
+- **Revenue Plataformas**: suma de LeakHunter + Blu + Trafix + ORA + Piclink (sin OnlyFans)
+- **Revenue OnlyFans**: solo OnlyFans, separado
 
-Replace the single `.select()` call with a paginated loop:
+Las cards individuales por plataforma se mantienen, pero ahora incluyen LeakHunter y ORA. El grid pasa de 5 a 8 columnas (7 plataformas + 2 totales parciales → se agrupan como: OF, LeakHunter, Blu, Trafix, ORA, Piclink, Rev Plataformas, Rev OF).
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Archivos a modificar
+- `src/pages/closers/hooks/useCloserLeads.ts` — agregar "LeakHunter" y "ORA" a PLATFORMS
+- `src/pages/closers/components/ClosersKPICards.tsx` — agregar cards LeakHunter/ORA, separar revenue en "Plataformas" vs "OnlyFans"
+- `src/pages/leadgen/leadgenConstants.ts` — agregar "LeakHunter" a LEADGEN_COMPANIES
 
