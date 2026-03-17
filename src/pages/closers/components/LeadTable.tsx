@@ -236,6 +236,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Agente</TableHead>
             <TableHead># Contactos</TableHead>
             <TableHead>Último contacto</TableHead>
+            <TableHead>Plataforma LG</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Alertas</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
