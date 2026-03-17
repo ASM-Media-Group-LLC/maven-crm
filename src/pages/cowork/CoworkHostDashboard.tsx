@@ -80,8 +80,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 size="icon"
                 className="h-7 w-7 text-white/60 hover:text-white"
                 onClick={() => {
-                  navigator.clipboard.writeText(cowork.session?.id || "");
-                  toast.success("ID copiado");
+                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("Enlace copiado");
                 }}
               >
                 <Copy className="h-3.5 w-3.5" />
