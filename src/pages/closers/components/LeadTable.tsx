@@ -30,6 +30,7 @@ const stageColor = (s: string) => {
     case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
     case "Completada": return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-300";
     case "No interesada": return "bg-destructive/10 text-destructive";
+    case "Pendiente LG": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
     default: return "bg-muted text-muted-foreground";
   }
 };
@@ -108,6 +109,17 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
+const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
+  if (!phone) return <span className="text-muted-foreground">—</span>;
+  return (
+    <a href={`https://wa.me/${cleanPhoneForWhatsApp(phone)}`} target="_blank" rel="noopener noreferrer"
+      className="flex items-center gap-1 text-primary hover:underline">
+      <Phone className="h-3 w-3" />
+      <span className="truncate max-w-[100px]">{phone}</span>
+    </a>
+  );
+};
+
 const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, isAdmin }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -124,6 +136,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     { monetization: 0, revenue: 0, count: 0 }
   ) : null;
 
+  const isCloserRow = (c: CloserCreatorRow) => c._source === "closer";
+
   // ========= GRID VIEW =========
   if (viewMode === "grid") {
     return (
@@ -138,9 +152,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               return (
                 <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between">
-                    <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+                    <a href={`https://instagram.com/${c.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
                       className="text-primary hover:underline font-semibold flex items-center gap-1">
-                      @{c.instagram_handle}
+                      {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                     <Badge className={`${stageColor(c.stage)} text-[10px]`}>{c.stage}</Badge>
@@ -163,18 +177,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       <p className="text-[10px] uppercase text-muted-foreground">Contactos</p>
                       <p className="font-medium">{c.contact_count}/6</p>
                     </div>
-                    {c.lg_platform && (
-                      <div>
-                        <p className="text-[10px] uppercase text-muted-foreground">Plataforma LG</p>
-                        <p className="font-medium truncate">{c.lg_platform}</p>
-                      </div>
-                    )}
-                    {c.lg_quality && (
-                      <div>
-                        <p className="text-[10px] uppercase text-muted-foreground">Calidad LG</p>
-                        <p className="font-medium truncate">{c.lg_quality}</p>
-                      </div>
-                    )}
                     {(c.stage === "Confirmada" || c.stage === "Completada") && (
                       <>
                         <div>
@@ -232,11 +234,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="w-10">#</TableHead>
             <TableHead>Instagram</TableHead>
             <TableHead>Cuenta origen</TableHead>
+            <TableHead>Categoría</TableHead>
             <TableHead>Fecha asignación</TableHead>
             <TableHead>Agente</TableHead>
             <TableHead># Contactos</TableHead>
             <TableHead>Último contacto</TableHead>
-            <TableHead>Plataforma LG</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Alertas</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
@@ -248,6 +250,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="w-10">#</TableHead>
             <TableHead>Instagram</TableHead>
             <TableHead>Agente</TableHead>
+            <TableHead>Teléfono</TableHead>
             <TableHead>Monetización</TableHead>
             <TableHead>% Comisión</TableHead>
             <TableHead>Extras</TableHead>
@@ -289,11 +292,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Cuenta origen</TableHead>
             <TableHead>Categoría</TableHead>
             <TableHead>Agente</TableHead>
-            <TableHead>Fecha asignación</TableHead>
             <TableHead># Contactos</TableHead>
-            <TableHead>Plataforma LG</TableHead>
-            <TableHead>Calidad LG</TableHead>
-            <TableHead>Agente LG</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>OF URL</TableHead>
             <TableHead>Notas</TableHead>
@@ -308,11 +307,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
     const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
     const isLastAttempt = c.contact_count >= 6;
     const nextDate = getNextContactDate(c.passed_date, c.contact_count);
+    const isCloser = isCloserRow(c);
 
     const igLink = (
-      <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+      <a href={`https://instagram.com/${c.instagram_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
         className="text-primary hover:underline flex items-center gap-1 font-medium">
-        @{c.instagram_handle}
+        {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
         <ExternalLink className="h-3 w-3" />
       </a>
     );
@@ -323,7 +323,20 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
-            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell>
+              {isCloser ? (
+                <InlineText value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} />
+              ) : (
+                <span className="text-sm">{c.source_account || "—"}</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {isCloser ? (
+                <InlineText value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+              ) : (
+                <span className="text-sm">{c.category || "—"}</span>
+              )}
+            </TableCell>
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
@@ -337,16 +350,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </p>
               )}
             </TableCell>
-            <TableCell className="text-sm">{c.lg_platform || "—"}</TableCell>
-            <TableCell className="text-sm">
-              {c.phone ? (
-                <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-primary hover:underline">
-                  <Phone className="h-3 w-3" />
-                  <span className="truncate max-w-[100px]">{c.phone}</span>
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell>
               <div className="flex gap-1">
                 {followUpPending && (
@@ -363,18 +367,22 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
-                <ContactQuickForm creatorId={c.id} />
+                {isCloser && <ContactQuickForm creatorId={c.id} />}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onStageChange(c.id, "Confirmada")}>
-                      Mover a Confirmada
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
-                      Marcar No interesada
-                    </DropdownMenuItem>
+                    {isCloser && (
+                      <>
+                        <DropdownMenuItem onClick={() => onStageChange(c.id, "Confirmada")}>
+                          Mover a Confirmada
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onStageChange(c.id, "No interesada")}>
+                          Marcar No interesada
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     {isAdmin && (
                       <>
                         <DropdownMenuSeparator />
@@ -397,6 +405,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
               <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
+              <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
               <TableCell>
                 <InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} />
               </TableCell>
@@ -440,7 +449,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableRow>
             {expandedId === c.id && (
               <TableRow>
-                <TableCell colSpan={10} className="bg-muted/30 p-4">
+                <TableCell colSpan={11} className="bg-muted/30 p-4">
                   <PlatformSalesPanel creatorId={c.id} />
                 </TableCell>
               </TableRow>
@@ -487,25 +496,25 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <Badge className={stageColor(c.stage)}>{c.stage}</Badge>
             </TableCell>
-            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
-            <TableCell className="text-sm">{c.category || "—"}</TableCell>
+            <TableCell>
+              {isCloser ? (
+                <InlineText value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} />
+              ) : (
+                <span className="text-sm">{c.source_account || "—"}</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {isCloser ? (
+                <InlineText value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+              ) : (
+                <span className="text-sm">{c.category || "—"}</span>
+              )}
+            </TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
-            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell>
               <Badge variant="outline">{c.contact_count}/6</Badge>
             </TableCell>
-            <TableCell className="text-sm">{c.lg_platform || "—"}</TableCell>
-            <TableCell className="text-sm">{c.lg_quality || "—"}</TableCell>
-            <TableCell className="text-sm">{c.lg_agent_name || "—"}</TableCell>
-            <TableCell className="text-sm">
-              {c.phone ? (
-                <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-primary hover:underline">
-                  <Phone className="h-3 w-3" />
-                  <span className="truncate max-w-[100px]">{c.phone}</span>
-                </a>
-              ) : <span className="text-muted-foreground">—</span>}
-            </TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell className="text-sm">
               {c.onlyfans_url ? (
                 <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
@@ -515,17 +524,21 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell>
-              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              {isCloser ? (
+                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              ) : (
+                <span className="text-sm">{c.notes || "—"}</span>
+              )}
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
-                <ContactQuickForm creatorId={c.id} />
+                {isCloser && <ContactQuickForm creatorId={c.id} />}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {CLOSER_STAGES.filter((s) => s !== c.stage).map((s) => (
+                    {isCloser && CLOSER_STAGES.filter((s) => s !== c.stage).map((s) => (
                       <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
                         Mover a {s}
                       </DropdownMenuItem>

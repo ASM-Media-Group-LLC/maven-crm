@@ -12,7 +12,7 @@ import { useState } from "react";
 
 const TABS = [
   { value: "todas", label: "Todas" },
-  { value: "asignadas", label: "Asignadas" },
+  { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
   { value: "completadas", label: "Completadas" },
   { value: "no_interesadas", label: "No Interesadas" },
