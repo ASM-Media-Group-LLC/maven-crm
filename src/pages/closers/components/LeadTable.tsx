@@ -744,15 +744,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {isCloser && CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
-                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
+                    {CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
+                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s, c._source)}>
                         Mover a {s}
                       </DropdownMenuItem>
                     ))}
                     {isAdmin && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>
                           <UserPlus className="h-4 w-4 mr-2" /> Asignar
                         </DropdownMenuItem>
                       </>
