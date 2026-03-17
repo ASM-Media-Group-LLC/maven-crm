@@ -184,16 +184,18 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
               )}
             </div>
           ) : (
-            <div className="flex flex-col h-full gap-2">
+            <div className="relative h-full">
               {spotlightParticipant && (
-                <div className={cn("flex-1 min-h-0", visibleParticipants.length <= 1 && "h-full")}>
+                <div className="absolute inset-0">
                   <ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
                 </div>
               )}
               {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).length > 0 && (
-                <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
+                <div className="absolute bottom-3 right-3 z-10 flex gap-2 overflow-x-auto max-w-[60%]">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="w-36 h-24 shrink-0 rounded-lg overflow-hidden shadow-lg ring-1 ring-[hsl(220_3%_30%/0.5)]">
+                      <ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />
+                    </div>
                   ))}
                 </div>
               )}
