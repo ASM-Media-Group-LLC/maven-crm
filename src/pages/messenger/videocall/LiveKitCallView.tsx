@@ -9,7 +9,7 @@ import AdjustViewDialog, { type ViewSettings } from "./AdjustViewDialog";
 import VideoSettingsDialog from "./VideoSettingsDialog";
 import MetricsDialog from "./MetricsDialog";
 import ParticipantTile from "./ParticipantTile";
-import SelfViewPip from "./SelfViewPip";
+
 import { Loader2, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -185,18 +185,6 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
             </div>
           )}
 
-          {/* PiP self-view when sharing screen */}
-          {lk.isScreenSharing && (() => {
-            const localP = lk.participants.find((p) => p.isLocal);
-            return localP ? (
-              <SelfViewPip
-                room={room}
-                name={localP.name}
-                isMuted={localP.isMuted}
-                isCameraOff={localP.isCameraOff}
-              />
-            ) : null;
-          })()}
 
         </div>
 
