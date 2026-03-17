@@ -129,23 +129,33 @@ export function useCoworkSession(sessionId: string | null) {
     if (!sessionId) return;
     fetchData();
 
+    const realtimeRefetch = () => fetchData(true);
+
+    const sessionCh = supabase.channel(`cowork-session-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_sessions", filter: `id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+
+    const roomsCh = supabase.channel(`cowork-rooms-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_rooms", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+
     const assignCh = supabase.channel(`cowork-assignments-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_room_assignments", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_room_assignments", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const reqCh = supabase.channel(`cowork-host-reqs-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const ssCh = supabase.channel(`cowork-ss-reqs-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_screenshare_requests", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_screenshare_requests", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const memCh = supabase.channel(`cowork-members-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_memberships", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_memberships", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
-    channelsRef.current = [assignCh, reqCh, ssCh, memCh];
+    channelsRef.current = [sessionCh, roomsCh, assignCh, reqCh, ssCh, memCh];
 
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
