@@ -336,17 +336,30 @@ export function useLiveKit() {
     const room = roomRef.current;
     if (!room) return;
 
-    const participantMap = new Map<string, LKParticipant>();
+    const result: LKParticipant[] = [];
     const local = buildParticipant(room.localParticipant, true);
-    participantMap.set(local.identity || local.sid || "local", local);
+
+    // If local is screen-sharing AND camera is on, emit two tiles
+    if (local.isScreenSharing && !local.isCameraOff) {
+      // Screen share tile (camera hidden so ParticipantTile uses ScreenShare source)
+      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true });
+      // Camera tile (not screen sharing so ParticipantTile uses Camera source)
+      result.push({ ...local, isScreenSharing: false });
+    } else {
+      result.push(local);
+    }
 
     room.remoteParticipants.forEach((p) => {
       const remote = buildParticipant(p, false);
-      const key = remote.identity || remote.sid;
-      if (key) participantMap.set(key, remote);
+      if (remote.isScreenSharing && !remote.isCameraOff) {
+        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true });
+        result.push({ ...remote, isScreenSharing: false });
+      } else {
+        result.push(remote);
+      }
     });
 
-    setParticipants(Array.from(participantMap.values()));
+    setParticipants(result);
   }, [buildParticipant]);
 
   const debouncedRefresh = useCallback(() => {
