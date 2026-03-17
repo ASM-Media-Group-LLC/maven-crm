@@ -251,12 +251,14 @@ export default function CallControls({
           </button>
         </div>
 
-        <ControlBtn
-          icon={isScreenSharing ? MonitorOff : Monitor}
-          active={!isScreenSharing ? undefined : true}
-          onClick={onToggleScreenShare}
-          label="Compartir pantalla"
-        />
+        {!hideScreenShare && (
+          <ControlBtn
+            icon={isScreenSharing ? MonitorOff : Monitor}
+            active={!isScreenSharing ? undefined : true}
+            onClick={onToggleScreenShare}
+            label="Compartir pantalla"
+          />
+        )}
 
         {/* Reactions */}
         <Popover>
