@@ -215,7 +215,7 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
       <SelectTrigger className={`h-7 w-36 text-xs border-0 ${stageColor(value)}`}>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent position="popper" side="bottom">
         {[...CLOSER_STAGES, "Pendiente LG" as const].map((s) => (
           <SelectItem key={s} value={s}>
             <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${stageColor(s)}`}>{s}</span>
