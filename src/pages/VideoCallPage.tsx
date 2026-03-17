@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 export default function VideoCallPage() {
   const { roomName } = useParams<{ roomName: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const isAdmin = searchParams.get("admin") === "1";
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
@@ -23,6 +24,39 @@ export default function VideoCallPage() {
     audioOutputDeviceId?: string;
     backgroundEffect?: BackgroundEffect;
   }>({ micOn: true, camOn: true, backgroundEffect: "none" });
+
+  // Detect cowork rooms and redirect to cowork dashboard
+  useEffect(() => {
+    if (!roomName) return;
+    const isCoworkRoom = roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_");
+    if (!isCoworkRoom) return;
+
+    const resolveAndRedirect = async () => {
+      // Try host hub first
+      if (roomName.startsWith("cowork_hub_")) {
+        const { data } = await supabase
+          .from("cowork_sessions")
+          .select("id")
+          .eq("host_hub_livekit_room", roomName)
+          .eq("status", "active")
+          .maybeSingle();
+        if (data) {
+          navigate(`/cowork?session=${data.id}&role=host`, { replace: true });
+          return;
+        }
+      }
+      // Try regular cowork room
+      const { data: room } = await supabase
+        .from("cowork_rooms")
+        .select("session_id")
+        .eq("livekit_room_name", roomName)
+        .maybeSingle();
+      if (room) {
+        navigate(`/cowork?session=${room.session_id}`, { replace: true });
+      }
+    };
+    resolveAndRedirect();
+  }, [roomName, navigate]);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile-for-call", user?.id],
