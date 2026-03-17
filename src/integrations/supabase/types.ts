@@ -1333,6 +1333,262 @@ export type Database = {
         }
         Relationships: []
       }
+      cowork_host_requests: {
+        Row: {
+          acked_at: string | null
+          acked_by: string | null
+          created_at: string
+          id: string
+          message: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          room_id: string
+          session_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          acked_at?: string | null
+          acked_by?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          room_id: string
+          session_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          acked_at?: string | null
+          acked_by?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          room_id?: string
+          session_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cowork_host_requests_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cowork_host_requests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cowork_memberships: {
+        Row: {
+          id: string
+          joined_at: string
+          role: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          role?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          role?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cowork_memberships_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cowork_room_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          is_active: boolean
+          room_id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean
+          room_id: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          is_active?: boolean
+          room_id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cowork_room_assignments_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cowork_room_assignments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cowork_rooms: {
+        Row: {
+          created_at: string
+          id: string
+          livekit_room_name: string
+          name: string
+          session_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          livekit_room_name: string
+          name: string
+          session_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          livekit_room_name?: string
+          name?: string
+          session_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cowork_rooms_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cowork_screenshare_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          expires_at: string | null
+          id: string
+          room_id: string
+          session_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at?: string | null
+          id?: string
+          room_id: string
+          session_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at?: string | null
+          id?: string
+          room_id?: string
+          session_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cowork_screenshare_requests_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cowork_screenshare_requests_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cowork_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cowork_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          ended_at: string | null
+          host_hub_livekit_room: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          ended_at?: string | null
+          host_hub_livekit_room: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          ended_at?: string | null
+          host_hub_livekit_room?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       creator_assignments: {
         Row: {
           closer_profile_id: string | null
@@ -5525,6 +5781,10 @@ export type Database = {
           status: string
         }[]
       }
+      get_cowork_user_room: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: string
+      }
       get_project_by_share_token: {
         Args: { _token: string }
         Returns: {
@@ -5632,6 +5892,14 @@ export type Database = {
       }
       is_chat_participant: {
         Args: { _conversation_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_cowork_host: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_cowork_member: {
+        Args: { _session_id: string; _user_id: string }
         Returns: boolean
       }
       is_project_creator: {
