@@ -121,6 +121,16 @@ function playLeaveSound() {
   setTimeout(() => playTone(440, 0.18, 0.08), 170);
 }
 
+function playHandRaisedSound() {
+  playTone(880, 0.2, 0.25);
+  setTimeout(() => playTone(1174.66, 0.18, 0.2), 200);
+}
+
+function playChatMessageSound() {
+  playTone(660, 0.12, 0.2);
+  setTimeout(() => playTone(880, 0.1, 0.15), 80);
+}
+
 // ── Map livekit ConnectionQuality to our level ───────────────────
 function mapConnectionQuality(q: ConnectionQuality): ConnectionQualityLevel {
   switch (q) {
