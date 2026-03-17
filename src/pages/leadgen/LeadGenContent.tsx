@@ -32,6 +32,7 @@ import AddLeadModal from "./AddLeadModal";
 import AddContactoModal from "./AddContactoModal";
 import ViewLeadModal from "./ViewLeadModal";
 import AgentDetailView from "./AgentDetailView";
+import AgentHourlyPerformance from "./AgentHourlyPerformance";
 import LeadGenSupervisorView from "./LeadGenSupervisorView";
 import LeadGenPerformanceView from "./LeadGenPerformanceView";
 
