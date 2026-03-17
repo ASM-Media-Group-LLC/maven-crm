@@ -86,8 +86,9 @@ function ConnectionIndicator({ quality }: { quality: string }) {
 
 const ParticipantTile = memo(function ParticipantTile({
   participant, room, large, className, preferredAudioOutputDeviceId,
-  onMuteParticipant, onRemoveParticipant, onPinParticipant, isAdmin,
+  onMuteParticipant, onRemoveParticipant, onPinParticipant, pinnedSid, isAdmin,
 }: ParticipantTileProps) {
+  const isPinned = pinnedSid === participant.sid;
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const attachedVideoTrackRef = useRef<any>(null);
