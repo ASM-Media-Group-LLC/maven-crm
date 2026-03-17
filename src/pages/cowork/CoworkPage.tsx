@@ -8,7 +8,6 @@ import CoworkHostDashboard from "./CoworkHostDashboard";
 import CoworkParticipantView from "./CoworkParticipantView";
 import { Button } from "@/components/ui/button";
 import { Plus, Users2 } from "lucide-react";
-import { toast } from "sonner";
 
 export default function CoworkPage() {
   const [searchParams, setSearchParams] = useSearchParams();
