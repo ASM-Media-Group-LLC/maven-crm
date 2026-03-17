@@ -107,6 +107,15 @@ export default function VideoCallPage() {
     );
   }
 
+  // Block rendering while resolving cowork redirect
+  if (coworkRedirecting) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[hsl(240_10%_6%)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (isLoading || !profile) {
     return (
       <div className="h-screen flex items-center justify-center bg-[hsl(240_10%_6%)]">
