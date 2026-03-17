@@ -35,7 +35,7 @@ const ClosersContent = () => {
   } = useCloserLeads();
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null } | null>(null);
+  const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
