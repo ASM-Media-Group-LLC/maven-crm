@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users2, Crown, Hand, Monitor, LogIn, ArrowRightLeft,
-  Check, X, Loader2, Radio, Power,
+  Check, X, Loader2, Radio, Power, Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
