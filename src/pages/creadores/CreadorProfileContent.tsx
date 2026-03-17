@@ -198,12 +198,7 @@ const CreadorProfileContent = () => {
       )}
 
       {(c.status === "leaving" || c.status === "terminated") && !isAgent && (
-        <OffboardingSection
-          creatorId={id!}
-          creatorName={c.name}
-          artisticName={c.artistic_name}
-          instagramHandle={c.instagram_handle}
-        />
+        <OffboardingSummaryCard creatorId={id!} />
       )}
 
       <div className="px-6 mt-4 pb-6">
