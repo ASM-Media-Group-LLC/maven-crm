@@ -86,6 +86,7 @@ const ALL_COUNTRIES = [
   { code: "zw", flag: "🇿🇼", name: "Zimbabue" },
 ];
 
+const leadSchema = z.object({
   source_link: z.string().url("URL de perfil requerida"),
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Calidad requerida"),
