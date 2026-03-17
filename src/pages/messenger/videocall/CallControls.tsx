@@ -36,6 +36,7 @@ interface CallControlsProps {
   onVideoInputChange: (id: string) => void;
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
+  hideScreenShare?: boolean;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
