@@ -1,22 +1,41 @@
 
 
-## Problem
+## Plan: Add "Iniciar Offboarding" Button + Test Flow
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+The offboarding list page has no way to **initiate** a new offboarding process. Users can only trigger it indirectly by changing a creator's status to "Retiro" from the creator profile. The list page should allow starting an offboarding directly.
 
-## Solution
+### Changes
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+#### 1. Add "Iniciar Offboarding" button to `OffboardingListPage.tsx`
 
-## Changes
+Add a button in the header area that opens a dialog/modal to select a creator and start their offboarding:
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+- Button: "Iniciar Offboarding" next to the page title
+- Opens a dialog with a searchable creator selector (fetches creators with status `active`, `leaving`, or `paused` who don't already have an active offboarding)
+- On confirm: changes creator status to `leaving`, creates the offboarding record, navigates to the detail page
+- Reuses `createOffboardingRecord` from `useOffboarding.ts`
 
-Replace the single `.select()` call with a paginated loop:
+#### 2. Create `InitiateOffboardingDialog.tsx` in `src/pages/creadores/offboarding/`
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+A dialog component that:
+- Fetches all creators without an existing active offboarding
+- Provides a search/filter input
+- Shows a selectable list of creators (name, artistic name, Instagram)
+- On "Iniciar": updates creator status to `leaving`, calls `createOffboardingRecord`, navigates to `/creadores/offboarding/:id`
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+#### 3. Insert test creator via Supabase insert tool
+
+Insert a creator named "Testing Offboarding" with status `active` to use for testing the flow. This will be done as a data operation.
+
+---
+
+### Files Summary
+
+| Action | File |
+|--------|------|
+| Create | `src/pages/creadores/offboarding/InitiateOffboardingDialog.tsx` |
+| Modify | `src/pages/creadores/offboarding/OffboardingListPage.tsx` — add button + dialog |
+
+After implementation, I'll insert a test creator record for you to test the full flow. You'll be able to delete it afterward from the creator profile or directly.
 
