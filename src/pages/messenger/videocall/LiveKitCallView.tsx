@@ -55,6 +55,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [audioInputId, setAudioInputId] = useState(initialAudioDeviceId);
   const [audioOutputId, setAudioOutputId] = useState(initialAudioOutputDeviceId);
   const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
+  const [pinnedSid, setPinnedSid] = useState<string | null>(null);
 
   const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); saveViewSettings(s); }, []);
 
@@ -83,6 +84,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);
   const handleVideoInputChange = useCallback((id: string) => { setVideoInputId(id); lk.switchVideoInput?.(id); }, [lk]);
 
+  const handlePinParticipant = useCallback((sid: string) => {
+    setPinnedSid((prev) => {
+      if (prev === sid) {
+        toast.info("Tile desanclado");
+        return null;
+      }
+      toast.info("Tile anclado");
+      return sid;
+    });
+  }, []);
+
   const shareLink = useMemo(() => {
     const params = new URLSearchParams();
     const n = (callDisplayName || roomName).trim();
@@ -91,13 +103,21 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return `${window.location.origin}/call/${encodeURIComponent(roomName)}${qs ? `?${qs}` : ""}`;
   }, [roomName, callDisplayName]);
 
+  // Clear pin if participant left
+  useEffect(() => {
+    if (pinnedSid && !lk.participants.some((p) => p.sid === pinnedSid)) {
+      setPinnedSid(null);
+    }
+  }, [lk.participants, pinnedSid]);
+
   const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
+    if (pinnedSid) return "spotlight"; // pinned always forces spotlight
     const mode = viewSettings.layout;
     if (mode === "spotlight") return "spotlight";
     if (mode === "sidebar") return "sidebar";
     if (mode === "tiled") return "grid";
     return lk.participants.some((p) => p.isScreenSharing) ? "spotlight" : "grid";
-  }, [viewSettings.layout, lk.participants]);
+  }, [viewSettings.layout, lk.participants, pinnedSid]);
 
   const visibleParticipants = useMemo(() => {
     let list = lk.participants;
@@ -107,9 +127,13 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk.participants, viewSettings.hideNoVideo, viewSettings.maxTiles]);
 
   const spotlightParticipant = useMemo(() => {
+    if (pinnedSid) {
+      const pinned = visibleParticipants.find((p) => p.sid === pinnedSid);
+      if (pinned) return pinned;
+    }
     const ss = visibleParticipants.find((p) => p.isScreenSharing);
     return ss || visibleParticipants.find((p) => p.identity === lk.activeSpeaker) || visibleParticipants[0];
-  }, [visibleParticipants, lk.activeSpeaker]);
+  }, [visibleParticipants, lk.activeSpeaker, pinnedSid]);
 
   const room = lk.getRoom();
 
@@ -153,26 +177,26 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         <div className="relative flex-1 p-3 overflow-hidden">
           {effectiveLayout === "grid" ? (
             <div className={cn("grid gap-2 h-full", gridCols)}>
-              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} />)}
+              {visibleParticipants.map((p) => <ParticipantTile key={`${p.identity}-${p.sid}`} participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} />)}
             </div>
           ) : effectiveLayout === "sidebar" ? (
             <div className="flex h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
                   ))}
                 </div>
               )}
             </div>
           ) : (
             <div className="flex flex-col h-full gap-2">
-              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>}
+              {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>}
               {visibleParticipants.length > 1 && (
                 <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
-                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} isAdmin={isAdmin} /></div>
+                    <div key={`${p.identity}-${p.sid}`} className="w-40 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
                   ))}
                 </div>
               )}
