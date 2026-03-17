@@ -250,13 +250,13 @@ const ContactCountCell = ({ creatorId, count }: { creatorId: string; count: numb
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <Badge variant="outline" className="cursor-pointer hover:bg-muted/50 gap-0.5">
+        <button className="inline-flex items-center gap-0.5 rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:bg-muted/50 transition-colors">
           {count}/6 <ChevronDown className="h-3 w-3" />
-        </Badge>
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-3 space-y-3" align="start">
+      <PopoverContent className="w-80 p-3 space-y-3" align="start" side="bottom">
         <p className="text-sm font-semibold">Historial de contactos</p>
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Cargando...</p>
