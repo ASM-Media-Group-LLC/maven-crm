@@ -16,6 +16,10 @@ export default function VideoCallPage() {
   const callDisplayName = searchParams.get("name") || roomName || "Videollamada";
   const { user } = useAuth();
   const [joined, setJoined] = useState(false);
+  const [coworkRedirecting, setCoworkRedirecting] = useState(() => {
+    // Synchronously detect cowork rooms to block rendering from the start
+    return !!roomName && (roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_"));
+  });
   const [joinOpts, setJoinOpts] = useState<{
     micOn: boolean;
     camOn: boolean;
@@ -31,29 +35,37 @@ export default function VideoCallPage() {
     const isCoworkRoom = roomName.startsWith("cowork_hub_") || roomName.startsWith("cowork_");
     if (!isCoworkRoom) return;
 
+    setCoworkRedirecting(true);
     const resolveAndRedirect = async () => {
-      // Try host hub first
-      if (roomName.startsWith("cowork_hub_")) {
-        const { data } = await supabase
-          .from("cowork_sessions")
-          .select("id")
-          .eq("host_hub_livekit_room", roomName)
-          .eq("status", "active")
+      try {
+        // Try host hub first
+        if (roomName.startsWith("cowork_hub_")) {
+          const { data } = await supabase
+            .from("cowork_sessions")
+            .select("id")
+            .eq("host_hub_livekit_room", roomName)
+            .eq("status", "active")
+            .maybeSingle();
+          if (data) {
+            navigate(`/cowork?session=${data.id}&role=host`, { replace: true });
+            return;
+          }
+        }
+        // Try regular cowork room
+        const { data: room } = await supabase
+          .from("cowork_rooms")
+          .select("session_id")
+          .eq("livekit_room_name", roomName)
           .maybeSingle();
-        if (data) {
-          navigate(`/cowork?session=${data.id}&role=host`, { replace: true });
+        if (room) {
+          navigate(`/cowork?session=${room.session_id}`, { replace: true });
           return;
         }
+      } catch (e) {
+        console.error("Cowork redirect failed:", e);
       }
-      // Try regular cowork room
-      const { data: room } = await supabase
-        .from("cowork_rooms")
-        .select("session_id")
-        .eq("livekit_room_name", roomName)
-        .maybeSingle();
-      if (room) {
-        navigate(`/cowork?session=${room.session_id}`, { replace: true });
-      }
+      // If no match found, allow normal video call rendering
+      setCoworkRedirecting(false);
     };
     resolveAndRedirect();
   }, [roomName, navigate]);
