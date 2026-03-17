@@ -1,22 +1,34 @@
 
 
-## Problem
+## Diagnóstico
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+El problema está en la línea 331 de `LeadGenContent.tsx`. Cuando el agente hace clic en la pestaña **"Rendimiento por Hora"** (`leads-hora`), el código lo trata igual que la pestaña "Leads" y muestra la misma tabla de leads:
 
-## Solution
+```typescript
+// Línea 331 — ambos tabs renderizan lo mismo
+{(activeTab === "leads" || activeTab === "leads-hora") && (
+  // ... muestra tabla de leads
+)}
+```
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+Mientras tanto, el `AgentDetailView` (que sí tiene gráficas de rendimiento por hora, objetivo por hora, etc.) solo se muestra cuando un supervisor/owner hace clic en un agente específico.
 
-## Changes
+## Plan
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+### 1. Separar el rendering del tab "leads-hora" (en `LeadGenContent.tsx`)
 
-Replace the single `.select()` call with a paginated loop:
+- Cambiar la condición de la línea 331 para que solo aplique a `activeTab === "leads"`.
+- Agregar un nuevo bloque de contenido para `activeTab === "leads-hora"` que renderice la vista de rendimiento del agente logueado, reutilizando la lógica de `AgentDetailView` (gráficas por hora, KPIs de objetivo, etc.) pero sin el header de "volver" ni la navegación de tabs interna.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### 2. Crear un componente `AgentHourlyPerformance` extraído de `AgentDetailView`
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+- Extraer la sección de "rendimiento por hora" de `AgentDetailView` (gráfica de barras por hora, indicador de objetivo 20/hora, tiempo activo) en un componente reutilizable.
+- Renderizar ese componente en el tab "leads-hora" pasándole los leads del agente actual (`enrichedLeads` ya filtrados por `userId`).
+
+Esto evita duplicar código y le da al closer/agente acceso a sus métricas de rendimiento por hora directamente desde su pestaña.
+
+### Archivos a modificar
+- `src/pages/leadgen/AgentDetailView.tsx` — extraer la sección de rendimiento en un componente separado
+- `src/pages/leadgen/AgentHourlyPerformance.tsx` — nuevo componente con las gráficas de rendimiento por hora
+- `src/pages/leadgen/LeadGenContent.tsx` — separar el rendering de "leads-hora" y usar el nuevo componente
 
