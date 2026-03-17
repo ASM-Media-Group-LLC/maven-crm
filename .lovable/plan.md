@@ -1,22 +1,45 @@
 
 
-## Problem
+## Plan: Fix Offboarding Flow from Creators List
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Issues Identified
 
-## Solution
+1. **Sidebar order wrong**: Currently `Dashboard > Onboarding > Offboarding > Listado`. Should follow the user journey: `Dashboard > Listado > Onboarding > Offboarding`.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+2. **No link from creators list to offboarding**: When a creator has status "Retiro" (leaving) or "Terminada" (terminated) in the table, there's no visual indicator or action to go to their offboarding process.
 
-## Changes
+3. **Status change to "Retiro" doesn't redirect**: After changing status to `leaving` in `ChangeStatusModal`, the offboarding record is created silently but the user has no way to navigate to it directly.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+---
 
-Replace the single `.select()` call with a paginated loop:
+### Changes
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+#### 1. Reorder sidebar items (`DashboardSidebar.tsx`)
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+```
+Dashboard → Listado → Onboarding → Offboarding
+```
+
+#### 2. Add offboarding action in creators table (`CreadoresTable.tsx`)
+
+For creators with status `leaving` or `terminated`, add a `LogOut` icon button in the actions column that navigates to their offboarding detail page. This requires a quick lookup of the offboarding ID by creator ID (can use the existing `creator_offboardings` table).
+
+#### 3. Add navigation after status change (`ChangeStatusModal.tsx`)
+
+When status is changed to `leaving` and the offboarding record is created successfully, show a toast with an action button "Ver Offboarding" that navigates to the offboarding detail page. This requires `createOffboardingRecord` to return the new offboarding ID.
+
+#### 4. Update `createOffboardingRecord` in `useOffboarding.ts`
+
+Change it to return the created offboarding record ID so `ChangeStatusModal` can link to it.
+
+---
+
+### Files Summary
+
+| Action | File |
+|--------|------|
+| Modify | `src/components/dashboard/DashboardSidebar.tsx` — reorder items |
+| Modify | `src/pages/creadores/CreadoresTable.tsx` — add offboarding link for leaving/terminated creators |
+| Modify | `src/pages/creadores/ChangeStatusModal.tsx` — navigate to offboarding after creating it |
+| Modify | `src/pages/creadores/useOffboarding.ts` — return ID from `createOffboardingRecord` |
 
