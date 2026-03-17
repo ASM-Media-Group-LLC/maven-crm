@@ -716,18 +716,10 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!isCloser} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={sourceAccounts} />
-              ) : (
-                <span className="text-sm">{c.source_account || "—"}</span>
-              )}
+              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
-              ) : (
-                <span className="text-sm">{c.category || "—"}</span>
-              )}
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
@@ -743,11 +735,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell>
-              {isCloser ? (
-                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
-              ) : (
-                <span className="text-sm">{c.notes || "—"}</span>
-              )}
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
             <TableCell className="text-right">
               <div className="flex items-center justify-end gap-1">
