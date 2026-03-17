@@ -202,7 +202,7 @@ const ParticipantTile = memo(function ParticipantTile({
     let retryAttempts = 0;
 
     const scheduleAttachRetry = () => {
-      if (retryAttempts >= 8 || participant.isCameraOff) return;
+      if (retryAttempts >= 8 || (participant.isCameraOff && !participant.isScreenSharing)) return;
       retryTimer = setTimeout(() => {
         retryAttempts += 1;
         const stillNeedsRetry = attachVideo();
