@@ -115,7 +115,15 @@ const ChangeStatusModal = ({
       queryClient.invalidateQueries({ queryKey: ["creator_notes", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["creator_offboarding", creatorId] });
 
-      toast({ title: "Estado actualizado exitosamente" });
+      toast({
+        title: "Estado actualizado exitosamente",
+        description: offboardingId ? "Se creó el proceso de offboarding." : undefined,
+        action: offboardingId ? (
+          <Button variant="outline" size="sm" onClick={() => navigate(`/creadores/offboarding/${offboardingId}`)}>
+            Ver Offboarding
+          </Button>
+        ) : undefined,
+      });
       resetAndClose();
     } catch (err: any) {
       toast({

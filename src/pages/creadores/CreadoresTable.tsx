@@ -324,6 +324,36 @@ const CreadoresTable = ({ creators }: Props) => {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewingCreator(c)}>
                     <Eye className="h-4 w-4" />
                   </Button>
+                  {(c.status === "leaving" || c.status === "terminated") && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-warning"
+                            onClick={async () => {
+                              const { data } = await supabase
+                                .from("creator_offboardings")
+                                .select("id")
+                                .eq("creator_id", c.id)
+                                .order("created_at", { ascending: false })
+                                .limit(1)
+                                .maybeSingle();
+                              if (data?.id) {
+                                navigate(`/creadores/offboarding/${data.id}`);
+                              } else {
+                                toast("No se encontró proceso de offboarding para esta creadora.");
+                              }
+                            }}
+                          >
+                            <LogOut className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver Offboarding</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
