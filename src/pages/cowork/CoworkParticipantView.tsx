@@ -103,6 +103,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             callDisplayName={myRoom?.name}
             isAdmin={false}
             onLeave={() => setConnectedLkRoom(null)}
+            hideShareLink
           />
         ) : (
           <div className="flex items-center justify-center h-full">

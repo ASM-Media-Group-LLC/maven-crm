@@ -9,10 +9,11 @@ interface CallTopBarProps {
   isEncrypted?: boolean;
   onOpenAdjustView: () => void;
   shareLink: string;
+  hideShareLink?: boolean;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -53,13 +54,15 @@ export default function CallTopBar({
         <span className="text-xs text-[hsl(220_3%_55%)] mr-2">
           {participantCount} participante{participantCount !== 1 ? "s" : ""}
         </span>
-        <button
-          onClick={copyLink}
-          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
-        >
-          <Link2 className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">Copiar enlace</span>
-        </button>
+        {!hideShareLink && (
+          <button
+            onClick={copyLink}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">Copiar enlace</span>
+          </button>
+        )}
         <button
           onClick={onOpenAdjustView}
           title="Ajustar vista"
