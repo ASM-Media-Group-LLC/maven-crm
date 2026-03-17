@@ -89,7 +89,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 className="h-7 w-7 text-amber-400 hover:text-amber-300"
                 title="Copiar enlace de host"
                 onClick={() => {
-                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host`;
+                  const code = hostInviteCode || "";
+                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host&code=${code}`;
                   navigator.clipboard.writeText(url);
                   toast.success("Enlace de host copiado");
                 }}
