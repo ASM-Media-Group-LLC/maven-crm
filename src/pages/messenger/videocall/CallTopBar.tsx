@@ -13,7 +13,7 @@ interface CallTopBarProps {
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
