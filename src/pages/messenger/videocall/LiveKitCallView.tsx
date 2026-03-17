@@ -175,7 +175,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
           ) : effectiveLayout === "sidebar" ? (
             <div className="flex h-full gap-2">
               {spotlightParticipant && <div className="flex-1"><ParticipantTile participant={spotlightParticipant} room={room} large className="h-full" preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>}
-              {visibleParticipants.length > 1 && (
+              {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).length > 0 && (
                 <div className="flex flex-col gap-2 w-48 shrink-0 overflow-y-auto">
                   {visibleParticipants.filter((p) => p.sid !== spotlightParticipant?.sid).map((p) => (
                     <div key={`${p.identity}-${p.sid}`} className="h-28 shrink-0"><ParticipantTile participant={p} room={room} preferredAudioOutputDeviceId={audioOutputId} onMuteParticipant={lk.muteParticipant} onRemoveParticipant={lk.removeParticipant} onPinParticipant={handlePinParticipant} pinnedSid={pinnedSid} isAdmin={isAdmin} /></div>
