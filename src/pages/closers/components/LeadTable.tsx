@@ -165,7 +165,7 @@ const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | n
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
         </span>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-2 space-y-1" align="start">
+      <PopoverContent className="w-52 p-2 space-y-1" align="start" side="bottom">
         {!customMode ? (
           <>
             <div className="max-h-40 overflow-y-auto space-y-0.5">
