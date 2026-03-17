@@ -87,6 +87,8 @@ export const useCloserLeads = () => {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("todas");
   const [page, setPage] = useState(0);
+  const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null);
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
 
@@ -206,10 +208,18 @@ export const useCloserLeads = () => {
     staleTime: 30_000,
   });
 
-  // Client-side search
-  const filtered = search
-    ? creators.filter((c) => c.instagram_handle.toLowerCase().includes(search.toLowerCase()))
-    : creators;
+  // Unique agents for filter select
+  const agentList = [...new Map(
+    creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
+  )].map(([id, name]) => ({ id, name }));
+
+  // Client-side search + filters
+  const filtered = creators.filter((c) => {
+    if (search && !c.instagram_handle.toLowerCase().includes(search.toLowerCase())) return false;
+    if (agentFilter && c.assigned_to !== agentFilter) return false;
+    if (platformFilter && c.main_platform !== platformFilter) return false;
+    return true;
+  });
 
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
@@ -287,6 +297,9 @@ export const useCloserLeads = () => {
     page, setPage,
     search, setSearch,
     activeTab, setActiveTab: handleTabChange,
+    agentFilter, setAgentFilter,
+    platformFilter, setPlatformFilter,
+    agentList,
     updateField,
     updateStage,
     assignCreator,

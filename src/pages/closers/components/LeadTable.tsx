@@ -3,23 +3,21 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ChevronRight } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
 import ContactQuickForm from "./ContactQuickForm";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 interface Props {
   creators: CloserCreatorRow[];
   activeTab: string;
+  viewMode: "list" | "grid";
   onStageChange: (id: string, stage: string) => void;
   onFieldChange: (id: string, field: string, value: any) => void;
   onAssign: (id: string, currentAssignee: string | null) => void;
@@ -110,7 +108,7 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
-const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssign, isAdmin }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, isAdmin }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Compute revenue for completadas footer
@@ -126,6 +124,94 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
     { monetization: 0, revenue: 0, count: 0 }
   ) : null;
 
+  // ========= GRID VIEW =========
+  if (viewMode === "grid") {
+    return (
+      <div>
+        {creators.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">Sin registros</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {creators.map((c) => {
+              const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+              const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
+              return (
+                <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-3 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <a href={`https://instagram.com/${c.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+                      className="text-primary hover:underline font-semibold flex items-center gap-1">
+                      @{c.instagram_handle}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <Badge className={`${stageColor(c.stage)} text-[10px]`}>{c.stage}</Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Agente</p>
+                      <p className="font-medium truncate">{c.agent_name || "Sin asignar"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Cuenta origen</p>
+                      <p className="font-medium truncate">{c.source_account || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Categoría</p>
+                      <p className="font-medium truncate">{c.category || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Contactos</p>
+                      <p className="font-medium">{c.contact_count}/6</p>
+                    </div>
+                    {(c.stage === "Confirmada" || c.stage === "Completada") && (
+                      <>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">Plataforma</p>
+                          <p className="font-medium">{c.main_platform || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground">Revenue</p>
+                          <p className="font-semibold text-primary">${revenue.toLocaleString()}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 pt-1">
+                    {followUpPending && (
+                      <Badge variant="destructive" className="text-[10px] h-5 gap-0.5">
+                        <AlertTriangle className="h-3 w-3" /> Follow-up
+                      </Badge>
+                    )}
+                    {c.phone && (
+                      <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer">
+                        <Badge variant="outline" className="text-[10px] h-5 gap-0.5 cursor-pointer">
+                          <Phone className="h-3 w-3" /> WhatsApp
+                        </Badge>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {completadasTotals && completadasTotals.count > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 mt-4 border border-border rounded-lg bg-muted/30 text-sm">
+            <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
+            <div className="flex gap-6">
+              <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>Revenue: <strong className="text-primary">${completadasTotals.revenue.toLocaleString()}</strong></span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ========= LIST VIEW =========
+
   const renderHeaders = () => {
     switch (activeTab) {
       case "asignadas":
@@ -133,10 +219,12 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead>Instagram</TableHead>
+            <TableHead>Cuenta origen</TableHead>
             <TableHead>Fecha asignación</TableHead>
             <TableHead>Agente</TableHead>
             <TableHead># Contactos</TableHead>
             <TableHead>Último contacto</TableHead>
+            <TableHead>Teléfono</TableHead>
             <TableHead>Alertas</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -185,10 +273,13 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
             <TableHead className="w-10">#</TableHead>
             <TableHead>Instagram</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead>Cuenta origen</TableHead>
+            <TableHead>Categoría</TableHead>
             <TableHead>Agente</TableHead>
             <TableHead>Fecha asignación</TableHead>
             <TableHead># Contactos</TableHead>
             <TableHead>Teléfono</TableHead>
+            <TableHead>OF URL</TableHead>
             <TableHead>Notas</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -216,6 +307,7 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
@@ -228,6 +320,15 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
                   Próximo: {format(nextDate, "dd/MM")}
                 </p>
               )}
+            </TableCell>
+            <TableCell className="text-sm">
+              {c.phone ? (
+                <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-primary hover:underline">
+                  <Phone className="h-3 w-3" />
+                  <span className="truncate max-w-[100px]">{c.phone}</span>
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
             <TableCell>
               <div className="flex gap-1">
@@ -369,6 +470,8 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
             <TableCell>
               <Badge className={stageColor(c.stage)}>{c.stage}</Badge>
             </TableCell>
+            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell className="text-sm">{c.category || "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell>
@@ -380,6 +483,14 @@ const CloserTable = ({ creators, activeTab, onStageChange, onFieldChange, onAssi
                   className="flex items-center gap-1 text-primary hover:underline">
                   <Phone className="h-3 w-3" />
                   <span className="truncate max-w-[100px]">{c.phone}</span>
+                </a>
+              ) : <span className="text-muted-foreground">—</span>}
+            </TableCell>
+            <TableCell className="text-sm">
+              {c.onlyfans_url ? (
+                <a href={c.onlyfans_url} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1 truncate max-w-[120px]">
+                  <ExternalLink className="h-3 w-3 shrink-0" /> OF
                 </a>
               ) : <span className="text-muted-foreground">—</span>}
             </TableCell>
