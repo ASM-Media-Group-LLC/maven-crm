@@ -337,6 +337,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </p>
               )}
             </TableCell>
+            <TableCell className="text-sm">{c.lg_platform || "—"}</TableCell>
             <TableCell className="text-sm">
               {c.phone ? (
                 <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
