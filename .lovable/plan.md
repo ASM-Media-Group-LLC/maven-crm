@@ -3,36 +3,43 @@
 ## Plan: Selects inline para Categoría/Cuenta origen/Estado + Contactos como popover + Restricción de tabs por rol
 
 ### Resumen
-Implementar los dos planes aprobados previamente que no se aplicaron:
-1. Reemplazar `InlineText` por selects inline para Categoría, Cuenta de origen y Estado
-2. Convertir `# Contactos` en un popover con historial + formulario de registro
-3. Restringir tab "Todas" solo a admin/manager; closers ven solo sus tabs
 
-### Cambios en `LeadTable.tsx`
+Tres bloques de cambios:
+1. Reemplazar campos de texto editables (`InlineText`) por selects inline para Categoría, Cuenta de origen y Estado
+2. Convertir el badge "# Contactos" en un popover clickeable con historial + formulario de registro
+3. Restringir tab "Todas" solo a admin/manager; closers ven solo sus propios tabs
 
-**Nuevos componentes inline:**
-- `InlineCategorySelect`: Select con opciones fijas `["A+", "A", "B+", "B", "C"]` — reemplaza `InlineText` para `category` en tabs "todas" y "asignadas"
-- `InlineSourceSelect`: Popover con opciones dinámicas (valores únicos existentes de `source_account`) + input "Otra..." para agregar nuevas — reemplaza `InlineText` para `source_account`
-- `InlineStageSelect`: Select con `CLOSER_STAGES` coloreado — reemplaza el `<Badge>` estático del estado en tab "todas" para filas `_source === "closer"`
-- `ContactCountCell`: Popover que al hacer click en el badge `X/6` muestra historial de contactos + formulario rápido (Canal, Resultado, Notas) usando `useContactHistory` — reemplaza el badge estático y elimina el botón separado `ContactQuickForm`
+### Cambios detallados
 
-**Limpieza:**
-- Eliminar import de `ContactQuickForm` y su uso en filas
-- El formulario de contacto ahora vive dentro de `ContactCountCell`
+**1. `src/pages/closers/components/LeadTable.tsx`**
 
-### Cambios en `ClosersContent.tsx`
+- **InlineCategorySelect**: Nuevo componente — Popover con badges clickeables para opciones fijas `["A+", "A", "B+", "B", "C"]`. Reemplaza `InlineText` de `category` en tabs "todas" y "asignadas".
 
-- Filtrar `TABS` dinámicamente: solo mostrar "Todas" si `isAdmin || isManager`
-- Para closers, el array de tabs comienza en "Asignaciones"
+- **InlineSourceSelect**: Nuevo componente — Popover con lista de valores únicos existentes de `source_account` (extraídos del array `creators` via prop) + input para agregar una nueva. Reemplaza `InlineText` de `source_account`.
 
-### Cambios en `useCloserLeads.ts`
+- **InlineStageSelect**: Nuevo componente — Select con las opciones de `CLOSER_STAGES` coloreadas con `stageColor()`. Reemplaza el `<Badge>` estático del estado en tab "todas". Solo habilitado para filas `_source === "closer"` (las de LeadGen con "Pendiente LG" quedan como badge estático).
 
-- Cambiar `activeTab` default: si no es admin/manager, iniciar en `"asignadas"` en lugar de `"todas"`
-- Esto se puede lograr con: `const [activeTab, setActiveTab] = useState(() => (isAdmin || isManager) ? "todas" : "asignadas")`
-- Nota: como `isAdmin`/`isManager` vienen de `useUserRole` que es async, usar un `useEffect` para redirigir el tab cuando el rol se resuelva
+- **ContactCountCell**: Nuevo componente — el badge `X/6` se convierte en un Popover clickeable que muestra:
+  - Mini historial de contactos (fecha, canal, resultado) usando `useContactHistory`
+  - Formulario rápido abajo (Canal, Resultado, Notas) — misma lógica que `ContactQuickForm` pero integrado
+  - Se aplica en tabs "todas" y "asignadas"
+
+- **Limpieza**: Eliminar import y uso de `ContactQuickForm` en las filas (su funcionalidad queda integrada en `ContactCountCell`).
+
+- Pasar prop `sourceAccounts: string[]` al componente para alimentar `InlineSourceSelect`.
+
+**2. `src/pages/closers/ClosersContent.tsx`**
+
+- Filtrar `TABS` dinámicamente: solo incluir `{ value: "todas", label: "Todas" }` si `isAdmin || isManager`.
+- Computar `sourceAccounts` como valores únicos de `source_account` del array `creators` y pasarlo como prop a `CloserTable`.
+
+**3. `src/pages/closers/hooks/useCloserLeads.ts`**
+
+- Cambiar `useState("todas")` por `useState("asignadas")` como default.
+- Agregar `useEffect`: cuando `isAdmin || isManager` se resuelva a `true` y el tab actual es "asignadas", cambiar a "todas".
 
 ### Archivos a modificar
-- `src/pages/closers/components/LeadTable.tsx` — Nuevos componentes inline, eliminar ContactQuickForm
-- `src/pages/closers/ClosersContent.tsx` — Filtrar tabs por rol
+- `src/pages/closers/components/LeadTable.tsx` — Nuevos componentes inline, ContactCountCell, eliminar ContactQuickForm
+- `src/pages/closers/ClosersContent.tsx` — Filtrar tabs por rol, pasar sourceAccounts
 - `src/pages/closers/hooks/useCloserLeads.ts` — Default tab según rol
 
