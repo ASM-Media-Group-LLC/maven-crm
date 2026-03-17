@@ -1,22 +1,18 @@
 
 
-## Problem
+## Remove "Copiar enlace" from Cowork Video Views
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+The "Copiar enlace" button in the `CallTopBar` is visible in both the host room and participant room video areas (visible in both screenshots). This button generates a generic video call link that doesn't make sense in the cowork context — participants join via room-specific invite links from the host dashboard instead.
 
-## Solution
+### Changes
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+**1. `CallTopBar.tsx`** — Add optional `hideShareLink` prop; when true, don't render the copy link button.
 
-## Changes
+**2. `LiveKitCallView.tsx`** — Add optional `hideShareLink` prop, pass it through to `CallTopBar`.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+**3. `CoworkHostDashboard.tsx`** — Pass `hideShareLink={true}` to both `LiveKitCallView` instances (room view and Host Hub).
 
-Replace the single `.select()` call with a paginated loop:
+**4. `CoworkParticipantView.tsx`** — Pass `hideShareLink={true}` to the `LiveKitCallView` instance.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+This keeps the "Copiar enlace" button working for regular (non-cowork) video calls while hiding it in all cowork contexts. The room-specific invite Link2 buttons on the host sidebar room cards remain unchanged since those serve a different purpose (sharing participant invite links).
 
