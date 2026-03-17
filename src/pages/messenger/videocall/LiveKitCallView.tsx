@@ -243,6 +243,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onAudioOutputChange={handleAudioOutputChange}
         onVideoInputChange={handleVideoInputChange}
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
+        onOpenMetrics={() => setMetricsOpen(true)}
         hideScreenShare={hideScreenShare}
       />
 
