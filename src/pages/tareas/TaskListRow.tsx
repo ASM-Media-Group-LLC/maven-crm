@@ -94,7 +94,7 @@ const TaskListRow = ({ task, profiles, onComplete, onJustify, onEdit, onDelete, 
   const transitions = getStatusTransitions(task.status, isOverdue, !!task.overdue_reason);
 
   const handleShare = () => {
-    const url = `${window.location.origin}/tareas/share/${task.share_token}`;
+    const url = `${getPublicBaseUrl()}/tareas/share/${task.share_token}`;
     navigator.clipboard.writeText(url);
     toast({ title: "Link copiado", description: "El enlace fue copiado al portapapeles." });
   };

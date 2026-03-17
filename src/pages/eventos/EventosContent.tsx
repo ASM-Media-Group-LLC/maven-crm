@@ -68,7 +68,7 @@ const EventosContent = () => {
         token = (inserted as any).token;
       }
 
-      const link = `${window.location.origin}/shared/agenda/${token}`;
+      const link = `${getPublicBaseUrl()}/shared/agenda/${token}`;
       setShareLink(link);
       setShareOpen(true);
     } catch (err: any) {

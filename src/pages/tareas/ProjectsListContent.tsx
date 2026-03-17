@@ -100,7 +100,7 @@ const ProjectsListContent = () => {
 
   const handleShare = (project: TaskProject) => {
     if (project.share_token) {
-      const url = `${window.location.origin}/tareas/project-share/${project.share_token}`;
+      const url = `${getPublicBaseUrl()}/tareas/project-share/${project.share_token}`;
       navigator.clipboard.writeText(url);
       toast({ title: "Link copiado", description: "El enlace público fue copiado al portapapeles." });
     }
