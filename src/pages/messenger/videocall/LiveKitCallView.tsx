@@ -55,6 +55,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [audioInputId, setAudioInputId] = useState(initialAudioDeviceId);
   const [audioOutputId, setAudioOutputId] = useState(initialAudioOutputDeviceId);
   const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
+  const [pinnedSid, setPinnedSid] = useState<string | null>(null);
 
   const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); saveViewSettings(s); }, []);
 
