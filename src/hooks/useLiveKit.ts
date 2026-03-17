@@ -973,8 +973,10 @@ export function useLiveKit() {
               return newMessages;
             });
             setUnreadChatCount((c) => c + 1);
+            playChatMessageSound();
           } else if (msg.type === "hand") {
             handRaisedMap.current[participant?.identity || ""] = msg.payload.raised;
+            if (msg.payload.raised) playHandRaisedSound();
             refreshParticipants();
           } else if (msg.type === "reaction") {
             setParticipants((prev) =>
