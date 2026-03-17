@@ -50,6 +50,7 @@ const ChangeStatusModal = ({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const currentOption = statusOptions.find((s) => s.value === currentStatus);
   const isValid = newStatus && newStatus !== currentStatus && note.trim().length > 0;
