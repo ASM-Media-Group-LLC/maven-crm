@@ -354,6 +354,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 callDisplayName="Host Hub"
                 isAdmin={true}
                 onLeave={() => setHubConnected(false)}
+                hideShareLink
               />
             </div>
           </div>
