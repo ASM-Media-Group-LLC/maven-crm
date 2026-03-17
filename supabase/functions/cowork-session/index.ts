@@ -364,6 +364,22 @@ serve(async (req) => {
       return json({ success: true });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // GET HOST CODE (only for existing hosts)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "getHostCode") {
+      const { sessionId } = body;
+      if (!sessionId) return err("sessionId required");
+
+      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts can get the invite code", 403);
+
+      const { data: session } = await admin.from("cowork_sessions").select("host_invite_code").eq("id", sessionId).single();
+      if (!session) return err("Session not found");
+
+      return json({ hostCode: session.host_invite_code });
+    }
+
     return err("Unknown action: " + action);
   } catch (e) {
     console.error("cowork-session error:", e);
