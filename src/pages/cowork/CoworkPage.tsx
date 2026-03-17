@@ -32,7 +32,7 @@ export default function CoworkPage() {
           <Users2 className="h-16 w-16 mx-auto text-primary/60" />
           <h1 className="text-3xl font-bold text-foreground">Sala Cowork</h1>
           <p className="text-muted-foreground max-w-md">
-            Crea una sesión cowork con múltiples salas o únete a una existente.
+            Crea una sesión cowork con múltiples salas.
           </p>
         </div>
 
@@ -40,28 +40,6 @@ export default function CoworkPage() {
           <Button onClick={() => setShowCreate(true)} size="lg" className="gap-2">
             <Plus className="h-4 w-4" /> Crear sesión
           </Button>
-          <div className="flex gap-2">
-            <input
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value)}
-              placeholder="ID de sesión..."
-              className="px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm w-64"
-            />
-            <Button
-              variant="outline"
-              onClick={async () => {
-                if (!joinCode.trim()) return;
-                try {
-                  await cowork.joinSession(joinCode.trim());
-                  setSearchParams({ session: joinCode.trim() });
-                } catch (e: any) {
-                  toast.error(e.message);
-                }
-              }}
-            >
-              Unirse
-            </Button>
-          </div>
         </div>
 
         <CoworkCreateDialog
