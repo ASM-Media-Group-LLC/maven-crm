@@ -51,6 +51,7 @@ const ChangeStatusModal = ({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const currentOption = statusOptions.find((s) => s.value === currentStatus);
