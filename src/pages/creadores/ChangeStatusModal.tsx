@@ -96,10 +96,21 @@ const ChangeStatusModal = ({
       });
       if (noteErr) throw noteErr;
 
+      // Auto-create offboarding record when status changes to 'leaving'
+      if (newStatus === "leaving" && user?.id) {
+        try {
+          await createOffboardingRecord(creatorId, user.id);
+        } catch (offErr: any) {
+          // Ignore duplicate — offboarding may already exist
+          console.warn("Offboarding creation skipped:", offErr.message);
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["creators"] });
       queryClient.invalidateQueries({ queryKey: ["creator", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["creator_history", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["creator_notes", creatorId] });
+      queryClient.invalidateQueries({ queryKey: ["creator_offboarding", creatorId] });
 
       toast({ title: "Estado actualizado exitosamente" });
       resetAndClose();

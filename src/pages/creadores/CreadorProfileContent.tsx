@@ -197,6 +197,15 @@ const CreadorProfileContent = () => {
         <VerificationSection creatorId={id!} creatorName={c.name} currentStatus={c.status} />
       )}
 
+      {(c.status === "leaving" || c.status === "terminated") && !isAgent && (
+        <OffboardingSection
+          creatorId={id!}
+          creatorName={c.name}
+          artisticName={c.artistic_name}
+          instagramHandle={c.instagram_handle}
+        />
+      )}
+
       <div className="px-6 mt-4 pb-6">
         <Tabs defaultValue="operaciones">
           <TabsList className="w-full justify-start overflow-x-auto">
