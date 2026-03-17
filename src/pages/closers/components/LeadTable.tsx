@@ -159,11 +159,11 @@ const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | n
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setCustomMode(false); setCustomText(""); } }}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setCustomMode(false); setCustomText(""); } }} modal={true}>
       <PopoverTrigger asChild>
-        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 max-w-[160px] truncate" title={value || "—"}>
+        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 max-w-[160px] truncate bg-transparent border-0" title={value || "—"}>
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-        </span>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-52 p-2 space-y-1" align="start" side="bottom">
         {!customMode ? (
