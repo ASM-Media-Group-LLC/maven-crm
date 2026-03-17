@@ -9,6 +9,7 @@ interface CallTopBarProps {
   isEncrypted?: boolean;
   onOpenAdjustView: () => void;
   shareLink: string;
+  hideShareLink?: boolean;
 }
 
 export default function CallTopBar({
