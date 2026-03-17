@@ -197,6 +197,7 @@ const ClosersContent = () => {
             {TABS.map((tab) => (
               <TabsContent key={tab.value} value={tab.value} className="mt-0">
                 <CloserTable
+                  sourceAccounts={sourceAccounts}
                   creators={creators}
                   activeTab={activeTab}
                   viewMode={viewMode}
