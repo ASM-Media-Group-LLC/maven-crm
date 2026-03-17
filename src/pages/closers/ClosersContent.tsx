@@ -201,10 +201,16 @@ const ClosersContent = () => {
                   creators={creators}
                   activeTab={activeTab}
                   viewMode={viewMode}
-                  onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
+                  onStageChange={(id, stage, source) => {
+                    if (source === "leadgen") {
+                      convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
+                    } else {
+                      updateStage.mutate({ id, stage });
+                    }
+                  }}
                   onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
-                  onAssign={(id, assignee) => {
-                    setAssignTarget({ id, assignee });
+                  onAssign={(id, assignee, source) => {
+                    setAssignTarget({ id, assignee, source: source || "closer" });
                     setAssignDialogOpen(true);
                   }}
                   isAdmin={isAdmin}
