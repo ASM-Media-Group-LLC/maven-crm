@@ -346,22 +346,56 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 control={form.control}
                 name="company"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Compañía / Cuenta de Origen *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Selecciona la compañía" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="kash-agency">KASH Agency</SelectItem>
-                        <SelectItem value="alvaroletshoot">alvaroletshoot</SelectItem>
-                        <SelectItem value="blue-app">Blue app</SelectItem>
-                        <SelectItem value="piclink">Piclink.me</SelectItem>
-                        <SelectItem value="pagomundo">Pagomundo</SelectItem>
-                        <SelectItem value="exchange">Exchange</SelectItem>
-                        <SelectItem value="unlok">Unlok</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {isAddingCompany ? (
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input
+                            placeholder="Nombre de la nueva compañía"
+                            value={customCompany}
+                            onChange={(e) => setCustomCompany(e.target.value)}
+                            autoFocus
+                          />
+                        </FormControl>
+                        <Button type="button" size="sm" onClick={() => { if (customCompany.trim()) { field.onChange(customCompany.trim()); setIsAddingCompany(false); setCustomCompany(""); } }}>OK</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => { setIsAddingCompany(false); setCustomCompany(""); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}>
+                              {field.value || "Selecciona la compañía"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Buscar compañía..." />
+                            <CommandList>
+                              <CommandEmpty>No se encontró la compañía.</CommandEmpty>
+                              <CommandGroup className="max-h-60 overflow-y-auto">
+                                {LEADGEN_COMPANIES.map((company) => (
+                                  <CommandItem key={company} value={company} onSelect={() => field.onChange(company)}>
+                                    <Check className={cn("mr-2 h-4 w-4", field.value === company ? "opacity-100" : "opacity-0")} />
+                                    {company}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                              <CommandGroup>
+                                <CommandItem onSelect={() => setIsAddingCompany(true)} className="text-primary">
+                                  + Agregar nueva compañía
+                                </CommandItem>
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
