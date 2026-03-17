@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCountdown } from "./useCountdown";
 import { useAuth } from "@/hooks/useAuth";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import { useToast } from "@/hooks/use-toast";
 import SubtasksPanel from "./SubtasksPanel";
 import InlineAssigneeSelect from "./InlineAssigneeSelect";
