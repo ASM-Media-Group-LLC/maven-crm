@@ -1560,6 +1560,7 @@ export type Database = {
           description: string | null
           ended_at: string | null
           host_hub_livekit_room: string
+          host_invite_code: string
           id: string
           name: string
           status: string
@@ -1571,6 +1572,7 @@ export type Database = {
           description?: string | null
           ended_at?: string | null
           host_hub_livekit_room: string
+          host_invite_code?: string
           id?: string
           name: string
           status?: string
@@ -1582,6 +1584,7 @@ export type Database = {
           description?: string | null
           ended_at?: string | null
           host_hub_livekit_room?: string
+          host_invite_code?: string
           id?: string
           name?: string
           status?: string

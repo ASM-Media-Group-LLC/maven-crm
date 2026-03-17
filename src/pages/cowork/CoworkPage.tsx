@@ -91,8 +91,8 @@ export default function CoworkPage() {
       <CoworkLobby
         sessionId={sessionId}
         session={cowork.session}
-        onJoin={async (role) => {
-          await cowork.joinSession(sessionId, role);
+        onJoin={async (role, hostCode) => {
+          await cowork.joinSession(sessionId, role, hostCode);
           cowork.refetch();
         }}
       />

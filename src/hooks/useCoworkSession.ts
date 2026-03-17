@@ -162,9 +162,14 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("createSession", { name, roomNames, description });
   }, []);
 
-  const joinSession = useCallback(async (sid: string, role?: string) => {
-    return invokeCowork("joinSession", { sessionId: sid, role });
+  const joinSession = useCallback(async (sid: string, role?: string, hostCode?: string) => {
+    return invokeCowork("joinSession", { sessionId: sid, role, hostCode });
   }, []);
+
+  const getHostCode = useCallback(async () => {
+    if (!sessionId) throw new Error("No session");
+    return invokeCowork("getHostCode", { sessionId });
+  }, [sessionId]);
 
   const assignToRoom = useCallback(async (targetUserId: string, roomId: string) => {
     return invokeCowork("assignToRoom", { sessionId, targetUserId, roomId });
@@ -207,6 +212,6 @@ export function useCoworkSession(sessionId: string | null) {
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, endSession, refetch: fetchData,
+    requestScreenShare, approveScreenShare, endSession, getHostCode, refetch: fetchData,
   };
 }

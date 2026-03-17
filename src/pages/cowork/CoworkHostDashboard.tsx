@@ -26,6 +26,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
   const [hubConnected, setHubConnected] = useState(false);
   const [moveTarget, setMoveTarget] = useState<Record<string, string>>({});
+  const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -36,6 +37,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       setProfileLoaded(true);
     });
   }, []);
+
+  // Fetch host invite code for sharing
+  useEffect(() => {
+    if (cowork.session?.id) {
+      cowork.getHostCode().then((res: any) => setHostInviteCode(res.hostCode)).catch(() => {});
+    }
+  }, [cowork.session?.id]);
 
   // Auto-connect to Hub only after profile is loaded
   useEffect(() => {
@@ -81,7 +89,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 className="h-7 w-7 text-amber-400 hover:text-amber-300"
                 title="Copiar enlace de host"
                 onClick={() => {
-                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host`;
+                  const code = hostInviteCode || "";
+                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host&code=${code}`;
                   navigator.clipboard.writeText(url);
                   toast.success("Enlace de host copiado");
                 }}

@@ -124,7 +124,7 @@ serve(async (req) => {
     // JOIN SESSION (as participant or host)
     // ═══════════════════════════════════════════════════════════════
     if (action === "joinSession") {
-      const { sessionId, role } = body;
+      const { sessionId, role, hostCode } = body;
       if (!sessionId) return err("sessionId required");
 
       // Check session exists and is active
@@ -135,7 +135,15 @@ serve(async (req) => {
       const { data: existing } = await admin.from("cowork_memberships").select("id, role").eq("session_id", sessionId).eq("user_id", userId).single();
       if (existing) return json({ membership: existing, alreadyJoined: true });
 
-      const memberRole = role === "host" ? "host" : "participant";
+      // Enforce host invite code for host joins
+      let memberRole = "participant";
+      if (role === "host") {
+        if (!hostCode || hostCode !== session.host_invite_code) {
+          return err("Código de host inválido", 403);
+        }
+        memberRole = "host";
+      }
+
       const { data: membership, error: memErr } = await admin.from("cowork_memberships").insert({
         session_id: sessionId, user_id: userId, role: memberRole,
       }).select().single();
@@ -354,6 +362,22 @@ serve(async (req) => {
 
       await admin.from("cowork_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", sessionId);
       return json({ success: true });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GET HOST CODE (only for existing hosts)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "getHostCode") {
+      const { sessionId } = body;
+      if (!sessionId) return err("sessionId required");
+
+      const { data: hostCheck } = await admin.from("cowork_memberships").select("role").eq("session_id", sessionId).eq("user_id", userId).single();
+      if (hostCheck?.role !== "host") return err("Only hosts can get the invite code", 403);
+
+      const { data: session } = await admin.from("cowork_sessions").select("host_invite_code").eq("id", sessionId).single();
+      if (!session) return err("Session not found");
+
+      return json({ hostCode: session.host_invite_code });
     }
 
     return err("Unknown action: " + action);
