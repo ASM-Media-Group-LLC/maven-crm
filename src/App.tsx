@@ -32,6 +32,8 @@ import Dashboard from "./pages/Dashboard";
 import Creadores from "./pages/Creadores";
 import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
 import OnboardingWizardPage from "./pages/creadores/onboarding/OnboardingWizardPage";
+import OffboardingListPage from "./pages/creadores/offboarding/OffboardingListPage";
+import OffboardingDetailPage from "./pages/creadores/offboarding/OffboardingDetailPage";
 import CreadorasDashboardPage from "./pages/creadores/CreadorasDashboardPage";
 import NuevoCreador from "./pages/NuevoCreador";
 import CreadorProfile from "./pages/CreadorProfile";
