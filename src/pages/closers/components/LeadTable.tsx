@@ -22,9 +22,9 @@ interface Props {
   creators: CloserCreatorRow[];
   activeTab: string;
   viewMode: "list" | "grid";
-  onStageChange: (id: string, stage: string) => void;
+  onStageChange: (id: string, stage: string, source?: "closer" | "leadgen") => void;
   onFieldChange: (id: string, field: string, value: any) => void;
-  onAssign: (id: string, currentAssignee: string | null) => void;
+  onAssign: (id: string, currentAssignee: string | null, source?: "closer" | "leadgen") => void;
   isAdmin: boolean;
   sourceAccounts: string[];
 }
