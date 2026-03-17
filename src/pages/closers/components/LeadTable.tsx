@@ -119,11 +119,11 @@ InlineText.displayName = "InlineText";
 const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1">
+        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 bg-transparent border-0">
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </span>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
         <div className="flex flex-wrap gap-1.5">
@@ -159,11 +159,11 @@ const InlineSourceSelect = memo(({ value, onSave, options }: { value: string | n
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setCustomMode(false); setCustomText(""); } }}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setCustomMode(false); setCustomText(""); } }} modal={true}>
       <PopoverTrigger asChild>
-        <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 max-w-[160px] truncate" title={value || "—"}>
+        <button className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm inline-flex items-center gap-1 max-w-[160px] truncate bg-transparent border-0" title={value || "—"}>
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-        </span>
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-52 p-2 space-y-1" align="start" side="bottom">
         {!customMode ? (
@@ -207,22 +207,32 @@ InlineSourceSelect.displayName = "InlineSourceSelect";
 
 // ─── InlineStageSelect ───
 const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; onSave: (v: string) => void; disabled?: boolean }) => {
+  const [open, setOpen] = useState(false);
   if (disabled) {
     return <Badge className={stageColor(value)}>{value}</Badge>;
   }
+  const stages = [...CLOSER_STAGES, "Pendiente LG" as const];
   return (
-    <Select value={value} onValueChange={onSave}>
-      <SelectTrigger className={`h-7 w-36 text-xs border-0 ${stageColor(value)}`}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent position="popper" side="bottom">
-        {[...CLOSER_STAGES, "Pendiente LG" as const].map((s) => (
-          <SelectItem key={s} value={s}>
-            <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${stageColor(s)}`}>{s}</span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
+      <PopoverTrigger asChild>
+        <button className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium cursor-pointer border-0 ${stageColor(value)}`}>
+          {value} <ChevronDown className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-2" align="start" side="bottom">
+        <div className="flex flex-col gap-1">
+          {stages.filter((s) => s !== "Asignada").map((s) => (
+            <button
+              key={s}
+              className={`text-left rounded px-2 py-1 text-xs cursor-pointer hover:bg-muted ${s === value ? "ring-1 ring-primary" : ""} ${stageColor(s)}`}
+              onClick={() => { onSave(s); setOpen(false); }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 });
 InlineStageSelect.displayName = "InlineStageSelect";
