@@ -40,6 +40,7 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prev.large === next.large &&
     prev.className === next.className &&
     prev.preferredAudioOutputDeviceId === next.preferredAudioOutputDeviceId &&
+    prev.pinnedSid === next.pinnedSid &&
     prevP.sid === nextP.sid &&
     prevP.identity === nextP.identity &&
     prevP.name === nextP.name &&
