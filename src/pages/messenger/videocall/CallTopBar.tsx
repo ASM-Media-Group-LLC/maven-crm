@@ -63,9 +63,10 @@ export default function CallTopBar({
         <button
           onClick={onOpenAdjustView}
           title="Ajustar vista"
-          className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_70%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
+          className="flex items-center gap-1.5 h-8 px-3 rounded-full text-xs text-[hsl(220_3%_80%)] hover:bg-[hsl(220_3%_22%)] transition-colors"
         >
-          <SlidersHorizontal className="h-4 w-4" />
+          <LayoutGrid className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">Ajustar vista</span>
         </button>
       </div>
     </div>
