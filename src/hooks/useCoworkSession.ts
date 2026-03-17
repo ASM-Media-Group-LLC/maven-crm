@@ -76,46 +76,41 @@ export function useCoworkSession(sessionId: string | null) {
   const [myAssignment, setMyAssignment] = useState<CoworkAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const initialLoadDone = useRef(false);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
   const isHost = myMembership?.role === "host";
 
-  // Fetch all data
-  const fetchData = useCallback(async () => {
+  // Fetch all data (silent = true skips loading state for realtime refetches)
+  const fetchData = useCallback(async (silent = false) => {
     if (!sessionId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch session
       const { data: sess } = await supabase.from("cowork_sessions").select("*").eq("id", sessionId).single();
       setSession(sess);
 
-      // Fetch rooms
       const { data: rms } = await supabase.from("cowork_rooms").select("*").eq("session_id", sessionId).order("sort_order");
       setRooms((rms as CoworkRoom[]) || []);
 
-      // Fetch memberships
       const { data: mems } = await supabase.from("cowork_memberships").select("*").eq("session_id", sessionId);
       setMemberships((mems as CoworkMembership[]) || []);
       const mine = (mems as CoworkMembership[])?.find(m => m.user_id === user.id);
       setMyMembership(mine || null);
 
-      // Fetch assignments
       const { data: assigns } = await supabase.from("cowork_room_assignments").select("*").eq("session_id", sessionId).eq("is_active", true);
       setAssignments((assigns as CoworkAssignment[]) || []);
       const myAss = (assigns as CoworkAssignment[])?.find(a => a.user_id === user.id && a.is_active);
       setMyAssignment(myAss || null);
 
-      // Fetch requests (host sees all, participant sees own via RLS)
       const { data: hReqs } = await supabase.from("cowork_host_requests").select("*").eq("session_id", sessionId).neq("status", "resolved").order("created_at", { ascending: false });
       setHostRequests((hReqs as HostRequest[]) || []);
 
       const { data: ssReqs } = await supabase.from("cowork_screenshare_requests").select("*").eq("session_id", sessionId).in("status", ["pending"]).order("created_at", { ascending: false });
       setScreenShareRequests((ssReqs as ScreenShareRequest[]) || []);
 
-      // Fetch profiles for all members
       const userIds = (mems as CoworkMembership[])?.map(m => m.user_id) || [];
       if (userIds.length) {
         const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
@@ -124,7 +119,8 @@ export function useCoworkSession(sessionId: string | null) {
         setProfiles(map);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      initialLoadDone.current = true;
     }
   }, [sessionId]);
 
@@ -133,23 +129,33 @@ export function useCoworkSession(sessionId: string | null) {
     if (!sessionId) return;
     fetchData();
 
+    const realtimeRefetch = () => fetchData(true);
+
+    const sessionCh = supabase.channel(`cowork-session-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_sessions", filter: `id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+
+    const roomsCh = supabase.channel(`cowork-rooms-${sessionId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_rooms", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
+      .subscribe();
+
     const assignCh = supabase.channel(`cowork-assignments-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_room_assignments", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_room_assignments", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const reqCh = supabase.channel(`cowork-host-reqs-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_host_requests", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const ssCh = supabase.channel(`cowork-ss-reqs-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_screenshare_requests", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_screenshare_requests", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
     const memCh = supabase.channel(`cowork-members-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_memberships", filter: `session_id=eq.${sessionId}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "cowork_memberships", filter: `session_id=eq.${sessionId}` }, realtimeRefetch)
       .subscribe();
 
-    channelsRef.current = [assignCh, reqCh, ssCh, memCh];
+    channelsRef.current = [sessionCh, roomsCh, assignCh, reqCh, ssCh, memCh];
 
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
