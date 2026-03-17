@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { statusLabel, statusVariant, projectTypeColor, type EventRow } from "./useEventos";
+import { getPublicBaseUrl } from "@/lib/getPublicUrl";
 import ViewEventoModal from "./ViewEventoModal";
 import CloseEventoModal from "./CloseEventoModal";
 import DeleteEventoDialog from "./DeleteEventoDialog";
