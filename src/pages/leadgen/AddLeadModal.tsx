@@ -107,6 +107,8 @@ const MAX_FILES = 4;
 const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [isAddingCompany, setIsAddingCompany] = useState(false);
+  const [customCompany, setCustomCompany] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
