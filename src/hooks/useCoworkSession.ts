@@ -76,6 +76,7 @@ export function useCoworkSession(sessionId: string | null) {
   const [myAssignment, setMyAssignment] = useState<CoworkAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const initialLoadDone = useRef(false);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
   const isHost = myMembership?.role === "host";
