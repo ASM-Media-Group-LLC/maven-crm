@@ -8,7 +8,7 @@ import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
