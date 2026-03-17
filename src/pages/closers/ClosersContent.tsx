@@ -1,8 +1,9 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
-import { useCloserLeads } from "./hooks/useCloserLeads";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, X, ChevronLeft, ChevronRight, UserPlus, LayoutGrid, List } from "lucide-react";
+import { useCloserLeads, PLATFORMS } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
@@ -22,12 +23,16 @@ const ClosersContent = () => {
     totalCount, totalPages, page, setPage,
     search, setSearch,
     activeTab, setActiveTab,
+    agentFilter, setAgentFilter,
+    platformFilter, setPlatformFilter,
+    agentList,
     updateField, updateStage, assignCreator,
     isAdmin, isManager,
   } = useCloserLeads();
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null } | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -84,11 +89,61 @@ const ClosersContent = () => {
                   className="pl-9"
                 />
               </div>
-              {search && (
-                <Button variant="ghost" size="sm" onClick={() => setSearch("")}>
+
+              <Select
+                value={agentFilter || ""}
+                onValueChange={(v) => setAgentFilter(v === "all" ? null : v)}
+              >
+                <SelectTrigger className="w-44 h-10">
+                  <SelectValue placeholder="Agente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {agentList.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={platformFilter || ""}
+                onValueChange={(v) => setPlatformFilter(v === "all" ? null : v)}
+              >
+                <SelectTrigger className="w-40 h-10">
+                  <SelectValue placeholder="Plataforma" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {PLATFORMS.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(search || agentFilter || platformFilter) && (
+                <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setAgentFilter(null); setPlatformFilter(null); }}>
                   <X className="h-4 w-4 mr-1" /> Limpiar
                 </Button>
               )}
+
+              <div className="ml-auto flex items-center gap-1 border border-border rounded-md p-0.5">
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("list")}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -98,6 +153,7 @@ const ClosersContent = () => {
                 <CloserTable
                   creators={creators}
                   activeTab={activeTab}
+                  viewMode={viewMode}
                   onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
                   onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
                   onAssign={(id, assignee) => {
