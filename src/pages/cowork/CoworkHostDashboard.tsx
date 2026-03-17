@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users2, Crown, Hand, Monitor, LogIn, ArrowRightLeft,
-  Check, X, Loader2, Radio, Copy, Power,
+  Check, X, Loader2, Radio, Power,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -78,14 +78,28 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-white/60 hover:text-white"
+                className="h-7 w-7 text-amber-400 hover:text-amber-300"
+                title="Copiar enlace de host"
                 onClick={() => {
                   const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&role=host`;
                   navigator.clipboard.writeText(url);
-                  toast.success("Enlace copiado");
+                  toast.success("Enlace de host copiado");
                 }}
               >
-                <Copy className="h-3.5 w-3.5" />
+                <Crown className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-blue-400 hover:text-blue-300"
+                title="Copiar enlace de participante"
+                onClick={() => {
+                  const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("Enlace de participante copiado");
+                }}
+              >
+                <Users2 className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
