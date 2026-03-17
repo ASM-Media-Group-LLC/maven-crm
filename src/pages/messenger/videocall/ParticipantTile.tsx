@@ -210,7 +210,7 @@ const ParticipantTile = memo(function ParticipantTile({
       }, 200 * retryAttempts + 150);
     };
 
-    if (needsRetry && !participant.isCameraOff) scheduleAttachRetry();
+    if (needsRetry && (!participant.isCameraOff || participant.isScreenSharing)) scheduleAttachRetry();
 
     return () => { if (retryTimer) clearTimeout(retryTimer); };
   }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing]);
