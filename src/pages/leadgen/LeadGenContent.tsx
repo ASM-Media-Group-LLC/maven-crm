@@ -329,7 +329,11 @@ const LeadGenContent = () => {
         {/* Tab content */}
         <div className="p-6">
           {/* === LEADS TAB === */}
-          {(activeTab === "leads" || activeTab === "leads-hora") && (
+          {activeTab === "leads-hora" && (
+            <AgentHourlyPerformance leads={enrichedLeads} />
+          )}
+
+          {activeTab === "leads" && (
             <>
               {leadsLoading ? (
                 <div className="flex items-center justify-center py-16">
