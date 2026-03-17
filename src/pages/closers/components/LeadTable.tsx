@@ -125,7 +125,7 @@ const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; on
           {value || "—"} <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </span>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-2" align="start">
+      <PopoverContent className="w-auto p-2" align="start" side="bottom">
         <div className="flex flex-wrap gap-1.5">
           {CATEGORY_OPTIONS.map((cat) => (
             <Badge
