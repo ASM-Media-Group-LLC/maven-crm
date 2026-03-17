@@ -36,7 +36,7 @@ function copySharelink(e: EventRow, toast: ReturnType<typeof useToast>["toast"])
     toast({ title: "No hay sharelink disponible", variant: "destructive" });
     return;
   }
-  const link = `${window.location.origin}/eventos/share/${e.external_token}`;
+  const link = `${getPublicBaseUrl()}/eventos/share/${e.external_token}`;
   navigator.clipboard.writeText(link);
   toast({ title: "Sharelink copiado al portapapeles" });
 }
