@@ -30,12 +30,12 @@ const ClosersContent = () => {
     dateFrom, setDateFrom,
     dateTo, setDateTo,
     dateField, setDateField,
-    updateField, updateStage, assignCreator,
+    updateField, updateStage, assignCreator, convertLeadgenEntry,
     isAdmin, isManager,
   } = useCloserLeads();
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null } | null>(null);
+  const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
@@ -66,7 +66,7 @@ const ClosersContent = () => {
             <p className="text-sm text-muted-foreground">Pipeline de cierre de modelos</p>
           </div>
           {isAdmin && (
-            <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null }); setAssignDialogOpen(true); }}>
+            <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
               <UserPlus className="h-4 w-4 mr-1" /> Asignar
             </Button>
           )}
@@ -201,10 +201,16 @@ const ClosersContent = () => {
                   creators={creators}
                   activeTab={activeTab}
                   viewMode={viewMode}
-                  onStageChange={(id, stage) => updateStage.mutate({ id, stage })}
+                  onStageChange={(id, stage, source) => {
+                    if (source === "leadgen") {
+                      convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
+                    } else {
+                      updateStage.mutate({ id, stage });
+                    }
+                  }}
                   onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
-                  onAssign={(id, assignee) => {
-                    setAssignTarget({ id, assignee });
+                  onAssign={(id, assignee, source) => {
+                    setAssignTarget({ id, assignee, source: source || "closer" });
                     setAssignDialogOpen(true);
                   }}
                   isAdmin={isAdmin}
@@ -237,7 +243,11 @@ const ClosersContent = () => {
         open={assignDialogOpen}
         onOpenChange={setAssignDialogOpen}
         onAssign={(id, assignedTo) => {
-          assignCreator.mutate({ id, assigned_to: assignedTo });
+          if (assignTarget?.source === "leadgen") {
+            convertLeadgenEntry.mutate({ leadgenEntryId: id, stage: "Asignada", assigned_to: assignedTo });
+          } else {
+            assignCreator.mutate({ id, assigned_to: assignedTo });
+          }
           setAssignDialogOpen(false);
         }}
       />

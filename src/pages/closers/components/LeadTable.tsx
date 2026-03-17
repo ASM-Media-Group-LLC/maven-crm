@@ -22,9 +22,9 @@ interface Props {
   creators: CloserCreatorRow[];
   activeTab: string;
   viewMode: "list" | "grid";
-  onStageChange: (id: string, stage: string) => void;
+  onStageChange: (id: string, stage: string, source?: "closer" | "leadgen") => void;
   onFieldChange: (id: string, field: string, value: any) => void;
-  onAssign: (id: string, currentAssignee: string | null) => void;
+  onAssign: (id: string, currentAssignee: string | null, source?: "closer" | "leadgen") => void;
   isAdmin: boolean;
   sourceAccounts: string[];
 }
@@ -221,7 +221,7 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
   if (disabled) {
     return <Badge className={stageColor(value)}>{value}</Badge>;
   }
-  const stages = [...CLOSER_STAGES, "Pendiente LG" as const];
+  const stages = [...CLOSER_STAGES];
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
@@ -713,7 +713,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
-              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} disabled={!isCloser} />
+              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={false} />
             </TableCell>
             <TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
@@ -744,15 +744,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {isCloser && CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
-                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s)}>
+                    {CLOSER_STAGES.filter((s) => s !== c.stage && s !== "Asignada").map((s) => (
+                      <DropdownMenuItem key={s} onClick={() => onStageChange(c.id, s, c._source)}>
                         Mover a {s}
                       </DropdownMenuItem>
                     ))}
                     {isAdmin && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                        <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to, c._source)}>
                           <UserPlus className="h-4 w-4 mr-2" /> Asignar
                         </DropdownMenuItem>
                       </>

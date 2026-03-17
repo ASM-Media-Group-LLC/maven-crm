@@ -366,6 +366,45 @@ export const useCloserLeads = () => {
     },
   });
 
+  // Convert a leadgen entry into a closer_creators row
+  const convertLeadgenEntry = useMutation({
+    mutationFn: async ({ leadgenEntryId, stage, assigned_to }: { leadgenEntryId: string; stage?: string; assigned_to?: string }) => {
+      // Fetch the leadgen entry data
+      const { data: lg, error: lgErr } = await supabase
+        .from("leadgen_entries")
+        .select("model_handle, quality, company, phone_e164, notes, source_link, platform, entry_date")
+        .eq("id", leadgenEntryId)
+        .single();
+      if (lgErr || !lg) throw lgErr || new Error("Leadgen entry not found");
+
+      const insertData: Record<string, unknown> = {
+        instagram_handle: lg.model_handle || "—",
+        category: lg.quality || null,
+        source_account: lg.company || null,
+        phone: lg.phone_e164 || null,
+        notes: lg.notes || null,
+        onlyfans_url: lg.source_link || null,
+        main_platform: lg.platform || null,
+        passed_date: lg.entry_date || new Date().toISOString().split("T")[0],
+        leadgen_entry_id: leadgenEntryId,
+        stage: stage || "Asignada",
+        created_by: user?.id || null,
+      };
+      if (assigned_to) insertData.assigned_to = assigned_to;
+
+      const { error } = await supabase.from("closer_creators").insert(insertData as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
+      toast({ title: "Lead convertido a Closers" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error al convertir", description: e.message, variant: "destructive" });
+    },
+  });
+
   return {
     creators: filtered,
     isLoading,
@@ -385,6 +424,7 @@ export const useCloserLeads = () => {
     updateField,
     updateStage,
     assignCreator,
+    convertLeadgenEntry,
     isAdmin,
     isManager,
   };
