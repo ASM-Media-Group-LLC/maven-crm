@@ -40,6 +40,23 @@ const ClosersContent = () => {
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
 
+  const TABS = useMemo(() =>
+    (isAdmin || isManager) ? ALL_TABS : ALL_TABS.filter(t => t.value !== "todas"),
+    [isAdmin, isManager]
+  );
+
+  const sourceAccounts = useMemo(() =>
+    [...new Set(creators.map(c => c.source_account).filter(Boolean))] as string[],
+    [creators]
+  );
+
+  // Redirect to "todas" when admin/manager role resolves
+  useEffect(() => {
+    if ((isAdmin || isManager) && activeTab === "asignadas") {
+      setActiveTab("todas");
+    }
+  }, [isAdmin, isManager]);
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
