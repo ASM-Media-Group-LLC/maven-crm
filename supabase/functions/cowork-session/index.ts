@@ -362,6 +362,33 @@ serve(async (req) => {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // CLAIM SCREEN SHARE TOKEN (participant claims after approval)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "claimScreenShareToken") {
+      const { requestId } = body;
+      if (!requestId) return err("requestId required");
+
+      const { data: ssReq } = await admin.from("cowork_screenshare_requests").select("*").eq("id", requestId).single();
+      if (!ssReq) return err("Request not found");
+      if (ssReq.user_id !== userId) return err("Not your request", 403);
+      if (ssReq.status !== "approved") return err("Request is not approved");
+
+      // Mark as claimed to prevent reuse
+      await admin.from("cowork_screenshare_requests").update({ status: "claimed" }).eq("id", requestId);
+
+      // Issue token with full publish permissions (including screen share)
+      const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
+      if (!room) return err("Room not found");
+
+      const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+      const token = await createLKToken(lkKey, lkSecret, identity, userName, {
+        roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
+      }, 600); // 10 min token
+
+      return json({ token, url: lkUrl, room: room.livekit_room_name });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // END SESSION
     // ═══════════════════════════════════════════════════════════════
     if (action === "endSession") {

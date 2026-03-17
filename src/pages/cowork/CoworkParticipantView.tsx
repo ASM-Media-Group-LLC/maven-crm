@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Hand, Monitor, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -14,8 +14,9 @@ interface Props {
 export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [displayName, setDisplayName] = useState("User");
   const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
-  // We track the room's livekit_room_name to pass to LiveKitCallView
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
+  // Track whether we already claimed the current approved request
+  const claimedRequestRef = useRef<string | null>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -39,6 +40,29 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
   );
+
+  // Detect when screen share request is approved and auto-claim token
+  useEffect(() => {
+    const approvedReq = cowork.screenShareRequests.find(
+      r => r.user_id === userId && (r as any).status === "approved"
+    );
+    if (approvedReq && claimedRequestRef.current !== approvedReq.id) {
+      claimedRequestRef.current = approvedReq.id;
+      (async () => {
+        try {
+          const result = await cowork.claimScreenShareToken(approvedReq.id);
+          if (result?.token && result?.url && result?.room) {
+            toast.success("Pantalla compartida aprobada. Reconectando...");
+            // Force reconnect with new token that has screen share permissions
+            setConnectedLkRoom(null);
+            setTimeout(() => setConnectedLkRoom(result.room), 300);
+          }
+        } catch (e: any) {
+          toast.error(e.message || "Error al reclamar permisos de pantalla");
+        }
+      })();
+    }
+  }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
   if (!myAssignment) {
     return (
@@ -104,6 +128,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             isAdmin={false}
             onLeave={() => setConnectedLkRoom(null)}
             hideShareLink
+            hideScreenShare
           />
         ) : (
           <div className="flex items-center justify-center h-full">
