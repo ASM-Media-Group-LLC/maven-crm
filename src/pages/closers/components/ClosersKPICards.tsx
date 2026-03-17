@@ -1,4 +1,4 @@
-import { Users, CheckCircle, Trophy, XCircle, DollarSign, TrendingDown } from "lucide-react";
+import { Users, CheckCircle, Trophy, XCircle, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface Props {
@@ -18,7 +18,9 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
   const revTrafix = platformRevenue["Trafix"] || 0;
   const revBlu = platformRevenue["Blu"] || 0;
   const revPiclink = platformRevenue["Piclink"] || 0;
-  const revTotal = revOF + revTrafix + revBlu + revPiclink + (platformRevenue["Otra"] || 0);
+  const revLeakHunter = platformRevenue["LeakHunter"] || 0;
+  const revORA = platformRevenue["ORA"] || 0;
+  const revPlataformas = revLeakHunter + revBlu + revTrafix + revORA + revPiclink;
 
   const pipelineCards = [
     { label: "Total", count: total, icon: Users, colorClass: "text-muted-foreground", bgClass: "bg-muted" },
@@ -31,10 +33,13 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
 
   const revenueCards = [
     { label: "OnlyFans", amount: revOF },
-    { label: "Trafix", amount: revTrafix },
+    { label: "LeakHunter", amount: revLeakHunter },
     { label: "Blu", amount: revBlu },
+    { label: "Trafix", amount: revTrafix },
+    { label: "ORA", amount: revORA },
     { label: "Piclink", amount: revPiclink },
-    { label: "Revenue Total", amount: revTotal, highlight: true },
+    { label: "Rev. Plataformas", amount: revPlataformas, highlight: true },
+    { label: "Rev. OnlyFans", amount: revOF, highlight: true },
   ];
 
   return (
@@ -57,7 +62,7 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
       </div>
 
       {/* Revenue */}
-      <div className="grid grid-cols-3 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
         {revenueCards.map((card) => (
           <Card key={card.label} className={`transition-all duration-200 hover:scale-[1.02] ${card.highlight ? "border-primary/30" : ""}`}>
             <CardContent className="p-3">
