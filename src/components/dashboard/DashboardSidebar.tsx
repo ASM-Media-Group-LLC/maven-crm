@@ -46,7 +46,6 @@ const DashboardSidebar = () => {
 
   const creadoresSubItems = [
     { title: "Dashboard", url: "/creadores/dashboard" },
-    { title: "Casting", url: "/creadores/prospectos" },
     { title: "Onboarding", url: "/creadores/onboarding" },
     { title: "Listado", url: "/creadores" },
   ];
