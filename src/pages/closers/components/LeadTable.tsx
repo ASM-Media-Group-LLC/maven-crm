@@ -492,6 +492,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <Badge variant="outline">{c.contact_count}/6</Badge>
             </TableCell>
+            <TableCell className="text-sm">{c.lg_platform || "—"}</TableCell>
+            <TableCell className="text-sm">{c.lg_quality || "—"}</TableCell>
+            <TableCell className="text-sm">{c.lg_agent_name || "—"}</TableCell>
             <TableCell className="text-sm">
               {c.phone ? (
                 <a href={`https://wa.me/${cleanPhoneForWhatsApp(c.phone)}`} target="_blank" rel="noopener noreferrer"
