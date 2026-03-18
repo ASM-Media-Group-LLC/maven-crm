@@ -151,7 +151,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <h3 className="text-xs font-medium text-amber-400/80 uppercase tracking-wider">Sin asignar</h3>
                 {unassigned.map((m) => (
                   <div key={m.user_id} className="flex items-center justify-between text-xs">
-                    <span className="text-white/70">{cowork.profiles[m.user_id] || "User"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(m.user_id) ? "bg-green-400" : "bg-white/20"}`} />
+                      <span className="text-white/70">{cowork.profiles[m.user_id] || "User"}</span>
+                    </div>
                     <Select onValueChange={async (roomId) => {
                       try {
                         await cowork.assignToRoom(m.user_id, roomId);
