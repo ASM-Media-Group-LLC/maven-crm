@@ -37,6 +37,9 @@ interface CallControlsProps {
   onOpenVideoSettings: () => void;
   onOpenMetrics: () => void;
   hideScreenShare?: boolean;
+  compact?: boolean;
+  isNoiseCancellationOn?: boolean;
+  onToggleNoiseCancellation?: () => void;
 }
 
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
