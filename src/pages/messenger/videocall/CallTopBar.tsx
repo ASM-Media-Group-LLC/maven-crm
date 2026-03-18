@@ -10,10 +10,11 @@ interface CallTopBarProps {
   onOpenAdjustView: () => void;
   shareLink: string;
   hideShareLink?: boolean;
+  compact?: boolean;
 }
 
 export default function CallTopBar({
-  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink,
+  roomName, participantCount, isEncrypted, onOpenAdjustView, shareLink, hideShareLink, compact,
 }: CallTopBarProps) {
   const [elapsed, setElapsed] = useState(0);
 
