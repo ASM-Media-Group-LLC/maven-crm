@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
+import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
 
 type TokenResult = { token: string; url: string; room?: string } | null;
 
