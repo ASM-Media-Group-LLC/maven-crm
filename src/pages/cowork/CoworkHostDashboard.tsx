@@ -89,9 +89,30 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
 
   return (
-    <div className="flex h-screen bg-[#202124] text-white">
+    <div className="flex h-screen bg-[#202124] text-white relative">
+      {/* Mobile sidebar toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-3 left-3 z-50 md:hidden h-8 w-8 text-white/70 hover:text-white"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? <XIcon className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+      </Button>
+
+      {/* Overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Left sidebar - Dashboard */}
-      <div className="w-80 border-r border-white/10 flex flex-col">
+      <div className={`
+        fixed md:relative z-40 md:z-auto
+        w-72 md:w-80 h-full
+        border-r border-white/10 flex flex-col bg-[#202124]
+        transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
         <div className="p-4 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div>
