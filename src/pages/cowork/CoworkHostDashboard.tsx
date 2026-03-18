@@ -405,29 +405,62 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
         )}
 
-        {/* Host Hub mini view */}
-        {hubConnected && cowork.session?.host_hub_livekit_room && !activeRoomLk && (
-          <div className="border-t border-white/10 bg-[#1a1a1d] flex-1 min-h-0">
-            <div className="flex items-center gap-2 px-3 py-1 text-xs text-white/40">
-              <Crown className="h-3 w-3 text-amber-400" />
-              <span>Host Hub</span>
+      {/* Floating Host Hub pop-up */}
+      {hubConnected && cowork.session?.host_hub_livekit_room && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
+          {hubMinimized ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5 shadow-lg border border-white/10 bg-[#2a2a2d] hover:bg-[#35353a] text-amber-400"
+              onClick={() => setHubMinimized(false)}
+            >
+              <Crown className="h-3.5 w-3.5" />
+              Hub
+            </Button>
+          ) : (
+            <div className="w-80 md:w-96 rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col" style={{ height: "280px" }}>
+              <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
+                  <Crown className="h-3 w-3" />
+                  Host Hub
+                </div>
+                <div className="flex gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-white/50 hover:text-white"
+                    onClick={() => setHubMinimized(true)}
+                  >
+                    <span className="text-xs leading-none">−</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-red-400 hover:text-red-300"
+                    onClick={() => setHubConnected(false)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0">
+                <LiveKitCallView
+                  roomName={cowork.session.host_hub_livekit_room}
+                  displayName={displayName}
+                  callDisplayName="Host Hub"
+                  isAdmin={true}
+                  onLeave={() => setHubConnected(false)}
+                  hideShareLink
+                  initialMicOn={false}
+                  initialCamOn={false}
+                  getToken={getHubToken}
+                />
+              </div>
             </div>
-            <div className="h-[calc(100%-24px)]">
-              <LiveKitCallView
-                roomName={cowork.session.host_hub_livekit_room}
-                displayName={displayName}
-                callDisplayName="Host Hub"
-                isAdmin={true}
-                onLeave={() => setHubConnected(false)}
-                hideShareLink
-                initialMicOn={false}
-                initialCamOn={false}
-                getToken={getHubToken}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
