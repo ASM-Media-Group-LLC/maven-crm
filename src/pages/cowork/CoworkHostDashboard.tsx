@@ -64,6 +64,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomName(room.name);
   }, [cowork.rooms]);
 
+  // Token providers for cowork-specific LiveKit tokens
+  const getHubToken = useCallback(async () => {
+    const result = await cowork.issueLiveKitToken("join_host_hub");
+    return { token: result.token, url: result.url };
+  }, [cowork.issueLiveKitToken]);
+
+  const getActiveRoomToken = useCallback(async () => {
+    const result = await cowork.issueLiveKitToken("join_room", activeRoomId!);
+    return { token: result.token, url: result.url };
+  }, [cowork.issueLiveKitToken, activeRoomId]);
+
   const leaveActiveRoom = useCallback(() => {
     setActiveRoomLk(null);
     setActiveRoomId(null);
