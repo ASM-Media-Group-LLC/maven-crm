@@ -117,7 +117,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
-    if (existingReq) {
+    if (existingReq && dismissedRequestRef.current !== existingReq.id) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
     }
