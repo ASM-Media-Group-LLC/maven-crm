@@ -258,6 +258,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
             getToken={getToken}
+            onMediaStateChange={handleMediaStateChange}
           />
         ) : manuallyLeft ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">

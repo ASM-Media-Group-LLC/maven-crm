@@ -6,13 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Crown, Hand, Monitor, LogIn, ArrowRightLeft,
+  Users2, Crown, Hand, Monitor, LogIn,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone,
+  Mic, MicOff, Video, VideoOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 
 interface Props {
