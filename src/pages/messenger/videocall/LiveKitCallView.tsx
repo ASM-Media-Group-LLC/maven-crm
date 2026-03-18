@@ -248,6 +248,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
         onOpenVideoSettings={() => setVideoSettingsOpen(true)}
         onOpenMetrics={() => setMetricsOpen(true)}
         hideScreenShare={hideScreenShare}
+        compact={compact}
       />
 
       <AdjustViewDialog open={adjustViewOpen} onClose={() => setAdjustViewOpen(false)} settings={viewSettings} onSettingsChange={handleViewSettingsChange} />

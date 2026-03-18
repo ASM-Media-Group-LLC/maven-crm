@@ -456,6 +456,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   initialMicOn={false}
                   initialCamOn={false}
                   getToken={getHubToken}
+                  compact
                 />
               </div>
             </div>
