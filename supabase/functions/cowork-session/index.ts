@@ -333,7 +333,16 @@ serve(async (req) => {
         .maybeSingle();
 
       if (existingReq) {
-        return json({ request: existingReq, oneone_livekit_room: existingReq.oneone_livekit_room });
+        // Allow upgrading a simple request to a 1:1 call
+        if (requestOneOnOne && !existingReq.oneone_livekit_room) {
+          // Resolve the old simple request
+          await admin.from("cowork_host_requests")
+            .update({ status: "resolved", resolved_at: new Date().toISOString(), resolved_by: userId })
+            .eq("id", existingReq.id);
+          // Fall through to create a new 1:1 request below
+        } else {
+          return json({ request: existingReq, oneone_livekit_room: existingReq.oneone_livekit_room });
+        }
       }
 
       const requestId = crypto.randomUUID();
