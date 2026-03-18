@@ -281,7 +281,7 @@ serve(async (req) => {
         // Participants: no screen share by default
         const canPublishSources = isHost ? undefined : ["camera", "microphone"];
 
-        const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+        const identity = userId;
         const grants: LKGrants = {
           roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: isHost,
         };
