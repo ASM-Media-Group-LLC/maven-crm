@@ -86,7 +86,7 @@ export default function CoworkPage() {
     );
   }
 
-  if (cowork.loading) {
+  if (cowork.loading || autoJoining) {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -94,14 +94,12 @@ export default function CoworkPage() {
     );
   }
 
-  // Not a member yet → lobby to join
-  const roomFromUrl = searchParams.get("room");
+  // Not a member yet → lobby fallback (only shown when auto-join not possible or failed)
   if (!cowork.myMembership) {
     return (
       <CoworkLobby
         sessionId={sessionId}
         session={cowork.session}
-        roomId={roomFromUrl}
         onJoin={async (role, hostCode, roomId) => {
           await cowork.joinSession(sessionId, role, hostCode, roomId);
           cowork.refetch();
