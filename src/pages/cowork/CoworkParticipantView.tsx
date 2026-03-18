@@ -130,23 +130,25 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           >
             <Hand className="h-4 w-4" /> Pedir host
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={!!mySSReq}
-            onClick={async () => {
-              try {
-                await cowork.requestScreenShare(myAssignment.room_id);
-                toast.info("Solicitud de pantalla enviada, esperando aprobación...");
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
-          >
-            <Monitor className="h-4 w-4" />
-            {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
-          </Button>
+          {!hasScreenShareAccess && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
+              disabled={!!mySSReq}
+              onClick={async () => {
+                try {
+                  await cowork.requestScreenShare(myAssignment.room_id);
+                  toast.info("Solicitud de pantalla enviada, esperando aprobación...");
+                } catch (e: any) {
+                  toast.error(e.message);
+                }
+              }}
+            >
+              <Monitor className="h-4 w-4" />
+              {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
+            </Button>
+          )}
         </div>
       </div>
 
