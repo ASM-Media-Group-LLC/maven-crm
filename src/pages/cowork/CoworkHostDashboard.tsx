@@ -357,6 +357,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 isAdmin={true}
                 onLeave={() => setHubConnected(false)}
                 hideShareLink
+                initialMicOn={false}
+                initialCamOn={false}
               />
             </div>
           </div>
