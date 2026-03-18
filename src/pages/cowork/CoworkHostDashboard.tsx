@@ -254,11 +254,41 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     {req.message && <p className="text-[10px] text-white/50">{req.message}</p>}
                     <div className="flex gap-1">
                       {req.status === "open" && (
-                        <Button size="sm" variant="ghost" className="h-5 text-[10px] text-amber-400" onClick={() => cowork.ackHostRequest(req.id)}>
+                        <Button size="sm" variant="ghost" className="h-5 text-[10px] text-amber-400" onClick={async () => {
+                          await cowork.ackHostRequest(req.id);
+                          if (req.oneone_livekit_room) {
+                            setOneOnOneRequestId(req.id);
+                            setOneOnOneRoom(req.oneone_livekit_room);
+                            // Switch main content to 1:1 room
+                            setActiveRoomLk(req.oneone_livekit_room);
+                            setActiveRoomId(null);
+                            setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
+                            setHubMinimized(true);
+                          }
+                        }}>
                           Atender
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" className="h-5 text-[10px] text-green-400" onClick={() => cowork.resolveHostRequest(req.id)}>
+                      {req.status === "acknowledged" && req.oneone_livekit_room && (
+                        <Button size="sm" variant="ghost" className="h-5 text-[10px] text-blue-400" onClick={() => {
+                          setOneOnOneRequestId(req.id);
+                          setOneOnOneRoom(req.oneone_livekit_room!);
+                          setActiveRoomLk(req.oneone_livekit_room!);
+                          setActiveRoomId(null);
+                          setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
+                          setHubMinimized(true);
+                        }}>
+                          Unirse 1:1
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-5 text-[10px] text-green-400" onClick={async () => {
+                        await cowork.resolveHostRequest(req.id);
+                        // If currently in this 1:1, leave
+                        if (oneOnOneRequestId === req.id) {
+                          leaveOneOnOne();
+                          leaveActiveRoom();
+                        }
+                      }}>
                         Resolver
                       </Button>
                     </div>
