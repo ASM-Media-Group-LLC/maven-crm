@@ -131,11 +131,7 @@ serve(async (req) => {
       const { data: session } = await admin.from("cowork_sessions").select("*").eq("id", sessionId).eq("status", "active").single();
       if (!session) return err("Session not found or ended");
 
-      // Check if already a member
-      const { data: existing } = await admin.from("cowork_memberships").select("id, role").eq("session_id", sessionId).eq("user_id", userId).single();
-      if (existing) return json({ membership: existing, alreadyJoined: true });
-
-      // Enforce host invite code for host joins
+      // Determine requested role
       let memberRole = "participant";
       if (role === "host") {
         if (!hostCode || hostCode !== session.host_invite_code) {
@@ -144,6 +140,41 @@ serve(async (req) => {
         memberRole = "host";
       }
 
+      // Check if already a member
+      const { data: existing } = await admin.from("cowork_memberships").select("id, role").eq("session_id", sessionId).eq("user_id", userId).single();
+
+      if (existing) {
+        // Same role → return as-is
+        if (existing.role === memberRole) {
+          return json({ membership: existing, alreadyJoined: true });
+        }
+
+        // Different role → update membership
+        const { data: updated, error: upErr } = await admin.from("cowork_memberships")
+          .update({ role: memberRole })
+          .eq("id", existing.id)
+          .select()
+          .single();
+        if (upErr) return err(upErr.message, 500);
+
+        if (memberRole === "host") {
+          // Switching to host: remove active room assignments (hosts use Hub)
+          await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
+        } else if (memberRole === "participant" && roomId) {
+          // Switching to participant: assign room
+          const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", roomId).eq("session_id", sessionId).single();
+          if (roomCheck) {
+            await admin.from("cowork_room_assignments").update({ is_active: false }).eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true);
+            await admin.from("cowork_room_assignments").insert({
+              session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+            });
+          }
+        }
+
+        return json({ membership: updated, alreadyJoined: true, roleChanged: true });
+      }
+
+      // New member
       const { data: membership, error: memErr } = await admin.from("cowork_memberships").insert({
         session_id: sessionId, user_id: userId, role: memberRole,
       }).select().single();
@@ -151,7 +182,6 @@ serve(async (req) => {
 
       // Auto-assign participant to room if roomId provided
       if (memberRole === "participant" && roomId) {
-        // Verify room belongs to this session
         const { data: roomCheck } = await admin.from("cowork_rooms").select("id").eq("id", roomId).eq("session_id", sessionId).single();
         if (roomCheck) {
           await admin.from("cowork_room_assignments").insert({

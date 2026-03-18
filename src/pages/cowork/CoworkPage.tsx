@@ -25,9 +25,9 @@ export default function CoworkPage() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  // Auto-join from invite URL params
+  // Auto-join from invite URL params (always attempt if URL has credentials, even if already a member)
   useEffect(() => {
-    if (!sessionId || cowork.loading || cowork.myMembership || autoJoining || autoJoinFailed) return;
+    if (!sessionId || cowork.loading || autoJoining || autoJoinFailed) return;
 
     const role = searchParams.get("role");
     const code = searchParams.get("code");
@@ -35,6 +35,13 @@ export default function CoworkPage() {
 
     const canAutoJoin = (role === "host" && code) || roomId;
     if (!canAutoJoin) return;
+
+    // If already a member with the correct role, skip
+    if (cowork.myMembership) {
+      const wantsHost = role === "host" && code;
+      const isHost = cowork.myMembership.role === "host";
+      if ((wantsHost && isHost) || (!wantsHost && !isHost)) return;
+    }
 
     setAutoJoining(true);
     const doJoin = async () => {
