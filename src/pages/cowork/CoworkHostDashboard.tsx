@@ -33,6 +33,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
+  const [hubMaximized, setHubMaximized] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
