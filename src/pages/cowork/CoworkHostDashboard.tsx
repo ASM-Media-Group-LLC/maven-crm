@@ -64,6 +64,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomLk(room.livekit_room_name);
     setActiveRoomId(roomId);
     setActiveRoomName(room.name);
+    setHubMinimized(true);
   }, [cowork.rooms]);
 
   // Token providers for cowork-specific LiveKit tokens
