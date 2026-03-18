@@ -43,6 +43,7 @@ interface LiveKitCallViewProps {
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
+  compact?: boolean;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
 }
