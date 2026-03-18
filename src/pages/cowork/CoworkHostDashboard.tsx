@@ -90,10 +90,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomName(null);
   }, []);
 
-  const leaveOneOnOne = useCallback(() => {
+  const leaveOneOnOne = useCallback(async () => {
+    if (oneOnOneRequestId) {
+      try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+    }
     setOneOnOneRoom(null);
     setOneOnOneRequestId(null);
-  }, []);
+  }, [oneOnOneRequestId, cowork.resolveHostRequest]);
 
   // Auto-close 1:1 when host request is resolved (mirrors participant logic)
   useEffect(() => {

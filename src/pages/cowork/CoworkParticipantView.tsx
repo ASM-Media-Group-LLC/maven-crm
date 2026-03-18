@@ -315,7 +315,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 displayName={displayName}
                 callDisplayName="1:1 con Host"
                 isAdmin={false}
-                onLeave={() => {
+                onLeave={async () => {
+                  if (oneOnOneRequestId) {
+                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+                  }
                   setOneOnOneRoom(null);
                   setOneOnOneRequestId(null);
                 }}
