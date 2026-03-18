@@ -22,6 +22,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const claimedRequestRef = useRef<string | null>(null);
   // Track previous room assignment to detect host-initiated moves
   const prevRoomIdRef = useRef<string | null>(null);
+  // Store claimed screen share token for reconnection
+  const screenShareTokenRef = useRef<TokenResult>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -37,9 +39,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // When assignment changes, update the connected room
   useEffect(() => {
-    // If host moved participant to a different room, reset manuallyLeft
+    // If host moved participant to a different room, reset manuallyLeft and clear screen share token
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
+      screenShareTokenRef.current = null;
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
@@ -65,7 +68,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           const result = await cowork.claimScreenShareToken(approvedReq.id);
           if (result?.token && result?.url && result?.room) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
-            // Force reconnect with new token that has screen share permissions
+            // Store the claimed token so the reconnection uses it
+            screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
+            // Force reconnect — the getToken callback will use the stored token
             setConnectedLkRoom(null);
             setTimeout(() => setConnectedLkRoom(result.room), 300);
           }
