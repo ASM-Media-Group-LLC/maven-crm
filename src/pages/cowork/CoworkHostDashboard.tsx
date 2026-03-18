@@ -33,7 +33,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
   const [hubConnected, setHubConnected] = useState(false);
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
-  const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
   const [hubMaximized, setHubMaximized] = useState(false);
