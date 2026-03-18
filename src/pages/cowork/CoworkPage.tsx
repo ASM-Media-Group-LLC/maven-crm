@@ -61,7 +61,7 @@ export default function CoworkPage() {
       }
     };
     doJoin();
-  }, [sessionId, cowork.loading, cowork.myMembership, autoJoining, autoJoinFailed, searchParams]);
+  }, [sessionId, cowork.loading, cowork.myMembership, cowork.myAssignment, autoJoining, autoJoinFailed, searchParams]);
 
   // No session selected → lobby
   if (!sessionId) {
