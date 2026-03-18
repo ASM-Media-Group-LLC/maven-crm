@@ -45,23 +45,24 @@ interface CallControlsProps {
 const REACTIONS = ["👍", "👏", "❤️", "🎉", "😂", "😮", "🤔", "👋"];
 
 function ControlBtn({
-  icon: Icon, active, onClick, label, badge, className: extraClass,
+  icon: Icon, active, onClick, label, badge, className: extraClass, compact,
 }: {
-  icon: any; active?: boolean; onClick: () => void; label: string; badge?: boolean; className?: string;
+  icon: any; active?: boolean; onClick: () => void; label: string; badge?: boolean; className?: string; compact?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={label}
       className={cn(
-        "relative h-11 w-11 rounded-full flex items-center justify-center transition-colors",
+        "relative rounded-full flex items-center justify-center transition-colors",
+        compact ? "h-8 w-8" : "h-11 w-11",
         active === false
           ? "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
           : "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]",
         extraClass,
       )}
     >
-      <Icon className="h-[18px] w-[18px]" />
+      <Icon className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
       {badge && (
         <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-[hsl(214_82%_51%)] border-2 border-[hsl(220_3%_14%)]" />
       )}
