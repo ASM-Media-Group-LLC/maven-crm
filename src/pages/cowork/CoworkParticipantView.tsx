@@ -15,8 +15,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [displayName, setDisplayName] = useState("User");
   const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
+  const [manuallyLeft, setManuallyLeft] = useState(false);
   // Track whether we already claimed the current approved request
   const claimedRequestRef = useRef<string | null>(null);
+  // Track previous room assignment to detect host-initiated moves
+  const prevRoomIdRef = useRef<string | null>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -32,10 +35,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // When assignment changes, update the connected room
   useEffect(() => {
+    // If host moved participant to a different room, reset manuallyLeft
+    if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
+      setManuallyLeft(false);
+    }
+    prevRoomIdRef.current = myAssignment?.room_id || null;
+
+    if (manuallyLeft) return; // Don't auto-connect if user intentionally left
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
-  }, [myRoom?.livekit_room_name]);
+  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
 
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
@@ -126,12 +136,32 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             displayName={displayName}
             callDisplayName={myRoom?.name}
             isAdmin={false}
-            onLeave={() => setConnectedLkRoom(null)}
+            onLeave={() => {
+              setConnectedLkRoom(null);
+              setManuallyLeft(true);
+            }}
             hideShareLink
             hideScreenShare
             initialMicOn={false}
             initialCamOn={false}
           />
+        ) : manuallyLeft ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <p className="text-white/60 text-sm">Has salido de la sala</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setManuallyLeft(false);
+                if (myRoom?.livekit_room_name) {
+                  setConnectedLkRoom(myRoom.livekit_room_name);
+                }
+              }}
+            >
+              Reconectar
+            </Button>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-white/60" />

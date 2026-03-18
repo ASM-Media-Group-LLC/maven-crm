@@ -126,6 +126,16 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Radio className={`h-3 w-3 ${hubConnected ? "text-green-400" : "text-white/30"}`} />
               <span>Host Hub</span>
               {hubConnected && <Badge variant="secondary" className="text-[9px]">Activo</Badge>}
+              {!hubConnected && cowork.session?.host_hub_livekit_room && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 text-[10px] text-amber-400 hover:text-amber-300 px-1.5"
+                  onClick={() => setHubConnected(true)}
+                >
+                  Reconectar
+                </Button>
+              )}
             </div>
           </div>
 
