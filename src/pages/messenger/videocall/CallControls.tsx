@@ -179,11 +179,11 @@ export default function CallControls({
   const iconSize = compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
 
   return (
-    <div className={cn("shrink-0 flex items-center bg-[hsl(220_3%_14%)]", compact ? "py-1.5 px-2 justify-center" : "py-3 px-4")}>
+    <div className={cn("shrink-0 flex items-center bg-[hsl(220_3%_14%)]", compact ? "py-1.5 px-2 justify-center flex-wrap" : "py-3 px-4")}>
       {!compact && <div className="flex-1" />}
 
       {/* Center controls */}
-      <div className={cn("flex items-center", compact ? "gap-1" : "gap-2")}>
+      <div className={cn("flex items-center flex-wrap justify-center", compact ? "gap-1" : "gap-2")}>
         {/* Mic — compact skips device popover */}
         {compact ? (
           <button
@@ -288,38 +288,38 @@ export default function CallControls({
           </div>
         )}
 
-        {!compact && !hideScreenShare && (
+        {!hideScreenShare && (
           <ControlBtn
             icon={isScreenSharing ? MonitorOff : Monitor}
             active={!isScreenSharing ? undefined : true}
             onClick={onToggleScreenShare}
             label="Compartir pantalla"
+            compact={compact}
           />
         )}
 
-        {/* Reactions — hidden in compact */}
-        {!compact && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button title="Reacciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
-                <Smile className="h-[18px] w-[18px]" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" className="w-auto p-2 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
-              <div className="flex gap-1">
-                {REACTIONS.map((emoji) => (
-                  <button key={emoji} onClick={() => onSendReaction(emoji)} className="text-xl hover:scale-125 transition-transform p-1.5 rounded-full hover:bg-[hsl(220_3%_28%)]">
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
+        {/* Reactions */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button title="Reacciones" className={cn(
+              "rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors",
+              compact ? "h-8 w-8" : "h-11 w-11"
+            )}>
+              <Smile className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" className="w-auto p-2 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
+            <div className="flex gap-1">
+              {REACTIONS.map((emoji) => (
+                <button key={emoji} onClick={() => onSendReaction(emoji)} className={cn("hover:scale-125 transition-transform rounded-full hover:bg-[hsl(220_3%_28%)]", compact ? "text-base p-1" : "text-xl p-1.5")}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
 
-        {!compact && (
-          <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
-        )}
+        <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} compact={compact} />
 
         {/* Leave */}
         <button
@@ -331,9 +331,18 @@ export default function CallControls({
         >
           <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </button>
+
+        {/* Panel toggles — inline in compact, right-aligned otherwise */}
+        {compact && (
+          <>
+            <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" compact />
+            <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" compact />
+            <PanelBtn icon={MessageSquare} active={isChatOpen} onClick={onToggleChat} label="Chat" badge={!isChatOpen ? unreadChatCount : undefined} compact />
+          </>
+        )}
       </div>
 
-      {/* Right panel toggles — hidden in compact */}
+      {/* Right panel toggles — full mode */}
       {!compact && (
         <div className="flex-1 flex items-center justify-end gap-1">
           <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" />
