@@ -167,8 +167,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             variant="ghost"
             size="sm"
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={!!myOpenRequest || isInOneOnOne}
+            disabled={isInOneOnOne}
             onClick={async () => {
+              dismissedRequestRef.current = null;
               try {
                 await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
                 toast.success("Solicitud enviada al host");
