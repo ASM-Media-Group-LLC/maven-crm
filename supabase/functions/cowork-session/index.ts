@@ -453,7 +453,7 @@ serve(async (req) => {
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
         const { data: requesterProfile } = await admin.from("profiles").select("full_name").eq("id", ssReq.user_id).single();
         if (room) {
-          const identity = `${ssReq.user_id}_${crypto.randomUUID().slice(0, 8)}`;
+          const identity = ssReq.user_id;
           const token = await createLKToken(lkKey, lkSecret, identity, requesterProfile?.full_name || "User", {
             roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
           }, 600); // 10 min token
