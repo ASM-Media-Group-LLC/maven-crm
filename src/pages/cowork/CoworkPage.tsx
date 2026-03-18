@@ -101,6 +101,19 @@ export default function CoworkPage() {
     );
   }
 
+  // Session ended → show message and redirect
+  if (cowork.session?.status === "ended") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 p-6">
+        <Users2 className="h-12 w-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold text-foreground">Esta sesión ha finalizado</h2>
+        <Button variant="secondary" onClick={() => setSearchParams({})}>
+          Volver al inicio
+        </Button>
+      </div>
+    );
+  }
+
   // Not a member yet → lobby fallback (only shown when auto-join not possible or failed)
   if (!cowork.myMembership) {
     return (
