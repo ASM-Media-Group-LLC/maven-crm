@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { LogOut, Search, Filter, ExternalLink, Plus } from "lucide-react";
+import { LogOut, Search, ExternalLink, Plus, List, LayoutGrid } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useAllOffboardings } from "../useOffboarding";
 import InitiateOffboardingDialog from "./InitiateOffboardingDialog";
 
@@ -45,13 +46,16 @@ const OffboardingListPage = () => {
   const navigate = useNavigate();
   const { data: offboardings, isLoading, refetch } = useAllOffboardings();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [initiateOpen, setInitiateOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const filtered = (offboardings ?? []).filter((o) => {
-    if (statusFilter !== "all" && o.status !== statusFilter) return false;
-    if (categoryFilter !== "all" && o.categoria !== categoryFilter) return false;
+    if (statusFilter && o.status !== statusFilter) return false;
+    if (categoryFilter && o.categoria !== categoryFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       const match =
@@ -59,6 +63,16 @@ const OffboardingListPage = () => {
         o.artistic_name?.toLowerCase().includes(q) ||
         o.instagram_handle?.toLowerCase().includes(q);
       if (!match) return false;
+    }
+    if (dateFrom || dateTo) {
+      const d = o.exit_date ? new Date(o.exit_date) : o.created_at ? new Date(o.created_at) : null;
+      if (!d) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        if (d > end) return false;
+      }
     }
     return true;
   });
@@ -128,40 +142,57 @@ const OffboardingListPage = () => {
                   className="pl-9"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "_all" ? "" : v)}>
                 <SelectTrigger className="w-44">
-                  <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="_all">Todos</SelectItem>
                   {Object.entries(STATUS_LABELS).map(([val, { label }]) => (
                     <SelectItem key={val} value={val}>{label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={categoryFilter || undefined} onValueChange={(v) => setCategoryFilter(v === "_all" ? "" : v)}>
                 <SelectTrigger className="w-44">
-                  <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                   <SelectValue placeholder="Categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  <SelectItem value="_all">Todos</SelectItem>
                   {CATEGORIAS.map((c) => (
                     <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} />
+              <div className="flex items-center border border-border rounded-md overflow-hidden ml-auto">
+                <Button
+                  variant={viewMode === "table" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-9 w-9 rounded-none"
+                  onClick={() => setViewMode("table")}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-9 w-9 rounded-none"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
-            {/* Table */}
-            <Card>
-              <CardContent className="p-0">
-                {isLoading ? (
-                  <div className="p-8 text-center text-muted-foreground">Cargando...</div>
-                ) : filtered.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground">No se encontraron offboardings</div>
-                ) : (
+            {/* Content */}
+            {isLoading ? (
+              <div className="p-8 text-center text-muted-foreground">Cargando...</div>
+            ) : filtered.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">No se encontraron offboardings</div>
+            ) : viewMode === "table" ? (
+              <Card>
+                <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -225,9 +256,58 @@ const OffboardingListPage = () => {
                       })}
                     </TableBody>
                   </Table>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              /* Grid View */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filtered.map((o) => {
+                  const st = STATUS_LABELS[o.status] ?? STATUS_LABELS.en_proceso;
+                  const checkDone = [o.check_pagos, o.check_material, o.check_campanas, o.check_accesos, o.check_documentacion].filter(Boolean).length;
+                  return (
+                    <Card
+                      key={o.id}
+                      className="cursor-pointer hover:border-primary/40 transition-colors"
+                      onClick={() => navigate(`/creadores/offboarding/${o.id}`)}
+                    >
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-semibold text-sm">{o.creator_name ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground">{o.artistic_name ?? o.instagram_handle ?? ""}</p>
+                          </div>
+                          <Badge variant="outline" className={`text-[10px] shrink-0 ${st.variant}`}>{st.label}</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Categoría</span>
+                            <p className="font-medium">{CATEGORIAS.find((c) => c.value === o.categoria)?.label ?? "—"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Fecha Salida</span>
+                            <p className="font-medium">{o.exit_date ?? "—"}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Aprobaciones</span>
+                            <p className="font-medium">{o.approval_count ?? 0}/2</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Checklist</span>
+                            <p className="font-medium">{checkDone}/5</p>
+                          </div>
+                        </div>
+                        {o.estimated_lost_revenue != null && (
+                          <div className="pt-2 border-t border-border">
+                            <span className="text-xs text-muted-foreground">Revenue Perdido</span>
+                            <p className="text-sm font-bold text-destructive">${Number(o.estimated_lost_revenue).toLocaleString()}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </main>
         </div>
       </div>
