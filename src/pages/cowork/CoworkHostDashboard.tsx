@@ -256,22 +256,25 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               </h3>
               {openHostRequests.map((req) => {
                 const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
+                const is1on1 = !!req.oneone_livekit_room;
                 return (
-                  <div key={req.id} className="bg-amber-500/10 rounded-lg p-2 space-y-1">
+                  <div key={req.id} className={`rounded-lg p-2 space-y-1 ${is1on1 ? "bg-blue-500/10" : "bg-amber-500/10"}`}>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-white/80">{cowork.profiles[req.user_id] || "User"}</span>
-                      <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-400">{roomName}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        {is1on1 ? <Phone className="h-3 w-3 text-blue-400" /> : <Hand className="h-3 w-3 text-amber-400" />}
+                        <span className="text-xs text-white/80">{cowork.profiles[req.user_id] || "User"}</span>
+                      </div>
+                      <Badge variant="outline" className={`text-[9px] ${is1on1 ? "border-blue-500/30 text-blue-400" : "border-amber-500/30 text-amber-400"}`}>{roomName}</Badge>
                     </div>
                     {req.message && <p className="text-[10px] text-white/50">{req.message}</p>}
                     <div className="flex gap-1">
                       {req.status === "open" && (
-                        <Button size="sm" variant="ghost" className="h-5 text-[10px] text-amber-400" onClick={async () => {
+                        <Button size="sm" variant="ghost" className={`h-5 text-[10px] ${is1on1 ? "text-blue-400" : "text-amber-400"}`} onClick={async () => {
                           await cowork.ackHostRequest(req.id);
-                          if (req.oneone_livekit_room) {
+                          if (is1on1) {
                             setOneOnOneRequestId(req.id);
-                            setOneOnOneRoom(req.oneone_livekit_room);
-                            // Switch main content to 1:1 room
-                            setActiveRoomLk(req.oneone_livekit_room);
+                            setOneOnOneRoom(req.oneone_livekit_room!);
+                            setActiveRoomLk(req.oneone_livekit_room!);
                             setActiveRoomId(null);
                             setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
                             setHubMinimized(true);
@@ -280,7 +283,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           Atender
                         </Button>
                       )}
-                      {req.status === "acknowledged" && req.oneone_livekit_room && (
+                      {req.status === "acknowledged" && is1on1 && (
                         <Button size="sm" variant="ghost" className="h-5 text-[10px] text-blue-400" onClick={() => {
                           setOneOnOneRequestId(req.id);
                           setOneOnOneRoom(req.oneone_livekit_room!);
@@ -294,7 +297,6 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                       )}
                       <Button size="sm" variant="ghost" className="h-5 text-[10px] text-green-400" onClick={async () => {
                         await cowork.resolveHostRequest(req.id);
-                        // If currently in this 1:1, leave
                         if (oneOnOneRequestId === req.id) {
                           leaveOneOnOne();
                           leaveActiveRoom();
