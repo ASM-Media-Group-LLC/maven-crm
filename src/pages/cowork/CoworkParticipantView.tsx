@@ -297,7 +297,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 text-red-400 hover:text-red-300"
-                onClick={() => {
+                onClick={async () => {
+                  if (oneOnOneRequestId) {
+                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+                  }
                   dismissedRequestRef.current = oneOnOneRequestId;
                   setOneOnOneRoom(null);
                   setOneOnOneRequestId(null);
