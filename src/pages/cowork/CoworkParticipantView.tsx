@@ -129,6 +129,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={() => setConnectedLkRoom(null)}
             hideShareLink
             hideScreenShare
+            initialMicOn={false}
+            initialCamOn={false}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
