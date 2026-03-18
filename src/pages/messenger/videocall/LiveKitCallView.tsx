@@ -43,6 +43,8 @@ interface LiveKitCallViewProps {
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
+  /** Custom token provider; bypasses the default livekit-token edge function */
+  getToken?: () => Promise<{ token: string; url: string }>;
 }
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare }: LiveKitCallViewProps) {
