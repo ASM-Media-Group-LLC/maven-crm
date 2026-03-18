@@ -22,6 +22,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const claimedRequestRef = useRef<string | null>(null);
   const prevRoomIdRef = useRef<string | null>(null);
   const screenShareTokenRef = useRef<TokenResult>(null);
+  const dismissedRequestRef = useRef<string | null>(null);
+  const oneOnOneWasActiveRef = useRef(false);
 
   // 1:1 state
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
@@ -89,9 +91,22 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (!oneOnOneRequestId) return;
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
-    if (!req || req.status === "resolved") {
+    if (req) {
+      // Request found — mark as active so we can detect when it disappears
+      oneOnOneWasActiveRef.current = true;
+      if (req.status === "resolved") {
+        setOneOnOneRoom(null);
+        setOneOnOneRequestId(null);
+        dismissedRequestRef.current = null;
+        oneOnOneWasActiveRef.current = false;
+        toast.info("Sesión 1:1 con host finalizada");
+      }
+    } else if (oneOnOneWasActiveRef.current) {
+      // Was active before but now gone — resolved
       setOneOnOneRoom(null);
       setOneOnOneRequestId(null);
+      dismissedRequestRef.current = null;
+      oneOnOneWasActiveRef.current = false;
       toast.info("Sesión 1:1 con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
@@ -102,7 +117,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
-    if (existingReq) {
+    if (existingReq && dismissedRequestRef.current !== existingReq.id) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
     }
@@ -152,8 +167,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             variant="ghost"
             size="sm"
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={!!myOpenRequest || isInOneOnOne}
+            disabled={isInOneOnOne}
             onClick={async () => {
+              dismissedRequestRef.current = null;
               try {
                 await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
                 toast.success("Solicitud enviada al host");
@@ -267,6 +283,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 size="icon"
                 className="h-5 w-5 text-red-400 hover:text-red-300"
                 onClick={() => {
+                  dismissedRequestRef.current = oneOnOneRequestId;
                   setOneOnOneRoom(null);
                   setOneOnOneRequestId(null);
                 }}
