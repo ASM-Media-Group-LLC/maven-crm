@@ -18,7 +18,10 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
   const [roomNames, setRoomNames] = useState(["Sala 1", "Sala 2"]);
   const [loading, setLoading] = useState(false);
 
-  const addRoom = () => setRoomNames([...roomNames, `Sala ${roomNames.length + 1}`]);
+  const MAX_ROOMS = 10;
+  const addRoom = () => {
+    if (roomNames.length < MAX_ROOMS) setRoomNames([...roomNames, `Sala ${roomNames.length + 1}`]);
+  };
   const removeRoom = (i: number) => setRoomNames(roomNames.filter((_, idx) => idx !== i));
   const updateRoom = (i: number, val: string) => {
     const copy = [...roomNames];
