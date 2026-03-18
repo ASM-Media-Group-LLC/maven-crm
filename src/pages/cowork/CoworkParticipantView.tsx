@@ -6,6 +6,8 @@ import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 
+type TokenResult = { token: string; url: string; room?: string } | null;
+
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
