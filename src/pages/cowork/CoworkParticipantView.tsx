@@ -81,6 +81,18 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
+  // Token provider: use screen share token if available, otherwise regular cowork token
+  const getToken = useCallback(async () => {
+    const ssToken = screenShareTokenRef.current;
+    if (ssToken) {
+      // Consume the one-time screen share token
+      screenShareTokenRef.current = null;
+      return { token: ssToken.token, url: ssToken.url };
+    }
+    const result = await cowork.issueLiveKitToken("join_room");
+    return { token: result.token, url: result.url };
+  }, [cowork.issueLiveKitToken]);
+
   if (!myAssignment) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4">
