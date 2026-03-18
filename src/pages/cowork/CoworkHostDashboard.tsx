@@ -273,6 +273,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               hideShareLink
               initialMicOn={false}
               initialCamOn={false}
+              getToken={getActiveRoomToken}
             />
           </div>
         ) : (
