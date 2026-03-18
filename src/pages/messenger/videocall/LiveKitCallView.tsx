@@ -74,7 +74,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   displayNameRef.current = displayName;
 
   useEffect(() => {
-    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect });
+    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect, tokenProvider: getToken });
     return () => { lk.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);
