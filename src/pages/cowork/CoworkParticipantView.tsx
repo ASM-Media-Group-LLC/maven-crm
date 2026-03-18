@@ -70,6 +70,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           const result = await cowork.claimScreenShareToken(approvedReq.id);
           if (result?.token && result?.url && result?.room) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
+            setHasScreenShareAccess(true);
             // Store the claimed token so the reconnection uses it
             screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
             // Force reconnect — the getToken callback will use the stored token
