@@ -54,6 +54,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
 
+  const myOpenRequest = cowork.hostRequests.find(
+    r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
+  );
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
   );
