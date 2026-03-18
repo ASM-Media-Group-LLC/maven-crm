@@ -421,7 +421,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               Hub
             </Button>
           ) : (
-            <div className="w-96 md:w-[480px] rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col" style={{ height: "380px" }}>
+            <div
+              className={`rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col ${
+                hubMaximized
+                  ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
+                  : "w-96 md:w-[480px]"
+              }`}
+              style={!hubMaximized ? { height: "380px" } : undefined}
+            >
               <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
                   <Crown className="h-3 w-3" />
@@ -439,8 +446,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-5 w-5 text-white/50 hover:text-white"
+                    onClick={() => setHubMaximized(!hubMaximized)}
+                    title={hubMaximized ? "Restaurar" : "Maximizar"}
+                  >
+                    {hubMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="h-5 w-5 text-red-400 hover:text-red-300"
-                    onClick={() => setHubConnected(false)}
+                    onClick={() => { setHubConnected(false); setHubMaximized(false); }}
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -452,12 +468,12 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                   displayName={displayName}
                   callDisplayName="Host Hub"
                   isAdmin={true}
-                  onLeave={() => setHubConnected(false)}
+                  onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
                   hideShareLink
                   initialMicOn={false}
                   initialCamOn={false}
                   getToken={getHubToken}
-                  compact
+                  compact={!hubMaximized}
                 />
               </div>
             </div>
