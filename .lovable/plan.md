@@ -1,22 +1,39 @@
 
 
-## Problem
+## Plan: Mutually Exclusive Host/Participant Links
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+The server-side `joinSession` action (line 134-136 in `cowork-session/index.ts`) returns early with `alreadyJoined: true` if the user already has a membership, **without updating the role**. This means:
+- If you first join as participant, then click a host invite link → you stay as participant
+- The cached membership prevents role switching entirely
 
-## Solution
+### Root Cause
+```typescript
+// Current behavior (line 134-136):
+const { data: existing } = await admin.from("cowork_memberships")...
+if (existing) return json({ membership: existing, alreadyJoined: true });
+// ^ Never updates role, just returns old membership
+```
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### Changes
 
-## Changes
+#### 1. Edge Function: `supabase/functions/cowork-session/index.ts`
+When a user already has a membership but is joining with a **different role**, update their membership instead of returning early:
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+- If `existing.role !== requestedRole` and the role change is valid (host code verified for host role):
+  - Update the membership role in `cowork_memberships`
+  - If switching **to participant** with a `roomId`, create room assignment
+  - If switching **to host**, remove any active room assignment (hosts use the Hub)
+  - Return updated membership with `roleChanged: true`
+- If same role, keep current early-return behavior
 
-Replace the single `.select()` call with a paginated loop:
+#### 2. Client: `src/pages/cowork/CoworkPage.tsx`
+After auto-join returns, if `roleChanged` or `alreadyJoined` with a different role than expected, force a `refetch()` to reload membership data and render the correct view (host dashboard vs participant view).
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### Files
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+| Action | File |
+|--------|------|
+| Modify | `supabase/functions/cowork-session/index.ts` — update role on re-join with different credentials |
+| Modify | `src/pages/cowork/CoworkPage.tsx` — handle role change response from join |
 
