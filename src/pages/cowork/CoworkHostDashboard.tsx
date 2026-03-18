@@ -20,6 +20,7 @@ interface Props {
 }
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
+  const navigate = useNavigate();
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
