@@ -256,7 +256,7 @@ serve(async (req) => {
         const { data: session } = await admin.from("cowork_sessions").select("host_hub_livekit_room").eq("id", sessionId).single();
         if (!session) return err("Session not found");
 
-        const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+        const identity = userId;
         const token = await createLKToken(lkKey, lkSecret, identity, userName, {
           roomJoin: true, room: session.host_hub_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: true,
         });
@@ -281,7 +281,7 @@ serve(async (req) => {
         // Participants: no screen share by default
         const canPublishSources = isHost ? undefined : ["camera", "microphone"];
 
-        const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+        const identity = userId;
         const grants: LKGrants = {
           roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: isHost,
         };
@@ -375,7 +375,7 @@ serve(async (req) => {
 
       if (!isRequester && !callerIsHost) return err("Not authorized to join this 1:1 room", 403);
 
-      const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+      const identity = userId;
       const token = await createLKToken(lkKey, lkSecret, identity, userName, {
         roomJoin: true, room: hostReq.oneone_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: callerIsHost,
       }, 3600);
@@ -453,7 +453,7 @@ serve(async (req) => {
         const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
         const { data: requesterProfile } = await admin.from("profiles").select("full_name").eq("id", ssReq.user_id).single();
         if (room) {
-          const identity = `${ssReq.user_id}_${crypto.randomUUID().slice(0, 8)}`;
+          const identity = ssReq.user_id;
           const token = await createLKToken(lkKey, lkSecret, identity, requesterProfile?.full_name || "User", {
             roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
           }, 600); // 10 min token
@@ -483,7 +483,7 @@ serve(async (req) => {
       const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
       if (!room) return err("Room not found");
 
-      const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+      const identity = userId;
       const token = await createLKToken(lkKey, lkSecret, identity, userName, {
         roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
       }, 600); // 10 min token

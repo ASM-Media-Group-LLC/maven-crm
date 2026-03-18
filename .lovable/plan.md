@@ -1,36 +1,22 @@
 
 
-## Audit: "Llamar host" — Ghost Participants in 1:1 Room
+## Problem
 
-### Root Cause
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-Every call to `joinOneOnOne` in the edge function generates a **random identity**:
-```
-const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
-```
+## Solution
 
-LiveKit identifies participants by their `identity`. If the token provider is called more than once (due to component remounts, race between onClick handler and auto-restore effect, or page navigation), each call creates a **different identity** — LiveKit sees them as separate participants. The old participant lingers until the server cleans it up, causing 2 (or more) ghost entries in the small 1:1 room.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-This same pattern exists across **all** token issuance paths in the edge function (`join_host_hub`, `join_room`, `joinOneOnOne`, `claimScreenShareToken`), but it's most visible in the 1:1 room because it's a 2-person room.
+## Changes
 
-### Fix
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-**Edge Function (`cowork-session/index.ts`)**: Replace all random identity generation with **stable, deterministic identities** scoped by purpose:
+Replace the single `.select()` call with a paginated loop:
 
-- `joinOneOnOne`: `userId` (only 2 people in this room, no collision)
-- `join_room`: `userId` (one user per cowork room at a time)
-- `join_host_hub`: `userId` (one host identity per hub)
-- `claimScreenShareToken`: `userId` (same user reconnecting with elevated permissions)
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-This way, if the token is requested multiple times, LiveKit treats it as the **same participant reconnecting**, not a new one. The old connection is replaced instead of duplicated.
-
-### Additional Safety: Prevent Double-Mount Race
-
-**Participant View (`CoworkParticipantView.tsx`)**: The "Llamar host" onClick handler and the auto-restore effect can race. The onClick `await`s the API call, during which realtime delivers the new request to the auto-restore effect, which sees `oneOnOneRequestId === null` and mounts the overlay. Then the onClick sets state with the same values — no remount, but the overlay already called `getOneOnOneToken` once via auto-restore.
-
-Fix: In the onClick handler, set `oneOnOneRequestId` **before** awaiting `requestHost` (use a ref or set a "pending" flag) so the auto-restore effect doesn't race. Simplest approach: set a `pendingOneOnOneRef` before the await, and check it in the auto-restore effect.
-
-### Files Modified
-- `supabase/functions/cowork-session/index.ts` — Replace random identities with stable `userId`-based identities across all token paths
-- `src/pages/cowork/CoworkParticipantView.tsx` — Add race condition guard for "Llamar host" onClick vs auto-restore effect
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

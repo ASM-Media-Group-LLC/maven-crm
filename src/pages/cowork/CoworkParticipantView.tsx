@@ -24,6 +24,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const screenShareTokenRef = useRef<TokenResult>(null);
   const dismissedRequestRef = useRef<string | null>(null);
   const oneOnOneWasActiveRef = useRef(false);
+  const pendingOneOnOneRef = useRef(false);
 
   // 1:1 state
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
@@ -113,7 +114,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
   useEffect(() => {
-    if (oneOnOneRequestId) return; // already in a 1:1
+    if (oneOnOneRequestId || pendingOneOnOneRef.current) return; // already in a 1:1 or pending
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
@@ -187,6 +188,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
             disabled={!!myOpenRequest || isInOneOnOne}
             onClick={async () => {
+              pendingOneOnOneRef.current = true;
               try {
                 const result = await cowork.requestHost(myAssignment.room_id, "Llamada 1:1", true);
                 toast.success("Solicitud de llamada enviada al host");
@@ -198,6 +200,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 }
               } catch (e: any) {
                 toast.error(e.message);
+              } finally {
+                pendingOneOnOneRef.current = false;
               }
             }}
           >
