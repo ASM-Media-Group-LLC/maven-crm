@@ -43,13 +43,15 @@ interface DataMessage {
   payload: any;
 }
 
-interface ConnectOptions {
+export interface ConnectOptions {
   initialMicOn?: boolean;
   initialCamOn?: boolean;
   audioDeviceId?: string;
   videoDeviceId?: string;
   audioOutputDeviceId?: string;
   backgroundEffect?: BackgroundEffect;
+  /** If provided, used instead of calling the generic livekit-token edge function */
+  tokenProvider?: () => Promise<{ token: string; url: string }>;
 }
 
 function getDeviceConstraint(deviceId?: string) {
