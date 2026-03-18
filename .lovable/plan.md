@@ -1,22 +1,20 @@
 
 
-## Problem
+## Plan: Default Mic & Camera Off in Cowork Module
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+All `LiveKitCallView` instances in the Cowork module use the default `initialMicOn=true` and `initialCamOn=true`, so participants and hosts join with mic and camera already active.
 
-## Solution
+### Changes
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+Add `initialMicOn={false}` and `initialCamOn={false}` to all three `LiveKitCallView` usages in the cowork module:
 
-## Changes
+#### `src/pages/cowork/CoworkHostDashboard.tsx`
+- **Line 325** (host entering a participant room): Add `initialMicOn={false} initialCamOn={false}`
+- **Line 351** (Host Hub): Add `initialMicOn={false} initialCamOn={false}`
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+#### `src/pages/cowork/CoworkParticipantView.tsx`
+- **Line 124** (participant room): Add `initialMicOn={false} initialCamOn={false}`
 
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+No other files need changes. The `LiveKitCallView` component already supports these props natively.
 
