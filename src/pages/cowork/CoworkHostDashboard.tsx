@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { supabase } from "@/integrations/supabase/client";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
+  const { isOnline } = useOnlinePresence();
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
@@ -149,7 +151,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 <h3 className="text-xs font-medium text-amber-400/80 uppercase tracking-wider">Sin asignar</h3>
                 {unassigned.map((m) => (
                   <div key={m.user_id} className="flex items-center justify-between text-xs">
-                    <span className="text-white/70">{cowork.profiles[m.user_id] || "User"}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(m.user_id) ? "bg-green-400" : "bg-white/20"}`} />
+                      <span className="text-white/70">{cowork.profiles[m.user_id] || "User"}</span>
+                    </div>
                     <Select onValueChange={async (roomId) => {
                       try {
                         await cowork.assignToRoom(m.user_id, roomId);
@@ -280,7 +285,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <div className="space-y-1.5">
                           {participants.map((a) => (
                             <div key={a.user_id} className="flex items-center justify-between text-xs">
-                              <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(a.user_id) ? "bg-green-400" : "bg-white/20"}`} />
+                                <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
+                              </div>
                               <div className="flex items-center gap-1">
                                 <Select
                                   value={moveTarget[a.user_id] || ""}
