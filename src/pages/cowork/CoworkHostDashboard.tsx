@@ -25,13 +25,14 @@ interface Props {
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
+  const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
   const [hubConnected, setHubConnected] = useState(false);
-  const [moveTarget, setMoveTarget] = useState<Record<string, string>>({});
+  const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
