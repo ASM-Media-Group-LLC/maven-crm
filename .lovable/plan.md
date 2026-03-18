@@ -1,22 +1,27 @@
 
 
-## Problem
+## Fix: Host Hub Stays Connected When Minimized
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+When the Host Hub is minimized, the `LiveKitCallView` component is unmounted (replaced by a small "Hub" button). This disconnects the host from the Hub's LiveKit room. The user wants minimize to only hide the video UI while keeping the connection alive in the background.
 
-## Solution
+### Fix
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+**`src/pages/cowork/CoworkHostDashboard.tsx`** — Restructure the floating Hub popup (lines 463-534):
 
-## Changes
+- Always render the full Hub container (with `LiveKitCallView`) when `hubConnected` is true
+- When minimized: hide the main container with `hidden` class, and show the small "Hub" button alongside it
+- When expanded: show normally as today
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+This ensures the LiveKit connection persists across minimize/restore cycles. The X (close) button remains the only way to fully disconnect.
 
-Replace the single `.select()` call with a paginated loop:
+### Technical detail
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+Replace the current conditional render (`hubMinimized ? <Button> : <div with LiveKit>`) with:
+1. Always render the LiveKit container, applying `hidden` when minimized
+2. Render the minimized button when `hubMinimized` is true
+3. Both exist in the DOM simultaneously; only visibility toggles
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### File modified
+- `src/pages/cowork/CoworkHostDashboard.tsx` — Lines 463-534
 
