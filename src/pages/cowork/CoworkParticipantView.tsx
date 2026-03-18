@@ -188,6 +188,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
             disabled={!!myOpenRequest || isInOneOnOne}
             onClick={async () => {
+              pendingOneOnOneRef.current = true;
               try {
                 const result = await cowork.requestHost(myAssignment.room_id, "Llamada 1:1", true);
                 toast.success("Solicitud de llamada enviada al host");
@@ -199,6 +200,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 }
               } catch (e: any) {
                 toast.error(e.message);
+              } finally {
+                pendingOneOnOneRef.current = false;
               }
             }}
           >
