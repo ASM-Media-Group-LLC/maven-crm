@@ -346,12 +346,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               roomName={activeRoomLk}
               displayName={displayName}
               callDisplayName={activeRoomName || undefined}
-              isAdmin={true}
-              onLeave={leaveActiveRoom}
+              isAdmin={!oneOnOneRoom}
+              onLeave={() => {
+                if (oneOnOneRoom) {
+                  leaveOneOnOne();
+                }
+                leaveActiveRoom();
+              }}
               hideShareLink
-              initialMicOn={false}
+              initialMicOn={!!oneOnOneRoom}
               initialCamOn={false}
-              getToken={getActiveRoomToken}
+              getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
             />
           </div>
         ) : (
