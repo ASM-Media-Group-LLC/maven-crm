@@ -390,48 +390,56 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </CardHeader>
                     <CardContent className="p-4 pt-1 space-y-3">
                       {participants.length > 0 ? (
-                        <div className="space-y-1.5">
-                          {participants.map((a) => (
-                            <div key={a.user_id} className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(a.user_id) ? "bg-green-400" : "bg-white/20"}`} />
-                                <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Select
-                                  value={moveTarget[a.user_id] || ""}
-                                  onValueChange={(v) => setMoveTarget({ ...moveTarget, [a.user_id]: v })}
-                                >
-                                  <SelectTrigger className="h-6 w-28 text-[10px] bg-transparent border-white/20 text-white/60">
-                                    <SelectValue placeholder="Mover a..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {cowork.rooms.filter(r => r.id !== room.id).map(r => (
-                                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {moveTarget[a.user_id] && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-5 w-5 text-primary"
-                                    onClick={async () => {
-                                      try {
-                                        await cowork.moveParticipant(a.user_id, moveTarget[a.user_id]);
-                                        toast.success("Participante movido");
-                                        setMoveTarget({ ...moveTarget, [a.user_id]: "" });
-                                      } catch (e: any) {
-                                        toast.error(e.message);
-                                      }
-                                    }}
+                        <div className="grid grid-cols-2 gap-2">
+                          {participants.map((a) => {
+                            const fullName = cowork.profiles[a.user_id] || "User";
+                            const initials = fullName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                            const online = isOnline(a.user_id);
+                            return (
+                              <div key={a.user_id} className="flex flex-col items-center gap-1 rounded-md border border-white/10 bg-white/5 p-2 text-center">
+                                <div className="relative">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-[10px] font-medium text-primary-foreground">
+                                    {initials}
+                                  </div>
+                                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-green-400" : "bg-white/20"}`} />
+                                </div>
+                                <span className="text-[11px] text-white/70 truncate w-full">{fullName}</span>
+                                <div className="flex items-center gap-0.5 w-full">
+                                  <Select
+                                    value={moveTarget[a.user_id] || ""}
+                                    onValueChange={(v) => setMoveTarget({ ...moveTarget, [a.user_id]: v })}
                                   >
-                                    <ArrowRightLeft className="h-3 w-3" />
-                                  </Button>
-                                )}
+                                    <SelectTrigger className="h-5 w-full text-[9px] bg-transparent border-white/20 text-white/50">
+                                      <SelectValue placeholder="Mover" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {cowork.rooms.filter(r => r.id !== room.id).map(r => (
+                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {moveTarget[a.user_id] && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-5 w-5 text-primary flex-shrink-0"
+                                      onClick={async () => {
+                                        try {
+                                          await cowork.moveParticipant(a.user_id, moveTarget[a.user_id]);
+                                          toast.success("Participante movido");
+                                          setMoveTarget({ ...moveTarget, [a.user_id]: "" });
+                                        } catch (e: any) {
+                                          toast.error(e.message);
+                                        }
+                                      }}
+                                    >
+                                      <ArrowRightLeft className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <p className="text-[11px] text-white/30 italic">Sin participantes</p>

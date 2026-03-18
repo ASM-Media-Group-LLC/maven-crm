@@ -1,40 +1,22 @@
 
 
-## Change Room Card Participants from List to Grid
+## Problem
 
-### What changes
-In the Host Dashboard room cards, participants are currently shown as a vertical list. This will be changed to a compact grid layout using avatars with online indicators and names, making better use of card space.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Scope
-Only one location needs changes: **`src/pages/cowork/CoworkHostDashboard.tsx`** (lines 392-435) — the participant listing inside each room card.
+## Solution
 
-The sidebar's "Sin asignar" section (lines 222-246) will remain as a list since it includes assignment dropdowns that don't work well in a grid.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-### Implementation
+## Changes
 
-Replace the `space-y-1.5` vertical list (lines 393-435) with a grid layout:
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-- Use `grid grid-cols-2 gap-2` to display participants in a 2-column grid
-- Each grid cell shows: online indicator dot, truncated name, and a move action button (dropdown + arrow)
-- The move controls will be accessed via a small icon button that opens the Select dropdown, keeping the grid compact
-- Avatar-style initials circle for each participant instead of just a dot + name
+Replace the single `.select()` call with a paginated loop:
 
-### Technical detail
-```
-Before (list):
-  ● Juan Pérez       [Mover a... ▼] →
-  ● María López      [Mover a... ▼] →
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-After (grid):
-  ┌──────────┐ ┌──────────┐
-  │ ●JP      │ │ ●ML      │
-  │ Juan P.  │ │ María L. │
-  │ [Mover▼] │ │ [Mover▼] │
-  └──────────┘ └──────────┘
-```
-
-Each cell: avatar with initials + online dot overlay, truncated name below, compact move dropdown.
-
-### File modified
-- `src/pages/cowork/CoworkHostDashboard.tsx` — Replace participant list with grid layout in room cards
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
