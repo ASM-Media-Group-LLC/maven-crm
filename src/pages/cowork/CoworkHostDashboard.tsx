@@ -329,6 +329,8 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               isAdmin={true}
               onLeave={leaveActiveRoom}
               hideShareLink
+              initialMicOn={false}
+              initialCamOn={false}
             />
           </div>
         ) : (
