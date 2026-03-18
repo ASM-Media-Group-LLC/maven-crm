@@ -24,7 +24,7 @@ const LeadGenPerformanceView = ({ leads, profiles }: Props) => {
     const ids = [...new Set(leads.map(l => l.lg_user_id))];
     return ids.map(id => {
       const p = profiles.find(pr => pr.id === id);
-      return { id, name: p?.full_name || "Agente" };
+      return { id, name: p?.full_name || `Agente ${id.slice(0, 6)}` };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [leads, profiles]);
 
