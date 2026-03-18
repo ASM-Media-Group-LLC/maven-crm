@@ -88,6 +88,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setActiveRoomName(null);
   }, []);
 
+  const leaveOneOnOne = useCallback(() => {
+    setOneOnOneRoom(null);
+    setOneOnOneRequestId(null);
+  }, []);
+
+  const getOneOnOneToken = useCallback(async () => {
+    if (!oneOnOneRequestId) throw new Error("No 1:1 request");
+    const result = await cowork.joinOneOnOne(oneOnOneRequestId);
+    return { token: result.token, url: result.url };
+  }, [cowork.joinOneOnOne, oneOnOneRequestId]);
+
   const getRoomParticipants = (roomId: string) =>
     cowork.assignments.filter(a => a.room_id === roomId && a.is_active);
 
