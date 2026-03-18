@@ -86,13 +86,24 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (!oneOnOneRequestId) return;
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
-    // If request disappeared from the list (resolved) or status is resolved, close
     if (!req || req.status === "resolved") {
       setOneOnOneRoom(null);
       setOneOnOneRequestId(null);
       toast.info("Sesión 1:1 con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
+
+  // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
+  useEffect(() => {
+    if (oneOnOneRequestId) return; // already in a 1:1
+    const existingReq = cowork.hostRequests.find(
+      r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
+    );
+    if (existingReq) {
+      setOneOnOneRequestId(existingReq.id);
+      setOneOnOneRoom(existingReq.oneone_livekit_room!);
+    }
+  }, [cowork.hostRequests, userId, oneOnOneRequestId]);
 
   // Token provider: use screen share token if available, otherwise regular cowork token
   const getToken = useCallback(async () => {
