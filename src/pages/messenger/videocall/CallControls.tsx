@@ -71,22 +71,23 @@ function ControlBtn({
 }
 
 function PanelBtn({
-  icon: Icon, active, onClick, label, badge,
+  icon: Icon, active, onClick, label, badge, compact,
 }: {
-  icon: any; active?: boolean; onClick: () => void; label: string; badge?: number;
+  icon: any; active?: boolean; onClick: () => void; label: string; badge?: number; compact?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={label}
       className={cn(
-        "relative h-9 w-9 rounded-full flex items-center justify-center transition-colors",
+        "relative rounded-full flex items-center justify-center transition-colors",
+        compact ? "h-7 w-7" : "h-9 w-9",
         active
           ? "text-[hsl(214_82%_65%)] bg-[hsl(214_82%_51%/0.15)]"
           : "text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_22%)]",
       )}
     >
-      <Icon className="h-[18px] w-[18px]" />
+      <Icon className={compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]"} />
       {badge != null && badge > 0 && (
         <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-[hsl(0_72%_51%)] text-white text-[10px] font-bold flex items-center justify-center px-0.5 border-2 border-[hsl(220_3%_14%)]">
           {badge > 99 ? "99+" : badge}
