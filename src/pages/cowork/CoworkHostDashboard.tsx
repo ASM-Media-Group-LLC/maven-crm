@@ -463,7 +463,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
       {/* Floating Host Hub pop-up */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
         <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
-          {hubMinimized ? (
+          {hubMinimized && (
             <Button
               variant="secondary"
               size="sm"
@@ -473,64 +473,63 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               <Crown className="h-3.5 w-3.5" />
               Hub
             </Button>
-          ) : (
-            <div
-              className={`rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col ${
-                hubMaximized
-                  ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
-                  : "w-96 md:w-[480px]"
-              }`}
-              style={!hubMaximized ? { height: "380px" } : undefined}
-            >
-              <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
-                <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
-                  <Crown className="h-3 w-3" />
-                  Host Hub
-                </div>
-                <div className="flex gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 text-white/50 hover:text-white"
-                    onClick={() => setHubMinimized(true)}
-                  >
-                    <span className="text-xs leading-none">−</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 text-white/50 hover:text-white"
-                    onClick={() => setHubMaximized(!hubMaximized)}
-                    title={hubMaximized ? "Restaurar" : "Maximizar"}
-                  >
-                    {hubMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 text-red-400 hover:text-red-300"
-                    onClick={() => { setHubConnected(false); setHubMaximized(false); }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
+          )}
+          <div
+            className={`rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col ${
+              hubMaximized
+                ? "w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]"
+                : "w-96 md:w-[480px]"
+            } ${hubMinimized ? "hidden" : ""}`}
+            style={!hubMaximized ? { height: "380px" } : undefined}
+          >
+            <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
+                <Crown className="h-3 w-3" />
+                Host Hub
               </div>
-              <div className="flex-1 min-h-0">
-                <LiveKitCallView
-                  roomName={cowork.session.host_hub_livekit_room}
-                  displayName={displayName}
-                  callDisplayName="Host Hub"
-                  isAdmin={true}
-                  onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
-                  hideShareLink
-                  initialMicOn={false}
-                  initialCamOn={false}
-                  getToken={getHubToken}
-                  compact={!hubMaximized}
-                />
+              <div className="flex gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-white/50 hover:text-white"
+                  onClick={() => setHubMinimized(true)}
+                >
+                  <span className="text-xs leading-none">−</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-white/50 hover:text-white"
+                  onClick={() => setHubMaximized(!hubMaximized)}
+                  title={hubMaximized ? "Restaurar" : "Maximizar"}
+                >
+                  {hubMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-red-400 hover:text-red-300"
+                  onClick={() => { setHubConnected(false); setHubMaximized(false); }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
             </div>
-          )}
+            <div className="flex-1 min-h-0">
+              <LiveKitCallView
+                roomName={cowork.session.host_hub_livekit_room}
+                displayName={displayName}
+                callDisplayName="Host Hub"
+                isAdmin={true}
+                onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
+                hideShareLink
+                initialMicOn={false}
+                initialCamOn={false}
+                getToken={getHubToken}
+                compact={!hubMaximized}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
