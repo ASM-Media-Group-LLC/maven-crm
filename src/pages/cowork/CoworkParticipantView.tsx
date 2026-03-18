@@ -35,10 +35,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // When assignment changes, update the connected room
   useEffect(() => {
+    // If host moved participant to a different room, reset manuallyLeft
+    if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
+      setManuallyLeft(false);
+    }
+    prevRoomIdRef.current = myAssignment?.room_id || null;
+
+    if (manuallyLeft) return; // Don't auto-connect if user intentionally left
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
-  }, [myRoom?.livekit_room_name]);
+  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
 
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
