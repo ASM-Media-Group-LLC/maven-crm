@@ -1,22 +1,38 @@
 
 
-## Problem
+## Plan: Preserve All Controls in Compact Mode
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
 
-## Solution
+The current `compact` mode in `CallControls.tsx` hides 5 controls entirely:
+- Screen share (line 289: `!compact && !hideScreenShare`)
+- Reactions (line 299: `!compact`)
+- Hand raise (line 318: `!compact`)
+- Right panel toggles: Metrics, Participants, Chat (line 335: `!compact`)
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+The user wants all controls visible, just scaled down to fit the pop-up.
 
-## Changes
+### Changes
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+#### `CallControls.tsx`
 
-Replace the single `.select()` call with a paginated loop:
+1. **Remove all `!compact &&` guards** on screen share, reactions, hand raise, and right panel toggles -- so they always render.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+2. **Make `ControlBtn` and `PanelBtn` size-aware**: Accept a `compact` prop and use smaller sizes (`h-8 w-8` / `h-3.5 w-3.5` icons for ControlBtn, `h-7 w-7` / `h-3.5 w-3.5` for PanelBtn) when compact.
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+3. **Compact mic/cam**: Keep the simplified (no device popover chevron) versions for compact, but use the same smaller sizing already in place.
+
+4. **Reactions popover**: Render in compact with smaller emoji buttons.
+
+5. **Right panel toggles**: Render in compact mode but inside the same centered row (no flex-1 spacer), keeping everything in a single centered line of controls.
+
+6. **Layout adjustment**: In compact mode, use `flex-wrap justify-center gap-1` so controls wrap naturally within the 480px pop-up width if needed.
+
+#### `CallTopBar.tsx`
+
+No changes needed -- current compact behavior (hiding timer/share link) is appropriate for the top bar.
+
+### Result
+
+All 8+ controls (mic, cam, screen share, reactions, hand raise, leave, metrics, participants, chat) remain visible in compact mode, just smaller. The pop-up at 480px wide can fit ~10 small buttons in a row comfortably.
 
