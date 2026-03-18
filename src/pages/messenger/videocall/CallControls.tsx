@@ -173,88 +173,120 @@ export default function CallControls({
   const [videoPopoverOpen, setVideoPopoverOpen] = useState(false);
   const devices = useDevices(audioPopoverOpen || videoPopoverOpen);
 
+  const btnSize = compact ? "h-8 w-8" : "h-11 w-11";
+  const iconSize = compact ? "h-3.5 w-3.5" : "h-[18px] w-[18px]";
+
   return (
-    <div className="shrink-0 flex items-center py-3 bg-[hsl(220_3%_14%)] px-4">
-      <div className="flex-1" />
+    <div className={cn("shrink-0 flex items-center bg-[hsl(220_3%_14%)]", compact ? "py-1.5 px-2 justify-center" : "py-3 px-4")}>
+      {!compact && <div className="flex-1" />}
 
       {/* Center controls */}
-      <div className="flex items-center gap-2">
-        {/* Mic with audio popover — Google Meet grouped style */}
-        <div className="flex items-center">
-          <Popover open={audioPopoverOpen} onOpenChange={setAudioPopoverOpen}>
-            <PopoverTrigger asChild>
-              <button className={cn(
-                "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
-                isMicOn
-                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
-                  : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
-              )}>
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
-              <div className="flex items-center gap-2">
-                <DevicePill icon={Mic} devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} />
-                <DevicePill icon={Volume2} devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} />
-              </div>
-            </PopoverContent>
-          </Popover>
+      <div className={cn("flex items-center", compact ? "gap-1" : "gap-2")}>
+        {/* Mic — compact skips device popover */}
+        {compact ? (
           <button
             onClick={onToggleMic}
             title="Micrófono"
             className={cn(
-              "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+              btnSize, "rounded-full flex items-center justify-center transition-colors",
               isMicOn
                 ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
                 : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
             )}
           >
-            {isMicOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
+            {isMicOn ? <Mic className={iconSize} /> : <MicOff className={iconSize} />}
           </button>
-        </div>
-
-
-        {/* Cam with video popover — Google Meet grouped style */}
-        <div className="flex items-center">
-          <Popover open={videoPopoverOpen} onOpenChange={setVideoPopoverOpen}>
-            <PopoverTrigger asChild>
-              <button className={cn(
-                "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
-                isCamOn
-                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
-                  : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
-              )}>
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
-              <div className="flex items-center gap-2">
-                <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
-                <button
-                  onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
-                  title="Configuración de vídeo"
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors"
-                >
-                  <Settings className="h-4 w-4" />
+        ) : (
+          <div className="flex items-center">
+            <Popover open={audioPopoverOpen} onOpenChange={setAudioPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button className={cn(
+                  "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                  isMicOn
+                    ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
+                    : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+                )}>
+                  <ChevronUp className="h-3.5 w-3.5" />
                 </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+              </PopoverTrigger>
+              <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+                <div className="flex items-center gap-2">
+                  <DevicePill icon={Mic} devices={devices.audioInputs} selectedId={currentAudioInputId || ""} onSelect={onAudioInputChange} />
+                  <DevicePill icon={Volume2} devices={devices.audioOutputs} selectedId={currentAudioOutputId || ""} onSelect={onAudioOutputChange} />
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              onClick={onToggleMic}
+              title="Micrófono"
+              className={cn(
+                "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+                isMicOn
+                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                  : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+              )}
+            >
+              {isMicOn ? <Mic className="h-[18px] w-[18px]" /> : <MicOff className="h-[18px] w-[18px]" />}
+            </button>
+          </div>
+        )}
+
+        {/* Cam — compact skips device popover */}
+        {compact ? (
           <button
             onClick={onToggleCam}
             title="Cámara"
             className={cn(
-              "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+              btnSize, "rounded-full flex items-center justify-center transition-colors",
               isCamOn
                 ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
                 : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
             )}
           >
-            {isCamOn ? <VideoIcon className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
+            {isCamOn ? <VideoIcon className={iconSize} /> : <VideoOff className={iconSize} />}
           </button>
-        </div>
+        ) : (
+          <div className="flex items-center">
+            <Popover open={videoPopoverOpen} onOpenChange={setVideoPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button className={cn(
+                  "h-11 w-8 rounded-l-lg flex items-center justify-center transition-colors border-r",
+                  isCamOn
+                    ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_65%)] hover:bg-[hsl(220_3%_28%)] border-[hsl(220_3%_28%)]"
+                    : "bg-[hsl(0_72%_51%/0.85)] text-white hover:bg-[hsl(0_72%_45%/0.85)] border-[hsl(0_72%_45%)]"
+                )}>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="top" className="w-auto p-2.5 bg-[hsl(220_3%_17%)] border-[hsl(220_3%_28%)]" align="center">
+                <div className="flex items-center gap-2">
+                  <DevicePill icon={VideoIcon} devices={devices.videoInputs} selectedId={currentVideoInputId || ""} onSelect={onVideoInputChange} />
+                  <button
+                    onClick={() => { setVideoPopoverOpen(false); onOpenVideoSettings(); }}
+                    title="Configuración de vídeo"
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-[hsl(220_3%_65%)] hover:text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_25%)] transition-colors"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              onClick={onToggleCam}
+              title="Cámara"
+              className={cn(
+                "h-11 w-11 rounded-r-lg flex items-center justify-center transition-colors",
+                isCamOn
+                  ? "bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)]"
+                  : "bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)]"
+              )}
+            >
+              {isCamOn ? <VideoIcon className="h-[18px] w-[18px]" /> : <VideoOff className="h-[18px] w-[18px]" />}
+            </button>
+          </div>
+        )}
 
-        {!hideScreenShare && (
+        {!compact && !hideScreenShare && (
           <ControlBtn
             icon={isScreenSharing ? MonitorOff : Monitor}
             active={!isScreenSharing ? undefined : true}
@@ -263,49 +295,56 @@ export default function CallControls({
           />
         )}
 
-        {/* Reactions */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button title="Reacciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
-              <Smile className="h-[18px] w-[18px]" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" className="w-auto p-2 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
-            <div className="flex gap-1">
-              {REACTIONS.map((emoji) => (
-                <button key={emoji} onClick={() => onSendReaction(emoji)} className="text-xl hover:scale-125 transition-transform p-1.5 rounded-full hover:bg-[hsl(220_3%_28%)]">
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+        {/* Reactions — hidden in compact */}
+        {!compact && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button title="Reacciones" className="h-11 w-11 rounded-full flex items-center justify-center bg-[hsl(220_3%_22%)] text-[hsl(220_3%_85%)] hover:bg-[hsl(220_3%_28%)] transition-colors">
+                <Smile className="h-[18px] w-[18px]" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-auto p-2 bg-[hsl(220_3%_22%)] border-[hsl(220_3%_30%)]" align="center">
+              <div className="flex gap-1">
+                {REACTIONS.map((emoji) => (
+                  <button key={emoji} onClick={() => onSendReaction(emoji)} className="text-xl hover:scale-125 transition-transform p-1.5 rounded-full hover:bg-[hsl(220_3%_28%)]">
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
-
-        <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
-
+        {!compact && (
+          <ControlBtn icon={Hand} active={isHandRaised ? true : undefined} onClick={onToggleHand} label="Levantar mano" badge={isHandRaised} />
+        )}
 
         {/* Leave */}
         <button
           onClick={onLeave}
-          className="h-11 px-5 rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 text-sm font-medium"
+          className={cn(
+            "rounded-full bg-[hsl(0_72%_51%)] text-white hover:bg-[hsl(0_72%_45%)] transition-colors flex items-center gap-2 font-medium",
+            compact ? "h-8 px-3 text-xs" : "h-11 px-5 text-sm"
+          )}
         >
-          <PhoneOff className="h-4 w-4" />
+          <PhoneOff className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </button>
       </div>
 
-      {/* Right panel toggles */}
-      <div className="flex-1 flex items-center justify-end gap-1">
-        <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" />
-        <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" />
-        <PanelBtn
-          icon={MessageSquare}
-          active={isChatOpen}
-          onClick={onToggleChat}
-          label="Chat"
-          badge={!isChatOpen ? unreadChatCount : undefined}
-        />
-      </div>
+      {/* Right panel toggles — hidden in compact */}
+      {!compact && (
+        <div className="flex-1 flex items-center justify-end gap-1">
+          <PanelBtn icon={Info} onClick={onOpenMetrics} label="Métricas" />
+          <PanelBtn icon={Users} active={isParticipantsOpen} onClick={onToggleParticipants} label="Participantes" />
+          <PanelBtn
+            icon={MessageSquare}
+            active={isChatOpen}
+            onClick={onToggleChat}
+            label="Chat"
+            badge={!isChatOpen ? unreadChatCount : undefined}
+          />
+        </div>
+      )}
     </div>
   );
 }
