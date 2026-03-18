@@ -404,6 +404,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             </div>
           </div>
         )}
+      </div>
 
       {/* Floating Host Hub pop-up */}
       {hubConnected && cowork.session?.host_hub_livekit_room && (
