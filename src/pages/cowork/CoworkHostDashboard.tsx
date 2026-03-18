@@ -103,8 +103,13 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 size="icon"
                 className="h-7 w-7 text-red-400 hover:text-red-300"
                 onClick={async () => {
+                  setActiveRoomLk(null);
+                  setActiveRoomId(null);
+                  setActiveRoomName(null);
+                  setHubConnected(false);
                   await cowork.endSession();
                   toast.success("Sesión finalizada");
+                  navigate("/cowork");
                 }}
               >
                 <Power className="h-3.5 w-3.5" />
