@@ -137,7 +137,7 @@ const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; on
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1">
           {CATEGORY_OPTIONS.map((cat) => (
             <button
               key={cat}
