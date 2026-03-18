@@ -46,6 +46,8 @@ interface LiveKitCallViewProps {
   compact?: boolean;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
+  /** Fires whenever the local participant's media state changes */
+  onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
 }
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, compact, getToken }: LiveKitCallViewProps) {
