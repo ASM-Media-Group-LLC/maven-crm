@@ -18,6 +18,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
+  const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
   // Track whether we already claimed the current approved request
   const claimedRequestRef = useRef<string | null>(null);
   // Track previous room assignment to detect host-initiated moves
