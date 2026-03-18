@@ -1,57 +1,22 @@
 
 
-## Audit: Screen Share Button Visibility After Approval
+## Problem
 
-### Problem
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-After a participant's screen share request is approved, the system correctly claims the token, stores it, and reconnects with elevated permissions. However, `hideScreenShare` is **hardcoded to `true`** on line 164 of `CoworkParticipantView.tsx`:
+## Solution
 
-```tsx
-<LiveKitCallView
-  ...
-  hideScreenShare    // ← always hidden
-  getToken={getToken}
-/>
-```
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-This means after reconnection with a screen-share-capable token, the participant **still cannot see the screen share button** in CallControls. The elevated permissions are wasted.
+## Changes
 
-### Fix
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-Track whether the participant has been granted screen share access (i.e., the token was claimed and used for reconnection). Use this state to dynamically set `hideScreenShare`.
+Replace the single `.select()` call with a paginated loop:
 
-### Changes
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
 
-#### `src/pages/cowork/CoworkParticipantView.tsx`
-
-1. Add a `hasScreenShareAccess` state (boolean, default `false`).
-2. Set it to `true` when the screen share token is claimed and reconnection starts.
-3. Reset it to `false` when:
-   - The participant is moved to a different room (room change detection already exists).
-   - The participant manually leaves.
-4. Pass `hideScreenShare={!hasScreenShareAccess}` to `LiveKitCallView`.
-
-```tsx
-const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
-
-// In the approved-request effect, after claiming token:
-setHasScreenShareAccess(true);
-
-// In room change detection:
-setHasScreenShareAccess(false);
-
-// In onLeave:
-setHasScreenShareAccess(false);
-
-// In JSX:
-hideScreenShare={!hasScreenShareAccess}
-```
-
-Also hide the "Compartir pantalla" request button in the top bar when `hasScreenShareAccess` is true (the participant already has access — no need to request again).
-
-### Files
-
-| File | Change |
-|------|--------|
-| `src/pages/cowork/CoworkParticipantView.tsx` | Add `hasScreenShareAccess` state, make `hideScreenShare` dynamic, hide request button when access granted |
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

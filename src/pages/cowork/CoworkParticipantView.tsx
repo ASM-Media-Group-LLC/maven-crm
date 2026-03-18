@@ -18,6 +18,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
+  const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
   // Track whether we already claimed the current approved request
   const claimedRequestRef = useRef<string | null>(null);
   // Track previous room assignment to detect host-initiated moves
@@ -42,6 +43,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // If host moved participant to a different room, reset manuallyLeft and clear screen share token
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
+      setHasScreenShareAccess(false);
       screenShareTokenRef.current = null;
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
@@ -68,6 +70,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           const result = await cowork.claimScreenShareToken(approvedReq.id);
           if (result?.token && result?.url && result?.room) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
+            setHasScreenShareAccess(true);
             // Store the claimed token so the reconnection uses it
             screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
             // Force reconnect — the getToken callback will use the stored token
@@ -127,23 +130,25 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           >
             <Hand className="h-4 w-4" /> Pedir host
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={!!mySSReq}
-            onClick={async () => {
-              try {
-                await cowork.requestScreenShare(myAssignment.room_id);
-                toast.info("Solicitud de pantalla enviada, esperando aprobación...");
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
-          >
-            <Monitor className="h-4 w-4" />
-            {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
-          </Button>
+          {!hasScreenShareAccess && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
+              disabled={!!mySSReq}
+              onClick={async () => {
+                try {
+                  await cowork.requestScreenShare(myAssignment.room_id);
+                  toast.info("Solicitud de pantalla enviada, esperando aprobación...");
+                } catch (e: any) {
+                  toast.error(e.message);
+                }
+              }}
+            >
+              <Monitor className="h-4 w-4" />
+              {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -158,10 +163,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={() => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
+              setHasScreenShareAccess(false);
               screenShareTokenRef.current = null;
             }}
             hideShareLink
-            hideScreenShare
+            hideScreenShare={!hasScreenShareAccess}
             initialMicOn={false}
             initialCamOn={false}
             getToken={getToken}
