@@ -1,22 +1,16 @@
 
 
-## Problem
+## Plan: Add Maximize Button to Host Hub Pop-up
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Change
 
-## Solution
+In `CoworkHostDashboard.tsx`:
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+1. Add a `hubMaximized` state (`useState(false)`).
+2. Add a maximize/restore button (using `Maximize2`/`Minimize2` icons from lucide-react) between the minimize and close buttons in the pop-up header (line 429).
+3. When maximized, change the pop-up container classes from fixed-size (`w-96 md:w-[480px]`, `height: 380px`) to near-fullscreen (`w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]`), and pass `compact={false}` to `LiveKitCallView` so controls render at full size.
+4. When restored, revert to the current compact dimensions and `compact={true}`.
 
-## Changes
-
-**File: `src/pages/sales-performance/useEarningsData.ts`**
-
-Replace the single `.select()` call with a paginated loop:
-
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Files Modified
+- `src/pages/cowork/CoworkHostDashboard.tsx` — Add state, maximize button, and conditional sizing.
 
