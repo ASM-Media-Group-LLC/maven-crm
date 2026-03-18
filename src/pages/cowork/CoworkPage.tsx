@@ -14,6 +14,8 @@ export default function CoworkPage() {
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
+  const [autoJoining, setAutoJoining] = useState(false);
+  const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -22,6 +24,36 @@ export default function CoworkPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
+
+  // Auto-join from invite URL params
+  useEffect(() => {
+    if (!sessionId || cowork.loading || cowork.myMembership || autoJoining || autoJoinFailed) return;
+
+    const role = searchParams.get("role");
+    const code = searchParams.get("code");
+    const roomId = searchParams.get("room");
+
+    const canAutoJoin = (role === "host" && code) || roomId;
+    if (!canAutoJoin) return;
+
+    setAutoJoining(true);
+    const doJoin = async () => {
+      try {
+        if (role === "host" && code) {
+          await cowork.joinSession(sessionId, "host", code);
+        } else if (roomId) {
+          await cowork.joinSession(sessionId, "participant", undefined, roomId);
+        }
+        cowork.refetch();
+      } catch (e) {
+        console.error("Auto-join failed:", e);
+        setAutoJoinFailed(true);
+      } finally {
+        setAutoJoining(false);
+      }
+    };
+    doJoin();
+  }, [sessionId, cowork.loading, cowork.myMembership, autoJoining, autoJoinFailed, searchParams]);
 
   // No session selected → lobby
   if (!sessionId) {
