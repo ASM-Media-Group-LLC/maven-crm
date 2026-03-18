@@ -483,7 +483,7 @@ serve(async (req) => {
       const { data: room } = await admin.from("cowork_rooms").select("livekit_room_name").eq("id", ssReq.room_id).single();
       if (!room) return err("Room not found");
 
-      const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+      const identity = userId;
       const token = await createLKToken(lkKey, lkSecret, identity, userName, {
         roomJoin: true, room: room.livekit_room_name, canPublish: true, canSubscribe: true, canPublishData: true,
       }, 600); // 10 min token
