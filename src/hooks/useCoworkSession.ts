@@ -34,6 +34,7 @@ export interface HostRequest {
   user_id: string;
   message: string | null;
   status: "open" | "acknowledged" | "resolved";
+  oneone_livekit_room?: string;
   created_at: string;
 }
 
