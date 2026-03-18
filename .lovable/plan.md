@@ -1,22 +1,28 @@
 
 
-## Problem
+## Fix: Hangup in 1:1 Call Should Resolve the Host Request
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Problem
+When either the participant or the host hangs up from a 1:1 call (via the red hangup button inside LiveKitCallView), only local state is cleared. The underlying host request remains open/acknowledged, so:
+- The other side doesn't get notified that the call ended
+- The auto-close logic (which watches for "resolved" status) never triggers
+- The request lingers in the sidebar
 
-## Solution
+The X button on the participant's overlay also only dismisses locally without resolving.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+### Fix
 
-## Changes
+**`src/pages/cowork/CoworkParticipantView.tsx`** — Two changes:
+1. **LiveKitCallView `onLeave` (line 315-318)**: Call `cowork.resolveHostRequest(oneOnOneRequestId)` before clearing state, so the host side auto-closes via the existing realtime watcher.
+2. **X button `onClick` (line 300-304)**: Also resolve the request instead of just dismissing locally.
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+**`src/pages/cowork/CoworkHostDashboard.tsx`** — One change:
+1. **`leaveOneOnOne` callback (line 93-96)**: Call `cowork.resolveHostRequest(oneOnOneRequestId)` before clearing state, so the participant side auto-closes.
 
-Replace the single `.select()` call with a paginated loop:
+### Technical detail
+Both sides already have auto-close effects that watch `cowork.hostRequests` for resolved/removed entries. Resolving the request on hangup triggers the other side's cleanup automatically via realtime.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
-
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+### Files modified
+- `src/pages/cowork/CoworkParticipantView.tsx` — Resolve request on hangup and X button
+- `src/pages/cowork/CoworkHostDashboard.tsx` — Resolve request on host hangup
 
