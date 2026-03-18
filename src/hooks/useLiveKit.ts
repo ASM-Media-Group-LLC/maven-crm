@@ -43,13 +43,15 @@ interface DataMessage {
   payload: any;
 }
 
-interface ConnectOptions {
+export interface ConnectOptions {
   initialMicOn?: boolean;
   initialCamOn?: boolean;
   audioDeviceId?: string;
   videoDeviceId?: string;
   audioOutputDeviceId?: string;
   backgroundEffect?: BackgroundEffect;
+  /** If provided, used instead of calling the generic livekit-token edge function */
+  tokenProvider?: () => Promise<{ token: string; url: string }>;
 }
 
 function getDeviceConstraint(deviceId?: string) {
@@ -831,15 +833,21 @@ export function useLiveKit() {
       setActiveSpeaker(null);
       handRaisedMap.current = {};
 
-      const { data, error: fnErr } = await supabase.functions.invoke("livekit-token", {
-        body: { roomName, participantName, isAdmin },
-      });
+      let tokenData: { token: string; url: string };
 
-      if (fnErr || !data?.token) {
-        throw new Error(fnErr?.message || data?.error || "Failed to get token");
+      if (options.tokenProvider) {
+        tokenData = await options.tokenProvider();
+      } else {
+        const { data, error: fnErr } = await supabase.functions.invoke("livekit-token", {
+          body: { roomName, participantName, isAdmin },
+        });
+        if (fnErr || !data?.token) {
+          throw new Error(fnErr?.message || data?.error || "Failed to get token");
+        }
+        tokenData = { token: data.token, url: data.url };
       }
 
-      const livekitUrl = data.url;
+      const livekitUrl = tokenData.url;
       if (!livekitUrl || typeof livekitUrl !== "string" || (!livekitUrl.startsWith("wss://") && !livekitUrl.startsWith("ws://"))) {
         throw new Error(`Invalid LiveKit URL: "${livekitUrl}". Ensure LIVEKIT_URL is configured.`);
       }
@@ -1043,7 +1051,7 @@ export function useLiveKit() {
       });
 
       // ── Connect & publish tracks ────────────────────────────
-      await room.connect(livekitUrl, data.token);
+      await room.connect(livekitUrl, tokenData.token);
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
 

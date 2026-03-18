@@ -43,9 +43,11 @@ interface LiveKitCallViewProps {
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
+  /** Custom token provider; bypasses the default livekit-token edge function */
+  getToken?: () => Promise<{ token: string; url: string }>;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, getToken }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
@@ -72,7 +74,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   displayNameRef.current = displayName;
 
   useEffect(() => {
-    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect });
+    lk.connect(roomName, displayNameRef.current, isAdmin, { initialMicOn, initialCamOn, audioDeviceId: initialAudioDeviceId, videoDeviceId: initialVideoDeviceId, audioOutputDeviceId: initialAudioOutputDeviceId, backgroundEffect: initialBackgroundEffect, tokenProvider: getToken });
     return () => { lk.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, isAdmin, initialMicOn, initialCamOn, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect]);

@@ -6,6 +6,8 @@ import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 
+type TokenResult = { token: string; url: string; room?: string } | null;
+
 interface Props {
   cowork: ReturnType<typeof useCoworkSession>;
   userId: string;
@@ -20,6 +22,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const claimedRequestRef = useRef<string | null>(null);
   // Track previous room assignment to detect host-initiated moves
   const prevRoomIdRef = useRef<string | null>(null);
+  // Store claimed screen share token for reconnection
+  const screenShareTokenRef = useRef<TokenResult>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -35,9 +39,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // When assignment changes, update the connected room
   useEffect(() => {
-    // If host moved participant to a different room, reset manuallyLeft
+    // If host moved participant to a different room, reset manuallyLeft and clear screen share token
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
+      screenShareTokenRef.current = null;
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
@@ -63,7 +68,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           const result = await cowork.claimScreenShareToken(approvedReq.id);
           if (result?.token && result?.url && result?.room) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
-            // Force reconnect with new token that has screen share permissions
+            // Store the claimed token so the reconnection uses it
+            screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
+            // Force reconnect — the getToken callback will use the stored token
             setConnectedLkRoom(null);
             setTimeout(() => setConnectedLkRoom(result.room), 300);
           }
@@ -73,6 +80,18 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       })();
     }
   }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
+
+  // Token provider: use screen share token if available, otherwise regular cowork token
+  const getToken = useCallback(async () => {
+    const ssToken = screenShareTokenRef.current;
+    if (ssToken) {
+      // Consume the one-time screen share token
+      screenShareTokenRef.current = null;
+      return { token: ssToken.token, url: ssToken.url };
+    }
+    const result = await cowork.issueLiveKitToken("join_room");
+    return { token: result.token, url: result.url };
+  }, [cowork.issueLiveKitToken]);
 
   if (!myAssignment) {
     return (
@@ -139,11 +158,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={() => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
+              screenShareTokenRef.current = null;
             }}
             hideShareLink
             hideScreenShare
             initialMicOn={false}
             initialCamOn={false}
+            getToken={getToken}
           />
         ) : manuallyLeft ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
