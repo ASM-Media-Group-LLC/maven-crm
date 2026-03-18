@@ -1,22 +1,50 @@
 
 
-## Problem
+## Audit: Realtime User Status in Cowork Module
 
-Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
+### Current State
 
-## Solution
+The realtime flow works through `useCoworkSession`, which subscribes to 6 postgres_changes channels (sessions, rooms, assignments, memberships, host requests, screen share requests). Every change triggers a full `fetchData()` refetch.
 
-Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
+After auditing all files against the recent changes (end session, hangup/reconnect, direct room join), the **data synchronization** is correct:
 
-## Changes
+- **Session ended**: Realtime updates `session.status` → `CoworkPage` renders "ended" screen → unmounts LiveKit views → cleanup via unmount. **Works.**
+- **Participant moved**: Assignment changes → realtime refetch → `myAssignment` updates → `CoworkParticipantView` detects room change, resets `manuallyLeft`, auto-connects. **Works.**
+- **New member joins**: Membership insert → realtime refetch → host dashboard re-renders with new member. **Works.**
+- **Manual hangup + reconnect**: `manuallyLeft` state prevents auto-reconnect loop, reset on room change. **Works.**
 
-**File: `src/pages/sales-performance/useEarningsData.ts`**
+### Issue Found: No Online Presence Indicators
 
-Replace the single `.select()` call with a paginated loop:
+The cowork module **does not use `useOnlinePresence`** at all. The host dashboard shows participant names but has **no indication** of who is actually online/connected vs. who has closed their browser. This is critical for a host managing rooms — they can't distinguish between an active participant and one who left.
 
-1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
-2. Continue fetching until a batch returns fewer than 1000 rows
-3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+### Plan
 
-This ensures all historical data is loaded regardless of how many rows exist in the table.
+#### 1. `src/pages/cowork/CoworkHostDashboard.tsx`
+- Import and use `useOnlinePresence` hook
+- Add a green/gray dot next to each participant name in:
+  - **Room cards** (line 282-283): next to assigned participant names
+  - **Unassigned members list** (line 152): next to unassigned participant names
+
+#### 2. `src/pages/cowork/CoworkParticipantView.tsx`
+No changes needed — participant view doesn't display other users' names.
+
+### Implementation Detail
+
+```tsx
+// In CoworkHostDashboard
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+
+// Inside component
+const { isOnline } = useOnlinePresence();
+
+// Next to each participant name (both in room cards and unassigned list)
+<span className={`h-2 w-2 rounded-full ${isOnline(userId) ? "bg-green-400" : "bg-white/20"}`} />
+<span className="text-white/70">{cowork.profiles[userId] || "User"}</span>
+```
+
+### Files
+
+| File | Change |
+|------|--------|
+| `src/pages/cowork/CoworkHostDashboard.tsx` | Add online presence dots next to all participant names |
 
