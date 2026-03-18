@@ -243,10 +243,94 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-white/30 space-y-2">
-              <Users2 className="h-16 w-16 mx-auto" />
-              <p className="text-sm">Selecciona una sala para entrar</p>
+          <div className="flex-1 overflow-auto p-6">
+            <h3 className="text-sm font-medium text-white/50 uppercase tracking-wider mb-4">Seleccione sala para ingresar</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cowork.rooms.map((room) => {
+                const participants = getRoomParticipants(room.id);
+                return (
+                  <Card key={room.id} className="bg-white/5 border-white/10">
+                    <CardHeader className="p-4 pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm text-white/90">{room.name}</CardTitle>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {participants.length} <Users2 className="h-2.5 w-2.5 ml-0.5" />
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-1 space-y-3">
+                      {participants.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {participants.map((a) => (
+                            <div key={a.user_id} className="flex items-center justify-between text-xs">
+                              <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
+                              <div className="flex items-center gap-1">
+                                <Select
+                                  value={moveTarget[a.user_id] || ""}
+                                  onValueChange={(v) => setMoveTarget({ ...moveTarget, [a.user_id]: v })}
+                                >
+                                  <SelectTrigger className="h-6 w-28 text-[10px] bg-transparent border-white/20 text-white/60">
+                                    <SelectValue placeholder="Mover a..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {cowork.rooms.filter(r => r.id !== room.id).map(r => (
+                                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {moveTarget[a.user_id] && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-primary"
+                                    onClick={async () => {
+                                      try {
+                                        await cowork.moveParticipant(a.user_id, moveTarget[a.user_id]);
+                                        toast.success("Participante movido");
+                                        setMoveTarget({ ...moveTarget, [a.user_id]: "" });
+                                      } catch (e: any) {
+                                        toast.error(e.message);
+                                      }
+                                    }}
+                                  >
+                                    <ArrowRightLeft className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-white/30 italic">Sin participantes</p>
+                      )}
+
+                      <div className="flex gap-1">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="flex-1 h-8 text-xs gap-1"
+                          onClick={() => enterRoom(room.id)}
+                        >
+                          <LogIn className="h-3 w-3" /> Entrar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-400 hover:text-blue-300"
+                          title="Copiar enlace de participante para esta sala"
+                          onClick={() => {
+                            const url = `${window.location.origin}/cowork?session=${cowork.session?.id || ""}&room=${room.id}`;
+                            navigator.clipboard.writeText(url);
+                            toast.success(`Enlace de ${room.name} copiado`);
+                          }}
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
