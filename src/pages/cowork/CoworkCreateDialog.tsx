@@ -46,7 +46,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." />
           </div>
           <div>
-            <Label>Salas</Label>
+            <Label>Salas <span className="text-xs text-muted-foreground font-normal">({roomNames.length}/10)</span></Label>
             <div className="space-y-2 mt-1">
               {roomNames.map((rn, i) => (
                 <div key={i} className="flex gap-2">
