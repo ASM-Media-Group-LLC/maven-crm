@@ -34,6 +34,7 @@ export interface HostRequest {
   user_id: string;
   message: string | null;
   status: "open" | "acknowledged" | "resolved";
+  oneone_livekit_room?: string;
   created_at: string;
 }
 
@@ -213,6 +214,10 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("claimScreenShareToken", { requestId });
   }, []);
 
+  const joinOneOnOne = useCallback(async (requestId: string) => {
+    return invokeCowork("joinOneOnOne", { requestId });
+  }, []);
+
   const endSession = useCallback(async () => {
     return invokeCowork("endSession", { sessionId });
   }, [sessionId]);
@@ -222,6 +227,6 @@ export function useCoworkSession(sessionId: string | null) {
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, claimScreenShareToken, endSession, getHostCode, refetch: fetchData,
+    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, refetch: fetchData,
   };
 }

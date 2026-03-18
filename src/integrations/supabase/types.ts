@@ -1340,6 +1340,7 @@ export type Database = {
           created_at: string
           id: string
           message: string | null
+          oneone_livekit_room: string | null
           resolved_at: string | null
           resolved_by: string | null
           room_id: string
@@ -1353,6 +1354,7 @@ export type Database = {
           created_at?: string
           id?: string
           message?: string | null
+          oneone_livekit_room?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           room_id: string
@@ -1366,6 +1368,7 @@ export type Database = {
           created_at?: string
           id?: string
           message?: string | null
+          oneone_livekit_room?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           room_id?: string

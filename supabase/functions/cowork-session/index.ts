@@ -324,12 +324,42 @@ serve(async (req) => {
       const { sessionId, roomId, message } = body;
       if (!sessionId || !roomId) return err("sessionId and roomId required");
 
+      const requestId = crypto.randomUUID();
+      const oneoneRoom = `cowork_1on1_${sessionId.slice(0, 8)}_${requestId.slice(0, 8)}`;
+
       const { data: req, error: reqErr } = await admin.from("cowork_host_requests").insert({
-        session_id: sessionId, room_id: roomId, user_id: userId, message: message || null,
+        id: requestId, session_id: sessionId, room_id: roomId, user_id: userId, message: message || null, oneone_livekit_room: oneoneRoom,
       }).select().single();
       if (reqErr) return err(reqErr.message, 500);
 
-      return json({ request: req });
+      return json({ request: req, oneone_livekit_room: oneoneRoom });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // JOIN 1:1 ROOM (for host requests)
+    // ═══════════════════════════════════════════════════════════════
+    if (action === "joinOneOnOne") {
+      const { requestId } = body;
+      if (!requestId) return err("requestId required");
+
+      const { data: hostReq } = await admin.from("cowork_host_requests").select("*").eq("id", requestId).single();
+      if (!hostReq) return err("Request not found");
+      if (!hostReq.oneone_livekit_room) return err("No 1:1 room for this request");
+
+      // Validate: caller must be the requester or a host of the session
+      const isRequester = hostReq.user_id === userId;
+      const { data: membership } = await admin.from("cowork_memberships").select("role").eq("session_id", hostReq.session_id).eq("user_id", userId).single();
+      if (!membership) return err("Not a member", 403);
+      const callerIsHost = membership.role === "host";
+
+      if (!isRequester && !callerIsHost) return err("Not authorized to join this 1:1 room", 403);
+
+      const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+      const token = await createLKToken(lkKey, lkSecret, identity, userName, {
+        roomJoin: true, room: hostReq.oneone_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: callerIsHost,
+      }, 3600);
+
+      return json({ token, url: lkUrl, room: hostReq.oneone_livekit_room });
     }
 
     // ═══════════════════════════════════════════════════════════════
