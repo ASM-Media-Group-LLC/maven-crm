@@ -420,7 +420,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               Hub
             </Button>
           ) : (
-            <div className="w-80 md:w-96 rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col" style={{ height: "280px" }}>
+            <div className="w-96 md:w-[480px] rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col" style={{ height: "380px" }}>
               <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
                   <Crown className="h-3 w-3" />

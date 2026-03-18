@@ -1,13 +1,22 @@
 
 
-## Plan: Enlarge Host Hub Pop-up Window
+## Problem
 
-### Change
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-In `src/pages/cowork/CoworkHostDashboard.tsx` line 423, increase the pop-up dimensions:
+## Solution
 
-- **Width**: `w-80 md:w-96` → `w-96 md:w-[480px]` (from 320/384px to 384/480px)
-- **Height**: `280px` → `380px`
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-Single line change. No other files affected.
+## Changes
+
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
