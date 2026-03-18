@@ -145,6 +145,23 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
           />
+        ) : manuallyLeft ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <p className="text-white/60 text-sm">Has salido de la sala</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setManuallyLeft(false);
+                if (myRoom?.livekit_room_name) {
+                  setConnectedLkRoom(myRoom.livekit_room_name);
+                }
+              }}
+            >
+              Reconectar
+            </Button>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-white/60" />
