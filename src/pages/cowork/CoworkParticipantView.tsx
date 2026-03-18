@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2 } from "lucide-react";
+import { Hand, Monitor, Loader2, X, Crown } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -19,12 +19,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
   const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
-  // Track whether we already claimed the current approved request
   const claimedRequestRef = useRef<string | null>(null);
-  // Track previous room assignment to detect host-initiated moves
   const prevRoomIdRef = useRef<string | null>(null);
-  // Store claimed screen share token for reconnection
   const screenShareTokenRef = useRef<TokenResult>(null);
+
+  // 1:1 state
+  const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
+  const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
@@ -40,7 +41,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // When assignment changes, update the connected room
   useEffect(() => {
-    // If host moved participant to a different room, reset manuallyLeft and clear screen share token
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
       setHasScreenShareAccess(false);
@@ -48,7 +48,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
-    if (manuallyLeft) return; // Don't auto-connect if user intentionally left
+    if (manuallyLeft) return;
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
@@ -71,9 +71,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           if (result?.token && result?.url && result?.room) {
             toast.success("Pantalla compartida aprobada. Reconectando...");
             setHasScreenShareAccess(true);
-            // Store the claimed token so the reconnection uses it
             screenShareTokenRef.current = { token: result.token, url: result.url, room: result.room };
-            // Force reconnect — the getToken callback will use the stored token
             setConnectedLkRoom(null);
             setTimeout(() => setConnectedLkRoom(result.room), 300);
           }
@@ -84,17 +82,35 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
+  // Auto-close 1:1 overlay when host request is resolved
+  useEffect(() => {
+    if (!oneOnOneRequestId) return;
+    const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
+    // If request disappeared from the list (resolved) or status is resolved, close
+    if (!req || req.status === "resolved") {
+      setOneOnOneRoom(null);
+      setOneOnOneRequestId(null);
+      toast.info("Sesión 1:1 con host finalizada");
+    }
+  }, [cowork.hostRequests, oneOnOneRequestId]);
+
   // Token provider: use screen share token if available, otherwise regular cowork token
   const getToken = useCallback(async () => {
     const ssToken = screenShareTokenRef.current;
     if (ssToken) {
-      // Consume the one-time screen share token
       screenShareTokenRef.current = null;
       return { token: ssToken.token, url: ssToken.url };
     }
     const result = await cowork.issueLiveKitToken("join_room");
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken]);
+
+  // Token provider for 1:1 room
+  const getOneOnOneToken = useCallback(async () => {
+    if (!oneOnOneRequestId) throw new Error("No 1:1 request");
+    const result = await cowork.joinOneOnOne(oneOnOneRequestId);
+    return { token: result.token, url: result.url };
+  }, [cowork.joinOneOnOne, oneOnOneRequestId]);
 
   if (!myAssignment) {
     return (
@@ -105,6 +121,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       </div>
     );
   }
+
+  const isInOneOnOne = !!oneOnOneRoom;
 
   return (
     <div className="flex flex-col h-screen bg-[#202124]">
@@ -119,16 +137,24 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             variant="ghost"
             size="sm"
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
+            disabled={isInOneOnOne}
             onClick={async () => {
               try {
-                await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
+                const result = await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
                 toast.success("Solicitud enviada al host");
+                // Auto-connect to 1:1 room
+                const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
+                const reqId = result?.request?.id;
+                if (roomName && reqId) {
+                  setOneOnOneRequestId(reqId);
+                  setOneOnOneRoom(roomName);
+                }
               } catch (e: any) {
                 toast.error(e.message);
               }
             }}
           >
-            <Hand className="h-4 w-4" /> Pedir host
+            <Hand className="h-4 w-4" /> {isInOneOnOne ? "En llamada con host..." : "Pedir host"}
           </Button>
           {!hasScreenShareAccess && (
             <Button
@@ -195,6 +221,48 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </div>
         )}
       </div>
+
+      {/* Floating 1:1 overlay with host */}
+      {oneOnOneRoom && oneOnOneRequestId && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
+          <div className="rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col w-96 md:w-[480px]" style={{ height: "380px" }}>
+            <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
+                <Crown className="h-3 w-3" />
+                1:1 con Host
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-red-400 hover:text-red-300"
+                onClick={() => {
+                  setOneOnOneRoom(null);
+                  setOneOnOneRequestId(null);
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <LiveKitCallView
+                roomName={oneOnOneRoom}
+                displayName={displayName}
+                callDisplayName="1:1 con Host"
+                isAdmin={false}
+                onLeave={() => {
+                  setOneOnOneRoom(null);
+                  setOneOnOneRequestId(null);
+                }}
+                hideShareLink
+                initialMicOn={true}
+                initialCamOn={false}
+                getToken={getOneOnOneToken}
+                compact
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -227,6 +227,6 @@ export function useCoworkSession(sessionId: string | null) {
     myMembership, myAssignment, isHost, loading, profiles,
     createSession, joinSession, assignToRoom, moveParticipant,
     issueLiveKitToken, requestHost, ackHostRequest, resolveHostRequest,
-    requestScreenShare, approveScreenShare, claimScreenShareToken, endSession, getHostCode, refetch: fetchData,
+    requestScreenShare, approveScreenShare, claimScreenShareToken, joinOneOnOne, endSession, getHostCode, refetch: fetchData,
   };
 }
