@@ -285,7 +285,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                         <div className="space-y-1.5">
                           {participants.map((a) => (
                             <div key={a.user_id} className="flex items-center justify-between text-xs">
-                              <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isOnline(a.user_id) ? "bg-green-400" : "bg-white/20"}`} />
+                                <span className="text-white/70 truncate">{cowork.profiles[a.user_id] || "User"}</span>
+                              </div>
                               <div className="flex items-center gap-1">
                                 <Select
                                   value={moveTarget[a.user_id] || ""}
