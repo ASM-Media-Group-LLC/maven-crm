@@ -1,0 +1,1 @@
+ALTER TABLE public.cowork_host_requests ADD COLUMN oneone_livekit_room text;
