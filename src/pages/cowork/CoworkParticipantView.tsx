@@ -158,11 +158,13 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={() => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
+              screenShareTokenRef.current = null;
             }}
             hideShareLink
             hideScreenShare
             initialMicOn={false}
             initialCamOn={false}
+            getToken={getToken}
           />
         ) : manuallyLeft ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
