@@ -43,6 +43,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     // If host moved participant to a different room, reset manuallyLeft and clear screen share token
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
+      setHasScreenShareAccess(false);
       screenShareTokenRef.current = null;
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
