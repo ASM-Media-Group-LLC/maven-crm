@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, X, Crown } from "lucide-react";
+import { Hand, Monitor, Loader2, X, Crown, Phone } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -54,6 +54,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
 
+  const myOpenRequest = cowork.hostRequests.find(
+    r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
+  );
   const mySSReq = cowork.screenShareRequests.find(
     r => r.user_id === userId && r.status === "pending"
   );
@@ -144,16 +147,33 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <span className="text-white/40 text-xs">{cowork.session?.name}</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Simple notification request */}
           <Button
             variant="ghost"
             size="sm"
             className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={isInOneOnOne}
+            disabled={!!myOpenRequest || isInOneOnOne}
             onClick={async () => {
               try {
-                const result = await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
+                await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
                 toast.success("Solicitud enviada al host");
-                // Auto-connect to 1:1 room
+              } catch (e: any) {
+                toast.error(e.message);
+              }
+            }}
+          >
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+          </Button>
+          {/* 1:1 video call request */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
+            disabled={!!myOpenRequest || isInOneOnOne}
+            onClick={async () => {
+              try {
+                const result = await cowork.requestHost(myAssignment.room_id, "Llamada 1:1", true);
+                toast.success("Solicitud de llamada enviada al host");
                 const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
                 const reqId = result?.request?.id;
                 if (roomName && reqId) {
@@ -165,7 +185,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               }
             }}
           >
-            <Hand className="h-4 w-4" /> {isInOneOnOne ? "En llamada con host..." : "Pedir host"}
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada con host..." : "Llamar host"}
           </Button>
           {!hasScreenShareAccess && (
             <Button
