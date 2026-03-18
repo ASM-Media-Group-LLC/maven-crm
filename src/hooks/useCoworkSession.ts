@@ -214,6 +214,10 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("claimScreenShareToken", { requestId });
   }, []);
 
+  const joinOneOnOne = useCallback(async (requestId: string) => {
+    return invokeCowork("joinOneOnOne", { requestId });
+  }, []);
+
   const endSession = useCallback(async () => {
     return invokeCowork("endSession", { sessionId });
   }, [sessionId]);
