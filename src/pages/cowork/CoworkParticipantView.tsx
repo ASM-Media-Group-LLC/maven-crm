@@ -306,7 +306,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                   setOneOnOneRequestId(null);
                 }}
                 hideShareLink
-                initialMicOn={true}
+                initialMicOn={false}
                 initialCamOn={false}
                 getToken={getOneOnOneToken}
                 compact

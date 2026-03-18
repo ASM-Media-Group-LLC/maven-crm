@@ -1,20 +1,22 @@
 
 
-## Fix: Mic/Cam Always Off in Cowork Module
+## Problem
 
-### Problem
-Two places start with microphone ON, violating the "always off" rule for the Cowork module:
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-1. **`CoworkParticipantView.tsx` line 309**: The 1:1 overlay `LiveKitCallView` has `initialMicOn={true}`
-2. **`CoworkHostDashboard.tsx` line 370**: The host's active room view has `initialMicOn={!!oneOnOneRoom}` (evaluates to `true` when in a 1:1 call)
+## Solution
 
-Camera is already `false` everywhere — no changes needed there.
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-### Fix
-- **`CoworkParticipantView.tsx`**: Change `initialMicOn={true}` → `initialMicOn={false}` (line 309)
-- **`CoworkHostDashboard.tsx`**: Change `initialMicOn={!!oneOnOneRoom}` → `initialMicOn={false}` (line 370)
+## Changes
 
-### Files Modified
-- `src/pages/cowork/CoworkParticipantView.tsx` — 1 line change
-- `src/pages/cowork/CoworkHostDashboard.tsx` — 1 line change
+**File: `src/pages/sales-performance/useEarningsData.ts`**
+
+Replace the single `.select()` call with a paginated loop:
+
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 
