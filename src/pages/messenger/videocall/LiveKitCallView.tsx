@@ -113,6 +113,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     }
   }, [lk.participants, pinnedSid]);
 
+  // Fire onMediaStateChange when local participant's media state changes
+  const localP = lk.participants.find((p) => p.isLocal);
+  const localMicOn = localP ? !localP.isMuted : false;
+  const localCamOn = localP ? !localP.isCameraOff : false;
+  const localScreenShare = localP ? localP.isScreenSharing : false;
+  const onMediaStateChangeRef = useRef(onMediaStateChange);
+  onMediaStateChangeRef.current = onMediaStateChange;
+  useEffect(() => {
+    onMediaStateChangeRef.current?.({ micOn: localMicOn, camOn: localCamOn, screenShareOn: localScreenShare });
+  }, [localMicOn, localCamOn, localScreenShare]);
+
   const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
     if (pinnedSid) return "spotlight"; // pinned always forces spotlight
     const mode = viewSettings.layout;
