@@ -18,7 +18,10 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
   const [roomNames, setRoomNames] = useState(["Sala 1", "Sala 2"]);
   const [loading, setLoading] = useState(false);
 
-  const addRoom = () => setRoomNames([...roomNames, `Sala ${roomNames.length + 1}`]);
+  const MAX_ROOMS = 10;
+  const addRoom = () => {
+    if (roomNames.length < MAX_ROOMS) setRoomNames([...roomNames, `Sala ${roomNames.length + 1}`]);
+  };
   const removeRoom = (i: number) => setRoomNames(roomNames.filter((_, idx) => idx !== i));
   const updateRoom = (i: number, val: string) => {
     const copy = [...roomNames];
@@ -43,7 +46,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." />
           </div>
           <div>
-            <Label>Salas</Label>
+            <Label>Salas <span className="text-xs text-muted-foreground font-normal">({roomNames.length}/10)</span></Label>
             <div className="space-y-2 mt-1">
               {roomNames.map((rn, i) => (
                 <div key={i} className="flex gap-2">
@@ -55,7 +58,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
                   )}
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1">
+              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1" disabled={roomNames.length >= MAX_ROOMS}>
                 <Plus className="h-3 w-3" /> Agregar sala
               </Button>
             </div>
