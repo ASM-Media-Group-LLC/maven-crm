@@ -91,9 +91,22 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   useEffect(() => {
     if (!oneOnOneRequestId) return;
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
-    if (!req || req.status === "resolved") {
+    if (req) {
+      // Request found — mark as active so we can detect when it disappears
+      oneOnOneWasActiveRef.current = true;
+      if (req.status === "resolved") {
+        setOneOnOneRoom(null);
+        setOneOnOneRequestId(null);
+        dismissedRequestRef.current = null;
+        oneOnOneWasActiveRef.current = false;
+        toast.info("Sesión 1:1 con host finalizada");
+      }
+    } else if (oneOnOneWasActiveRef.current) {
+      // Was active before but now gone — resolved
       setOneOnOneRoom(null);
       setOneOnOneRequestId(null);
+      dismissedRequestRef.current = null;
+      oneOnOneWasActiveRef.current = false;
       toast.info("Sesión 1:1 con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
