@@ -93,6 +93,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setOneOnOneRequestId(null);
   }, []);
 
+  // Auto-close 1:1 when host request is resolved (mirrors participant logic)
+  useEffect(() => {
+    if (!oneOnOneRequestId) return;
+    const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
+    if (!req || req.status === "resolved") {
+      leaveOneOnOne();
+      leaveActiveRoom();
+      toast.info("Sesión 1:1 finalizada");
+    }
+  }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne, leaveActiveRoom]);
+
   const getOneOnOneToken = useCallback(async () => {
     if (!oneOnOneRequestId) throw new Error("No 1:1 request");
     const result = await cowork.joinOneOnOne(oneOnOneRequestId);

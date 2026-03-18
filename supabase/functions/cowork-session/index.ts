@@ -324,6 +324,18 @@ serve(async (req) => {
       const { sessionId, roomId, message } = body;
       if (!sessionId || !roomId) return err("sessionId and roomId required");
 
+      // Check for existing open/acknowledged request from this user
+      const { data: existingReq } = await admin.from("cowork_host_requests")
+        .select("*")
+        .eq("session_id", sessionId)
+        .eq("user_id", userId)
+        .in("status", ["open", "acknowledged"])
+        .maybeSingle();
+
+      if (existingReq) {
+        return json({ request: existingReq, oneone_livekit_room: existingReq.oneone_livekit_room });
+      }
+
       const requestId = crypto.randomUUID();
       const oneoneRoom = `cowork_1on1_${sessionId.slice(0, 8)}_${requestId.slice(0, 8)}`;
 
