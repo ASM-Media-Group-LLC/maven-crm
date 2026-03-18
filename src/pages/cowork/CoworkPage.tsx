@@ -36,11 +36,12 @@ export default function CoworkPage() {
     const canAutoJoin = (role === "host" && code) || roomId;
     if (!canAutoJoin) return;
 
-    // If already a member with the correct role, skip
+    // If already a member with the correct role, skip — unless participant needs room assignment
     if (cowork.myMembership) {
       const wantsHost = role === "host" && code;
       const isHost = cowork.myMembership.role === "host";
-      if ((wantsHost && isHost) || (!wantsHost && !isHost)) return;
+      const needsRoomAssignment = !wantsHost && !isHost && roomId && !cowork.myAssignment;
+      if (((wantsHost && isHost) || (!wantsHost && !isHost)) && !needsRoomAssignment) return;
     }
 
     setAutoJoining(true);

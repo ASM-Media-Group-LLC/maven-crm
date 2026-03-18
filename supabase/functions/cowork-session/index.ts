@@ -146,6 +146,20 @@ serve(async (req) => {
       if (existing) {
         // Same role → return as-is
         if (existing.role === memberRole) {
+          // If participant re-joins with a roomId but has no active assignment, create one
+          if (memberRole === "participant" && roomId) {
+            const { data: currentAssignment } = await admin.from("cowork_room_assignments")
+              .select("id").eq("session_id", sessionId).eq("user_id", userId).eq("is_active", true).single();
+            if (!currentAssignment) {
+              const { data: roomCheck } = await admin.from("cowork_rooms")
+                .select("id").eq("id", roomId).eq("session_id", sessionId).single();
+              if (roomCheck) {
+                await admin.from("cowork_room_assignments").insert({
+                  session_id: sessionId, user_id: userId, room_id: roomId, assigned_by: userId,
+                });
+              }
+            }
+          }
           return json({ membership: existing, alreadyJoined: true });
         }
 
