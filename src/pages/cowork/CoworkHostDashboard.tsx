@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { supabase } from "@/integrations/supabase/client";
+import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 
 interface Props {
