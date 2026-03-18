@@ -256,7 +256,7 @@ serve(async (req) => {
         const { data: session } = await admin.from("cowork_sessions").select("host_hub_livekit_room").eq("id", sessionId).single();
         if (!session) return err("Session not found");
 
-        const identity = `${userId}_${crypto.randomUUID().slice(0, 8)}`;
+        const identity = userId;
         const token = await createLKToken(lkKey, lkSecret, identity, userName, {
           roomJoin: true, room: session.host_hub_livekit_room, canPublish: true, canSubscribe: true, canPublishData: true, roomAdmin: true,
         });
