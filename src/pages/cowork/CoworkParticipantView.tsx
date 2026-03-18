@@ -297,7 +297,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 text-red-400 hover:text-red-300"
-                onClick={() => {
+                onClick={async () => {
+                  if (oneOnOneRequestId) {
+                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+                  }
                   dismissedRequestRef.current = oneOnOneRequestId;
                   setOneOnOneRoom(null);
                   setOneOnOneRequestId(null);
@@ -312,7 +315,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 displayName={displayName}
                 callDisplayName="1:1 con Host"
                 isAdmin={false}
-                onLeave={() => {
+                onLeave={async () => {
+                  if (oneOnOneRequestId) {
+                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+                  }
                   setOneOnOneRoom(null);
                   setOneOnOneRequestId(null);
                 }}
