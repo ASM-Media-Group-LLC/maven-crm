@@ -1051,7 +1051,7 @@ export function useLiveKit() {
       });
 
       // ── Connect & publish tracks ────────────────────────────
-      await room.connect(livekitUrl, data.token);
+      await room.connect(livekitUrl, tokenData.token);
       console.info("[LiveKit] Connected to room:", roomName, "as", room.localParticipant.identity);
       console.info("[LiveKit] Remote participants already in room:", room.remoteParticipants.size);
 
