@@ -1,27 +1,22 @@
 
 
-## Plan: Auto-Join from Invite URLs (Skip Lobby)
+## Problem
 
-### Problem
-When a user clicks a host invite link (`?session=X&role=host&code=Y`) or a participant room link (`?session=X&room=Z`), they see a lobby card requiring manual button clicks. Since the URL already contains all needed info, the system should auto-join directly.
+Supabase returns a maximum of **1000 rows** by default per query. The `of_gross_earnings` table has ~1,400 rows per day, so the current fetch only retrieves about 1.5 days of data — that's why you only see March 3 and 4.
 
-### Changes
+## Solution
 
-#### 1. Auto-join in `CoworkPage.tsx`
-Add an effect that detects when `!cowork.myMembership` and the URL contains sufficient join info, then auto-joins without showing the lobby:
+Paginate the Supabase query to fetch **all rows** across multiple requests of 1000 each, until no more data is returned.
 
-- **Host link** (`role=host` + `code=X`): Auto-call `cowork.joinSession(sessionId, "host", code)` → skip lobby entirely
-- **Participant link** (`room=X`): Auto-call `cowork.joinSession(sessionId, "participant", undefined, roomId)` → skip lobby
-- Track an `autoJoining` state to show a spinner during the process
-- On error, fall back to showing the `CoworkLobby` so the user can retry manually
+## Changes
 
-#### 2. Simplify `CoworkLobby.tsx`
-The lobby becomes a fallback-only view (no URL params to auto-join). Remove the URL param reading logic (`role`, `code`) from the lobby since it's now handled upstream. Keep it as a simple "Join as participant" screen for direct `/cowork?session=X` links without role/room params.
+**File: `src/pages/sales-performance/useEarningsData.ts`**
 
-### Files
+Replace the single `.select()` call with a paginated loop:
 
-| Action | File |
-|--------|------|
-| Modify | `src/pages/cowork/CoworkPage.tsx` — add auto-join effect |
-| Modify | `src/pages/cowork/CoworkLobby.tsx` — simplify to fallback only |
+1. Fetch in batches of 1000 rows using `.range(offset, offset + 999)`
+2. Continue fetching until a batch returns fewer than 1000 rows
+3. Concatenate all batches before processing (mapping creators, computing effective dates, deduplicating)
+
+This ensures all historical data is loaded regardless of how many rows exist in the table.
 

@@ -14,6 +14,8 @@ export default function CoworkPage() {
   const sessionId = searchParams.get("session");
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
+  const [autoJoining, setAutoJoining] = useState(false);
+  const [autoJoinFailed, setAutoJoinFailed] = useState(false);
   
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -22,6 +24,36 @@ export default function CoworkPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
+
+  // Auto-join from invite URL params
+  useEffect(() => {
+    if (!sessionId || cowork.loading || cowork.myMembership || autoJoining || autoJoinFailed) return;
+
+    const role = searchParams.get("role");
+    const code = searchParams.get("code");
+    const roomId = searchParams.get("room");
+
+    const canAutoJoin = (role === "host" && code) || roomId;
+    if (!canAutoJoin) return;
+
+    setAutoJoining(true);
+    const doJoin = async () => {
+      try {
+        if (role === "host" && code) {
+          await cowork.joinSession(sessionId, "host", code);
+        } else if (roomId) {
+          await cowork.joinSession(sessionId, "participant", undefined, roomId);
+        }
+        cowork.refetch();
+      } catch (e) {
+        console.error("Auto-join failed:", e);
+        setAutoJoinFailed(true);
+      } finally {
+        setAutoJoining(false);
+      }
+    };
+    doJoin();
+  }, [sessionId, cowork.loading, cowork.myMembership, autoJoining, autoJoinFailed, searchParams]);
 
   // No session selected → lobby
   if (!sessionId) {
@@ -54,7 +86,7 @@ export default function CoworkPage() {
     );
   }
 
-  if (cowork.loading) {
+  if (cowork.loading || autoJoining) {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
@@ -62,14 +94,12 @@ export default function CoworkPage() {
     );
   }
 
-  // Not a member yet → lobby to join
-  const roomFromUrl = searchParams.get("room");
+  // Not a member yet → lobby fallback (only shown when auto-join not possible or failed)
   if (!cowork.myMembership) {
     return (
       <CoworkLobby
         sessionId={sessionId}
         session={cowork.session}
-        roomId={roomFromUrl}
         onJoin={async (role, hostCode, roomId) => {
           await cowork.joinSession(sessionId, role, hostCode, roomId);
           cowork.refetch();
