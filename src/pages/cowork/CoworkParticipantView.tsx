@@ -163,6 +163,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onLeave={() => {
               setConnectedLkRoom(null);
               setManuallyLeft(true);
+              setHasScreenShareAccess(false);
               screenShareTokenRef.current = null;
             }}
             hideShareLink
