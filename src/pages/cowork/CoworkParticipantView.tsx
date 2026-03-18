@@ -136,7 +136,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             displayName={displayName}
             callDisplayName={myRoom?.name}
             isAdmin={false}
-            onLeave={() => setConnectedLkRoom(null)}
+            onLeave={() => {
+              setConnectedLkRoom(null);
+              setManuallyLeft(true);
+            }}
             hideShareLink
             hideScreenShare
             initialMicOn={false}
