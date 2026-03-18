@@ -46,9 +46,11 @@ interface LiveKitCallViewProps {
   compact?: boolean;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
+  /** Fires whenever the local participant's media state changes */
+  onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, compact, getToken }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, compact, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
@@ -110,6 +112,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       setPinnedSid(null);
     }
   }, [lk.participants, pinnedSid]);
+
+  // Fire onMediaStateChange when local participant's media state changes
+  const localP = lk.participants.find((p) => p.isLocal);
+  const localMicOn = localP ? !localP.isMuted : false;
+  const localCamOn = localP ? !localP.isCameraOff : false;
+  const localScreenShare = localP ? localP.isScreenSharing : false;
+  const onMediaStateChangeRef = useRef(onMediaStateChange);
+  onMediaStateChangeRef.current = onMediaStateChange;
+  useEffect(() => {
+    onMediaStateChangeRef.current?.({ micOn: localMicOn, camOn: localCamOn, screenShareOn: localScreenShare });
+  }, [localMicOn, localCamOn, localScreenShare]);
 
   const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
     if (pinnedSid) return "spotlight"; // pinned always forces spotlight

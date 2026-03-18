@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
+import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
 
 type TokenResult = { token: string; url: string; room?: string } | null;
 
@@ -32,6 +33,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
+
+  // Media presence broadcasting
+  const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
+  const handleMediaStateChange = useCallback(
+    (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
+      trackMediaState(state);
+    },
+    [trackMediaState]
+  );
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -248,6 +258,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             initialMicOn={false}
             initialCamOn={false}
             getToken={getToken}
+            onMediaStateChange={handleMediaStateChange}
           />
         ) : manuallyLeft ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">

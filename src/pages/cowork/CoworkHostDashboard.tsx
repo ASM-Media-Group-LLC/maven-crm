@@ -6,13 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Users2, Crown, Hand, Monitor, LogIn, ArrowRightLeft,
+  Users2, Crown, Hand, Monitor, LogIn,
   Check, X, Loader2, Radio, Power, Link2, Menu, XIcon, Maximize2, Minimize2, Phone,
+  Mic, MicOff, Video, VideoOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import { supabase } from "@/integrations/supabase/client";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
+import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 
 interface Props {
@@ -23,13 +25,13 @@ interface Props {
 export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const navigate = useNavigate();
   const { isOnline } = useOnlinePresence();
+  const { mediaStates } = useCoworkMediaPresence(cowork.session?.id, userId);
   const [displayName, setDisplayName] = useState("Host");
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [activeRoomLk, setActiveRoomLk] = useState<string | null>(null);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoomName, setActiveRoomName] = useState<string | null>(null);
   const [hubConnected, setHubConnected] = useState(false);
-  const [moveTarget, setMoveTarget] = useState<Record<string, string>>({});
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hubMinimized, setHubMinimized] = useState(false);
@@ -404,39 +406,17 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                                   <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card ${online ? "bg-green-400" : "bg-white/20"}`} />
                                 </div>
                                 <span className="text-[11px] text-white/70 truncate w-full">{fullName}</span>
-                                <div className="flex items-center gap-0.5 w-full">
-                                  <Select
-                                    value={moveTarget[a.user_id] || ""}
-                                    onValueChange={(v) => setMoveTarget({ ...moveTarget, [a.user_id]: v })}
-                                  >
-                                    <SelectTrigger className="h-5 w-full text-[9px] bg-transparent border-white/20 text-white/50">
-                                      <SelectValue placeholder="Mover" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {cowork.rooms.filter(r => r.id !== room.id).map(r => (
-                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  {moveTarget[a.user_id] && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-5 w-5 text-primary flex-shrink-0"
-                                      onClick={async () => {
-                                        try {
-                                          await cowork.moveParticipant(a.user_id, moveTarget[a.user_id]);
-                                          toast.success("Participante movido");
-                                          setMoveTarget({ ...moveTarget, [a.user_id]: "" });
-                                        } catch (e: any) {
-                                          toast.error(e.message);
-                                        }
-                                      }}
-                                    >
-                                      <ArrowRightLeft className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
+                                {(() => {
+                                  const ms = mediaStates[a.user_id];
+                                  if (!ms) return null;
+                                  return (
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {ms.micOn ? <Mic className="h-3 w-3 text-green-400" /> : <MicOff className="h-3 w-3 text-red-400/70" />}
+                                      {ms.camOn ? <Video className="h-3 w-3 text-green-400" /> : <VideoOff className="h-3 w-3 text-red-400/70" />}
+                                      {ms.screenShareOn && <Monitor className="h-3 w-3 text-blue-400" />}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             );
                           })}
