@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users2, Crown, Hand, Monitor, LogIn, ArrowRightLeft,
-  Check, X, Loader2, Radio, Power, Link2,
+  Check, X, Loader2, Radio, Power, Link2, Menu, XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
@@ -31,6 +31,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const [hubConnected, setHubConnected] = useState(false);
   const [moveTarget, setMoveTarget] = useState<Record<string, string>>({});
   const [hostInviteCode, setHostInviteCode] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -88,9 +89,30 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
 
   return (
-    <div className="flex h-screen bg-[#202124] text-white">
+    <div className="flex h-screen bg-[#202124] text-white relative">
+      {/* Mobile sidebar toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-3 left-3 z-50 md:hidden h-8 w-8 text-white/70 hover:text-white"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? <XIcon className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+      </Button>
+
+      {/* Overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Left sidebar - Dashboard */}
-      <div className="w-80 border-r border-white/10 flex flex-col">
+      <div className={`
+        fixed md:relative z-40 md:z-auto
+        w-72 md:w-80 h-full
+        border-r border-white/10 flex flex-col bg-[#202124]
+        transition-transform duration-200 ease-in-out
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
         <div className="p-4 border-b border-white/10">
           <div className="flex items-center justify-between">
             <div>
@@ -277,9 +299,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
             />
           </div>
         ) : (
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-4 pt-14 md:p-6">
             <h3 className="text-sm font-medium text-white/50 uppercase tracking-wider mb-4">Seleccione sala para ingresar</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
               {cowork.rooms.map((room) => {
                 const participants = getRoomParticipants(room.id);
                 return (
