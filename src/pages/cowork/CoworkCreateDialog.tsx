@@ -58,7 +58,7 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
                   )}
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1">
+              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1" disabled={roomNames.length >= MAX_ROOMS}>
                 <Plus className="h-3 w-3" /> Agregar sala
               </Button>
             </div>

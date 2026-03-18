@@ -91,6 +91,14 @@ serve(async (req) => {
     if (action === "createSession") {
       const { name, description, roomNames } = body; // roomNames: string[]
       if (!name || !roomNames?.length) return err("name and roomNames required");
+      if (roomNames.length > 10) return err("Máximo 10 salas por sesión");
+
+      // Check active session limit per user
+      const { count: activeCount } = await admin.from("cowork_sessions")
+        .select("*", { count: "exact", head: true })
+        .eq("created_by", userId)
+        .eq("status", "active");
+      if (activeCount !== null && activeCount >= 10) return err("Máximo 10 sesiones activas permitidas");
 
       const sessionId = crypto.randomUUID();
       const hostHubRoom = `cowork_hub_${sessionId.slice(0, 8)}`;
