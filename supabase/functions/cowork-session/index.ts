@@ -321,7 +321,7 @@ serve(async (req) => {
     // REQUEST HOST
     // ═══════════════════════════════════════════════════════════════
     if (action === "requestHost") {
-      const { sessionId, roomId, message } = body;
+      const { sessionId, roomId, message, requestOneOnOne } = body;
       if (!sessionId || !roomId) return err("sessionId and roomId required");
 
       // Check for existing open/acknowledged request from this user
@@ -337,7 +337,7 @@ serve(async (req) => {
       }
 
       const requestId = crypto.randomUUID();
-      const oneoneRoom = `cowork_1on1_${sessionId.slice(0, 8)}_${requestId.slice(0, 8)}`;
+      const oneoneRoom = requestOneOnOne ? `cowork_1on1_${sessionId.slice(0, 8)}_${requestId.slice(0, 8)}` : null;
 
       const { data: req, error: reqErr } = await admin.from("cowork_host_requests").insert({
         id: requestId, session_id: sessionId, room_id: roomId, user_id: userId, message: message || null, oneone_livekit_room: oneoneRoom,

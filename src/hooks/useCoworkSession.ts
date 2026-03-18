@@ -190,8 +190,8 @@ export function useCoworkSession(sessionId: string | null) {
     return invokeCowork("issueLiveKitToken", { sessionId, purpose, roomId });
   }, [sessionId]);
 
-  const requestHost = useCallback(async (roomId: string, message?: string) => {
-    return invokeCowork("requestHost", { sessionId, roomId, message });
+  const requestHost = useCallback(async (roomId: string, message?: string, requestOneOnOne?: boolean) => {
+    return invokeCowork("requestHost", { sessionId, roomId, message, requestOneOnOne: !!requestOneOnOne });
   }, [sessionId]);
 
   const ackHostRequest = useCallback(async (requestId: string) => {
