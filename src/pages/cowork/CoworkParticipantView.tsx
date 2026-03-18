@@ -167,7 +167,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               screenShareTokenRef.current = null;
             }}
             hideShareLink
-            hideScreenShare
+            hideScreenShare={!hasScreenShareAccess}
             initialMicOn={false}
             initialCamOn={false}
             getToken={getToken}
