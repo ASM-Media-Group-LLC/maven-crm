@@ -22,6 +22,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const claimedRequestRef = useRef<string | null>(null);
   const prevRoomIdRef = useRef<string | null>(null);
   const screenShareTokenRef = useRef<TokenResult>(null);
+  const dismissedRequestRef = useRef<string | null>(null);
+  const oneOnOneWasActiveRef = useRef(false);
 
   // 1:1 state
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
