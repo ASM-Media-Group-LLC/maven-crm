@@ -33,6 +33,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
         <TableHeader>
           <TableRow>
             <TableHead>Usuario</TableHead>
+            <TableHead>Correo</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Ficha HR</TableHead>
             <TableHead>Fecha de registro</TableHead>
