@@ -78,19 +78,18 @@ export const useAdminUsers = () => {
 
   const changeRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { data, error } = await supabase.functions.invoke("manage-user-roles", {
-        body: { action: "assign_role", user_id: userId, role },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return adminInvoke("manage-user-roles", { action: "assign_role", user_id: userId, role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Rol actualizado", description: "El rol del usuario ha sido cambiado exitosamente." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error instanceof SessionExpiredError) {
+        toast({ title: "Sesión expirada", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     },
   });
 
