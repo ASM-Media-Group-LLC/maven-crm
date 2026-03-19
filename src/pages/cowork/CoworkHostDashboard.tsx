@@ -105,7 +105,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!req || req.status === "resolved") {
       leaveOneOnOne();
       leaveActiveRoom();
-      toast.info("Sesión 1:1 finalizada");
+      toast.info("Llamada privada finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne, leaveActiveRoom]);
 
@@ -281,7 +281,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                             setOneOnOneRoom(req.oneone_livekit_room!);
                             setActiveRoomLk(req.oneone_livekit_room!);
                             setActiveRoomId(null);
-                            setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
+                            setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                             setHubMinimized(true);
                           }
                         }}>
@@ -294,10 +294,10 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           setOneOnOneRoom(req.oneone_livekit_room!);
                           setActiveRoomLk(req.oneone_livekit_room!);
                           setActiveRoomId(null);
-                          setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
+                          setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                           setHubMinimized(true);
                         }}>
-                          Unirse 1:1
+                          Unirse a llamada privada
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" className="h-5 text-[10px] text-green-400" onClick={async () => {
@@ -372,6 +372,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 leaveActiveRoom();
               }}
               hideShareLink
+              suppressLeaveToast
               initialMicOn={false}
               initialCamOn={false}
               getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
@@ -523,6 +524,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                 isAdmin={true}
                 onLeave={() => { setHubConnected(false); setHubMaximized(false); }}
                 hideShareLink
+                suppressLeaveToast
                 initialMicOn={false}
                 initialCamOn={false}
                 getToken={getHubToken}
