@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall } from "lucide-react";
+import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
 import { supabase } from "@/integrations/supabase/client";
 import { useCoworkMediaPresence } from "@/hooks/useCoworkMediaPresence";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type TokenResult = { token: string; url: string; room?: string } | null;
 
@@ -15,6 +22,7 @@ interface Props {
 }
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
+  const isMobile = useIsMobile();
   const [displayName, setDisplayName] = useState("User");
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
@@ -26,14 +34,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const pendingOneOnOneRef = useRef(false);
   const oneOnOneSeenInListRef = useRef(false);
 
-  // 1:1 state
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
 
   const myAssignment = cowork.myAssignment;
   const myRoom = cowork.rooms.find(r => r.id === myAssignment?.room_id);
 
-  // Media presence broadcasting
   const { trackMediaState } = useCoworkMediaPresence(cowork.session?.id, userId);
   const handleMediaStateChange = useCallback(
     (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => {
@@ -42,7 +48,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     [trackMediaState]
   );
 
-  // Helper to reconnect to main room
   const reconnectToMainRoom = useCallback(() => {
     setOneOnOneRoom(null);
     setOneOnOneRequestId(null);
@@ -59,7 +64,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     });
   }, []);
 
-  // When assignment changes, update the connected room
   useEffect(() => {
     if (myAssignment?.room_id && prevRoomIdRef.current && myAssignment.room_id !== prevRoomIdRef.current) {
       setManuallyLeft(false);
@@ -81,7 +85,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     r => r.user_id === userId && r.status === "pending"
   );
 
-  // Detect when screen share request is approved and auto-claim token
   useEffect(() => {
     const approvedReq = cowork.screenShareRequests.find(
       r => r.user_id === userId && (r as any).status === "approved"
@@ -105,7 +108,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
-  // Auto-close 1:1 overlay when host resolves the request
   useEffect(() => {
     if (!oneOnOneRequestId) {
       oneOnOneSeenInListRef.current = false;
@@ -113,7 +115,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
     if (req) oneOnOneSeenInListRef.current = true;
-    // Only act if we've previously seen the request in the list
     if (!oneOnOneSeenInListRef.current) return;
     if (req?.status === "resolved" || !req) {
       dismissedRequestRef.current = null;
@@ -122,7 +123,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
-  // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
   useEffect(() => {
     if (oneOnOneRequestId || pendingOneOnOneRef.current) return;
     const existingReq = cowork.hostRequests.find(
@@ -135,7 +135,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.hostRequests, userId, oneOnOneRequestId]);
 
-  // Dismissed but still active request (for reconnect button)
   const dismissedActiveRequest = cowork.hostRequests.find(
     r => r.user_id === userId
       && (r.status === "open" || r.status === "acknowledged")
@@ -143,7 +142,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       && r.id === dismissedRequestRef.current
   );
 
-  // Token provider: use screen share token if available, otherwise regular cowork token
   const getToken = useCallback(async () => {
     const ssToken = screenShareTokenRef.current;
     if (ssToken) {
@@ -154,7 +152,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     return { token: result.token, url: result.url };
   }, [cowork.issueLiveKitToken]);
 
-  // Token provider for 1:1 room
   const getOneOnOneToken = useCallback(async () => {
     if (!oneOnOneRequestId) throw new Error("No 1:1 request");
     const result = await cowork.joinOneOnOne(oneOnOneRequestId);
@@ -163,114 +160,134 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   if (!myAssignment) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
-        <p className="text-muted-foreground">Esperando asignación de sala por el host...</p>
-        <p className="text-xs text-muted-foreground">Sesión: {cowork.session?.name}</p>
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
+        <div className="flex flex-col items-center gap-3 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-muted-foreground text-sm text-center">Esperando asignación de sala por el host...</p>
+          <p className="text-xs text-muted-foreground/70">{cowork.session?.name}</p>
+        </div>
       </div>
     );
   }
 
   const isInOneOnOne = !!oneOnOneRoom;
 
+  // Action handlers for both inline and dropdown
+  const handleRequestHost = async () => {
+    dismissedRequestRef.current = null;
+    try {
+      await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
+      toast.success("Solicitud enviada al host");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleRequestOneOnOne = async () => {
+    pendingOneOnOneRef.current = true;
+    try {
+      const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
+      toast.success("Solicitud de llamada privada enviada al host");
+      const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
+      const reqId = result?.request?.id;
+      if (roomName && reqId) {
+        setOneOnOneRequestId(reqId);
+        setOneOnOneRoom(roomName);
+        setConnectedLkRoom(null);
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      pendingOneOnOneRef.current = false;
+    }
+  };
+
+  const handleRequestScreenShare = async () => {
+    try {
+      await cowork.requestScreenShare(myAssignment.room_id);
+      toast.info("Solicitud de pantalla enviada, esperando aprobación...");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleReconnectPrivateCall = () => {
+    if (!dismissedActiveRequest) return;
+    dismissedRequestRef.current = null;
+    setOneOnOneRequestId(dismissedActiveRequest.id);
+    setOneOnOneRoom(dismissedActiveRequest.oneone_livekit_room!);
+    setConnectedLkRoom(null);
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-[#202124]">
-      {/* Top bar with cowork-specific actions */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#202124] border-b border-white/10 z-10">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col h-full bg-background">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-card border-b border-border z-10 shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
           {isInOneOnOne ? (
             <>
-              <Crown className="h-4 w-4 text-amber-400" />
-              <span className="text-amber-400 text-sm font-medium">Llamada privada con host</span>
+              <Crown className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-amber-500 text-sm font-medium truncate">Llamada privada con host</span>
             </>
           ) : (
             <>
-              <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
-              <span className="text-white/40 text-xs">{cowork.session?.name}</span>
+              <span className="text-foreground text-sm font-medium truncate">{myRoom?.name || "Sala"}</span>
+              <span className="text-muted-foreground/70 text-xs hidden sm:inline">{cowork.session?.name}</span>
             </>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {/* Reconnect to dismissed private call */}
+
+        {/* Desktop actions */}
+        <div className="hidden md:flex items-center gap-2">
           {dismissedActiveRequest && !isInOneOnOne && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 gap-1.5 animate-pulse"
-              onClick={() => {
-                dismissedRequestRef.current = null;
-                setOneOnOneRequestId(dismissedActiveRequest.id);
-                setOneOnOneRoom(dismissedActiveRequest.oneone_livekit_room!);
-                setConnectedLkRoom(null);
-              }}
-            >
+            <Button variant="ghost" size="sm" className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 gap-1.5 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
               <PhoneCall className="h-4 w-4" /> Reconectar a llamada privada
             </Button>
           )}
-          {/* Simple notification request */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={isInOneOnOne}
-            onClick={async () => {
-              dismissedRequestRef.current = null;
-              try {
-                await cowork.requestHost(myAssignment.room_id, "Necesito ayuda");
-                toast.success("Solicitud enviada al host");
-              } catch (e: any) {
-                toast.error(e.message);
-              }
-            }}
-          >
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host ingrese a la sala"}
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={isInOneOnOne} onClick={handleRequestHost}>
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
           </Button>
-          {/* 1:1 video call request */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-            disabled={!!myOpenRequest || isInOneOnOne}
-            onClick={async () => {
-              pendingOneOnOneRef.current = true;
-              try {
-                const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
-                toast.success("Solicitud de llamada privada enviada al host");
-                const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
-                const reqId = result?.request?.id;
-                if (roomName && reqId) {
-                  setOneOnOneRequestId(reqId);
-                  setOneOnOneRoom(roomName);
-                  setConnectedLkRoom(null);
-                }
-              } catch (e: any) {
-                toast.error(e.message);
-              } finally {
-                pendingOneOnOneRef.current = false;
-              }
-            }}
-          >
-            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada con host..." : "Llamada privada con host"}
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!myOpenRequest || isInOneOnOne} onClick={handleRequestOneOnOne}>
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada..." : "Llamada privada"}
           </Button>
           {!hasScreenShareAccess && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white/70 hover:text-white hover:bg-white/10 gap-1.5"
-              disabled={!!mySSReq}
-              onClick={async () => {
-                try {
-                  await cowork.requestScreenShare(myAssignment.room_id);
-                  toast.info("Solicitud de pantalla enviada, esperando aprobación...");
-                } catch (e: any) {
-                  toast.error(e.message);
-                }
-              }}
-            >
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 rounded-full" disabled={!!mySSReq} onClick={handleRequestScreenShare}>
               <Monitor className="h-4 w-4" />
               {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
             </Button>
           )}
+        </div>
+
+        {/* Mobile actions dropdown */}
+        <div className="flex md:hidden items-center gap-1">
+          {dismissedActiveRequest && !isInOneOnOne && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-amber-500 animate-pulse rounded-full" onClick={handleReconnectPrivateCall}>
+              <PhoneCall className="h-4 w-4" />
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-full">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuItem onClick={handleRequestHost} disabled={isInOneOnOne}>
+                <Hand className="h-4 w-4 mr-2" />
+                {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleRequestOneOnOne} disabled={!!myOpenRequest || isInOneOnOne}>
+                <Phone className="h-4 w-4 mr-2" />
+                {isInOneOnOne ? "En llamada privada..." : "Llamada privada con host"}
+              </DropdownMenuItem>
+              {!hasScreenShareAccess && (
+                <DropdownMenuItem onClick={handleRequestScreenShare} disabled={!!mySSReq}>
+                  <Monitor className="h-4 w-4 mr-2" />
+                  {mySSReq ? "Esperando aprobación..." : "Compartir pantalla"}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -284,7 +301,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             callDisplayName="Llamada privada con host"
             isAdmin={false}
             onLeave={() => {
-              // Participant leaves private call → return to main room, don't resolve
               dismissedRequestRef.current = oneOnOneRequestId;
               reconnectToMainRoom();
             }}
@@ -317,25 +333,27 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onMediaStateChange={handleMediaStateChange}
           />
         ) : manuallyLeft ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <p className="text-white/60 text-sm">Has salido de la sala</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => {
-                setManuallyLeft(false);
-                if (myRoom?.livekit_room_name) {
-                  setConnectedLkRoom(myRoom.livekit_room_name);
-                }
-              }}
-            >
-              Reconectar
-            </Button>
+          <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
+            <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 max-w-xs w-full">
+              <p className="text-muted-foreground text-sm">Has salido de la sala</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5 rounded-full"
+                onClick={() => {
+                  setManuallyLeft(false);
+                  if (myRoom?.livekit_room_name) {
+                    setConnectedLkRoom(myRoom.livekit_room_name);
+                  }
+                }}
+              >
+                Reconectar
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           </div>
         )}
       </div>
