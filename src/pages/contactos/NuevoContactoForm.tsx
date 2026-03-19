@@ -105,7 +105,23 @@ const NuevoContactoForm = () => {
   };
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Auto-detect platform when account link changes
+      if (key === "accountLink" && typeof value === "string") {
+        const detected = detectPlatformFromUrl(value);
+        if (detected) {
+          const platformMap: Record<string, string> = {
+            instagram: "Instagram",
+            tiktok: "TikTok",
+            twitter: "Twitter/X",
+            onlyfans: "OnlyFans",
+          };
+          next.plataforma = platformMap[detected] || next.plataforma;
+        }
+      }
+      return next;
+    });
     if (errors[key]) setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   };
 
