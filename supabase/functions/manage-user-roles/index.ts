@@ -1,10 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { createRemoteJWKSet, jwtVerify } from "https://deno.land/x/jose@v5.2.0/index.ts";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_JWKS = createRemoteJWKSet(
-  new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
-);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,20 +23,23 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    let callerId: string;
-    try {
-      const { payload } = await jwtVerify(token, SUPABASE_JWKS, {
-        issuer: `${SUPABASE_URL}/auth/v1`,
-      });
-      callerId = payload.sub as string;
-      if (!callerId) throw new Error("no sub claim");
-    } catch (jwtErr) {
-      console.error("[manage-user-roles] JWT verification failed:", (jwtErr as Error).message);
+    // Use getClaims() for HS256 token verification (compatible with Supabase signing-keys)
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error("[manage-user-roles] getClaims failed:", claimsError?.message ?? "no sub claim");
       return new Response(JSON.stringify({ error: "Unauthorized", reason: "invalid_token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const callerId = claimsData.claims.sub as string;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,

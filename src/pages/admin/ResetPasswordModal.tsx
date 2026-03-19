@@ -95,7 +95,7 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
 
             <div className="rounded-lg border border-green-200 bg-green-50 p-3">
               <p className="text-sm text-green-800">
-                Se envió un email al usuario con la contraseña temporal.
+                La contraseña fue actualizada. Comparte la contraseña temporal con el usuario de forma segura.
               </p>
             </div>
 
