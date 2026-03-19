@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KeyRound, Copy, Check, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 interface ResetPasswordModalProps {
   open: boolean;
@@ -23,15 +23,15 @@ const ResetPasswordModal = ({ open, onOpenChange, userName, userId }: ResetPassw
   const handleReset = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "reset_password", user_id: userId },
+      const data = await adminInvoke<{ temp_password: string }>("admin-user-actions", {
+        action: "reset_password",
+        user_id: userId,
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
       setTempPassword(data.temp_password);
       setStep("result");
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      const title = e instanceof SessionExpiredError ? "Sesión expirada" : "Error";
+      toast({ title, description: e.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

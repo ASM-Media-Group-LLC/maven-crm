@@ -18,8 +18,8 @@ import AddUserModal from "./AddUserModal";
 import type { AppRole } from "@/hooks/useUserRole";
 import { Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 
 const AdminUsuarios = () => {
   const { users, isLoading, changeRole, isChangingRole, stats } = useAdminUsers();
@@ -53,16 +53,17 @@ const AdminUsuarios = () => {
 
   const adminAction = useMutation({
     mutationFn: async (body: Record<string, string>) => {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", { body });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return adminInvoke("admin-user-actions", body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     },
     onError: (e: Error) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      if (e instanceof SessionExpiredError) {
+        toast({ title: "Sesión expirada", description: e.message, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      }
     },
   });
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import type { AppRole } from "@/hooks/useUserRole";
 
 export interface AdminUser {
@@ -43,16 +44,16 @@ export const useAdminUsers = () => {
       // Fetch emails via edge function (uses auth.admin.listUsers)
       let emailsMap = new Map<string, string>();
       try {
-        const { data: emailsData } = await supabase.functions.invoke("admin-user-actions", {
-          body: { action: "list_users" },
-        });
+        const emailsData = await adminInvoke<{ users: { id: string; email: string }[] }>("admin-user-actions", { action: "list_users" });
         if (emailsData?.users) {
-          emailsData.users.forEach((u: { id: string; email: string }) => {
+          emailsData.users.forEach((u) => {
             emailsMap.set(u.id, u.email || "");
           });
         }
-      } catch {
-        // If the edge function fails, emails stay empty
+      } catch (e) {
+        // If session expired, re-throw so react-query surfaces it
+        if (e instanceof SessionExpiredError) throw e;
+        // Otherwise emails stay empty
       }
 
       const rolesMap = new Map<string, AppRole>();
@@ -77,19 +78,18 @@ export const useAdminUsers = () => {
 
   const changeRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { data, error } = await supabase.functions.invoke("manage-user-roles", {
-        body: { action: "assign_role", user_id: userId, role },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return adminInvoke("manage-user-roles", { action: "assign_role", user_id: userId, role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       toast({ title: "Rol actualizado", description: "El rol del usuario ha sido cambiado exitosamente." });
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error instanceof SessionExpiredError) {
+        toast({ title: "Sesión expirada", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     },
   });
 
