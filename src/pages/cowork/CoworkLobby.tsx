@@ -1,7 +1,5 @@
-// CoworkLobby - fallback for direct session links
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users2, Loader2 } from "lucide-react";
 
 interface Props {
@@ -28,22 +26,33 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
 
   return (
     <div className="flex items-center justify-center min-h-[80vh] p-6">
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
-          <Users2 className="h-12 w-12 mx-auto text-primary/60 mb-2" />
-          <CardTitle>{session?.name || "Sesión Cowork"}</CardTitle>
+      <div className="max-w-md w-full bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="flex flex-col items-center gap-3 px-8 pt-10 pb-6">
+          <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10">
+            <Users2 className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground text-center">
+            {session?.name || "Sesión Cowork"}
+          </h2>
           {session?.description && (
-            <p className="text-sm text-muted-foreground">{session.description}</p>
+            <p className="text-sm text-muted-foreground text-center">{session.description}</p>
           )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-col gap-3 px-8 pb-8">
           <Button
             onClick={handleJoin}
             size="lg"
-            className="w-full gap-2"
+            className="w-full gap-2 rounded-full"
             disabled={loading}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users2 className="h-4 w-4" />}
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Users2 className="h-4 w-4" />
+            )}
             Unirse como participante
           </Button>
 
@@ -54,8 +63,8 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
           <p className="text-xs text-muted-foreground text-center mt-2">
             ID: {sessionId}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
