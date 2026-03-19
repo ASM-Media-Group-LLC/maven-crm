@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jwtVerify } from "https://deno.land/x/jose@v5.2.0/index.ts";
+import { createRemoteJWKSet, jwtVerify } from "https://deno.land/x/jose@v5.2.0/index.ts";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_JWKS = createRemoteJWKSet(
+  new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,12 +38,10 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // Verify JWT locally using the signing secret (no session dependency)
-    const jwtSecret = new TextEncoder().encode(Deno.env.get("SUPABASE_JWT_SECRET")!);
     let callerId: string;
     try {
-      const { payload } = await jwtVerify(token, jwtSecret, {
-        issuer: `${Deno.env.get("SUPABASE_URL")!}/auth/v1`,
+      const { payload } = await jwtVerify(token, SUPABASE_JWKS, {
+        issuer: `${SUPABASE_URL}/auth/v1`,
       });
       callerId = payload.sub as string;
       if (!callerId) throw new Error("no sub claim");
