@@ -208,6 +208,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 if (roomName && reqId) {
                   setOneOnOneRequestId(reqId);
                   setOneOnOneRoom(roomName);
+                  setConnectedLkRoom(null); // disconnect main room
                 }
               } catch (e: any) {
                 toast.error(e.message);
