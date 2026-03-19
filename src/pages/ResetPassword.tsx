@@ -21,54 +21,61 @@ const ResetPassword = () => {
 
   useEffect(() => {
     let isMounted = true;
-    let retryInterval: ReturnType<typeof setInterval> | null = null;
-    let safetyTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const isRecoveryRedirect = hashParams.get("type") === "recovery";
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const finish = (ready: boolean) => {
       if (!isMounted) return;
+      setRecoveryReady(ready);
+      setChecking(false);
+    };
+
+    // 1. Listen for the PASSWORD_RECOVERY event fired by Supabase client
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        setRecoveryReady(true);
-        setChecking(false);
-        if (retryInterval) clearInterval(retryInterval);
-        if (safetyTimeout) clearTimeout(safetyTimeout);
+        finish(true);
       }
     });
 
-    if (isRecoveryRedirect) {
-      const startTime = Date.now();
-      retryInterval = setInterval(async () => {
-        if (!isMounted) return;
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setRecoveryReady(true);
-          setChecking(false);
-          if (retryInterval) clearInterval(retryInterval);
-          if (safetyTimeout) clearTimeout(safetyTimeout);
-        }
-      }, 500);
+    // 2. Try to extract tokens from the URL hash that Supabase puts there
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    const type = hashParams.get("type");
 
-      safetyTimeout = setTimeout(() => {
-        if (!isMounted) return;
-        if (retryInterval) clearInterval(retryInterval);
-        setChecking(false);
-      }, 5000);
+    if (accessToken && refreshToken && type === "recovery") {
+      // Manually set the session from the hash tokens
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          if (error) {
+            console.error("ResetPassword: setSession failed", error.message);
+            finish(false);
+          } else {
+            finish(true);
+          }
+        });
     } else {
+      // No hash tokens — maybe the user already has a session (e.g. page reload)
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!isMounted) return;
-        if (session) setRecoveryReady(true);
-        setChecking(false);
+        if (session) {
+          finish(true);
+        } else {
+          // Give the auth listener a bit more time (the SDK may still be processing)
+          setTimeout(() => {
+            if (isMounted && !recoveryReady) {
+              supabase.auth.getSession().then(({ data: { session: s } }) => {
+                finish(!!s);
+              });
+            }
+          }, 3000);
+        }
       });
     }
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      if (retryInterval) clearInterval(retryInterval);
-      if (safetyTimeout) clearTimeout(safetyTimeout);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const hasMinLength = password.length >= 8;
