@@ -22,22 +22,29 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // Use service role client for privileged operations
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller identity using getUser with token
-    const { data: { user: caller }, error: userError } = await adminClient.auth.getUser(token);
-    if (userError || !caller) {
+    // Verify caller identity using signed JWT claims
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    const callerId = claimsData?.claims?.sub;
+
+    if (claimsError || !callerId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const callerId = caller.id;
+    
 
     // Verify caller is admin
     const { data: callerRole } = await adminClient
