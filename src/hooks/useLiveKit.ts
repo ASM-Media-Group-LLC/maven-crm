@@ -811,7 +811,7 @@ export function useLiveKit() {
 
     try {
       if (roomRef.current) {
-        roomRef.current.disconnect();
+        roomRef.current.disconnect(true);
         roomRef.current = null;
       }
       clearSyncInterval();
