@@ -46,13 +46,15 @@ interface LiveKitCallViewProps {
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
+  /** If set, auto-leave when remote participants reach 0 for this many ms */
+  autoLeaveOnEmpty?: number;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
   /** Fires whenever the local participant's media state changes */
   onMediaStateChange?: (state: { micOn: boolean; camOn: boolean; screenShareOn: boolean }) => void;
 }
 
-export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, suppressLeaveToast, compact, getToken, onMediaStateChange }: LiveKitCallViewProps) {
+export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
   const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
@@ -114,6 +116,17 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
       setPinnedSid(null);
     }
   }, [lk.participants, pinnedSid]);
+
+  // Auto-leave when remote participants reach 0 for autoLeaveOnEmpty ms
+  const handleLeaveRef = useRef(handleLeave);
+  handleLeaveRef.current = handleLeave;
+  useEffect(() => {
+    if (!autoLeaveOnEmpty || lk.connectionState !== ConnectionState.Connected) return;
+    const remoteCount = lk.participants.filter((p) => !p.isLocal).length;
+    if (remoteCount > 0) return;
+    const timer = setTimeout(() => { handleLeaveRef.current(); }, autoLeaveOnEmpty);
+    return () => clearTimeout(timer);
+  }, [autoLeaveOnEmpty, lk.participants, lk.connectionState]);
 
   // Fire onMediaStateChange when local participant's media state changes
   const localP = lk.participants.find((p) => p.isLocal);
