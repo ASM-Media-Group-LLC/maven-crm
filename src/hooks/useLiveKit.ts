@@ -1161,7 +1161,7 @@ export function useLiveKit() {
     ncProcessorRef.current = null;
     ncEnabledRef.current = false;
     setIsNoiseCancellationOn(false);
-    roomRef.current?.disconnect();
+    roomRef.current?.disconnect(true);
     roomRef.current = null;
     connectingRef.current = false;
     holdLocalVideoUntilBackgroundRef.current = false;
