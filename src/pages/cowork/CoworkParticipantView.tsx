@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, X, Crown, Phone } from "lucide-react";
+import { Hand, Monitor, Loader2, Crown, Phone } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -61,11 +61,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
-    if (manuallyLeft) return;
+    if (manuallyLeft || oneOnOneRoom) return; // don't reconnect main room during 1:1
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
-  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
+  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id, oneOnOneRoom]);
 
   const myOpenRequest = cowork.hostRequests.find(
     r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
@@ -110,27 +110,32 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         setOneOnOneRequestId(null);
         dismissedRequestRef.current = null;
         oneOnOneWasActiveRef.current = false;
+        // Auto-reconnect to main room
+        setManuallyLeft(false);
+        if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
         toast.info("Sesión 1:1 con host finalizada");
       }
     } else if (oneOnOneWasActiveRef.current) {
-      // Was active before but now gone — resolved
       setOneOnOneRoom(null);
       setOneOnOneRequestId(null);
       dismissedRequestRef.current = null;
       oneOnOneWasActiveRef.current = false;
+      setManuallyLeft(false);
+      if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
       toast.info("Sesión 1:1 con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
 
   // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
   useEffect(() => {
-    if (oneOnOneRequestId || pendingOneOnOneRef.current) return; // already in a 1:1 or pending
+    if (oneOnOneRequestId || pendingOneOnOneRef.current) return;
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
     if (existingReq && dismissedRequestRef.current !== existingReq.id) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
+      setConnectedLkRoom(null); // disconnect main room
     }
   }, [cowork.hostRequests, userId, oneOnOneRequestId]);
 
@@ -169,8 +174,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       {/* Top bar with cowork-specific actions */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#202124] border-b border-white/10 z-10">
         <div className="flex items-center gap-3">
-          <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
-          <span className="text-white/40 text-xs">{cowork.session?.name}</span>
+          {isInOneOnOne ? (
+            <>
+              <Crown className="h-4 w-4 text-amber-400" />
+              <span className="text-amber-400 text-sm font-medium">1:1 con Host</span>
+            </>
+          ) : (
+            <>
+              <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
+              <span className="text-white/40 text-xs">{cowork.session?.name}</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Simple notification request */}
@@ -207,6 +221,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 if (roomName && reqId) {
                   setOneOnOneRequestId(reqId);
                   setOneOnOneRoom(roomName);
+                  setConnectedLkRoom(null); // disconnect main room
                 }
               } catch (e: any) {
                 toast.error(e.message);
@@ -239,9 +254,32 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         </div>
       </div>
 
-      {/* Video area using existing LiveKitCallView */}
+      {/* Video area */}
       <div className="flex-1 min-h-0">
-        {connectedLkRoom ? (
+        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
+          <LiveKitCallView
+            roomName={oneOnOneRoom}
+            displayName={displayName}
+            callDisplayName="1:1 con Host"
+            isAdmin={false}
+            onLeave={async () => {
+              if (oneOnOneRequestId) {
+                try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+              }
+              setOneOnOneRoom(null);
+              setOneOnOneRequestId(null);
+              // Auto-reconnect to main room
+              setManuallyLeft(false);
+              if (myRoom?.livekit_room_name) {
+                setConnectedLkRoom(myRoom.livekit_room_name);
+              }
+            }}
+            hideShareLink
+            initialMicOn={false}
+            initialCamOn={false}
+            getToken={getOneOnOneToken}
+          />
+        ) : connectedLkRoom ? (
           <LiveKitCallView
             roomName={connectedLkRoom}
             displayName={displayName}
@@ -283,55 +321,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </div>
         )}
       </div>
-
-      {/* Floating 1:1 overlay with host */}
-      {oneOnOneRoom && oneOnOneRequestId && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
-          <div className="rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col w-96 md:w-[480px]" style={{ height: "380px" }}>
-            <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
-                <Crown className="h-3 w-3" />
-                1:1 con Host
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-red-400 hover:text-red-300"
-                onClick={async () => {
-                  if (oneOnOneRequestId) {
-                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
-                  }
-                  dismissedRequestRef.current = oneOnOneRequestId;
-                  setOneOnOneRoom(null);
-                  setOneOnOneRequestId(null);
-                }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <LiveKitCallView
-                roomName={oneOnOneRoom}
-                displayName={displayName}
-                callDisplayName="1:1 con Host"
-                isAdmin={false}
-                onLeave={async () => {
-                  if (oneOnOneRequestId) {
-                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
-                  }
-                  setOneOnOneRoom(null);
-                  setOneOnOneRequestId(null);
-                }}
-                hideShareLink
-                initialMicOn={false}
-                initialCamOn={false}
-                getToken={getOneOnOneToken}
-                compact
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
