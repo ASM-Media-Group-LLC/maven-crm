@@ -113,7 +113,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         // Auto-reconnect to main room
         setManuallyLeft(false);
         if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
-        toast.info("Sesión 1:1 con host finalizada");
+        toast.info("Llamada privada con host finalizada");
       }
     } else if (oneOnOneWasActiveRef.current) {
       setOneOnOneRoom(null);
@@ -122,7 +122,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       oneOnOneWasActiveRef.current = false;
       setManuallyLeft(false);
       if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
-      toast.info("Sesión 1:1 con host finalizada");
+      toast.info("Llamada privada con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
 
@@ -177,7 +177,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {isInOneOnOne ? (
             <>
               <Crown className="h-4 w-4 text-amber-400" />
-              <span className="text-amber-400 text-sm font-medium">1:1 con Host</span>
+              <span className="text-amber-400 text-sm font-medium">Llamada privada con host</span>
             </>
           ) : (
             <>
@@ -203,7 +203,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               }
             }}
           >
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host ingrese a la sala"}
           </Button>
           {/* 1:1 video call request */}
           <Button
@@ -214,8 +214,8 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             onClick={async () => {
               pendingOneOnOneRef.current = true;
               try {
-                const result = await cowork.requestHost(myAssignment.room_id, "Llamada 1:1", true);
-                toast.success("Solicitud de llamada enviada al host");
+                const result = await cowork.requestHost(myAssignment.room_id, "Llamada privada", true);
+                toast.success("Solicitud de llamada privada enviada al host");
                 const roomName = result?.oneone_livekit_room || result?.request?.oneone_livekit_room;
                 const reqId = result?.request?.id;
                 if (roomName && reqId) {
@@ -230,7 +230,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               }
             }}
           >
-            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada con host..." : "Llamar host"}
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada con host..." : "Llamada privada con host"}
           </Button>
           {!hasScreenShareAccess && (
             <Button
@@ -260,7 +260,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <LiveKitCallView
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="1:1 con Host"
+            callDisplayName="Llamada privada con host"
             isAdmin={false}
             onLeave={async () => {
               if (oneOnOneRequestId) {
