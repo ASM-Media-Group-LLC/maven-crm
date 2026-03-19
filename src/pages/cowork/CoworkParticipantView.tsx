@@ -230,7 +230,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               }
             }}
           >
-            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada con host..." : "Llamar host"}
+            <Phone className="h-4 w-4" /> {isInOneOnOne ? "En llamada privada con host..." : "Llamada privada con host"}
           </Button>
           {!hasScreenShareAccess && (
             <Button
