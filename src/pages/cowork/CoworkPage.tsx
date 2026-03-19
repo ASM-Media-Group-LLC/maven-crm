@@ -100,7 +100,7 @@ export default function CoworkPage() {
 
   if (cowork.loading || autoJoining) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-screen">
         <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
       </div>
     );
