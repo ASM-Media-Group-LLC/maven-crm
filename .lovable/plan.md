@@ -1,25 +1,34 @@
 
 
-## Plan: Simplify "Registrar Cobro" Modal
+## Plan: Fix Contact Insert Status & Table Ordering
 
-### Problem
-The modal currently has "Tipo de cobro" (quincenal/mensual) and "Estado" fields that don't match the intended workflow of collecting pending payments from creators. It should focus on: which creator, how much, and a note/detail.
+### Problems Found
+
+1. **Status mismatch on insert**: `NuevoContactoForm.tsx` line 138 inserts `status: "Nuevo"` (Spanish, capitalized) but the rest of the system uses English lowercase values (`new`, `contacted`, `interested`, `not_interested`). The `statusMap` in `ContactosContent.tsx` translates English→Spanish for display. Currently 4 records in the DB have `"Nuevo"` instead of `"new"`, meaning filters and KPIs may miscategorize them.
+
+2. **No March 18 records exist in the database**: Only March 17 (3 records) and March 19 (1 record) exist. The inserts on March 18 may have failed silently. After fixing the status value, future inserts will be consistent.
+
+3. **Table sort uses formatted date strings**: The `creacion` field is a locale-formatted string (`"19 mar, 14:30"`), so sorting by it produces alphabetical, not chronological order. The table should sort by the raw `created_at` timestamp.
 
 ### Changes
 
-**File: `src/pages/finanzas/collections/CollectionsPage.tsx`**
+**File: `src/pages/contactos/NuevoContactoForm.tsx`**
+- Line 138: Change `status: "Nuevo"` → `status: "new"` to match the expected English enum values used throughout the system.
 
-1. **Remove state variables**: Drop `regType` and `regStatus` (lines 52-53), and their reset calls (line 95).
+**File: `src/pages/contactos/ContactosContent.tsx`**
+- Add a `rawCreatedAt` field to the `Contacto` interface storing the ISO timestamp string from the DB.
+- Populate `rawCreatedAt` in the mapping (line 140) alongside the formatted `creacion`.
 
-2. **Simplify mutation**: Remove `statusMap` logic; always insert with `status: "enviada"` (pending) and `payment_method: "cobro"`. Store the note in the `notes` field of the invoices table (need to verify this column exists).
+**File: `src/pages/contactos/ContactosTable.tsx`**
+- Update sort logic for the `creacion` column to compare using `rawCreatedAt` (ISO string comparison) instead of the formatted locale string, ensuring correct chronological order.
+- Default sort: `creacion` descending (newest first) — already the default, but now it will work correctly.
 
-3. **Add note state**: Replace `regType`/`regStatus` with a new `regNotes` state variable.
+**Database fix (migration)**
+- Update the 4 existing records with `status = 'Nuevo'` to `status = 'new'` so they're consistent.
 
-4. **Rewrite modal form** (lines 379-414): Keep "Creadora" selector and "Monto" input. Replace "Tipo de cobro" and "Estado" with a single `Textarea` for notes/detail. Order: Creadora → Monto → Notas.
-
-5. **Update mutation insert**: Add `notes: regNotes` to the insert payload.
-
-### Technical Detail
-- The `invoices` table likely has a `notes` column already. Will verify and use it. If not, the field can map to an existing text column or we add a migration.
-- No other files affected. Removes ~20 lines of unused form code.
+### Files Modified
+- `src/pages/contactos/NuevoContactoForm.tsx` — fix status value
+- `src/pages/contactos/ContactosContent.tsx` — add `rawCreatedAt` field
+- `src/pages/contactos/ContactosTable.tsx` — fix sort by date
+- SQL migration to normalize existing `"Nuevo"` → `"new"`
 
