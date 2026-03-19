@@ -177,7 +177,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           {isInOneOnOne ? (
             <>
               <Crown className="h-4 w-4 text-amber-400" />
-              <span className="text-amber-400 text-sm font-medium">1:1 con Host</span>
+              <span className="text-amber-400 text-sm font-medium">Llamada privada con host</span>
             </>
           ) : (
             <>
