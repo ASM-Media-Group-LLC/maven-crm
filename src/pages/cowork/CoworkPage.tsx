@@ -65,7 +65,7 @@ export default function CoworkPage() {
   // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-4 md:p-6">
+      <div className="flex flex-col items-center justify-center h-screen gap-6 p-4 md:p-6">
         <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12 max-w-lg w-full">
           <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
             <Users2 className="h-8 w-8 md:h-10 md:w-10 text-primary" />
