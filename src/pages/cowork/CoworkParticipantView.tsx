@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Hand, Monitor, Loader2, Crown, Phone } from "lucide-react";
+import { Hand, Monitor, Loader2, Crown, Phone, PhoneCall } from "lucide-react";
 import { toast } from "sonner";
 import LiveKitCallView from "@/pages/messenger/videocall/LiveKitCallView";
 import type { useCoworkSession } from "@/hooks/useCoworkSession";
@@ -16,7 +16,6 @@ interface Props {
 
 export default function CoworkParticipantView({ cowork, userId }: Props) {
   const [displayName, setDisplayName] = useState("User");
-  const [ssRequestStatus, setSsRequestStatus] = useState<string | null>(null);
   const [connectedLkRoom, setConnectedLkRoom] = useState<string | null>(null);
   const [manuallyLeft, setManuallyLeft] = useState(false);
   const [hasScreenShareAccess, setHasScreenShareAccess] = useState(false);
@@ -24,7 +23,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const prevRoomIdRef = useRef<string | null>(null);
   const screenShareTokenRef = useRef<TokenResult>(null);
   const dismissedRequestRef = useRef<string | null>(null);
-  const oneOnOneWasActiveRef = useRef(false);
   const pendingOneOnOneRef = useRef(false);
 
   // 1:1 state
@@ -42,6 +40,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     },
     [trackMediaState]
   );
+
+  // Helper to reconnect to main room
+  const reconnectToMainRoom = useCallback(() => {
+    setOneOnOneRoom(null);
+    setOneOnOneRequestId(null);
+    setManuallyLeft(false);
+    if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
+  }, [myRoom?.livekit_room_name]);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -61,7 +67,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
-    if (manuallyLeft || oneOnOneRoom) return; // don't reconnect main room during 1:1
+    if (manuallyLeft || oneOnOneRoom) return;
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
@@ -98,33 +104,21 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
   }, [cowork.screenShareRequests, userId, cowork.claimScreenShareToken]);
 
-  // Auto-close 1:1 overlay when host request is resolved
+  // Auto-close 1:1 overlay when host resolves the request
   useEffect(() => {
     if (!oneOnOneRequestId) return;
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
-    if (req) {
-      // Request found — mark as active so we can detect when it disappears
-      oneOnOneWasActiveRef.current = true;
-      if (req.status === "resolved") {
-        setOneOnOneRoom(null);
-        setOneOnOneRequestId(null);
-        dismissedRequestRef.current = null;
-        oneOnOneWasActiveRef.current = false;
-        // Auto-reconnect to main room
-        setManuallyLeft(false);
-        if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
-        toast.info("Llamada privada con host finalizada");
-      }
-    } else if (oneOnOneWasActiveRef.current) {
-      setOneOnOneRoom(null);
-      setOneOnOneRequestId(null);
+    if (req?.status === "resolved") {
       dismissedRequestRef.current = null;
-      oneOnOneWasActiveRef.current = false;
-      setManuallyLeft(false);
-      if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
+      reconnectToMainRoom();
+      toast.info("Llamada privada con host finalizada");
+    } else if (!req) {
+      // Request disappeared from the list (resolved and filtered out)
+      dismissedRequestRef.current = null;
+      reconnectToMainRoom();
       toast.info("Llamada privada con host finalizada");
     }
-  }, [cowork.hostRequests, oneOnOneRequestId]);
+  }, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
 
   // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
   useEffect(() => {
@@ -135,9 +129,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     if (existingReq && dismissedRequestRef.current !== existingReq.id) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
-      setConnectedLkRoom(null); // disconnect main room
+      setConnectedLkRoom(null);
     }
   }, [cowork.hostRequests, userId, oneOnOneRequestId]);
+
+  // Dismissed but still active request (for reconnect button)
+  const dismissedActiveRequest = cowork.hostRequests.find(
+    r => r.user_id === userId
+      && (r.status === "open" || r.status === "acknowledged")
+      && r.oneone_livekit_room
+      && r.id === dismissedRequestRef.current
+  );
 
   // Token provider: use screen share token if available, otherwise regular cowork token
   const getToken = useCallback(async () => {
@@ -187,6 +189,22 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Reconnect to dismissed private call */}
+          {dismissedActiveRequest && !isInOneOnOne && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 gap-1.5 animate-pulse"
+              onClick={() => {
+                dismissedRequestRef.current = null;
+                setOneOnOneRequestId(dismissedActiveRequest.id);
+                setOneOnOneRoom(dismissedActiveRequest.oneone_livekit_room!);
+                setConnectedLkRoom(null);
+              }}
+            >
+              <PhoneCall className="h-4 w-4" /> Reconectar a llamada privada
+            </Button>
+          )}
           {/* Simple notification request */}
           <Button
             variant="ghost"
@@ -221,7 +239,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
                 if (roomName && reqId) {
                   setOneOnOneRequestId(reqId);
                   setOneOnOneRoom(roomName);
-                  setConnectedLkRoom(null); // disconnect main room
+                  setConnectedLkRoom(null);
                 }
               } catch (e: any) {
                 toast.error(e.message);
@@ -262,17 +280,10 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             displayName={displayName}
             callDisplayName="Llamada privada con host"
             isAdmin={false}
-            onLeave={async () => {
-              if (oneOnOneRequestId) {
-                try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
-              }
-              setOneOnOneRoom(null);
-              setOneOnOneRequestId(null);
-              // Auto-reconnect to main room
-              setManuallyLeft(false);
-              if (myRoom?.livekit_room_name) {
-                setConnectedLkRoom(myRoom.livekit_room_name);
-              }
+            onLeave={() => {
+              // Participant leaves private call → return to main room, don't resolve
+              dismissedRequestRef.current = oneOnOneRequestId;
+              reconnectToMainRoom();
             }}
             hideShareLink
             suppressLeaveToast
