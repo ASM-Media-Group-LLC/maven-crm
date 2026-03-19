@@ -1,46 +1,34 @@
 
 
-## Fix: Ghost Session on Host After Participant Leaves Private Call
+## Fix: Private Call Hang Up Should Return to Main Room with Reconnect Option
 
-### Root Cause
+### Current Problem
+When the participant hangs up the private call, `resolveHostRequest` is called (line 267), which kills the session on both sides. The same happens when `autoLeaveOnEmpty` fires. There's no way to rejoin if the host is still waiting.
 
-When the participant leaves the private call, the cleanup depends on an API call (`resolveHostRequest`) succeeding AND the realtime subscription delivering the change to the host. Two failure scenarios cause a persistent ghost on the host side:
+### Desired Behavior
+- Participant hangs up → returns to main room immediately
+- If the host request is still open/acknowledged (host still in the private room), show a "Reconectar a llamada privada" button in the top bar
+- Participant can click to rejoin the private call
+- Only the host can fully resolve the request
 
-1. **Participant closes browser tab**: The `beforeunload` handler in `LiveKitCallView` only calls `lk.disconnect()` — it never calls `onLeave`, so `resolveHostRequest` is never invoked. The host stays in the 1:1 view with 0 remote participants indefinitely.
-
-2. **API call fails or is slow**: Even when the participant clicks hang up, if `resolveHostRequest` fails (network error, edge function timeout), the host's realtime never fires the cleanup. The host sees an empty call — the ghost.
-
-In both cases, the LiveKit room on the host side instantly shows 0 remote participants, but nothing in the current code reacts to that signal.
-
-### Solution: Auto-Leave on Empty Room
-
-Add an `autoLeaveOnEmpty` prop to `LiveKitCallView`. When enabled, if the remote participant count drops to 0 and stays there for a configurable timeout (e.g., 3 seconds), it automatically calls `onLeave`. This provides instant, reliable ghost detection regardless of API or realtime failures.
-
-### Implementation
-
-**`src/pages/messenger/videocall/LiveKitCallView.tsx`**:
-- Add `autoLeaveOnEmpty?: number` prop (timeout in ms, e.g. `3000`)
-- Add an effect that watches `lk.participants`: when remote participants (non-local) count is 0, start a timer. If it remains 0 for the timeout, call `handleLeave`. Clear timer if a remote participant appears.
-
-**`src/pages/cowork/CoworkHostDashboard.tsx`**:
-- Pass `autoLeaveOnEmpty={3000}` to the 1:1 LiveKitCallView (when `oneOnOneRoom` is active). Not on the regular room or Hub views — only private calls.
+### Changes
 
 **`src/pages/cowork/CoworkParticipantView.tsx`**:
-- Pass `autoLeaveOnEmpty={3000}` to the 1:1 LiveKitCallView. This handles the reverse case (host leaves/disconnects first).
 
-### Flow After Fix
-```text
-Participant hangs up (or closes tab)
-  └─ LiveKit server removes participant instantly
-  └─ Host's LiveKitCallView detects 0 remote participants
-  └─ 3-second timer starts
-  └─ Timer fires → handleLeave() called
-  └─ onLeave → resolveHostRequest + clear state
-  └─ Ghost eliminated
-```
+1. **Modify `onLeave` for 1:1 LiveKitCallView** (line 265-276):
+   - Remove `resolveHostRequest` call — participant no longer kills the session
+   - Set `dismissedRequestRef.current = oneOnOneRequestId` to prevent auto-restore takeover
+   - Clear 1:1 state, reconnect to main room (keep existing reconnect logic)
+
+2. **Add reconnect button in top bar**: When there's a dismissed request that's still active (`open`/`acknowledged` with `oneone_livekit_room`), show a "Reconectar a llamada privada" button. Clicking it clears `dismissedRequestRef` and re-enters the 1:1 room.
+
+3. **Clean up unused state**: Remove `ssRequestStatus` (declared on line 19, never meaningfully used).
+
+4. **Remove `oneOnOneWasActiveRef`**: This ref was only needed to detect when a resolved request disappears from the list. The auto-close effect (line 101-127) already handles `status === "resolved"` directly. The fallback branch (line 118-126) that uses this ref can cause false positives. Replace with a simpler check.
+
+### Host Side (`CoworkHostDashboard.tsx`)
+No changes needed. The host's `leaveOneOnOne` still calls `resolveHostRequest`, and the host can also click "Resolver" in the sidebar. The `autoLeaveOnEmpty` on the host side correctly resolves (host leaving = session over).
 
 ### Files Modified
-- `src/pages/messenger/videocall/LiveKitCallView.tsx` — Add `autoLeaveOnEmpty` prop + effect
-- `src/pages/cowork/CoworkHostDashboard.tsx` — Pass prop to 1:1 LiveKitCallView
-- `src/pages/cowork/CoworkParticipantView.tsx` — Pass prop to 1:1 LiveKitCallView
+- `src/pages/cowork/CoworkParticipantView.tsx` — 4 changes: modify onLeave, add reconnect button, remove unused state, simplify auto-close effect
 
