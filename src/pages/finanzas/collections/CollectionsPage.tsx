@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -49,8 +50,7 @@ export default function CollectionsPage() {
   // Register form
   const [regCreator, setRegCreator] = useState("");
   const [regAmount, setRegAmount] = useState("");
-  const [regType, setRegType] = useState("quincenal");
-  const [regStatus, setRegStatus] = useState("pendiente");
+  const [regNotes, setRegNotes] = useState("");
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["collections-invoices"],
@@ -74,17 +74,17 @@ export default function CollectionsPage() {
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       const invNum = `COB-${Date.now().toString(36).toUpperCase()}`;
-      const statusMap: Record<string, string> = { pagada: "pagada", pendiente: "enviada", vencida: "vencida", sin_cobro: "borrador" };
       const { error } = await supabase.from("invoices").insert({
         creator_id: regCreator,
         amount: Number(regAmount),
         fee_amount: 0,
         net_amount: Number(regAmount),
-        status: statusMap[regStatus] || "enviada",
-        payment_method: regType,
+        status: "enviada",
+        payment_method: "cobro",
         invoice_number: invNum,
         due_date: new Date().toISOString().split("T")[0],
         created_by: user.user?.id,
+        notes: regNotes || null,
       });
       if (error) throw error;
     },
@@ -92,7 +92,7 @@ export default function CollectionsPage() {
       queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
       toast({ title: "Cobro registrado exitosamente" });
       setShowRegisterModal(false);
-      setRegCreator(""); setRegAmount(""); setRegType("quincenal"); setRegStatus("pendiente");
+      setRegCreator(""); setRegAmount(""); setRegNotes("");
     },
     onError: () => toast({ title: "Error al registrar cobro", variant: "destructive" }),
   });
@@ -387,30 +387,12 @@ export default function CollectionsPage() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de cobro</Label>
-              <Select value={regType} onValueChange={setRegType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label>Monto ($)</Label>
               <Input type="number" placeholder="0.00" value={regAmount} onChange={e => setRegAmount(e.target.value)} />
             </div>
             <div>
-              <Label>Estado</Label>
-              <Select value={regStatus} onValueChange={setRegStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pagada">Pagada</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="vencida">Vencida</SelectItem>
-                  <SelectItem value="sin_cobro">Sin Cobro</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Detalle / Nota</Label>
+              <Textarea placeholder="Descripción del cobro..." value={regNotes} onChange={e => setRegNotes(e.target.value)} rows={3} />
             </div>
           </div>
           <DialogFooter>
