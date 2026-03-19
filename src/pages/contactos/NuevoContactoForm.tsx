@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Upload, Save, X, ImageIcon, Film, FileText, Check, ChevronsUpDown, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,7 +52,7 @@ interface FormData {
   countryCode: string;
   phone: string;
   plataforma: string;
-  instagramLink: string;
+  accountLink: string;
   ticket: string;
   notas: string;
 }
@@ -64,7 +65,7 @@ const defaultForm: FormData = {
   countryCode: "+57",
   phone: "",
   plataforma: "Instagram",
-  instagramLink: "",
+  accountLink: "",
   ticket: "",
   notas: "",
 };
@@ -104,7 +105,23 @@ const NuevoContactoForm = () => {
   };
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Auto-detect platform when account link changes
+      if (key === "accountLink" && typeof value === "string") {
+        const detected = detectPlatformFromUrl(value);
+        if (detected) {
+          const platformMap: Record<string, string> = {
+            instagram: "Instagram",
+            tiktok: "TikTok",
+            twitter: "Twitter/X",
+            onlyfans: "OnlyFans",
+          };
+          next.plataforma = platformMap[detected] || next.plataforma;
+        }
+      }
+      return next;
+    });
     if (errors[key]) setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   };
 
@@ -113,7 +130,7 @@ const NuevoContactoForm = () => {
   const handleSubmit = async () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
-    if (!form.instagramLink.trim()) e.instagramLink = "El handle es obligatorio";
+    if (!form.accountLink.trim()) e.accountLink = "El link de la cuenta es obligatorio";
     if (Object.keys(e).length > 0) {
       setErrors(e);
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
@@ -122,9 +139,10 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
+      const handle = normalizeHandle(form.accountLink.trim());
       const { error } = await supabase.from("closers_contacts").insert({
         name: form.nombre.trim(),
-        handle: form.instagramLink.trim(),
+        handle,
         platform: form.plataforma,
         physical_appearance: form.categoria || null,
         company: form.compania || null,
@@ -203,18 +221,15 @@ const NuevoContactoForm = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Link de la Cuenta *" error={errors.accountLink}>
+              <Input value={form.accountLink} onChange={(e) => set("accountLink", e.target.value)} placeholder="https://instagram.com/usuario" className={errors.accountLink ? "border-destructive" : ""} />
+            </Field>
             <Field label="Plataforma">
               <Select value={form.plataforma} onValueChange={(v) => set("plataforma", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <div>
-              <Field label="Handle *" error={errors.instagramLink}>
-                <Input value={form.instagramLink} onChange={(e) => set("instagramLink", e.target.value)} placeholder="@usuario o handle" className={errors.instagramLink ? "border-destructive" : ""} />
-              </Field>
-              <p className="text-xs text-muted-foreground mt-1">Puedes ingresar el handle (@usuario) o el link completo</p>
-            </div>
           </div>
 
           <Field label="Número de Ticket">
