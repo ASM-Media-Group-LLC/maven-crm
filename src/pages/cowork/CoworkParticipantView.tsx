@@ -289,7 +289,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             }}
             hideShareLink
             suppressLeaveToast
-            autoLeaveOnEmpty={3000}
+            autoLeaveOnEmpty={undefined}
             initialMicOn={false}
             initialCamOn={false}
             getToken={getOneOnOneToken}
