@@ -19,6 +19,7 @@ import AddAgenciaModal from "./AddAgenciaModal";
 export interface Contacto {
   id: string;
   creacion: string;
+  rawCreatedAt: string;
   ticket: string;
   nombre: string;
   estado: string;
