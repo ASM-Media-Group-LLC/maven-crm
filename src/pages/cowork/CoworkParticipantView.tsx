@@ -61,11 +61,11 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
     }
     prevRoomIdRef.current = myAssignment?.room_id || null;
 
-    if (manuallyLeft) return;
+    if (manuallyLeft || oneOnOneRoom) return; // don't reconnect main room during 1:1
     if (myRoom?.livekit_room_name && myRoom.livekit_room_name !== connectedLkRoom) {
       setConnectedLkRoom(myRoom.livekit_room_name);
     }
-  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id]);
+  }, [myRoom?.livekit_room_name, manuallyLeft, myAssignment?.room_id, oneOnOneRoom]);
 
   const myOpenRequest = cowork.hostRequests.find(
     r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged")
