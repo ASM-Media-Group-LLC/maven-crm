@@ -1,35 +1,13 @@
 
 
-## Diagnóstico
+## Plan: Mostrar correo del usuario en la tabla de admin
 
-Las dos edge functions (`manage-user-roles` y `admin-user-actions`) siguen usando `authClient.auth.getClaims(token)` para verificar la identidad del usuario. Este método no funciona correctamente en este proyecto (falla con "Auth session missing" o "invalid_token").
+El modelo `AdminUser` ya tiene el campo `email` (se obtiene via edge function). Solo falta mostrarlo en la tabla.
 
-Los auth logs confirman que las llamadas a `/user` (que es lo que usa `getUser()`) devuelven **status 200** exitosamente. Esto significa que `getUser(token)` sí funciona.
+### Cambio único en `src/pages/admin/UsersTable.tsx`
 
-## Solución
+1. Agregar columna "Correo" en el `TableHeader` después de "Usuario"
+2. Agregar celda con `user.email` en cada fila, con texto truncado y estilo `text-muted-foreground text-sm`
 
-Reemplazar `getClaims(token)` por `getUser(token)` en ambas edge functions. Es el método estándar y probado para verificar tokens en edge functions de Supabase.
-
-### Cambio en ambas functions
-
-```typescript
-// ANTES (no funciona):
-const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-const callerId = claimsData?.claims?.sub;
-
-// DESPUÉS (estándar, funciona):
-const { data: { user }, error: userError } = await authClient.auth.getUser(token);
-const callerId = user?.id;
-```
-
-### Archivos a modificar
-
-1. **`supabase/functions/manage-user-roles/index.ts`** -- Reemplazar `getClaims` por `getUser`
-2. **`supabase/functions/admin-user-actions/index.ts`** -- Reemplazar `getClaims` por `getUser`
-
-### Por qué va a funcionar esta vez
-
-- Los auth logs muestran que `GET /user` (el endpoint que usa `getUser()`) devuelve **200** consistentemente
-- `getUser(token)` valida el JWT contra el servidor de auth y devuelve el usuario directamente, sin depender de sesiones activas del lado del servidor
-- Es el método documentado oficialmente por Supabase para edge functions
+No se requieren cambios en el hook ni en el backend — el dato ya existe.
 
