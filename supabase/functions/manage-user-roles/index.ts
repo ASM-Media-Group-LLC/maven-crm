@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { jwtVerify } from "https://deno.land/x/jose@v5.2.0/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,30 +24,27 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    const authClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Verify caller identity using signed JWT claims
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    const callerId = claimsData?.claims?.sub;
-
-    if (claimsError || !callerId) {
-      console.error("[manage-user-roles] JWT claims verification failed:", claimsError?.message ?? "no sub claim");
+    // Verify JWT locally using the signing secret (no session dependency)
+    const jwtSecret = new TextEncoder().encode(Deno.env.get("SUPABASE_JWT_SECRET")!);
+    let callerId: string;
+    try {
+      const { payload } = await jwtVerify(token, jwtSecret, {
+        issuer: `${Deno.env.get("SUPABASE_URL")!}/auth/v1`,
+      });
+      callerId = payload.sub as string;
+      if (!callerId) throw new Error("no sub claim");
+    } catch (jwtErr) {
+      console.error("[manage-user-roles] JWT verification failed:", (jwtErr as Error).message);
       return new Response(JSON.stringify({ error: "Unauthorized", reason: "invalid_token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
     // Verify caller is admin
     const { data: callerRole } = await adminClient

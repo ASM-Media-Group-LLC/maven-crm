@@ -22,12 +22,15 @@ export async function adminInvoke<T = Record<string, unknown>>(
   functionName: string,
   body: Record<string, unknown>
 ): Promise<T> {
-  // 1. Ensure we have a fresh session before calling
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData?.session?.access_token) {
-    // Force sign-out so the UI reacts
-    await supabase.auth.signOut();
-    throw new SessionExpiredError();
+  // 1. Refresh session to get a fresh token (avoids stale/expired sessions)
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !refreshData?.session?.access_token) {
+    // Fallback: check existing session
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.access_token) {
+      await supabase.auth.signOut();
+      throw new SessionExpiredError();
+    }
   }
 
   // 2. Call the edge function
