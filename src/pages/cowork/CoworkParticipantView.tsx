@@ -170,8 +170,17 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       {/* Top bar with cowork-specific actions */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#202124] border-b border-white/10 z-10">
         <div className="flex items-center gap-3">
-          <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
-          <span className="text-white/40 text-xs">{cowork.session?.name}</span>
+          {isInOneOnOne ? (
+            <>
+              <Crown className="h-4 w-4 text-amber-400" />
+              <span className="text-amber-400 text-sm font-medium">1:1 con Host</span>
+            </>
+          ) : (
+            <>
+              <span className="text-white/90 text-sm font-medium">{myRoom?.name || "Sala"}</span>
+              <span className="text-white/40 text-xs">{cowork.session?.name}</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Simple notification request */}
