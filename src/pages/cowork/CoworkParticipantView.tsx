@@ -116,11 +116,12 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         toast.info("Sesión 1:1 con host finalizada");
       }
     } else if (oneOnOneWasActiveRef.current) {
-      // Was active before but now gone — resolved
       setOneOnOneRoom(null);
       setOneOnOneRequestId(null);
       dismissedRequestRef.current = null;
       oneOnOneWasActiveRef.current = false;
+      setManuallyLeft(false);
+      if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
       toast.info("Sesión 1:1 con host finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId]);
