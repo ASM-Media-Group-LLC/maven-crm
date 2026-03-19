@@ -15,6 +15,7 @@ const makeParticipant = (overrides: Record<string, any> = {}) => ({
   handRaised: false,
   reactions: [] as string[],
   connectionQuality: "excellent" as string,
+  hasVideoTrack: false,
   ...overrides,
 });
 

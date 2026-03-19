@@ -214,7 +214,7 @@ const ParticipantTile = memo(function ParticipantTile({
     if (needsRetry && (!participant.isCameraOff || participant.isScreenSharing)) scheduleAttachRetry();
 
     return () => { if (retryTimer) clearTimeout(retryTimer); };
-  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing]);
+  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.hasVideoTrack]);
 
   // ── Audio attachment effect (separate from video) ──────────────
   useEffect(() => {

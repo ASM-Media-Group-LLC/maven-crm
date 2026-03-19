@@ -359,10 +359,13 @@ export function useLiveKit() {
 
     // If local is screen-sharing AND camera is on, emit two tiles
     if (local.isScreenSharing && !local.isCameraOff) {
-      // Screen share tile (camera hidden so ParticipantTile uses ScreenShare source)
-      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true });
-      // Camera tile (not screen sharing so ParticipantTile uses Camera source)
-      result.push({ ...local, isScreenSharing: false });
+      const lp = room.localParticipant;
+      const localScreenPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
+      const localCamPub = Array.from(lp.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
+      // Screen share tile
+      result.push({ ...local, sid: `${local.sid}-screen`, isCameraOff: true, hasVideoTrack: !!localScreenPub?.track && !localScreenPub.isMuted });
+      // Camera tile
+      result.push({ ...local, isScreenSharing: false, hasVideoTrack: !!localCamPub?.track && !localCamPub.isMuted });
     } else {
       result.push(local);
     }
@@ -370,8 +373,10 @@ export function useLiveKit() {
     room.remoteParticipants.forEach((p) => {
       const remote = buildParticipant(p, false);
       if (remote.isScreenSharing && !remote.isCameraOff) {
-        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true });
-        result.push({ ...remote, isScreenSharing: false });
+        const screenPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.ScreenShare);
+        const camPub = Array.from(p.videoTrackPublications.values()).find((t) => t.source === Track.Source.Camera);
+        result.push({ ...remote, sid: `${remote.sid}-screen`, isCameraOff: true, hasVideoTrack: !!screenPub?.track && !screenPub.isMuted });
+        result.push({ ...remote, isScreenSharing: false, hasVideoTrack: !!camPub?.track && !camPub.isMuted });
       } else {
         result.push(remote);
       }
