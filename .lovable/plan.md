@@ -1,45 +1,51 @@
 
 
-## Plan: Estabilizar flujos de contraseña (admin reset + user self-service reset)
+## Diagnóstico definitivo
 
-### Problemas identificados
+Los logs del edge function confirman el problema real:
 
-1. **Admin reset password (desde `/admin/usuarios`)**: Funciona correctamente a nivel de código -- usa `adminInvoke` que ya maneja sesión expirada. El error 401 que ves es el mismo problema de sesión que ya abordamos en el plan anterior; con el fix de `adminInvoke` ya debería funcionar si estás logueado.
+```
+JWT claims verification failed: Auth session missing!
+```
 
-2. **ForgotPassword (`/forgot-password`)**: Usa `window.location.origin` para el `redirectTo`, lo cual en el preview de Lovable genera un URL del preview que puede no coincidir con producción. Debería usar `VITE_PUBLIC_URL` (ya existe `getPublicBaseUrl()` en el proyecto).
+`authClient.auth.getClaims(token)` internamente hace una llamada al servidor de Auth que verifica la **sesión**, no solo el JWT. Cuando la sesión expira o se invalida en el servidor (como pasa en el preview de Lovable), `getClaims()` falla aunque el token JWT siga siendo criptográficamente válido.
 
-3. **ResetPassword (`/reset-password`)**: Tiene una lógica de detección de recovery frágil -- usa polling con `getSession()` cada 500ms durante 5 segundos. Si el hash de Supabase no se procesa a tiempo, muestra "enlace inválido" erróneamente. Además, la detección de `#type=recovery` en el hash puede fallar dependiendo del formato exacto del redirect de Supabase.
+Esto explica por qué todo falla: no es un problema de permisos ni de rol admin, es que la verificación de identidad depende de una sesión que ya no existe en el servidor.
 
-4. **ChangePasswordModal (dashboard)**: Usa validación mínima de 6 caracteres, inconsistente con ResetPassword que pide 8 + mayúscula + número.
+## Solución
 
-5. **`adminInvoke` ya centraliza errores**: El reset desde admin ya usa `adminInvoke`, así que la parte de sesión expirada ya está cubierta.
+Reemplazar `getClaims()` por verificación directa del JWT usando el secret `SUPABASE_JWT_SECRET` (disponible automáticamente en edge functions). Esto verifica la firma criptográfica del token sin depender de la sesión del servidor.
 
-### Cambios a implementar
+### Cambios
 
-**1. ForgotPassword.tsx -- Usar URL pública correcta**
-- Cambiar `window.location.origin` por `getPublicBaseUrl()` para que el link de recovery apunte al dominio correcto en producción.
+**1. Ambas edge functions: verificar JWT con jose (sin depender de sesión)**
 
-**2. ResetPassword.tsx -- Robustecer detección de recovery**
-- Simplificar la lógica: además de escuchar `PASSWORD_RECOVERY`, también parsear los query params que Supabase pone en el hash (`access_token`, `refresh_token`, `type=recovery`).
-- Si hay tokens en el hash, llamar `supabase.auth.setSession()` directamente en vez de esperar polling.
-- Aumentar el timeout de seguridad a 8 segundos.
-- Manejar el caso donde el usuario ya tiene sesión activa (ej. llegó por bookmark) sin confundirlo con recovery.
+En `admin-user-actions/index.ts` y `manage-user-roles/index.ts`:
 
-**3. ChangePasswordModal.tsx -- Alinear validación de contraseña**
-- Aplicar las mismas reglas que ResetPassword: mínimo 8 caracteres, 1 mayúscula, 1 número.
-- Agregar indicadores visuales de requisitos (como en ResetPassword).
+- Importar `jwtVerify` de `https://deno.land/x/jose@v5.2.0/index.ts`
+- Reemplazar el bloque `getClaims()` por verificación directa:
+  ```typescript
+  const secret = new TextEncoder().encode(Deno.env.get("SUPABASE_JWT_SECRET")!);
+  const { payload } = await jwtVerify(token, secret, { issuer: `${Deno.env.get("SUPABASE_URL")!}/auth/v1` });
+  const callerId = payload.sub;
+  ```
+- Eliminar la creación del `authClient` (ya no se necesita)
+- Mantener el `adminClient` para operaciones privilegiadas
 
-**4. Edge function `admin-user-actions` (reset_password action) -- Sin cambios necesarios**
-- La acción `reset_password` ya funciona correctamente: genera contraseña temporal y usa `adminClient.auth.admin.updateUserById`. El problema era solo la autenticación del caller, ya resuelta.
+**2. Frontend `adminInvoke.ts`: refrescar sesión antes de llamar**
+
+- Antes de invocar, llamar `supabase.auth.refreshSession()` en lugar de solo `getSession()` para obtener un token fresco si el actual ya está cerca de expirar
+- Esto reduce la probabilidad de enviar tokens asociados a sesiones muertas
 
 ### Archivos a modificar
-- `src/pages/ForgotPassword.tsx` (1 línea: import + uso de `getPublicBaseUrl`)
-- `src/pages/ResetPassword.tsx` (reescribir useEffect de detección de recovery)
-- `src/components/dashboard/ChangePasswordModal.tsx` (alinear validación, agregar indicadores)
 
-### Resultado esperado
-- Admin puede resetear contraseñas desde `/admin/usuarios` sin 401 (ya cubierto por `adminInvoke`).
-- Usuarios pueden hacer forgot password y el link funciona tanto en preview como en producción.
-- La página `/reset-password` detecta el token de recovery de forma robusta sin falsos "enlace inválido".
-- Cambiar contraseña desde el dashboard tiene las mismas reglas de seguridad que el reset.
+- `supabase/functions/admin-user-actions/index.ts` (verificación JWT)
+- `supabase/functions/manage-user-roles/index.ts` (verificación JWT)
+- `src/lib/adminInvoke.ts` (refresh de sesión)
+
+### Resultado
+
+- La verificación ya no depende de sesiones del servidor
+- Si el JWT es válido y no ha expirado, la operación procede
+- Se elimina la causa raíz del error "Auth session missing!"
 
