@@ -22,6 +22,7 @@ function makeMockParticipant(overrides: Partial<LKParticipant> = {}): LKParticip
     handRaised: false,
     reactions: [],
     connectionQuality: "excellent",
+    hasVideoTrack: false,
     ...overrides,
   };
 }
