@@ -1041,7 +1041,7 @@ export function useLiveKit() {
                 return;
               }
               setError("Has sido removido de la llamada por un moderador");
-              room.disconnect();
+              room.disconnect(true);
             }
           }
         } catch {}
