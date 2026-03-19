@@ -221,18 +221,15 @@ const NuevoContactoForm = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Link de la Cuenta *" error={errors.accountLink}>
+              <Input value={form.accountLink} onChange={(e) => set("accountLink", e.target.value)} placeholder="https://instagram.com/usuario" className={errors.accountLink ? "border-destructive" : ""} />
+            </Field>
             <Field label="Plataforma">
               <Select value={form.plataforma} onValueChange={(v) => set("plataforma", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            <div>
-              <Field label="Handle *" error={errors.instagramLink}>
-                <Input value={form.instagramLink} onChange={(e) => set("instagramLink", e.target.value)} placeholder="@usuario o handle" className={errors.instagramLink ? "border-destructive" : ""} />
-              </Field>
-              <p className="text-xs text-muted-foreground mt-1">Puedes ingresar el handle (@usuario) o el link completo</p>
-            </div>
           </div>
 
           <Field label="Número de Ticket">
