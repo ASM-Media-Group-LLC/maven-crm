@@ -373,6 +373,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
               }}
               hideShareLink
               suppressLeaveToast
+              autoLeaveOnEmpty={oneOnOneRoom ? 3000 : undefined}
               initialMicOn={false}
               initialCamOn={false}
               getToken={oneOnOneRoom ? getOneOnOneToken : getActiveRoomToken}
