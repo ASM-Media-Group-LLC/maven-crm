@@ -811,7 +811,7 @@ export function useLiveKit() {
 
     try {
       if (roomRef.current) {
-        roomRef.current.disconnect();
+        roomRef.current.disconnect(true);
         roomRef.current = null;
       }
       clearSyncInterval();
@@ -1041,7 +1041,7 @@ export function useLiveKit() {
                 return;
               }
               setError("Has sido removido de la llamada por un moderador");
-              room.disconnect();
+              room.disconnect(true);
             }
           }
         } catch {}
@@ -1161,7 +1161,7 @@ export function useLiveKit() {
     ncProcessorRef.current = null;
     ncEnabledRef.current = false;
     setIsNoiseCancellationOn(false);
-    roomRef.current?.disconnect();
+    roomRef.current?.disconnect(true);
     roomRef.current = null;
     connectingRef.current = false;
     holdLocalVideoUntilBackgroundRef.current = false;
@@ -1454,7 +1454,7 @@ export function useLiveKit() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       try { ncProcessorRef.current?.destroy(); } catch {}
       void disposeBackgroundProcessor();
-      roomRef.current?.disconnect();
+      roomRef.current?.disconnect(true);
     };
   }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
