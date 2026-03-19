@@ -1,24 +1,18 @@
 
 
-## Plan: Make Cowork Module Standalone (Remove HRLayout Wrapper)
+## Plan: Always Display Screen Share Requests Section in Host Dashboard
 
 ### Problem
-The Cowork module is currently wrapped in `HRLayout` (sidebar + topbar), making it look like part of the main app. The user wants it to be a standalone, full-screen module — separate from the main navigation chrome.
+The "Screen Share" requests section in the sidebar only renders when `pendingSSRequests.length > 0` (line 323). Same pattern as the Solicitudes fix — make it permanently visible with an empty state.
 
 ### Change
 
-**File: `src/App.tsx` (line 175)**
-- Remove the `<HRLayout>` wrapper from the Cowork route, making it render standalone like `VideoCallPage` does:
-```tsx
-// BEFORE
-<Route path="/cowork" element={<ProtectedRoute><HRLayout><CoworkPage /></HRLayout></ProtectedRoute>} />
+**File: `src/pages/cowork/CoworkHostDashboard.tsx`**
 
-// AFTER
-<Route path="/cowork" element={<ProtectedRoute><CoworkPage /></ProtectedRoute>} />
-```
+- Remove the `{pendingSSRequests.length > 0 && ...}` conditional wrapper (~line 323)
+- Keep the section always rendered
+- Add empty state text ("Sin solicitudes de pantalla") when count is 0
+- Header always shows count, e.g., `Screen Share (0)`
 
-**File: `src/pages/cowork/CoworkPage.tsx`**
-- Change `h-full` to `h-screen` on the landing, loading, and ended state containers so they fill the viewport without relying on a parent layout.
-
-No other files affected. No orphan code introduced.
+No other files affected. No orphan code.
 
