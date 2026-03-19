@@ -14,7 +14,8 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("[manage-user-roles] Missing or malformed Authorization header");
+      return new Response(JSON.stringify({ error: "Unauthorized", reason: "missing_auth_header" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -38,7 +39,8 @@ Deno.serve(async (req) => {
     const callerId = claimsData?.claims?.sub;
 
     if (claimsError || !callerId) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("[manage-user-roles] JWT claims verification failed:", claimsError?.message ?? "no sub claim");
+      return new Response(JSON.stringify({ error: "Unauthorized", reason: "invalid_token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
