@@ -1,18 +1,24 @@
 
 
-## Plan: Always Display Solicitudes Section in Host Dashboard
+## Plan: Make Cowork Module Standalone (Remove HRLayout Wrapper)
 
 ### Problem
-The "Solicitudes" (Host Requests) section on the sidebar only renders when `openHostRequests.length > 0` (line 258). The user wants it permanently visible with an empty state when no requests exist.
+The Cowork module is currently wrapped in `HRLayout` (sidebar + topbar), making it look like part of the main app. The user wants it to be a standalone, full-screen module — separate from the main navigation chrome.
 
 ### Change
 
-**File: `src/pages/cowork/CoworkHostDashboard.tsx`**
+**File: `src/App.tsx` (line 175)**
+- Remove the `<HRLayout>` wrapper from the Cowork route, making it render standalone like `VideoCallPage` does:
+```tsx
+// BEFORE
+<Route path="/cowork" element={<ProtectedRoute><HRLayout><CoworkPage /></HRLayout></ProtectedRoute>} />
 
-- Remove the `{openHostRequests.length > 0 && ...}` conditional wrapper around the Solicitudes section (lines 258 and 318)
-- Keep the section always rendered
-- Add an empty state message (e.g., "Sin solicitudes pendientes") when `openHostRequests.length === 0`
-- The header will always show the count, displaying "(0)" when empty
+// AFTER
+<Route path="/cowork" element={<ProtectedRoute><CoworkPage /></ProtectedRoute>} />
+```
 
-No other files need changes. No orphan or obsolete code related to this request.
+**File: `src/pages/cowork/CoworkPage.tsx`**
+- Change `h-full` to `h-screen` on the landing, loading, and ended state containers so they fill the viewport without relying on a parent layout.
+
+No other files affected. No orphan code introduced.
 
