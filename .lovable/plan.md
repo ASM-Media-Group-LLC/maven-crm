@@ -1,34 +1,96 @@
 
 
-## Fix: Private Call Hang Up Should Return to Main Room with Reconnect Option
+## Fix: "Client initiated disconnect" Error on Private Call Button Click
 
-### Current Problem
-When the participant hangs up the private call, `resolveHostRequest` is called (line 267), which kills the session on both sides. The same happens when `autoLeaveOnEmpty` fires. There's no way to rejoin if the host is still waiting.
+### Root Cause
 
-### Desired Behavior
-- Participant hangs up → returns to main room immediately
-- If the host request is still open/acknowledged (host still in the private room), show a "Reconectar a llamada privada" button in the top bar
-- Participant can click to rejoin the private call
-- Only the host can fully resolve the request
+When the participant clicks "Llamada privada con host", this sequence causes the error:
 
-### Changes
+1. `requestHost` API inserts the request into the DB and returns the room name + request ID
+2. State updates: `oneOnOneRequestId`, `oneOnOneRoom` are set → 1:1 LiveKitCallView mounts and starts connecting
+3. The DB insert triggers a Supabase realtime event → `fetchData(true)` starts (async refetch)
+4. **Before the refetch completes**, the auto-close effect (line 107-121) runs with the OLD `hostRequests` list
+5. `cowork.hostRequests.find(r => r.id === oneOnOneRequestId)` returns `undefined` — the new request isn't in the stale list yet
+6. The `!req` branch (line 115) fires → `reconnectToMainRoom()` → clears `oneOnOneRoom` → 1:1 LiveKitCallView **unmounts mid-connect**
+7. The cleanup `lk.disconnect()` fires while `room.connect()` is in progress → LiveKit SDK throws "Client initiated disconnect"
+
+```text
+Click button → requestHost API → state set → 1:1 mounts & connects
+                                            ↓
+                        Realtime fires → fetchData(true) starts...
+                                            ↓
+                     Auto-close effect runs with STALE hostRequests
+                                            ↓
+                       !req → reconnectToMainRoom() → unmount!
+                                            ↓
+                      lk.disconnect() during connect → ERROR
+```
+
+The same bug exists in `CoworkHostDashboard.tsx` line 105.
+
+### Secondary Issue
+
+`autoLeaveOnEmpty={3000}` on the 1:1 view kicks the participant out after 3 seconds if the host hasn't joined yet. This is wrong for private calls — the participant should wait for the host. The auto-leave should only fire after a remote participant has been seen and then left (room was populated then emptied), not when no one has ever joined.
+
+### Fixes
 
 **`src/pages/cowork/CoworkParticipantView.tsx`**:
 
-1. **Modify `onLeave` for 1:1 LiveKitCallView** (line 265-276):
-   - Remove `resolveHostRequest` call — participant no longer kills the session
-   - Set `dismissedRequestRef.current = oneOnOneRequestId` to prevent auto-restore takeover
-   - Clear 1:1 state, reconnect to main room (keep existing reconnect logic)
+1. **Add `oneOnOneSeenInListRef`** — tracks whether we've ever seen the 1:1 request in `hostRequests`. The `!req` auto-close branch only fires if we've previously seen the request in the list (meaning it truly disappeared, not that it hasn't arrived yet).
 
-2. **Add reconnect button in top bar**: When there's a dismissed request that's still active (`open`/`acknowledged` with `oneone_livekit_room`), show a "Reconectar a llamada privada" button. Clicking it clears `dismissedRequestRef` and re-enters the 1:1 room.
+2. **Remove `autoLeaveOnEmpty` from the 1:1 LiveKitCallView** — the participant should wait for the host indefinitely. The auto-close effect already handles cleanup when the host resolves the request. Keep `autoLeaveOnEmpty` only if we track "was populated" state, but that adds complexity for little benefit in 1:1 calls where the auto-close via Supabase already works.
 
-3. **Clean up unused state**: Remove `ssRequestStatus` (declared on line 19, never meaningfully used).
+**`src/pages/cowork/CoworkHostDashboard.tsx`**:
 
-4. **Remove `oneOnOneWasActiveRef`**: This ref was only needed to detect when a resolved request disappears from the list. The auto-close effect (line 101-127) already handles `status === "resolved"` directly. The fallback branch (line 118-126) that uses this ref can cause false positives. Replace with a simpler check.
+3. **Same `seenInList` guard for the host's auto-close effect** (line 102-110) — prevent premature cleanup on stale data.
 
-### Host Side (`CoworkHostDashboard.tsx`)
-No changes needed. The host's `leaveOneOnOne` still calls `resolveHostRequest`, and the host can also click "Resolver" in the sidebar. The `autoLeaveOnEmpty` on the host side correctly resolves (host leaving = session over).
+**`src/pages/messenger/videocall/LiveKitCallView.tsx`**:
+
+4. **Enhance `autoLeaveOnEmpty` to only fire after room was populated** — add a ref tracking whether at least one remote participant was ever seen. Only start the empty-room timer after that ref is true. This makes it safe for all use cases.
+
+### Implementation Detail
+
+```typescript
+// CoworkParticipantView.tsx — new ref
+const oneOnOneSeenInListRef = useRef(false);
+
+// Reset when entering 1:1
+// (in button handler and reconnect handler)
+oneOnOneSeenInListRef.current = false;
+
+// Track when we first see it
+useEffect(() => {
+  if (!oneOnOneRequestId) { oneOnOneSeenInListRef.current = false; return; }
+  const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
+  if (req) oneOnOneSeenInListRef.current = true;
+  // Only auto-close if we've seen it before and it's now gone/resolved
+  if (!oneOnOneSeenInListRef.current) return;
+  if (req?.status === "resolved" || !req) {
+    reconnectToMainRoom();
+    toast.info("Llamada privada con host finalizada");
+  }
+}, [cowork.hostRequests, oneOnOneRequestId, reconnectToMainRoom]);
+```
+
+```typescript
+// LiveKitCallView.tsx — autoLeaveOnEmpty fix
+const hadRemoteParticipantRef = useRef(false);
+
+useEffect(() => {
+  if (!autoLeaveOnEmpty || lk.connectionState !== ConnectionState.Connected) return;
+  const remoteCount = lk.participants.filter(p => !p.isLocal).length;
+  if (remoteCount > 0) { hadRemoteParticipantRef.current = true; return; }
+  if (!hadRemoteParticipantRef.current) return; // Never had anyone, don't auto-leave
+  const timer = setTimeout(() => handleLeaveRef.current(), autoLeaveOnEmpty);
+  return () => clearTimeout(timer);
+}, [autoLeaveOnEmpty, lk.participants, lk.connectionState]);
+
+// Reset on roomName change
+useEffect(() => { hadRemoteParticipantRef.current = false; }, [roomName]);
+```
 
 ### Files Modified
-- `src/pages/cowork/CoworkParticipantView.tsx` — 4 changes: modify onLeave, add reconnect button, remove unused state, simplify auto-close effect
+- `src/pages/cowork/CoworkParticipantView.tsx` — Add seen-in-list guard, remove redundant auto-close branch
+- `src/pages/cowork/CoworkHostDashboard.tsx` — Same seen-in-list guard
+- `src/pages/messenger/videocall/LiveKitCallView.tsx` — `autoLeaveOnEmpty` only after room was populated
 
