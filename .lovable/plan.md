@@ -1,34 +1,30 @@
 
 
-## Plan: Fix Contact Insert Status & Table Ordering
+## Plan: Clean Test Data & Update Contact Form to Use Link Instead of Handle
 
-### Problems Found
+### Problem 1: Test data in Closers
+The 209 `team_*` records in `leadgen_entries` are **seed/test data** from October 2025 with fake user IDs (`55555555-...`, `11111111-...`) and fake URLs (`https://example.com/...`). They were inserted during development and are polluting the Closers pipeline. They need to be deleted.
 
-1. **Status mismatch on insert**: `NuevoContactoForm.tsx` line 138 inserts `status: "Nuevo"` (Spanish, capitalized) but the rest of the system uses English lowercase values (`new`, `contacted`, `interested`, `not_interested`). The `statusMap` in `ContactosContent.tsx` translates English→Spanish for display. Currently 4 records in the DB have `"Nuevo"` instead of `"new"`, meaning filters and KPIs may miscategorize them.
+### Problem 2: Contact form asks for "Handle" instead of "Link"
+The `NuevoContactoForm` currently has a field labeled "Handle" that accepts `@usuario` or a link. It should instead ask for the **link of the account** and auto-extract the handle and platform from it — the same pattern already used in `AddLeadModal.tsx` (LeadGen).
 
-2. **No March 18 records exist in the database**: Only March 17 (3 records) and March 19 (1 record) exist. The inserts on March 18 may have failed silently. After fixing the status value, future inserts will be consistent.
-
-3. **Table sort uses formatted date strings**: The `creacion` field is a locale-formatted string (`"19 mar, 14:30"`), so sorting by it produces alphabetical, not chronological order. The table should sort by the raw `created_at` timestamp.
+---
 
 ### Changes
 
-**File: `src/pages/contactos/NuevoContactoForm.tsx`**
-- Line 138: Change `status: "Nuevo"` → `status: "new"` to match the expected English enum values used throughout the system.
+**1. Delete test data (SQL via insert tool)**
+- `DELETE FROM leadgen_entries WHERE model_handle LIKE 'team_%'` — removes the 209 fake records.
 
-**File: `src/pages/contactos/ContactosContent.tsx`**
-- Add a `rawCreatedAt` field to the `Contacto` interface storing the ISO timestamp string from the DB.
-- Populate `rawCreatedAt` in the mapping (line 140) alongside the formatted `creacion`.
+**2. File: `src/pages/contactos/NuevoContactoForm.tsx`**
 
-**File: `src/pages/contactos/ContactosTable.tsx`**
-- Update sort logic for the `creacion` column to compare using `rawCreatedAt` (ISO string comparison) instead of the formatted locale string, ensuring correct chronological order.
-- Default sort: `creacion` descending (newest first) — already the default, but now it will work correctly.
-
-**Database fix (migration)**
-- Update the 4 existing records with `status = 'Nuevo'` to `status = 'new'` so they're consistent.
+- **Rename form field**: Change `instagramLink` → `accountLink` in `FormData` interface and default values. Update label from "Handle *" to "Link de la Cuenta *".
+- **Add auto-extraction**: Import `normalizeHandle` and `detectPlatformFromUrl` from `@/lib/handle-utils`. When the user types a URL, auto-detect the platform and update the platform selector automatically (same pattern as `AddLeadModal`).
+- **Update placeholder**: Change from `@usuario o handle` to `https://instagram.com/usuario`.
+- **Update validation**: Error message from "El handle es obligatorio" to "El link de la cuenta es obligatorio".
+- **Update insert logic**: Extract handle from the link using `normalizeHandle()` before saving to `handle` column. Auto-detect platform with `detectPlatformFromUrl()`.
+- **Remove hint text**: Remove the line "Puedes ingresar el handle (@usuario) o el link completo" since the field now explicitly asks for the link.
 
 ### Files Modified
-- `src/pages/contactos/NuevoContactoForm.tsx` — fix status value
-- `src/pages/contactos/ContactosContent.tsx` — add `rawCreatedAt` field
-- `src/pages/contactos/ContactosTable.tsx` — fix sort by date
-- SQL migration to normalize existing `"Nuevo"` → `"new"`
+- `src/pages/contactos/NuevoContactoForm.tsx`
+- SQL data cleanup (delete test records)
 
