@@ -43,6 +43,8 @@ interface LiveKitCallViewProps {
   initialBackgroundEffect?: BackgroundEffect;
   hideShareLink?: boolean;
   hideScreenShare?: boolean;
+  /** When true, skip the generic "Llamada finalizada" toast on leave */
+  suppressLeaveToast?: boolean;
   compact?: boolean;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
