@@ -294,7 +294,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           setOneOnOneRoom(req.oneone_livekit_room!);
                           setActiveRoomLk(req.oneone_livekit_room!);
                           setActiveRoomId(null);
-                          setActiveRoomName(`1:1 con ${cowork.profiles[req.user_id] || "User"}`);
+                          setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                           setHubMinimized(true);
                         }}>
                           Unirse 1:1
