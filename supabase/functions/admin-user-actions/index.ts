@@ -32,23 +32,22 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    // Use getClaims() for HS256 token verification (compatible with Supabase signing-keys)
     const authClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.error("[admin-user-actions] getClaims failed:", claimsError?.message ?? "no sub claim");
+    const { data: { user }, error: userError } = await authClient.auth.getUser(token);
+    if (userError || !user?.id) {
+      console.error("[admin-user-actions] getUser failed:", userError?.message ?? "no user");
       return new Response(JSON.stringify({ error: "Unauthorized", reason: "invalid_token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const callerId = claimsData.claims.sub as string;
+    const callerId = user.id;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
