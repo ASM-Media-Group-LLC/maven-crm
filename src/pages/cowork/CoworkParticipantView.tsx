@@ -278,6 +278,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
       <div className="flex-1 min-h-0">
         {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
           <LiveKitCallView
+            key={`oneOnOne-${oneOnOneRoom}`}
             roomName={oneOnOneRoom}
             displayName={displayName}
             callDisplayName="Llamada privada con host"
