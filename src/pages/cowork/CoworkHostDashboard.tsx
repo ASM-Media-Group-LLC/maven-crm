@@ -255,12 +255,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           })()}
 
           {/* Host Requests */}
-          {openHostRequests.length > 0 && (
-            <div className="p-3 border-t border-border/50 space-y-2">
-              <h3 className="text-xs font-medium text-amber-500 uppercase tracking-wider flex items-center gap-1">
-                <Hand className="h-3 w-3" /> Solicitudes ({openHostRequests.length})
-              </h3>
-              {openHostRequests.map((req) => {
+          <div className="p-3 border-t border-border/50 space-y-2">
+            <h3 className="text-xs font-medium text-amber-500 uppercase tracking-wider flex items-center gap-1">
+              <Hand className="h-3 w-3" /> Solicitudes ({openHostRequests.length})
+            </h3>
+            {openHostRequests.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-1">Sin solicitudes pendientes</p>
+            ) : (
+              openHostRequests.map((req) => {
                 const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
                 const is1on1 = !!req.oneone_livekit_room;
                 return (
@@ -313,9 +315,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
 
           {/* Screen Share Requests */}
           {pendingSSRequests.length > 0 && (
