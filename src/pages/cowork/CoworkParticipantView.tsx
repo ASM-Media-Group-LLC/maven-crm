@@ -110,6 +110,9 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         setOneOnOneRequestId(null);
         dismissedRequestRef.current = null;
         oneOnOneWasActiveRef.current = false;
+        // Auto-reconnect to main room
+        setManuallyLeft(false);
+        if (myRoom?.livekit_room_name) setConnectedLkRoom(myRoom.livekit_room_name);
         toast.info("Sesión 1:1 con host finalizada");
       }
     } else if (oneOnOneWasActiveRef.current) {
