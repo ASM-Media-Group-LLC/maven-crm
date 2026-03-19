@@ -367,6 +367,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
         {activeRoomLk ? (
           <div className="flex-1 min-h-0">
             <LiveKitCallView
+              key={activeRoomLk}
               roomName={activeRoomLk}
               displayName={displayName}
               callDisplayName={activeRoomName || undefined}
