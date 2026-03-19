@@ -33,6 +33,7 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
         <TableHeader>
           <TableRow>
             <TableHead>Usuario</TableHead>
+            <TableHead>Correo</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Ficha HR</TableHead>
             <TableHead>Fecha de registro</TableHead>
@@ -50,6 +51,9 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
                   </Avatar>
                   <span className="font-medium">{user.full_name || "Sin nombre"}</span>
                 </div>
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                {user.email || "—"}
               </TableCell>
               <TableCell>
                 {user.role ? (
