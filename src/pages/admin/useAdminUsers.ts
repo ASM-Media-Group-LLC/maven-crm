@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { adminInvoke, SessionExpiredError } from "@/lib/adminInvoke";
 import type { AppRole } from "@/hooks/useUserRole";
 
 export interface AdminUser {
