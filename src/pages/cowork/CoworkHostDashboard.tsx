@@ -105,7 +105,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     if (!req || req.status === "resolved") {
       leaveOneOnOne();
       leaveActiveRoom();
-      toast.info("Sesión 1:1 finalizada");
+      toast.info("Llamada privada finalizada");
     }
   }, [cowork.hostRequests, oneOnOneRequestId, leaveOneOnOne, leaveActiveRoom]);
 
