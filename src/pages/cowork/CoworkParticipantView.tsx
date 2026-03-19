@@ -124,13 +124,14 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // Auto-restore 1:1 overlay from existing open/acknowledged requests (handles refresh/re-entry)
   useEffect(() => {
-    if (oneOnOneRequestId || pendingOneOnOneRef.current) return; // already in a 1:1 or pending
+    if (oneOnOneRequestId || pendingOneOnOneRef.current) return;
     const existingReq = cowork.hostRequests.find(
       r => r.user_id === userId && (r.status === "open" || r.status === "acknowledged") && r.oneone_livekit_room
     );
     if (existingReq && dismissedRequestRef.current !== existingReq.id) {
       setOneOnOneRequestId(existingReq.id);
       setOneOnOneRoom(existingReq.oneone_livekit_room!);
+      setConnectedLkRoom(null); // disconnect main room
     }
   }, [cowork.hostRequests, userId, oneOnOneRequestId]);
 
