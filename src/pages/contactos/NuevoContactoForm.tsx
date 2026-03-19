@@ -52,7 +52,7 @@ interface FormData {
   countryCode: string;
   phone: string;
   plataforma: string;
-  instagramLink: string;
+  accountLink: string;
   ticket: string;
   notas: string;
 }
@@ -65,7 +65,7 @@ const defaultForm: FormData = {
   countryCode: "+57",
   phone: "",
   plataforma: "Instagram",
-  instagramLink: "",
+  accountLink: "",
   ticket: "",
   notas: "",
 };
