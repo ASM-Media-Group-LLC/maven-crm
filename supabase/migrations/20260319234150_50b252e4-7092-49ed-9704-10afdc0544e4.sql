@@ -1,0 +1,1 @@
+UPDATE public.closers_contacts SET status = 'new' WHERE status = 'Nuevo';
