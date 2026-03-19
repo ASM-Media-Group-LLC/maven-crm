@@ -24,6 +24,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   const screenShareTokenRef = useRef<TokenResult>(null);
   const dismissedRequestRef = useRef<string | null>(null);
   const pendingOneOnOneRef = useRef(false);
+  const oneOnOneSeenInListRef = useRef(false);
 
   // 1:1 state
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
@@ -106,14 +107,15 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   // Auto-close 1:1 overlay when host resolves the request
   useEffect(() => {
-    if (!oneOnOneRequestId) return;
+    if (!oneOnOneRequestId) {
+      oneOnOneSeenInListRef.current = false;
+      return;
+    }
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
-    if (req?.status === "resolved") {
-      dismissedRequestRef.current = null;
-      reconnectToMainRoom();
-      toast.info("Llamada privada con host finalizada");
-    } else if (!req) {
-      // Request disappeared from the list (resolved and filtered out)
+    if (req) oneOnOneSeenInListRef.current = true;
+    // Only act if we've previously seen the request in the list
+    if (!oneOnOneSeenInListRef.current) return;
+    if (req?.status === "resolved" || !req) {
       dismissedRequestRef.current = null;
       reconnectToMainRoom();
       toast.info("Llamada privada con host finalizada");
@@ -287,7 +289,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
             }}
             hideShareLink
             suppressLeaveToast
-            autoLeaveOnEmpty={3000}
+            autoLeaveOnEmpty={undefined}
             initialMicOn={false}
             initialCamOn={false}
             getToken={getOneOnOneToken}

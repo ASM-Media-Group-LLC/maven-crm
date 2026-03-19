@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   // 1:1 state
   const [oneOnOneRequestId, setOneOnOneRequestId] = useState<string | null>(null);
   const [oneOnOneRoom, setOneOnOneRoom] = useState<string | null>(null);
+  const oneOnOneSeenInListRef = useRef(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -98,10 +99,15 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
     setOneOnOneRequestId(null);
   }, [oneOnOneRequestId, cowork.resolveHostRequest]);
 
-  // Auto-close 1:1 when host request is resolved (mirrors participant logic)
+  // Auto-close 1:1 when host request is resolved
   useEffect(() => {
-    if (!oneOnOneRequestId) return;
+    if (!oneOnOneRequestId) {
+      oneOnOneSeenInListRef.current = false;
+      return;
+    }
     const req = cowork.hostRequests.find(r => r.id === oneOnOneRequestId);
+    if (req) oneOnOneSeenInListRef.current = true;
+    if (!oneOnOneSeenInListRef.current) return;
     if (!req || req.status === "resolved") {
       leaveOneOnOne();
       leaveActiveRoom();

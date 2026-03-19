@@ -118,12 +118,16 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   }, [lk.participants, pinnedSid]);
 
   // Auto-leave when remote participants reach 0 for autoLeaveOnEmpty ms
+  // Only triggers after at least one remote participant has been seen (room was populated)
   const handleLeaveRef = useRef(handleLeave);
   handleLeaveRef.current = handleLeave;
+  const hadRemoteParticipantRef = useRef(false);
+  useEffect(() => { hadRemoteParticipantRef.current = false; }, [roomName]);
   useEffect(() => {
     if (!autoLeaveOnEmpty || lk.connectionState !== ConnectionState.Connected) return;
     const remoteCount = lk.participants.filter((p) => !p.isLocal).length;
-    if (remoteCount > 0) return;
+    if (remoteCount > 0) { hadRemoteParticipantRef.current = true; return; }
+    if (!hadRemoteParticipantRef.current) return;
     const timer = setTimeout(() => { handleLeaveRef.current(); }, autoLeaveOnEmpty);
     return () => clearTimeout(timer);
   }, [autoLeaveOnEmpty, lk.participants, lk.connectionState]);
