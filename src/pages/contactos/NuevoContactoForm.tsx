@@ -130,7 +130,7 @@ const NuevoContactoForm = () => {
   const handleSubmit = async () => {
     const e: Record<string, string> = {};
     if (!form.nombre.trim()) e.nombre = "El nombre es obligatorio";
-    if (!form.instagramLink.trim()) e.instagramLink = "El handle es obligatorio";
+    if (!form.accountLink.trim()) e.accountLink = "El link de la cuenta es obligatorio";
     if (Object.keys(e).length > 0) {
       setErrors(e);
       toast({ title: "Revisa los campos marcados", variant: "destructive" });
@@ -139,9 +139,10 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
+      const handle = normalizeHandle(form.accountLink.trim());
       const { error } = await supabase.from("closers_contacts").insert({
         name: form.nombre.trim(),
-        handle: form.instagramLink.trim(),
+        handle,
         platform: form.plataforma,
         physical_appearance: form.categoria || null,
         company: form.compania || null,
