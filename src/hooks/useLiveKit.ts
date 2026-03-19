@@ -312,6 +312,10 @@ export function useLiveKit() {
         ? (typeof localParticipant.isCameraEnabled === "boolean" ? !localParticipant.isCameraEnabled : (videoTrack ? videoTrack.isMuted : true))
         : (videoTrack ? videoTrack.isMuted || !videoTrack.isSubscribed : true);
 
+    const isScreenSharing = !!screenTrack && !screenTrack.isMuted;
+    const hasCameraTrack = !!videoTrack?.track && !videoTrack.isMuted;
+    const hasScreenTrack = !!screenTrack?.track && !screenTrack.isMuted;
+
     return {
       sid: p.sid,
       identity: p.identity,
@@ -319,11 +323,12 @@ export function useLiveKit() {
       isSpeaking: p.isSpeaking,
       isMuted: micMuted,
       isCameraOff: camOff,
-      isScreenSharing: !!screenTrack && !screenTrack.isMuted,
+      isScreenSharing,
       isLocal,
       handRaised: handRaisedMap.current[p.identity] || false,
       reactions: [],
       connectionQuality: mapConnectionQuality(p.connectionQuality),
+      hasVideoTrack: isScreenSharing ? hasScreenTrack : hasCameraTrack,
     };
   }, []);
 
