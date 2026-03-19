@@ -31,43 +31,46 @@ export default function CoworkCreateDialog({ open, onOpenChange, onCreate }: Pro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Crear sesión Cowork</DialogTitle>
+          <DialogTitle className="text-foreground">Crear sesión Cowork</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Nombre de la sesión</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Cowork semanal" />
+            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Nombre de la sesión</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Cowork semanal" className="mt-1.5 rounded-xl" />
           </div>
           <div>
-            <Label>Descripción (opcional)</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." />
+            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Descripción (opcional)</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descripción..." className="mt-1.5 rounded-xl" />
           </div>
           <div>
-            <Label>Salas <span className="text-xs text-muted-foreground font-normal">({roomNames.length}/10)</span></Label>
-            <div className="space-y-2 mt-1">
+            <Label className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+              Salas <span className="text-muted-foreground/70 font-normal normal-case">({roomNames.length}/10)</span>
+            </Label>
+            <div className="space-y-2 mt-1.5">
               {roomNames.map((rn, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input value={rn} onChange={(e) => updateRoom(i, e.target.value)} />
+                <div key={i} className="flex gap-2 items-center">
+                  <Input value={rn} onChange={(e) => updateRoom(i, e.target.value)} className="rounded-xl" />
                   {roomNames.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeRoom(i)}>
+                    <Button variant="ghost" size="icon" onClick={() => removeRoom(i)} className="shrink-0 h-8 w-8 rounded-full text-muted-foreground hover:text-destructive">
                       <X className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1" disabled={roomNames.length >= MAX_ROOMS}>
+              <Button variant="outline" size="sm" onClick={addRoom} className="gap-1 rounded-full" disabled={roomNames.length >= MAX_ROOMS}>
                 <Plus className="h-3 w-3" /> Agregar sala
               </Button>
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">Cancelar</Button>
           <Button
+            className="rounded-full"
             disabled={!name.trim() || roomNames.some(r => !r.trim()) || loading}
             onClick={async () => {
               setLoading(true);

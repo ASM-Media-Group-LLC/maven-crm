@@ -25,14 +25,14 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[80vh] p-6">
+    <div className="flex items-center justify-center h-full p-4 md:p-6">
       <div className="max-w-md w-full bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col items-center gap-3 px-8 pt-10 pb-6">
-          <div className="flex items-center justify-center h-16 w-16 rounded-full bg-primary/10">
-            <Users2 className="h-8 w-8 text-primary" />
+        <div className="flex flex-col items-center gap-3 px-6 md:px-8 pt-8 md:pt-10 pb-5 md:pb-6">
+          <div className="flex items-center justify-center h-14 w-14 md:h-16 md:w-16 rounded-full bg-primary/10">
+            <Users2 className="h-7 w-7 md:h-8 md:w-8 text-primary" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground text-center">
+          <h2 className="text-lg md:text-xl font-semibold text-foreground text-center">
             {session?.name || "Sesión Cowork"}
           </h2>
           {session?.description && (
@@ -41,7 +41,7 @@ export default function CoworkLobby({ sessionId, session, onJoin }: Props) {
         </div>
 
         {/* Content */}
-        <div className="flex flex-col gap-3 px-8 pb-8">
+        <div className="flex flex-col gap-3 px-6 md:px-8 pb-6 md:pb-8">
           <Button
             onClick={handleJoin}
             size="lg"
