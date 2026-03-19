@@ -73,17 +73,17 @@ export default function CollectionsPage() {
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       const invNum = `COB-${Date.now().toString(36).toUpperCase()}`;
-      const statusMap: Record<string, string> = { pagada: "pagada", pendiente: "enviada", vencida: "vencida", sin_cobro: "borrador" };
       const { error } = await supabase.from("invoices").insert({
         creator_id: regCreator,
         amount: Number(regAmount),
         fee_amount: 0,
         net_amount: Number(regAmount),
-        status: statusMap[regStatus] || "enviada",
-        payment_method: regType,
+        status: "enviada",
+        payment_method: "cobro",
         invoice_number: invNum,
         due_date: new Date().toISOString().split("T")[0],
         created_by: user.user?.id,
+        notes: regNotes || null,
       });
       if (error) throw error;
     },
@@ -91,7 +91,7 @@ export default function CollectionsPage() {
       queryClient.invalidateQueries({ queryKey: ["collections-invoices"] });
       toast({ title: "Cobro registrado exitosamente" });
       setShowRegisterModal(false);
-      setRegCreator(""); setRegAmount(""); setRegType("quincenal"); setRegStatus("pendiente");
+      setRegCreator(""); setRegAmount(""); setRegNotes("");
     },
     onError: () => toast({ title: "Error al registrar cobro", variant: "destructive" }),
   });
