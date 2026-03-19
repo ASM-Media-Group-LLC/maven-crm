@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,14 +20,16 @@ const ChangePasswordModal = ({ open, onOpenChange }: ChangePasswordModalProps) =
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const passwordsMatch = password === confirm && confirm.length > 0;
+  const isValid = hasMinLength && hasUppercase && hasNumber && passwordsMatch;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast({ title: "Error", description: "La contraseña debe tener al menos 6 caracteres.", variant: "destructive" });
-      return;
-    }
-    if (password !== confirm) {
-      toast({ title: "Error", description: "Las contraseñas no coinciden.", variant: "destructive" });
+    if (!isValid) {
+      toast({ title: "Error", description: "La contraseña no cumple los requisitos.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -43,6 +45,13 @@ const ChangePasswordModal = ({ open, onOpenChange }: ChangePasswordModalProps) =
     }
   };
 
+  const RequirementItem = ({ met, label }: { met: boolean; label: string }) => (
+    <div className="flex items-center gap-1.5 text-xs">
+      {met ? <Check className="h-3 w-3 text-green-500" /> : <X className="h-3 w-3 text-muted-foreground" />}
+      <span className={met ? "text-green-500" : "text-muted-foreground"}>{label}</span>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -57,7 +66,7 @@ const ChangePasswordModal = ({ open, onOpenChange }: ChangePasswordModalProps) =
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
               />
               <Button
                 type="button"
@@ -90,7 +99,13 @@ const ChangePasswordModal = ({ open, onOpenChange }: ChangePasswordModalProps) =
               </Button>
             </div>
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <div className="space-y-1.5 pt-1">
+            <RequirementItem met={hasMinLength} label="Mínimo 8 caracteres" />
+            <RequirementItem met={hasUppercase} label="Al menos 1 mayúscula" />
+            <RequirementItem met={hasNumber} label="Al menos 1 número" />
+            <RequirementItem met={passwordsMatch} label="Las contraseñas coinciden" />
+          </div>
+          <Button type="submit" className="w-full" disabled={loading || !isValid}>
             {loading ? "Actualizando…" : "Actualizar contraseña"}
           </Button>
         </form>
