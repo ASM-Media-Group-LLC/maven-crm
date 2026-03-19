@@ -203,7 +203,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
               }
             }}
           >
-            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host"}
+            <Hand className="h-4 w-4" /> {myOpenRequest && !isInOneOnOne ? "Solicitud enviada" : "Pedir host ingrese a la sala"}
           </Button>
           {/* 1:1 video call request */}
           <Button
