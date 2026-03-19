@@ -260,7 +260,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           <LiveKitCallView
             roomName={oneOnOneRoom}
             displayName={displayName}
-            callDisplayName="1:1 con Host"
+            callDisplayName="Llamada privada con host"
             isAdmin={false}
             onLeave={async () => {
               if (oneOnOneRequestId) {
