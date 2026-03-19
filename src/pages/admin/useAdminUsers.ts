@@ -44,16 +44,16 @@ export const useAdminUsers = () => {
       // Fetch emails via edge function (uses auth.admin.listUsers)
       let emailsMap = new Map<string, string>();
       try {
-        const { data: emailsData } = await supabase.functions.invoke("admin-user-actions", {
-          body: { action: "list_users" },
-        });
+        const emailsData = await adminInvoke<{ users: { id: string; email: string }[] }>("admin-user-actions", { action: "list_users" });
         if (emailsData?.users) {
-          emailsData.users.forEach((u: { id: string; email: string }) => {
+          emailsData.users.forEach((u) => {
             emailsMap.set(u.id, u.email || "");
           });
         }
-      } catch {
-        // If the edge function fails, emails stay empty
+      } catch (e) {
+        // If session expired, re-throw so react-query surfaces it
+        if (e instanceof SessionExpiredError) throw e;
+        // Otherwise emails stay empty
       }
 
       const rolesMap = new Map<string, AppRole>();
