@@ -49,8 +49,7 @@ export default function CollectionsPage() {
   // Register form
   const [regCreator, setRegCreator] = useState("");
   const [regAmount, setRegAmount] = useState("");
-  const [regType, setRegType] = useState("quincenal");
-  const [regStatus, setRegStatus] = useState("pendiente");
+  const [regNotes, setRegNotes] = useState("");
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["collections-invoices"],
