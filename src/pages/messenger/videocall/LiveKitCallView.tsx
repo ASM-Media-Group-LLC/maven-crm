@@ -90,7 +90,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     return () => window.removeEventListener("beforeunload", h);
   }, [lk]);
 
-  const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); toast.info("Llamada finalizada"); }, [lk, onLeave]);
+  const handleLeave = useCallback(() => { lk.disconnect(); onLeave(); if (!suppressLeaveToast) toast.info("Llamada finalizada"); }, [lk, onLeave, suppressLeaveToast]);
 
   const handleAudioInputChange = useCallback((id: string) => { setAudioInputId(id); lk.switchAudioInput?.(id); }, [lk]);
   const handleAudioOutputChange = useCallback((id: string) => { setAudioOutputId(id); lk.switchAudioOutput?.(id); }, [lk]);

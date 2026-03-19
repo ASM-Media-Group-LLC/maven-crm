@@ -297,7 +297,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                           setActiveRoomName(`Llamada privada con ${cowork.profiles[req.user_id] || "User"}`);
                           setHubMinimized(true);
                         }}>
-                          Unirse 1:1
+                          Unirse a llamada privada
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" className="h-5 text-[10px] text-green-400" onClick={async () => {
