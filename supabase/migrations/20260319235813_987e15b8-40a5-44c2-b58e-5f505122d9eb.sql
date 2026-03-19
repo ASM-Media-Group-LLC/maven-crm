@@ -1,0 +1,1 @@
+DELETE FROM public.leadgen_entries WHERE model_handle LIKE 'team_%';
