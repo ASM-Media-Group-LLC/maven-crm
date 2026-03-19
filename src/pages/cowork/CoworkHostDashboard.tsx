@@ -320,12 +320,14 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
           </div>
 
           {/* Screen Share Requests */}
-          {pendingSSRequests.length > 0 && (
-            <div className="p-3 border-t border-border/50 space-y-2">
-              <h3 className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1">
-                <Monitor className="h-3 w-3" /> Screen Share ({pendingSSRequests.length})
-              </h3>
-              {pendingSSRequests.map((req) => {
+          <div className="p-3 border-t border-border/50 space-y-2">
+            <h3 className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1">
+              <Monitor className="h-3 w-3" /> Screen Share ({pendingSSRequests.length})
+            </h3>
+            {pendingSSRequests.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-1">Sin solicitudes de pantalla</p>
+            ) : (
+              pendingSSRequests.map((req) => {
                 const roomName = cowork.rooms.find(r => r.id === req.room_id)?.name || "?";
                 return (
                   <div key={req.id} className="bg-primary/5 rounded-xl p-2.5">
@@ -353,9 +355,9 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </ScrollArea>
       </div>
 
