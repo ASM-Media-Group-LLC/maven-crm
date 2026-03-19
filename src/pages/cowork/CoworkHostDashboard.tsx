@@ -123,7 +123,7 @@ export default function CoworkHostDashboard({ cowork, userId }: Props) {
   const pendingSSRequests = cowork.screenShareRequests.filter(r => r.status === "pending");
 
   return (
-    <div className="flex h-full bg-background text-foreground relative">
+    <div className="flex h-screen bg-background text-foreground relative">
       {/* Mobile sidebar toggle */}
       <Button
         variant="ghost"

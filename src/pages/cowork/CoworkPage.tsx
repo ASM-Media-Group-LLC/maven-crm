@@ -65,7 +65,7 @@ export default function CoworkPage() {
   // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-6 p-4 md:p-6">
+      <div className="flex flex-col items-center justify-center h-screen gap-6 p-4 md:p-6">
         <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-6 md:px-10 py-10 md:py-12 max-w-lg w-full">
           <div className="flex items-center justify-center h-16 w-16 md:h-20 md:w-20 rounded-full bg-primary/10">
             <Users2 className="h-8 w-8 md:h-10 md:w-10 text-primary" />
@@ -100,7 +100,7 @@ export default function CoworkPage() {
 
   if (cowork.loading || autoJoining) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-screen">
         <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
       </div>
     );
@@ -109,7 +109,7 @@ export default function CoworkPage() {
   // Session ended
   if (cowork.session?.status === "ended") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-5 p-4 md:p-6">
+      <div className="flex flex-col items-center justify-center h-screen gap-5 p-4 md:p-6">
         <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
           <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
             <Users2 className="h-7 w-7 text-muted-foreground" />

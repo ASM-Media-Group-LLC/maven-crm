@@ -160,7 +160,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
 
   if (!myAssignment) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
+      <div className="flex flex-col items-center justify-center h-screen gap-4 p-4">
         <div className="flex flex-col items-center gap-3 bg-primary/5 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           <p className="text-muted-foreground text-sm text-center">Esperando asignación de sala por el host...</p>
@@ -220,7 +220,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
       <div className="flex items-center justify-between px-3 md:px-4 py-2 bg-card border-b border-border z-10 shrink-0">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
