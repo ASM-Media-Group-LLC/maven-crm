@@ -46,6 +46,8 @@ interface LiveKitCallViewProps {
   /** When true, skip the generic "Llamada finalizada" toast on leave */
   suppressLeaveToast?: boolean;
   compact?: boolean;
+  /** If set, auto-leave when remote participants reach 0 for this many ms */
+  autoLeaveOnEmpty?: number;
   /** Custom token provider; bypasses the default livekit-token edge function */
   getToken?: () => Promise<{ token: string; url: string }>;
   /** Fires whenever the local participant's media state changes */
