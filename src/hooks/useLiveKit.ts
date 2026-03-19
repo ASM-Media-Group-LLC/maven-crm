@@ -1454,7 +1454,7 @@ export function useLiveKit() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       try { ncProcessorRef.current?.destroy(); } catch {}
       void disposeBackgroundProcessor();
-      roomRef.current?.disconnect();
+      roomRef.current?.disconnect(true);
     };
   }, [clearSyncInterval, clearBackgroundReapplyTimer, cleanupAudioResumeListeners, disposeBackgroundProcessor]);
 
