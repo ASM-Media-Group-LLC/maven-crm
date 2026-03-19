@@ -28,6 +28,7 @@ export interface LKParticipant {
   handRaised: boolean;
   reactions: string[];
   connectionQuality: ConnectionQualityLevel;
+  hasVideoTrack: boolean;
 }
 
 export interface LKChatMessage {
