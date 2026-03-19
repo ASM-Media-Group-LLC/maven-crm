@@ -386,30 +386,12 @@ export default function CollectionsPage() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de cobro</Label>
-              <Select value={regType} onValueChange={setRegType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label>Monto ($)</Label>
               <Input type="number" placeholder="0.00" value={regAmount} onChange={e => setRegAmount(e.target.value)} />
             </div>
             <div>
-              <Label>Estado</Label>
-              <Select value={regStatus} onValueChange={setRegStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pagada">Pagada</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="vencida">Vencida</SelectItem>
-                  <SelectItem value="sin_cobro">Sin Cobro</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Detalle / Nota</Label>
+              <Textarea placeholder="Descripción del cobro..." value={regNotes} onChange={e => setRegNotes(e.target.value)} rows={3} />
             </div>
           </div>
           <DialogFooter>
