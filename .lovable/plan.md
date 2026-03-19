@@ -1,24 +1,25 @@
 
 
-## Plan: Fix Screen Share Track Not Stopping on Session End
+## Plan: Simplify "Registrar Cobro" Modal
 
 ### Problem
-When a cowork session ends while a participant is sharing their screen, the browser's screen-sharing indicator bar persists ("está compartiendo su pantalla"). The screen capture continues running even though the LiveKit room has been disconnected and the UI has been torn down.
+The modal currently has "Tipo de cobro" (quincenal/mensual) and "Estado" fields that don't match the intended workflow of collecting pending payments from creators. It should focus on: which creator, how much, and a note/detail.
 
-### Root Cause
-In livekit-client v2.x, `Room.disconnect()` does **not** stop local tracks by default. It only closes the WebSocket connection. To also stop the underlying `MediaStreamTrack` (which releases the browser's screen capture), you must call `Room.disconnect(true)`.
+### Changes
 
-There are **4 call sites** in `useLiveKit.ts` that call `.disconnect()` without passing `true`:
+**File: `src/pages/finanzas/collections/CollectionsPage.tsx`**
 
-1. **Line 814** — reconnect guard (when connecting to a new room while already connected)
-2. **Line 1044** — moderation kick (removed by admin)
-3. **Line 1164** — explicit `disconnect()` function
-4. **Line 1457** — cleanup on unmount
+1. **Remove state variables**: Drop `regType` and `regStatus` (lines 52-53), and their reset calls (line 95).
 
-### Change
+2. **Simplify mutation**: Remove `statusMap` logic; always insert with `status: "enviada"` (pending) and `payment_method: "cobro"`. Store the note in the `notes` field of the invoices table (need to verify this column exists).
 
-**File: `src/hooks/useLiveKit.ts`**
-- Change all 4 `.disconnect()` calls to `.disconnect(true)` so that all local tracks (including screen share) are fully stopped, releasing the browser capture.
+3. **Add note state**: Replace `regType`/`regStatus` with a new `regNotes` state variable.
 
-No other files affected. No orphan code.
+4. **Rewrite modal form** (lines 379-414): Keep "Creadora" selector and "Monto" input. Replace "Tipo de cobro" and "Estado" with a single `Textarea` for notes/detail. Order: Creadora → Monto → Notas.
+
+5. **Update mutation insert**: Add `notes: regNotes` to the insert payload.
+
+### Technical Detail
+- The `invoices` table likely has a `notes` column already. Will verify and use it. If not, the field can map to an existing text column or we add a migration.
+- No other files affected. Removes ~20 lines of unused form code.
 
