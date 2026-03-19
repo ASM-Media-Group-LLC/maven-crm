@@ -1,13 +1,14 @@
 
 
-## Plan: Mostrar correo del usuario en la tabla de admin
+## Plan: Update VITE_PUBLIC_URL
 
-El modelo `AdminUser` ya tiene el campo `email` (se obtiene via edge function). Solo falta mostrarlo en la tabla.
+Update the `VITE_PUBLIC_URL` environment variable in `.env` from `https://simple-maven-say.lovable.app` to `https://maven.asmtech.ai`.
 
-### Cambio único en `src/pages/admin/UsersTable.tsx`
+### File to modify
+- **`.env`** — change `VITE_PUBLIC_URL` value
 
-1. Agregar columna "Correo" en el `TableHeader` después de "Usuario"
-2. Agregar celda con `user.email` en cada fila, con texto truncado y estilo `text-muted-foreground text-sm`
-
-No se requieren cambios en el hook ni en el backend — el dato ya existe.
+### Reminder
+Make sure your Supabase Dashboard (Authentication → URL Configuration) also reflects this new domain:
+- **Site URL**: `https://maven.asmtech.ai`
+- **Redirect URLs**: `https://maven.asmtech.ai/**`
 
