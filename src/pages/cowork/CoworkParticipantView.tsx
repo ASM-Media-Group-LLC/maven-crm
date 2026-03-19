@@ -250,9 +250,32 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
         </div>
       </div>
 
-      {/* Video area using existing LiveKitCallView */}
+      {/* Video area */}
       <div className="flex-1 min-h-0">
-        {connectedLkRoom ? (
+        {isInOneOnOne && oneOnOneRoom && oneOnOneRequestId ? (
+          <LiveKitCallView
+            roomName={oneOnOneRoom}
+            displayName={displayName}
+            callDisplayName="1:1 con Host"
+            isAdmin={false}
+            onLeave={async () => {
+              if (oneOnOneRequestId) {
+                try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
+              }
+              setOneOnOneRoom(null);
+              setOneOnOneRequestId(null);
+              // Auto-reconnect to main room
+              setManuallyLeft(false);
+              if (myRoom?.livekit_room_name) {
+                setConnectedLkRoom(myRoom.livekit_room_name);
+              }
+            }}
+            hideShareLink
+            initialMicOn={false}
+            initialCamOn={false}
+            getToken={getOneOnOneToken}
+          />
+        ) : connectedLkRoom ? (
           <LiveKitCallView
             roomName={connectedLkRoom}
             displayName={displayName}
@@ -294,55 +317,6 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           </div>
         )}
       </div>
-
-      {/* Floating 1:1 overlay with host */}
-      {oneOnOneRoom && oneOnOneRequestId && (
-        <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
-          <div className="rounded-lg border border-white/10 bg-[#1a1a1d] shadow-2xl overflow-hidden flex flex-col w-96 md:w-[480px]" style={{ height: "380px" }}>
-            <div className="flex items-center justify-between px-3 py-1.5 bg-[#2a2a2d] border-b border-white/10 shrink-0">
-              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium">
-                <Crown className="h-3 w-3" />
-                1:1 con Host
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-red-400 hover:text-red-300"
-                onClick={async () => {
-                  if (oneOnOneRequestId) {
-                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
-                  }
-                  dismissedRequestRef.current = oneOnOneRequestId;
-                  setOneOnOneRoom(null);
-                  setOneOnOneRequestId(null);
-                }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <LiveKitCallView
-                roomName={oneOnOneRoom}
-                displayName={displayName}
-                callDisplayName="1:1 con Host"
-                isAdmin={false}
-                onLeave={async () => {
-                  if (oneOnOneRequestId) {
-                    try { await cowork.resolveHostRequest(oneOnOneRequestId); } catch {}
-                  }
-                  setOneOnOneRoom(null);
-                  setOneOnOneRequestId(null);
-                }}
-                hideShareLink
-                initialMicOn={false}
-                initialCamOn={false}
-                getToken={getOneOnOneToken}
-                compact
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
