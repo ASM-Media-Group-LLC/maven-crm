@@ -109,7 +109,7 @@ export default function CoworkPage() {
   // Session ended
   if (cowork.session?.status === "ended") {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-5 p-4 md:p-6">
+      <div className="flex flex-col items-center justify-center h-screen gap-5 p-4 md:p-6">
         <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-6 md:px-10 py-8 md:py-10 max-w-sm w-full">
           <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
             <Users2 className="h-7 w-7 text-muted-foreground" />
