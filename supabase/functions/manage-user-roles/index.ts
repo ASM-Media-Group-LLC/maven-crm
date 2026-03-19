@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const callerId = caller.id;
+    
 
     // Verify caller is admin
     const { data: callerRole } = await adminClient
