@@ -56,10 +56,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
   };
 
   const sorted = [...contactos].sort((a, b) => {
+    if (sortKey === "creacion") {
+      const da = a.rawCreatedAt || "";
+      const db = b.rawCreatedAt || "";
+      return sortAsc ? da.localeCompare(db) : db.localeCompare(da);
+    }
     let va = "";
     let vb = "";
     switch (sortKey) {
-      case "creacion": va = a.creacion; vb = b.creacion; break;
       case "ticket": va = a.ticket; vb = b.ticket; break;
       case "nombre": va = a.nombre; vb = b.nombre; break;
       case "estado": va = a.estado; vb = b.estado; break;
