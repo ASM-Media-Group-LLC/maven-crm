@@ -52,6 +52,9 @@ const UsersTable = ({ users, onEditRole, onEdit, onResetPassword, onDelete, onRe
                   <span className="font-medium">{user.full_name || "Sin nombre"}</span>
                 </div>
               </TableCell>
+              <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                {user.email || "—"}
+              </TableCell>
               <TableCell>
                 {user.role ? (
                   <Badge variant={roleBadgeVariant[user.role] ?? "outline"} className="inline-flex items-center gap-1 pr-1">
