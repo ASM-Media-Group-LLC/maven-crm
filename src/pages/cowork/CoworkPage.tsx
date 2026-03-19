@@ -25,7 +25,7 @@ export default function CoworkPage() {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null));
   }, []);
 
-  // Auto-join from invite URL params (always attempt if URL has credentials, even if already a member)
+  // Auto-join from invite URL params
   useEffect(() => {
     if (!sessionId || cowork.loading || autoJoining || autoJoinFailed) return;
 
@@ -36,7 +36,6 @@ export default function CoworkPage() {
     const canAutoJoin = (role === "host" && code) || roomId;
     if (!canAutoJoin) return;
 
-    // If already a member with the correct role, skip — unless participant needs room assignment
     if (cowork.myMembership) {
       const wantsHost = role === "host" && code;
       const isHost = cowork.myMembership.role === "host";
@@ -63,21 +62,29 @@ export default function CoworkPage() {
     doJoin();
   }, [sessionId, cowork.loading, cowork.myMembership, cowork.myAssignment, autoJoining, autoJoinFailed, searchParams]);
 
-  // No session selected → lobby
+  // No session selected → landing
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 p-6">
-        <div className="text-center space-y-2">
-          <Users2 className="h-16 w-16 mx-auto text-primary/60" />
-          <h1 className="text-3xl font-bold text-foreground">Sala Cowork</h1>
-          <p className="text-muted-foreground max-w-md">
-            Crea una sesión cowork con múltiples salas.
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 p-6">
+        {/* M3 Hero surface */}
+        <div className="flex flex-col items-center gap-4 bg-primary/5 rounded-3xl px-10 py-12 max-w-lg w-full">
+          <div className="flex items-center justify-center h-20 w-20 rounded-full bg-primary/10">
+            <Users2 className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight text-center">
+            Sala Cowork
+          </h1>
+          <p className="text-muted-foreground text-center text-sm md:text-base max-w-sm">
+            Crea una sesión cowork con múltiples salas y colabora en tiempo real.
           </p>
-        </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button onClick={() => setShowCreate(true)} size="lg" className="gap-2">
-            <Plus className="h-4 w-4" /> Crear sesión
+          {/* M3 FAB-style button */}
+          <Button
+            onClick={() => setShowCreate(true)}
+            size="lg"
+            className="gap-2 rounded-full px-8 mt-2 shadow-md"
+          >
+            <Plus className="h-5 w-5" /> Crear sesión
           </Button>
         </div>
 
@@ -97,25 +104,33 @@ export default function CoworkPage() {
   if (cowork.loading || autoJoining) {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+        <div className="h-10 w-10 rounded-full border-[3px] border-primary/30 border-t-primary animate-spin" />
       </div>
     );
   }
 
-  // Session ended → show message and redirect
+  // Session ended
   if (cowork.session?.status === "ended") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-4 p-6">
-        <Users2 className="h-12 w-12 text-muted-foreground" />
-        <h2 className="text-xl font-semibold text-foreground">Esta sesión ha finalizado</h2>
-        <Button variant="secondary" onClick={() => setSearchParams({})}>
-          Volver al inicio
-        </Button>
+      <div className="flex flex-col items-center justify-center min-h-[80vh] gap-5 p-6">
+        <div className="flex flex-col items-center gap-3 bg-muted/50 rounded-3xl px-10 py-10 max-w-sm w-full">
+          <div className="flex items-center justify-center h-14 w-14 rounded-full bg-muted">
+            <Users2 className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Esta sesión ha finalizado</h2>
+          <Button
+            variant="secondary"
+            className="rounded-full px-6 mt-1"
+            onClick={() => setSearchParams({})}
+          >
+            Volver al inicio
+          </Button>
+        </div>
       </div>
     );
   }
 
-  // Not a member yet → lobby fallback (only shown when auto-join not possible or failed)
+  // Not a member yet → lobby
   if (!cowork.myMembership) {
     return (
       <CoworkLobby
