@@ -156,6 +156,7 @@ describe("LKParticipant type", () => {
       handRaised: false,
       reactions: [],
       connectionQuality: "excellent",
+      hasVideoTrack: false,
     };
 
     expect(participant.sid).toBe("sid-1");

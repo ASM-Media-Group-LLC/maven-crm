@@ -51,6 +51,7 @@ function areParticipantPropsEqual(prev: ParticipantTileProps, next: ParticipantT
     prevP.isLocal === nextP.isLocal &&
     prevP.handRaised === nextP.handRaised &&
     prevP.connectionQuality === nextP.connectionQuality &&
+    prevP.hasVideoTrack === nextP.hasVideoTrack &&
     areReactionsEqual(prevP.reactions, nextP.reactions) &&
     prev.isAdmin === next.isAdmin &&
     prev.onMuteParticipant === next.onMuteParticipant &&
@@ -213,7 +214,7 @@ const ParticipantTile = memo(function ParticipantTile({
     if (needsRetry && (!participant.isCameraOff || participant.isScreenSharing)) scheduleAttachRetry();
 
     return () => { if (retryTimer) clearTimeout(retryTimer); };
-  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing]);
+  }, [room, participant.identity, participant.isLocal, participant.isCameraOff, participant.isScreenSharing, participant.hasVideoTrack]);
 
   // ── Audio attachment effect (separate from video) ──────────────
   useEffect(() => {

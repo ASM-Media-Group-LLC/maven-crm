@@ -5,9 +5,9 @@ import { LKParticipant } from "@/hooks/useLiveKit";
 
 describe("CallParticipantsSidebar", () => {
   const mockParticipants: LKParticipant[] = [
-    { sid: "s1", identity: "user-1", name: "Yo", isSpeaking: false, isMuted: false, isCameraOff: false, isScreenSharing: false, isLocal: true, handRaised: false, reactions: [], connectionQuality: "excellent" },
-    { sid: "s2", identity: "user-2", name: "Juan Pérez", isSpeaking: true, isMuted: false, isCameraOff: false, isScreenSharing: false, isLocal: false, handRaised: false, reactions: [], connectionQuality: "good" },
-    { sid: "s3", identity: "user-3", name: "María López", isSpeaking: false, isMuted: true, isCameraOff: true, isScreenSharing: false, isLocal: false, handRaised: true, reactions: [], connectionQuality: "poor" },
+    { sid: "s1", identity: "user-1", name: "Yo", isSpeaking: false, isMuted: false, isCameraOff: false, isScreenSharing: false, isLocal: true, handRaised: false, reactions: [], connectionQuality: "excellent", hasVideoTrack: false },
+    { sid: "s2", identity: "user-2", name: "Juan Pérez", isSpeaking: true, isMuted: false, isCameraOff: false, isScreenSharing: false, isLocal: false, handRaised: false, reactions: [], connectionQuality: "good", hasVideoTrack: false },
+    { sid: "s3", identity: "user-3", name: "María López", isSpeaking: false, isMuted: true, isCameraOff: true, isScreenSharing: false, isLocal: false, handRaised: true, reactions: [], connectionQuality: "poor", hasVideoTrack: false },
   ];
 
   const defaultProps = {
