@@ -297,6 +297,7 @@ export default function CoworkParticipantView({ cowork, userId }: Props) {
           />
         ) : connectedLkRoom ? (
           <LiveKitCallView
+            key={`room-${connectedLkRoom}`}
             roomName={connectedLkRoom}
             displayName={displayName}
             callDisplayName={myRoom?.name}
