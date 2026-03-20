@@ -221,7 +221,7 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
   if (disabled) {
     return <Badge className={stageColor(value)}>{value}</Badge>;
   }
-  const stages = [...CLOSER_STAGES];
+  const stages = CLOSER_STAGES.filter((s) => s !== "Pendiente LG");
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
