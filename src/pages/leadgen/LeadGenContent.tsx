@@ -114,7 +114,7 @@ const LeadGenContent = () => {
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  
   const [qualityFilter, setQualityFilter] = useState("");
   const [qaFilter, setQaFilter] = useState("");
   const [agencyFilter, setAgencyFilter] = useState("");
