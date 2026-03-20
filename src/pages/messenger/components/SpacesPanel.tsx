@@ -162,7 +162,7 @@ export default function SpacesPanel({
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-2xl mx-1 cursor-pointer transition-all text-sm",
                 isDragOver && "bg-primary/15 ring-1 ring-primary/40",
-                !isDragOver && "hover:bg-muted/50"
+                !isDragOver && "hover:bg-primary/5"
               )}
               onClick={() => toggleExpand(space.id)}
               onDragOver={(e) => handleDragOver(e, space.id)}
