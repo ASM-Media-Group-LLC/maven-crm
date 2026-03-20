@@ -154,28 +154,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     } catch {}
   }, []);
 
-  useEffect(() => {
-    const persisted = loadPreJoinSettings(roomName);
-    if (!persisted) return;
-
-    setMicOn(persisted.micOn);
-    setCamOn(persisted.camOn);
-    setBgEffect(persisted.backgroundEffect || "none");
-    setSelectedAudioInput(persisted.audioDeviceId || "");
-    setSelectedVideoInput(persisted.videoDeviceId || "");
-    setSelectedAudioOutput(persisted.audioOutputDeviceId || "");
-  }, [roomName]);
-
-  useEffect(() => {
-    savePreJoinSettings(roomName, {
-      micOn,
-      camOn,
-      audioDeviceId: selectedAudioInput || undefined,
-      videoDeviceId: selectedVideoInput || undefined,
-      audioOutputDeviceId: selectedAudioOutput || undefined,
-      backgroundEffect: bgEffect,
-    });
-  }, [roomName, micOn, camOn, selectedAudioInput, selectedVideoInput, selectedAudioOutput, bgEffect]);
 
   // ── Stop individual tracks ──────────────────────────────────
   const stopVideoTrack = useCallback(() => {
