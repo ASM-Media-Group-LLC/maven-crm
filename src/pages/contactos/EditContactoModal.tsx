@@ -177,9 +177,9 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Categoría Física</Label>
+                  <Label className="text-sm font-medium">Categoría Física *</Label>
                   <Select value={categoria} onValueChange={setCategoria}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                     <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
