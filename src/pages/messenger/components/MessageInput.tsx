@@ -572,7 +572,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Button
                 size="icon"
                 onClick={handleSend}
-                className="shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-all"
+                className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground shadow-none hover:bg-primary/90 transition-all"
                 disabled={uploading}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
