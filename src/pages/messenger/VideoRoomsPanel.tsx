@@ -125,7 +125,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
             onChange={e => setJoinLink(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleJoinByLink()}
           />
-          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()}>
+          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()} className="rounded-full">
             Unirse
           </Button>
         </div>
