@@ -247,12 +247,14 @@ const ContactosContent = () => {
       </header>
 
       <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
-        <ContactosKPICards
-          total={totalCount}
-          nuevos={0}
-          convertidos={0}
-          esteMes={0}
-        />
+        <div className="shrink-0">
+          <ContactosKPICards
+            total={totalCount}
+            nuevos={0}
+            convertidos={0}
+            esteMes={0}
+          />
+        </div>
 
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           <Button
