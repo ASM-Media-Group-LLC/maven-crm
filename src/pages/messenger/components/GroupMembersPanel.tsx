@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getInitials } from "../utils";
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
