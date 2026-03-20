@@ -313,7 +313,7 @@ const LeadGenBaseDatosContent = () => {
                             <TableHead>Agente</TableHead>
                             <TableHead>Agencia</TableHead>
                             <TableHead>Calidad</TableHead>
-                            <TableHead>Estado</TableHead>
+                            
                             <TableHead>País</TableHead>
                             <TableHead>Fecha</TableHead>
                             <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
