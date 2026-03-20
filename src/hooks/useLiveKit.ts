@@ -598,6 +598,30 @@ export function useLiveKit() {
           BACKGROUND_SWITCH_TIMEOUT_MS,
           "bg-template",
         );
+      } else if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        if (!preloadedBackgroundsRef.current.has(customUrl)) {
+          await new Promise<void>((resolve, reject) => {
+            const image = new Image();
+            image.src = customUrl;
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error("custom-bg-load-failed"));
+          });
+          preloadedBackgroundsRef.current.add(customUrl);
+        }
+
+        if (opId !== bgApplyOpRef.current) return false;
+
+        await withTimeout(
+          Promise.resolve(
+            processor.switchTo({
+              mode: "virtual-background",
+              imagePath: customUrl,
+            }),
+          ),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-custom",
+        );
       } else {
         return false;
       }

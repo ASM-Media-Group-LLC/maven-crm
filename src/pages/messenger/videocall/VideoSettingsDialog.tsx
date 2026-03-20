@@ -1,12 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud } from "lucide-react";
+import { Video as VideoIcon, ChevronDown, Check, Ban, Cloud, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
+import { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground } from "./BackgroundSelector";
 
 interface DeviceInfo {
   deviceId: string;
   label: string;
+}
+
+interface CustomBg {
+  id: string;
+  objectUrl: string;
 }
 
 interface VideoSettingsDialogProps {
@@ -25,6 +30,8 @@ export default function VideoSettingsDialog({
 }: VideoSettingsDialogProps) {
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [selectedVideoInput, setSelectedVideoInput] = useState(currentVideoInputId || "");
+  const [customBgs, setCustomBgs] = useState<CustomBg[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const enumerateDevices = useCallback(async () => {
     try {
@@ -39,6 +46,22 @@ export default function VideoSettingsDialog({
       setSelectedVideoInput(currentVideoInputId || "");
     }
   }, [open, enumerateDevices, currentVideoInputId]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const objectUrl = URL.createObjectURL(file);
+    const id = `custom-${Date.now()}`;
+    setCustomBgs((prev) => [...prev, { id, objectUrl }]);
+    onBackgroundChange(`custom:${objectUrl}`);
+    if (fileRef.current) fileRef.current.value = "";
+  }, [onBackgroundChange]);
+
+  const handleDeleteCustom = useCallback((bg: CustomBg) => {
+    URL.revokeObjectURL(bg.objectUrl);
+    setCustomBgs((prev) => prev.filter((b) => b.id !== bg.id));
+    if (backgroundEffect === `custom:${bg.objectUrl}`) onBackgroundChange("none");
+  }, [backgroundEffect, onBackgroundChange]);
 
   const isSelected = (id: string) => backgroundEffect === id;
 
@@ -67,7 +90,51 @@ export default function VideoSettingsDialog({
                     <Cloud className="h-4 w-4 text-[hsl(220_3%_55%)]" />
                   </div>
                 </EffectOption>
+                <EffectOption label="Subir imagen" active={false} onClick={() => fileRef.current?.click()}>
+                  <div className="w-full h-full bg-[hsl(220_3%_25%)] rounded flex items-center justify-center">
+                    <Plus className="h-4 w-4 text-[hsl(220_3%_55%)]" />
+                  </div>
+                </EffectOption>
               </div>
+
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
+
+              {/* Custom backgrounds */}
+              {customBgs.length > 0 && (
+                <>
+                  <p className="text-[10px] uppercase tracking-wider text-[hsl(220_3%_50%)] mb-1">Tus fondos</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {customBgs.map((bg) => (
+                      <button
+                        key={bg.id}
+                        title="Fondo personalizado"
+                        onClick={() => onBackgroundChange(`custom:${bg.objectUrl}`)}
+                        className={cn(
+                          "relative h-14 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 group",
+                          isSelected(`custom:${bg.objectUrl}`)
+                            ? "border-[hsl(214_82%_51%)] ring-1 ring-[hsl(214_82%_51%/0.3)]"
+                            : "border-transparent hover:border-[hsl(220_3%_40%)]"
+                        )}
+                      >
+                        <img src={bg.objectUrl} alt="Custom" className="w-full h-full object-cover" />
+                        {isSelected(`custom:${bg.objectUrl}`) && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <Check className="h-4 w-4 text-white" />
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCustom(bg); }}
+                          className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-2.5 w-2.5 text-white" />
+                        </button>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Templates */}
               <div className="grid grid-cols-4 gap-1.5">
                 {BACKGROUND_TEMPLATES.map((tpl) => (
                   <button
