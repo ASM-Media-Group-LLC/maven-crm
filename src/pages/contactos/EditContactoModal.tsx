@@ -209,15 +209,15 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
+                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario" />
+                </div>
+                <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Plataforma</Label>
                   <Select value={plataforma} onValueChange={setPlataforma}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
-                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario o @usuario" />
                 </div>
               </div>
 
