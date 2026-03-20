@@ -44,7 +44,7 @@ interface LiveKitCallViewProps {
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
-  const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
+  const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
