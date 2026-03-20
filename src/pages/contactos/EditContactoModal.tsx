@@ -118,8 +118,9 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   };
 
   const handleSave = async () => {
-    if (!nombre.trim() || !handle.trim()) {
-      toast({ title: "Nombre y handle son obligatorios", variant: "destructive" });
+    const extractedHandle = normalizeHandle(accountLink);
+    if (!nombre.trim() || !extractedHandle) {
+      toast({ title: "Nombre y link de la cuenta son obligatorios", variant: "destructive" });
       return;
     }
     if (!contacto) return;
@@ -130,7 +131,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
         .from("closers_contacts")
         .update({
           name: nombre.trim(),
-          handle: handle.trim(),
+          handle: extractedHandle,
           platform: plataforma,
           physical_appearance: categoria || null,
           company: compania || null,
@@ -139,6 +140,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
           phone: phone || null,
           notes: notas || null,
           profile_picture_url: profilePhoto?.url || null,
+          ticket_number: ticket || null,
         })
         .eq("id", contacto.id);
 
