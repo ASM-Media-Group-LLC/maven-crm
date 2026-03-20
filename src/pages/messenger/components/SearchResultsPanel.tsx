@@ -90,7 +90,7 @@ export default function SearchResultsPanel({
 
       {/* Results count */}
       {query.trim() && (
-        <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0">
+        <div className="px-3 py-1.5 text-xs text-muted-foreground shrink-0">
           {results.length === 0
             ? `Sin resultados para "${query}"`
             : `${results.length} resultado${results.length !== 1 ? "s" : ""}`}
