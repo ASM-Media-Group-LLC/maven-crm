@@ -227,20 +227,18 @@ export const useCloserLeads = () => {
   const totalCount = creatorsData?.total || 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // Status counts for KPIs
+  // Status counts for KPIs — use server-side RPC
   const { data: statusCounts = {} } = useQuery({
     queryKey: ["closer-creators-counts", user?.id, role],
     queryFn: async () => {
-      let query = supabase.from("closer_creators").select("stage");
-      if (!isAdmin && !isManager && user?.id) {
-        query = query.eq("assigned_to", user.id);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc("get_closer_stage_counts", {
+        _user_id: user!.id,
+        _is_admin: isAdmin || isManager,
+      });
       if (error) throw error;
       const counts: Record<string, number> = {};
       for (const row of data || []) {
-        const s = row.stage || "Asignada";
-        counts[s] = (counts[s] || 0) + 1;
+        counts[row.stage] = Number(row.cnt);
       }
       return counts;
     },

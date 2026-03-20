@@ -348,6 +348,11 @@ const LeadGenContent = () => {
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
               )}
+              {totalPages > 1 && (
+                <div className="mt-4">
+                  <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
+                </div>
+              )}
             </>
           )}
 
