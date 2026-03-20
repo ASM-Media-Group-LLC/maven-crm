@@ -473,7 +473,7 @@ export default function ThreadPanel({
       )}
 
       {/* Reply input with full controls */}
-      <div className="shrink-0 border-t border-border px-3 py-2.5">
+      <div className="shrink-0 bg-primary/[0.03] px-3 py-2.5">
         <div className="relative flex items-end gap-1.5">
           {/* Emoji picker */}
           {!isRecording && (
