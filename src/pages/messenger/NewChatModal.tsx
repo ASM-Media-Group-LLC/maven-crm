@@ -73,7 +73,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md sm:rounded-3xl">
         <DialogHeader>
           <DialogTitle>{isGroup ? "Nuevo grupo" : "Nuevo chat"}</DialogTitle>
           <p className="text-xs text-muted-foreground">
