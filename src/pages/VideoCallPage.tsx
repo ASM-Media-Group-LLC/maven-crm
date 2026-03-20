@@ -27,7 +27,7 @@ export default function VideoCallPage() {
     videoDeviceId?: string;
     audioOutputDeviceId?: string;
     backgroundEffect?: BackgroundEffect;
-  }>({ micOn: true, camOn: true, backgroundEffect: "none" });
+  }>({ micOn: false, camOn: false, backgroundEffect: "none" });
 
   // Detect cowork rooms and redirect to cowork dashboard
   useEffect(() => {
