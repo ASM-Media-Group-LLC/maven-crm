@@ -1,51 +1,46 @@
 
 
-## Plan: Clean Remaining Test Data & Clarify Closers Data Flow
+## Plan: Make All LeadGen Entries Visible in Closers
 
-### Root Cause
-The previous migration only deleted `leadgen_entries` matching `team_%`. There are **39 more test records** from October 2025 with status `interested`/`meeting_set` that the Closers "Todas" tab pulls in as "Pendiente LG". All have fake user IDs (`11111111-...`, `55555555-...`, `aaaaaaaa-...`, etc.) and fake handles (`pepe_*`, `@modelo_*`, `@m_*`, `luna_l`, `sofia_star`, `dany_blue`, `mia_moon`).
+### Problem
+The Closers module only pulls `leadgen_entries` with status `interested` or `meeting_set` (6 records out of 80,509). The user wants ALL leads generated in LeadGen to be visible in Closers. Additionally, 33 remaining test records (`@m_*` handles from Oct 2025) still need cleanup.
 
-### How Closers Works (current flow)
-1. **Converted leads** → stored in `closer_creators` table (e.g., `@marielby`). These appear in Asignadas/Confirmadas/Completadas tabs.
-2. **"Pendiente LG" items** → the "Todas" tab also fetches `leadgen_entries` with status `interested` or `meeting_set` that haven't been converted yet. This is meant to show leads ready to be closed. But right now it's only showing test data.
+### Key Challenge
+There are ~80K leadgen entries. Loading them all into the "Todas" tab would be impractical. We need a dedicated tab with server-side pagination.
 
 ### Changes
 
-**1. SQL Migration — Delete all remaining test data**
-Delete all leadgen_entries from October 2025 that have fake user IDs (the `11111111-...`, `22222222-...`, `55555555-...`, `88888888-...`, `99999999-...`, `aaaaaaaa-...` pattern). This covers all remaining seed records including `pepe_*`, `@modelo_*`, `@m_*`, `luna_l`, `sofia_star`, `dany_blue`, `mia_moon`.
+**1. Add "Pendiente LG" tab to Closers** (`src/pages/closers/ClosersContent.tsx`)
+- Add a new tab `{ value: "pendiente_lg", label: "Pendiente LG" }` visible to Admin/Manager roles
+- This tab shows ALL unconverted leadgen entries (no status filter), with server-side pagination
 
-Specifically:
-```sql
-DELETE FROM public.leadgen_entries
-WHERE lg_user_id IN (
-  '11111111-1111-1111-1111-111111111111',
-  '22222222-2222-2222-2222-222222222222',
-  '33333333-3333-3333-3333-333333333333',
-  '44444444-4444-4444-4444-444444444444',
-  '55555555-5555-5555-5555-555555555555',
-  '88888888-8888-8888-8888-888888888888',
-  '99999999-9999-9999-9999-999999999999',
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-);
-```
+**2. Update data fetching** (`src/pages/closers/hooks/useCloserLeads.ts`)
+- Remove the status filter `.in("status", ["interested", "meeting_set"])` from the "todas" tab query
+- For the new `pendiente_lg` tab: fetch from `leadgen_entries` WHERE `id NOT IN (select leadgen_entry_id from closer_creators where leadgen_entry_id is not null)`, with proper server-side pagination (100 rows per page)
+- For the `todas` tab: keep fetching `closer_creators` as-is, plus append a count of pending LG entries (badge only, not full list)
+- Add leadgen status display in the table rows so closers can see the current status of each lead
 
-Also delete the remaining `pepe_*`, `luna_l`, `sofia_star`, `dany_blue`, `mia_moon` entries that have real-looking user IDs but are still test data:
-```sql
-DELETE FROM public.leadgen_entries
-WHERE entry_date <= '2025-10-15'
-  AND model_handle IN ('pepe_a_1','pepe_a_2','pepe_a_3','pepe_a_4','pepe_a_5','pepe_a_6','pepe_a_7',
-    'pepe_aplus_1','pepe_aplus_2','pepe_aplus_3','pepe_aplus_4','pepe_aplus_5',
-    'pepe_b_2','pepe_bplus_1','pepe_bplus_2','pepe_bplus_4',
-    'luna_l','sofia_star','dany_blue','mia_moon');
-```
+**3. Update LeadGen status values** (`src/pages/closers/hooks/useCloserLeads.ts`)
+- Also include `interesado` in the status filter alongside `interested` (there's a mismatch: LeadGen uses Spanish `interesado` but Closers queries for English `interested`)
+- Wait -- actually since we're removing the filter entirely for the new tab, this is handled implicitly
 
-**2. No code changes needed** — The Closers data flow is correct:
-- Leads generated in LeadGen that reach `interested`/`meeting_set` status appear in Closers "Todas" tab as "Pendiente LG"
-- From there, admins can assign them to a closer, which converts them into a `closer_creators` record
-- Once converted, they move through the pipeline: Asignada → Confirmada → Completada
+**4. Update tab mapping** (`src/pages/closers/hooks/useCloserLeads.ts`)
+- Add `pendiente_lg: []` to `TAB_STAGE_MAP`
+- When `activeTab === "pendiente_lg"`, skip the `closer_creators` query entirely and only query `leadgen_entries`
+- Exclude already-converted entries (those with matching `leadgen_entry_id` in `closer_creators`)
 
-After cleanup, the Closers module will be clean — only showing the 1 real converted lead (`@marielby`) and any future real leads from LeadGen.
+**5. Clean remaining test data** (SQL migration)
+- Delete 33 records: `DELETE FROM leadgen_entries WHERE model_handle LIKE '@m_%' AND entry_date < '2025-11-01'`
+- Also delete any records with ID pattern `20000014-*` (the remaining fake IDs)
+
+**6. Update "Todas" tab behavior**
+- "Todas" tab continues to show all `closer_creators` records (converted leads)
+- Remove the leadgen_entries fetch from "todas" tab since there's now a dedicated tab for it
+- This simplifies the "todas" logic and avoids loading 80K records
 
 ### Files Modified
-- New SQL migration (delete remaining test data)
+- `src/pages/closers/hooks/useCloserLeads.ts` -- add pendiente_lg tab logic, paginated LG query
+- `src/pages/closers/ClosersContent.tsx` -- add new tab, wire it up
+- `src/pages/closers/components/LeadTable.tsx` -- display leadgen status column for LG rows
+- New SQL migration -- clean remaining test data
 
