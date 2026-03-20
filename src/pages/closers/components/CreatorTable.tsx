@@ -33,7 +33,7 @@ const stageBadgeColor = (stage: string) => {
     case "Formulario enviado": return "bg-accent/10 text-accent-foreground";
     case "Acuerdo enviado": return "bg-accent/20 text-accent-foreground";
     case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "Completada": return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-300";
+    case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
     case "No interesada": return "bg-destructive/10 text-destructive";
     default: return "";
   }

@@ -35,7 +35,7 @@ const stageColor = (s: string) => {
   switch (s) {
     case "Asignada": return "bg-primary/10 text-primary";
     case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "Completada": return "bg-green-200 text-green-900 dark:bg-green-900/50 dark:text-green-300";
+    case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
     case "No interesada": return "bg-destructive/10 text-destructive";
     case "Pendiente LG": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
     default: return "bg-muted text-muted-foreground";
@@ -469,7 +469,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Último contacto</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Alertas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       case "confirmadas":
@@ -485,7 +485,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Plataforma</TableHead>
             <TableHead>Revenue</TableHead>
             <TableHead className="w-10"></TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
@@ -523,7 +523,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Fecha entrada</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Notas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       default: // todas
@@ -539,7 +539,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Teléfono</TableHead>
             <TableHead>OF URL</TableHead>
             <TableHead>Notas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
     }
@@ -600,7 +600,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right sticky right-0 bg-background z-20">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -665,7 +665,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   <ChevronDown className={`h-4 w-4 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                 </Button>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right sticky right-0 bg-background z-20">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -738,7 +738,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell className="text-sm max-w-[180px] truncate" title={c.notes || ""}>{c.notes || "—"}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -788,7 +788,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right sticky right-0 bg-background z-20">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -818,8 +818,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <Table>
+    <div className="overflow-auto rounded-lg border border-border max-h-[calc(100vh-24rem)]">
+      <Table className="min-w-[1000px]">
         <TableHeader className="sticky top-0 z-10 bg-background">
           {renderHeaders()}
         </TableHeader>
