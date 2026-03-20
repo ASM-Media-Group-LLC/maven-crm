@@ -173,7 +173,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
             <div className="space-y-4 pb-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Nombre *</Label>
+                  <Label className="text-sm font-medium">Nombre del Contacto *</Label>
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
