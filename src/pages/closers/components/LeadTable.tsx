@@ -459,87 +459,87 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
       case "asignadas":
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Cuenta origen</TableHead>
-            <TableHead>Categoría</TableHead>
-            <TableHead>Fecha asignación</TableHead>
-            <TableHead>Agente</TableHead>
-            <TableHead># Contactos</TableHead>
-            <TableHead>Último contacto</TableHead>
-            <TableHead>Teléfono</TableHead>
-            <TableHead>Alertas</TableHead>
-            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha asignación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"># Contactos</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Último contacto</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Alertas</TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
       case "confirmadas":
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Agente</TableHead>
-            <TableHead>Teléfono</TableHead>
-            <TableHead>Monetización</TableHead>
-            <TableHead>% Comisión</TableHead>
-            <TableHead>Extras</TableHead>
-            <TableHead>Plataforma</TableHead>
-            <TableHead>Revenue</TableHead>
-            <TableHead className="w-10"></TableHead>
-            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Extras</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Revenue</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Agente</TableHead>
-            <TableHead>Monetización</TableHead>
-            <TableHead>% Comisión</TableHead>
-            <TableHead>Extras</TableHead>
-            <TableHead>Revenue</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Extras</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Revenue</TableHead>
           </TableRow>
         );
       case "no_interesadas":
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Closer</TableHead>
-            <TableHead>Último contacto</TableHead>
-            <TableHead>Motivo rechazo</TableHead>
-            <TableHead>Notas</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Closer</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Último contacto</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Motivo rechazo</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
           </TableRow>
         );
       case "pendiente_lg":
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Estado LG</TableHead>
-            <TableHead>Plataforma</TableHead>
-            <TableHead>Cuenta origen</TableHead>
-            <TableHead>Categoría</TableHead>
-            <TableHead>Fecha entrada</TableHead>
-            <TableHead>Teléfono</TableHead>
-            <TableHead>Notas</TableHead>
-            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Estado LG</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha entrada</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
       default: // todas
         return (
           <TableRow>
-            <TableHead className="w-10">#</TableHead>
-            <TableHead>Instagram</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Cuenta origen</TableHead>
-            <TableHead>Categoría</TableHead>
-            <TableHead>Agente</TableHead>
-            <TableHead># Contactos</TableHead>
-            <TableHead>Teléfono</TableHead>
-            <TableHead>OF URL</TableHead>
-            <TableHead>Notas</TableHead>
-            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Estado</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"># Contactos</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
     }
