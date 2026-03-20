@@ -523,7 +523,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Fecha entrada</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Notas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       default: // todas
