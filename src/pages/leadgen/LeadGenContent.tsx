@@ -134,8 +134,6 @@ const LeadGenContent = () => {
       }
       // Agency filter
       if (agencyFilter && lead.company !== agencyFilter) return false;
-      // Status filter
-      if (statusFilter && lead.status !== statusFilter) return false;
       // Quality filter
       if (qualityFilter && lead.quality?.toLowerCase() !== qualityFilter) return false;
       // Card filters
