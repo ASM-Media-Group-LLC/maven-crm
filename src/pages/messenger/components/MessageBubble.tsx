@@ -45,12 +45,8 @@ interface MessageBubbleProps {
   isGridLeader?: boolean;
   isPartOfGrid?: boolean;
 }
-
-// getInitials imported from ../utils
-
-function formatMsgTime(d: string) {
-  return new Date(d).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-}
+import { getInitials, formatTime as formatMsgTime } from "../utils";
+// Re-export formatTime as formatMsgTime for local usage
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
