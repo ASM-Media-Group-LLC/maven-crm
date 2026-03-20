@@ -35,12 +35,12 @@ export default function StatusPicker() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs">
+        <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2.5 text-xs rounded-full bg-primary/5 hover:bg-primary/8">
           <Icon className={cn("h-3 w-3 fill-current", config.color)} />
           <span className="text-muted-foreground">{config.label}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[160px]">
+      <DropdownMenuContent align="start" className="min-w-[160px] rounded-2xl">
         {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][]).map(([key, cfg]) => {
           const ItemIcon = cfg.icon;
           return (

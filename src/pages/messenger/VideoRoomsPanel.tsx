@@ -91,8 +91,8 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
   };
 
   return (
-    <div className="flex flex-col h-full bg-card border-r border-border">
-      <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
+    <div className="flex flex-col h-full bg-card/50">
+      <div className="shrink-0 flex items-center justify-between p-4 bg-primary/[0.03]">
         <div className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Video Rooms</h2>
@@ -105,11 +105,11 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       <div className="shrink-0 p-4 space-y-3">
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1">
+          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Plus className="h-5 w-5" />
             <span className="text-xs">Nueva sala</span>
           </Button>
-          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1">
+          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Link2 className="h-5 w-5" />
             <span className="text-xs">Unirse</span>
           </Button>
@@ -120,12 +120,12 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
           <Input
             id="join-link-input"
             placeholder="Pegar enlace de la sala..."
-            className="h-9 bg-muted/50 text-xs"
+            className="h-9 bg-primary/5 border-0 text-xs rounded-full"
             value={joinLink}
             onChange={e => setJoinLink(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleJoinByLink()}
           />
-          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()}>
+          <Button variant="secondary" size="sm" onClick={handleJoinByLink} disabled={!joinLink.trim()} className="rounded-full">
             Unirse
           </Button>
         </div>
@@ -134,7 +134,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       <ScrollArea className="flex-1 px-4 pb-4">
         <div className="space-y-3">
           {rooms.map(room => (
-            <Card key={room.id} className={cn("transition-colors", room.isActive && "border-primary/40 bg-primary/5")}>
+            <Card key={room.id} className={cn("transition-colors border-0 rounded-3xl", room.isActive ? "bg-primary/8" : "bg-primary/[0.03]")}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

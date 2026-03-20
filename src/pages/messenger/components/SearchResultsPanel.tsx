@@ -72,14 +72,14 @@ export default function SearchResultsPanel({
   }, [results]);
 
   return (
-    <div className="w-80 border-l border-border bg-card flex flex-col h-full shrink-0">
+    <div className="w-full sm:w-80 shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/[0.03] shrink-0">
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           ref={inputRef}
           placeholder="Buscar en la conversación..."
-          className="h-8 bg-background text-sm"
+          className="h-9 bg-primary/5 border-0 rounded-full text-sm"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -90,7 +90,7 @@ export default function SearchResultsPanel({
 
       {/* Results count */}
       {query.trim() && (
-        <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0">
+        <div className="px-3 py-1.5 text-xs text-muted-foreground shrink-0">
           {results.length === 0
             ? `Sin resultados para "${query}"`
             : `${results.length} resultado${results.length !== 1 ? "s" : ""}`}
@@ -110,7 +110,7 @@ export default function SearchResultsPanel({
 
         {grouped.map((group) => (
           <div key={group.label}>
-            <div className="sticky top-0 bg-muted/60 backdrop-blur-sm px-3 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide z-10">
+            <div className="sticky top-0 bg-primary/5 backdrop-blur-sm px-3 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-widest z-10">
               {group.label}
             </div>
             {group.items.map((msg) => {
@@ -123,8 +123,8 @@ export default function SearchResultsPanel({
                 <button
                   key={msg.id}
                   className={cn(
-                    "w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-muted/50 transition-colors",
-                    "border-b border-border/50 last:border-b-0",
+                    "w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-primary/5 transition-colors rounded-2xl mx-1",
+                    "",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                   )}
                   onClick={() => onResultClick(msg.id)}

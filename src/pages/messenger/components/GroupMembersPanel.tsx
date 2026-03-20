@@ -14,16 +14,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getInitials } from "../utils";
 
 interface GroupMembersPanelProps {
   conversation: ConversationWithDetails;
   profiles: Record<string, UserProfile>;
   onClose: () => void;
   onMembersChanged: () => void;
-}
-
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export default function GroupMembersPanel({
@@ -139,9 +136,9 @@ export default function GroupMembersPanel({
   };
 
   return (
-    <div className="w-full md:w-[360px] shrink-0 border-l border-border bg-card flex flex-col h-full">
+    <div className="w-full md:w-[360px] shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <Shield className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold flex-1">Miembros del grupo</h3>
         <span className="text-xs text-muted-foreground">{conversation.participants.length}</span>
@@ -152,11 +149,11 @@ export default function GroupMembersPanel({
 
       {/* Add member button */}
       {isAdmin && !showAddPanel && (
-        <div className="px-4 py-2 border-b border-border">
+        <div className="px-4 py-2">
           <Button
             variant="outline"
             size="sm"
-            className="w-full gap-2 text-xs"
+            className="w-full gap-2 text-xs rounded-full"
             onClick={() => setShowAddPanel(true)}
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -230,7 +227,7 @@ export default function GroupMembersPanel({
             const isSelf = p.user_id === user?.id;
 
             return (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-2 hover:bg-muted/30 transition-colors">
+              <div key={p.id} className="flex items-center gap-3 px-4 py-2 hover:bg-primary/5 rounded-2xl mx-1 transition-colors">
                 <div className="relative">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className={cn(

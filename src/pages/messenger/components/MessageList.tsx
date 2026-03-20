@@ -70,13 +70,11 @@ export default function MessageList({
   const prevMessagesLengthRef = useRef(0);
   const isInitialLoadRef = useRef(true);
 
-  // Auto-scroll to bottom on new messages (only if near bottom)
   useEffect(() => {
     if (!scrollRef.current) return;
     const el = scrollRef.current;
     
     if (isInitialLoadRef.current) {
-      // First load: scroll to bottom
       el.scrollTop = el.scrollHeight;
       isInitialLoadRef.current = false;
       prevMessagesLengthRef.current = messages.length;
@@ -93,21 +91,18 @@ export default function MessageList({
     prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
-  // Reset on conversation change (use messages reference identity as proxy for conv change)
   const conversationKey = messages.length > 0 ? messages[0]?.conversation_id : null;
   useEffect(() => {
     isInitialLoadRef.current = true;
     prevMessagesLengthRef.current = 0;
   }, [conversationKey]);
 
-  // Scroll to highlighted message
   useEffect(() => {
     if (highlightedMsgId && msgRefs.current[highlightedMsgId]) {
       msgRefs.current[highlightedMsgId]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [highlightedMsgId]);
 
-  // Preserve scroll position after older messages are prepended
   const prevScrollHeightRef = useRef(0);
   const wasLoadingMoreRef = useRef(false);
 
@@ -119,7 +114,6 @@ export default function MessageList({
     }
   }, [messages, loadingMore]);
 
-  // Infinite scroll: load more on scroll to top
   const handleScroll = useCallback(() => {
     if (!scrollRef.current || !hasMore || loadingMore || !onLoadMore) return;
     if (scrollRef.current.scrollTop < 80) {
@@ -142,7 +136,7 @@ export default function MessageList({
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center space-y-2">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <div className="h-14 w-14 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
             <span className="text-2xl">💬</span>
           </div>
           <p className="text-sm text-muted-foreground">Envía el primer mensaje</p>
@@ -154,7 +148,6 @@ export default function MessageList({
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto py-4 px-2 md:px-4 space-y-1">
-        {/* Load more indicator */}
         {loadingMore && (
           <div className="flex justify-center py-3">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -164,7 +157,7 @@ export default function MessageList({
           <div className="flex justify-center py-2">
             <button
               onClick={onLoadMore}
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-primary hover:bg-primary/8 rounded-full px-4 py-1.5 transition-colors"
             >
               Cargar mensajes anteriores
             </button>
@@ -174,13 +167,12 @@ export default function MessageList({
         {groups.map((group, gi) => (
           <div key={gi}>
             <div className="flex justify-center my-4">
-              <span className="text-[11px] text-muted-foreground bg-muted/60 backdrop-blur-sm px-3 py-1 rounded-full font-medium select-none">
+              <span className="text-[11px] text-muted-foreground bg-primary/8 px-4 py-1 rounded-full font-medium select-none">
                 {formatDateSeparator(group.date)}
               </span>
             </div>
 
             {(() => {
-              // Compute image groups for grid display
               const imageGroups = new Map<number, ChatMessage[]>();
               const msgGridLeader = new Map<string, boolean>();
               const msgGridPart = new Map<string, boolean>();
@@ -190,7 +182,6 @@ export default function MessageList({
               while (i < group.messages.length) {
                 const msg = group.messages[i];
                 if (msg.type === "image" && msg.file_url && !msg.is_deleted) {
-                  const groupStart = i;
                   const imgs: ChatMessage[] = [msg];
                   let j = i + 1;
                   while (j < group.messages.length) {
@@ -203,7 +194,7 @@ export default function MessageList({
                     } else break;
                   }
                   if (imgs.length > 1) {
-                    imageGroups.set(groupStart, imgs);
+                    imageGroups.set(i, imgs);
                     imgs.forEach((im, idx) => {
                       msgGridPart.set(im.id, true);
                       if (idx === 0) {
@@ -233,7 +224,7 @@ export default function MessageList({
                     ref={el => { msgRefs.current[msg.id] = el; }}
                     className={cn(
                       "transition-colors duration-700",
-                      isHighlighted && "bg-primary/10 rounded-lg"
+                      isHighlighted && "bg-primary/10 rounded-2xl"
                     )}
                   >
                     <MessageBubble

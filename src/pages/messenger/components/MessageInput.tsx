@@ -420,10 +420,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
   }, [user, onSendMessage]);
 
   return (
-    <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-sm">
+    <div className="shrink-0 bg-primary/[0.03]">
       {/* Reply bar */}
       {replyTo && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border animate-fade-in">
+        <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 animate-fade-in">
           <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-primary">
@@ -439,7 +439,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* File previews with sizes */}
       {pendingFiles.length > 0 && (
-        <div className="border-b border-border bg-muted/20">
+        <div className="bg-primary/[0.03]">
           <div className="flex items-center justify-between px-4 pt-2 pb-1">
             <span className="text-[11px] text-muted-foreground font-medium">
               {pendingFiles.length}/{MAX_FILES} archivos adjuntos
@@ -455,9 +455,9 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             {pendingFiles.map((pf, i) => (
               <div key={i} className="relative shrink-0 group/file">
                 {pf.preview ? (
-                  <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-lg border border-border" />
+                  <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 object-cover rounded-2xl" />
                 ) : (
-                  <div className="h-16 w-16 rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-1">
+                  <div className="h-16 w-16 rounded-2xl bg-primary/5 flex flex-col items-center justify-center gap-1">
                     <FileText className="h-5 w-5 text-muted-foreground" />
                     <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">
                       {pf.file.name.split(".").pop()?.toUpperCase()}
@@ -480,7 +480,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* Upload progress with percentage and cancel */}
       {uploading && uploadProgress && (
-        <div className="px-4 py-2 border-b border-border bg-primary/5 space-y-1">
+        <div className="px-4 py-2 bg-primary/5 space-y-1">
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
             <span className="text-[11px] text-primary font-medium truncate flex-1">{uploadProgress}</span>
@@ -505,7 +505,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground">
                   <Smile className="h-5 w-5" />
                 </Button>
               </PopoverTrigger>
@@ -527,7 +527,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} multiple accept="*/*" />
             <Button
               variant="ghost" size="icon"
-              className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+              className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
@@ -558,7 +558,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Textarea
                 ref={inputRef}
                 placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
-                className="min-h-[38px] max-h-[120px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
+                className="min-h-[38px] max-h-[120px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-4 py-2.5 text-sm"
                 rows={1}
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}
@@ -572,7 +572,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Button
                 size="icon"
                 onClick={handleSend}
-                className="shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground shadow-md hover:shadow-lg transition-all"
+                className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground shadow-none hover:bg-primary/90 transition-all"
                 disabled={uploading}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -581,7 +581,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Button
                 variant="ghost"
                 size="icon"
-                className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground"
                 onClick={() => setIsRecording(true)}
               >
                 <Mic className="h-5 w-5" />

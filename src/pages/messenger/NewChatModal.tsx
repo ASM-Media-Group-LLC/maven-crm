@@ -23,9 +23,7 @@ interface NewChatModalProps {
   getStatusFn?: (userId: string) => UserStatus | null;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-}
+import { getInitials } from "./utils";
 
 const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewChatModal(
   { open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn },
@@ -75,7 +73,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md sm:rounded-3xl">
         <DialogHeader>
           <DialogTitle>{isGroup ? "Nuevo grupo" : "Nuevo chat"}</DialogTitle>
           <p className="text-xs text-muted-foreground">
@@ -92,7 +90,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar usuario..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="Buscar usuario..." className="pl-9 rounded-full bg-primary/5 border-0" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
         <div className="max-h-64 overflow-y-auto space-y-1 mt-2">
@@ -105,9 +103,9 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
               <div
                 key={profile.id}
                 onClick={() => isGroup ? toggleSelect(profile.id) : onSelectUser(profile.id)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-muted/50 transition-colors cursor-pointer",
-                  isGroup && selected.includes(profile.id) && "bg-primary/10"
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left hover:bg-primary/5 transition-colors cursor-pointer",
+                    isGroup && selected.includes(profile.id) && "bg-primary/10"
                 )}
               >
                 {isGroup && (
@@ -140,7 +138,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
         {isGroup && (
           <div className="flex justify-end mt-2">
-            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selected.length === 0}>
+            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selected.length === 0} className="rounded-full">
               Crear grupo ({selected.length})
             </Button>
           </div>

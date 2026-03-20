@@ -29,9 +29,7 @@ interface SpacesPanelProps {
   draggingChatId?: string | null;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-}
+import { getInitials } from "../utils";
 
 export default function SpacesPanel({
   spaces, conversations, activeChatId, onSelectChat,
@@ -162,9 +160,9 @@ export default function SpacesPanel({
           <div key={space.id}>
             <div
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg mx-1 cursor-pointer transition-all text-sm",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-2xl mx-1 cursor-pointer transition-all text-sm",
                 isDragOver && "bg-primary/15 ring-1 ring-primary/40",
-                !isDragOver && "hover:bg-muted/50"
+                !isDragOver && "hover:bg-primary/5"
               )}
               onClick={() => toggleExpand(space.id)}
               onDragOver={(e) => handleDragOver(e, space.id)}
@@ -245,8 +243,8 @@ export default function SpacesPanel({
                       <div
                         key={cid}
                         className={cn(
-                          "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors group",
-                          activeChatId === cid ? "bg-primary/10" : "hover:bg-muted/40"
+                          "flex items-center gap-2 px-2 py-1.5 rounded-2xl cursor-pointer transition-colors group",
+                          activeChatId === cid ? "bg-primary/12" : "hover:bg-primary/5"
                         )}
                         onClick={() => onSelectChat(cid)}
                       >

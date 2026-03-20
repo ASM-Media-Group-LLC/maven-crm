@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Trash2, SearchCheck, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare } from "lucide-react";
+import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,6 +26,7 @@ import DeleteChatDialog from "./components/DeleteChatDialog";
 import SpacesPanel from "./components/SpacesPanel";
 import { ChatSpace } from "@/hooks/useSpaces";
 import { useMentionedConversations } from "@/hooks/useMentionedConversations";
+import { getInitials } from "./utils";
 
 interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
@@ -36,7 +37,6 @@ interface ChatSidebarProps {
   onSelectContact: (userId: string) => void;
   onDeleteChat: (chatId: string) => Promise<boolean>;
   loading: boolean;
-  
   profiles: Record<string, import("./types").UserProfile>;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
@@ -46,10 +46,6 @@ interface ChatSidebarProps {
   onRenameSpace: (id: string, name: string) => Promise<boolean>;
   onAddConversationToSpace: (spaceId: string, convId: string) => Promise<boolean>;
   onRemoveConversationFromSpace: (spaceId: string, convId: string) => Promise<boolean>;
-}
-
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
 function formatTime(dateStr?: string) {
@@ -81,7 +77,6 @@ export default function ChatSidebar({
   const [tab, setTab] = useState("all");
   const { results: globalResults, searching: globalSearching, search: globalSearch, clearResults: clearGlobalResults } = useGlobalSearch();
 
-  // Trigger global search when query has 2+ chars
   useEffect(() => {
     if (search.trim().length >= 2) {
       globalSearch(search);
@@ -155,36 +150,36 @@ export default function ChatSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full border-r border-border bg-card">
-      {/* Header — Google Chat style */}
-      <div className="shrink-0 px-3 sm:px-4 pt-3 pb-2 space-y-2">
+    <div className="flex flex-col h-full bg-card/50">
+      {/* Header — M3 tonal surface */}
+      <div className="shrink-0 px-3 sm:px-4 pt-3 pb-2 space-y-2.5 bg-primary/[0.03]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <StatusPicker />
           </div>
           <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onOpenVideoRooms} title="Video Rooms">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onOpenVideoRooms} title="Video Rooms">
               <Video className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onNewGroup} title="Nuevo grupo">
+            <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={onNewGroup} title="Nuevo grupo">
               <MessageSquarePlus className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search — M3 pill */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar en todos los chats…"
-            className="pl-9 pr-8 h-9 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
+            className="pl-10 pr-8 h-11 sm:h-9 bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-full text-sm"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -194,7 +189,7 @@ export default function ChatSidebar({
 
       <ScrollArea className="flex-1">
         <div className="pb-2">
-          {/* Acceso Rápido section */}
+          {/* Quick access section */}
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
             <div className="px-2 pb-1">
               {[
@@ -211,10 +206,10 @@ export default function ChatSidebar({
                     key={item.key}
                     onClick={() => setTab(item.key)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-[7px] rounded-full text-sm transition-colors",
+                      "w-full flex items-center gap-3 px-3 py-[7px] min-h-[40px] sm:min-h-0 rounded-full text-sm transition-colors",
                       isActive
                         ? "bg-primary/12 text-primary font-medium"
-                        : "text-foreground/70 hover:bg-muted/60 font-normal"
+                        : "text-foreground/70 hover:bg-primary/5 font-normal"
                     )}
                   >
                     <Icon className={cn("h-[18px] w-[18px] shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
@@ -234,7 +229,7 @@ export default function ChatSidebar({
           <div className="mt-1 px-2">
             <button
               onClick={() => setDmExpanded(!dmExpanded)}
-              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
             >
               {dmExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               <span>Mensajes directos</span>
@@ -277,7 +272,7 @@ export default function ChatSidebar({
           {/* Global message search results */}
           {search.trim().length >= 2 && (
             <div className="mt-1 px-2">
-              <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
                 <Search className="h-3.5 w-3.5" />
                 <span>Resultados en mensajes</span>
               </div>
@@ -298,7 +293,7 @@ export default function ChatSidebar({
                 }, {});
                 return Object.entries(grouped).map(([convId, group]) => (
                   <div key={convId} className="mb-1">
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-muted/30">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-primary/5">
                       <MessageSquare className="h-3 w-3 text-primary shrink-0" />
                       <span className="text-[11px] font-semibold text-foreground truncate">{group.title}</span>
                       <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[9px] rounded-full ml-auto">
@@ -309,7 +304,7 @@ export default function ChatSidebar({
                       <button
                         key={r.messageId}
                         onClick={() => onSelectChat(r.conversationId)}
-                        className="w-full text-left px-3 py-1.5 hover:bg-accent/50 transition-colors rounded-md"
+                        className="w-full text-left px-3 py-1.5 hover:bg-primary/5 transition-colors rounded-2xl"
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <User className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -349,7 +344,7 @@ export default function ChatSidebar({
           <div className="mt-1 px-2">
             <button
               onClick={() => setContactsExpanded(!contactsExpanded)}
-              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors"
             >
               {contactsExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               <span>Contactos</span>
@@ -367,7 +362,7 @@ export default function ChatSidebar({
                     <button
                       key={p.id}
                       onClick={() => onSelectContact(p.id)}
-                      className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-full text-left hover:bg-muted/50 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-[7px] min-h-[40px] sm:min-h-0 rounded-2xl text-left hover:bg-primary/5 transition-colors"
                     >
                       <div className="relative shrink-0">
                         <Avatar className="h-7 w-7">
@@ -415,26 +410,17 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-1.5 px-3 pb-0.5 pt-1 select-none hover:bg-muted/40 rounded transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 pb-0.5 pt-1 select-none hover:bg-primary/5 rounded-2xl transition-colors"
       >
         {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</span>
       </button>
       {open && children}
     </div>
   );
 }
 
-/* ── Section Header (Google Chat style) ── */
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <p className="text-[11px] font-semibold text-muted-foreground px-3 pb-0.5 pt-1 uppercase tracking-wider select-none">
-      {label}
-    </p>
-  );
-}
-
-/* ── Conversation Item ── */
+/* ── Conversation Item — M3 ── */
 function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onDragStart, onDragEnd, spaces, onAddToSpace }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
@@ -463,13 +449,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
     if (!lastMsg) return "Sin mensajes";
     if (lastMsg.is_deleted) return "🚫 Mensaje eliminado";
     if (lastMsg.type === "system") return `ℹ️ ${lastMsg.content || ""}`;
-
     let body = "";
     if (lastMsg.type === "file") body = `📎 ${lastMsg.file_name}`;
     else if (lastMsg.type === "image") body = "📷 Foto";
     else body = lastMsg.content || "";
-
-    // In group chats, prefix sender name
     if (isGroup && lastMsg.sender_id) {
       const senderName = lastMsg.sender_id === user?.id
         ? "Tú"
@@ -489,11 +472,11 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           onDragEnd={onDragEnd}
           onClick={onClick}
           className={cn(
-            "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 group",
+            "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group",
             isActive
-              ? "bg-primary/10"
-              : "hover:bg-muted/50",
-            hasUnread && !isActive && "bg-muted/30"
+              ? "bg-primary/12"
+              : "hover:bg-primary/5",
+            hasUnread && !isActive && "bg-primary/[0.04]"
           )}
         >
           {/* Drag handle */}
@@ -501,7 +484,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
 
           {/* Avatar */}
           <div className="relative shrink-0">
-            <Avatar className={cn("h-9 w-9", isActive && "ring-2 ring-primary/30")}>
+            <Avatar className={cn("h-10 w-10 sm:h-9 sm:w-9", isActive && "ring-2 ring-primary/20")}>
               {conversation.avatar_url && <AvatarImage src={conversation.avatar_url} alt={conversation.displayName} className="object-cover" />}
               {!conversation.avatar_url && !isGroup && otherParticipant?.profile?.avatar_url && (
                 <AvatarImage src={otherParticipant.profile.avatar_url} alt={conversation.displayName} className="object-cover" />
@@ -554,7 +537,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           </div>
         </button>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent className="rounded-2xl">
         <ContextMenuItem onClick={onTogglePin}>
           {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
           {isPinned ? "Desanclar" : "Anclar"}
@@ -562,7 +545,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         {spaces.length > 0 && (
           <ContextMenuSub>
             <ContextMenuSubTrigger>Agregar a espacio</ContextMenuSubTrigger>
-            <ContextMenuSubContent>
+            <ContextMenuSubContent className="rounded-2xl">
               {spaces.map(space => (
                 <ContextMenuItem key={space.id} onClick={() => onAddToSpace(space.id, conversation.id)}>
                   {space.icon} {space.name}
@@ -571,7 +554,6 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             </ContextMenuSubContent>
           </ContextMenuSub>
         )}
-        {/* Only show delete for DMs or if user is group admin */}
         {(!isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
           <ContextMenuItem
             onClick={onDelete}

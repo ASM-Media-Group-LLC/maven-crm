@@ -429,9 +429,9 @@ export default function ThreadPanel({
   };
 
   return (
-    <div className="w-full md:w-[380px] shrink-0 border-l border-border bg-card flex flex-col h-full">
+    <div className="w-full sm:w-[380px] shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <MessageSquareText className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold flex-1">Hilo</h3>
         <span className="text-xs text-muted-foreground">{replies.length} {replies.length === 1 ? "respuesta" : "respuestas"}</span>
@@ -441,7 +441,7 @@ export default function ThreadPanel({
       </div>
 
       {/* Parent message */}
-      <div className="border-b border-border">
+      <div className="bg-primary/[0.02]">
         {renderMessage(parentMessage, true)}
       </div>
 
@@ -460,7 +460,7 @@ export default function ThreadPanel({
 
       {/* Upload progress */}
       {uploading && (
-        <div className="px-3 py-2 border-t border-border bg-muted/20">
+        <div className="px-3 py-2 bg-primary/5">
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             <span className="text-[11px] text-muted-foreground flex-1 truncate">{uploadProgress}</span>
@@ -473,7 +473,7 @@ export default function ThreadPanel({
       )}
 
       {/* Reply input with full controls */}
-      <div className="shrink-0 border-t border-border px-3 py-2.5">
+      <div className="shrink-0 bg-primary/[0.03] px-3 py-2.5">
         <div className="relative flex items-end gap-1.5">
           {/* Emoji picker */}
           {!isRecording && (
@@ -536,7 +536,7 @@ export default function ThreadPanel({
                 <Textarea
                   ref={inputRef}
                   placeholder="Responder en hilo..."
-                  className="min-h-[36px] max-h-[80px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-xl px-3 py-2 text-sm"
+                  className="min-h-[36px] max-h-[80px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-3 py-2 text-sm"
                   rows={1}
                   value={text}
                   onChange={e => handleTextChange(e.target.value)}
