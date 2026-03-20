@@ -107,66 +107,40 @@ export const useCloserLeads = () => {
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
     queryFn: async () => {
-      // ── Pendiente LG tab: fetch directly from leadgen_entries ──
+      // ── Pendiente LG tab: now uses closer_creators with stage 'Pendiente LG' (auto-synced by trigger) ──
       if (activeTab === "pendiente_lg") {
-        // Get already-converted leadgen entry IDs to exclude
-        const { data: existingLinks } = await supabase
+        let query = supabase
           .from("closer_creators")
-          .select("leadgen_entry_id")
-          .not("leadgen_entry_id", "is", null);
-        const excludeSet = new Set((existingLinks || []).map((r: any) => r.leadgen_entry_id).filter(Boolean));
-
-        let lgQuery = supabase
-          .from("leadgen_entries")
           .select("*", { count: "exact" })
-          .order("entry_date", { ascending: false });
+          .eq("stage", "Pendiente LG")
+          .order("created_at", { ascending: false });
 
-        // Date filter
-        if (dateFrom && dateTo && dateField === "lg_entry_date") {
+        if (dateFrom && dateTo) {
           const fromStr = dateFrom.toISOString().split("T")[0];
           const toStr = dateTo.toISOString().split("T")[0];
-          lgQuery = lgQuery.gte("entry_date", fromStr).lte("entry_date", toStr);
+          query = query.gte("passed_date", fromStr).lte("passed_date", toStr);
         }
 
         const from = page * PAGE_SIZE;
-        lgQuery = lgQuery.range(from, from + PAGE_SIZE - 1);
+        query = query.range(from, from + PAGE_SIZE - 1);
 
-        const { data: lgData, error: lgErr, count: lgCount } = await lgQuery;
-        if (lgErr) throw lgErr;
+        const { data, error, count } = await query;
+        if (error) throw error;
 
-        // Filter out already-converted client-side
-        const filtered = (lgData || []).filter((r: any) => !excludeSet.has(r.id));
-
-        const lgRows: CloserCreatorRow[] = filtered.map((r: any) => ({
-          id: r.id,
-          instagram_handle: r.model_handle || "—",
-          category: r.quality || null,
-          passed_date: r.entry_date || null,
-          source_account: r.company || null,
-          phone: r.phone_e164 || null,
-          notes: r.notes || null,
-          onlyfans_url: r.source_link || null,
-          estimated_monetization: 0,
-          agency_commission: 0,
-          stage: "Pendiente LG",
-          assigned_to: null,
-          rejection_reason: null,
-          confirmed_date: null,
-          completed_date: null,
-          last_contact_date: null,
-          monthly_monetization: null,
-          main_platform: r.platform || null,
-          extras: 0,
-          created_at: r.created_at || "",
-          updated_at: r.updated_at || "",
-          leadgen_entry_id: r.id,
+        const rows: CloserCreatorRow[] = (data || []).map((c: any) => ({
+          ...c,
+          leadgen_entry_id: c.leadgen_entry_id ?? null,
+          estimated_monetization: c.estimated_monetization ?? 0,
+          agency_commission: c.agency_commission ?? 0,
+          extras: c.extras ?? 0,
+          main_platform: c.main_platform ?? null,
           agent_name: null,
           contact_count: 0,
-          _source: "leadgen" as const,
-          _lg_status: r.status || null,
+          _source: "closer" as const,
+          _lg_status: null,
         }));
 
-        return { creators: lgRows, total: lgCount || 0 };
+        return { creators: rows, total: count || 0 };
       }
 
       // ── All other tabs: fetch from closer_creators ──
