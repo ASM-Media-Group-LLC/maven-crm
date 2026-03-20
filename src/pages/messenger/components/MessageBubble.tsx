@@ -15,6 +15,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { renderTextWithMentions } from "./MentionAutocomplete";
+import { getInitials } from "../utils";
 
 const MAX_GRID_IMAGES = 9;
 
