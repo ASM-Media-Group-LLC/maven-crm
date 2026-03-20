@@ -1,67 +1,39 @@
 
 
-## Plan: Server-side Pagination for LeadGen + Closers Performance Fix + Data Verification
+## Plan: Sticky Header/Actions + Fix Stage Colors + Remove "Pendiente LG" from Closers Table
 
-### Current Problems
+### Issues
 
-1. **LeadGen main page with "Todo" filter**: Fetches ALL 80k+ rows in a while-loop, freezing the UI.
-2. **LeadGen Base de Datos page**: `useLeadGenEntries()` fetches ALL 80k+ rows at once into memory.
-3. **Closers status counts**: `SELECT stage FROM closer_creators` returns 80k+ rows just to count them — should use a server-side count query.
-4. **Data verification**: Closers data IS correctly synced from LeadGen (confirmed: `instagram_handle` = `model_handle`, `source_account` = `company`, `category` = `quality`, all linked via `leadgen_entry_id`). No mock data — all 80,942 rows are real.
+1. **Header and Actions column not sticky**: LeadGen table has `sticky top-0 z-10 bg-card` on `TableHeader` and `sticky right-0 bg-card` on the Actions column. The Closers `LeadTable.tsx` has sticky header (`sticky top-0 z-10 bg-background`) but does NOT have a sticky right Actions column.
+
+2. **"Pendiente LG" stage confusion**: This stage exists as a tab but also appears in the stage badge colors and inline stage selector. It's an intermediate state from the LeadGen sync — users shouldn't see it as a selectable stage within the table. The tab is fine for filtering, but the stage badge and inline selector should not expose it as a manual option.
+
+3. **"Confirmada" and "Completada" same green semantic**: Both use green shades (`green-100/green-800` vs `green-200/green-900`), which are nearly indistinguishable. Fix: change "Completada" to a distinct blue/purple to signal "done/closed" vs "confirmed/active".
 
 ### Changes
 
-**1. `src/pages/leadgen/useLeadGen.ts` — Add server-side pagination to main page query**
-- Change `fetchEntriesByDateRange` to accept `page` and `pageSize` params
-- Use `.range()` with `{ count: "exact" }` instead of the while-loop
-- Return `{ data, total }` instead of a flat array
-- Update `useLeadGenByDateRange` hook signature to include pagination params
-- Keep the while-loop version ONLY for `fetchAllEntries` (Base de Datos) but convert that to server-side pagination too (see point 2)
+**1. `src/pages/closers/components/LeadTable.tsx`**
 
-**2. `src/pages/leadgen/useLeadGen.ts` — Convert Base de Datos to server-side pagination**
-- Change `useLeadGenEntries` to accept `page` and `pageSize` (default 100)
-- Use `.range()` with `{ count: "exact" }` — single query, no while-loop
-- Return `{ data, total }`
+- **Sticky Actions column**: Add `sticky right-0 bg-background z-20` to all Actions `<TableHead>` headers and corresponding `<TableCell>` elements across all tab layouts (asignadas, confirmadas, todas, pendiente_lg). Match the LeadGen pattern exactly.
+- **Table wrapper**: Add `max-h-[calc(100vh-24rem)]` to the outer div (matching LeadGen) so the table scrolls vertically with sticky header visible.
+- **Min-width**: Add `min-w-[1000px]` to `<Table>` to guarantee horizontal scroll.
 
-**3. `src/pages/leadgen/LeadGenContent.tsx` — Add pagination UI to leads tab**
-- Add `page` state (default 0), pass to `useLeadGenByDateRange`
-- Reset page to 0 when filters change
-- Show pagination controls (reuse `EarningsPagination` component) below the table
-- Display total count from server response
+**2. `src/pages/closers/components/LeadTable.tsx` — Fix stage colors**
 
-**4. `src/pages/leadgen/LeadGenBaseDatosContent.tsx` — Add pagination**
-- Add `page` state, pass to updated `useLeadGenEntries`
-- Add `EarningsPagination` below the table
-- Remove client-side date filtering (move to server-side via the query)
-- Keep client-side search as complementary filter
+Update `stageColor()`:
+- "Confirmada" → keep green: `bg-green-100 text-green-800` (active, confirmed)
+- "Completada" → change to blue: `bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400` (done, closed — visually distinct)
+- "Pendiente LG" → keep yellow (only shown in pendiente_lg tab, not user-selectable)
 
-**5. `src/pages/closers/hooks/useCloserLeads.ts` — Fix status counts query**
-- Replace `SELECT stage` (returns 80k rows) with a database RPC or grouped count query
-- Create a simple SQL function `get_closer_stage_counts` that returns `stage, count` grouped
-- OR use multiple `.select('id', { count: 'exact', head: true }).eq('stage', X)` queries (simpler, no migration needed)
+**3. `src/pages/closers/components/LeadTable.tsx` — Hide "Pendiente LG" from inline stage selector**
 
-**6. Database migration — Create count function for closers**
-```sql
-CREATE OR REPLACE FUNCTION public.get_closer_stage_counts(_user_id uuid, _is_admin boolean)
-RETURNS TABLE(stage text, cnt bigint)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
-AS $$
-  SELECT cc.stage, COUNT(*) as cnt
-  FROM public.closer_creators cc
-  WHERE _is_admin OR cc.assigned_to = _user_id
-  GROUP BY cc.stage;
-$$;
-```
+In `InlineStageSelect`, filter out "Pendiente LG" from the selectable stages list so users can't manually set it.
+
+**4. Same color fix in `CreatorTable.tsx`** (the older table component)
+
+Update `stageBadgeColor()` to match: "Completada" → blue instead of green.
 
 ### Files Modified
-- `src/pages/leadgen/useLeadGen.ts` — server-side pagination for both hooks
-- `src/pages/leadgen/LeadGenContent.tsx` — pagination state + UI
-- `src/pages/leadgen/LeadGenBaseDatosContent.tsx` — pagination state + UI
-- `src/pages/closers/hooks/useCloserLeads.ts` — use RPC for counts
-- New DB migration — `get_closer_stage_counts` function
-
-### Impact
-- Main LeadGen page: 1 query of ~100 rows instead of 80+ queries of 1000 rows
-- Base de Datos: 1 query of ~100 rows instead of 80+ queries
-- Closers counts: 1 query returning ~4 rows instead of 80k rows
+- `src/pages/closers/components/LeadTable.tsx` — sticky actions, stage colors, min-width, max-height
+- `src/pages/closers/components/CreatorTable.tsx` — stage color consistency
 
