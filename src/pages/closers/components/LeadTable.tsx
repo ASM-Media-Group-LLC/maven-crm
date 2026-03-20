@@ -485,7 +485,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Plataforma</TableHead>
             <TableHead>Revenue</TableHead>
             <TableHead className="w-10"></TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
