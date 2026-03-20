@@ -365,8 +365,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                               {lead.quality?.toUpperCase()}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
+                          <div className="flex items-center justify-end text-xs text-muted-foreground">
                             <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
