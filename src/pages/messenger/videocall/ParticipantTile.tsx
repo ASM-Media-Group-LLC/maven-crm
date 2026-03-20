@@ -95,6 +95,8 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
@@ -128,6 +130,36 @@ const ParticipantTile = memo(function ParticipantTile({
         audioTrack.track.attach(audioEl);
         attachedAudioTrackRef.current = audioTrack.track;
         audioEl.volume = 1;
+
+        // ── Output gain boost (1.4x ≈ +3dB) to match Google Meet levels ──
+        try {
+          // Clean up previous gain pipeline
+          if (gainSourceRef.current) {
+            try { gainSourceRef.current.disconnect(); } catch {}
+            gainSourceRef.current = null;
+          }
+          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+            try { audioCtxRef.current.close(); } catch {}
+          }
+
+          const ctx = new AudioContext();
+          audioCtxRef.current = ctx;
+
+          if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+          const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
+          gainSourceRef.current = source;
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 1.4;
+          const destination = ctx.createMediaStreamDestination();
+
+          source.connect(gainNode);
+          gainNode.connect(destination);
+
+          audioEl.srcObject = destination.stream;
+        } catch {
+          // Fallback: keep original stream without boost
+        }
 
         // Set audio output device
         const mediaEl = audioEl as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void>; sinkId?: string };
@@ -254,6 +286,8 @@ const ParticipantTile = memo(function ParticipantTile({
     const audioElRef = audioRef;
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
+    const audioCtx = audioCtxRef;
+    const gainSource = gainSourceRef;
     return () => {
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
@@ -264,6 +298,14 @@ const ParticipantTile = memo(function ParticipantTile({
         try { attachedAudio.current.detach(audioElRef.current!); } catch {}
         try { attachedAudio.current.detach(); } catch {}
         attachedAudio.current = null;
+      }
+      if (gainSource.current) {
+        try { gainSource.current.disconnect(); } catch {}
+        gainSource.current = null;
+      }
+      if (audioCtx.current && audioCtx.current.state !== "closed") {
+        try { audioCtx.current.close(); } catch {}
+        audioCtx.current = null;
       }
     };
   }, []);
