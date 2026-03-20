@@ -149,6 +149,12 @@ export default function SearchResultsPanel({
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
                       {highlightText(snippet, query)}
                     </p>
+                    {fileNameMatch && (
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5 flex items-center gap-1">
+                        <span>📎</span>
+                        <span className="truncate">{highlightText(msg.file_name!, query)}</span>
+                      </p>
+                    )}
                   </div>
                 </button>
               );
