@@ -344,6 +344,24 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     }
   };
 
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageFiles = items
+      .filter(item => item.type.startsWith("image/"))
+      .map(item => {
+        const file = item.getAsFile();
+        if (!file) return null;
+        const ext = file.type.split("/")[1] || "png";
+        return new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
+      })
+      .filter((f): f is File => f !== null);
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addFilesInternal(imageFiles);
+    }
+  }, [addFilesInternal]);
+
   const handleTextChange = (val: string) => {
     setText(val);
     setCursorPosition(inputRef.current?.selectionStart || val.length);
