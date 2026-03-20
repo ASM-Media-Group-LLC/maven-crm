@@ -23,9 +23,7 @@ interface NewChatModalProps {
   getStatusFn?: (userId: string) => UserStatus | null;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-}
+import { getInitials } from "./utils";
 
 const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewChatModal(
   { open, onClose, profiles, onSelectUser, isGroup, onCreateGroup, isOnlineFn, getStatusFn },
