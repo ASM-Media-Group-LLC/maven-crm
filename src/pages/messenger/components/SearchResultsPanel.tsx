@@ -79,7 +79,7 @@ export default function SearchResultsPanel({
         <Input
           ref={inputRef}
           placeholder="Buscar en la conversación..."
-          className="h-8 bg-background text-sm"
+          className="h-9 bg-primary/5 border-0 rounded-full text-sm"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
