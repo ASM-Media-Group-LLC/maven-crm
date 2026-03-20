@@ -15,19 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BackgroundEffect } from "./BackgroundSelector";
 
-const STORAGE_KEY = "call-view-settings";
-
-function loadViewSettings(): ViewSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return { layout: "auto", maxTiles: 49, hideNoVideo: false };
-}
-
-function saveViewSettings(s: ViewSettings) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
-}
+const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
 
 interface LiveKitCallViewProps {
   roomName: string;
