@@ -1,46 +1,24 @@
 
 
-## Plan: Make All LeadGen Entries Visible in Closers
+## Plan: Align Edit Modal Fields with Create Form
 
-### Problem
-The Closers module only pulls `leadgen_entries` with status `interested` or `meeting_set` (6 records out of 80,509). The user wants ALL leads generated in LeadGen to be visible in Closers. Additionally, 33 remaining test records (`@m_*` handles from Oct 2025) still need cleanup.
-
-### Key Challenge
-There are ~80K leadgen entries. Loading them all into the "Todas" tab would be impractical. We need a dedicated tab with server-side pagination.
+### Differences Found
+1. **EditContactoModal** still uses a plain "Handle/Usuario" text field (`@usuario`), while NuevoContactoForm was updated to use "Link de la Cuenta" with `normalizeHandle` + `detectPlatformFromUrl` auto-extraction.
+2. **EditContactoModal** is missing the "Número de Ticket" field entirely -- it's not shown and not saved on update.
+3. Minor label inconsistency: create form says "Categoría Física *", edit says "Categoría".
 
 ### Changes
 
-**1. Add "Pendiente LG" tab to Closers** (`src/pages/closers/ClosersContent.tsx`)
-- Add a new tab `{ value: "pendiente_lg", label: "Pendiente LG" }` visible to Admin/Manager roles
-- This tab shows ALL unconverted leadgen entries (no status filter), with server-side pagination
+**File: `src/pages/contactos/EditContactoModal.tsx`**
 
-**2. Update data fetching** (`src/pages/closers/hooks/useCloserLeads.ts`)
-- Remove the status filter `.in("status", ["interested", "meeting_set"])` from the "todas" tab query
-- For the new `pendiente_lg` tab: fetch from `leadgen_entries` WHERE `id NOT IN (select leadgen_entry_id from closer_creators where leadgen_entry_id is not null)`, with proper server-side pagination (100 rows per page)
-- For the `todas` tab: keep fetching `closer_creators` as-is, plus append a count of pending LG entries (badge only, not full list)
-- Add leadgen status display in the table rows so closers can see the current status of each lead
+1. **Replace Handle field with Link de la Cuenta field**: Rename state from `handle` to `accountLink`. Import `normalizeHandle` and `detectPlatformFromUrl`. When the field value changes, auto-detect platform (same logic as NuevoContactoForm). On save, extract handle via `normalizeHandle()` before sending to DB.
 
-**3. Update LeadGen status values** (`src/pages/closers/hooks/useCloserLeads.ts`)
-- Also include `interesado` in the status filter alongside `interested` (there's a mismatch: LeadGen uses Spanish `interesado` but Closers queries for English `interested`)
-- Wait -- actually since we're removing the filter entirely for the new tab, this is handled implicitly
+2. **Add Ticket field**: Add a `ticket` state variable, initialize from `contacto.ticket` in the sync block. Add a "Número de Ticket" input field below the Notas field. Include `ticket_number: ticket || null` in the `.update()` call.
 
-**4. Update tab mapping** (`src/pages/closers/hooks/useCloserLeads.ts`)
-- Add `pendiente_lg: []` to `TAB_STAGE_MAP`
-- When `activeTab === "pendiente_lg"`, skip the `closer_creators` query entirely and only query `leadgen_entries`
-- Exclude already-converted entries (those with matching `leadgen_entry_id` in `closer_creators`)
+3. **Fix Categoría label**: Change from "Categoría" to "Categoría Física" for consistency.
 
-**5. Clean remaining test data** (SQL migration)
-- Delete 33 records: `DELETE FROM leadgen_entries WHERE model_handle LIKE '@m_%' AND entry_date < '2025-11-01'`
-- Also delete any records with ID pattern `20000014-*` (the remaining fake IDs)
-
-**6. Update "Todas" tab behavior**
-- "Todas" tab continues to show all `closer_creators` records (converted leads)
-- Remove the leadgen_entries fetch from "todas" tab since there's now a dedicated tab for it
-- This simplifies the "todas" logic and avoids loading 80K records
+4. **Pre-populate accountLink**: When loading an existing contact, set `accountLink` to the stored handle value (since old records only have the handle, not the full URL).
 
 ### Files Modified
-- `src/pages/closers/hooks/useCloserLeads.ts` -- add pendiente_lg tab logic, paginated LG query
-- `src/pages/closers/ClosersContent.tsx` -- add new tab, wire it up
-- `src/pages/closers/components/LeadTable.tsx` -- display leadgen status column for LG rows
-- New SQL migration -- clean remaining test data
+- `src/pages/contactos/EditContactoModal.tsx`
 
