@@ -1,24 +1,29 @@
 
 
-## Plan: Align Edit Modal Fields with Create Form
+## Plan: Fix Edit Modal to Match Create Form Exactly
 
 ### Differences Found
-1. **EditContactoModal** still uses a plain "Handle/Usuario" text field (`@usuario`), while NuevoContactoForm was updated to use "Link de la Cuenta" with `normalizeHandle` + `detectPlatformFromUrl` auto-extraction.
-2. **EditContactoModal** is missing the "Número de Ticket" field entirely -- it's not shown and not saved on update.
-3. Minor label inconsistency: create form says "Categoría Física *", edit says "Categoría".
 
-### Changes
+| Field | Create Form (correct) | Edit Modal (wrong) |
+|---|---|---|
+| Name label | "Nombre del Contacto *" | "Nombre *" |
+| Category label | "Categoría Física *" (with asterisk) | "Categoría Física" (no asterisk) |
+| Company label | "Compañía / Cuenta de Origen" | "Compañía" |
+| Link/Platform order | Link left, Platform right | Platform left, Link right (reversed) |
+| Link placeholder | "https://instagram.com/usuario" | "https://instagram.com/usuario o @usuario" |
+| Phone placeholder | "Número de teléfono" | "Número" |
+| Country code labels | "🇨🇴 Colombia +57" (full) | "🇨🇴 +57" (short) |
+| Field order | Ticket → Notas | Notas → Ticket (reversed) |
+| Ticket placeholder | "Ej: CT586864" | "Ej: TK-001" |
+| Notas placeholder | "Notas adicionales sobre el contacto..." | "Notas adicionales..." |
+| Select placeholder | "Seleccionar categoría" | "Seleccionar" |
 
-**File: `src/pages/contactos/EditContactoModal.tsx`**
+### Changes (single file: `src/pages/contactos/EditContactoModal.tsx`)
 
-1. **Replace Handle field with Link de la Cuenta field**: Rename state from `handle` to `accountLink`. Import `normalizeHandle` and `detectPlatformFromUrl`. When the field value changes, auto-detect platform (same logic as NuevoContactoForm). On save, extract handle via `normalizeHandle()` before sending to DB.
-
-2. **Add Ticket field**: Add a `ticket` state variable, initialize from `contacto.ticket` in the sync block. Add a "Número de Ticket" input field below the Notas field. Include `ticket_number: ticket || null` in the `.update()` call.
-
-3. **Fix Categoría label**: Change from "Categoría" to "Categoría Física" for consistency.
-
-4. **Pre-populate accountLink**: When loading an existing contact, set `accountLink` to the stored handle value (since old records only have the handle, not the full URL).
-
-### Files Modified
-- `src/pages/contactos/EditContactoModal.tsx`
+1. Fix all labels to match: "Nombre del Contacto *", "Categoría Física *", "Compañía / Cuenta de Origen"
+2. Swap Link/Platform column order: Link left, Platform right
+3. Fix all placeholders to match create form exactly
+4. Swap Ticket before Notas
+5. Update COUNTRY_CODES to use full labels (e.g., "🇨🇴 Colombia +57")
+6. Fix category select placeholder to "Seleccionar categoría"
 
