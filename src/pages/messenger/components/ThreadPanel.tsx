@@ -429,9 +429,9 @@ export default function ThreadPanel({
   };
 
   return (
-    <div className="w-full md:w-[380px] shrink-0 border-l border-border bg-card flex flex-col h-full">
+    <div className="w-full sm:w-[380px] shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <MessageSquareText className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold flex-1">Hilo</h3>
         <span className="text-xs text-muted-foreground">{replies.length} {replies.length === 1 ? "respuesta" : "respuestas"}</span>
