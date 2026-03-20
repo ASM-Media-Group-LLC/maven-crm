@@ -1,39 +1,32 @@
 
 
-## Plan: Sticky Header/Actions + Fix Stage Colors + Remove "Pendiente LG" from Closers Table
+## Plan: Fix Toggle Position, Sticky Headers, and Add Contactos Pagination
 
-### Issues
+### 1. Toggle position in Closers — keep inline, not wrapping
 
-1. **Header and Actions column not sticky**: LeadGen table has `sticky top-0 z-10 bg-card` on `TableHeader` and `sticky right-0 bg-card` on the Actions column. The Closers `LeadTable.tsx` has sticky header (`sticky top-0 z-10 bg-background`) but does NOT have a sticky right Actions column.
+**`src/pages/closers/ClosersContent.tsx`** (lines 106-194): The filter bar uses `flex-wrap` which causes the `ml-auto` toggle to wrap below on smaller screens. Remove `ml-auto` from the toggle group and place it immediately after the `DateRangePicker` + "Limpiar" button, without `ml-auto`, so it stays in the same visual row next to the date selector. Use a simple `flex gap-1` wrapper without auto margin.
 
-2. **"Pendiente LG" stage confusion**: This stage exists as a tab but also appears in the stage badge colors and inline stage selector. It's an intermediate state from the LeadGen sync — users shouldn't see it as a selectable stage within the table. The tab is fine for filtering, but the stage badge and inline selector should not expose it as a manual option.
+### 2. Sticky table header in Closers
 
-3. **"Confirmada" and "Completada" same green semantic**: Both use green shades (`green-100/green-800` vs `green-200/green-900`), which are nearly indistinguishable. Fix: change "Completada" to a distinct blue/purple to signal "done/closed" vs "confirmed/active".
+**`src/pages/closers/components/LeadTable.tsx`**: The table already has `sticky top-0` on `TableHeader`, but the outer scroll container in `ClosersContent.tsx` (line 197: `<div className="flex-1 overflow-auto px-6 py-4">`) controls the scroll. The table's own `max-h` and `overflow-auto` wrapper needs to be present inside `LeadTable.tsx` so the sticky header works within its own scroll context (like ContactosTable does with `max-h-[calc(100vh-24rem)] overflow-auto`). Verify and add the constrained wrapper if missing.
 
-### Changes
+### 3. Sticky table header in Contactos
 
-**1. `src/pages/closers/components/LeadTable.tsx`**
+**`src/pages/contactos/ContactosTable.tsx`** (line 87-89): Already has `max-h-[calc(100vh-24rem)] overflow-auto` and `sticky top-0 z-10 bg-card` — this should work. Verify it's not broken by the outer `overflow-auto` on the parent div.
 
-- **Sticky Actions column**: Add `sticky right-0 bg-background z-20` to all Actions `<TableHead>` headers and corresponding `<TableCell>` elements across all tab layouts (asignadas, confirmadas, todas, pendiente_lg). Match the LeadGen pattern exactly.
-- **Table wrapper**: Add `max-h-[calc(100vh-24rem)]` to the outer div (matching LeadGen) so the table scrolls vertically with sticky header visible.
-- **Min-width**: Add `min-w-[1000px]` to `<Table>` to guarantee horizontal scroll.
+### 4. Add server-side pagination to Contactos
 
-**2. `src/pages/closers/components/LeadTable.tsx` — Fix stage colors**
-
-Update `stageColor()`:
-- "Confirmada" → keep green: `bg-green-100 text-green-800` (active, confirmed)
-- "Completada" → change to blue: `bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400` (done, closed — visually distinct)
-- "Pendiente LG" → keep yellow (only shown in pendiente_lg tab, not user-selectable)
-
-**3. `src/pages/closers/components/LeadTable.tsx` — Hide "Pendiente LG" from inline stage selector**
-
-In `InlineStageSelect`, filter out "Pendiente LG" from the selectable stages list so users can't manually set it.
-
-**4. Same color fix in `CreatorTable.tsx`** (the older table component)
-
-Update `stageBadgeColor()` to match: "Completada" → blue instead of green.
+**`src/pages/contactos/ContactosContent.tsx`**:
+- Add `page` state and `pageSize = 50`
+- Change the query to use `.range()` with `{ count: "exact" }` instead of fetching all contacts
+- Pass `page` and `pageSize` to the query, return `{ data, total }`
+- Add `EarningsPagination` component below the table/grid
+- Reset page to 0 when filters change
+- Move date/search filtering to server-side where possible (`.ilike()` for search, `.gte()`/`.lte()` for dates)
 
 ### Files Modified
-- `src/pages/closers/components/LeadTable.tsx` — sticky actions, stage colors, min-width, max-height
-- `src/pages/closers/components/CreatorTable.tsx` — stage color consistency
+- `src/pages/closers/ClosersContent.tsx` — move toggle inline next to date picker
+- `src/pages/closers/components/LeadTable.tsx` — ensure table has own scroll container with sticky header
+- `src/pages/contactos/ContactosContent.tsx` — add server-side pagination with `.range()`, add EarningsPagination
+- `src/pages/contactos/ContactosTable.tsx` — verify sticky header (already present)
 
