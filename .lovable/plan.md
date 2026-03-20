@@ -1,23 +1,36 @@
 
 
-## Plan: Add Clipboard Paste Support for Images in Chat
+## Plan: Remove User Preferences Persistence & Default Mic/Camera Off
 
-### Problem
-The MessageInput textarea has no `onPaste` handler. When a user pastes an image from their clipboard (e.g., a screenshot via Ctrl+V / Cmd+V), nothing happens — the image is silently discarded.
+### What changes
 
-### Solution
-Add an `onPaste` event handler to the `<Textarea>` in `MessageInput.tsx` that intercepts clipboard events, extracts image files from `clipboardData.items`, and feeds them into the existing `addFilesInternal()` pipeline (same as drag-and-drop and file picker).
+Remove localStorage persistence for pre-join settings (mic, cam, background, devices) and view settings (layout). Always default to mic OFF, camera OFF, background "none".
 
-### Changes (single file)
+### Changes
 
-**`src/pages/messenger/components/MessageInput.tsx`**
-1. Add a `handlePaste` callback that:
-   - Reads `e.clipboardData.items` for items with `type.startsWith("image/")`
-   - Converts each to a `File` via `.getAsFile()`
-   - Names pasted files with a timestamp (e.g., `pasted-image-1710000000000.png`)
-   - Calls `addFilesInternal(files)` to add them to the pending files queue
-   - Calls `e.preventDefault()` only when images are found (so normal text paste still works)
-2. Attach `onPaste={handlePaste}` to the `<Textarea>` element
+**1. `src/pages/messenger/videocall/PreJoinLobby.tsx`**
+- Remove constants: `PREJOIN_STORAGE_KEY_PREFIX`, `PREJOIN_GLOBAL_STORAGE_KEY`
+- Remove types: `PersistedPreJoinSettings`
+- Remove functions: `getPreJoinStorageKey`, `parsePreJoinSettings`, `loadPreJoinSettings`, `savePreJoinSettings`
+- Remove `initialSettingsRef` — replace all usages with hardcoded defaults
+- Change defaults: `micOn: false`, `camOn: false`, `backgroundEffect: "none"`, device IDs: `""`
+- Remove the `useEffect` that loads persisted settings on mount (~line 159-169)
+- Remove the `useEffect` that auto-saves settings on change (~line 171-180)
 
-No other files need changes — the existing upload, preview, and send pipeline already handles image files from `pendingFiles`.
+**2. `src/pages/messenger/videocall/LiveKitCallView.tsx`**
+- Remove `STORAGE_KEY` constant
+- Remove `loadViewSettings` and `saveViewSettings` functions
+- Initialize `viewSettings` with inline default: `{ layout: "auto", maxTiles: 49, hideNoVideo: false }`
+- Update `handleViewSettingsChange` to just `setViewSettings(s)` without saving
+
+**3. `src/test/videocall/PreJoinLobby.test.tsx`**
+- Remove `roomStorageKey` and `globalStorageKey` constants
+- Remove `localStorage.clear()` from `beforeEach`
+- Remove 3 tests that reference localStorage ("loads mic/cam presets from global storage", "prioritizes room-specific presets", and any others)
+- Update tests that expect mic/cam ON by default — they now start OFF
+
+### Files Modified
+- `src/pages/messenger/videocall/PreJoinLobby.tsx`
+- `src/pages/messenger/videocall/LiveKitCallView.tsx`
+- `src/test/videocall/PreJoinLobby.test.tsx`
 
