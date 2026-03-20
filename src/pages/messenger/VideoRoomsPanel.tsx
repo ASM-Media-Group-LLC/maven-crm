@@ -120,7 +120,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
           <Input
             id="join-link-input"
             placeholder="Pegar enlace de la sala..."
-            className="h-9 bg-muted/50 text-xs"
+            className="h-9 bg-primary/5 border-0 text-xs rounded-full"
             value={joinLink}
             onChange={e => setJoinLink(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleJoinByLink()}
