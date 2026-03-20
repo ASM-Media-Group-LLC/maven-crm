@@ -239,7 +239,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
 
   return (
     <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
-      <Table>
+      <Table className="min-w-[900px]">
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
             <TableHead><SortHeader label="Hora" col="hora" /></TableHead>
