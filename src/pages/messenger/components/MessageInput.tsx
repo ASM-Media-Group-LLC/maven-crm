@@ -439,7 +439,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* File previews with sizes */}
       {pendingFiles.length > 0 && (
-        <div className="border-b border-border bg-muted/20">
+        <div className="bg-primary/[0.03]">
           <div className="flex items-center justify-between px-4 pt-2 pb-1">
             <span className="text-[11px] text-muted-foreground font-medium">
               {pendingFiles.length}/{MAX_FILES} archivos adjuntos
