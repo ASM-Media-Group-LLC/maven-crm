@@ -539,7 +539,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Teléfono</TableHead>
             <TableHead>OF URL</TableHead>
             <TableHead>Notas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
     }
