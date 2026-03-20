@@ -87,7 +87,7 @@ class NoiseSuppressorProcessor extends AudioWorkletProcessor {
     } else {
       // Soft attenuation: quadratic curve for smooth transition
       const ratio = rms / Math.max(threshold, 0.0001);
-      targetGain = Math.max(ratio * ratio, 0.008); // ~-42dB noise floor
+      targetGain = Math.max(ratio * ratio, 0.02); // ~-34dB noise floor
     }
 
     // Apply gain with per-sample smoothing to all channels
