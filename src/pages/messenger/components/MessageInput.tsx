@@ -313,7 +313,10 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           continue;
         }
         const { data: urlData } = supabase.storage.from("chat-files").getPublicUrl(path);
-        const msgContent = i === 0 && text.trim() ? text.trim() : pf.file.name;
+        const baseContent = i === 0 && text.trim() ? text.trim() : "";
+        const msgContent = baseContent
+          ? `${baseContent}\n📎 ${pf.file.name}`
+          : pf.file.name;
         onSendMessage(msgContent, pf.type as ChatMessage["type"], urlData.publicUrl, pf.file.name, replyTo?.id);
       }
       setPendingFiles([]);

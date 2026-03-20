@@ -48,7 +48,10 @@ export default function SearchResultsPanel({
     if (!query.trim()) return [];
     const q = query.toLowerCase();
     return messages
-      .filter(m => m.content?.toLowerCase().includes(q) && !m.is_deleted)
+      .filter(m => !m.is_deleted && (
+        m.content?.toLowerCase().includes(q) ||
+        m.file_name?.toLowerCase().includes(q)
+      ))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [messages, query]);
 
@@ -114,6 +117,7 @@ export default function SearchResultsPanel({
               const profile = profiles[msg.sender_id];
               const name = profile?.full_name || "Usuario";
               const snippet = msg.content || "";
+              const fileNameMatch = msg.file_name && msg.file_name.toLowerCase().includes(query.toLowerCase());
 
               return (
                 <button
@@ -145,6 +149,12 @@ export default function SearchResultsPanel({
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
                       {highlightText(snippet, query)}
                     </p>
+                    {fileNameMatch && (
+                      <p className="text-[11px] text-muted-foreground/80 mt-0.5 flex items-center gap-1">
+                        <span>📎</span>
+                        <span className="truncate">{highlightText(msg.file_name!, query)}</span>
+                      </p>
+                    )}
                   </div>
                 </button>
               );
