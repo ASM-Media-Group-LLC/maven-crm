@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
-  PhoneOff, Users, MessageSquare, Settings, Hand, Copy, Link2, MoreVertical,
-  Maximize, Grid3X3, LayoutGrid,
+  PhoneOff, Users, MessageSquare, Hand, Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
