@@ -36,7 +36,7 @@ export default function NotificationSettings({ conversation, onClose }: Notifica
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 rounded-3xl">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Notificaciones</h3>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
