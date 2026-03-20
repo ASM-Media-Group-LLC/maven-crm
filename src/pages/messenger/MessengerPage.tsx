@@ -114,11 +114,9 @@ export default function MessengerPage() {
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
 
-    // Send automatic message with call link for direct chats
-    if (conv.type === "direct") {
-      const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
-      await sendMessage(`📹 Videollamada iniciada\n${callLink}`, "text");
-    }
+    // Send automatic message with call link for direct and group chats
+    const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
+    await sendMessage(`📹 Videollamada iniciada\n${callLink}`, "text");
   };
 
   const handleDeleteChat = async (chatId: string) => {
