@@ -29,59 +29,11 @@ interface DeviceInfo {
 const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
-const PREJOIN_STORAGE_KEY_PREFIX = "call-prejoin-settings:v1";
-const PREJOIN_GLOBAL_STORAGE_KEY = `${PREJOIN_STORAGE_KEY_PREFIX}:global`;
-
-interface PersistedPreJoinSettings {
-  micOn: boolean;
-  camOn: boolean;
-  audioDeviceId?: string;
-  videoDeviceId?: string;
-  audioOutputDeviceId?: string;
-  backgroundEffect: BackgroundEffect;
-}
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
 }
 
-function getPreJoinStorageKey(roomName: string) {
-  return `${PREJOIN_STORAGE_KEY_PREFIX}:${roomName}`;
-}
-
-function parsePreJoinSettings(raw: string | null): PersistedPreJoinSettings | null {
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<PersistedPreJoinSettings>;
-    return {
-      micOn: typeof parsed.micOn === "boolean" ? parsed.micOn : true,
-      camOn: typeof parsed.camOn === "boolean" ? parsed.camOn : true,
-      audioDeviceId: typeof parsed.audioDeviceId === "string" ? parsed.audioDeviceId : undefined,
-      videoDeviceId: typeof parsed.videoDeviceId === "string" ? parsed.videoDeviceId : undefined,
-      audioOutputDeviceId: typeof parsed.audioOutputDeviceId === "string" ? parsed.audioOutputDeviceId : undefined,
-      backgroundEffect: typeof parsed.backgroundEffect === "string" ? parsed.backgroundEffect : "none",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
-  const roomSettings = parsePreJoinSettings(localStorage.getItem(getPreJoinStorageKey(roomName)));
-  if (roomSettings) return roomSettings;
-  return parsePreJoinSettings(localStorage.getItem(PREJOIN_GLOBAL_STORAGE_KEY));
-}
-
-function savePreJoinSettings(roomName: string, settings: PersistedPreJoinSettings) {
-  try {
-    const serialized = JSON.stringify(settings);
-    localStorage.setItem(getPreJoinStorageKey(roomName), serialized);
-    localStorage.setItem(PREJOIN_GLOBAL_STORAGE_KEY, serialized);
-  } catch {
-    // no-op
-  }
-}
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -113,12 +65,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const bgFailureCooldownUntilRef = useRef(0);
 
-  const initialSettingsRef = useRef<PersistedPreJoinSettings | null>(loadPreJoinSettings(roomName));
-
-  const [micOn, setMicOn] = useState(initialSettingsRef.current?.micOn ?? true);
-  const [camOn, setCamOn] = useState(initialSettingsRef.current?.camOn ?? true);
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialSettingsRef.current?.backgroundEffect ?? "none");
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
   
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
@@ -126,9 +76,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
-  const [selectedAudioInput, setSelectedAudioInput] = useState<string>(initialSettingsRef.current?.audioDeviceId ?? "");
-  const [selectedVideoInput, setSelectedVideoInput] = useState<string>(initialSettingsRef.current?.videoDeviceId ?? "");
-  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>(initialSettingsRef.current?.audioOutputDeviceId ?? "");
+  const [selectedAudioInput, setSelectedAudioInput] = useState<string>("");
+  const [selectedVideoInput, setSelectedVideoInput] = useState<string>("");
+  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -156,28 +106,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
     } catch {}
   }, []);
 
-  useEffect(() => {
-    const persisted = loadPreJoinSettings(roomName);
-    if (!persisted) return;
-
-    setMicOn(persisted.micOn);
-    setCamOn(persisted.camOn);
-    setBgEffect(persisted.backgroundEffect || "none");
-    setSelectedAudioInput(persisted.audioDeviceId || "");
-    setSelectedVideoInput(persisted.videoDeviceId || "");
-    setSelectedAudioOutput(persisted.audioOutputDeviceId || "");
-  }, [roomName]);
-
-  useEffect(() => {
-    savePreJoinSettings(roomName, {
-      micOn,
-      camOn,
-      audioDeviceId: selectedAudioInput || undefined,
-      videoDeviceId: selectedVideoInput || undefined,
-      audioOutputDeviceId: selectedAudioOutput || undefined,
-      backgroundEffect: bgEffect,
-    });
-  }, [roomName, micOn, camOn, selectedAudioInput, selectedVideoInput, selectedAudioOutput, bgEffect]);
 
   // ── Stop individual tracks ──────────────────────────────────
   const stopVideoTrack = useCallback(() => {
@@ -433,14 +361,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const handleJoin = async () => {
     setJoining(true);
 
-    savePreJoinSettings(roomName, {
-      micOn,
-      camOn,
-      audioDeviceId: selectedAudioInput || undefined,
-      videoDeviceId: selectedVideoInput || undefined,
-      audioOutputDeviceId: selectedAudioOutput || undefined,
-      backgroundEffect: bgEffect,
-    });
 
     await disposeBackgroundProcessor();
     stopVideoTrack();

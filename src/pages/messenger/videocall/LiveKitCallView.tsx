@@ -15,19 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BackgroundEffect } from "./BackgroundSelector";
 
-const STORAGE_KEY = "call-view-settings";
-
-function loadViewSettings(): ViewSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return { layout: "auto", maxTiles: 49, hideNoVideo: false };
-}
-
-function saveViewSettings(s: ViewSettings) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
-}
+const DEFAULT_VIEW_SETTINGS: ViewSettings = { layout: "auto", maxTiles: 49, hideNoVideo: false };
 
 interface LiveKitCallViewProps {
   roomName: string;
@@ -56,7 +44,7 @@ interface LiveKitCallViewProps {
 
 export default function LiveKitCallView({ roomName, displayName, callDisplayName, isAdmin = false, onLeave, initialMicOn = true, initialCamOn = true, initialAudioDeviceId, initialVideoDeviceId, initialAudioOutputDeviceId, initialBackgroundEffect = "none", hideShareLink, hideScreenShare, suppressLeaveToast, compact, autoLeaveOnEmpty, getToken, onMediaStateChange }: LiveKitCallViewProps) {
   const lk = useLiveKit();
-  const [viewSettings, setViewSettings] = useState<ViewSettings>(loadViewSettings);
+  const [viewSettings, setViewSettings] = useState<ViewSettings>(DEFAULT_VIEW_SETTINGS);
   const [adjustViewOpen, setAdjustViewOpen] = useState(false);
   const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
@@ -68,7 +56,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
   const [pinnedSid, setPinnedSid] = useState<string | null>(null);
 
-  const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); saveViewSettings(s); }, []);
+  const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); }, []);
 
   useEffect(() => { if (chatOpen && lk.unreadChatCount > 0) lk.clearUnreadChat(); }, [chatOpen, lk.unreadChatCount, lk.clearUnreadChat]);
 
