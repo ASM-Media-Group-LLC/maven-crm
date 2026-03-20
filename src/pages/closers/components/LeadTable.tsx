@@ -511,6 +511,21 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Notas</TableHead>
           </TableRow>
         );
+      case "pendiente_lg":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Estado LG</TableHead>
+            <TableHead>Plataforma</TableHead>
+            <TableHead>Cuenta origen</TableHead>
+            <TableHead>Categoría</TableHead>
+            <TableHead>Fecha entrada</TableHead>
+            <TableHead>Teléfono</TableHead>
+            <TableHead>Notas</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        );
       default: // todas
         return (
           <TableRow>
@@ -703,6 +718,42 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+          </TableRow>
+        );
+
+      case "pendiente_lg":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell>
+              <Badge variant="outline" className="text-xs">{(c as any)._lg_status || "—"}</Badge>
+            </TableCell>
+            <TableCell className="text-sm">{c.main_platform || "—"}</TableCell>
+            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell>
+              {c.category ? <Badge variant="outline" className={`text-xs ${CATEGORY_BADGE_COLORS[c.category] || ""}`}>{c.category}</Badge> : "—"}
+            </TableCell>
+            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell className="text-sm max-w-[180px] truncate" title={c.notes || ""}>{c.notes || "—"}</TableCell>
+            <TableCell className="text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onAssign(c.id, null, "leadgen")}>
+                      <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada", "leadgen")}>
+                    Convertir a Asignada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         );
