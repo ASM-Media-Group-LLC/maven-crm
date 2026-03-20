@@ -131,17 +131,16 @@ const CreadoresTable = ({ creators }: Props) => {
 
   return (
     <>
-    <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
-    <Table>
-      <TableHeader className="sticky top-0 z-10 bg-card">
+    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+      <TableHeader>
         <TableRow>
-          <TableHead><SortHeader label="Creador" col="name" /></TableHead>
-          <TableHead><SortHeader label="Categoría" col="category" /></TableHead>
-          <TableHead><SortHeader label="Estado" col="status" /></TableHead>
-          <TableHead><SortHeader label="Ubicación" col="country" /></TableHead>
-          <TableHead><SortHeader label="Agencia" col="agency" /></TableHead>
-          <TableHead>Redes</TableHead>
-          <TableHead className="sticky right-0 bg-card z-20">Acciones</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creador" col="name" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="category" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Estado" col="status" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ubicación" col="country" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agency" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Redes</TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -369,7 +368,6 @@ const CreadoresTable = ({ creators }: Props) => {
         )}
       </TableBody>
     </Table>
-    </div>
 
     {editingCreator && (
       <EditCreadorModal

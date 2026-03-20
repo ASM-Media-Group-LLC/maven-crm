@@ -238,38 +238,34 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   );
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 28rem)" }}>
-      <div className="overflow-auto flex-1">
-        <Table containerClassName="overflow-visible" className="min-w-[900px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Hora" col="hora" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Calidad" col="calidad" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Contacto" col="contacto" /></TableHead>
-              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="QA" col="qa" /></TableHead>
-              <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((lead) => (
-              <LeadRow key={lead.id} lead={lead} onView={onView} />
-            ))}
-            {sorted.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
-                  No se encontraron leads.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Hora" col="hora" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Calidad" col="calidad" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Contacto" col="contacto" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="QA" col="qa" /></TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((lead) => (
+          <LeadRow key={lead.id} lead={lead} onView={onView} />
+        ))}
+        {sorted.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+              No se encontraron leads.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
   );
 };
 
