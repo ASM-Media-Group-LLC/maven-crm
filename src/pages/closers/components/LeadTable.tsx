@@ -818,26 +818,28 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   };
 
   return (
-    <div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
-      <Table className="min-w-[1000px] [&>div]:!overflow-visible">
-        <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
-          {renderHeaders()}
-        </TableHeader>
-        <TableBody>
-          {creators.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
-                Sin registros
-              </TableCell>
-            </TableRow>
-          ) : (
-            creators.map((c, idx) => renderRow(c, idx))
-          )}
-        </TableBody>
-      </Table>
+    <div className="rounded-lg border border-border overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 20rem)" }}>
+      <div className="overflow-auto flex-1">
+        <Table containerClassName="overflow-visible" className="min-w-[1000px]">
+          <TableHeader>
+            {renderHeaders()}
+          </TableHeader>
+          <TableBody>
+            {creators.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                  Sin registros
+                </TableCell>
+              </TableRow>
+            ) : (
+              creators.map((c, idx) => renderRow(c, idx))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {completadasTotals && completadasTotals.count > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm shrink-0">
           <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
           <div className="flex gap-6">
             <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
