@@ -441,7 +441,7 @@ export default function ThreadPanel({
       </div>
 
       {/* Parent message */}
-      <div className="border-b border-border">
+      <div className="bg-primary/[0.02]">
         {renderMessage(parentMessage, true)}
       </div>
 
