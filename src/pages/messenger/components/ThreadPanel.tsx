@@ -460,7 +460,7 @@ export default function ThreadPanel({
 
       {/* Upload progress */}
       {uploading && (
-        <div className="px-3 py-2 border-t border-border bg-muted/20">
+        <div className="px-3 py-2 bg-primary/5">
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             <span className="text-[11px] text-muted-foreground flex-1 truncate">{uploadProgress}</span>
