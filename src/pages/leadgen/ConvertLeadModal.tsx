@@ -29,22 +29,41 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Insert into closer_creators with leadgen_entry_id for traceability
-      const { error: insertError } = await supabase.from("closer_creators").insert({
-        instagram_handle: lead.model_handle,
-        source_account: lead.company || null,
-        category: lead.quality || null,
-        phone: lead.phone_raw || null,
-        onlyfans_url: lead.source_link || null,
-        passed_date: lead.entry_date || new Date().toISOString().slice(0, 10),
-        stage: "Asignada",
-        estimated_monetization: 0,
-        agency_commission: 0,
-        created_by: user.id,
-        assigned_to: user.id,
-        leadgen_entry_id: lead.id,
-      } as any);
-      if (insertError) throw insertError;
+      // Check if a closer_creators row already exists for this lead (auto-synced by trigger)
+      const { data: existing } = await supabase
+        .from("closer_creators")
+        .select("id")
+        .eq("leadgen_entry_id", lead.id)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing row to "Asignada"
+        const { error: updateError } = await supabase
+          .from("closer_creators")
+          .update({
+            stage: "Asignada",
+            assigned_to: user.id,
+          } as any)
+          .eq("id", existing.id);
+        if (updateError) throw updateError;
+      } else {
+        // Insert new row (fallback for leads created before trigger)
+        const { error: insertError } = await supabase.from("closer_creators").insert({
+          instagram_handle: lead.model_handle,
+          source_account: lead.company || null,
+          category: lead.quality || null,
+          phone: lead.phone_raw || null,
+          onlyfans_url: lead.source_link || null,
+          passed_date: lead.entry_date || new Date().toISOString().slice(0, 10),
+          stage: "Asignada",
+          estimated_monetization: 0,
+          agency_commission: 0,
+          created_by: user.id,
+          assigned_to: user.id,
+          leadgen_entry_id: lead.id,
+        } as any);
+        if (insertError) throw insertError;
+      }
 
       // Also insert into closers_contacts for traceability
       const ticketId = lead.ticket_number || `#LG${lead.id.slice(-7).toUpperCase()}`;
@@ -70,6 +89,8 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries"] });
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
       queryClient.invalidateQueries({ queryKey: ["closer-creators"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       toast({ title: "Lead convertido", description: "El contacto fue creado y agregado al pipeline de Closers." });
       onConverted();
