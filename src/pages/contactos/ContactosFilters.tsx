@@ -45,7 +45,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
 
   return (
     <div className="flex items-center gap-3 overflow-x-auto">
-      <div className="relative w-64">
+      <div className="relative w-64 shrink-0">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Buscar por ticket, nombre, handle..."
