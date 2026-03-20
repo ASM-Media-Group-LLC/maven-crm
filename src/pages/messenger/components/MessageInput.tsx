@@ -558,7 +558,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
               <Textarea
                 ref={inputRef}
                 placeholder={chatType === "group" ? "Escribe un mensaje... (usa @ para mencionar)" : "Escribe un mensaje..."}
-                className="min-h-[38px] max-h-[120px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-2xl px-4 py-2.5 text-sm"
+                className="min-h-[38px] max-h-[120px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-4 py-2.5 text-sm"
                 rows={1}
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}
