@@ -366,7 +366,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
+                            <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
                             <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}
