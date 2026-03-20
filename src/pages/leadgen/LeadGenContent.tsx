@@ -175,6 +175,7 @@ const LeadGenContent = () => {
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
     setDateTo(to);
+    setPage(0);
   }, []);
 
   // If an agent is selected, show detail view
