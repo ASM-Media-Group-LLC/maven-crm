@@ -33,8 +33,8 @@ function getInitials(name: string) {
 }
 
 export default function ChatHeader({
-  conversation, profiles, typingUsers, searchOpen, searchQuery,
-  onSearchToggle, onSearchChange, onBack, onStartVideoCall,
+  conversation, profiles, typingUsers,
+  onSearchToggle, onBack, onStartVideoCall,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
   onAvatarChanged,
 }: ChatHeaderProps) {
