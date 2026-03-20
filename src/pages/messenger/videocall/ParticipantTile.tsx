@@ -286,6 +286,8 @@ const ParticipantTile = memo(function ParticipantTile({
     const audioElRef = audioRef;
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
+    const audioCtx = audioCtxRef;
+    const gainSource = gainSourceRef;
     return () => {
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
@@ -296,6 +298,14 @@ const ParticipantTile = memo(function ParticipantTile({
         try { attachedAudio.current.detach(audioElRef.current!); } catch {}
         try { attachedAudio.current.detach(); } catch {}
         attachedAudio.current = null;
+      }
+      if (gainSource.current) {
+        try { gainSource.current.disconnect(); } catch {}
+        gainSource.current = null;
+      }
+      if (audioCtx.current && audioCtx.current.state !== "closed") {
+        try { audioCtx.current.close(); } catch {}
+        audioCtx.current = null;
       }
     };
   }, []);
