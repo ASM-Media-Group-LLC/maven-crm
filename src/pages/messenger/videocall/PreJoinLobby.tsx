@@ -29,59 +29,11 @@ interface DeviceInfo {
 const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
-const PREJOIN_STORAGE_KEY_PREFIX = "call-prejoin-settings:v1";
-const PREJOIN_GLOBAL_STORAGE_KEY = `${PREJOIN_STORAGE_KEY_PREFIX}:global`;
-
-interface PersistedPreJoinSettings {
-  micOn: boolean;
-  camOn: boolean;
-  audioDeviceId?: string;
-  videoDeviceId?: string;
-  audioOutputDeviceId?: string;
-  backgroundEffect: BackgroundEffect;
-}
 
 function isTemplateBackground(effect: BackgroundEffect) {
   return effect !== "none" && effect !== "blur";
 }
 
-function getPreJoinStorageKey(roomName: string) {
-  return `${PREJOIN_STORAGE_KEY_PREFIX}:${roomName}`;
-}
-
-function parsePreJoinSettings(raw: string | null): PersistedPreJoinSettings | null {
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<PersistedPreJoinSettings>;
-    return {
-      micOn: typeof parsed.micOn === "boolean" ? parsed.micOn : true,
-      camOn: typeof parsed.camOn === "boolean" ? parsed.camOn : true,
-      audioDeviceId: typeof parsed.audioDeviceId === "string" ? parsed.audioDeviceId : undefined,
-      videoDeviceId: typeof parsed.videoDeviceId === "string" ? parsed.videoDeviceId : undefined,
-      audioOutputDeviceId: typeof parsed.audioOutputDeviceId === "string" ? parsed.audioOutputDeviceId : undefined,
-      backgroundEffect: typeof parsed.backgroundEffect === "string" ? parsed.backgroundEffect : "none",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function loadPreJoinSettings(roomName: string): PersistedPreJoinSettings | null {
-  const roomSettings = parsePreJoinSettings(localStorage.getItem(getPreJoinStorageKey(roomName)));
-  if (roomSettings) return roomSettings;
-  return parsePreJoinSettings(localStorage.getItem(PREJOIN_GLOBAL_STORAGE_KEY));
-}
-
-function savePreJoinSettings(roomName: string, settings: PersistedPreJoinSettings) {
-  try {
-    const serialized = JSON.stringify(settings);
-    localStorage.setItem(getPreJoinStorageKey(roomName), serialized);
-    localStorage.setItem(PREJOIN_GLOBAL_STORAGE_KEY, serialized);
-  } catch {
-    // no-op
-  }
-}
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
