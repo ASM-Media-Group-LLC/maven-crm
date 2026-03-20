@@ -292,10 +292,7 @@ const LeadGenBaseDatosContent = () => {
                         </div>
                         <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
                         <p className="text-xs text-muted-foreground">{lead.company || "—"}</p>
-                        <div className="flex items-center justify-between">
-                          <Badge variant="secondary" className="text-xs">
-                            {statusLabels[lead.status] || lead.status}
-                          </Badge>
+                        <div className="flex items-center justify-end">
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(lead.created_at), "d MMM", { locale: es })}
                           </span>
