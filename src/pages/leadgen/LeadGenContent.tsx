@@ -62,13 +62,17 @@ const LeadGenContent = () => {
   // Date range state with today as default
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [page, setPage] = useState(0);
 
   const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;
   const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : undefined;
 
-  // Fetch entries filtered by date and user scope
+  // Fetch entries filtered by date and user scope — server-side paginated
   const userId = viewMode === "agent" ? user?.id : undefined;
-  const { data: leads = [], isLoading: leadsLoading } = useLeadGenByDateRange(dateFromStr, dateToStr, userId);
+  const { data: paginatedData, isLoading: leadsLoading } = useLeadGenByDateRange(dateFromStr, dateToStr, userId, page);
+  const leads = paginatedData?.data || [];
+  const totalLeads = paginatedData?.total || 0;
+  const totalPages = Math.ceil(totalLeads / 100);
   const { data: profiles = [] } = useLeadGenProfiles();
 
   // Build profiles map
