@@ -222,13 +222,13 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Notas</Label>
-                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales..." rows={3} />
+                <Label className="text-sm font-medium">Número de Ticket</Label>
+                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: CT586864" />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Número de Ticket</Label>
-                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: TK-001" />
+                <Label className="text-sm font-medium">Notas</Label>
+                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={3} />
               </div>
 
               <div className="space-y-1.5">
