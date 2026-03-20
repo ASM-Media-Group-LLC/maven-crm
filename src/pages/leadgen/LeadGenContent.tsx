@@ -22,7 +22,7 @@ import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { getMiamiDateStr, formatToMiamiTime } from "./timezoneUtils";
-import { LEADGEN_COMPANIES, STATUS_OPTIONS, QUALITY_OPTIONS } from "./leadgenConstants";
+import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
