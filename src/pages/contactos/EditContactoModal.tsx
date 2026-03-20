@@ -74,16 +74,31 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     setLastId(contacto.id);
     setNombre(contacto.nombre);
     setCategoria(contacto.categoria);
-    setHandle(contacto.instagram);
+    setAccountLink(contacto.instagram || "");
     setCompania(contacto.company);
     setEmail(contacto.email);
     setCountryCode(contacto.country_code || "+57");
     setPhone(contacto.phone);
     setNotas(contacto.notes);
+    setTicket(contacto.ticket || "");
     setPlataforma(contacto.platform || "Instagram");
     setProfilePhoto(contacto.profile_picture_url ? { url: contacto.profile_picture_url, name: "current", type: "image/jpeg", size: 0, category: "piclink" as const } : null);
     setExtraFiles([]);
   }
+
+  const handleAccountLinkChange = useCallback((value: string) => {
+    setAccountLink(value);
+    const detected = detectPlatformFromUrl(value);
+    if (detected) {
+      const platformMap: Record<string, string> = {
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        twitter: "Twitter/X",
+        onlyfans: "OnlyFans",
+      };
+      setPlataforma(platformMap[detected] || "Otra");
+    }
+  }, []);
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
     if (uploadModal.category === "piclink") setProfilePhoto(files[0] || null);
