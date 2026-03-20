@@ -1,10 +1,8 @@
-import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users, Camera,
+  Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -21,10 +19,7 @@ interface ChatHeaderProps {
   conversation: ConversationWithDetails;
   profiles: Record<string, UserProfile>;
   typingUsers: string[];
-  searchOpen: boolean;
-  searchQuery: string;
   onSearchToggle: () => void;
-  onSearchChange: (q: string) => void;
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   onOpenNotificationSettings: () => void;
