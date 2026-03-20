@@ -665,7 +665,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   <ChevronDown className={`h-4 w-4 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                 </Button>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right sticky right-0 bg-background z-20">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
