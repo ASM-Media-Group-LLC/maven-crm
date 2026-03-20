@@ -16,14 +16,14 @@ class NoiseSuppressorProcessor extends AudioWorkletProcessor {
     this._noiseAdaptRate = 0.997; // Slow adaptation to ambient noise
 
     // Gate parameters
-    this._gateRatio = 3.0; // Signal must be 3x above noise floor
+    this._gateRatio = 2.0; // Signal must be 2x above noise floor
     this._smoothedGain = 0.0;
-    this._holdSamples = Math.floor(0.15 * sampleRate); // 150ms hold after voice
+    this._holdSamples = Math.floor(0.20 * sampleRate); // 200ms hold after voice
     this._holdCounter = 0;
 
     // Per-sample gain smoothing coefficients
     this._attackCoeff = 1 - Math.exp(-1 / (0.003 * sampleRate)); // 3ms attack
-    this._releaseCoeff = 1 - Math.exp(-1 / (0.06 * sampleRate)); // 60ms release
+    this._releaseCoeff = 1 - Math.exp(-1 / (0.04 * sampleRate)); // 40ms release
 
     // Enabled state (controlled from main thread)
     this._enabled = true;
