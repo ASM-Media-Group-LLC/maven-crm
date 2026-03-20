@@ -164,7 +164,15 @@ const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
 const VIDEO_SWITCH_MIN_INTERVAL_MS = 420;
 
 function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "blur";
+  return effect !== "none" && effect !== "blur" && !effect.startsWith("custom:");
+}
+
+function isCustomBackground(effect: BackgroundEffect) {
+  return typeof effect === "string" && effect.startsWith("custom:");
+}
+
+function getCustomBackgroundUrl(effect: BackgroundEffect) {
+  return effect.replace(/^custom:/, "");
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
