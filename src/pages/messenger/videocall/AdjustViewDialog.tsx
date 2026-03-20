@@ -21,7 +21,6 @@ interface AdjustViewDialogProps {
 const LAYOUT_OPTIONS: { value: LayoutMode; label: string; description: string; icon: React.ElementType }[] = [
   { value: "auto", label: "Auto (dinámico)", description: "Se ajusta según participantes", icon: LayoutGrid },
   { value: "tiled", label: "Mosaico", description: "Todos en cuadrícula uniforme", icon: Grid3X3 },
-  { value: "spotlight", label: "Destacado", description: "Enfoca al orador activo", icon: Presentation },
   { value: "sidebar", label: "Barra lateral", description: "Principal + miniaturas", icon: PanelRight },
 ];
 

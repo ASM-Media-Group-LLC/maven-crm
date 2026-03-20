@@ -94,40 +94,18 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
 
       {/* Video grid */}
       <div className="flex-1 p-3 overflow-hidden">
-        {layout === "grid" ? (
-          <div className={cn("grid gap-2 h-full", gridCols)}>
-            {allParticipants.map(p => (
-              <ParticipantTile
-                key={p.id}
-                name={p.full_name || "?"}
-                isMe={(p as any).isMe}
-                micOn={!(p as any).isMe || micOn}
-                camOn={!(p as any).isMe || camOn}
-                screenShare={(p as any).isMe && screenShare}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col h-full gap-2">
-            <div className="flex-1">
-              <ParticipantTile
-                name={allParticipants[0]?.full_name || ""}
-                isMe
-                micOn={micOn}
-                camOn={camOn}
-                screenShare={screenShare}
-                large
-              />
-            </div>
-            <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
-              {allParticipants.slice(1).map(p => (
-                <div key={p.id} className="w-40 shrink-0">
-                  <ParticipantTile name={p.full_name || "?"} micOn camOn={false} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className={cn("grid gap-2 h-full", gridCols)}>
+          {allParticipants.map(p => (
+            <ParticipantTile
+              key={p.id}
+              name={p.full_name || "?"}
+              isMe={(p as any).isMe}
+              micOn={!(p as any).isMe || micOn}
+              camOn={!(p as any).isMe || camOn}
+              screenShare={(p as any).isMe && screenShare}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Bottom controls */}
