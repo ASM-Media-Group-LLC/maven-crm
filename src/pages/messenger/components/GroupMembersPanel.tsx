@@ -156,7 +156,7 @@ export default function GroupMembersPanel({
           <Button
             variant="outline"
             size="sm"
-            className="w-full gap-2 text-xs"
+            className="w-full gap-2 text-xs rounded-full"
             onClick={() => setShowAddPanel(true)}
           >
             <UserPlus className="h-3.5 w-3.5" />
