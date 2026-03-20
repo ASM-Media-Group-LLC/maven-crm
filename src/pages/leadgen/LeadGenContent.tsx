@@ -207,7 +207,7 @@ const LeadGenContent = () => {
           <div>
             <h1 className="text-2xl font-semibold">LeadGen</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {enrichedLeads.length.toLocaleString()} leads
+              {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
               {dateFrom && dateTo && (
                 <span className="ml-1">
                   ({format(dateFrom, "d MMM", { locale: es })} — {format(dateTo, "d MMM", { locale: es })})
