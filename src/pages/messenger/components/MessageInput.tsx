@@ -423,7 +423,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     <div className="shrink-0 bg-primary/[0.03]">
       {/* Reply bar */}
       {replyTo && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border animate-fade-in">
+        <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 animate-fade-in">
           <div className="h-8 w-1 rounded-full bg-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-semibold text-primary">
