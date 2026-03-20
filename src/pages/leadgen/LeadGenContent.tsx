@@ -22,7 +22,6 @@ import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
-import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
