@@ -121,7 +121,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
       l.company?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return result;
-  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, filterContacto, searchTerm]);
+  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterContacto, searchTerm]);
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
