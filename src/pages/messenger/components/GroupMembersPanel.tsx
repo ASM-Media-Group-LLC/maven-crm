@@ -230,7 +230,7 @@ export default function GroupMembersPanel({
             const isSelf = p.user_id === user?.id;
 
             return (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-2 hover:bg-muted/30 transition-colors">
+              <div key={p.id} className="flex items-center gap-3 px-4 py-2 hover:bg-primary/5 rounded-2xl mx-1 transition-colors">
                 <div className="relative">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className={cn(

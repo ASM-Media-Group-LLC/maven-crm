@@ -75,7 +75,7 @@ export default function NotificationSettings({ conversation, onClose }: Notifica
         </RadioGroup>
       )}
 
-      <Button onClick={handleSave} disabled={saving} size="sm" className="w-full">
+      <Button onClick={handleSave} disabled={saving} size="sm" className="w-full rounded-full">
         {saving ? "Guardando..." : "Guardar"}
       </Button>
     </div>

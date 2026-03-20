@@ -165,7 +165,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 px-4 py-2 border-b border-border overflow-x-auto">
+      <div className="flex gap-1 px-4 py-2 overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.key}

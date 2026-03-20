@@ -266,7 +266,7 @@ export default function ChatView({
       )}
 
       {showNotifSettings && (
-        <div className="absolute right-4 top-16 z-50 w-72 bg-card border border-border rounded-xl shadow-lg">
+        <div className="absolute right-4 top-16 z-50 w-72 bg-card rounded-3xl shadow-lg">
           <NotificationSettings
             conversation={conversation}
             onClose={() => setShowNotifSettings(false)}

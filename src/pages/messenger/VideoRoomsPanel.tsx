@@ -134,7 +134,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       <ScrollArea className="flex-1 px-4 pb-4">
         <div className="space-y-3">
           {rooms.map(room => (
-            <Card key={room.id} className={cn("transition-colors", room.isActive && "border-primary/40 bg-primary/5")}>
+            <Card key={room.id} className={cn("transition-colors border-0 rounded-3xl", room.isActive ? "bg-primary/8" : "bg-primary/[0.03]")}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

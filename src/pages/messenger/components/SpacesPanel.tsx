@@ -243,8 +243,8 @@ export default function SpacesPanel({
                       <div
                         key={cid}
                         className={cn(
-                          "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors group",
-                          activeChatId === cid ? "bg-primary/10" : "hover:bg-muted/40"
+                          "flex items-center gap-2 px-2 py-1.5 rounded-2xl cursor-pointer transition-colors group",
+                          activeChatId === cid ? "bg-primary/12" : "hover:bg-primary/5"
                         )}
                         onClick={() => onSelectChat(cid)}
                       >

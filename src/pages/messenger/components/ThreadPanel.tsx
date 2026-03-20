@@ -536,7 +536,7 @@ export default function ThreadPanel({
                 <Textarea
                   ref={inputRef}
                   placeholder="Responder en hilo..."
-                  className="min-h-[36px] max-h-[80px] resize-none bg-muted/40 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-xl px-3 py-2 text-sm"
+                  className="min-h-[36px] max-h-[80px] resize-none bg-primary/5 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 rounded-3xl px-3 py-2 text-sm"
                   rows={1}
                   value={text}
                   onChange={e => handleTextChange(e.target.value)}

@@ -138,7 +138,7 @@ const NewChatModal = forwardRef<HTMLDivElement, NewChatModalProps>(function NewC
 
         {isGroup && (
           <div className="flex justify-end mt-2">
-            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selected.length === 0}>
+            <Button onClick={handleCreateGroup} disabled={!groupName.trim() || selected.length === 0} className="rounded-full">
               Crear grupo ({selected.length})
             </Button>
           </div>

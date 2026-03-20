@@ -40,7 +40,7 @@ export default function StatusPicker() {
           <span className="text-muted-foreground">{config.label}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[160px]">
+      <DropdownMenuContent align="start" className="min-w-[160px] rounded-2xl">
         {(Object.entries(STATUS_CONFIG) as [UserStatus, typeof config][]).map(([key, cfg]) => {
           const ItemIcon = cfg.icon;
           return (
