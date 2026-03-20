@@ -287,6 +287,7 @@ const ContactosContent = () => {
               onClear={() => setFilters(emptyFilters)}
               creators={creatorsList}
             />
+            </div>
 
             {isLoading ? (
               <p className="text-sm text-muted-foreground">Cargando...</p>
