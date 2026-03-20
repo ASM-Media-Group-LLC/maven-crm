@@ -480,7 +480,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
 
       {/* Upload progress with percentage and cancel */}
       {uploading && uploadProgress && (
-        <div className="px-4 py-2 border-b border-border bg-primary/5 space-y-1">
+        <div className="px-4 py-2 bg-primary/5 space-y-1">
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
             <span className="text-[11px] text-primary font-medium truncate flex-1">{uploadProgress}</span>
