@@ -15,6 +15,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { renderTextWithMentions } from "./MentionAutocomplete";
+import { getInitials } from "../utils";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -44,14 +45,7 @@ interface MessageBubbleProps {
   isGridLeader?: boolean;
   isPartOfGrid?: boolean;
 }
-
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
-function formatMsgTime(d: string) {
-  return new Date(d).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-}
+import { formatTime as formatMsgTime } from "../utils";
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
