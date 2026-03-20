@@ -117,6 +117,7 @@ export default function SearchResultsPanel({
               const profile = profiles[msg.sender_id];
               const name = profile?.full_name || "Usuario";
               const snippet = msg.content || "";
+              const fileNameMatch = msg.file_name && msg.file_name.toLowerCase().includes(query.toLowerCase());
 
               return (
                 <button
