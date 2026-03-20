@@ -91,8 +91,8 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
   };
 
   return (
-    <div className="flex flex-col h-full bg-card border-r border-border">
-      <div className="shrink-0 flex items-center justify-between p-4 border-b border-border">
+    <div className="flex flex-col h-full bg-card/50">
+      <div className="shrink-0 flex items-center justify-between p-4 bg-primary/[0.03]">
         <div className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Video Rooms</h2>
