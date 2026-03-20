@@ -319,9 +319,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                                   {lead.quality?.toUpperCase()}
                                 </span>
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
-                              </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
                                 {format(new Date(lead.created_at), "d MMM", { locale: es })}
