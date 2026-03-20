@@ -89,17 +89,6 @@ export const QUALITY_OPTIONS = [
   { value: "C", label: "C (Básica)" },
 ];
 
-export const STATUS_OPTIONS = [
-  { value: "no_response", label: "Sin Respuesta" },
-  { value: "contactado", label: "Contactado" },
-  { value: "respondio", label: "Respondió" },
-  { value: "interesado", label: "Interesada" },
-  { value: "no_interesado", label: "No Interesada" },
-  { value: "meeting_set", label: "Reunión Agendada" },
-  { value: "cerrado", label: "Cerrado" },
-  { value: "rechazado", label: "Rechazado" },
-];
-
 /** Get the platform URL for a lead */
 export const getPlatformUrl = (lead: { model_handle?: string; platform?: string; source_link?: string | null }) => {
   const handle = lead.model_handle?.replace("@", "").trim();
@@ -119,16 +108,4 @@ export const QUALITY_COLORS: Record<string, string> = {
   "b+": "bg-violet-500/15 text-violet-400 border-violet-500/30",
   b: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
   c: "bg-slate-500/15 text-slate-400 border-slate-500/30",
-};
-
-/** Status color classes */
-export const STATUS_COLORS: Record<string, string> = {
-  meeting_set: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  interested: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  interesado: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  replied: "bg-accent/15 text-accent border-accent/30",
-  respondio: "bg-accent/15 text-accent border-accent/30",
-  contactado: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  cerrado: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  rechazado: "bg-destructive/15 text-destructive border-destructive/30",
 };

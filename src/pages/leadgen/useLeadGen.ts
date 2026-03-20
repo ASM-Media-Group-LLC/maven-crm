@@ -182,7 +182,6 @@ function optimisticEntryUpdate(
   id: string,
   patch: Partial<LeadGenEntry>
 ) {
-  // Update all matching query caches
   for (const key of ["leadgen-entries", "leadgen-entries-range"]) {
     queryClient.setQueriesData<LeadGenEntry[]>(
       { queryKey: [key] },
@@ -203,25 +202,6 @@ export const useUpdateLeadQuality = () => {
     },
     onMutate: async ({ id, quality }) => {
       optimisticEntryUpdate(queryClient, id, { quality });
-    },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
-    },
-  });
-};
-
-export const useUpdateLeadStatus = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase
-        .from("leadgen_entries")
-        .update({ status } as any)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onMutate: async ({ id, status }) => {
-      optimisticEntryUpdate(queryClient, id, { status });
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["leadgen-entries-range"] });
