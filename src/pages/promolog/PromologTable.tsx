@@ -114,88 +114,86 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
   }
 
   return (
-    <div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
-      <Table>
-        <TableHeader className="sticky top-0 z-10 bg-card">
-          <TableRow>
-            <TableHead><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
-            <TableHead><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
-            <TableHead><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
-            <TableHead><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
-            <TableHead><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
-            <TableHead><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
-            <TableHead><SortHeader label="Fecha" sortKeyName="date" /></TableHead>
-            <TableHead className="sticky right-0 bg-card z-20 text-right">Acciones</TableHead>
+    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+      <TableHeader>
+        <TableRow>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Fecha" sortKeyName="date" /></TableHead>
+          <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sorted.map((entry) => (
+          <TableRow key={entry.id} className="cursor-pointer" onClick={() => onEdit?.(entry)}>
+            <TableCell>
+              <Badge variant="outline" className="text-xs font-mono">{entry.ticketNumber}</Badge>
+            </TableCell>
+            <TableCell className="min-w-[180px]">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">{entry.name}</span>
+                {entry.handle && (
+                  <span className="text-xs text-muted-foreground">@{entry.handle}</span>
+                )}
+              </div>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className="gap-1 text-xs">
+                <NetworkIcon network={entry.network} />
+                {networkLabel[entry.network] || entry.network}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
+                {entry.platform}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline" className={`text-xs ${resultVariant[entry.result] || ""}`}>
+                {entry.result}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-sm text-muted-foreground">@{entry.agent}</TableCell>
+            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+              <div className="flex flex-col">
+                <span>{entry.date}</span>
+                <span className="text-xs">{entry.time}</span>
+              </div>
+            </TableCell>
+            <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => onView?.(entry)}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      Ver detalle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit?.(entry)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sorted.map((entry) => (
-            <TableRow key={entry.id} className="cursor-pointer" onClick={() => onEdit?.(entry)}>
-              <TableCell>
-                <Badge variant="outline" className="text-xs font-mono">{entry.ticketNumber}</Badge>
-              </TableCell>
-              <TableCell className="min-w-[180px]">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{entry.name}</span>
-                  {entry.handle && (
-                    <span className="text-xs text-muted-foreground">@{entry.handle}</span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="gap-1 text-xs">
-                  <NetworkIcon network={entry.network} />
-                  {networkLabel[entry.network] || entry.network}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
-                  {entry.platform}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className={`text-xs ${resultVariant[entry.result] || ""}`}>
-                  {entry.result}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">@{entry.agent}</TableCell>
-              <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                <div className="flex flex-col">
-                  <span>{entry.date}</span>
-                  <span className="text-xs">{entry.time}</span>
-                </div>
-              </TableCell>
-              <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-end">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onView?.(entry)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Ver detalle
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEdit?.(entry)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => onDelete?.(entry)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 };
 

@@ -201,7 +201,7 @@ const LeadGenContent = () => {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-full min-w-0">
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-start justify-between gap-4">
@@ -231,8 +231,8 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-auto">
+      {/* Scrollable top controls */}
+      <div className="shrink-0 overflow-auto" style={{ maxHeight: "45vh" }}>
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-2 gap-6">
@@ -317,44 +317,50 @@ const LeadGenContent = () => {
               )}
             </div>
           )}
-        </div>
+      </div>
 
-        {/* Tab content */}
-        <div className="p-6">
-          {/* === LEADS TAB === */}
-          {activeTab === "leads-hora" && (
+      {/* Tab content - fills remaining space */}
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4">
+        {/* === LEADS TAB === */}
+        {activeTab === "leads-hora" && (
+          <div className="flex-1 min-h-0 overflow-auto">
             <AgentHourlyPerformance leads={enrichedLeads} />
-          )}
+          </div>
+        )}
 
-          {activeTab === "leads" && (
-            <>
-              {leadsLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <p className="text-muted-foreground text-sm">Cargando leads...</p>
-                </div>
-              ) : filteredLeads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">No hay leads para mostrar con estos filtros</p>
-                </div>
-              ) : listView === "grid" ? (
+        {activeTab === "leads" && (
+          <>
+            {leadsLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <p className="text-muted-foreground text-sm">Cargando leads...</p>
+              </div>
+            ) : filteredLeads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground text-sm">No hay leads para mostrar con estos filtros</p>
+              </div>
+            ) : listView === "grid" ? (
+              <div className="flex-1 min-h-0 overflow-auto">
                 <LeadGenGrid
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
-              ) : (
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
-              )}
-              {totalPages > 1 && (
-                <div className="mt-4">
-                  <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
-                </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
+            {totalPages > 1 && (
+              <div className="shrink-0 pt-3">
+                <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
+              </div>
+            )}
+          </>
+        )}
 
           {/* === AGENTS TAB === */}
           {activeTab === "agentes" && (
