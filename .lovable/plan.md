@@ -1,20 +1,23 @@
 
 
-## Plan: Include File Names in Chat Search
+## Plan: Add Clipboard Paste Support for Images in Chat
 
 ### Problem
-When files are uploaded, the search panel only checks `message.content` for matches. If the user typed a custom text with the first file, the actual file name is only stored in `file_name` — invisible to search. Similarly, `file_name` is never checked.
+The MessageInput textarea has no `onPaste` handler. When a user pastes an image from their clipboard (e.g., a screenshot via Ctrl+V / Cmd+V), nothing happens — the image is silently discarded.
 
-### Changes
+### Solution
+Add an `onPaste` event handler to the `<Textarea>` in `MessageInput.tsx` that intercepts clipboard events, extracts image files from `clipboardData.items`, and feeds them into the existing `addFilesInternal()` pipeline (same as drag-and-drop and file picker).
 
-**1. `src/pages/messenger/components/SearchResultsPanel.tsx`** — Expand search filter
-- Line 51: Change filter to also search in `m.file_name` alongside `m.content`
-- In the results display, show the file name as secondary text when it matches the query (with highlighting)
+### Changes (single file)
 
-**2. `src/pages/messenger/components/MessageInput.tsx`** — Ensure file name is always in content
-- Line 316: When user typed custom text AND is sending a file, append the file name to the content so it's always searchable in `content` field too. Format: `"user text\n📎 filename.pdf"` for the first file with text, keep `pf.file.name` for files without text.
+**`src/pages/messenger/components/MessageInput.tsx`**
+1. Add a `handlePaste` callback that:
+   - Reads `e.clipboardData.items` for items with `type.startsWith("image/")`
+   - Converts each to a `File` via `.getAsFile()`
+   - Names pasted files with a timestamp (e.g., `pasted-image-1710000000000.png`)
+   - Calls `addFilesInternal(files)` to add them to the pending files queue
+   - Calls `e.preventDefault()` only when images are found (so normal text paste still works)
+2. Attach `onPaste={handlePaste}` to the `<Textarea>` element
 
-### Files Modified
-- `src/pages/messenger/components/SearchResultsPanel.tsx` — search filter + display
-- `src/pages/messenger/components/MessageInput.tsx` — content includes file name
+No other files need changes — the existing upload, preview, and send pipeline already handles image files from `pendingFiles`.
 
