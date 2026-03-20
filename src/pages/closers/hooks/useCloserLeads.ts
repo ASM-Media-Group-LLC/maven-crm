@@ -52,6 +52,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
   todas: [],
+  pendiente_lg: [],
   asignadas: ["Asignada"],
   confirmadas: ["Confirmada"],
   completadas: ["Completada"],
