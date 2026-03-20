@@ -113,12 +113,10 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const bgApplyQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const bgFailureCooldownUntilRef = useRef(0);
 
-  const initialSettingsRef = useRef<PersistedPreJoinSettings | null>(loadPreJoinSettings(roomName));
-
-  const [micOn, setMicOn] = useState(initialSettingsRef.current?.micOn ?? true);
-  const [camOn, setCamOn] = useState(initialSettingsRef.current?.camOn ?? true);
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [bgEffect, setBgEffect] = useState<BackgroundEffect>(initialSettingsRef.current?.backgroundEffect ?? "none");
+  const [bgEffect, setBgEffect] = useState<BackgroundEffect>("none");
   
   const [backgroundPreviewUnsupported, setBackgroundPreviewUnsupported] = useState(false);
   const [isPreparingBackgroundFirstFrame, setIsPreparingBackgroundFirstFrame] = useState(false);
@@ -126,9 +124,9 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const [audioInputs, setAudioInputs] = useState<DeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<DeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<DeviceInfo[]>([]);
-  const [selectedAudioInput, setSelectedAudioInput] = useState<string>(initialSettingsRef.current?.audioDeviceId ?? "");
-  const [selectedVideoInput, setSelectedVideoInput] = useState<string>(initialSettingsRef.current?.videoDeviceId ?? "");
-  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>(initialSettingsRef.current?.audioOutputDeviceId ?? "");
+  const [selectedAudioInput, setSelectedAudioInput] = useState<string>("");
+  const [selectedVideoInput, setSelectedVideoInput] = useState<string>("");
+  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>("");
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
