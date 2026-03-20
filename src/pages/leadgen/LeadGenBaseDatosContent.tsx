@@ -38,12 +38,6 @@ const calidadColors: Record<string, string> = {
   c: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
-const statusLabels: Record<string, string> = {
-  no_response: "Sin Respuesta",
-  contactado: "Contactado",
-  cerrado: "Cerrado",
-  rechazado: "Rechazado",
-};
 
 const LeadGenBaseDatosContent = () => {
   const navigate = useNavigate();
@@ -55,7 +49,7 @@ const LeadGenBaseDatosContent = () => {
   const [filterAgente, setFilterAgente] = useState("");
   const [agenteSelectOpen, setAgenteSelectOpen] = useState(false);
   const [filterCalidad, setFilterCalidad] = useState("");
-  const [filterEstado, setFilterEstado] = useState("");
+  
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -86,7 +80,7 @@ const LeadGenBaseDatosContent = () => {
         if (agentName !== filterAgente) return false;
       }
       if (filterCalidad && l.quality?.toLowerCase() !== filterCalidad) return false;
-      if (filterEstado && l.status !== filterEstado) return false;
+      
       if (dateFrom) {
         const d = new Date(l.created_at);
         if (d < startOfDay(dateFrom)) return false;
@@ -99,7 +93,7 @@ const LeadGenBaseDatosContent = () => {
       }
       return true;
     });
-  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, filterEstado, dateFrom, dateTo]);
+  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, dateFrom, dateTo]);
 
   const totalLeads = filtered.length;
   const conContacto = filtered.filter((l) => ["contactado", "cerrado"].includes(l.status)).length;
@@ -263,16 +257,6 @@ const LeadGenBaseDatosContent = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="no_response">Sin Respuesta</SelectItem>
-              <SelectItem value="contactado">Contactado</SelectItem>
-              <SelectItem value="cerrado">Cerrado</SelectItem>
-              <SelectItem value="rechazado">Rechazado</SelectItem>
-            </SelectContent>
-          </Select>
 
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder="Filtrar por fecha" className="h-9" />
 
@@ -308,10 +292,7 @@ const LeadGenBaseDatosContent = () => {
                         </div>
                         <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
                         <p className="text-xs text-muted-foreground">{lead.company || "—"}</p>
-                        <div className="flex items-center justify-between">
-                          <Badge variant="secondary" className="text-xs">
-                            {statusLabels[lead.status] || lead.status}
-                          </Badge>
+                        <div className="flex items-center justify-end">
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(lead.created_at), "d MMM", { locale: es })}
                           </span>
@@ -332,7 +313,7 @@ const LeadGenBaseDatosContent = () => {
                             <TableHead>Agente</TableHead>
                             <TableHead>Agencia</TableHead>
                             <TableHead>Calidad</TableHead>
-                            <TableHead>Estado</TableHead>
+                            
                             <TableHead>País</TableHead>
                             <TableHead>Fecha</TableHead>
                             <TableHead className="text-center sticky right-0 bg-card z-20">Acciones</TableHead>
@@ -348,11 +329,6 @@ const LeadGenBaseDatosContent = () => {
                               <TableCell>
                                 <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>
                                   {lead.quality?.toUpperCase()}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className="text-xs">
-                                  {statusLabels[lead.status] || lead.status}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>

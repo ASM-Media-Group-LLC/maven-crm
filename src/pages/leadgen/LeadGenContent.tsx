@@ -22,7 +22,7 @@ import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { getMiamiDateStr, formatToMiamiTime } from "./timezoneUtils";
-import { LEADGEN_COMPANIES, STATUS_OPTIONS, QUALITY_OPTIONS } from "./leadgenConstants";
+import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
 import LeadGenEstadosCard from "./LeadGenEstadosCard";
@@ -114,7 +114,7 @@ const LeadGenContent = () => {
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  
   const [qualityFilter, setQualityFilter] = useState("");
   const [qaFilter, setQaFilter] = useState("");
   const [agencyFilter, setAgencyFilter] = useState("");
@@ -134,8 +134,6 @@ const LeadGenContent = () => {
       }
       // Agency filter
       if (agencyFilter && lead.company !== agencyFilter) return false;
-      // Status filter
-      if (statusFilter && lead.status !== statusFilter) return false;
       // Quality filter
       if (qualityFilter && lead.quality?.toLowerCase() !== qualityFilter) return false;
       // Card filters
@@ -149,7 +147,7 @@ const LeadGenContent = () => {
       }
       return true;
     });
-  }, [enrichedLeads, searchQuery, agencyFilter, statusFilter, qualityFilter, activeFilter]);
+  }, [enrichedLeads, searchQuery, agencyFilter, qualityFilter, activeFilter]);
 
   // Agent stats
   const agentStats = useMemo(() => {
@@ -280,15 +278,6 @@ const LeadGenContent = () => {
           />
           {(activeTab === "leads" || activeTab === "leads-hora") && (
             <>
-              <Select value={statusFilter || undefined} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  {STATUS_OPTIONS.map(s => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
                 <SelectContent>

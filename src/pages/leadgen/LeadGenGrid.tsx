@@ -19,21 +19,6 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
   c: "destructive-soft",
 };
 
-const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
-  no_response: "primary-soft",
-  contactado: "warning-soft",
-  cerrado: "success-soft",
-  rechazado: "destructive-soft",
-};
-
-const statusLabels: Record<string, string> = {
-  no_response: "Sin resp.",
-  contactado: "Contactado",
-  en_llamada: "En llamada",
-  cerrado: "Cerrado",
-  rechazado: "Rechazado",
-};
-
 const getTicketId = (entry: LeadGenEntry) =>
   entry.ticket_number || `#LG${entry.id.slice(-7).toUpperCase()}`;
 
@@ -119,12 +104,6 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                     <span className="font-medium">
                       {format(createdAt, "d MMM yyyy", { locale: es })} · {format(createdAt, "hh:mm a")}
                     </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Estado:</span>
-                    <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
-                      {statusLabels[lead.status] || lead.status}
-                    </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">País:</span>

@@ -47,7 +47,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
-  const [filterEstado, setFilterEstado] = useState("");
+  
   const [filterContacto, setFilterContacto] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
@@ -112,7 +112,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
     if (dateFrom) result = result.filter(l => new Date(l.created_at) >= startOfDay(dateFrom));
     if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
     if (filterCalidad) result = result.filter(l => l.quality?.toLowerCase() === filterCalidad);
-    if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
+    
     if (filterContacto === "con_telefono") result = result.filter(l => l.phone_raw || l.phone_e164);
     if (filterContacto === "sin_telefono") result = result.filter(l => !l.phone_raw && !l.phone_e164);
     if (searchTerm) result = result.filter(l =>
@@ -121,7 +121,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
       l.company?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return result;
-  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterEstado, filterContacto, searchTerm]);
+  }, [agentLeads, dateFrom, dateTo, filterCalidad, filterContacto, searchTerm]);
 
   return (
     <main className="flex-1 flex flex-col h-full min-w-0">
@@ -252,14 +252,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <SelectItem value="c">C</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="no_response">Sin Resp.</SelectItem>
-                    <SelectItem value="contactado">Contactado</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={filterContacto || undefined} onValueChange={(v) => setFilterContacto(v === "__all__" ? "" : v)}>
                   <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
                   <SelectContent>
@@ -292,7 +284,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                           <TableHead className="text-xs">Ticket</TableHead>
                           <TableHead className="text-xs">Handle</TableHead>
                           <TableHead className="text-xs">Calidad</TableHead>
-                          <TableHead className="text-xs">Estado</TableHead>
+                          
                           <TableHead className="text-xs">País</TableHead>
                           <TableHead className="text-xs">Fecha</TableHead>
                           <TableHead className="text-xs text-right">Acciones</TableHead>
@@ -326,9 +318,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                                 <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
                                   {lead.quality?.toUpperCase()}
                                 </span>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
                               </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
@@ -376,8 +365,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                               {lead.quality?.toUpperCase()}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs capitalize">{lead.status === "no_response" ? "Sin respuesta" : lead.status}</Badge>
+                          <div className="flex items-center justify-end text-xs text-muted-foreground">
                             <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
                           </div>
                           {lead.country_code && <p className="text-xs text-muted-foreground mt-1">{lead.country_code}</p>}

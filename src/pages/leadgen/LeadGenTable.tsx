@@ -14,17 +14,10 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUpdateLeadQuality, useUpdateLeadStatus, useUpdateLeadField } from "./useLeadGen";
+import { useUpdateLeadQuality, useUpdateLeadField } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 
 const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
-const STATUS_OPTIONS = [
-  { value: "no_response", label: "Sin resp." },
-  { value: "contactado", label: "Contactado" },
-  { value: "en_llamada", label: "En llamada" },
-  { value: "cerrado", label: "Cerrado" },
-  { value: "rechazado", label: "Rechazado" },
-] as const;
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
   "a+": "success-soft",
@@ -32,22 +25,6 @@ const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-
   "b+": "warning-soft",
   b: "secondary-soft",
   c: "destructive-soft",
-};
-
-const statusVariant: Record<string, "primary-soft" | "warning-soft" | "success-soft" | "destructive-soft"> = {
-  no_response: "primary-soft",
-  contactado: "warning-soft",
-  en_llamada: "warning-soft",
-  cerrado: "success-soft",
-  rechazado: "destructive-soft",
-};
-
-const statusLabels: Record<string, string> = {
-  no_response: "Sin resp.",
-  contactado: "Contactado",
-  en_llamada: "En llamada",
-  cerrado: "Cerrado",
-  rechazado: "Rechazado",
 };
 
 const getTicketId = (entry: LeadGenEntry) =>
@@ -70,7 +47,7 @@ const getPlatformIcon = (platform: string) => {
 const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "estado" | "pais" | "contacto" | "qa";
+type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "pais" | "contacto" | "qa";
 
 interface Props {
   leads: LeadGenEntry[];
@@ -117,45 +94,6 @@ const QualityCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
   );
 });
 QualityCell.displayName = "QualityCell";
-
-// Inline status editor
-const StatusCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
-  const [open, setOpen] = useState(false);
-  const updateStatus = useUpdateLeadStatus();
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className="cursor-pointer hover:ring-1 hover:ring-border rounded-md px-0.5 py-0.5 transition-all flex items-center gap-0.5"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Badge variant={statusVariant[lead.status] ?? "secondary-soft"}>
-            {statusLabels[lead.status] || lead.status}
-          </Badge>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-1.5" align="start" onClick={(e) => e.stopPropagation()}>
-        <div className="flex flex-col gap-0.5">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s.value}
-              className="flex items-center px-2 py-1.5 rounded-md hover:bg-muted transition-colors text-left"
-              onClick={() => {
-                updateStatus.mutate({ id: lead.id, status: s.value });
-                setOpen(false);
-              }}
-            >
-              <Badge variant={statusVariant[s.value] ?? "secondary-soft"}>{s.label}</Badge>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-});
-StatusCell.displayName = "StatusCell";
 
 // Inline editable company/source cell
 const InlineSourceCell = React.memo(({ lead }: { lead: LeadGenEntry }) => {
@@ -235,7 +173,6 @@ const LeadRow = React.memo(({ lead, onView }: { lead: LeadGenEntry; onView?: (le
       <InlineSourceCell lead={lead} />
     </TableCell>
     <TableCell><QualityCell lead={lead} /></TableCell>
-    <TableCell><StatusCell lead={lead} /></TableCell>
     <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
     <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
       {lead.phone_raw ? (
@@ -286,7 +223,6 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
       case "calidad": va = a.quality; vb = b.quality; break;
-      case "estado": va = a.status; vb = b.status; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
       case "qa": va = ""; vb = ""; break;
@@ -312,7 +248,6 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
             <TableHead><SortHeader label="Agente" col="agente" /></TableHead>
             <TableHead><SortHeader label="Agencia" col="agencia" /></TableHead>
             <TableHead><SortHeader label="Calidad" col="calidad" /></TableHead>
-            <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
             <TableHead><SortHeader label="Contacto" col="contacto" /></TableHead>
             <TableHead><SortHeader label="QA" col="qa" /></TableHead>
@@ -325,7 +260,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                 No se encontraron leads.
               </TableCell>
             </TableRow>
