@@ -257,16 +257,6 @@ const LeadGenBaseDatosContent = () => {
             </SelectContent>
           </Select>
 
-          <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todos</SelectItem>
-              <SelectItem value="no_response">Sin Respuesta</SelectItem>
-              <SelectItem value="contactado">Contactado</SelectItem>
-              <SelectItem value="cerrado">Cerrado</SelectItem>
-              <SelectItem value="rechazado">Rechazado</SelectItem>
-            </SelectContent>
-          </Select>
 
           <DateRangePicker from={dateFrom} to={dateTo} onApply={(from, to) => { setDateFrom(from); setDateTo(to); }} placeholder="Filtrar por fecha" className="h-9" />
 
