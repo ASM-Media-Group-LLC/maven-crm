@@ -252,14 +252,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                     <SelectItem value="c">C</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={filterEstado || undefined} onValueChange={(v) => setFilterEstado(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="no_response">Sin Resp.</SelectItem>
-                    <SelectItem value="contactado">Contactado</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Select value={filterContacto || undefined} onValueChange={(v) => setFilterContacto(v === "__all__" ? "" : v)}>
                   <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Contacto" /></SelectTrigger>
                   <SelectContent>
