@@ -48,7 +48,10 @@ export default function SearchResultsPanel({
     if (!query.trim()) return [];
     const q = query.toLowerCase();
     return messages
-      .filter(m => m.content?.toLowerCase().includes(q) && !m.is_deleted)
+      .filter(m => !m.is_deleted && (
+        m.content?.toLowerCase().includes(q) ||
+        m.file_name?.toLowerCase().includes(q)
+      ))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [messages, query]);
 
