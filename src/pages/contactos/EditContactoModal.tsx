@@ -186,7 +186,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Compañía</Label>
+                <Label className="text-sm font-medium">Compañía / Cuenta de Origen</Label>
                 <CompanySelector value={compania} onChange={setCompania} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
               </div>
 
