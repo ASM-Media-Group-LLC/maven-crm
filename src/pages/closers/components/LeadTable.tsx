@@ -511,6 +511,21 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Notas</TableHead>
           </TableRow>
         );
+      case "pendiente_lg":
+        return (
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Instagram</TableHead>
+            <TableHead>Estado LG</TableHead>
+            <TableHead>Plataforma</TableHead>
+            <TableHead>Cuenta origen</TableHead>
+            <TableHead>Categoría</TableHead>
+            <TableHead>Fecha entrada</TableHead>
+            <TableHead>Teléfono</TableHead>
+            <TableHead>Notas</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
+          </TableRow>
+        );
       default: // todas
         return (
           <TableRow>
