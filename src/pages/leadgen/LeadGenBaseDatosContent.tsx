@@ -331,11 +331,6 @@ const LeadGenBaseDatosContent = () => {
                                   {lead.quality?.toUpperCase()}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className="text-xs">
-                                  {statusLabels[lead.status] || lead.status}
-                                </Badge>
-                              </TableCell>
                               <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                 {format(new Date(lead.created_at), "dd MMM yyyy", { locale: es })}
