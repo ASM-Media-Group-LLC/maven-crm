@@ -1,52 +1,45 @@
 
 
-## Plan: Fix Screen Share Persisting After Cowork Session Ends
+## Plan: Custom Background Upload Support
 
 ### Problem
-When the host ends a cowork session while sharing their screen, the browser's screen-sharing indicator ("está compartiendo tu pantalla") persists. This happens because:
+Users can only choose from 8 preset backgrounds or blur. There's no way to upload a personal image as a virtual background.
 
-1. In `CoworkHostDashboard`, the "End Session" handler sets `setActiveRoomLk(null)` and `setHubConnected(false)` synchronously, which unmounts the `LiveKitCallView` components
-2. The unmount cleanup calls `lk.disconnect()`, but `room.disconnect(true)` is asynchronous — it needs time to stop all MediaStreamTracks
-3. `navigate("/cowork")` fires immediately after, tearing down the component tree before the async track cleanup completes
-4. The screen share MediaStreamTrack is never properly stopped, so the browser keeps showing the capture indicator
-
-### Solution
-
-**`src/pages/cowork/CoworkHostDashboard.tsx`** — Fix the "End Session" handler
-
-Replace the current fire-and-forget approach with a proper sequential cleanup:
-
-1. Before changing any state, grab the current `LiveKitCallView`'s room instance and explicitly stop screen share and disconnect
-2. Introduce a ref to the `useLiveKit` `disconnect` function from the active room/hub views so the host dashboard can call it directly
-3. Alternatively (simpler): **don't unmount** the LiveKit views before disconnecting — instead, call `endSession()` first, let the realtime subscription trigger the session-ended screen which handles the unmount naturally
-
-The simplest robust fix:
-- Remove the state resets (`setActiveRoomLk(null)`, `setHubConnected(false)`) from *before* `endSession()`
-- Call `await cowork.endSession()` first
-- The realtime subscription will set `session.status = "ended"`, which causes `CoworkPage` to render the "session ended" screen
-- This unmounts `CoworkHostDashboard` → unmounts `LiveKitCallView` → cleanup calls `lk.disconnect()` with `room.disconnect(true)`
-- Add a small delay or wait before navigating to ensure cleanup completes
-- As a safety net, in `useLiveKit`'s `disconnect` function, explicitly stop all local tracks' `MediaStreamTrack`s before calling `room.disconnect(true)` to guarantee browser releases screen capture
+### Approach
+Use a `custom:<objectURL>` convention for the `BackgroundEffect` type. The image is loaded client-side only (no server upload needed) — the object URL lives for the session duration, which matches the "no persistence" policy already in place.
 
 ### Changes
 
-**1. `src/pages/cowork/CoworkHostDashboard.tsx`** (End Session handler ~line 175)
-- Reorder: call `await cowork.endSession()` first, then a brief `await` (200ms) for realtime propagation, then navigate
-- Remove premature state resets (`setActiveRoomLk(null)`, `setHubConnected(false)`) — let unmount handle them naturally via the session-ended render path
+**1. `src/pages/messenger/videocall/BackgroundSelector.tsx`**
+- Add a hidden `<input type="file" accept="image/*">` and an "Upload" button tile in the effects row (Plus icon)
+- On file select: create `URL.createObjectURL(file)`, store it in local state as `customBgs: { id, src, objectUrl }[]`
+- Call `onSelect("custom:<objectUrl>")` when a custom background is chosen
+- Show custom backgrounds in a "Tus fondos" section above templates, with a delete (X) button on hover that revokes the object URL
+- Add helper: `isCustomBackground(effect)` → checks `effect.startsWith("custom:")`
+- Update `isTemplateBackground()` to exclude custom backgrounds
+- Export `isCustomBackground` and `getCustomBackgroundUrl` (strips `custom:` prefix)
 
-**2. `src/hooks/useLiveKit.ts`** (disconnect function ~line 1153)
-- Before calling `room.disconnect(true)`, explicitly stop all local participant's MediaStreamTracks:
-  ```
-  room.localParticipant.videoTrackPublications.forEach(pub => {
-    pub.track?.mediaStreamTrack?.stop();
-  });
-  room.localParticipant.audioTrackPublications.forEach(pub => {
-    pub.track?.mediaStreamTrack?.stop();
-  });
-  ```
-- This guarantees the browser releases camera/mic/screen-share indicators even if `room.disconnect()` is interrupted
+**2. `src/pages/messenger/videocall/VideoSettingsDialog.tsx`**
+- Mirror the same custom upload UI: file input + upload button + custom backgrounds grid
+- Use same `custom:<url>` convention when calling `onBackgroundChange`
+
+**3. `src/hooks/useLiveKit.ts`** (~line 563)
+- In the background apply function, add an `else if (isCustomBackground(effect))` branch before the final `else`
+- Extract URL via `getCustomBackgroundUrl(effect)`, preload the image, then call `processor.switchTo({ mode: "virtual-background", imagePath: url })`
+
+**4. `src/pages/messenger/videocall/PreJoinLobby.tsx`** (~line 196)
+- Same change: add `isCustomBackground` handling in `applyBackgroundToTrack`
+- Extract URL and pass to `processor.switchTo({ mode: "virtual-background", imagePath: url })`
+- Update `preloadTemplate` to also handle custom URLs
+
+**5. `src/test/videocall/BackgroundSelector.test.tsx`**
+- Add test for `isCustomBackground` helper
+- Verify custom backgrounds don't interfere with template validation
 
 ### Files Modified
-- `src/pages/cowork/CoworkHostDashboard.tsx` — reorder end-session cleanup
-- `src/hooks/useLiveKit.ts` — force-stop MediaStreamTracks before disconnect
+- `src/pages/messenger/videocall/BackgroundSelector.tsx` — upload UI + helpers
+- `src/pages/messenger/videocall/VideoSettingsDialog.tsx` — upload UI
+- `src/hooks/useLiveKit.ts` — custom background processor branch
+- `src/pages/messenger/videocall/PreJoinLobby.tsx` — custom background processor branch
+- `src/test/videocall/BackgroundSelector.test.tsx` — tests
 
