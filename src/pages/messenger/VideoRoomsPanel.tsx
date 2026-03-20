@@ -109,7 +109,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
             <Plus className="h-5 w-5" />
             <span className="text-xs">Nueva sala</span>
           </Button>
-          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1">
+          <Button variant="outline" onClick={() => document.getElementById("join-link-input")?.focus()} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Link2 className="h-5 w-5" />
             <span className="text-xs">Unirse</span>
           </Button>
