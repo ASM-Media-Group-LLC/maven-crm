@@ -100,9 +100,9 @@ export default function ChatView({
     return messages.filter(m => m.reply_to_id === threadParent.id);
   }, [threadParent, messages]);
 
-  const handleSendThreadReply = useCallback((content: string) => {
+  const handleSendThreadReply = useCallback((content: string, type?: ChatMessage["type"], fileUrl?: string, fileName?: string) => {
     if (!threadParent) return;
-    onSendMessage(content, "text", undefined, undefined, threadParent.id);
+    onSendMessage(content, type || "text", fileUrl, fileName, threadParent.id);
   }, [threadParent, onSendMessage]);
 
   const getThreadCount = useCallback((messageId: string) => {
