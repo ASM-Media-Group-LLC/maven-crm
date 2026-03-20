@@ -112,7 +112,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
     if (dateFrom) result = result.filter(l => new Date(l.created_at) >= startOfDay(dateFrom));
     if (dateTo) result = result.filter(l => new Date(l.created_at) <= endOfDay(dateTo));
     if (filterCalidad) result = result.filter(l => l.quality?.toLowerCase() === filterCalidad);
-    if (filterEstado) result = result.filter(l => l.status?.toLowerCase() === filterEstado);
+    
     if (filterContacto === "con_telefono") result = result.filter(l => l.phone_raw || l.phone_e164);
     if (filterContacto === "sin_telefono") result = result.filter(l => !l.phone_raw && !l.phone_e164);
     if (searchTerm) result = result.filter(l =>
