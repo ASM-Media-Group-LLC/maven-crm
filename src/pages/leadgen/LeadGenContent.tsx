@@ -21,7 +21,6 @@ import { useLeadGenByDateRange, useLeadGenProfiles } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
-import { getMiamiDateStr, formatToMiamiTime } from "./timezoneUtils";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
@@ -61,12 +60,11 @@ const LeadGenContent = () => {
   }, [dataScope]);
 
   // Date range state with today as default
-  const todayStr = getMiamiDateStr();
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
-  const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : todayStr;
-  const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : todayStr;
+  const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;
+  const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : undefined;
 
   // Fetch entries filtered by date and user scope
   const userId = viewMode === "agent" ? user?.id : undefined;
