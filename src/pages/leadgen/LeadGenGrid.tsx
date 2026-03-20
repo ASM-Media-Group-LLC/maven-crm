@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { ExternalLink, Eye, Medal } from "lucide-react";
+import { ExternalLink, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -8,7 +7,6 @@ import XIcon from "@/components/icons/XIcon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import AssignCalidadModal from "./AssignCalidadModal";
 import type { LeadGenEntry } from "./useLeadGen";
 
 const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
@@ -42,8 +40,6 @@ interface Props {
 }
 
 const LeadGenGrid = ({ leads, onView }: Props) => {
-  const [calidadLead, setCalidadLead] = useState<LeadGenEntry | null>(null);
-
   const buildProfileUrl = (entry: LeadGenEntry) => {
     if (entry.source_link) return entry.source_link;
     const p = entry.platform.toLowerCase();
@@ -113,20 +109,10 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Button size="sm" className="flex-1" onClick={() => onView?.(lead)}>
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver Detalles
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => setCalidadLead(lead)}
-                  >
-                    <Medal className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); onView?.(lead); }}>
+                  <Eye className="h-4 w-4 mr-1" />
+                  Ver Detalles
+                </Button>
               </CardContent>
             </Card>
           );
@@ -137,12 +123,6 @@ const LeadGenGrid = ({ leads, onView }: Props) => {
           <p className="text-muted-foreground text-sm">No hay leads para mostrar</p>
         </div>
       )}
-
-      <AssignCalidadModal
-        open={!!calidadLead}
-        onOpenChange={(open) => { if (!open) setCalidadLead(null); }}
-        lead={calidadLead}
-      />
     </div>
   );
 };

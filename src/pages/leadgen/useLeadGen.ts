@@ -82,8 +82,8 @@ async function fetchAllEntries(): Promise<LeadGenEntry[]> {
 
 /** Fetch entries for a specific date range — used by main page */
 async function fetchEntriesByDateRange(
-  dateFrom: string,
-  dateTo: string,
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
   userId?: string
 ): Promise<LeadGenEntry[]> {
   const PAGE_SIZE = 1000;
@@ -95,10 +95,12 @@ async function fetchEntriesByDateRange(
     let query = supabase
       .from("leadgen_entries")
       .select(ENTRY_COLUMNS)
-      .gte("entry_date", dateFrom)
-      .lte("entry_date", dateTo)
       .order("created_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+
+    if (dateFrom && dateTo) {
+      query = query.gte("entry_date", dateFrom).lte("entry_date", dateTo);
+    }
 
     if (userId) {
       query = query.eq("lg_user_id", userId);
@@ -133,8 +135,7 @@ export const useLeadGenByDateRange = (
 ) =>
   useQuery({
     queryKey: ["leadgen-entries-range", dateFrom, dateTo, userId],
-    queryFn: () => fetchEntriesByDateRange(dateFrom!, dateTo!, userId),
-    enabled: !!dateFrom && !!dateTo,
+    queryFn: () => fetchEntriesByDateRange(dateFrom, dateTo, userId),
     staleTime: 2 * 60 * 1000,
   });
 
