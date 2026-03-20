@@ -103,7 +103,7 @@ const ClosersContent = () => {
               ))}
             </TabsList>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3 overflow-x-auto">
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -194,29 +194,31 @@ const ClosersContent = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-6 py-4">
+          <div className="flex-1 flex flex-col overflow-hidden px-6 py-4">
             {TABS.map((tab) => (
-              <TabsContent key={tab.value} value={tab.value} className="mt-0">
-                <CloserTable
-                  sourceAccounts={sourceAccounts}
-                  creators={creators}
-                  activeTab={activeTab}
-                  viewMode={viewMode}
-                  onStageChange={(id, stage, source) => {
-                    if (source === "leadgen") {
-                      convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
-                    } else {
-                      updateStage.mutate({ id, stage });
-                    }
-                  }}
-                  onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
-                  onAssign={(id, assignee, source) => {
-                    setAssignTarget({ id, assignee, source: source || "closer" });
-                    setAssignDialogOpen(true);
-                  }}
-                  isAdmin={isAdmin}
-                />
-                <div className="flex items-center justify-between mt-3">
+              <TabsContent key={tab.value} value={tab.value} className="mt-0 flex-1 flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <CloserTable
+                    sourceAccounts={sourceAccounts}
+                    creators={creators}
+                    activeTab={activeTab}
+                    viewMode={viewMode}
+                    onStageChange={(id, stage, source) => {
+                      if (source === "leadgen") {
+                        convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
+                      } else {
+                        updateStage.mutate({ id, stage });
+                      }
+                    }}
+                    onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
+                    onAssign={(id, assignee, source) => {
+                      setAssignTarget({ id, assignee, source: source || "closer" });
+                      setAssignDialogOpen(true);
+                    }}
+                    isAdmin={isAdmin}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-3 shrink-0">
                   <p className="text-xs text-muted-foreground">
                     Mostrando {creators.length} de {totalCount}
                   </p>

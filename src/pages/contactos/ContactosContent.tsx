@@ -246,15 +246,17 @@ const ContactosContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        <ContactosKPICards
-          total={totalCount}
-          nuevos={0}
-          convertidos={0}
-          esteMes={0}
-        />
+      <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
+        <div className="shrink-0">
+          <ContactosKPICards
+            total={totalCount}
+            nuevos={0}
+            convertidos={0}
+            esteMes={0}
+          />
+        </div>
 
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 shrink-0">
           <Button
             variant={activeTab === "contactos" ? "secondary" : "ghost"}
             size="sm"
@@ -275,7 +277,8 @@ const ContactosContent = () => {
 
         {activeTab === "contactos" ? (
           <>
-            <ContactosFilters
+            <div className="shrink-0">
+              <ContactosFilters
               filters={filters}
               onChange={updateFilters}
               view={view}
@@ -284,16 +287,19 @@ const ContactosContent = () => {
               onClear={() => setFilters(emptyFilters)}
               creators={creatorsList}
             />
+            </div>
 
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando...</p>
-            ) : view === "table" ? (
-              <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-            ) : (
-              <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-            )}
+            <div className="flex-1 min-h-0 overflow-auto">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando...</p>
+              ) : view === "table" ? (
+                <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+              ) : (
+                <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+              )}
+            </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between shrink-0">
               <p className="text-xs text-muted-foreground">
                 Mostrando {filtered.length} de {totalCount}
               </p>
