@@ -814,6 +814,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
           </TableRow>
         );
+    }
+  };
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
