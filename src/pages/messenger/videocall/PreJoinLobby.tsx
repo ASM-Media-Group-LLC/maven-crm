@@ -7,7 +7,7 @@ import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-cli
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
+import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "./BackgroundSelector";
 
 
 interface PreJoinLobbyProps {
