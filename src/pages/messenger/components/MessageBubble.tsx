@@ -45,8 +45,7 @@ interface MessageBubbleProps {
   isGridLeader?: boolean;
   isPartOfGrid?: boolean;
 }
-import { getInitials, formatTime as formatMsgTime } from "../utils";
-// Re-export formatTime as formatMsgTime for local usage
+import { formatTime as formatMsgTime } from "../utils";
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
