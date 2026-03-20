@@ -38,12 +38,6 @@ const calidadColors: Record<string, string> = {
   c: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
-const statusLabels: Record<string, string> = {
-  no_response: "Sin Respuesta",
-  contactado: "Contactado",
-  cerrado: "Cerrado",
-  rechazado: "Rechazado",
-};
 
 const LeadGenBaseDatosContent = () => {
   const navigate = useNavigate();
