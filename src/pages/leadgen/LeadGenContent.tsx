@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import EarningsPagination from "@/pages/sales-performance/EarningsPagination";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
