@@ -600,7 +600,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right sticky right-0 bg-background z-20">
               <div className="flex items-center justify-end gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
