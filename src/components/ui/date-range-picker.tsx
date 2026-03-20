@@ -22,6 +22,10 @@ interface DateRangePickerProps {
 
 const presets = [
   {
+    label: "Todo",
+    getValue: () => ({ from: undefined as Date | undefined, to: undefined as Date | undefined }),
+  },
+  {
     label: "Hoy",
     getValue: () => {
       const today = startOfToday();
