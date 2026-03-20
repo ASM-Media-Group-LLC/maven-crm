@@ -563,6 +563,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
                 value={text}
                 onChange={e => handleTextChange(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 onSelect={e => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
               />
             </div>
