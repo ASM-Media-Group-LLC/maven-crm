@@ -738,7 +738,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell className="text-sm max-w-[180px] truncate" title={c.notes || ""}>{c.notes || "—"}</TableCell>
-            <TableCell className="text-right">
+            <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
