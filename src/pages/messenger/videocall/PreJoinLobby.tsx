@@ -409,14 +409,6 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
   const handleJoin = async () => {
     setJoining(true);
 
-    savePreJoinSettings(roomName, {
-      micOn,
-      camOn,
-      audioDeviceId: selectedAudioInput || undefined,
-      videoDeviceId: selectedVideoInput || undefined,
-      audioOutputDeviceId: selectedAudioOutput || undefined,
-      backgroundEffect: bgEffect,
-    });
 
     await disposeBackgroundProcessor();
     stopVideoTrack();

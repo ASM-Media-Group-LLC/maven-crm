@@ -26,12 +26,9 @@ describe("PreJoinLobby", () => {
     callDisplayName: "Daily Standup",
     onJoin: vi.fn(),
   };
-  const roomStorageKey = "call-prejoin-settings:v1:test-room";
-  const globalStorageKey = "call-prejoin-settings:v1:global";
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
   });
 
   it("does not render the call display name (hidden by design)", () => {
@@ -54,26 +51,26 @@ describe("PreJoinLobby", () => {
     expect(screen.getByText("Unirse ahora")).toBeInTheDocument();
   });
 
-  it("shows avatar initials when camera is off", () => {
+  it("shows avatar initials when camera is off (default)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    // Toggle cam off — it starts on by default, so toggle once
-    const camBtn = screen.getByTitle("Desactivar cámara");
-    fireEvent.click(camBtn);
+    // Camera defaults to OFF, so initials should be visible
     expect(screen.getByText("JP")).toBeInTheDocument();
   });
 
-  it("toggles microphone button", () => {
+  it("toggles microphone button (starts OFF)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    const micBtn = screen.getByTitle("Desactivar micrófono");
+    // Mic starts OFF
+    const micBtn = screen.getByTitle("Activar micrófono");
     fireEvent.click(micBtn);
-    expect(screen.getByTitle("Activar micrófono")).toBeInTheDocument();
+    expect(screen.getByTitle("Desactivar micrófono")).toBeInTheDocument();
   });
 
-  it("toggles camera button", () => {
+  it("toggles camera button (starts OFF)", () => {
     render(<PreJoinLobby {...defaultProps} />);
-    const camBtn = screen.getByTitle("Desactivar cámara");
+    // Cam starts OFF
+    const camBtn = screen.getByTitle("Activar cámara");
     fireEvent.click(camBtn);
-    expect(screen.getByTitle("Activar cámara")).toBeInTheDocument();
+    expect(screen.getByTitle("Desactivar cámara")).toBeInTheDocument();
   });
 
   it("shows background selector button", () => {
@@ -96,42 +93,19 @@ describe("PreJoinLobby", () => {
   it("calls onJoin when join button is clicked", async () => {
     render(<PreJoinLobby {...defaultProps} />);
     fireEvent.click(screen.getByText("Unirse ahora"));
-    // onJoin is called after async cleanup
     await vi.waitFor(() => {
       expect(defaultProps.onJoin).toHaveBeenCalledTimes(1);
     });
   });
 
-  it("passes correct options to onJoin", async () => {
+  it("passes correct options to onJoin (defaults to mic/cam OFF)", async () => {
     render(<PreJoinLobby {...defaultProps} />);
-    // Turn off mic first
-    fireEvent.click(screen.getByTitle("Desactivar micrófono"));
     fireEvent.click(screen.getByText("Unirse ahora"));
     await vi.waitFor(() => {
       expect(defaultProps.onJoin).toHaveBeenCalledWith(
-        expect.objectContaining({ micOn: false, camOn: true, backgroundEffect: "none" })
+        expect.objectContaining({ micOn: false, camOn: false, backgroundEffect: "none" })
       );
     });
-  });
-
-  it("loads mic/cam presets from global storage when room-specific settings are missing", () => {
-    localStorage.setItem(globalStorageKey, JSON.stringify({ micOn: false, camOn: false, backgroundEffect: "none" }));
-
-    const { container } = render(<PreJoinLobby {...defaultProps} roomName="another-room" />);
-
-    expect(screen.getByTitle("Activar micrófono")).toBeInTheDocument();
-    expect(screen.getByTitle("Activar cámara")).toBeInTheDocument();
-    expect(container.querySelector("video")).not.toBeInTheDocument();
-  });
-
-  it("prioritizes room-specific presets over global settings", () => {
-    localStorage.setItem(globalStorageKey, JSON.stringify({ micOn: false, camOn: false, backgroundEffect: "none" }));
-    localStorage.setItem(roomStorageKey, JSON.stringify({ micOn: true, camOn: false, backgroundEffect: "none" }));
-
-    render(<PreJoinLobby {...defaultProps} />);
-
-    expect(screen.getByTitle("Desactivar micrófono")).toBeInTheDocument();
-    expect(screen.getByTitle("Activar cámara")).toBeInTheDocument();
   });
 
   it("does not render callDisplayName or roomName (hidden by design)", () => {
@@ -139,14 +113,8 @@ describe("PreJoinLobby", () => {
     expect(screen.queryByText("test-room")).not.toBeInTheDocument();
   });
 
-  it("renders video element when camera is on (initial state)", () => {
+  it("does not render video when camera is off (default state)", () => {
     const { container } = render(<PreJoinLobby {...defaultProps} />);
-    expect(container.querySelector("video")).toBeInTheDocument();
-  });
-
-  it("does not render video when camera toggled off", () => {
-    const { container } = render(<PreJoinLobby {...defaultProps} />);
-    fireEvent.click(screen.getByTitle("Desactivar cámara"));
     expect(container.querySelector("video")).not.toBeInTheDocument();
   });
 });

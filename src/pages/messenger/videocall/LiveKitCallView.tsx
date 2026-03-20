@@ -56,7 +56,7 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
   const [videoInputId, setVideoInputId] = useState(initialVideoDeviceId);
   const [pinnedSid, setPinnedSid] = useState<string | null>(null);
 
-  const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); saveViewSettings(s); }, []);
+  const handleViewSettingsChange = useCallback((s: ViewSettings) => { setViewSettings(s); }, []);
 
   useEffect(() => { if (chatOpen && lk.unreadChatCount > 0) lk.clearUnreadChat(); }, [chatOpen, lk.unreadChatCount, lk.clearUnreadChat]);
 
