@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff, Monitor, MonitorOff,
-  PhoneOff, Users, MessageSquare, Settings, Hand, Copy, Link2, MoreVertical,
-  Maximize, Grid3X3, LayoutGrid,
+  PhoneOff, Users, MessageSquare, Hand, Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,7 +25,7 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
   const [camOn, setCamOn] = useState(true);
   const [screenShare, setScreenShare] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
+  
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -69,13 +68,6 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
             <Link2 className="h-3.5 w-3.5" />
             Copiar enlace
           </Button>
-          <Button
-            variant="ghost" size="icon"
-            className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]"
-            onClick={() => setLayout(l => l === "grid" ? "spotlight" : "grid")}
-          >
-            {layout === "grid" ? <Grid3X3 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]">
@@ -102,40 +94,18 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
 
       {/* Video grid */}
       <div className="flex-1 p-3 overflow-hidden">
-        {layout === "grid" ? (
-          <div className={cn("grid gap-2 h-full", gridCols)}>
-            {allParticipants.map(p => (
-              <ParticipantTile
-                key={p.id}
-                name={p.full_name || "?"}
-                isMe={(p as any).isMe}
-                micOn={!(p as any).isMe || micOn}
-                camOn={!(p as any).isMe || camOn}
-                screenShare={(p as any).isMe && screenShare}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col h-full gap-2">
-            <div className="flex-1">
-              <ParticipantTile
-                name={allParticipants[0]?.full_name || ""}
-                isMe
-                micOn={micOn}
-                camOn={camOn}
-                screenShare={screenShare}
-                large
-              />
-            </div>
-            <div className="flex gap-2 h-28 shrink-0 overflow-x-auto">
-              {allParticipants.slice(1).map(p => (
-                <div key={p.id} className="w-40 shrink-0">
-                  <ParticipantTile name={p.full_name || "?"} micOn camOn={false} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className={cn("grid gap-2 h-full", gridCols)}>
+          {allParticipants.map(p => (
+            <ParticipantTile
+              key={p.id}
+              name={p.full_name || "?"}
+              isMe={(p as any).isMe}
+              micOn={!(p as any).isMe || micOn}
+              camOn={!(p as any).isMe || camOn}
+              screenShare={(p as any).isMe && screenShare}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Bottom controls */}
