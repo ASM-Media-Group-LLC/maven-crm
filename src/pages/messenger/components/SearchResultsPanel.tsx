@@ -74,7 +74,7 @@ export default function SearchResultsPanel({
   return (
     <div className="w-full sm:w-80 shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/[0.03] shrink-0">
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           ref={inputRef}
