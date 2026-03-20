@@ -147,7 +147,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 </a>
               </TableCell>
               <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
-              <TableCell className="sticky right-0 bg-card">
+              <TableCell className="sticky right-0 z-10 bg-card">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -177,7 +177,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             </TableRow>
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 };
