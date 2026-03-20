@@ -142,7 +142,7 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
         </Button>
       )}
 
-      <div className="ml-auto flex gap-1">
+      <div className="ml-auto flex gap-1 shrink-0">
         <Button
           variant={view === "table" ? "secondary" : "ghost"}
           size="icon"
