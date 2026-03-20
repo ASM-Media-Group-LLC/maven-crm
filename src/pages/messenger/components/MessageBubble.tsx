@@ -15,7 +15,7 @@ import ReactionsDisplay from "./ReactionsDisplay";
 import ReadReceiptIndicator from "./ReadReceiptIndicator";
 import ImageLightbox from "./ImageLightbox";
 import { renderTextWithMentions } from "./MentionAutocomplete";
-import { getInitials } from "../utils";
+import { getInitials, formatTime as formatMsgTime } from "../utils";
 
 const MAX_GRID_IMAGES = 9;
 
@@ -40,12 +40,10 @@ interface MessageBubbleProps {
   threadCount?: number;
   unreadThreadCount?: number;
   onOpenThread?: () => void;
-  /** Adjacent image messages in the same group for grid display */
   adjacentImages?: ChatMessage[];
   isGridLeader?: boolean;
   isPartOfGrid?: boolean;
 }
-import { formatTime as formatMsgTime } from "../utils";
 
 const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   message, isMe, chatType, profiles, highlight, onReply, onCopy, onEdit, onDelete,
@@ -64,14 +62,13 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
     return Object.values(profiles).map(p => p.full_name).filter(Boolean) as string[];
   }, [profiles]);
 
-  // If this message is part of a grid but not the leader, don't render
   if (isPartOfGrid && !isGridLeader) return null;
 
   if (message.is_deleted) {
     return (
       <div ref={ref} className={cn("flex items-end gap-2", isMe ? "justify-end" : "justify-start", "px-1")}>
         {!isMe && <div className="w-8 shrink-0" />}
-        <div className="max-w-[70%] rounded-xl px-3 py-1.5 bg-muted/40">
+        <div className="max-w-[70%] rounded-3xl px-3 py-1.5 bg-primary/5">
           <p className="text-xs text-muted-foreground italic">Mensaje eliminado</p>
         </div>
       </div>
@@ -111,8 +108,8 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
   };
 
   const bubbleRadius = isMe
-    ? cn("rounded-2xl rounded-tr-lg", isLastInGroup ? "rounded-br-md" : "rounded-br-2xl")
-    : cn("rounded-2xl rounded-tl-lg", isLastInGroup ? "rounded-bl-md" : "rounded-bl-2xl");
+    ? cn("rounded-3xl rounded-tr-xl", isLastInGroup ? "rounded-br-md" : "rounded-br-3xl")
+    : cn("rounded-3xl rounded-tl-xl", isLastInGroup ? "rounded-bl-md" : "rounded-bl-3xl");
 
   const isVoiceNote = message.type === "file" && message.file_name?.startsWith("voice-note");
   const audioExtPattern = /\.(webm|ogg|mp3|m4a|wav)(\?|$)/i;
@@ -128,13 +125,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
   const renderImageGrid = () => {
     if (!adjacentImages || adjacentImages.length <= 1) {
-      // Single image
       return (
         <div>
           <img
             src={message.file_url!}
             alt={message.file_name || "image"}
-            className="rounded-lg max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+            className="rounded-2xl max-w-full max-h-60 object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(message.file_url!, "image")}
           />
           {message.content && message.content !== message.file_name && (
@@ -144,22 +140,18 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       );
     }
 
-    // Grid display
     const images = adjacentImages;
     const displayImages = showAllImages ? images : images.slice(0, MAX_GRID_IMAGES);
     const remaining = images.length - MAX_GRID_IMAGES;
     const count = displayImages.length;
 
-    // Dynamic grid classes
     const gridClass = count === 1
       ? "grid-cols-1"
       : count === 2
         ? "grid-cols-2"
         : count <= 4
           ? "grid-cols-2"
-          : count <= 6
-            ? "grid-cols-3"
-            : "grid-cols-3";
+          : "grid-cols-3";
 
     return (
       <div>
@@ -169,7 +161,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
             return (
               <div
                 key={img.id}
-                className="relative cursor-pointer overflow-hidden rounded-lg aspect-square"
+                className="relative cursor-pointer overflow-hidden rounded-2xl aspect-square"
                 onClick={() => {
                   if (isLast) {
                     setShowAllImages(true);
@@ -208,12 +200,12 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       return (
         <div>
           <div
-            className="relative rounded-lg overflow-hidden cursor-pointer group/video max-w-full max-h-60"
+            className="relative rounded-2xl overflow-hidden cursor-pointer group/video max-w-full max-h-60"
             onClick={() => openLightbox(message.file_url!, "video")}
           >
             <video
               src={message.file_url!}
-              className="rounded-lg max-w-full max-h-60 object-cover"
+              className="rounded-2xl max-w-full max-h-60 object-cover"
               preload="metadata"
               muted
               controlsList="nodownload noremoteplayback"
@@ -248,7 +240,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
       const ext = message.file_name?.split(".").pop()?.toLowerCase() || "";
       return (
         <a href={message.file_url || "#"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:underline">
-          <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-muted")}>
+          <div className={cn("h-8 w-8 rounded-2xl flex items-center justify-center shrink-0", isMe ? "bg-primary-foreground/15" : "bg-primary/8")}>
             <File className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -289,19 +281,19 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         )}
 
         <div className={cn("relative max-w-[70%]", isMe ? "order-first" : "")}>
-          {/* Hover actions */}
+          {/* Hover actions — M3 tonal */}
           <div className={cn(
             "absolute top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-0.5",
             isMe ? "-left-16" : "-right-16"
           )}>
-            <ReactionPicker onSelect={onToggleReaction} className="bg-card shadow-sm border border-border" />
+            <ReactionPicker onSelect={onToggleReaction} className="bg-primary/10 border-0 rounded-full shadow-none" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full bg-card shadow-sm border border-border">
+                <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full bg-primary/10 border-0 shadow-none hover:bg-primary/15">
                   <MoreVertical className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[140px]">
+              <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[140px] rounded-2xl">
                 <DropdownMenuItem onClick={onReply}>
                   <Reply className="h-3.5 w-3.5 mr-2" /> Responder
                 </DropdownMenuItem>
@@ -331,14 +323,14 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           </div>
 
           <div className={cn(
-            "px-3 py-2 shadow-sm",
+            "px-3.5 py-2",
             bubbleRadius,
-            isMe ? "bg-primary text-primary-foreground" : "bg-card border border-border"
+            isMe ? "bg-primary text-primary-foreground" : "bg-primary/8 border-0"
           )}>
             {replyMessage && (
               <div className={cn(
-                "text-[11px] mb-1.5 px-2 py-1 rounded-lg border-l-2",
-                isMe ? "bg-primary-foreground/10 border-primary-foreground/40" : "bg-muted/50 border-primary/40"
+                "text-[11px] mb-1.5 px-2.5 py-1.5 rounded-xl",
+                isMe ? "bg-primary-foreground/10" : "bg-primary/5"
               )}>
                 <p className="font-semibold opacity-80">{profiles[replyMessage.sender_id]?.full_name || "Usuario"}</p>
                 <p className="truncate opacity-70">{replyMessage.content}</p>
@@ -372,12 +364,15 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
           {threadCount > 0 && (
             <button
               onClick={onOpenThread}
-              className={cn("flex items-center gap-1 mt-1 text-xs text-primary hover:underline", isMe ? "justify-end" : "justify-start")}
+              className={cn(
+                "flex items-center gap-1.5 mt-1 text-xs text-primary hover:bg-primary/8 rounded-full px-3 py-1 transition-colors",
+                isMe ? "justify-end ml-auto" : "justify-start"
+              )}
             >
               <MessageSquareText className="h-3 w-3" />
               <span>{threadCount} {threadCount === 1 ? "respuesta" : "respuestas"}</span>
               {unreadThreadCount > 0 && (
-                <span className="ml-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+                <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
                   {unreadThreadCount}
                 </span>
               )}
@@ -388,7 +383,6 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
         {isMe && <div className="w-0 shrink-0" />}
       </div>
 
-      {/* Lightbox for images and videos */}
       <ImageLightbox
         src={lightboxSrc}
         alt={message.file_name || "media"}
@@ -402,9 +396,7 @@ const MessageBubble = forwardRef<HTMLDivElement, MessageBubbleProps>(({
 
 MessageBubble.displayName = "MessageBubble";
 
-// Memoize to prevent re-renders when parent state changes but this message didn't
 const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
-  // Re-render only when message-specific data changes
   return (
     prev.message === next.message &&
     prev.isMe === next.isMe &&

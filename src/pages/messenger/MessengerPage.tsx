@@ -44,7 +44,6 @@ export default function MessengerPage() {
   
   const joinedFromLinkRef = useRef(false);
 
-  // Wrap setActiveChatId to also clear unread
   const selectChat = useCallback((chatId: string | null) => {
     setActiveChatId(chatId);
     activeChatIdRef.current = chatId;
@@ -54,9 +53,7 @@ export default function MessengerPage() {
   const activeConv = conversations.find(c => c.id === activeChatId) || null;
 
   const handleNewMessage = useCallback((msg: ChatMessage) => {
-    // Don't notify for messages in the currently active chat
     if (activeChatIdRef.current === msg.conversation_id) {
-      // But still clear unread for the active chat
       markConversationRead(msg.conversation_id);
       return;
     }
@@ -113,8 +110,6 @@ export default function MessengerPage() {
   const handleStartVideoCall = async (conv: ConversationWithDetails) => {
     const roomName = `call-${conv.id}`;
     openCallInNewTab(roomName, true, conv.displayName);
-
-    // Send automatic message with call link for direct and group chats
     const callLink = `${window.location.origin}/call/${encodeURIComponent(roomName)}`;
     await sendMessage(`📹 Videollamada iniciada\n${callLink}`, "text");
   };
@@ -124,7 +119,6 @@ export default function MessengerPage() {
     if (success && activeChatId === chatId) selectChat(null);
     return success;
   };
-
 
   useEffect(() => {
     const chatParam = new URLSearchParams(window.location.search).get("chat");
@@ -212,9 +206,9 @@ export default function MessengerPage() {
             />
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-muted/10">
+          <div className="flex-1 flex items-center justify-center bg-primary/[0.02]">
             <div className="text-center space-y-4 px-4">
-              <div className="h-20 w-20 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto">
+              <div className="h-20 w-20 rounded-3xl bg-primary/8 flex items-center justify-center mx-auto">
                 <MessageSquare className="h-10 w-10 text-primary/60" />
               </div>
               <div className="space-y-1.5">

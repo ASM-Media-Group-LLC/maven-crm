@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import AvatarUpload from "./AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getInitials } from "../utils";
 
 interface ChatHeaderProps {
   conversation: ConversationWithDetails;
@@ -26,10 +27,6 @@ interface ChatHeaderProps {
   onOpenSharedFiles: () => void;
   onOpenGroupMembers?: () => void;
   onAvatarChanged?: () => void;
-}
-
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export default function ChatHeader({
@@ -46,7 +43,6 @@ export default function ChatHeader({
     p => p.user_id === user?.id && p.role === "admin"
   );
 
-  // Find the OTHER participant in direct chats
   const otherParticipant = !isGroup
     ? conversation.participants.find(p => p.user_id !== user?.id)
     : null;
@@ -71,7 +67,6 @@ export default function ChatHeader({
         ? getStatusLabel(status, online)
         : "Desconectado";
 
-  // Avatar URL: group avatar or other user's avatar
   const avatarUrl = isGroup
     ? conversation.avatar_url
     : otherProfile?.avatar_url;
@@ -102,9 +97,9 @@ export default function ChatHeader({
   };
 
   return (
-    <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
+    <div className="shrink-0 bg-primary/[0.03]">
       <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5">
-        <Button variant="ghost" size="icon" className="sm:hidden shrink-0 h-8 w-8" onClick={onBack}>
+        <Button variant="ghost" size="icon" className="sm:hidden shrink-0 h-9 w-9 rounded-full hover:bg-primary/8" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
@@ -157,11 +152,11 @@ export default function ChatHeader({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onStartVideoCall(conversation)} title="Videollamada">
+          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8" onClick={() => onStartVideoCall(conversation)} title="Videollamada">
             <Video className="h-4 w-4" />
           </Button>
           <Button
-            variant="ghost" size="icon" className="h-8 w-8"
+            variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8"
             onClick={onSearchToggle}
             title="Buscar"
           >
@@ -169,11 +164,11 @@ export default function ChatHeader({
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full hover:bg-primary/8">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="rounded-2xl">
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
@@ -189,7 +184,6 @@ export default function ChatHeader({
           </DropdownMenu>
         </div>
       </div>
-
     </div>
   );
 }
