@@ -154,8 +154,8 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
   ];
 
   return (
-    <div className="w-full md:w-[360px] shrink-0 border-l border-border bg-card flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+    <div className="w-full md:w-[360px] shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <FileText className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold flex-1">Archivos compartidos</h3>
         <span className="text-xs text-muted-foreground">{totalCount}</span>
