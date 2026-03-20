@@ -227,6 +227,11 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
               </div>
 
               <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Número de Ticket</Label>
+                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: TK-001" />
+              </div>
+
+              <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Foto de Perfil</Label>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
