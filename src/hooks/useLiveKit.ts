@@ -164,7 +164,15 @@ const PARTICIPANT_SYNC_INTERVAL_MS = 3000;
 const VIDEO_SWITCH_MIN_INTERVAL_MS = 420;
 
 function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "blur";
+  return effect !== "none" && effect !== "blur" && !effect.startsWith("custom:");
+}
+
+function isCustomBackground(effect: BackgroundEffect) {
+  return typeof effect === "string" && effect.startsWith("custom:");
+}
+
+function getCustomBackgroundUrl(effect: BackgroundEffect) {
+  return effect.replace(/^custom:/, "");
 }
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -589,6 +597,30 @@ export function useLiveKit() {
           ),
           BACKGROUND_SWITCH_TIMEOUT_MS,
           "bg-template",
+        );
+      } else if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        if (!preloadedBackgroundsRef.current.has(customUrl)) {
+          await new Promise<void>((resolve, reject) => {
+            const image = new Image();
+            image.src = customUrl;
+            image.onload = () => resolve();
+            image.onerror = () => reject(new Error("custom-bg-load-failed"));
+          });
+          preloadedBackgroundsRef.current.add(customUrl);
+        }
+
+        if (opId !== bgApplyOpRef.current) return false;
+
+        await withTimeout(
+          Promise.resolve(
+            processor.switchTo({
+              mode: "virtual-background",
+              imagePath: customUrl,
+            }),
+          ),
+          BACKGROUND_SWITCH_TIMEOUT_MS,
+          "bg-custom",
         );
       } else {
         return false;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import BackgroundSelector, { BACKGROUND_TEMPLATES, BackgroundEffect } from "@/pages/messenger/videocall/BackgroundSelector";
+import BackgroundSelector, { BACKGROUND_TEMPLATES, BackgroundEffect, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "@/pages/messenger/videocall/BackgroundSelector";
 
 describe("BackgroundSelector", () => {
   const defaultProps = {
@@ -33,5 +33,36 @@ describe("BackgroundSelector", () => {
   it("all template IDs are unique", () => {
     const ids = BACKGROUND_TEMPLATES.map(t => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("isCustomBackground", () => {
+  it("returns true for custom: prefixed strings", () => {
+    expect(isCustomBackground("custom:blob:http://localhost/abc")).toBe(true);
+    expect(isCustomBackground("custom:https://example.com/img.jpg")).toBe(true);
+  });
+
+  it("returns false for non-custom values", () => {
+    expect(isCustomBackground("none")).toBe(false);
+    expect(isCustomBackground("blur")).toBe(false);
+    expect(isCustomBackground("tpl-office")).toBe(false);
+  });
+});
+
+describe("getCustomBackgroundUrl", () => {
+  it("strips the custom: prefix", () => {
+    expect(getCustomBackgroundUrl("custom:blob:http://localhost/abc")).toBe("blob:http://localhost/abc");
+  });
+});
+
+describe("isTemplateBackground", () => {
+  it("returns true for template IDs", () => {
+    expect(isTemplateBackground("tpl-office")).toBe(true);
+  });
+
+  it("returns false for none, blur, and custom backgrounds", () => {
+    expect(isTemplateBackground("none")).toBe(false);
+    expect(isTemplateBackground("blur")).toBe(false);
+    expect(isTemplateBackground("custom:blob:http://localhost/abc")).toBe(false);
   });
 });

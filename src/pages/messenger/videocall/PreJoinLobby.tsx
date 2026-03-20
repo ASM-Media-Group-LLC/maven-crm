@@ -7,7 +7,7 @@ import { createLocalTracks, LocalAudioTrack, LocalVideoTrack } from "livekit-cli
 import { BackgroundProcessor, supportsBackgroundProcessors } from "@livekit/track-processors";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES } from "./BackgroundSelector";
+import BackgroundSelector, { BackgroundEffect, BACKGROUND_TEMPLATES, isCustomBackground, getCustomBackgroundUrl, isTemplateBackground } from "./BackgroundSelector";
 
 
 interface PreJoinLobbyProps {
@@ -30,9 +30,7 @@ const PREJOIN_BG_ATTACH_TIMEOUT_MS = 4000;
 const PREJOIN_BG_SWITCH_TIMEOUT_MS = 5000;
 const PREJOIN_BG_FAILURE_COOLDOWN_MS = 8000;
 
-function isTemplateBackground(effect: BackgroundEffect) {
-  return effect !== "none" && effect !== "blur";
-}
+// isTemplateBackground, isCustomBackground, getCustomBackgroundUrl imported from BackgroundSelector
 
 
 async function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -190,9 +188,24 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       }
       if (opId !== bgOpRef.current) return false;
       if (isTemplateBackground(effect)) await preloadTemplate(effect);
+      if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        if (!preloadedRef.current.has(customUrl)) {
+          await new Promise<void>((resolve, reject) => {
+            const img = new Image();
+            img.src = customUrl;
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error("custom-bg-load-failed"));
+          });
+          preloadedRef.current.add(customUrl);
+        }
+      }
       if (opId !== bgOpRef.current) return false;
       if (effect === "blur") {
         await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
+      } else if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: customUrl })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-custom");
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (!tpl) return false;
