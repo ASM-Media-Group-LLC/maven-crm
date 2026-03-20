@@ -80,7 +80,7 @@ const LeadGenBaseDatosContent = () => {
         if (agentName !== filterAgente) return false;
       }
       if (filterCalidad && l.quality?.toLowerCase() !== filterCalidad) return false;
-      if (filterEstado && l.status !== filterEstado) return false;
+      
       if (dateFrom) {
         const d = new Date(l.created_at);
         if (d < startOfDay(dateFrom)) return false;
