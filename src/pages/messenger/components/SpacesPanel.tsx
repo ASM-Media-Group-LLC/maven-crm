@@ -160,7 +160,7 @@ export default function SpacesPanel({
           <div key={space.id}>
             <div
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg mx-1 cursor-pointer transition-all text-sm",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-2xl mx-1 cursor-pointer transition-all text-sm",
                 isDragOver && "bg-primary/15 ring-1 ring-primary/40",
                 !isDragOver && "hover:bg-muted/50"
               )}
