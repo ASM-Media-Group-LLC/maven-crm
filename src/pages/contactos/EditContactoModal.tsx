@@ -202,7 +202,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                       <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
                       <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número" className="flex-1" />
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
                   </div>
                 </div>
               </div>
