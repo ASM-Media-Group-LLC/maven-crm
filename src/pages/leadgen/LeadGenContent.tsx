@@ -201,7 +201,7 @@ const LeadGenContent = () => {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-full min-w-0">
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       {/* Header */}
       <header className="shrink-0 px-6 pt-6 pb-4 border-b">
         <div className="flex items-start justify-between gap-4">
@@ -231,8 +231,8 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-auto">
+      {/* Scrollable top controls */}
+      <div className="shrink-0 overflow-auto" style={{ maxHeight: "45vh" }}>
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-2 gap-6">
