@@ -216,8 +216,8 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Handle/Usuario *</Label>
-                  <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@usuario" />
+                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
+                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario o @usuario" />
                 </div>
               </div>
 
