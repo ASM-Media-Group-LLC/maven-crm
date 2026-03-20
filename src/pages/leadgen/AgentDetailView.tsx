@@ -284,7 +284,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                           <TableHead className="text-xs">Ticket</TableHead>
                           <TableHead className="text-xs">Handle</TableHead>
                           <TableHead className="text-xs">Calidad</TableHead>
-                          <TableHead className="text-xs">Estado</TableHead>
+                          
                           <TableHead className="text-xs">País</TableHead>
                           <TableHead className="text-xs">Fecha</TableHead>
                           <TableHead className="text-xs text-right">Acciones</TableHead>
