@@ -238,7 +238,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
   );
 
   return (
-    <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
+    <div className="max-h-[calc(100vh-28rem)] overflow-auto rounded-lg border border-border">
       <Table className="min-w-[900px] [&>div]:!overflow-visible">
         <TableHeader className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
           <TableRow>
