@@ -246,7 +246,7 @@ const ContactosContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
         <ContactosKPICards
           total={totalCount}
           nuevos={0}
