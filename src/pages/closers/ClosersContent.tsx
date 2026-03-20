@@ -173,7 +173,7 @@ const ClosersContent = () => {
                 </Button>
               )}
 
-              <div className="ml-auto flex items-center gap-1 border border-border rounded-md p-0.5">
+              <div className="flex items-center gap-1 border border-border rounded-md p-0.5">
                 <Button
                   variant={viewMode === "list" ? "secondary" : "ghost"}
                   size="icon"
