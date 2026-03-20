@@ -131,13 +131,12 @@ export default function LiveKitCallView({ roomName, displayName, callDisplayName
     onMediaStateChangeRef.current?.({ micOn: localMicOn, camOn: localCamOn, screenShareOn: localScreenShare });
   }, [localMicOn, localCamOn, localScreenShare]);
 
-  const effectiveLayout: "grid" | "spotlight" | "sidebar" = useMemo(() => {
-    if (pinnedSid) return "spotlight"; // pinned always forces spotlight
+  const effectiveLayout: "grid" | "sidebar" = useMemo(() => {
+    if (pinnedSid) return "sidebar";
     const mode = viewSettings.layout;
-    if (mode === "spotlight") return "spotlight";
     if (mode === "sidebar") return "sidebar";
     if (mode === "tiled") return "grid";
-    return lk.participants.some((p) => p.isScreenSharing) ? "spotlight" : "grid";
+    return lk.participants.some((p) => p.isScreenSharing) ? "sidebar" : "grid";
   }, [viewSettings.layout, lk.participants, pinnedSid]);
 
   const visibleParticipants = useMemo(() => {
