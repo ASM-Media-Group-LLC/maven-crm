@@ -299,7 +299,7 @@ const ContactosContent = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between shrink-0">
               <p className="text-xs text-muted-foreground">
                 Mostrando {filtered.length} de {totalCount}
               </p>
