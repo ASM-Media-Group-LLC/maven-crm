@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Pencil, Upload, X, ImageIcon, Film, FileText, Save, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -58,7 +59,8 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const [countryCode, setCountryCode] = useState("+57");
   const [phone, setPhone] = useState("");
   const [plataforma, setPlataforma] = useState("Instagram");
-  const [handle, setHandle] = useState("");
+  const [accountLink, setAccountLink] = useState("");
+  const [ticket, setTicket] = useState("");
   const [notas, setNotas] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
   const [extraFiles, setExtraFiles] = useState<UploadedFile[]>([]);
@@ -72,16 +74,31 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
     setLastId(contacto.id);
     setNombre(contacto.nombre);
     setCategoria(contacto.categoria);
-    setHandle(contacto.instagram);
+    setAccountLink(contacto.instagram || "");
     setCompania(contacto.company);
     setEmail(contacto.email);
     setCountryCode(contacto.country_code || "+57");
     setPhone(contacto.phone);
     setNotas(contacto.notes);
+    setTicket(contacto.ticket || "");
     setPlataforma(contacto.platform || "Instagram");
     setProfilePhoto(contacto.profile_picture_url ? { url: contacto.profile_picture_url, name: "current", type: "image/jpeg", size: 0, category: "piclink" as const } : null);
     setExtraFiles([]);
   }
+
+  const handleAccountLinkChange = useCallback((value: string) => {
+    setAccountLink(value);
+    const detected = detectPlatformFromUrl(value);
+    if (detected) {
+      const platformMap: Record<string, string> = {
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        twitter: "Twitter/X",
+        onlyfans: "OnlyFans",
+      };
+      setPlataforma(platformMap[detected] || "Otra");
+    }
+  }, []);
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
     if (uploadModal.category === "piclink") setProfilePhoto(files[0] || null);
@@ -101,8 +118,9 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   };
 
   const handleSave = async () => {
-    if (!nombre.trim() || !handle.trim()) {
-      toast({ title: "Nombre y handle son obligatorios", variant: "destructive" });
+    const extractedHandle = normalizeHandle(accountLink);
+    if (!nombre.trim() || !extractedHandle) {
+      toast({ title: "Nombre y link de la cuenta son obligatorios", variant: "destructive" });
       return;
     }
     if (!contacto) return;
@@ -113,7 +131,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
         .from("closers_contacts")
         .update({
           name: nombre.trim(),
-          handle: handle.trim(),
+          handle: extractedHandle,
           platform: plataforma,
           physical_appearance: categoria || null,
           company: compania || null,
@@ -122,6 +140,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
           phone: phone || null,
           notes: notas || null,
           profile_picture_url: profilePhoto?.url || null,
+          ticket_number: ticket || null,
         })
         .eq("id", contacto.id);
 
@@ -158,7 +177,7 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Categoría</Label>
+                  <Label className="text-sm font-medium">Categoría Física</Label>
                   <Select value={categoria} onValueChange={setCategoria}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                     <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
@@ -197,14 +216,19 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Handle/Usuario *</Label>
-                  <Input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@usuario" />
+                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
+                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario o @usuario" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Notas</Label>
                 <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales..." rows={3} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Número de Ticket</Label>
+                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: TK-001" />
               </div>
 
               <div className="space-y-1.5">
