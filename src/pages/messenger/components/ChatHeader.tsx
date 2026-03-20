@@ -190,22 +190,6 @@ export default function ChatHeader({
         </div>
       </div>
 
-      {/* Search bar */}
-      {searchOpen && (
-        <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20 animate-fade-in">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
-            placeholder="Buscar en la conversación..."
-            className="h-7 bg-background text-sm"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            autoFocus
-          />
-          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onSearchToggle}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
