@@ -1,62 +1,65 @@
 
-## Plan: corregir sticky del header real de las tablas sin mover filtros
+## Plan: alinear Closers y Contactos con LeadGen sin volver a mover cosas incorrectamente
 
-### Qué entendí del problema
-- Cuando dices “header”, te refieres a la fila de columnas de la tabla: “Creación”, “Ticket”, “Nombre”, etc.
-- No quieres que se reorganicen los filtros ni que fecha/toggles bajen de línea innecesariamente.
-- El objetivo es:
-  1. mantener todos los filtros en la misma línea visual,
-  2. fijar la fila de encabezados de la tabla en `/contactos`,
-  3. fijar la fila de encabezados de la tabla en `/closers`.
+### Lo que está mal hoy
+- En `/contactos` el bloque de filtros se está partiendo: “Fecha creación” y los toggles bajan a otra línea.
+- En `/closers` pasa lo mismo con los toggles.
+- El “header” real de las tablas (la fila `Creación / Ticket / Nombre...` y sus equivalentes) sigue sin comportarse como en LeadGen.
+- La implementación actual usa `sticky` en `TableHeader`, pero en tablas HTML eso puede ser inconsistente; para que funcione como LeadGen hay que fijar las celdas `<th>` reales.
 
-### Hallazgos en el código
-- `/contactos`
-  - `ContactosFilters.tsx` ya tiene los filtros y toggles en la misma barra.
-  - `ContactosTable.tsx` ya tiene `TableHeader className="sticky top-0 z-10 bg-card"` y contenedor con `max-h[...] overflow-auto`.
-  - El problema probablemente no es “mover componentes”, sino ajustar el contexto de scroll/capas para que el header pegajoso funcione de verdad y no quede tapado o sin fondo consistente.
-- `/closers`
-  - `ClosersContent.tsx` ya deja el toggle al lado del `DateRangePicker`.
-  - `LeadTable.tsx` ya tiene wrapper con `overflow-auto max-h[...]` y `TableHeader sticky`.
-  - El error a corregir aquí también es del header real de la tabla, no del bloque de filtros.
+### Cambios a hacer
 
-### Cambios a implementar
-1. **No mover la barra de filtros**
-   - Mantener en `/contactos` y `/closers` el search, selects, fecha y toggles dentro de la misma fila de filtros.
-   - No reubicar `DateRangePicker` ni el toggle fuera de esa línea.
+#### 1. `/contactos` — dejar toda la barra de filtros en una sola línea visual
+**Archivo:** `src/pages/contactos/ContactosFilters.tsx`
 
-2. **Fijar correctamente el header de la tabla en `/contactos`**
-   - Revisar `src/pages/contactos/ContactosTable.tsx`.
-   - Asegurar que:
-     - el `sticky` esté aplicado al `TableHead`/`TableHeader` correcto,
-     - el fondo del header sea sólido,
-     - el `z-index` sea suficiente,
-     - la fila sticky no quede afectada por wrappers externos.
-   - Si hace falta, alinear el patrón con LeadGen:
-     - header sticky sobre el contenedor scrolleable de la tabla,
-     - celdas del header con fondo consistente,
-     - columna de acciones sticky compatible con el header.
+- Mantener el mismo orden visual del screenshot:
+  `Buscar → Estado → País → Categoría → Agente → Fecha creación → toggles`
+- Quitar el comportamiento que empuja los toggles a otra fila.
+- Compactar anchos de búsqueda/selects y hacer que todos los controles sean `shrink-0`.
+- Usar una fila horizontal consistente como LeadGen, con fallback de scroll horizontal si el ancho no alcanza, en vez de romper la línea.
 
-3. **Fijar correctamente el header de la tabla en `/closers`**
-   - Revisar `src/pages/closers/components/LeadTable.tsx`.
-   - Aplicar el mismo patrón visual/estructural que LeadGen:
-     - fila de columnas sticky,
-     - fondo sólido uniforme,
-     - `z-index` correcto,
-     - compatibilidad con scroll vertical y horizontal,
-     - columna de acciones sticky sin romper el encabezado.
+#### 2. `/closers` — hacer lo mismo en la barra de filtros
+**Archivo:** `src/pages/closers/ClosersContent.tsx`
 
-4. **Homogeneizar el patrón de tablas**
-   - Dejar `/contactos` y `/closers` siguiendo la misma lógica visual que LeadGen:
-     - contenedor interno de scroll para la tabla,
-     - header sticky real de columnas,
-     - acciones sticky a la derecha,
-     - fondo y capas consistentes.
+- Mantener todos los filtros y toggles en la misma fila:
+  `Buscar → Agente → Plataforma → Fecha de paso → Seleccionar fechas → Limpiar → toggles`
+- Evitar que el contenedor use wrapping que empuje los toggles abajo.
+- Ajustar anchos para que a viewport desktop como el de tus screenshots entre en una sola línea, igual que LeadGen.
 
-### Archivos a tocar
+#### 3. `/contactos` — fijar de verdad la fila de columnas
+**Archivo:** `src/pages/contactos/ContactosTable.tsx`
+
+- Dejar de depender solo de `sticky` en `<TableHeader>`.
+- Aplicar el patrón sticky sobre las `<TableHead>` reales para que la fila:
+  `Creación / Ticket / Nombre / Agente / ...`
+  quede fija dentro del scroll de la tabla.
+- Igualar capas/fondo/sombra con LeadGen:
+  - fondo sólido
+  - z-index correcto
+  - separación visual al hacer scroll
+- Alinear también la columna de acciones sticky con el mismo layering del header.
+
+#### 4. `/closers` — fijar de verdad la fila de columnas
+**Archivo:** `src/pages/closers/components/LeadTable.tsx`
+
+- Repetir exactamente el mismo patrón de sticky por celda de header.
+- Unificar el fondo del header con LeadGen/Contactos para que no se vea “cortado” o mezclado con las filas.
+- Mantener la columna de acciones sticky a la derecha sin romper el header principal.
+
+#### 5. Homogeneizar el patrón visual de tablas
+**Archivos:**
 - `src/pages/contactos/ContactosTable.tsx`
 - `src/pages/closers/components/LeadTable.tsx`
 
+- Dejar ambas tablas con el mismo comportamiento base que LeadGen:
+  - contenedor de tabla con scroll interno
+  - fila de encabezados realmente fija
+  - columna de acciones sticky
+  - anchos mínimos consistentes
+  - fondo y sombra coherentes
+
 ### Resultado esperado
-- En `/contactos`, la fila “Creación / Ticket / Nombre / ...” queda fija al hacer scroll dentro de la tabla.
-- En `/closers`, la fila de columnas también queda fija correctamente.
-- Los filtros no se mueven de sitio: fecha y toggles permanecen en la misma línea que el resto de filtros.
+- En `/contactos`, “Fecha creación” y los toggles quedan en la misma fila que el resto de filtros.
+- En `/closers`, los toggles ya no bajan a otra línea.
+- En ambos módulos, la fila de columnas de la tabla queda fija al hacer scroll, igual que en LeadGen.
+- No se vuelven a mover componentes de lugar fuera del orden visual esperado.
