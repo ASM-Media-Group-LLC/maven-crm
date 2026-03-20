@@ -152,7 +152,7 @@ export default function GroupMembersPanel({
 
       {/* Add member button */}
       {isAdmin && !showAddPanel && (
-        <div className="px-4 py-2 border-b border-border">
+        <div className="px-4 py-2">
           <Button
             variant="outline"
             size="sm"
