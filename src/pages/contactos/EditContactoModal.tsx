@@ -36,11 +36,11 @@ const DEFAULT_COMPANIES = [
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
 
 const COUNTRY_CODES = [
-  { code: "+57", label: "🇨🇴 +57" }, { code: "+52", label: "🇲🇽 +52" },
-  { code: "+54", label: "🇦🇷 +54" }, { code: "+34", label: "🇪🇸 +34" },
-  { code: "+56", label: "🇨🇱 +56" }, { code: "+51", label: "🇵🇪 +51" },
-  { code: "+598", label: "🇺🇾 +598" }, { code: "+55", label: "🇧🇷 +55" },
-  { code: "+1", label: "🇺🇸 +1" },
+  { code: "+57", label: "🇨🇴 Colombia +57" }, { code: "+52", label: "🇲🇽 México +52" },
+  { code: "+54", label: "🇦🇷 Argentina +54" }, { code: "+34", label: "🇪🇸 España +34" },
+  { code: "+56", label: "🇨🇱 Chile +56" }, { code: "+51", label: "🇵🇪 Perú +51" },
+  { code: "+598", label: "🇺🇾 Uruguay +598" }, { code: "+55", label: "🇧🇷 Brasil +55" },
+  { code: "+1", label: "🇺🇸 Estados Unidos +1" },
 ];
 
 interface Props {
