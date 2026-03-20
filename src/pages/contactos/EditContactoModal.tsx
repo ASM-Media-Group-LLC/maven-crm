@@ -36,11 +36,11 @@ const DEFAULT_COMPANIES = [
 const PLATFORMS = ["Instagram", "TikTok", "Twitter/X", "OnlyFans", "Otra"];
 
 const COUNTRY_CODES = [
-  { code: "+57", label: "🇨🇴 +57" }, { code: "+52", label: "🇲🇽 +52" },
-  { code: "+54", label: "🇦🇷 +54" }, { code: "+34", label: "🇪🇸 +34" },
-  { code: "+56", label: "🇨🇱 +56" }, { code: "+51", label: "🇵🇪 +51" },
-  { code: "+598", label: "🇺🇾 +598" }, { code: "+55", label: "🇧🇷 +55" },
-  { code: "+1", label: "🇺🇸 +1" },
+  { code: "+57", label: "🇨🇴 Colombia +57" }, { code: "+52", label: "🇲🇽 México +52" },
+  { code: "+54", label: "🇦🇷 Argentina +54" }, { code: "+34", label: "🇪🇸 España +34" },
+  { code: "+56", label: "🇨🇱 Chile +56" }, { code: "+51", label: "🇵🇪 Perú +51" },
+  { code: "+598", label: "🇺🇾 Uruguay +598" }, { code: "+55", label: "🇧🇷 Brasil +55" },
+  { code: "+1", label: "🇺🇸 Estados Unidos +1" },
 ];
 
 interface Props {
@@ -173,20 +173,20 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
             <div className="space-y-4 pb-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Nombre *</Label>
+                  <Label className="text-sm font-medium">Nombre del Contacto *</Label>
                   <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Categoría Física</Label>
+                  <Label className="text-sm font-medium">Categoría Física *</Label>
                   <Select value={categoria} onValueChange={setCategoria}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
                     <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Compañía</Label>
+                <Label className="text-sm font-medium">Compañía / Cuenta de Origen</Label>
                 <CompanySelector value={compania} onChange={setCompania} companies={companies} onAddCompany={(name) => setCompanies((prev) => [...prev, name])} />
               </div>
 
@@ -202,12 +202,16 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                       <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
                       <SelectContent>{COUNTRY_CODES.map((cc) => <SelectItem key={cc.code} value={cc.code}>{cc.label}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número" className="flex-1" />
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Número de teléfono" className="flex-1" />
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
+                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario" />
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium">Plataforma</Label>
                   <Select value={plataforma} onValueChange={setPlataforma}>
@@ -215,20 +219,16 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
                     <SelectContent>{PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Link de la Cuenta *</Label>
-                  <Input value={accountLink} onChange={(e) => handleAccountLinkChange(e.target.value)} placeholder="https://instagram.com/usuario o @usuario" />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Notas</Label>
-                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales..." rows={3} />
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Número de Ticket</Label>
-                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: TK-001" />
+                <Input value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="Ej: CT586864" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Notas</Label>
+                <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas adicionales sobre el contacto..." rows={3} />
               </div>
 
               <div className="space-y-1.5">
