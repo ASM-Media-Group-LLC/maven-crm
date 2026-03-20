@@ -1,10 +1,8 @@
-import { useState } from "react";
 import {
-  Video, Search, MoreVertical, X, ArrowLeft, Bell, FileText, Users, Camera,
+  Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -21,10 +19,7 @@ interface ChatHeaderProps {
   conversation: ConversationWithDetails;
   profiles: Record<string, UserProfile>;
   typingUsers: string[];
-  searchOpen: boolean;
-  searchQuery: string;
   onSearchToggle: () => void;
-  onSearchChange: (q: string) => void;
   onBack: () => void;
   onStartVideoCall: (conv: ConversationWithDetails) => void;
   onOpenNotificationSettings: () => void;
@@ -38,8 +33,8 @@ function getInitials(name: string) {
 }
 
 export default function ChatHeader({
-  conversation, profiles, typingUsers, searchOpen, searchQuery,
-  onSearchToggle, onSearchChange, onBack, onStartVideoCall,
+  conversation, profiles, typingUsers,
+  onSearchToggle, onBack, onStartVideoCall,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
   onAvatarChanged,
 }: ChatHeaderProps) {
@@ -195,22 +190,6 @@ export default function ChatHeader({
         </div>
       </div>
 
-      {/* Search bar */}
-      {searchOpen && (
-        <div className="flex items-center gap-2 px-4 py-2 border-t border-border bg-muted/20 animate-fade-in">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
-            placeholder="Buscar en la conversación..."
-            className="h-7 bg-background text-sm"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            autoFocus
-          />
-          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onSearchToggle}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

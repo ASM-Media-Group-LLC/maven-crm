@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { ConversationWithDetails, ChatMessage, UserProfile } from "./types";
 import { ReactionGroup } from "@/hooks/useReactions";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,7 +7,7 @@ import ChatHeader from "./components/ChatHeader";
 import MessageList from "./components/MessageList";
 import MessageInput, { MessageInputHandle } from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
-import SearchResultsBar from "./components/SearchResultsBar";
+import SearchResultsPanel from "./components/SearchResultsPanel";
 import NotificationSettings from "./components/NotificationSettings";
 import SharedFilesGallery from "./components/SharedFilesGallery";
 import GroupMembersPanel from "./components/GroupMembersPanel";
@@ -44,7 +44,6 @@ export default function ChatView({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchIndex, setSearchIndex] = useState(0);
   const [threadParent, setThreadParent] = useState<ChatMessage | null>(null);
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const [showNotifSettings, setShowNotifSettings] = useState(false);
@@ -54,43 +53,21 @@ export default function ChatView({
   const dragCounterRef = useRef(0);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return messages.filter(m => m.content?.toLowerCase().includes(q) && !m.is_deleted);
-  }, [messages, searchQuery]);
+  // Close all side panels except the one being opened
+  const closeSidePanels = useCallback((except?: "search" | "thread" | "files" | "members") => {
+    if (except !== "search") { setSearchOpen(false); setSearchQuery(""); }
+    if (except !== "thread") setThreadParent(null);
+    if (except !== "files") setShowSharedFiles(false);
+    if (except !== "members") setShowGroupMembers(false);
+    if (except !== "search") setHighlightedMsgId(null);
+  }, []);
 
-  useEffect(() => { setSearchIndex(0); }, [searchQuery]);
-
-  const handleSearchNavigate = useCallback((index: number) => {
-    setSearchIndex(index);
-    const msg = searchResults[index];
-    if (msg) setHighlightedMsgId(msg.id);
-  }, [searchResults]);
-
-  // Messages that are thread replies (have reply_to_id pointing to a non-reply message)
-  // These should only show inside the ThreadPanel, not in the main chat
-  const threadParentIds = useMemo(() => {
-    const ids = new Set<string>();
-    messages.forEach(m => {
-      if (m.reply_to_id) ids.add(m.reply_to_id);
-    });
-    return ids;
-  }, [messages]);
-
+  // Messages that are thread replies should only show inside the ThreadPanel
   const mainMessages = useMemo(() => {
-    // Show messages that are NOT thread replies.
-    // A message is a thread reply if it has reply_to_id AND that reply_to_id
-    // points to a root message (one without its own reply_to_id) that has other replies.
     return messages.filter(m => {
       if (!m.reply_to_id) return true;
-      // Check if the parent is a root message (not itself a reply)
       const parent = messages.find(p => p.id === m.reply_to_id);
-      if (parent && !parent.reply_to_id) {
-        // This is a thread reply to a root message — hide from main chat
-        return false;
-      }
-      // If parent is not found or parent is also a reply, show it (legacy reply behavior)
+      if (parent && !parent.reply_to_id) return false;
       return true;
     });
   }, [messages]);
@@ -124,30 +101,31 @@ export default function ChatView({
     const count = messages.filter(m => m.reply_to_id === parentId).length;
     setSeenThreadCounts(prev => ({ ...prev, [parentId]: count }));
 
+    closeSidePanels("thread");
     if (msg.reply_to_id) {
       const parent = messages.find(m => m.id === msg.reply_to_id);
       if (parent) { setThreadParent(parent); return; }
     }
     setThreadParent(msg);
-  }, [messages]);
+  }, [messages, closeSidePanels]);
+
+  const handleSearchResultClick = useCallback((messageId: string) => {
+    setHighlightedMsgId(messageId);
+  }, []);
 
   // Drag-and-drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current++;
-    if (e.dataTransfer.types.includes("Files")) {
-      setIsDragging(true);
-    }
+    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragging(false);
-    }
+    if (dragCounterRef.current === 0) setIsDragging(false);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -160,7 +138,6 @@ export default function ChatView({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragging(false);
-
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0 && messageInputRef.current) {
       messageInputRef.current.addFiles(files);
@@ -191,28 +168,21 @@ export default function ChatView({
           conversation={conversation}
           profiles={profiles}
           typingUsers={typingUsers}
-          searchOpen={searchOpen}
-          searchQuery={searchQuery}
-          onSearchToggle={() => { setSearchOpen(!searchOpen); setSearchQuery(""); setHighlightedMsgId(null); }}
-          onSearchChange={setSearchQuery}
+          onSearchToggle={() => {
+            if (searchOpen) {
+              closeSidePanels();
+            } else {
+              closeSidePanels("search");
+              setSearchOpen(true);
+            }
+          }}
           onBack={onBack}
           onStartVideoCall={onStartVideoCall}
           onOpenNotificationSettings={() => setShowNotifSettings(true)}
-          onOpenSharedFiles={() => { setShowSharedFiles(true); setThreadParent(null); setShowGroupMembers(false); }}
-          onOpenGroupMembers={() => { setShowGroupMembers(true); setShowSharedFiles(false); setThreadParent(null); }}
+          onOpenSharedFiles={() => { closeSidePanels("files"); setShowSharedFiles(true); }}
+          onOpenGroupMembers={() => { closeSidePanels("members"); setShowGroupMembers(true); }}
           onAvatarChanged={onMembersChanged}
         />
-
-        {searchOpen && searchQuery && (
-          <SearchResultsBar
-            results={searchResults}
-            currentIndex={searchIndex}
-            query={searchQuery}
-            profiles={profiles}
-            onNavigate={handleSearchNavigate}
-            onClose={() => { setSearchOpen(false); setSearchQuery(""); setHighlightedMsgId(null); }}
-          />
-        )}
 
         <MessageList
           messages={mainMessages}
@@ -249,6 +219,16 @@ export default function ChatView({
           chatType={conversation.type}
         />
       </div>
+
+      {searchOpen && (
+        <SearchResultsPanel
+          messages={messages}
+          profiles={profiles}
+          onResultClick={handleSearchResultClick}
+          onClose={() => closeSidePanels()}
+          onQueryChange={setSearchQuery}
+        />
+      )}
 
       {threadParent && !showSharedFiles && (
         <ThreadPanel
