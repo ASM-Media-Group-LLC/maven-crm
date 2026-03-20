@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
 import AgenciasContent from "./AgenciasContent";
 import AddAgenciaModal from "./AddAgenciaModal";
+import EarningsPagination from "../sales-performance/EarningsPagination";
 
 export interface Contacto {
   id: string;
@@ -58,6 +59,8 @@ const emptyFilters: ContactoFilters = {
   creadoPor: "",
 };
 
+const PAGE_SIZE = 50;
+
 const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
@@ -67,22 +70,55 @@ const ContactosContent = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
-  const [convertRawContacto, setConvertRawContacto] = useState<typeof dbContactos[number] | null>(null);
+  const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const { data: dbContactos = [], isLoading } = useQuery({
-    queryKey: ["closers_contacts"],
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [filters]);
+
+  // Server-side paginated query
+  const { data: queryResult, isLoading } = useQuery({
+    queryKey: ["closers_contacts", page, filters],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("closers_contacts")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
+
+      // Server-side filters
+      if (filters.search) {
+        q = q.or(`name.ilike.%${filters.search}%,handle.ilike.%${filters.search}%,ticket_number.ilike.%${filters.search}%`);
+      }
+      if (filters.estado) {
+        // Map display status back to DB status
+        const reverseMap: Record<string, string> = { Nuevo: "new", Contactado: "contacted", Interesado: "interested", Descartado: "not_interested", Convertido: "converted" };
+        const dbStatus = reverseMap[filters.estado] || filters.estado;
+        q = q.eq("status", dbStatus);
+      }
+      if (filters.pais) q = q.eq("country_code", filters.pais);
+      if (filters.categoria) q = q.eq("physical_appearance", filters.categoria);
+      if (filters.dateFrom) q = q.gte("created_at", filters.dateFrom);
+      if (filters.dateTo) {
+        const endOfDay = new Date(filters.dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        q = q.lte("created_at", endOfDay.toISOString());
+      }
+
+      const from = (page - 1) * PAGE_SIZE;
+      q = q.range(from, from + PAGE_SIZE - 1);
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return data;
+      return { data: data ?? [], total: count ?? 0 };
     },
   });
+
+  const dbContactos = queryResult?.data ?? [];
+  const totalCount = queryResult?.total ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   // Resolve created_by UUIDs to profile names
   const creatorIds = useMemo(() => {
@@ -106,7 +142,6 @@ const ContactosContent = () => {
     },
   });
 
-  // Build creators list for filter dropdown (include all unique creators)
   const creatorsList = useMemo(() => {
     const map = new Map<string, string>();
     creatorIds.forEach((id) => {
@@ -119,13 +154,16 @@ const ContactosContent = () => {
     return entries;
   }, [creatorIds, profilesMap]);
 
-  // Fetch interaction counts per contact
+  // Fetch interaction counts for current page contacts
+  const contactIds = useMemo(() => dbContactos.map(c => c.id), [dbContactos]);
   const { data: interactionCounts = {} } = useQuery({
-    queryKey: ["contact_interaction_counts"],
+    queryKey: ["contact_interaction_counts", contactIds],
+    enabled: contactIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contact_interactions")
-        .select("contact_id");
+        .select("contact_id")
+        .in("contact_id", contactIds);
       if (error) throw error;
       const counts: Record<string, number> = {};
       (data ?? []).forEach((r: any) => {
@@ -162,6 +200,12 @@ const ContactosContent = () => {
     })),
   [dbContactos, interactionCounts, profilesMap]);
 
+  // Client-side creadoPor filter (since it's resolved from profiles, not in DB)
+  const filtered = useMemo(() => {
+    if (!filters.creadoPor) return allContactos;
+    return allContactos.filter((c) => c.creadoPor === filters.creadoPor);
+  }, [filters.creadoPor, allContactos]);
+
   const handleView = (c: Contacto) => { setSelectedContacto(c); setViewOpen(true); };
   const handleEdit = (c: Contacto) => { setSelectedContacto(c); setEditOpen(true); };
   const handleConvert = (c: Contacto) => {
@@ -176,48 +220,6 @@ const ContactosContent = () => {
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
 
-  const filtered = useMemo(() => {
-    return allContactos.filter((c) => {
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        if (
-          !c.nombre.toLowerCase().includes(q) &&
-          !c.ticket.toLowerCase().includes(q) &&
-          !c.instagram.toLowerCase().includes(q)
-        ) return false;
-      }
-      if (filters.estado && c.estado !== filters.estado) return false;
-      if (filters.pais && c.pais !== filters.pais) return false;
-      if (filters.categoria && c.categoria !== filters.categoria) return false;
-
-      // Date range filter
-      if (filters.dateFrom || filters.dateTo) {
-        const raw = dbContactos.find((d) => d.id === c.id);
-        const created = new Date(raw?.created_at || "");
-        if (filters.dateFrom && created < new Date(filters.dateFrom)) return false;
-        if (filters.dateTo) {
-          const endOfDay = new Date(filters.dateTo);
-          endOfDay.setHours(23, 59, 59, 999);
-          if (created > endOfDay) return false;
-        }
-      }
-
-      // Creator filter
-      if (filters.creadoPor && c.creadoPor !== filters.creadoPor) return false;
-
-      return true;
-    });
-  }, [filters, allContactos, dbContactos]);
-
-  const totalContactos = allContactos.length;
-  const nuevos = allContactos.filter((c) => c.estado === "Nuevo").length;
-  const convertidos = allContactos.filter((c) => c.estado === "Convertido").length;
-  const esteMes = allContactos.filter((c) => {
-    const now = new Date();
-    const created = new Date(dbContactos.find(d => d.id === c.id)?.created_at || "");
-    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-  }).length;
-
   const hasActiveFilters = !!(filters.search || filters.estado || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
 
   return (
@@ -227,7 +229,7 @@ const ContactosContent = () => {
           <div>
             <h1 className="text-2xl font-bold">Directorio de Contactos</h1>
             <p className="text-sm text-muted-foreground">
-              Total: {totalContactos} contactos
+              Total: {totalCount} contactos
             </p>
           </div>
           {activeTab === "contactos" ? (
@@ -246,10 +248,10 @@ const ContactosContent = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-6">
         <ContactosKPICards
-          total={totalContactos}
-          nuevos={nuevos}
-          convertidos={convertidos}
-          esteMes={esteMes}
+          total={totalCount}
+          nuevos={0}
+          convertidos={0}
+          esteMes={0}
         />
 
         <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
@@ -283,11 +285,20 @@ const ContactosContent = () => {
               creators={creatorsList}
             />
 
-            {view === "table" ? (
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando...</p>
+            ) : view === "table" ? (
               <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
             ) : (
               <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
             )}
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {filtered.length} de {totalCount}
+              </p>
+              <EarningsPagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+            </div>
           </>
         ) : (
           <AgenciasContent />
