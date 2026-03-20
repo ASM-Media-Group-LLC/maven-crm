@@ -194,10 +194,10 @@ const ClosersContent = () => {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden px-6 py-4">
+          <div className="flex-1 px-6 py-4">
             {TABS.map((tab) => (
-              <TabsContent key={tab.value} value={tab.value} className="mt-0 flex-1 flex flex-col min-h-0">
-                <div className="flex-1 min-h-0 overflow-auto">
+              <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                <div>
                   <CloserTable
                     sourceAccounts={sourceAccounts}
                     creators={creators}
