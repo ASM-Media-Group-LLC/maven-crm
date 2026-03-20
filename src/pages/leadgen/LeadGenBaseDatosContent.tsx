@@ -49,7 +49,7 @@ const LeadGenBaseDatosContent = () => {
   const [filterAgente, setFilterAgente] = useState("");
   const [agenteSelectOpen, setAgenteSelectOpen] = useState(false);
   const [filterCalidad, setFilterCalidad] = useState("");
-  const [filterEstado, setFilterEstado] = useState("");
+  
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
