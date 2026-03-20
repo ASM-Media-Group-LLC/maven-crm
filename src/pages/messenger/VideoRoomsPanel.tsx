@@ -105,7 +105,7 @@ export default function VideoRoomsPanel({ rooms, onCreateRoom, onJoinRoom, onClo
       <div className="shrink-0 p-4 space-y-3">
         {/* Quick actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1">
+          <Button onClick={handleCreate} className="h-auto py-3 flex-col gap-1 rounded-2xl">
             <Plus className="h-5 w-5" />
             <span className="text-xs">Nueva sala</span>
           </Button>
