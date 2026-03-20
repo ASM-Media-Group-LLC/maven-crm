@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Pencil, Upload, X, ImageIcon, Film, FileText, Save, Check, ChevronsUpDown, Plus } from "lucide-react";
+import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
