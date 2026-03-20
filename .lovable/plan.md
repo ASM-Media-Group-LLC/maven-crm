@@ -1,63 +1,113 @@
 
+Objetivo: corregir de raíz el patrón de tablas para que en Contactos, Closers y LeadGen se cumplan 3 cosas a la vez: header de columnas sticky real, scrollbar horizontal visible en desktop y paginación siempre visible sin quedar cortada.
 
-## Plan: Fix tables in Closers, Contactos, and LeadGen pagination
+### Hallazgo principal
+El problema no está solo en cada página: está en el componente compartido `src/components/ui/table.tsx`.
 
-### Root cause analysis
-
-**Why sticky headers don't work in Closers/Contactos:**
-The previous fix removed the internal `max-h` + `overflow-auto` from the table wrappers in ContactosTable and LeadTable, delegating scroll to parent flex containers. But `sticky top-0` only works relative to the nearest scrolling ancestor. With the scroll on a distant parent (and intermediate flex wrappers, Radix TabsContent), the sticky positioning breaks. LeadGen works because it has `max-h-[calc(100vh-24rem)] overflow-auto` directly on its table wrapper div.
-
-**Why Closers table is invisible:**
-The `TabsContent` with `flex-1 flex flex-col min-h-0` inside a `flex-1 flex flex-col overflow-hidden` parent likely collapses because Radix TabsContent doesn't naturally participate in flex stretch without explicit height.
-
-**Why LeadGen pagination is cut off:**
-The table has `max-h-[calc(100vh-24rem)]` which is ~`100vh - 384px`. But the KPIs, tabs, and filters above it already take ~400px+, so the table + pagination below it exceeds the viewport. The outer `overflow-auto` div scrolls, but the user has to scroll past the table's internal scroll area to see the pagination — confusing UX.
-
-### Fix strategy: match LeadGen pattern exactly, then fix LeadGen pagination
-
-#### 1. ContactosTable.tsx (line 87)
-Add `max-h-[calc(100vh-20rem)] overflow-auto` to the table wrapper div so it has its own scroll context:
-```
-<div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
-```
-
-#### 2. LeadTable.tsx (line 821)
-Same fix — add internal scroll:
-```
-<div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
-```
-
-#### 3. ContactosContent.tsx (line 292)
-Remove `overflow-auto` from the table's parent wrapper. Change `flex-1 min-h-0 overflow-auto` to `flex-1 min-h-0`:
-```
-<div className="flex-1 min-h-0">
-```
-
-#### 4. ClosersContent.tsx (line 197-200)
-Simplify the content wrapper. Remove `overflow-hidden` from the outer div and `overflow-auto` from the inner div. The table manages its own scroll:
+Hoy `Table` siempre renderiza su propio wrapper:
 ```tsx
-<div className="flex-1 px-6 py-4">
-  {TABS.map((tab) => (
-    <TabsContent key={tab.value} value={tab.value} className="mt-0">
-      <CloserTable ... />
-      <div className="flex items-center justify-between mt-3">
-        {/* pagination */}
-      </div>
-    </TabsContent>
-  ))}
+<div className="relative w-full overflow-x-auto">
+  <table ... />
 </div>
 ```
+pero el `className` se aplica al `<table>`, no a ese wrapper. Por eso intentos como `[&>div]:!overflow-visible` no funcionan realmente y dejan el comportamiento inconsistente:
+- el sticky depende de un scroll container distinto al esperado,
+- el scrollbar lateral no se controla correctamente por módulo,
+- aparecen dobles contextos de scroll,
+- el paginador termina fuera de la zona visible.
 
-#### 5. LeadGenTable.tsx (line 241)
-Reduce `max-h` so the pagination is visible below the table without needing to scroll the outer container:
+### Qué voy a cambiar
+
+#### 1. Arreglar el componente base `Table`
+**Archivo:** `src/components/ui/table.tsx`
+
+Voy a separar responsabilidades para que el wrapper horizontal sí sea configurable desde cada tabla. La corrección más limpia es una de estas dos:
+- agregar props para el wrapper (`containerClassName` / `containerProps`), o
+- simplificar `Table` para que no meta un wrapper fijo y dejar que cada página controle su propio contenedor.
+
+La meta es que cada módulo pueda definir explícitamente:
+- scroll horizontal visible,
+- scroll vertical del área de datos,
+- contexto correcto para sticky.
+
+#### 2. Unificar patrón accesible de tablas con mucha data
+Aplicar el mismo patrón en:
+- `src/pages/contactos/ContactosTable.tsx`
+- `src/pages/closers/components/LeadTable.tsx`
+- `src/pages/leadgen/LeadGenTable.tsx`
+
+Patrón objetivo:
+```text
+outer column layout
+ ├─ filters / KPIs (no sticky de tabla aquí)
+ ├─ table shell
+ │   ├─ horizontal scrollbar visible
+ │   └─ vertical scroll area for rows
+ │       └─ table
+ │           ├─ sticky header row (titles de columnas)
+ │           └─ sticky actions column when exista
+ └─ pagination footer visible debajo de la tabla
 ```
-<div className="max-h-[calc(100vh-28rem)] overflow-auto rounded-lg border border-border">
-```
 
-### Files modified
-- `src/pages/contactos/ContactosTable.tsx` — add internal scroll wrapper
-- `src/pages/closers/components/LeadTable.tsx` — add internal scroll wrapper
-- `src/pages/contactos/ContactosContent.tsx` — remove parent overflow-auto
-- `src/pages/closers/ClosersContent.tsx` — simplify flex wrappers
-- `src/pages/leadgen/LeadGenTable.tsx` — reduce max-h for pagination visibility
+Eso implica:
+- contenedor de tabla con `overflow-x-auto` real y visible,
+- área vertical con `max-h`/`overflow-y-auto` para que el header sticky se adhiera ahí,
+- `TableHead` sticky por celda, no confiar solo en `thead`,
+- `z-index` y fondo sólidos en header y columna de acciones.
 
+#### 3. Corregir Contactos
+**Archivos:**
+- `src/pages/contactos/ContactosContent.tsx`
+- `src/pages/contactos/ContactosTable.tsx`
+- `src/pages/contactos/ContactosFilters.tsx`
+
+Cambios:
+- mantener filtros en una sola línea horizontal con scroll x si hace falta, sin romper el orden visual,
+- dejar la tabla dentro de un shell propio con scroll horizontal visible,
+- fijar la fila de columnas real (`Creación`, `Ticket`, `Nombre`, etc.),
+- dejar el paginador fuera del área que scrollea verticalmente para que siempre sea visible,
+- revisar el `max-h` para que no compita con header/KPIs/filtros.
+
+#### 4. Corregir Closers
+**Archivos:**
+- `src/pages/closers/ClosersContent.tsx`
+- `src/pages/closers/components/LeadTable.tsx`
+
+Cambios:
+- no volver a romper el layout de tabs,
+- mantener filtros y toggles en la misma línea,
+- encapsular la tabla en su propio shell scrolleable,
+- hacer sticky la fila de columnas por `<TableHead>`,
+- conservar columna de acciones sticky a la derecha,
+- dejar paginación completamente visible debajo de la tabla, fuera del scroll vertical de filas.
+
+Además, en Closers hay una causa extra:
+- `useCloserLeads` ya pagina server-side, pero `ClosersContent` muestra `creators.length` del resultado filtrado en cliente. Voy a mantener la paginación visible y coherente con el dataset paginado actual para que no genere confusión.
+
+#### 5. Corregir LeadGen
+**Archivos:**
+- `src/pages/leadgen/LeadGenContent.tsx`
+- `src/pages/leadgen/LeadGenTable.tsx`
+
+Cambios:
+- evitar que el `max-h` de la tabla se coma el espacio del paginador,
+- dejar el paginador siempre debajo y visible,
+- asegurar scrollbar lateral visible en desktop,
+- mantener sticky el header de columnas como referencia visual del dataset.
+
+### Resultado esperado
+- El usuario siempre verá el paginador completo en tablas grandes.
+- El header de columnas permanecerá fijo al hacer scroll vertical dentro de la tabla.
+- El scroll lateral tendrá scrollbar visible y usable en desktop.
+- Contactos, Closers y LeadGen compartirán el mismo patrón accesible y consistente.
+- Se elimina la fragilidad actual causada por el wrapper interno del componente `Table`.
+
+### Archivos a tocar
+- `src/components/ui/table.tsx`
+- `src/pages/contactos/ContactosContent.tsx`
+- `src/pages/contactos/ContactosTable.tsx`
+- `src/pages/contactos/ContactosFilters.tsx`
+- `src/pages/closers/ClosersContent.tsx`
+- `src/pages/closers/components/LeadTable.tsx`
+- `src/pages/leadgen/LeadGenContent.tsx`
+- `src/pages/leadgen/LeadGenTable.tsx`
