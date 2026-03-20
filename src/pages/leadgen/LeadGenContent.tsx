@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import EarningsPagination from "@/pages/sales-performance/EarningsPagination";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
@@ -62,13 +63,17 @@ const LeadGenContent = () => {
   // Date range state with today as default
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [page, setPage] = useState(0);
 
   const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;
   const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : undefined;
 
-  // Fetch entries filtered by date and user scope
+  // Fetch entries filtered by date and user scope — server-side paginated
   const userId = viewMode === "agent" ? user?.id : undefined;
-  const { data: leads = [], isLoading: leadsLoading } = useLeadGenByDateRange(dateFromStr, dateToStr, userId);
+  const { data: paginatedData, isLoading: leadsLoading } = useLeadGenByDateRange(dateFromStr, dateToStr, userId, page);
+  const leads = paginatedData?.data || [];
+  const totalLeads = paginatedData?.total || 0;
+  const totalPages = Math.ceil(totalLeads / 100);
   const { data: profiles = [] } = useLeadGenProfiles();
 
   // Build profiles map
@@ -171,6 +176,7 @@ const LeadGenContent = () => {
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
     setDateTo(to);
+    setPage(0);
   }, []);
 
   // If an agent is selected, show detail view
@@ -202,7 +208,7 @@ const LeadGenContent = () => {
           <div>
             <h1 className="text-2xl font-semibold">LeadGen</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {enrichedLeads.length.toLocaleString()} leads
+              {viewMode === "agent" ? "Tus leads" : "Gestión de leads"} · {totalLeads.toLocaleString()} leads
               {dateFrom && dateTo && (
                 <span className="ml-1">
                   ({format(dateFrom, "d MMM", { locale: es })} — {format(dateTo, "d MMM", { locale: es })})
@@ -341,6 +347,11 @@ const LeadGenContent = () => {
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
+              )}
+              {totalPages > 1 && (
+                <div className="mt-4">
+                  <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
+                </div>
               )}
             </>
           )}

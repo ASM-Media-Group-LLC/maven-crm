@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, subDays, startOfDay, isToday } from "date-fns";
+import { format, subDays, isToday } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ArrowLeft, Search, List, LayoutGrid, Eye, ChevronsUpDown, Check,
-  Database, BarChart3, TrendingUp,
+  Database, BarChart3,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -26,6 +26,7 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandItem,
 } from "@/components/ui/command";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import EarningsPagination from "@/pages/sales-performance/EarningsPagination";
 import { useLeadGenEntries, useLeadGenProfiles } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
@@ -49,11 +50,15 @@ const LeadGenBaseDatosContent = () => {
   const [filterAgente, setFilterAgente] = useState("");
   const [agenteSelectOpen, setAgenteSelectOpen] = useState(false);
   const [filterCalidad, setFilterCalidad] = useState("");
+  const [page, setPage] = useState(0);
   
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
-  const { data: leads = [], isLoading } = useLeadGenEntries();
+  const { data: paginatedData, isLoading } = useLeadGenEntries(page);
+  const leads = paginatedData?.data || [];
+  const totalCount = paginatedData?.total || 0;
+  const totalPages = Math.ceil(totalCount / 100);
   const { data: profiles = [] } = useLeadGenProfiles();
 
   const profilesMap = useMemo(() => {
@@ -83,7 +88,9 @@ const LeadGenBaseDatosContent = () => {
       
       if (dateFrom) {
         const d = new Date(l.created_at);
-        if (d < startOfDay(dateFrom)) return false;
+        const start = new Date(dateFrom);
+        start.setHours(0, 0, 0, 0);
+        if (d < start) return false;
       }
       if (dateTo) {
         const d = new Date(l.created_at);
@@ -159,8 +166,8 @@ const LeadGenBaseDatosContent = () => {
             <p className="text-sm text-muted-foreground mt-1">Todos los leads registrados en el sistema</p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-primary">{leads.length.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">leads</p>
+            <p className="text-3xl font-bold text-primary">{totalCount.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">leads totales</p>
           </div>
         </div>
       </header>
@@ -169,7 +176,7 @@ const LeadGenBaseDatosContent = () => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-4 gap-4">
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">GENERAL</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">Total</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">Con Contacto</p></div></div></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">PÁGINA ACTUAL</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold">{totalLeads.toLocaleString()}</p><p className="text-xs text-muted-foreground">Filtrados</p></div><div><p className="text-2xl font-bold text-primary">{conContacto.toLocaleString()}</p><p className="text-xs text-muted-foreground">Con Contacto</p></div></div></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD ALTA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-emerald-400">{aPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">A+</p></div><div><p className="text-2xl font-bold text-green-400">{aCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">A</p></div></div></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD MEDIA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-yellow-400">{bPlus.toLocaleString()}</p><p className="text-xs text-muted-foreground">B+</p></div><div><p className="text-2xl font-bold text-orange-400">{bCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">B</p></div></div></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground font-medium mb-1">CALIDAD BAJA</p><div className="flex items-baseline gap-4"><div><p className="text-2xl font-bold text-red-400">{cCount.toLocaleString()}</p><p className="text-xs text-muted-foreground">C</p></div></div></CardContent></Card>
@@ -273,7 +280,7 @@ const LeadGenBaseDatosContent = () => {
           {activeTab === "leads" && (
             <>
               <p className="text-sm text-muted-foreground mb-4">
-                Leads Encontrados: <span className="font-semibold text-foreground">{filtered.length.toLocaleString()}</span>
+                Mostrando: <span className="font-semibold text-foreground">{filtered.length}</span> de {totalCount.toLocaleString()} leads (página {page + 1} de {totalPages})
               </p>
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
@@ -281,11 +288,11 @@ const LeadGenBaseDatosContent = () => {
                 </div>
               ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filtered.slice(0, 200).map((lead, idx) => (
+                  {filtered.map((lead, idx) => (
                     <Card key={lead.id} className="hover:border-primary/30 transition-colors">
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                          <span className="text-xs text-muted-foreground">#{page * 100 + idx + 1}</span>
                           <Badge variant="outline" className={calidadColors[lead.quality?.toLowerCase()] || ""}>
                             {lead.quality?.toUpperCase()}
                           </Badge>
@@ -320,9 +327,9 @@ const LeadGenBaseDatosContent = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filtered.slice(0, 500).map((lead, idx) => (
+                          {filtered.map((lead, idx) => (
                             <TableRow key={lead.id}>
-                              <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{page * 100 + idx + 1}</TableCell>
                               <TableCell className="font-medium text-sm max-w-[200px] truncate">@{lead.model_handle}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{profilesMap[lead.lg_user_id] || "—"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{lead.company || "—"}</TableCell>
@@ -346,59 +353,56 @@ const LeadGenBaseDatosContent = () => {
                   </CardContent>
                 </Card>
               )}
+              {totalPages > 1 && (
+                <div className="mt-4">
+                  <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
+                </div>
+              )}
             </>
           )}
 
           {activeTab === "analisis" && (
             <div className="space-y-6">
               <Card>
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Leads por Hora (Hoy)</h3>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={hourlyData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                        <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                <CardContent className="p-6">
+                  <h3 className="text-sm font-semibold mb-4">Leads por Hora (Hoy)</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={hourlyData}>
+                      <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Leads por Día (Última Semana)</h3>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={weeklyData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                        <Bar dataKey="leads" name="Leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                <CardContent className="p-6">
+                  <h3 className="text-sm font-semibold mb-4">Leads Últimos 7 Días</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={weeklyData}>
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="leads" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />Tendencia (Últimos 30 días)</h3>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={monthlyData}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                        <Line type="monotone" dataKey="leads" name="Leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} activeDot={{ r: 5 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                <CardContent className="p-6">
+                  <h3 className="text-sm font-semibold mb-4">Tendencia Últimos 30 Días</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={monthlyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={4} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="leads" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </div>

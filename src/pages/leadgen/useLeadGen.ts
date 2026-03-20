@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 // Only the columns we actually use
@@ -55,88 +55,70 @@ export type LeadGenNote = {
   user_name?: string;
 };
 
-/** Paginated fetch for large tables (79K+ rows) — used by Database page */
-async function fetchAllEntries(): Promise<LeadGenEntry[]> {
-  const PAGE_SIZE = 1000;
-  let allData: LeadGenEntry[] = [];
-  let from = 0;
-  let hasMore = true;
+type PaginatedResult = { data: LeadGenEntry[]; total: number };
 
-  while (hasMore) {
-    const { data, error } = await supabase
-      .from("leadgen_entries")
-      .select(ENTRY_COLUMNS)
-      .order("created_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData = allData.concat(data as unknown as LeadGenEntry[]);
-      if (data.length < PAGE_SIZE) hasMore = false;
-      else from += PAGE_SIZE;
-    }
-  }
-  return allData;
+const PAGE_SIZE = 100;
+
+/** Server-side paginated fetch for Base de Datos page */
+async function fetchEntriesPaginated(page: number): Promise<PaginatedResult> {
+  const from = page * PAGE_SIZE;
+  const { data, error, count } = await supabase
+    .from("leadgen_entries")
+    .select(ENTRY_COLUMNS, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + PAGE_SIZE - 1);
+  if (error) throw error;
+  return { data: (data || []) as unknown as LeadGenEntry[], total: count || 0 };
 }
 
-/** Fetch entries for a specific date range — used by main page */
+/** Server-side paginated fetch by date range — used by main page */
 async function fetchEntriesByDateRange(
   dateFrom: string | undefined,
   dateTo: string | undefined,
-  userId?: string
-): Promise<LeadGenEntry[]> {
-  const PAGE_SIZE = 1000;
-  let allData: LeadGenEntry[] = [];
-  let from = 0;
-  let hasMore = true;
+  userId: string | undefined,
+  page: number
+): Promise<PaginatedResult> {
+  const from = page * PAGE_SIZE;
+  let query = supabase
+    .from("leadgen_entries")
+    .select(ENTRY_COLUMNS, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + PAGE_SIZE - 1);
 
-  while (hasMore) {
-    let query = supabase
-      .from("leadgen_entries")
-      .select(ENTRY_COLUMNS)
-      .order("created_at", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (dateFrom && dateTo) {
-      query = query.gte("entry_date", dateFrom).lte("entry_date", dateTo);
-    }
-
-    if (userId) {
-      query = query.eq("lg_user_id", userId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData = allData.concat(data as unknown as LeadGenEntry[]);
-      if (data.length < PAGE_SIZE) hasMore = false;
-      else from += PAGE_SIZE;
-    }
+  if (dateFrom && dateTo) {
+    query = query.gte("entry_date", dateFrom).lte("entry_date", dateTo);
   }
-  return allData;
+
+  if (userId) {
+    query = query.eq("lg_user_id", userId);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data || []) as unknown as LeadGenEntry[], total: count || 0 };
 }
 
-/** Fetch all entries (for database page) */
-export const useLeadGenEntries = () =>
+/** Fetch all entries with server-side pagination (for database page) */
+export const useLeadGenEntries = (page: number) =>
   useQuery({
-    queryKey: ["leadgen-entries"],
-    queryFn: fetchAllEntries,
+    queryKey: ["leadgen-entries", page],
+    queryFn: () => fetchEntriesPaginated(page),
     staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
-/** Fetch entries by date range with optional user filter */
+/** Fetch entries by date range with server-side pagination */
 export const useLeadGenByDateRange = (
   dateFrom: string | undefined,
   dateTo: string | undefined,
-  userId?: string
+  userId?: string,
+  page: number = 0
 ) =>
   useQuery({
-    queryKey: ["leadgen-entries-range", dateFrom, dateTo, userId],
-    queryFn: () => fetchEntriesByDateRange(dateFrom, dateTo, userId),
+    queryKey: ["leadgen-entries-range", dateFrom, dateTo, userId, page],
+    queryFn: () => fetchEntriesByDateRange(dateFrom, dateTo, userId, page),
     staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
 /** Fetch profiles for agent names */
@@ -183,12 +165,16 @@ function optimisticEntryUpdate(
   id: string,
   patch: Partial<LeadGenEntry>
 ) {
-  for (const key of ["leadgen-entries", "leadgen-entries-range"]) {
-    queryClient.setQueriesData<LeadGenEntry[]>(
-      { queryKey: [key] },
-      (old) => old?.map((e) => (e.id === id ? { ...e, ...patch } : e))
-    );
-  }
+  // Update paginated range queries
+  queryClient.setQueriesData<PaginatedResult>(
+    { queryKey: ["leadgen-entries-range"] },
+    (old) => old ? { ...old, data: old.data.map((e) => (e.id === id ? { ...e, ...patch } : e)) } : old
+  );
+  // Update paginated database queries
+  queryClient.setQueriesData<PaginatedResult>(
+    { queryKey: ["leadgen-entries"] },
+    (old) => old ? { ...old, data: old.data.map((e) => (e.id === id ? { ...e, ...patch } : e)) } : old
+  );
 }
 
 export const useUpdateLeadQuality = () => {

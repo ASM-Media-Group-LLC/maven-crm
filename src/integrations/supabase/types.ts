@@ -5902,6 +5902,13 @@ export type Database = {
           status: string
         }[]
       }
+      get_closer_stage_counts: {
+        Args: { _is_admin: boolean; _user_id: string }
+        Returns: {
+          cnt: number
+          stage: string
+        }[]
+      }
       get_cowork_user_room: {
         Args: { _session_id: string; _user_id: string }
         Returns: string
