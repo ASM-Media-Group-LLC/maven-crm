@@ -259,6 +259,12 @@ export default function ChatView({
           onSendReply={handleSendThreadReply}
           onClose={() => setThreadParent(null)}
           participants={conversation.participants}
+          onEditMessage={onEditMessage}
+          onDeleteMessage={onDeleteMessage}
+          getReactionsForMessage={getReactionsForMessage}
+          onToggleReaction={onToggleReaction}
+          getReadByUsers={getReadByUsers}
+          totalParticipants={conversation.participants.length}
         />
       )}
 
