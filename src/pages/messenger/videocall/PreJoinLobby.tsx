@@ -188,9 +188,24 @@ export default function PreJoinLobby({ roomName, displayName, callDisplayName, o
       }
       if (opId !== bgOpRef.current) return false;
       if (isTemplateBackground(effect)) await preloadTemplate(effect);
+      if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        if (!preloadedRef.current.has(customUrl)) {
+          await new Promise<void>((resolve, reject) => {
+            const img = new Image();
+            img.src = customUrl;
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error("custom-bg-load-failed"));
+          });
+          preloadedRef.current.add(customUrl);
+        }
+      }
       if (opId !== bgOpRef.current) return false;
       if (effect === "blur") {
         await withTimeout(Promise.resolve(processor.switchTo({ mode: "background-blur", blurRadius: 20 })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-blur");
+      } else if (isCustomBackground(effect)) {
+        const customUrl = getCustomBackgroundUrl(effect);
+        await withTimeout(Promise.resolve(processor.switchTo({ mode: "virtual-background", imagePath: customUrl })), PREJOIN_BG_SWITCH_TIMEOUT_MS, "prejoin-bg-custom");
       } else {
         const tpl = BACKGROUND_TEMPLATES.find((t) => t.id === effect);
         if (!tpl) return false;
