@@ -25,7 +25,7 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
   const [camOn, setCamOn] = useState(true);
   const [screenShare, setScreenShare] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  const [layout, setLayout] = useState<"grid" | "spotlight">("grid");
+  
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
