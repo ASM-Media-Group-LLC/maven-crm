@@ -84,23 +84,24 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
   );
 
   return (
-    <div className="max-h-[calc(100vh-20rem)] overflow-auto rounded-lg border border-border">
-      <Table className="min-w-[900px] [&>div]:!overflow-visible">
-        <TableHeader className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
-          <TableRow>
-            <TableHead><SortHeader label="Creación" col="creacion" /></TableHead>
-            <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
-            <TableHead className="max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
-            <TableHead><SortHeader label="Agente" col="creadoPor" /></TableHead>
-            <TableHead><SortHeader label="Estado" col="estado" /></TableHead>
-            <TableHead><SortHeader label="Instagram" col="instagram" /></TableHead>
-            <TableHead><SortHeader label="País" col="pais" /></TableHead>
-            <TableHead><SortHeader label="Categoría" col="categoria" /></TableHead>
-            <TableHead>WhatsApp</TableHead>
-            <TableHead><SortHeader label="Inter." col="interacciones" /></TableHead>
-            <TableHead className="sticky right-0 bg-card z-20"></TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="rounded-lg border border-border overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 20rem)" }}>
+      <div className="overflow-auto flex-1">
+        <Table containerClassName="overflow-visible" className="min-w-[900px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Estado" col="estado" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">WhatsApp</TableHead>
+              <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Inter." col="interacciones" /></TableHead>
+              <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {sorted.map((c) => (
             <TableRow key={c.id}>
@@ -146,7 +147,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 </a>
               </TableCell>
               <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
-              <TableCell className="sticky right-0 bg-card">
+              <TableCell className="sticky right-0 z-10 bg-card">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -176,7 +177,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             </TableRow>
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 };
