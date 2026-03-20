@@ -59,7 +59,8 @@ const EditContactoModal = ({ open, onOpenChange, contacto }: Props) => {
   const [countryCode, setCountryCode] = useState("+57");
   const [phone, setPhone] = useState("");
   const [plataforma, setPlataforma] = useState("Instagram");
-  const [handle, setHandle] = useState("");
+  const [accountLink, setAccountLink] = useState("");
+  const [ticket, setTicket] = useState("");
   const [notas, setNotas] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
   const [extraFiles, setExtraFiles] = useState<UploadedFile[]>([]);
