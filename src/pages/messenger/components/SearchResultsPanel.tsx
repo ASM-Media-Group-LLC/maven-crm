@@ -123,8 +123,8 @@ export default function SearchResultsPanel({
                 <button
                   key={msg.id}
                   className={cn(
-                    "w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-muted/50 transition-colors",
-                    "border-b border-border/50 last:border-b-0",
+                    "w-full text-left px-3 py-2.5 flex gap-2.5 hover:bg-primary/5 transition-colors rounded-2xl mx-1",
+                    "",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                   )}
                   onClick={() => onResultClick(msg.id)}
