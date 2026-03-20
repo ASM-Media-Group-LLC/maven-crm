@@ -93,7 +93,7 @@ const LeadGenBaseDatosContent = () => {
       }
       return true;
     });
-  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, filterEstado, dateFrom, dateTo]);
+  }, [leads, searchTerm, filterAgencia, filterAgente, profilesMap, filterCalidad, dateFrom, dateTo]);
 
   const totalLeads = filtered.length;
   const conContacto = filtered.filter((l) => ["contactado", "cerrado"].includes(l.status)).length;
