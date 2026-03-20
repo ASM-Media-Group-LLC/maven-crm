@@ -68,13 +68,6 @@ export default function VideoCallView({ room, onLeave }: VideoCallViewProps) {
             <Link2 className="h-3.5 w-3.5" />
             Copiar enlace
           </Button>
-          <Button
-            variant="ghost" size="icon"
-            className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]"
-            onClick={() => setLayout(l => l === "grid" ? "spotlight" : "grid")}
-          >
-            {layout === "grid" ? <Grid3X3 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="text-[hsl(0_0%_96%/0.7)] hover:text-[hsl(0_0%_96%)] hover:bg-[hsl(0_0%_100%/0.1)]">
