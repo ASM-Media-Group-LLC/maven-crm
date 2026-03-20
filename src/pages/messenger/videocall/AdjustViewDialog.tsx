@@ -1,4 +1,4 @@
-import { X, LayoutGrid, Grid3X3, Presentation, PanelRight } from "lucide-react";
+import { X, LayoutGrid, Grid3X3, PanelRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
