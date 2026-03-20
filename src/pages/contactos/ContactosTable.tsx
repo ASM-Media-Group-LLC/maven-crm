@@ -85,8 +85,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
 
   return (
     <div className="max-h-[calc(100vh-24rem)] overflow-auto rounded-lg border border-border">
-      <Table>
-        <TableHeader className="sticky top-0 z-10 bg-card">
+      <Table className="min-w-[900px] [&>div]:!overflow-visible">
+        <TableHeader className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
           <TableRow>
             <TableHead><SortHeader label="Creación" col="creacion" /></TableHead>
             <TableHead><SortHeader label="Ticket" col="ticket" /></TableHead>
