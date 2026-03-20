@@ -505,7 +505,7 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
           <>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="icon" className="shrink-0 h-11 w-11 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:bg-primary/8 hover:text-foreground">
                   <Smile className="h-5 w-5" />
                 </Button>
               </PopoverTrigger>
