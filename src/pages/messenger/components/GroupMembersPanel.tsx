@@ -23,10 +23,6 @@ interface GroupMembersPanelProps {
   onMembersChanged: () => void;
 }
 
-function getInitials(name: string) {
-  return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
 export default function GroupMembersPanel({
   conversation, profiles, onClose, onMembersChanged,
 }: GroupMembersPanelProps) {
