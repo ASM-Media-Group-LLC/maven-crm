@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 
-export type LayoutMode = "auto" | "tiled" | "spotlight" | "sidebar";
+export type LayoutMode = "auto" | "tiled" | "sidebar";
 
 export interface ViewSettings {
   layout: LayoutMode;
