@@ -818,8 +818,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <Table>
+    <div className="overflow-auto rounded-lg border border-border max-h-[calc(100vh-24rem)]">
+      <Table className="min-w-[1000px]">
         <TableHeader className="sticky top-0 z-10 bg-background">
           {renderHeaders()}
         </TableHeader>
