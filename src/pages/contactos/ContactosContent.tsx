@@ -289,13 +289,15 @@ const ContactosContent = () => {
             />
             </div>
 
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando...</p>
-            ) : view === "table" ? (
-              <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-            ) : (
-              <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-            )}
+            <div className="flex-1 min-h-0 overflow-auto">
+              {isLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando...</p>
+              ) : view === "table" ? (
+                <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+              ) : (
+                <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
+              )}
+            </div>
 
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
