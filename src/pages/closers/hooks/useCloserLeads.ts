@@ -33,6 +33,7 @@ export interface CloserCreatorRow {
   contact_count: number;
   // Source indicator
   _source: "closer" | "leadgen";
+  _lg_status: string | null;
 }
 
 export const CLOSER_STAGES = [
