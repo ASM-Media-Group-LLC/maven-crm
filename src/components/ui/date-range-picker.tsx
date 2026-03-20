@@ -111,8 +111,16 @@ function DateRangePicker({
 
   const handlePreset = (preset: (typeof presets)[number]) => {
     const value = preset.getValue();
-    setRange(value);
-    syncInputsFromRange(value);
+    if (!value.from && !value.to) {
+      // "Todo" preset — apply immediately
+      setRange(undefined);
+      syncInputsFromRange(undefined);
+      onApply(undefined, undefined);
+      setOpen(false);
+      return;
+    }
+    setRange(value as DateRange);
+    syncInputsFromRange(value as DateRange);
   };
 
   const handleInputFromBlur = () => {
