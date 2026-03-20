@@ -131,6 +131,36 @@ const ParticipantTile = memo(function ParticipantTile({
         attachedAudioTrackRef.current = audioTrack.track;
         audioEl.volume = 1;
 
+        // ── Output gain boost (1.4x ≈ +3dB) to match Google Meet levels ──
+        try {
+          // Clean up previous gain pipeline
+          if (gainSourceRef.current) {
+            try { gainSourceRef.current.disconnect(); } catch {}
+            gainSourceRef.current = null;
+          }
+          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+            try { audioCtxRef.current.close(); } catch {}
+          }
+
+          const ctx = new AudioContext();
+          audioCtxRef.current = ctx;
+
+          if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+          const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
+          gainSourceRef.current = source;
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 1.4;
+          const destination = ctx.createMediaStreamDestination();
+
+          source.connect(gainNode);
+          gainNode.connect(destination);
+
+          audioEl.srcObject = destination.stream;
+        } catch {
+          // Fallback: keep original stream without boost
+        }
+
         // Set audio output device
         const mediaEl = audioEl as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void>; sinkId?: string };
         if (preferredAudioOutputDeviceId && typeof mediaEl.setSinkId === "function" && mediaEl.sinkId !== preferredAudioOutputDeviceId) {
