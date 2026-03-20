@@ -469,7 +469,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead>Último contacto</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Alertas</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right sticky right-0 bg-background z-20">Acciones</TableHead>
           </TableRow>
         );
       case "confirmadas":
