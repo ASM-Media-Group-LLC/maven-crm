@@ -47,7 +47,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
-  const [filterEstado, setFilterEstado] = useState("");
+  
   const [filterContacto, setFilterContacto] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
