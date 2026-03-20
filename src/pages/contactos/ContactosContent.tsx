@@ -277,7 +277,8 @@ const ContactosContent = () => {
 
         {activeTab === "contactos" ? (
           <>
-            <ContactosFilters
+            <div className="shrink-0">
+              <ContactosFilters
               filters={filters}
               onChange={updateFilters}
               view={view}
