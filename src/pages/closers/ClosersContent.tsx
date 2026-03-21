@@ -196,37 +196,33 @@ const ClosersContent = () => {
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
-            {TABS.map((tab) => (
-              <TabsContent key={tab.value} value={tab.value} className="mt-0 flex-1 min-h-0 flex flex-col">
-                <DataTableShell
-                  currentPage={page + 1}
-                  totalPages={totalPages}
-                  totalCount={totalCount}
-                  pageSize={50}
-                  onPageChange={(p) => setPage(p - 1)}
-                >
-                  <CloserTable
-                    sourceAccounts={sourceAccounts}
-                    creators={creators}
-                    activeTab={activeTab}
-                    viewMode={viewMode}
-                    onStageChange={(id, stage, source) => {
-                      if (source === "leadgen") {
-                        convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
-                      } else {
-                        updateStage.mutate({ id, stage });
-                      }
-                    }}
-                    onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
-                    onAssign={(id, assignee, source) => {
-                      setAssignTarget({ id, assignee, source: source || "closer" });
-                      setAssignDialogOpen(true);
-                    }}
-                    isAdmin={isAdmin}
-                  />
-                </DataTableShell>
-              </TabsContent>
-            ))}
+            <DataTableShell
+              currentPage={page + 1}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={50}
+              onPageChange={(p) => setPage(p - 1)}
+            >
+              <CloserTable
+                sourceAccounts={sourceAccounts}
+                creators={creators}
+                activeTab={activeTab}
+                viewMode={viewMode}
+                onStageChange={(id, stage, source) => {
+                  if (source === "leadgen") {
+                    convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
+                  } else {
+                    updateStage.mutate({ id, stage });
+                  }
+                }}
+                onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
+                onAssign={(id, assignee, source) => {
+                  setAssignTarget({ id, assignee, source: source || "closer" });
+                  setAssignDialogOpen(true);
+                }}
+                isAdmin={isAdmin}
+              />
+            </DataTableShell>
           </div>
         </Tabs>
       )}
