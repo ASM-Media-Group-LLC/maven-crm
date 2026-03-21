@@ -64,7 +64,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 key={cat.key}
                 onClick={() => handleClick(cat.key)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all duration-200 cursor-pointer",
+                  "flex flex-col items-center gap-0.5 rounded-lg border p-1.5 transition-all duration-200 cursor-pointer",
                   active
                     ? cat.activeClass
                     : cn("border-border bg-card text-foreground", cat.hoverClass)
