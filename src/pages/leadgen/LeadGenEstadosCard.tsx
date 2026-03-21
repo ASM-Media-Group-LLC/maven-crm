@@ -77,12 +77,12 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
 
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1 p-4">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Estados
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-1 pt-0">
+      <CardContent className="space-y-0.5 p-4 pt-0">
         {estadoConfig.map((estado) => {
           const count = estado.count(leads);
           const active = isActive(estado.key);
@@ -91,7 +91,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
               key={estado.key}
               onClick={() => handleClick(estado.key)}
               className={cn(
-                "group w-full flex items-center gap-3 rounded-md px-3 py-2.5 border-l-[3px] transition-all duration-200 cursor-pointer text-left",
+                "group w-full flex items-center gap-3 rounded-md px-3 py-1.5 border-l-[3px] transition-all duration-200 cursor-pointer text-left",
                 active
                   ? estado.activeClass
                   : cn("border-l-transparent", estado.hoverClass)

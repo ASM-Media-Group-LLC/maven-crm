@@ -48,13 +48,13 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
 
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1 p-4">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid grid-cols-5 gap-1.5 mb-3">
+      <CardContent className="p-4 pt-0">
+        <div className="grid grid-cols-5 gap-1.5 mb-1.5">
           {categoryConfig.map((cat) => {
             const count = counts[cat.key] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
@@ -64,7 +64,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 key={cat.key}
                 onClick={() => handleClick(cat.key)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-lg border p-2 transition-all duration-200 cursor-pointer",
+                  "flex flex-col items-center gap-0.5 rounded-lg border p-1.5 transition-all duration-200 cursor-pointer",
                   active
                     ? cat.activeClass
                     : cn("border-border bg-card text-foreground", cat.hoverClass)
@@ -73,7 +73,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 <span className={cn("text-[10px] font-bold uppercase tracking-wide", active ? "" : "text-muted-foreground")}>
                   {cat.label}
                 </span>
-                <span className="text-xl font-bold tabular-nums leading-none">{count}</span>
+                <span className="text-base font-bold tabular-nums leading-none">{count}</span>
                 <span className={cn("text-[10px] tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>
                   {pct}%
                 </span>
@@ -83,13 +83,13 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
         </div>
 
         <div className="grid grid-cols-2 gap-1.5">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground">Total</span>
-            <span className="text-lg font-bold tabular-nums">{total}</span>
+            <span className="text-sm font-bold tabular-nums">{total}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground">QA</span>
-            <span className="text-lg font-bold tabular-nums text-primary">{qa}</span>
+            <span className="text-sm font-bold tabular-nums text-primary">{qa}</span>
           </div>
         </div>
       </CardContent>
