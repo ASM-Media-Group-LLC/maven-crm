@@ -232,7 +232,7 @@ const LeadGenContent = () => {
       </header>
 
       {/* KPI Cards */}
-      <div className="shrink-0 px-6 py-4">
+      <div className="shrink-0 px-6 py-2">
         <div className="grid grid-cols-2 gap-6">
           <LeadGenCantidadCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
           <LeadGenEstadosCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />

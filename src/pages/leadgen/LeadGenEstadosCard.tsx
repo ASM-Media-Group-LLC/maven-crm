@@ -91,7 +91,7 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
               key={estado.key}
               onClick={() => handleClick(estado.key)}
               className={cn(
-                "group w-full flex items-center gap-3 rounded-md px-3 py-2.5 border-l-[3px] transition-all duration-200 cursor-pointer text-left",
+                "group w-full flex items-center gap-3 rounded-md px-3 py-1.5 border-l-[3px] transition-all duration-200 cursor-pointer text-left",
                 active
                   ? estado.activeClass
                   : cn("border-l-transparent", estado.hoverClass)

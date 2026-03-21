@@ -83,13 +83,13 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
         </div>
 
         <div className="grid grid-cols-2 gap-1.5">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground">Total</span>
-            <span className="text-lg font-bold tabular-nums">{total}</span>
+            <span className="text-sm font-bold tabular-nums">{total}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground">QA</span>
-            <span className="text-lg font-bold tabular-nums text-primary">{qa}</span>
+            <span className="text-sm font-bold tabular-nums text-primary">{qa}</span>
           </div>
         </div>
       </CardContent>
