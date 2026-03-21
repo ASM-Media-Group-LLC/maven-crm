@@ -1512,7 +1512,6 @@ const PromologContent = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
       {/* KPI Detail Modal */}
       <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
