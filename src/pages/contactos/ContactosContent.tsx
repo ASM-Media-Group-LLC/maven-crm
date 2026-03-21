@@ -295,6 +295,7 @@ const ContactosContent = () => {
               </div>
             ) : view === "table" ? (
               <DataTableShell
+                className="flex-1 min-h-0"
                 currentPage={page}
                 totalPages={totalPages}
                 totalCount={totalCount}

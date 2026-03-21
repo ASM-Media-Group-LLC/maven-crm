@@ -43,9 +43,9 @@ const DataTableShell = ({
   const to = Math.min(currentPage * pageSize, totalCount);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className={cn("flex flex-col", className)}>
       {/* Scrollable table area */}
-      <div className={cn("flex-1 min-h-0 overflow-auto rounded-lg border border-border", className)}>
+      <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
         {children}
       </div>
 
