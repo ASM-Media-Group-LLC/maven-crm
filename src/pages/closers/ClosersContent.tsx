@@ -197,7 +197,13 @@ const ClosersContent = () => {
           <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
             {TABS.map((tab) => (
               <TabsContent key={tab.value} value={tab.value} className="mt-0 flex-1 min-h-0 flex flex-col">
-                <div className="flex-1 min-h-0 overflow-auto">
+                <DataTableShell
+                  currentPage={page + 1}
+                  totalPages={totalPages}
+                  totalCount={totalCount}
+                  pageSize={50}
+                  onPageChange={(p) => setPage(p - 1)}
+                >
                   <CloserTable
                     sourceAccounts={sourceAccounts}
                     creators={creators}
@@ -217,23 +223,7 @@ const ClosersContent = () => {
                     }}
                     isAdmin={isAdmin}
                   />
-                </div>
-                <div className="flex items-center justify-between mt-3 shrink-0">
-                  <p className="text-xs text-muted-foreground">
-                    Mostrando {creators.length} de {totalCount}
-                  </p>
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <span className="text-sm text-muted-foreground">{page + 1} / {totalPages}</span>
-                      <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                </DataTableShell>
               </TabsContent>
             ))}
           </div>
