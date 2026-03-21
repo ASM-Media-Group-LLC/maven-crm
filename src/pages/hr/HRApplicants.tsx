@@ -81,6 +81,8 @@ export default function HRApplicants() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [appPage, setAppPage] = useState(1);
+  const [appPageSize, setAppPageSize] = useState(25);
 
   // Modals
   const [viewItem, setViewItem] = useState<ApplicantRecord | null>(null);
