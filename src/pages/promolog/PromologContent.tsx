@@ -617,15 +617,25 @@ const PromologContent = () => {
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
-
-            <div className="space-y-3">
-              {entryView === "list" ? (
-                <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              ) : (
-                <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              )}
-            </div>
+            {entryView === "list" ? (
+              <DataTableShell
+                currentPage={promoPage}
+                totalPages={Math.max(1, Math.ceil(filteredEntries.length / promoPageSize))}
+                totalCount={filteredEntries.length}
+                pageSize={promoPageSize}
+                onPageChange={setPromoPage}
+                onPageSizeChange={(s) => { setPromoPageSize(s); setPromoPage(1); }}
+              >
+                <PromologTable
+                  entries={filteredEntries.slice((promoPage - 1) * promoPageSize, promoPage * promoPageSize)}
+                  onView={handleViewEntry}
+                  onEdit={handleEditEntry}
+                  onDelete={handleDeleteEntry}
+                />
+              </DataTableShell>
+            ) : (
+              <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+            )}
           </>
         )}
 
