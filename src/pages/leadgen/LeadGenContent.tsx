@@ -485,7 +485,6 @@ const LeadGenContent = () => {
             <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
           )}
         </div>
-      </div>
 
       {/* Modals */}
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
