@@ -346,6 +346,7 @@ const LeadGenContent = () => {
               </div>
             ) : (
               <DataTableShell
+                className="flex-1 min-h-0"
                 currentPage={page + 1}
                 totalPages={totalPages}
                 totalCount={filteredLeads.length}
