@@ -439,7 +439,7 @@ const PromologContent = () => {
         </div>
       </header>
 
-      <div className="shrink-0 overflow-auto p-6 space-y-6" style={{ maxHeight: "45vh" }}>
+      <div className="flex-1 overflow-auto p-6 space-y-6">
         {/* KPI Cards - always visible */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
@@ -565,10 +565,8 @@ const PromologContent = () => {
             </Button>
           ))}
         </div>
-      </div>
 
-      {/* Tab content - fills remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-hidden">
+        {/* Tab content */}
         {/* Promos tab */}
         {activeTab === "promos" && (
           <>
