@@ -23,10 +23,12 @@ const emptyFilters: CreadorFilters = {
 const CreadoresContent = () => {
   const [filters, setFilters] = useState<CreadorFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const navigate = useNavigate();
 
-  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers } =
-    useCreadores(filters);
+  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
+    useCreadores(filters, page, pageSize);
 
   const updateFilters = (patch: Partial<CreadorFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
