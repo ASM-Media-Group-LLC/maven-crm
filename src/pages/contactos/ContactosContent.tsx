@@ -15,7 +15,7 @@ import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
 import AgenciasContent from "./AgenciasContent";
 import AddAgenciaModal from "./AddAgenciaModal";
-import EarningsPagination from "../sales-performance/EarningsPagination";
+import DataTableShell from "@/components/ui/data-table-shell";
 
 export interface Contacto {
   id: string;
