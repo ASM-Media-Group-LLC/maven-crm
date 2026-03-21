@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import DataTableShell from "@/components/ui/data-table-shell";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -80,6 +81,8 @@ export default function HRApplicants() {
   const [statusFilter, setStatusFilter] = useState("");
   const [deptTab, setDeptTab] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [appPage, setAppPage] = useState(1);
+  const [appPageSize, setAppPageSize] = useState(25);
 
   // Modals
   const [viewItem, setViewItem] = useState<ApplicantRecord | null>(null);
@@ -231,19 +234,25 @@ export default function HRApplicants() {
 
         {/* ── Table View ──────────────────────────────────────────────────── */}
         {viewMode === "list" ? (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <div className="overflow-auto max-h-[calc(100vh-28rem)]">
+          <DataTableShell
+            currentPage={appPage}
+            totalPages={Math.max(1, Math.ceil(filtered.length / appPageSize))}
+            totalCount={filtered.length}
+            pageSize={appPageSize}
+            onPageChange={setAppPage}
+            onPageSizeChange={(s) => { setAppPageSize(s); setAppPage(1); }}
+          >
               <Table>
                 <TableHeader>
-                  <TableRow className="sticky top-0 z-10 bg-card border-b">
-                    <TableHead className="text-xs font-medium text-muted-foreground">Nombre</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Email</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Posición</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Área</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fuente</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Fecha</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                  <TableRow>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Nombre</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Email</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Posición</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Área</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Fuente</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="sticky top-0 z-10 bg-card text-xs font-medium text-muted-foreground">Estado</TableHead>
+                    <TableHead className="sticky top-0 right-0 z-20 bg-card text-xs font-medium text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -260,7 +269,7 @@ export default function HRApplicants() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((app) => {
+                    filtered.slice((appPage - 1) * appPageSize, appPage * appPageSize).map((app) => {
                       const initials = getInitials(app.full_name);
                       const statusColors = APPLICANT_STATUS_COLORS[app.status] ?? { bg: "bg-muted", text: "text-muted-foreground" };
                       return (
@@ -308,8 +317,7 @@ export default function HRApplicants() {
                   )}
                 </TableBody>
               </Table>
-            </div>
-          </div>
+          </DataTableShell>
         ) : (
           /* ── Grid View ──────────────────────────────────────────────────── */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

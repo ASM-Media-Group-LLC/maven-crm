@@ -15,7 +15,7 @@ import DeleteContactoDialog from "./DeleteContactoDialog";
 import ConvertContactoModal from "./ConvertContactoModal";
 import AgenciasContent from "./AgenciasContent";
 import AddAgenciaModal from "./AddAgenciaModal";
-import EarningsPagination from "../sales-performance/EarningsPagination";
+import DataTableShell from "@/components/ui/data-table-shell";
 
 export interface Contacto {
   id: string;
@@ -289,22 +289,25 @@ const ContactosContent = () => {
             />
             </div>
 
-            <div className="flex-1 min-h-0 overflow-auto">
-              {isLoading ? (
+            {isLoading ? (
+              <div className="flex-1 flex items-center justify-center">
                 <p className="text-sm text-muted-foreground">Cargando...</p>
-              ) : view === "table" ? (
+              </div>
+            ) : view === "table" ? (
+              <DataTableShell
+                currentPage={page}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={50}
+                onPageChange={setPage}
+              >
                 <ContactosTable contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-              ) : (
+              </DataTableShell>
+            ) : (
+              <div className="flex-1 min-h-0 overflow-auto">
                 <ContactosGrid contactos={filtered} onView={handleView} onEdit={handleEdit} onConvert={handleConvert} />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between shrink-0">
-              <p className="text-xs text-muted-foreground">
-                Mostrando {filtered.length} de {totalCount}
-              </p>
-              <EarningsPagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
-            </div>
+              </div>
+            )}
           </>
         ) : (
           <AgenciasContent />

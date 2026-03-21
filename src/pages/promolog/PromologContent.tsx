@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +54,7 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
+import DataTableShell from "@/components/ui/data-table-shell";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -383,6 +384,8 @@ const PromologContent = () => {
   const pendingCreators = filteredCreators.length - completedToday;
 
   const [searchEntry, setSearchEntry] = useState("");
+  const [promoPage, setPromoPage] = useState(1);
+  const [promoPageSize, setPromoPageSize] = useState(25);
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
@@ -614,15 +617,25 @@ const PromologContent = () => {
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground">{filteredEntries.length} entradas</p>
-
-            <div className="space-y-3">
-              {entryView === "list" ? (
-                <PromologTable entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              ) : (
-                <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
-              )}
-            </div>
+            {entryView === "list" ? (
+              <DataTableShell
+                currentPage={promoPage}
+                totalPages={Math.max(1, Math.ceil(filteredEntries.length / promoPageSize))}
+                totalCount={filteredEntries.length}
+                pageSize={promoPageSize}
+                onPageChange={setPromoPage}
+                onPageSizeChange={(s) => { setPromoPageSize(s); setPromoPage(1); }}
+              >
+                <PromologTable
+                  entries={filteredEntries.slice((promoPage - 1) * promoPageSize, promoPage * promoPageSize)}
+                  onView={handleViewEntry}
+                  onEdit={handleEditEntry}
+                  onDelete={handleDeleteEntry}
+                />
+              </DataTableShell>
+            ) : (
+              <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+            )}
           </>
         )}
 

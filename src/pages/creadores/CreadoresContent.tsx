@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import DataTableShell from "@/components/ui/data-table-shell";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
@@ -22,13 +23,17 @@ const emptyFilters: CreadorFilters = {
 const CreadoresContent = () => {
   const [filters, setFilters] = useState<CreadorFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const navigate = useNavigate();
 
-  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers } =
-    useCreadores(filters);
+  const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
+    useCreadores(filters, page, pageSize);
 
-  const updateFilters = (patch: Partial<CreadorFilters>) =>
+  const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -93,7 +98,16 @@ const CreadoresContent = () => {
           />
 
           {view === "table" ? (
-            <CreadoresTable creators={creators} />
+            <DataTableShell
+              currentPage={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            >
+              <CreadoresTable creators={creators} />
+            </DataTableShell>
           ) : (
             <CreadoresGrid creators={creators} />
           )}

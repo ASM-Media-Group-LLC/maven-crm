@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import EarningsPagination from "@/pages/sales-performance/EarningsPagination";
+import DataTableShell from "@/components/ui/data-table-shell";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
@@ -348,17 +348,18 @@ const LeadGenContent = () => {
                 />
               </div>
             ) : (
-              <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
+              <DataTableShell
+                currentPage={page + 1}
+                totalPages={totalPages}
+                totalCount={filteredLeads.length}
+                pageSize={50}
+                onPageChange={(p) => setPage(p - 1)}
+              >
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
                 />
-              </div>
-            )}
-            {totalPages > 1 && (
-              <div className="shrink-0 pt-3">
-                <EarningsPagination currentPage={page + 1} totalPages={totalPages} onPageChange={(p) => setPage(p - 1)} />
-              </div>
+              </DataTableShell>
             )}
           </>
         )}
