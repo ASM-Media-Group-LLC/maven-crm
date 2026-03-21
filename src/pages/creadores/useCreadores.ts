@@ -116,7 +116,7 @@ function applyFilters(creators: CreatorWithBusiness[], filters: CreadorFilters):
   return result;
 }
 
-export function useCreadores(filters: CreadorFilters) {
+export function useCreadores(filters: CreadorFilters, page = 1, pageSize = 25) {
   const query = useQuery({
     queryKey: ["creators"],
     queryFn: fetchCreators,
@@ -124,10 +124,15 @@ export function useCreadores(filters: CreadorFilters) {
 
   const allCreators = query.data ?? [];
   const filtered = applyFilters(allCreators, filters);
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return {
-    creators: filtered,
+    creators: paginated,
     allCreators,
+    totalCount,
+    totalPages,
     isLoading: query.isLoading,
     statusCounts: computeStatusCounts(filtered),
     agencies: uniqueAgencies(allCreators),

@@ -30,8 +30,10 @@ const CreadoresContent = () => {
   const { creators, allCreators, isLoading, statusCounts, agencies, categories, countries, cities, managers, totalCount, totalPages } =
     useCreadores(filters, page, pageSize);
 
-  const updateFilters = (patch: Partial<CreadorFilters>) =>
+  const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
