@@ -964,9 +964,9 @@ const PromologContent = () => {
             })()}
           </div>
         )}
+      </div>
 
-
-        {/* Creators Selection Modal */}
+      {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="pr-8">
