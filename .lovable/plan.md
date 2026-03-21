@@ -1,50 +1,141 @@
 
 
-## Plan: Auditoría y corrección de tablas — LeadGen, Closers, Contactos, Promolog
+## Plan: Estandarizar comportamiento de TODAS las tablas de la plataforma
 
-### Problema raíz encontrado
+### Diagnóstico actual
 
-**LeadGen no carga (nada visible):** El contenido de la tabla (líneas 323-486) está anidado DENTRO del div "Scrollable top controls" (línea 235) que tiene `maxHeight: "45vh"`. Los KPIs, tabs y filtros ya consumen ese espacio, dejando 0px para la tabla. Falta un `</div>` de cierre antes de la sección de contenido de tabs.
+Hay **72 archivos** con tablas en la plataforma. Se dividen en dos categorías:
 
-**Closers no scrollea:** El contenedor de la tabla en `ClosersContent.tsx` (línea 197) usa `flex-1` sin `min-h-0` ni `overflow-auto`. La tabla (`LeadTable.tsx`) no tiene contenedor con scroll propio — depende del padre que no scrollea.
+**Tablas de alto volumen (necesitan paginación + scroll + sticky):**
+- LeadGen, Closers, Contactos — ya tienen paginación server-side pero layout roto
+- Creadores — descarga todo sin paginación
+- Promolog — `.limit(200)` sin paginación real
+- HR Applicants, HR Performance, HR Offboarding, HR Schedules — sin paginación
+- Finanzas Comisiones, Collections — sin paginación
+- Sales Performance (EarningsTable) — ya tiene paginación
 
-**Contactos paginador encima:** El layout en `ContactosContent.tsx` tiene la tabla en `flex-1 min-h-0` pero sin `overflow-auto` en el wrapper de la tabla, así que no hay scroll interno y el paginador flota sin contexto correcto.
+**Tablas pequeñas (config, detalle, auditoría):**
+- Finanzas Configuración, Horas, Announcements detail — pocas filas, no necesitan paginación
 
-**Promolog "ver todo" mal:** `PromologContent.tsx` usa `flex-1 overflow-auto p-6 space-y-6` (línea 439) como un solo contenedor scrollable para TODO (KPIs + cards + tabs + tabla). No hay separación entre controles fijos y tabla scrollable; no tiene paginación.
+### Componente reutilizable: `DataTableShell`
 
-### Correcciones
+Crear un wrapper compartido que encapsule el patrón correcto de una sola vez. Esto evita repetir la misma estructura en cada módulo y garantiza consistencia.
 
-#### 1. LeadGenContent.tsx — cerrar el div correctamente
-- Cerrar el div "Scrollable top controls" (`maxHeight: 45vh`) DESPUÉS de los filtros (línea 320), ANTES del tab content (línea 323).
-- Esto libera el tab content para que ocupe `flex-1 min-h-0` correctamente.
-- Dentro del tab "leads", el wrapper de la tabla debe tener `flex-1 min-h-0 overflow-auto` para scroll vertical con sticky headers.
-- El paginador (`shrink-0 pt-3`) ya está fuera del scroll — solo necesita que el div padre funcione.
+**Archivo:** `src/components/ui/data-table-shell.tsx`
 
-#### 2. ClosersContent.tsx — agregar scroll al contenedor de tabla
-- En línea 197, cambiar `<div className="flex-1 px-6 py-4">` a `<div className="flex-1 min-h-0 overflow-auto px-6 py-4">`.
-- Envolver la tabla `CloserTable` en un div con `overflow-auto` para que tenga scroll vertical+horizontal propio.
-- El paginador (líneas 221-236) ya está fuera de la tabla — moverlo fuera del div scrollable para que sea `shrink-0`.
+Responsabilidades:
+- Contenedor `flex flex-col` con altura controlada
+- Área de scroll interna (`overflow-auto`) donde vive la `<Table>`
+- Footer fijo (`shrink-0`) con: contador "Mostrando X–Y de Z registros" + paginador + selector de filas por página (10/25/50)
+- Props: `currentPage`, `totalPages`, `totalCount`, `pageSize`, `onPageChange`, `onPageSizeChange`, `children` (la tabla)
 
-#### 3. ContactosContent.tsx — scroll interno para la tabla
-- En línea 292, el div `flex-1 min-h-0` necesita `overflow-auto` para que la tabla scrollee dentro de ese espacio.
-- El paginador en líneas 302-307 ya está en un `shrink-0` — solo falta que el contenedor de tabla tenga overflow correcto.
+El componente se encarga de:
+1. Scroll vertical interno con altura máxima relativa al viewport
+2. Scroll horizontal con scrollbar visible (`overflow-x-auto`)
+3. Footer siempre visible fuera del scroll
+4. Contador de resultados alineado a la izquierda, paginador a la derecha
 
-#### 4. PromologContent.tsx — separar controles de tabla
-- El gran `div className="flex-1 overflow-auto p-6 space-y-6"` (línea 439) es un solo bloque scrollable. La tabla de promos queda al final y no tiene paginación.
-- Reestructurar: mantener KPIs + social cards + tab bar en un área `shrink-0` con `overflow-auto max-h` limitada (como LeadGen).
-- Dejar la tabla de promos en `flex-1 min-h-0 overflow-auto` con sus sticky headers.
-- Agregar paginador visible debajo (aunque Promolog hoy trae `.limit(200)`, al menos mostrarlo para los resultados existentes).
+### Cambios por módulo
+
+#### 1. LeadGen (`LeadGenContent.tsx`, `LeadGenTable.tsx`)
+- Envolver `LeadGenTable` en `DataTableShell` con las props de paginación existentes
+- Eliminar el div `shrink-0 pt-3` manual que tiene el `EarningsPagination`
+- La tabla ya tiene sticky headers correctos — solo reorganizar el contenedor
+
+#### 2. Closers (`ClosersContent.tsx`, `LeadTable.tsx`)
+- Envolver `CloserTable` en `DataTableShell`
+- Eliminar el bloque manual de paginación (líneas 221-236 de ClosersContent)
+- La tabla ya tiene sticky headers correctos
+
+#### 3. Contactos (`ContactosContent.tsx`, `ContactosTable.tsx`)
+- Envolver `ContactosTable` en `DataTableShell`
+- Eliminar el bloque manual de paginación (líneas 302-307)
+- La tabla ya tiene sticky headers correctos
+
+#### 4. Creadores (`useCreadores.ts`, `CreadoresContent.tsx`, `CreadoresTable.tsx`)
+- Agregar paginación server-side a `useCreadores`: aceptar `page` y `pageSize`, usar `.range()` + `{ count: "exact" }`
+- Devolver `{ creators, total, totalPages }` desde el hook
+- Agregar estado `page`/`pageSize` en `CreadoresContent`
+- Envolver `CreadoresTable` en `DataTableShell`
+- La tabla ya tiene sticky headers correctos
+
+#### 5. Promolog (`PromologContent.tsx`, `PromologTable.tsx`)
+- Reemplazar `.limit(200)` por paginación server-side con `.range()` + `{ count: "exact" }`
+- Agregar estado `page`/`pageSize` en `PromologContent`
+- Envolver `PromologTable` en `DataTableShell`
+- La tabla ya tiene sticky headers correctos
+
+#### 6. HR Applicants (`HRApplicants.tsx`)
+- Ya tiene `max-h-[calc(100vh-28rem)]` y sticky on `TableRow` (incorrecto — debe ser por celda)
+- Cambiar sticky de `TableRow` a cada `TableHead`
+- Agregar paginación client-side (paginar `filtered` array)
+- Envolver en `DataTableShell`
+
+#### 7. HR Performance (`HRPerformance.tsx`)
+- Misma corrección: sticky por celda + `DataTableShell` con paginación client-side
+
+#### 8. HR Offboarding (`HROffboarding.tsx`)
+- Misma corrección
+
+#### 9. HR Schedules + Chatter Schedules (`HRSchedules.tsx`, `HRChatterSchedules.tsx`)
+- Misma corrección
+
+#### 10. Finanzas Comisiones (`ComisionesPage.tsx`)
+- Agregar paginación client-side + `DataTableShell`
+
+#### 11. Finanzas Collections (`CollectionsPage.tsx`)
+- Agregar paginación client-side + `DataTableShell`
+
+#### 12. Sales Performance EarningsTable
+- Ya tiene paginación — solo envolver en `DataTableShell` para consistencia visual
+
+### Tablas pequeñas (NO tocar paginación)
+- `AuditoriaUsersTable`, `ConfiguracionPage`, `HorasPage`, `AnnouncementDetailModal`
+- Solo corregir sticky headers si aplica (por celda, no por row)
+- No agregar paginación — son tablas de pocas filas
+
+### Especificaciones del `DataTableShell`
+
+```text
+┌──────────────────────────────────────────────┐
+│  overflow-auto (vertical + horizontal)       │
+│  ┌──────────────────────────────────────────┐│
+│  │ Table (min-width para scroll horizontal) ││
+│  │  thead → sticky top-0 z-20 bg-card      ││
+│  │  tbody → datos paginados                 ││
+│  └──────────────────────────────────────────┘│
+├──────────────────────────────────────────────┤
+│  shrink-0 border-t px-4 py-3 bg-background  │
+│  ┌─────────────────┐  ┌───────────────────┐ │
+│  │ Mostrando 1-10  │  │ < 1 2 3 ... 10 > │ │
+│  │ de 124 registros│  │ 10 | 25 | 50     │ │
+│  └─────────────────┘  └───────────────────┘ │
+└──────────────────────────────────────────────┘
+```
+
+### Archivos a crear
+- `src/components/ui/data-table-shell.tsx`
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — mover `</div>` de cierre del scrollable top controls
-- `src/pages/closers/ClosersContent.tsx` — agregar overflow-auto y reestructurar paginador
-- `src/pages/contactos/ContactosContent.tsx` — agregar overflow-auto al wrapper de tabla
-- `src/pages/promolog/PromologContent.tsx` — separar KPIs/filtros de la tabla scrollable
+- `src/pages/leadgen/LeadGenContent.tsx`
+- `src/pages/closers/ClosersContent.tsx`
+- `src/pages/contactos/ContactosContent.tsx`
+- `src/pages/creadores/useCreadores.ts`
+- `src/pages/creadores/CreadoresContent.tsx`
+- `src/pages/promolog/PromologContent.tsx`
+- `src/pages/hr/HRApplicants.tsx`
+- `src/pages/hr/HRPerformance.tsx`
+- `src/pages/hr/HROffboarding.tsx`
+- `src/pages/hr/HRSchedules.tsx`
+- `src/pages/hr/HRChatterSchedules.tsx`
+- `src/pages/finanzas/comisiones/ComisionesPage.tsx`
+- `src/pages/finanzas/collections/CollectionsPage.tsx`
+- `src/pages/sales-performance/EarningsTable.tsx` (o su parent)
 
-### Resultado esperado
-- LeadGen vuelve a mostrar la tabla y el paginador sin estar recortado.
-- Closers scrollea verticalmente y muestra el paginador.
-- Contactos tiene scroll interno en la tabla y el paginador no se monta encima.
-- Promolog separa visualmente los controles fijos de la tabla y deja de verse "terriblemente mal" al hacer scroll.
-- Los sticky headers de columnas funcionan en todas las tablas porque cada una tiene su propio contenedor de scroll.
+### Resultado
+- Todas las tablas con >10 registros tienen paginador visible con contador + selector de pageSize
+- El paginador nunca se corta ni se monta encima de la tabla
+- Headers sticky reales en todas las tablas
+- Scroll horizontal con barra visible en desktop
+- Un solo componente `DataTableShell` controla el patrón — sin variaciones
 
