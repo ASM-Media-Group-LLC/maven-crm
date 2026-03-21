@@ -1,33 +1,34 @@
 
 
-## Plan: Eliminar tabla "fija" en todos los módulos
+## Plan: Compactar stats cards de LeadGen para dar más espacio a la tabla
 
 ### Problema
-`DataTableShell` tiene `flex flex-col flex-1 min-h-0` en su div raíz (línea 46). Esto funciona cuando el parent es un flex container con altura acotada (Contactos, LeadGen, Closers), pero **rompe** en módulos donde la tabla está dentro de un `overflow-auto` general de página (Creadores, Promolog, HR Applicants). En esos casos, `flex-1` no recibe altura del parent, así que la tabla toma altura natural 0 o queda desconectada del scroll de la página.
+Las dos KPI cards (Cantidad y Estados) ocupan demasiado espacio vertical (~200px+), dejando poco espacio para la tabla. En un viewport de 887px, después del header, KPIs, tabs y filtros, quedan apenas ~250px para la tabla — insuficiente para mostrar 5 filas.
 
 ### Solución
-Hacer que `DataTableShell` sea neutro — sin `flex-1 min-h-0` forzado. Los módulos que necesitan que la tabla llene el espacio restante le pasan una clase extra.
+Compactar ambas cards para que ocupen ~50% del espacio actual, pasando de layout vertical a horizontal dentro de cada card.
 
 ### Cambios
 
-#### 1. `src/components/ui/data-table-shell.tsx` (línea 46)
-- Cambiar `<div className="flex flex-col flex-1 min-h-0">` a `<div className={cn("flex flex-col", className)}>` 
-- Mover las clases `flex-1 min-h-0` al scroll area interno solo si el parent lo necesita
-- Mejor aún: el div raíz sea simplemente `flex flex-col` y el scroll area interna sea solo `overflow-auto rounded-lg border` (sin `flex-1 min-h-0`)
-- Los módulos que necesitan stretch (LeadGen, Closers, Contactos) pasan `className="flex-1 min-h-0"` al shell
+#### 1. `LeadGenCantidadCard.tsx`
+- Reducir padding del CardHeader y CardContent (`pb-1`, `p-4 pt-0`)
+- Cambiar los botones de categoría: reducir padding de `p-2` a `p-1.5`, font del número de `text-xl` a `text-base`
+- Reducir la fila Total/QA: padding de `px-3 py-2` a `px-2 py-1`, font de `text-lg` a `text-sm`
+- Reducir `mb-3` a `mb-1.5` entre las dos secciones
 
-#### 2. Módulos con layout flex acotado — agregar `className="flex-1 min-h-0"`
-- `src/pages/leadgen/LeadGenContent.tsx` línea 348: `<DataTableShell className="flex-1 min-h-0" ...>`
-- `src/pages/closers/ClosersContent.tsx` línea 199: `<DataTableShell className="flex-1 min-h-0" ...>`
-- `src/pages/contactos/ContactosContent.tsx` línea 297: `<DataTableShell className="flex-1 min-h-0" ...>`
+#### 2. `LeadGenEstadosCard.tsx`
+- Reducir padding de cada botón de estado de `py-2.5` a `py-1.5`
+- Reducir `space-y-1` a `space-y-0.5`
+- Reducir padding del CardHeader y CardContent (`pb-1`, `p-4 pt-0`)
 
-#### 3. Módulos con scroll de página — sin clase extra (ya fluyen naturalmente)
-- `src/pages/creadores/CreadoresContent.tsx` — sin cambios (ya está en `overflow-auto p-6`)
-- `src/pages/promolog/PromologContent.tsx` — sin cambios
-- `src/pages/hr/HRApplicants.tsx` — sin cambios
+#### 3. `LeadGenContent.tsx` (línea 235)
+- Reducir padding del contenedor de KPIs de `py-4` a `py-2`
 
 ### Resultado
-- En Creadores, Promolog, HR: la tabla fluye dentro del scroll general de la página junto con KPIs y filtros. No queda "fija".
-- En LeadGen, Closers, Contactos: la tabla sigue llenando el espacio restante con scroll interno gracias a `flex-1 min-h-0`.
-- Un solo componente, comportamiento controlado por el parent.
+Las cards pasan de ~200px a ~130px de alto, liberando ~70px adicionales para la tabla — suficiente para mostrar al menos 5 filas de leads con la paginación visible.
+
+### Archivos a modificar
+- `src/pages/leadgen/LeadGenCantidadCard.tsx`
+- `src/pages/leadgen/LeadGenEstadosCard.tsx`
+- `src/pages/leadgen/LeadGenContent.tsx`
 
