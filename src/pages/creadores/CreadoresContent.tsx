@@ -98,7 +98,16 @@ const CreadoresContent = () => {
           />
 
           {view === "table" ? (
-            <CreadoresTable creators={creators} />
+            <DataTableShell
+              currentPage={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            >
+              <CreadoresTable creators={creators} />
+            </DataTableShell>
           ) : (
             <CreadoresGrid creators={creators} />
           )}
