@@ -48,7 +48,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
 
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1 p-4">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
         </CardTitle>
