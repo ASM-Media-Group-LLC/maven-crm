@@ -439,7 +439,7 @@ const PromologContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="shrink-0 overflow-auto p-6 space-y-6" style={{ maxHeight: "45vh" }}>
         {/* KPI Cards - always visible */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
@@ -565,7 +565,10 @@ const PromologContent = () => {
             </Button>
           ))}
         </div>
+      </div>
 
+      {/* Tab content - fills remaining space */}
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-hidden">
         {/* Promos tab */}
         {activeTab === "promos" && (
           <>
@@ -961,9 +964,9 @@ const PromologContent = () => {
             })()}
           </div>
         )}
+      </div>
 
-
-        {/* Creators Selection Modal */}
+      {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="pr-8">
@@ -1509,7 +1512,6 @@ const PromologContent = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
       {/* KPI Detail Modal */}
       <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>

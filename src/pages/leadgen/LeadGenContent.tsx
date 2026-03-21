@@ -231,93 +231,90 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* Scrollable top controls */}
-      <div className="shrink-0 overflow-auto" style={{ maxHeight: "45vh" }}>
-        {/* KPI Cards */}
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-2 gap-6">
-            <LeadGenCantidadCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-            <LeadGenEstadosCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-          </div>
+      {/* KPI Cards */}
+      <div className="shrink-0 px-6 py-4">
+        <div className="grid grid-cols-2 gap-6">
+          <LeadGenCantidadCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+          <LeadGenEstadosCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         </div>
+      </div>
 
-        {/* Tab bar */}
-        <div className="px-6 py-2 flex items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              return (
-                <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
-                </Button>
-              );
-            })}
-          </div>
-          {viewMode !== "agent" && (
-            <Button variant="outline" size="sm" onClick={() => navigate("/leadgen/base-datos")}>
-              <Database className="h-4 w-4" />
-              Base de Datos
-            </Button>
-          )}
+      {/* Tab bar */}
+      <div className="shrink-0 px-6 py-2 flex items-center justify-between gap-4">
+        <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <Button key={tab.id} variant={activeTab === tab.id ? "secondary" : "ghost"} size="sm" onClick={() => setActiveTab(tab.id)} className="text-xs">
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </Button>
+            );
+          })}
         </div>
+        {viewMode !== "agent" && (
+          <Button variant="outline" size="sm" onClick={() => navigate("/leadgen/base-datos")}>
+            <Database className="h-4 w-4" />
+            Base de Datos
+          </Button>
+        )}
+      </div>
 
-        {/* Filters bar */}
-        <div className="px-6 py-3 flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar lead, agente, ticket..."
-              className="pl-9 h-9"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <DateRangePicker
-            from={dateFrom}
-            to={dateTo}
-            onApply={handleDateApply}
-            placeholder="Selecciona fechas"
-            className="h-9"
+      {/* Filters bar */}
+      <div className="shrink-0 px-6 py-3 flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar lead, agente, ticket..."
+            className="pl-9 h-9"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
           />
-          {(activeTab === "leads" || activeTab === "leads-hora") && (
-            <>
-              <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  {QUALITY_OPTIONS.map(q => (
-                    <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  {LEADGEN_COMPANIES.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
-          )}
-          {(activeTab === "leads" || activeTab === "agentes") && (
-            <div className="ml-auto flex gap-1">
-              <Button variant={listView === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("list")}>
-                <List className="h-4 w-4" />
-              </Button>
-              <Button variant={listView === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("grid")}>
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-              {activeTab === "agentes" && (
-                <Button variant={listView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("calendar")}>
-                  <Calendar className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
         </div>
+        <DateRangePicker
+          from={dateFrom}
+          to={dateTo}
+          onApply={handleDateApply}
+          placeholder="Selecciona fechas"
+          className="h-9"
+        />
+        {(activeTab === "leads" || activeTab === "leads-hora") && (
+          <>
+            <Select value={qualityFilter || undefined} onValueChange={(v) => setQualityFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {QUALITY_OPTIONS.map(q => (
+                  <SelectItem key={q.value} value={q.value.toLowerCase()}>{q.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={agencyFilter || undefined} onValueChange={(v) => setAgencyFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Agencia" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {LEADGEN_COMPANIES.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+        {(activeTab === "leads" || activeTab === "agentes") && (
+          <div className="ml-auto flex gap-1">
+            <Button variant={listView === "list" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("list")}>
+              <List className="h-4 w-4" />
+            </Button>
+            <Button variant={listView === "grid" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("grid")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            {activeTab === "agentes" && (
+              <Button variant={listView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-9 w-9" onClick={() => setListView("calendar")}>
+                <Calendar className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tab content - fills remaining space */}
