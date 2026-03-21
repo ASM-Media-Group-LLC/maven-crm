@@ -565,10 +565,8 @@ const PromologContent = () => {
             </Button>
           ))}
         </div>
-      </div>
 
-      {/* Tab content - fills remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-hidden">
+        {/* Tab content */}
         {/* Promos tab */}
         {activeTab === "promos" && (
           <>
