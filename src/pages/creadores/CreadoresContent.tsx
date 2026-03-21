@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import DataTableShell from "@/components/ui/data-table-shell";
 import CreadoresFilters from "./CreadoresFilters";
 import CreadoresTable from "./CreadoresTable";
 import CreadoresGrid from "./CreadoresGrid";
