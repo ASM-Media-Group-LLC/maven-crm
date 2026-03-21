@@ -289,7 +289,7 @@ const ContactosContent = () => {
             />
             </div>
 
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-auto">
               {isLoading ? (
                 <p className="text-sm text-muted-foreground">Cargando...</p>
               ) : view === "table" ? (

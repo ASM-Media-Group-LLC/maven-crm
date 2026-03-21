@@ -317,6 +317,7 @@ const LeadGenContent = () => {
               )}
             </div>
           )}
+        </div>
       </div>
 
       {/* Tab content - fills remaining space */}
