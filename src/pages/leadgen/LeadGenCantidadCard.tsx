@@ -73,7 +73,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 <span className={cn("text-[10px] font-bold uppercase tracking-wide", active ? "" : "text-muted-foreground")}>
                   {cat.label}
                 </span>
-                <span className="text-xl font-bold tabular-nums leading-none">{count}</span>
+                <span className="text-base font-bold tabular-nums leading-none">{count}</span>
                 <span className={cn("text-[10px] tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>
                   {pct}%
                 </span>
