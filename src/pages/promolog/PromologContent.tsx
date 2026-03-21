@@ -383,6 +383,8 @@ const PromologContent = () => {
   const pendingCreators = filteredCreators.length - completedToday;
 
   const [searchEntry, setSearchEntry] = useState("");
+  const [promoPage, setPromoPage] = useState(1);
+  const [promoPageSize, setPromoPageSize] = useState(25);
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
