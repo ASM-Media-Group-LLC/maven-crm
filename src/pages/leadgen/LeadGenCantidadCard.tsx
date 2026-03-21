@@ -53,8 +53,8 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
           Cantidad
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid grid-cols-5 gap-1.5 mb-3">
+      <CardContent className="p-4 pt-0">
+        <div className="grid grid-cols-5 gap-1.5 mb-1.5">
           {categoryConfig.map((cat) => {
             const count = counts[cat.key] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
