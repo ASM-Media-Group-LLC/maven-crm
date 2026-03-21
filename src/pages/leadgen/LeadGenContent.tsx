@@ -317,6 +317,7 @@ const LeadGenContent = () => {
               )}
             </div>
           )}
+        </div>
       </div>
 
       {/* Tab content - fills remaining space */}
@@ -484,7 +485,6 @@ const LeadGenContent = () => {
             <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
           )}
         </div>
-      </div>
 
       {/* Modals */}
       <AddLeadModal open={addLeadOpen} onOpenChange={setAddLeadOpen} />
