@@ -14,7 +14,6 @@ import { useState, useMemo, useEffect } from "react";
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
   { value: "nuevo", label: "Nuevo" },
-  { value: "pendiente_lg", label: "Pendiente LG" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
   { value: "completadas", label: "Completadas" },
