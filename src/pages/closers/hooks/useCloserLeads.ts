@@ -116,8 +116,14 @@ export const useCloserLeads = () => {
         let query = supabase
           .from("closer_creators")
           .select("*", { count: "exact" })
-          .eq("stage", stageValue)
-          .order("created_at", { ascending: false });
+          .eq("stage", stageValue);
+
+        // For "Nuevo" tab, only show rows originating from closers_contacts (not leadgen)
+        if (activeTab === "nuevo") {
+          query = query.not("source_contact_id", "is", null);
+        }
+
+        query = query.order("created_at", { ascending: false });
 
         if (dateFrom && dateTo) {
           const fromStr = dateFrom.toISOString().split("T")[0];

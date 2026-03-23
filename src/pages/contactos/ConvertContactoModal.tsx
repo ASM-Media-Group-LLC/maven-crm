@@ -41,7 +41,7 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
 
       const { error: updateError } = await supabase
         .from("closers_contacts")
-        .update({ status: "Convertido" })
+        .update({ status: "converted" })
         .eq("id", contacto.id);
       if (updateError) throw updateError;
     },
