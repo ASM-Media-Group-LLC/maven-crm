@@ -38,6 +38,7 @@ const stageColor = (s: string) => {
     case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
     case "No interesada": return "bg-destructive/10 text-destructive";
     case "Pendiente LG": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+    case "Nuevo": return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
     default: return "bg-muted text-muted-foreground";
   }
 };
