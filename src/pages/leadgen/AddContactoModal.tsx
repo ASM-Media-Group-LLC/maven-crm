@@ -105,6 +105,7 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
 
       toast({ title: "Contacto guardado exitosamente" });
       queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
       form.reset();
       onOpenChange(false);
     } catch (err: any) {
