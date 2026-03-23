@@ -109,18 +109,21 @@ export const useCloserLeads = () => {
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
     queryFn: async () => {
-      // ── Pendiente LG tab: now uses closer_creators with stage 'Pendiente LG' (auto-synced by trigger) ──
-      if (activeTab === "pendiente_lg") {
+      // ── Pendiente LG tab: closer_creators with stage 'Pendiente LG' ──
+      // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
+      if (activeTab === "pendiente_lg" || activeTab === "nuevo") {
+        const stageValue = activeTab === "nuevo" ? "Nuevo" : "Pendiente LG";
         let query = supabase
           .from("closer_creators")
           .select("*", { count: "exact" })
-          .eq("stage", "Pendiente LG")
+          .eq("stage", stageValue)
           .order("created_at", { ascending: false });
 
         if (dateFrom && dateTo) {
           const fromStr = dateFrom.toISOString().split("T")[0];
           const toStr = dateTo.toISOString().split("T")[0];
-          query = query.gte("passed_date", fromStr).lte("passed_date", toStr);
+          const field = activeTab === "nuevo" ? "created_at" : "passed_date";
+          query = query.gte(field, fromStr).lte(field, toStr);
         }
 
         const from = page * PAGE_SIZE;

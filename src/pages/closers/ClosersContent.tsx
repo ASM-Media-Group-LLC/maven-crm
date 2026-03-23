@@ -91,11 +91,13 @@ const ClosersContent = () => {
                   {tab.label}
                   {statusCounts[
                     tab.value === "todas" ? "" :
+                    tab.value === "nuevo" ? "Nuevo" :
                     tab.value === "asignadas" ? "Asignada" :
                     tab.value === "confirmadas" ? "Confirmada" :
                     tab.value === "completadas" ? "Completada" :
                     "No interesada"
                   ] ? ` (${statusCounts[
+                    tab.value === "nuevo" ? "Nuevo" :
                     tab.value === "asignadas" ? "Asignada" :
                     tab.value === "confirmadas" ? "Confirmada" :
                     tab.value === "completadas" ? "Completada" :
