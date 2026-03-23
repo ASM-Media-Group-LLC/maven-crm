@@ -14,11 +14,11 @@ interface SharedFilesGalleryProps {
 
 type TabType = "all" | "media" | "documents" | "links";
 
+import { formatFileSize as _formatFileSize } from "../uploadUtils";
+
 function formatFileSize(bytes: number | null) {
   if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  return _formatFileSize(bytes);
 }
 
 function formatDate(d: string) {
@@ -154,7 +154,7 @@ export default function SharedFilesGallery({ conversationId, profiles, onClose }
   ];
 
   return (
-    <div className="w-full md:w-[360px] shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
+    <div className="absolute inset-0 sm:inset-y-0 sm:left-auto sm:right-0 z-30 w-full sm:w-[380px] bg-card sm:rounded-l-3xl sm:shadow-xl flex flex-col h-full">
       <div className="flex items-center gap-2 px-4 py-3 bg-primary/[0.03]">
         <FileText className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-semibold flex-1">Archivos compartidos</h3>

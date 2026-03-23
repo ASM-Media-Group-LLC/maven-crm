@@ -53,7 +53,6 @@ export default function ChatView({
   const dragCounterRef = useRef(0);
   const messageInputRef = useRef<MessageInputHandle>(null);
 
-  // Close all side panels except the one being opened
   const closeSidePanels = useCallback((except?: "search" | "thread" | "files" | "members") => {
     if (except !== "search") { setSearchOpen(false); setSearchQuery(""); }
     if (except !== "thread") setThreadParent(null);
@@ -62,7 +61,6 @@ export default function ChatView({
     if (except !== "search") setHighlightedMsgId(null);
   }, []);
 
-  // Messages that are thread replies should only show inside the ThreadPanel
   const mainMessages = useMemo(() => {
     return messages.filter(m => {
       if (!m.reply_to_id) return true;
@@ -144,9 +142,11 @@ export default function ChatView({
     }
   }, []);
 
+  const hasSidePanel = searchOpen || (threadParent && !showSharedFiles) || showSharedFiles || (showGroupMembers && conversation.type === "group");
+
   return (
     <div
-      className="flex h-full bg-background relative"
+      className="flex flex-col h-full bg-background relative"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -163,106 +163,115 @@ export default function ChatView({
         </div>
       )}
 
-      <div className="flex flex-col flex-1 min-w-0">
-        <ChatHeader
-          conversation={conversation}
-          profiles={profiles}
-          typingUsers={typingUsers}
-          onSearchToggle={() => {
-            if (searchOpen) {
-              closeSidePanels();
-            } else {
-              closeSidePanels("search");
-              setSearchOpen(true);
-            }
-          }}
-          onBack={onBack}
-          onStartVideoCall={onStartVideoCall}
-          onOpenNotificationSettings={() => setShowNotifSettings(true)}
-          onOpenSharedFiles={() => { closeSidePanels("files"); setShowSharedFiles(true); }}
-          onOpenGroupMembers={() => { closeSidePanels("members"); setShowGroupMembers(true); }}
-          onAvatarChanged={onMembersChanged}
-        />
+      <ChatHeader
+        conversation={conversation}
+        profiles={profiles}
+        typingUsers={typingUsers}
+        onSearchToggle={() => {
+          if (searchOpen) {
+            closeSidePanels();
+          } else {
+            closeSidePanels("search");
+            setSearchOpen(true);
+          }
+        }}
+        onBack={onBack}
+        onStartVideoCall={onStartVideoCall}
+        onOpenNotificationSettings={() => setShowNotifSettings(true)}
+        onOpenSharedFiles={() => { closeSidePanels("files"); setShowSharedFiles(true); }}
+        onOpenGroupMembers={() => { closeSidePanels("members"); setShowGroupMembers(true); }}
+        onAvatarChanged={onMembersChanged}
+      />
 
-        <MessageList
-          messages={mainMessages}
-          profiles={profiles}
-          chatType={conversation.type}
-          currentUserId={user?.id}
-          searchQuery={searchQuery}
-          loading={loading}
-          onReply={setReplyTo}
-          onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
-          onEdit={onEditMessage}
-          onDelete={onDeleteMessage}
-          getReactionsForMessage={getReactionsForMessage}
-          onToggleReaction={onToggleReaction}
-          getReadByUsers={getReadByUsers}
-          totalParticipants={conversation.participants.length}
-          highlightedMsgId={highlightedMsgId}
-          onOpenThread={handleOpenThreadWithTracking}
-          getThreadCount={getThreadCount}
-          getUnreadThreadCount={getUnreadThreadCount}
-          hasMore={hasMore}
-          loadingMore={loadingMore}
-          onLoadMore={onLoadMore}
-        />
+      <MessageList
+        messages={mainMessages}
+        profiles={profiles}
+        chatType={conversation.type}
+        currentUserId={user?.id}
+        searchQuery={searchQuery}
+        loading={loading}
+        onReply={setReplyTo}
+        onCopy={(content) => { navigator.clipboard.writeText(content); toast.success("Copiado"); }}
+        onEdit={onEditMessage}
+        onDelete={onDeleteMessage}
+        getReactionsForMessage={getReactionsForMessage}
+        onToggleReaction={onToggleReaction}
+        getReadByUsers={getReadByUsers}
+        totalParticipants={conversation.participants.length}
+        highlightedMsgId={highlightedMsgId}
+        onOpenThread={handleOpenThreadWithTracking}
+        getThreadCount={getThreadCount}
+        getUnreadThreadCount={getUnreadThreadCount}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
+      />
 
-        <MessageInput
-          ref={messageInputRef}
-          onSendMessage={onSendMessage}
-          onSendTyping={onSendTyping}
-          replyTo={replyTo}
-          profiles={profiles}
-          onCancelReply={() => setReplyTo(null)}
-          participants={conversation.participants}
-          chatType={conversation.type}
-        />
-      </div>
+      <MessageInput
+        ref={messageInputRef}
+        onSendMessage={onSendMessage}
+        onSendTyping={onSendTyping}
+        replyTo={replyTo}
+        profiles={profiles}
+        onCancelReply={() => setReplyTo(null)}
+        participants={conversation.participants}
+        chatType={conversation.type}
+      />
 
-      {searchOpen && (
-        <SearchResultsPanel
-          messages={messages}
-          profiles={profiles}
-          onResultClick={handleSearchResultClick}
-          onClose={() => closeSidePanels()}
-          onQueryChange={setSearchQuery}
-        />
-      )}
+      {/* Side panel overlay — all panels render as absolute overlays */}
+      {hasSidePanel && (
+        <>
+          {/* Backdrop for mobile */}
+          <div
+            className="absolute inset-0 z-20 bg-black/20 sm:hidden"
+            onClick={() => closeSidePanels()}
+          />
 
-      {threadParent && !showSharedFiles && (
-        <ThreadPanel
-          parentMessage={threadParent}
-          replies={threadReplies}
-          profiles={profiles}
-          currentUserId={user?.id}
-          onSendReply={handleSendThreadReply}
-          onClose={() => setThreadParent(null)}
-          participants={conversation.participants}
-          onEditMessage={onEditMessage}
-          onDeleteMessage={onDeleteMessage}
-          getReactionsForMessage={getReactionsForMessage}
-          onToggleReaction={onToggleReaction}
-          getReadByUsers={getReadByUsers}
-          totalParticipants={conversation.participants.length}
-        />
-      )}
+          {searchOpen && (
+            <SearchResultsPanel
+              messages={messages}
+              profiles={profiles}
+              onResultClick={handleSearchResultClick}
+              onClose={() => closeSidePanels()}
+              onQueryChange={setSearchQuery}
+            />
+          )}
 
-      {showSharedFiles && (
-        <SharedFilesGallery
-          conversationId={conversation.id}
-          profiles={profiles}
-          onClose={() => setShowSharedFiles(false)}
-        />
-      )}
+          {threadParent && !showSharedFiles && (
+            <ThreadPanel
+              parentMessage={threadParent}
+              replies={threadReplies}
+              profiles={profiles}
+              currentUserId={user?.id}
+              onSendReply={handleSendThreadReply}
+              onClose={() => setThreadParent(null)}
+              participants={conversation.participants}
+              onEditMessage={onEditMessage}
+              onDeleteMessage={onDeleteMessage}
+              getReactionsForMessage={getReactionsForMessage}
+              onToggleReaction={onToggleReaction}
+              getReadByUsers={getReadByUsers}
+              totalParticipants={conversation.participants.length}
+            />
+          )}
 
-      {showGroupMembers && conversation.type === "group" && (
-        <GroupMembersPanel
-          conversation={conversation}
-          profiles={profiles}
-          onClose={() => setShowGroupMembers(false)}
-          onMembersChanged={() => { onMembersChanged?.(); }}
-        />
+          {showSharedFiles && (
+            <SharedFilesGallery
+              conversationId={conversation.id}
+              profiles={profiles}
+              onClose={() => setShowSharedFiles(false)}
+            />
+          )}
+
+          {showGroupMembers && conversation.type === "group" && (
+            <GroupMembersPanel
+              conversation={conversation}
+              profiles={profiles}
+              onClose={() => setShowGroupMembers(false)}
+              onMembersChanged={() => { onMembersChanged?.(); }}
+            />
+          )}
+        </>
       )}
 
       {showNotifSettings && (

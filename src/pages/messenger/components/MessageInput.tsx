@@ -12,23 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
 
-const EMOJIS = [
-  "😀","😂","😍","🥰","😎","🤔","👍","👋","🎉","🔥",
-  "❤️","💯","🚀","✅","⭐","💪","🙏","😊","🤩","👏",
-  "😅","🫡","🤝","💀","🥲","😤","🤓","🫠","🙌","💜",
-];
-
-const MAX_FILES = 20;
-const MAX_FILE_SIZE_MB = 350;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const TUS_CHUNK_SIZE_BYTES = 6 * 1024 * 1024;
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+import { EMOJIS, MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
 interface PendingFile {
   file: File;
@@ -95,185 +79,13 @@ const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(({
     addFiles: addFilesInternal,
   }), [addFilesInternal]);
 
-  // TUS resumable upload with 6MB chunks, retry logic, and progress for large files
+  // TUS resumable upload using shared utility
   const uploadFileWithProgress = useCallback(async (file: File, path: string): Promise<{ error: string | null }> => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
-
-    if (!token) return { error: "No auth session" };
-    if (!apikey) return { error: "Missing Supabase publishable key" };
-    if (!projectId) return { error: "Missing Supabase project id" };
-
-    const tusEndpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
-
-    console.log("[TUS] Starting upload:", { fileName: file.name, fileSize: file.size, fileSizeMB: (file.size / 1024 / 1024).toFixed(1), path, endpoint: tusEndpoint });
-
-    // Base64 metadata per TUS spec
-    const b64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
-    const uploadMetadata = [
-      `bucketName ${b64("chat-files")}`,
-      `objectName ${b64(path)}`,
-      `contentType ${b64(file.type || "application/octet-stream")}`,
-      `cacheControl ${b64("3600")}`,
-    ].join(",");
-
-    try {
-      // Step 1: Create TUS upload session
-      console.log("[TUS] Creating upload session...");
-      const createRes = await fetch(tusEndpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          apikey,
-          "x-upsert": "true",
-          "Upload-Length": String(file.size),
-          "Upload-Metadata": uploadMetadata,
-          "Tus-Resumable": "1.0.0",
-        },
-      });
-
-      if (!createRes.ok) {
-        let detail = `HTTP ${createRes.status}`;
-        try {
-          const text = await createRes.text();
-          console.error("[TUS] Create session failed - raw response:", text);
-          try {
-            const body = JSON.parse(text);
-            detail = body.message || body.error || body.statusCode || detail;
-          } catch {
-            detail = text.substring(0, 200) || detail;
-          }
-        } catch {}
-        console.error("[TUS] Create session failed:", createRes.status, detail);
-        if (createRes.status === 413 || detail.toLowerCase().includes("maximum allowed size") || detail.toLowerCase().includes("payload too large")) {
-          return {
-            error:
-              "El archivo excede el límite de Storage del proyecto. Ve a Supabase Dashboard > Storage > Settings y aumenta el 'Global file size limit' (mín. 367001600 bytes para 350MB).",
-          };
-        }
-        return { error: `Error al iniciar subida: ${detail}` };
-      }
-
-      const location = createRes.headers.get("Location");
-      if (!location) {
-        console.error("[TUS] No Location header in response. Headers:", [...createRes.headers.entries()]);
-        return { error: "No upload location returned by server" };
-      }
-
-      const uploadUrl = location.startsWith("http") ? location : new URL(location, tusEndpoint).toString();
-      console.log("[TUS] Upload session created. Location:", uploadUrl);
-
-      // Step 2: Upload chunks with retry
-      const MAX_RETRIES = 3;
-      let offset = 0;
-      const totalChunks = Math.ceil(file.size / TUS_CHUNK_SIZE_BYTES);
-      let chunkIndex = 0;
-
-      while (offset < file.size) {
-        chunkIndex++;
-        const chunkEnd = Math.min(offset + TUS_CHUNK_SIZE_BYTES, file.size);
-        const chunk = file.slice(offset, chunkEnd);
-        const currentOffset = offset;
-
-        console.log(`[TUS] Uploading chunk ${chunkIndex}/${totalChunks} (offset: ${currentOffset}, size: ${chunk.size})`);
-
-        let lastError: string | null = null;
-        let succeeded = false;
-
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-          if (attempt > 1) {
-            console.log(`[TUS] Retry attempt ${attempt}/${MAX_RETRIES} for chunk ${chunkIndex}`);
-            setUploadProgress(`Reintentando chunk ${chunkIndex}/${totalChunks} (intento ${attempt})...`);
-            await new Promise(r => setTimeout(r, 1000 * attempt)); // backoff
-          }
-
-          const chunkResult = await new Promise<{ error: string | null; nextOffset: number }>((resolve) => {
-            const xhr = new XMLHttpRequest();
-            abortRef.current = xhr;
-
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                const uploaded = currentOffset + e.loaded;
-                setUploadPercent(Math.min(99, Math.round((uploaded / file.size) * 100)));
-              }
-            };
-
-            xhr.onload = () => {
-              abortRef.current = null;
-              if (xhr.status >= 200 && xhr.status < 300) {
-                const nextOffsetHeader = xhr.getResponseHeader("Upload-Offset");
-                const nextOffset = Number(nextOffsetHeader ?? currentOffset + chunk.size);
-                console.log(`[TUS] Chunk ${chunkIndex} uploaded. Server offset: ${nextOffsetHeader}, nextOffset: ${nextOffset}`);
-                resolve({ error: null, nextOffset: Number.isFinite(nextOffset) ? nextOffset : currentOffset + chunk.size });
-              } else {
-                let detail = `HTTP ${xhr.status}`;
-                try {
-                  const body = JSON.parse(xhr.responseText);
-                  detail = body.message || body.error || detail;
-                } catch {
-                  detail = xhr.responseText?.substring(0, 200) || detail;
-                }
-                console.error(`[TUS] Chunk ${chunkIndex} failed (attempt ${attempt}):`, xhr.status, detail);
-                resolve({ error: detail, nextOffset: currentOffset });
-              }
-            };
-
-            xhr.onerror = () => {
-              abortRef.current = null;
-              console.error(`[TUS] Chunk ${chunkIndex} network error (attempt ${attempt})`);
-              resolve({ error: "Error de red — verifica tu conexión", nextOffset: currentOffset });
-            };
-
-            xhr.onabort = () => {
-              abortRef.current = null;
-              resolve({ error: "cancelled", nextOffset: currentOffset });
-            };
-
-            xhr.timeout = 120000; // 2min per chunk
-            xhr.ontimeout = () => {
-              abortRef.current = null;
-              console.error(`[TUS] Chunk ${chunkIndex} timeout (attempt ${attempt})`);
-              resolve({ error: "Timeout — conexión lenta", nextOffset: currentOffset });
-            };
-
-            xhr.open("PATCH", uploadUrl);
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-            xhr.setRequestHeader("apikey", apikey);
-            xhr.setRequestHeader("Content-Type", "application/offset+octet-stream");
-            xhr.setRequestHeader("Upload-Offset", String(currentOffset));
-            xhr.setRequestHeader("Tus-Resumable", "1.0.0");
-            xhr.send(chunk);
-          });
-
-          if (chunkResult.error === "cancelled") {
-            return { error: "cancelled" };
-          }
-
-          if (!chunkResult.error) {
-            offset = chunkResult.nextOffset;
-            setUploadPercent(Math.min(99, Math.round((offset / file.size) * 100)));
-            succeeded = true;
-            break;
-          }
-
-          lastError = chunkResult.error;
-        }
-
-        if (!succeeded) {
-          console.error(`[TUS] Chunk ${chunkIndex} failed after ${MAX_RETRIES} attempts:`, lastError);
-          return { error: `Error en chunk ${chunkIndex}/${totalChunks}: ${lastError}` };
-        }
-      }
-
-      setUploadPercent(100);
-      console.log("[TUS] Upload completed successfully:", path);
-      return { error: null };
-    } catch (err: any) {
-      console.error("[TUS] Unexpected error:", err);
-      return { error: err.message || "Error inesperado en la subida" };
-    }
+    return uploadFileWithTUS(file, path, {
+      onProgress: setUploadPercent,
+      onStatusText: setUploadProgress,
+      abortRef,
+    });
   }, []);
 
   const cancelUpload = useCallback(() => {
