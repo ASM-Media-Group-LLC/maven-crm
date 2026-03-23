@@ -77,87 +77,11 @@ export default function ThreadPanel({
 
   // --- File upload (TUS) ---
   const uploadFileWithProgress = useCallback(async (file: File, path: string): Promise<{ error: string | null }> => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
-    if (!token) return { error: "No auth session" };
-    if (!apikey) return { error: "Missing Supabase publishable key" };
-    if (!projectId) return { error: "Missing Supabase project id" };
-
-    const tusEndpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
-    const b64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
-    const uploadMetadata = [
-      `bucketName ${b64("chat-files")}`,
-      `objectName ${b64(path)}`,
-      `contentType ${b64(file.type || "application/octet-stream")}`,
-      `cacheControl ${b64("3600")}`,
-    ].join(",");
-
-    try {
-      const createRes = await fetch(tusEndpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`, apikey, "x-upsert": "true",
-          "Upload-Length": String(file.size), "Upload-Metadata": uploadMetadata, "Tus-Resumable": "1.0.0",
-        },
-      });
-      if (!createRes.ok) {
-        let detail = `HTTP ${createRes.status}`;
-        try { const t = await createRes.text(); detail = t.substring(0, 200) || detail; } catch {}
-        return { error: `Error al iniciar subida: ${detail}` };
-      }
-      const location = createRes.headers.get("Location");
-      if (!location) return { error: "No upload location returned" };
-      const uploadUrl = location.startsWith("http") ? location : new URL(location, tusEndpoint).toString();
-
-      let offset = 0;
-      const totalChunks = Math.ceil(file.size / TUS_CHUNK_SIZE_BYTES);
-      let chunkIndex = 0;
-      while (offset < file.size) {
-        chunkIndex++;
-        const chunkEnd = Math.min(offset + TUS_CHUNK_SIZE_BYTES, file.size);
-        const chunk = file.slice(offset, chunkEnd);
-        const currentOffset = offset;
-        let succeeded = false;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          if (attempt > 1) {
-            setUploadProgress(`Reintentando chunk ${chunkIndex}/${totalChunks}...`);
-            await new Promise(r => setTimeout(r, 1000 * attempt));
-          }
-          const result = await new Promise<{ error: string | null; nextOffset: number }>((resolve) => {
-            const xhr = new XMLHttpRequest();
-            abortRef.current = xhr;
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) setUploadPercent(Math.min(99, Math.round(((currentOffset + e.loaded) / file.size) * 100)));
-            };
-            xhr.onload = () => {
-              abortRef.current = null;
-              if (xhr.status >= 200 && xhr.status < 300) {
-                const no = Number(xhr.getResponseHeader("Upload-Offset") ?? currentOffset + chunk.size);
-                resolve({ error: null, nextOffset: Number.isFinite(no) ? no : currentOffset + chunk.size });
-              } else resolve({ error: `HTTP ${xhr.status}`, nextOffset: currentOffset });
-            };
-            xhr.onerror = () => { abortRef.current = null; resolve({ error: "Error de red", nextOffset: currentOffset }); };
-            xhr.onabort = () => { abortRef.current = null; resolve({ error: "cancelled", nextOffset: currentOffset }); };
-            xhr.timeout = 120000;
-            xhr.ontimeout = () => { abortRef.current = null; resolve({ error: "Timeout", nextOffset: currentOffset }); };
-            xhr.open("PATCH", uploadUrl);
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-            xhr.setRequestHeader("apikey", apikey);
-            xhr.setRequestHeader("Content-Type", "application/offset+octet-stream");
-            xhr.setRequestHeader("Upload-Offset", String(currentOffset));
-            xhr.setRequestHeader("Tus-Resumable", "1.0.0");
-            xhr.send(chunk);
-          });
-          if (result.error === "cancelled") return { error: "cancelled" };
-          if (!result.error) { offset = result.nextOffset; succeeded = true; break; }
-        }
-        if (!succeeded) return { error: `Error en chunk ${chunkIndex}` };
-      }
-      setUploadPercent(100);
-      return { error: null };
-    } catch (err: any) { return { error: err.message || "Error inesperado" }; }
+    return uploadFileWithTUS(file, path, {
+      onProgress: setUploadPercent,
+      onStatusText: setUploadProgress,
+      abortRef,
+    });
   }, []);
 
   const handleFileUploadAndSend = useCallback(async (file: File) => {
