@@ -50,6 +50,7 @@ const countryCodes = [
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<ContactoFormValues>({
     resolver: zodResolver(contactoSchema),
