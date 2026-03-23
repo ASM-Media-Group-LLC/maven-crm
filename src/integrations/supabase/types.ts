@@ -938,6 +938,7 @@ export type Database = {
           phone: string | null
           rejection_reason: string | null
           source_account: string | null
+          source_contact_id: string | null
           stage: string
           updated_at: string
         }
@@ -964,6 +965,7 @@ export type Database = {
           phone?: string | null
           rejection_reason?: string | null
           source_account?: string | null
+          source_contact_id?: string | null
           stage?: string
           updated_at?: string
         }
@@ -990,6 +992,7 @@ export type Database = {
           phone?: string | null
           rejection_reason?: string | null
           source_account?: string | null
+          source_contact_id?: string | null
           stage?: string
           updated_at?: string
         }
@@ -1006,6 +1009,13 @@ export type Database = {
             columns: ["leadgen_entry_id"]
             isOneToOne: false
             referencedRelation: "leadgen_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closer_creators_source_contact_id_fkey"
+            columns: ["source_contact_id"]
+            isOneToOne: true
+            referencedRelation: "closers_contacts"
             referencedColumns: ["id"]
           },
         ]
