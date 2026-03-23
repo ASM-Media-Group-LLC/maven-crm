@@ -48,6 +48,8 @@ const ConvertContactoModal = ({ open, onOpenChange, contacto, onConverted }: Pro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closers_contacts"] });
       queryClient.invalidateQueries({ queryKey: ["creators"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       toast({ title: "Contacto convertido", description: "El creador fue creado exitosamente." });
       onConverted();
     },
