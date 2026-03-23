@@ -785,11 +785,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
-            <TableCell>
-              <Badge variant="outline" className="text-xs">{(c as any)._lg_status || "—"}</Badge>
-            </TableCell>
+            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.main_platform || "—"}</TableCell>
             <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
             <TableCell>
