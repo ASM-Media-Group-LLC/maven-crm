@@ -1,43 +1,31 @@
 
 
-## Plan: Sincronizar contactos nuevos hacia Closers
+## Plan: Contactos de agentes → Closers con estado "Nuevo"
 
-### Problema raíz
-Existen **dos tablas independientes** que no se comunican:
-- `closers_contacts` — donde escribe AddContactoModal y donde lee /contactos
-- `closer_creators` — donde lee /closers
-
-Cuando un agente crea un contacto desde LeadGen (AddContactoModal), se inserta en `closers_contacts` pero **nunca llega a `closer_creators`**, por lo que no aparece en Closers.
-
-### Solución
-Crear un **trigger de base de datos** que sincronice automáticamente cada nuevo registro de `closers_contacts` hacia `closer_creators`, similar al trigger existente `auto_sync_leadgen_to_closers` que sincroniza `leadgen_entries → closer_creators`.
+### Problema
+El trigger `sync_closers_contact_to_creators` ya sincroniza `closers_contacts` → `closer_creators`, pero usa stage **"Pendiente LG"**, mezclando los ~472 contactos de agentes con los 81K+ leads de LeadGen. No hay forma de distinguirlos.
 
 ### Cambios
 
-#### 1. Migración SQL: Trigger `sync_closers_contact_to_creators`
-Crear una función + trigger en `closers_contacts` que al hacer INSERT:
-- Inserte en `closer_creators` con stage **"Pendiente LG"** (mismo flujo que LeadGen)
-- Mapeo de campos:
-  - `handle` → `instagram_handle`
-  - `company` → `source_account`
-  - `physical_appearance` → `category`
-  - `phone` → `phone`
-  - `notes` → `notes`
-  - `created_by` → `created_by`
-- Manejo de `UNIQUE VIOLATION` para evitar duplicados (igual que el trigger existente)
+#### 1. Migración SQL
+- **Actualizar función** `sync_closers_contact_to_creators`: cambiar stage de `'Pendiente LG'` a `'Nuevo'`
+- **Corregir registros existentes**: `UPDATE closer_creators SET stage = 'Nuevo' WHERE leadgen_entry_id IS NULL AND stage = 'Pendiente LG'` — los que no vienen de LeadGen pasan a "Nuevo"
 
-#### 2. Backfill de registros existentes
-Un segundo statement en la misma migración que inserte los `closers_contacts` ya existentes que no tengan correspondencia en `closer_creators` (por handle), para que los contactos creados antes de este fix también aparezcan en Closers.
+#### 2. Hook: agregar stage "Nuevo" (`useCloserLeads.ts`)
+- Agregar `"Nuevo"` a `STAGE_LABELS`
+- Agregar `nuevo: ["Nuevo"]` a `TAB_STAGE_MAP`
 
-#### 3. Actualizar `AddContactoModal.tsx`
-- Además de invalidar `closers-contacts`, también invalidar `closer-creators-list` para que la tabla de Closers se refresque inmediatamente sin necesitar reload.
+#### 3. Tab "Nuevo" en UI (`ClosersContent.tsx`)
+- Agregar `{ value: "nuevo", label: "Nuevo" }` a `ALL_TABS` (después de "Todas")
+
+#### 4. Tabla: color + columna fecha creación (`LeadTable.tsx`)
+- Agregar color teal para badge "Nuevo" en `stageColor`
+- Agregar headers y renderizado de filas para tab "nuevo" con columnas: Instagram, Fecha creación, Cuenta origen, Categoría, Teléfono, Notas, Acciones
+- Agregar columna "Creación" (`format(created_at, "dd/MM/yyyy")`) en los tabs existentes relevantes
 
 ### Archivos a modificar
-1. **Nueva migración SQL** — función + trigger + backfill
-2. `src/pages/leadgen/AddContactoModal.tsx` — agregar invalidación de query `closer-creators-list`
-
-### Lo que NO cambia
-- La tabla de Contactos (/contactos) sigue leyendo de `closers_contacts` — sin cambios
-- La tabla de Closers (/closers) sigue leyendo de `closer_creators` — sin cambios
-- El trigger existente de LeadGen (`auto_sync_leadgen_to_closers`) no se toca
+1. **Nueva migración SQL** — actualizar trigger + corregir datos
+2. `src/pages/closers/hooks/useCloserLeads.ts` — stage maps
+3. `src/pages/closers/ClosersContent.tsx` — tab nuevo
+4. `src/pages/closers/components/LeadTable.tsx` — color + headers/filas + columna creación
 
