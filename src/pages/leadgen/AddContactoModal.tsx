@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
@@ -49,6 +50,7 @@ const countryCodes = [
 const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<ContactoFormValues>({
     resolver: zodResolver(contactoSchema),
@@ -68,18 +70,18 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const onSubmit = async (data: ContactoFormValues) => {
     setIsSubmitting(true);
     try {
-      // Duplicate check by instagram handle
+      // Duplicate check by handle in closers_contacts
       const normalizedIg = normalizeHandle(data.instagram);
       if (normalizedIg) {
         const { data: existing } = await supabase
-          .from("contactos")
-          .select("id, nombre, instagram")
-          .ilike("instagram", normalizedIg)
+          .from("closers_contacts")
+          .select("id, name, handle")
+          .ilike("handle", normalizedIg)
           .maybeSingle();
         if (existing) {
           toast({
             title: "Duplicado detectado",
-            description: `Ya existe un contacto con este handle: ${existing.nombre}`,
+            description: `Ya existe un contacto con este handle: ${existing.name}`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -87,20 +89,22 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         }
       }
 
-      const { error } = await supabase.from("contactos").insert({
-        nombre: data.nombre,
-        instagram: data.instagram,
-        categoria_fisica: data.categoriaFisica,
-        compania: data.compania || null,
+      const { error } = await supabase.from("closers_contacts").insert({
+        name: data.nombre,
+        handle: normalizedIg || data.instagram,
+        platform: "Instagram",
+        physical_appearance: data.categoriaFisica,
+        company: data.compania || null,
         country_code: data.paisCodigo,
-        telefono: data.telefono || null,
-        notas: data.notas || null,
+        phone: data.telefono || null,
+        notes: data.notas || null,
+        created_by: user?.id ?? "",
       });
 
       if (error) throw error;
 
       toast({ title: "Contacto guardado exitosamente" });
-      queryClient.invalidateQueries({ queryKey: ["contactos"] });
+      queryClient.invalidateQueries({ queryKey: ["closers-contacts"] });
       form.reset();
       onOpenChange(false);
     } catch (err: any) {
