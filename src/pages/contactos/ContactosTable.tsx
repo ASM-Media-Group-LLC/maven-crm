@@ -102,14 +102,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
             <TableCell>
-              <div className="flex items-center gap-1">
-                <Badge variant={statusVariant[c.estado] ?? "secondary-soft"}>
-                  {c.estado}
-                </Badge>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </TableCell>
-            <TableCell>
               <a
                 href={`https://instagram.com/${c.instagram}`}
                 target="_blank"
