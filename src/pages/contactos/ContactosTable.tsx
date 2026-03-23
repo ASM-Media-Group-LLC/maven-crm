@@ -140,7 +140,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 {c.categoria}
               </Badge>
             </TableCell>
-            <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
+            
             <TableCell className="sticky right-0 z-10 bg-card">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
