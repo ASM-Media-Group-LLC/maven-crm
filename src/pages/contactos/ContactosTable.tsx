@@ -66,11 +66,9 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
     switch (sortKey) {
       case "ticket": va = a.ticket; vb = b.ticket; break;
       case "nombre": va = a.nombre; vb = b.nombre; break;
-      case "estado": va = a.estado; vb = b.estado; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
       case "categoria": va = a.categoria; vb = b.categoria; break;
-      case "interacciones": va = String(a.interacciones); vb = String(b.interacciones); break;
       case "creadoPor": va = a.creadoPor; vb = b.creadoPor; break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
