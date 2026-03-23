@@ -222,7 +222,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       case "handle": va = a.model_handle; vb = b.model_handle; break;
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
-      case "calidad": va = a.quality; vb = b.quality; break;
+      case "categoria": va = a.quality; vb = b.quality; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
       case "qa": va = ""; vb = ""; break;
