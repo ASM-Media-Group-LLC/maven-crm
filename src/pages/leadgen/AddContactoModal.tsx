@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle } from "@/lib/handle-utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(1, "Nombre requerido").max(100, "Máximo 100 caracteres"),
