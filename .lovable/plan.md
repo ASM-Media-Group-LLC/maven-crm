@@ -1,31 +1,53 @@
 
 
-## Plan: Corregir alineación de columnas en Contactos y Closers
+## Plan: Limpiar duplicados, mostrar creador, y edición inline en tab Nuevo
 
-### Problema 1: Contactos — columnas desalineadas
-La tabla tiene **7 headers** pero **8 celdas** por fila. Al quitar las columnas Estado e Inter. de los headers, no se quitó la celda `creadoPor` (línea 103) que quedó huérfana. Resultado: el header "Instagram" muestra el dato de `creadoPor`, el header "Contacto" muestra el link de Instagram, etc.
+### Problema 1: Los 418 "Nuevo" pueden incluir handles ya registrados como Creators
 
-**Solución**: Agregar header "Agente" entre Nombre e Instagram para que las 8 celdas coincidan con 8 headers. Actualizar `colSpan` del empty state a 8.
+El trigger `cleanup_closer_on_creator_insert` deberia limpiar al insertar un creator, pero puede haber registros previos que no se limpiaron. Solución en dos partes:
 
-### Problema 2: Closers — Creación no es la 1era columna en varios tabs
-Los tabs "asignadas", "todas", "confirmadas", "completadas" y "no_interesadas" tienen Instagram antes de Creación. Solo "nuevo" y "pendiente_lg" ya están correctos.
+**a) Limpieza one-time** via migration SQL:
+```sql
+DELETE FROM closer_creators
+WHERE stage = 'Nuevo'
+  AND leadgen_entry_id IS NULL
+  AND lower(trim(both '@' from instagram_handle)) IN (
+    SELECT lower(trim(both '@' from instagram_handle)) FROM creators
+  );
+```
 
-**Solución**: En `renderHeaders()` y `renderRow()`, mover Creación antes de Instagram en todos los tabs restantes (asignadas, todas, confirmadas, completadas, no_interesadas).
+**b) Filtro en la query del tab "Nuevo"**: Crear un RPC `get_nuevo_closer_creators` que haga un `NOT EXISTS` contra la tabla `creators`, asegurando que nunca se muestren handles duplicados. O alternativamente, mantener la query actual y confiar en el trigger + la limpieza one-time (más simple).
 
-### Problema 3: Closers — tab Pendiente LG con 822 entradas sin sentido
-El tab Pendiente LG muestra leads masivos de LeadGen que no encajan en el flujo de contactos manuales. El usuario no lo considera útil.
+Recomiendo opcion b-simple: la limpieza one-time + confiar en el trigger existente. Si se quiere extra seguridad, crear el RPC.
 
-**Solución**: Ocultar la pestaña "Pendiente LG" del UI en `ClosersContent.tsx`. Los datos siguen en la DB pero no se muestran en el pipeline de Closers.
+### Problema 2: Mostrar nombre del usuario que creó el contacto
+
+Actualmente en el tab "Nuevo", `agent_name` se setea a `null` (línea 148 del hook). Se necesita:
+
+**En `useCloserLeads.ts`** (tab "nuevo"):
+- Recoger los `created_by` IDs de los rows
+- Fetch profiles para esos IDs
+- Mapear `created_by` → `full_name` y agregar al campo `agent_name` (o un nuevo campo `creator_name`)
+
+**En `LeadTable.tsx`** (tab "nuevo", línea 755):
+- Ya existe la columna "Agente" que muestra `c.agent_name`. Una vez que el hook lo llene con el nombre del creador, se mostrará correctamente. Cambiar el header de "Agente" a "Creado por" para este tab.
+
+### Problema 3: Edición inline de Categoría y Estado en tab "Nuevo"
+
+**En `LeadTable.tsx`**:
+- **Categoría** (línea 757-758): Reemplazar el Badge estático por `InlineCategorySelect` (ya existe en el mismo archivo)
+- **Estado**: Agregar columna "Estado" con `InlineStageSelect` para poder mover registros directamente desde la tabla
+
+**Headers del tab "nuevo"** (líneas 519-532): Agregar header "Estado" y actualizar "Agente" → "Creado por"
 
 ### Archivos a modificar
 
-1. **`src/pages/contactos/ContactosTable.tsx`**
-   - Agregar header "Agente" (con SortHeader) entre Nombre e Instagram
-   - Actualizar colSpan del empty state
+1. **Migration SQL** -- Limpieza de handles duplicados en closer_creators
+2. **`src/pages/closers/hooks/useCloserLeads.ts`** -- Fetch profiles para `created_by` en tab "nuevo"
+3. **`src/pages/closers/components/LeadTable.tsx`** -- Inline editing en tab "nuevo", agregar columna Estado, cambiar header Agente → Creado por
 
-2. **`src/pages/closers/components/LeadTable.tsx`**
-   - Tabs asignadas, todas, confirmadas, completadas, no_interesadas: swap headers y celdas para que Creación vaya antes de Instagram
-
-3. **`src/pages/closers/ClosersContent.tsx`**
-   - Ocultar tab "Pendiente LG" de la lista de pestañas visibles
+### Resultado
+- Solo contactos realmente nuevos aparecen en el tab Nuevo
+- Se ve quién creó cada contacto
+- Categoría y Estado son editables inline con dropdowns
 
