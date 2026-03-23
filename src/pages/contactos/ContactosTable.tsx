@@ -127,7 +127,14 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 <ExternalLink className="h-3 w-3" />
               </a>
             </TableCell>
-            <TableCell className="text-sm">{c.pais}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">
+              {c.whatsapp ? (
+                <a href={`https://wa.me/${c.whatsapp}`} target="_blank" rel="noopener noreferrer"
+                  className="text-primary hover:underline">
+                  {c.countryCode}{c.phone}
+                </a>
+              ) : c.phone ? `${c.countryCode || ""}${c.phone}` : "—"}
+            </TableCell>
             <TableCell>
               <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
                 {c.categoria}
