@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -247,7 +247,7 @@ export const useCloserLeads = () => {
 
       return { creators: enriched, total: count || 0 };
     },
-    placeholderData: keepPreviousData,
+    
     enabled: !!user?.id && !!role,
   });
 
