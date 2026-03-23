@@ -220,7 +220,7 @@ const ContactosContent = () => {
   const updateFilters = (patch: Partial<ContactoFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
 
-  const hasActiveFilters = !!(filters.search || filters.estado || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
+  const hasActiveFilters = !!(filters.search || filters.pais || filters.categoria || filters.dateFrom || filters.dateTo || filters.creadoPor);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">

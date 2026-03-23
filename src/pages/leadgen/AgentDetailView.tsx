@@ -244,7 +244,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 </div>
                 <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Seleccionar fechas" className="h-9" />
                 <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
+                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
@@ -283,7 +283,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                         <TableRow>
                           <TableHead className="text-xs">Ticket</TableHead>
                           <TableHead className="text-xs">Handle</TableHead>
-                          <TableHead className="text-xs">Calidad</TableHead>
+                          <TableHead className="text-xs">Categoría</TableHead>
                           
                           <TableHead className="text-xs">País</TableHead>
                           <TableHead className="text-xs">Fecha</TableHead>
@@ -472,7 +472,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 {qualityDistData.length > 0 && (
                   <Card>
                     <CardContent className="p-5">
-                      <h3 className="font-semibold mb-4">Distribución por Calidad</h3>
+                      <h3 className="font-semibold mb-4">Distribución por Categoría</h3>
                       <div className="h-[220px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>

@@ -47,7 +47,7 @@ const getPlatformIcon = (platform: string) => {
 const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
-type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "calidad" | "pais" | "contacto" | "qa";
+type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa";
 
 interface Props {
   leads: LeadGenEntry[];
@@ -222,7 +222,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       case "handle": va = a.model_handle; vb = b.model_handle; break;
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
-      case "calidad": va = a.quality; vb = b.quality; break;
+      case "categoria": va = a.quality; vb = b.quality; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
       case "qa": va = ""; vb = ""; break;
@@ -246,7 +246,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agencia" col="agencia" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Calidad" col="calidad" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="País" col="pais" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Contacto" col="contacto" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="QA" col="qa" /></TableHead>

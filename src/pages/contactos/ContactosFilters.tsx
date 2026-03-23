@@ -56,12 +56,6 @@ const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilt
       </div>
 
       <FilterSelect
-        placeholder="Estado"
-        value={filters.estado}
-        options={["Nuevo", "Contactado", "Interesado", "Descartado"]}
-        onChange={(v) => onChange({ estado: v })}
-      />
-      <FilterSelect
         placeholder="País"
         value={filters.pais}
         options={["AR", "BR", "CL", "CO", "CR", "EC", "ES", "GB", "GT", "HN", "IT", "MX", "PA", "PE", "PY", "SV", "TH", "US", "UY", "VE"]}

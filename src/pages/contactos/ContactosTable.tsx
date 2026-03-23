@@ -34,7 +34,7 @@ const categoryVariant: Record<string, "success-soft" | "primary-soft" | "warning
   C: "destructive-soft",
 };
 
-type SortKey = "creacion" | "ticket" | "nombre" | "creadoPor" | "estado" | "instagram" | "pais" | "categoria" | "interacciones";
+type SortKey = "creacion" | "ticket" | "nombre" | "creadoPor" | "instagram" | "pais" | "categoria";
 
 interface Props {
   contactos: Contacto[];
@@ -66,11 +66,9 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
     switch (sortKey) {
       case "ticket": va = a.ticket; vb = b.ticket; break;
       case "nombre": va = a.nombre; vb = b.nombre; break;
-      case "estado": va = a.estado; vb = b.estado; break;
       case "instagram": va = a.instagram; vb = b.instagram; break;
       case "pais": va = a.pais; vb = b.pais; break;
       case "categoria": va = a.categoria; vb = b.categoria; break;
-      case "interacciones": va = String(a.interacciones); vb = String(b.interacciones); break;
       case "creadoPor": va = a.creadoPor; vb = b.creadoPor; break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
@@ -90,12 +88,9 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] max-w-[180px]"><SortHeader label="Nombre" col="nombre" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="creadoPor" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Estado" col="estado" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Instagram" col="instagram" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Contacto</TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Categoría" col="categoria" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Inter." col="interacciones" /></TableHead>
           <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
         </TableRow>
       </TableHeader>
@@ -106,14 +101,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableCell className="text-sm font-mono text-muted-foreground">{c.ticket}</TableCell>
             <TableCell className="text-sm font-medium max-w-[180px] truncate">{c.nombre}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.creadoPor}</TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1">
-                <Badge variant={statusVariant[c.estado] ?? "secondary-soft"}>
-                  {c.estado}
-                </Badge>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </TableCell>
             <TableCell>
               <a
                 href={`https://instagram.com/${c.instagram}`}
@@ -140,7 +127,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
                 {c.categoria}
               </Badge>
             </TableCell>
-            <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
+            
             <TableCell className="sticky right-0 z-10 bg-card">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -165,7 +152,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
         ))}
         {sorted.length === 0 && (
           <TableRow>
-            <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+            <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
               No se encontraron contactos.
             </TableCell>
           </TableRow>
