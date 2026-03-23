@@ -90,7 +90,7 @@ const ALL_COUNTRIES = [
 const leadSchema = z.object({
   source_link: z.string().url("URL de perfil requerida"),
   platform: z.string().min(1, "Plataforma requerida"),
-  quality: z.string().min(1, "Calidad requerida"),
+  quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
   country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),

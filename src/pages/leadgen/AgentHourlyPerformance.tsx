@@ -242,7 +242,7 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       {qualityDistData.length > 0 && (
         <Card>
           <CardContent className="p-5">
-            <h3 className="font-semibold mb-4">Distribución por Calidad</h3>
+            <h3 className="font-semibold mb-4">Distribución por Categoría</h3>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={qualityDistData} layout="vertical" margin={{ left: 10 }}>
