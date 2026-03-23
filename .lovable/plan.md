@@ -1,49 +1,31 @@
 
 
-## Plan: Optimizar rendimiento y frescura de datos en MAVEN
+## Plan: Corregir alineación de columnas en Contactos y Closers
 
-### Diagnóstico
+### Problema 1: Contactos — columnas desalineadas
+La tabla tiene **7 headers** pero **8 celdas** por fila. Al quitar las columnas Estado e Inter. de los headers, no se quitó la celda `creadoPor` (línea 103) que quedó huérfana. Resultado: el header "Instagram" muestra el dato de `creadoPor`, el header "Contacto" muestra el link de Instagram, etc.
 
-Hay **3 causas principales** de la lentitud y datos "viejos":
+**Solución**: Agregar header "Agente" entre Nombre e Instagram para que las 8 celdas coincidan con 8 headers. Actualizar `colSpan` del empty state a 8.
 
-1. **PWA Service Worker cachea agresivamente los assets** — El workbox precachea todos los JS/CSS/HTML con `globPatterns: ["**/*.{js,css,html,...}"]`. Cuando se despliega una nueva versión, el service worker viejo sigue sirviendo archivos cacheados hasta que se actualiza en segundo plano. Esto causa que los usuarios vean "versiones viejas" de la interfaz.
+### Problema 2: Closers — Creación no es la 1era columna en varios tabs
+Los tabs "asignadas", "todas", "confirmadas", "completadas" y "no_interesadas" tienen Instagram antes de Creación. Solo "nuevo" y "pendiente_lg" ya están correctos.
 
-2. **QueryClient sin configuración global** — La línea `new QueryClient()` no tiene `defaultOptions`. Los queries sin `staleTime` explícito usan `staleTime: 0` pero `gcTime: 5min` por defecto. Muchos hooks (contactos, creators, HR, finanzas) no tienen `staleTime`, lo que causa refetches innecesarios en cada render, mientras que otros tienen `staleTime: 2-5min` que puede sentirse "viejo".
+**Solución**: En `renderHeaders()` y `renderRow()`, mover Creación antes de Instagram en todos los tabs restantes (asignadas, todas, confirmadas, completadas, no_interesadas).
 
-3. **Todas las rutas se importan eagerly** — Los ~90 componentes de página se importan todos al inicio en `App.tsx` sin `React.lazy()`. Esto crea un bundle enorme que bloquea el hilo principal durante la carga inicial.
+### Problema 3: Closers — tab Pendiente LG con 822 entradas sin sentido
+El tab Pendiente LG muestra leads masivos de LeadGen que no encajan en el flujo de contactos manuales. El usuario no lo considera útil.
 
-### Cambios propuestos
-
-#### 1. Configurar QueryClient con defaults inteligentes
-En `App.tsx`, configurar el QueryClient con:
-- `staleTime: 60_000` (1 minuto) — evita refetches excesivos
-- `refetchOnWindowFocus: true` — datos frescos al volver a la pestaña
-- `retry: 1` — no reintentar 3 veces por defecto
-
-#### 2. Corregir la estrategia PWA para actualizaciones instantáneas
-En `vite.config.ts`:
-- Agregar `skipWaiting: true` y `clientsClaim: true` en workbox para que el nuevo service worker tome control inmediatamente
-- Esto elimina el problema de "versiones viejas" sin requerir acción del usuario
-
-#### 3. Lazy loading de rutas principales
-En `App.tsx`:
-- Convertir los ~90 imports estáticos a `React.lazy()` agrupados por módulo (HR, Finanzas, LeadGen, Closers, etc.)
-- Envolver las rutas con `<Suspense>` y un fallback de loading
-- Esto reduce el bundle inicial de varios MB a solo lo necesario para la ruta actual
+**Solución**: Ocultar la pestaña "Pendiente LG" del UI en `ClosersContent.tsx`. Los datos siguen en la DB pero no se muestran en el pipeline de Closers.
 
 ### Archivos a modificar
 
-1. **`src/App.tsx`**
-   - QueryClient con `defaultOptions`
-   - Lazy imports para todas las páginas
-   - `<Suspense>` wrapper
+1. **`src/pages/contactos/ContactosTable.tsx`**
+   - Agregar header "Agente" (con SortHeader) entre Nombre e Instagram
+   - Actualizar colSpan del empty state
 
-2. **`vite.config.ts`**
-   - `skipWaiting: true`, `clientsClaim: true` en workbox config
+2. **`src/pages/closers/components/LeadTable.tsx`**
+   - Tabs asignadas, todas, confirmadas, completadas, no_interesadas: swap headers y celdas para que Creación vaya antes de Instagram
 
-### Resultado esperado
-- La app cargará significativamente más rápido (bundle inicial ~80% menor)
-- Los datos se actualizarán automáticamente al volver a la pestaña
-- Las nuevas versiones se aplicarán inmediatamente sin mostrar código viejo
-- Menos requests redundantes a Supabase
+3. **`src/pages/closers/ClosersContent.tsx`**
+   - Ocultar tab "Pendiente LG" de la lista de pestañas visibles
 
