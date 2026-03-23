@@ -746,6 +746,40 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           </TableRow>
         );
 
+      case "nuevo":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell>
+              {c.category ? <Badge variant="outline" className={`text-xs ${CATEGORY_BADGE_COLORS[c.category] || ""}`}>{c.category}</Badge> : "—"}
+            </TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+            <TableCell className="text-right sticky right-0 bg-background z-20">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                      <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                    Mover a Asignada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
+          </TableRow>
+        );
+
       case "pendiente_lg":
         return (
           <TableRow key={c.id}>

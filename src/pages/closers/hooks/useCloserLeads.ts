@@ -44,6 +44,7 @@ export const CLOSER_STAGES = [
 ] as const;
 
 export const STAGE_LABELS: Record<string, string> = {
+  Nuevo: "Nuevo",
   Asignada: "Asignada",
   Confirmada: "Confirmada",
   Completada: "Completada",
@@ -53,6 +54,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
   todas: [],
+  nuevo: ["Nuevo"],
   pendiente_lg: [],
   asignadas: ["Asignada"],
   confirmadas: ["Confirmada"],
