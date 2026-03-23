@@ -255,7 +255,7 @@ const LeadGenBaseDatosContent = () => {
           </Popover>
 
           <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
+            <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">Todas</SelectItem>
               <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
