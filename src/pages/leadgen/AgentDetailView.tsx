@@ -244,7 +244,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 </div>
                 <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Seleccionar fechas" className="h-9" />
                 <Select value={filterCalidad || undefined} onValueChange={(v) => setFilterCalidad(v === "__all__" ? "" : v)}>
-                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Calidad" /></SelectTrigger>
+                  <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Categoría" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="a+">A+</SelectItem><SelectItem value="a">A</SelectItem>
