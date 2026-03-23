@@ -131,9 +131,9 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
               {c.whatsapp ? (
                 <a href={`https://wa.me/${c.whatsapp}`} target="_blank" rel="noopener noreferrer"
                   className="text-primary hover:underline">
-                  {c.countryCode}{c.phone}
+                  {c.country_code}{c.phone}
                 </a>
-              ) : c.phone ? `${c.countryCode || ""}${c.phone}` : "—"}
+              ) : c.phone ? `${c.country_code || ""}${c.phone}` : "—"}
             </TableCell>
             <TableCell>
               <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
