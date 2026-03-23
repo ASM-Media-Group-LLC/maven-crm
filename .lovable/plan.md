@@ -1,53 +1,48 @@
 
 
-## Plan: Limpiar duplicados, mostrar creador, y edición inline en tab Nuevo
+## Plan: Corregir visibilidad de datos en Contactos y Closers
 
-### Problema 1: Los 418 "Nuevo" pueden incluir handles ya registrados como Creators
+### Diagnóstico
 
-El trigger `cleanup_closer_on_creator_insert` deberia limpiar al insertar un creator, pero puede haber registros previos que no se limpiaron. Solución en dos partes:
+Encontré **2 causas raíz** de por qué no se ven los datos correctos:
 
-**a) Limpieza one-time** via migration SQL:
+#### 1. Closers — RLS bloquea el tab "Nuevo" para usuarios no-admin
+
+La tabla `closer_creators` tiene RLS habilitado con estas políticas de SELECT:
+- **Admins**: ven todo
+- **Managers**: ven todo  
+- **Closers/Agents**: solo ven registros donde `assigned_to = auth.uid()`
+
+El problema: los 420 registros en stage "Nuevo" tienen `assigned_to = NULL` (son contactos recién creados, aún no asignados). Entonces un closer o agent **no ve ninguno** aunque el RPC de conteos (que usa `SECURITY DEFINER`) sí los cuenta. El usuario ve los KPIs con números pero la tabla vacía.
+
+**Solución**: Agregar una política RLS que permita a los usuarios ver los registros de `closer_creators` que ellos mismos crearon (`created_by = auth.uid()`). Esto cubre el tab "Nuevo" donde los agentes deben ver sus propios contactos.
+
+#### 2. Closers — `keepPreviousData` muestra datos del tab anterior
+
+El hook usa `placeholderData: keepPreviousData`, lo que causa que al cambiar de tab se muestren brevemente los datos del tab anterior, dando la impresión de "datos incorrectos" o "versión vieja".
+
+**Solución**: Eliminar `placeholderData: keepPreviousData` para que al cambiar de tab se muestre el loading state en lugar de datos stale de otro tab.
+
+#### 3. Contactos — funciona correctamente
+
+La tabla `closers_contacts` tiene RLS **deshabilitado**, y la query con paginación (50 por página) funciona bien. Los 475 registros están accesibles. Si el usuario no ve todos, es porque debe navegar las páginas. El total se muestra correctamente en el header.
+
+### Cambios propuestos
+
+#### Archivo 1: Migration SQL
 ```sql
-DELETE FROM closer_creators
-WHERE stage = 'Nuevo'
-  AND leadgen_entry_id IS NULL
-  AND lower(trim(both '@' from instagram_handle)) IN (
-    SELECT lower(trim(both '@' from instagram_handle)) FROM creators
-  );
+-- Permitir a usuarios ver los closer_creators que ellos crearon
+CREATE POLICY "Users see own created closer_creators"
+ON public.closer_creators FOR SELECT
+TO authenticated
+USING (created_by = auth.uid());
 ```
 
-**b) Filtro en la query del tab "Nuevo"**: Crear un RPC `get_nuevo_closer_creators` que haga un `NOT EXISTS` contra la tabla `creators`, asegurando que nunca se muestren handles duplicados. O alternativamente, mantener la query actual y confiar en el trigger + la limpieza one-time (más simple).
-
-Recomiendo opcion b-simple: la limpieza one-time + confiar en el trigger existente. Si se quiere extra seguridad, crear el RPC.
-
-### Problema 2: Mostrar nombre del usuario que creó el contacto
-
-Actualmente en el tab "Nuevo", `agent_name` se setea a `null` (línea 148 del hook). Se necesita:
-
-**En `useCloserLeads.ts`** (tab "nuevo"):
-- Recoger los `created_by` IDs de los rows
-- Fetch profiles para esos IDs
-- Mapear `created_by` → `full_name` y agregar al campo `agent_name` (o un nuevo campo `creator_name`)
-
-**En `LeadTable.tsx`** (tab "nuevo", línea 755):
-- Ya existe la columna "Agente" que muestra `c.agent_name`. Una vez que el hook lo llene con el nombre del creador, se mostrará correctamente. Cambiar el header de "Agente" a "Creado por" para este tab.
-
-### Problema 3: Edición inline de Categoría y Estado en tab "Nuevo"
-
-**En `LeadTable.tsx`**:
-- **Categoría** (línea 757-758): Reemplazar el Badge estático por `InlineCategorySelect` (ya existe en el mismo archivo)
-- **Estado**: Agregar columna "Estado" con `InlineStageSelect` para poder mover registros directamente desde la tabla
-
-**Headers del tab "nuevo"** (líneas 519-532): Agregar header "Estado" y actualizar "Agente" → "Creado por"
-
-### Archivos a modificar
-
-1. **Migration SQL** -- Limpieza de handles duplicados en closer_creators
-2. **`src/pages/closers/hooks/useCloserLeads.ts`** -- Fetch profiles para `created_by` en tab "nuevo"
-3. **`src/pages/closers/components/LeadTable.tsx`** -- Inline editing en tab "nuevo", agregar columna Estado, cambiar header Agente → Creado por
+#### Archivo 2: `src/pages/closers/hooks/useCloserLeads.ts`
+- Eliminar `placeholderData: keepPreviousData` de la query principal para evitar flash de datos incorrectos al cambiar tabs
 
 ### Resultado
-- Solo contactos realmente nuevos aparecen en el tab Nuevo
-- Se ve quién creó cada contacto
-- Categoría y Estado son editables inline con dropdowns
+- Los agentes verán sus propios contactos en el tab "Nuevo"
+- Al cambiar de tab no se mostrarán datos de otro tab temporalmente
+- Contactos sigue funcionando correctamente con paginación
 
