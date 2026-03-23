@@ -138,14 +138,31 @@ export const useCloserLeads = () => {
         const { data, error, count } = await query;
         if (error) throw error;
 
-        const rows: CloserCreatorRow[] = (data || []).map((c: any) => ({
+        const rawRows = (data || []) as any[];
+
+        // Fetch created_by profiles for "nuevo" tab
+        let createdByMap: Record<string, string> = {};
+        if (activeTab === "nuevo") {
+          const createdByIds = [...new Set(rawRows.map((c) => c.created_by).filter(Boolean))] as string[];
+          if (createdByIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("id, full_name")
+              .in("id", createdByIds);
+            for (const p of profiles || []) {
+              createdByMap[p.id] = p.full_name || "Sin nombre";
+            }
+          }
+        }
+
+        const rows: CloserCreatorRow[] = rawRows.map((c: any) => ({
           ...c,
           leadgen_entry_id: c.leadgen_entry_id ?? null,
           estimated_monetization: c.estimated_monetization ?? 0,
           agency_commission: c.agency_commission ?? 0,
           extras: c.extras ?? 0,
           main_platform: c.main_platform ?? null,
-          agent_name: null,
+          agent_name: activeTab === "nuevo" && c.created_by ? (createdByMap[c.created_by] || null) : null,
           contact_count: 0,
           _source: "closer" as const,
           _lg_status: null,

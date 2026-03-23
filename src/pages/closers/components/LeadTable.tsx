@@ -753,10 +753,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
-            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
+            <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
             <TableCell>
-              {c.category ? <Badge variant="outline" className={`text-xs ${CATEGORY_BADGE_COLORS[c.category] || ""}`}>{c.category}</Badge> : "—"}
+              <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
+            </TableCell>
+            <TableCell>
+              <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v)} />
             </TableCell>
             <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
             <TableCell>
