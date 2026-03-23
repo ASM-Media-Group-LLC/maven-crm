@@ -750,8 +750,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
             <TableCell>
               {c.category ? <Badge variant="outline" className={`text-xs ${CATEGORY_BADGE_COLORS[c.category] || ""}`}>{c.category}</Badge> : "—"}
