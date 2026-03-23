@@ -1,54 +1,49 @@
 
 
-## Plan: Estandarizar tablas y corregir UI en Contactos y Closers
+## Plan: Optimizar rendimiento y frescura de datos en MAVEN
 
-### Problemas identificados
-1. **Contactos: todos dicen "Nuevo"** — el campo `status` en DB es `new` para casi todos. Como es un directorio, la columna Estado no aporta valor y el dropdown de cambio de estado tampoco debería existir.
-2. **Contactos: columna "Inter."** — muestra el conteo de interacciones (contact_interactions). Si no se usa activamente, ocupa espacio innecesario.
-3. **Terminología inconsistente** — LeadGen dice "Calidad", Contactos y Closers dicen "Categoría". Se estandariza a **"Categoría"** en todas las vistas.
-4. **Closers: redundancia "Pendiente LG"** — el tab se llama "Pendiente LG" y dentro hay una columna "Estado LG" que no aporta.
-5. **Closers: orden de columnas** — no coincide con Contactos. Debería ser más consistente: Creación, Handle, Agente, Estado, Categoría, etc.
+### Diagnóstico
 
-### Cambios
+Hay **3 causas principales** de la lentitud y datos "viejos":
 
-#### 1. `ContactosTable.tsx` — Simplificar como directorio
-- Quitar columna **Estado** (badge + ChevronDown) — es un directorio, no un pipeline
-- Quitar columna **Inter.** — no se usa activamente
-- Ajustar `colSpan` del empty state
-- Quitar `estado` e `interacciones` de `SortKey`
+1. **PWA Service Worker cachea agresivamente los assets** — El workbox precachea todos los JS/CSS/HTML con `globPatterns: ["**/*.{js,css,html,...}"]`. Cuando se despliega una nueva versión, el service worker viejo sigue sirviendo archivos cacheados hasta que se actualiza en segundo plano. Esto causa que los usuarios vean "versiones viejas" de la interfaz.
 
-#### 2. `ContactosFilters.tsx` — Quitar filtro de Estado
-- Eliminar el select de "Estado" del filtro ya que no tiene sentido en un directorio
+2. **QueryClient sin configuración global** — La línea `new QueryClient()` no tiene `defaultOptions`. Los queries sin `staleTime` explícito usan `staleTime: 0` pero `gcTime: 5min` por defecto. Muchos hooks (contactos, creators, HR, finanzas) no tienen `staleTime`, lo que causa refetches innecesarios en cada render, mientras que otros tienen `staleTime: 2-5min` que puede sentirse "viejo".
 
-#### 3. LeadGen: renombrar "Calidad" → "Categoría"
-- `LeadGenTable.tsx` (o equivalente): cambiar header "Calidad" a "Categoría"
-- `LeadGenGrid.tsx`: cambiar label "Calidad" a "Categoría"
-- `AgentHourlyPerformance.tsx`: cambiar "Distribución por Calidad" a "Distribución por Categoría"
-- `AgentDetailView.tsx`: mismos cambios de label
-- `leadgenConstants.ts`: renombrar `QUALITY_OPTIONS` label si aplica (los valores A+/A/B+/B/C no cambian)
+3. **Todas las rutas se importan eagerly** — Los ~90 componentes de página se importan todos al inicio en `App.tsx` sin `React.lazy()`. Esto crea un bundle enorme que bloquea el hilo principal durante la carga inicial.
 
-#### 4. `LeadTable.tsx` (Closers) — Estandarizar columnas
-- **Tab "Pendiente LG"**: quitar columna "Estado LG" redundante
-- **Tab "Nuevo"**: reordenar a: #, Creación, Instagram, Agente, Cuenta origen, Categoría, Teléfono, Notas, Acciones
-- **Tab "Todas"**: reordenar a: #, Creación, Instagram, Estado, Agente, Cuenta origen, Categoría, Contactos, Teléfono, Notas, Acciones
-- **Tab "Asignadas"**: reordenar similar: #, Creación, Instagram, Agente, Cuenta origen, Categoría, Contactos, Último contacto, Teléfono, Alertas, Acciones
-- Cambiar cualquier label "Calidad" que exista a "Categoría"
+### Cambios propuestos
 
-#### 5. `ClosersContent.tsx` — Tab "Pendiente LG"
-- Mantener el tab pero revisar que el count badge use la key correcta ("Pendiente LG")
+#### 1. Configurar QueryClient con defaults inteligentes
+En `App.tsx`, configurar el QueryClient con:
+- `staleTime: 60_000` (1 minuto) — evita refetches excesivos
+- `refetchOnWindowFocus: true` — datos frescos al volver a la pestaña
+- `retry: 1` — no reintentar 3 veces por defecto
+
+#### 2. Corregir la estrategia PWA para actualizaciones instantáneas
+En `vite.config.ts`:
+- Agregar `skipWaiting: true` y `clientsClaim: true` en workbox para que el nuevo service worker tome control inmediatamente
+- Esto elimina el problema de "versiones viejas" sin requerir acción del usuario
+
+#### 3. Lazy loading de rutas principales
+En `App.tsx`:
+- Convertir los ~90 imports estáticos a `React.lazy()` agrupados por módulo (HR, Finanzas, LeadGen, Closers, etc.)
+- Envolver las rutas con `<Suspense>` y un fallback de loading
+- Esto reduce el bundle inicial de varios MB a solo lo necesario para la ruta actual
 
 ### Archivos a modificar
-1. `src/pages/contactos/ContactosTable.tsx` — quitar Estado e Inter.
-2. `src/pages/contactos/ContactosFilters.tsx` — quitar filtro Estado
-3. `src/pages/contactos/ContactosContent.tsx` — quitar `estado` del tipo/filtros si aplica
-4. `src/pages/closers/components/LeadTable.tsx` — reordenar columnas, quitar "Estado LG"
-5. `src/pages/leadgen/LeadGenGrid.tsx` — "Calidad" → "Categoría"
-6. `src/pages/leadgen/AgentHourlyPerformance.tsx` — labels
-7. `src/pages/leadgen/AgentDetailView.tsx` — labels
-8. Cualquier otro archivo de LeadGen que muestre "Calidad" como header
 
-### Resultado
-- Contactos funciona como directorio limpio sin estado ni interacciones innecesarias
-- Todas las tablas usan "Categoría" consistentemente
-- Closers tiene columnas ordenadas de forma lógica y sin redundancias
+1. **`src/App.tsx`**
+   - QueryClient con `defaultOptions`
+   - Lazy imports para todas las páginas
+   - `<Suspense>` wrapper
+
+2. **`vite.config.ts`**
+   - `skipWaiting: true`, `clientsClaim: true` en workbox config
+
+### Resultado esperado
+- La app cargará significativamente más rápido (bundle inicial ~80% menor)
+- Los datos se actualizarán automáticamente al volver a la pestaña
+- Las nuevas versiones se aplicarán inmediatamente sin mostrar código viejo
+- Menos requests redundantes a Supabase
 
