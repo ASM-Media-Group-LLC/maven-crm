@@ -326,7 +326,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                   name="quality"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Calidad *</FormLabel>
+                      <FormLabel>Categoría *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
