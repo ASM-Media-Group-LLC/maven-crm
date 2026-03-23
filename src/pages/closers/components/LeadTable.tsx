@@ -568,7 +568,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
             <TableCell>{igLink}</TableCell>
-            <TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
             <TableCell>
