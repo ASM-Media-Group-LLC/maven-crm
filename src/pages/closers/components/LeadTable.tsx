@@ -38,6 +38,7 @@ const stageColor = (s: string) => {
     case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
     case "No interesada": return "bg-destructive/10 text-destructive";
     case "Pendiente LG": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+    case "Nuevo": return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
     default: return "bg-muted text-muted-foreground";
   }
 };
@@ -515,6 +516,19 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
           </TableRow>
         );
+      case "nuevo":
+        return (
+          <TableRow>
+            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+          </TableRow>
+        );
       case "pendiente_lg":
         return (
           <TableRow>
@@ -728,6 +742,40 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             </TableCell>
             <TableCell>
               <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+          </TableRow>
+        );
+
+      case "nuevo":
+        return (
+          <TableRow key={c.id}>
+            <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+            <TableCell>{igLink}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell>
+              {c.category ? <Badge variant="outline" className={`text-xs ${CATEGORY_BADGE_COLORS[c.category] || ""}`}>{c.category}</Badge> : "—"}
+            </TableCell>
+            <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
+            <TableCell>
+              <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+            </TableCell>
+            <TableCell className="text-right sticky right-0 bg-background z-20">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onAssign(c.id, c.assigned_to)}>
+                      <UserPlus className="h-4 w-4 mr-2" /> Asignar a Closer
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                    Mover a Asignada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TableCell>
           </TableRow>
         );

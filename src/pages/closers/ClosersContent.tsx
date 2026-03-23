@@ -13,6 +13,7 @@ import { useState, useMemo, useEffect } from "react";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
+  { value: "nuevo", label: "Nuevo" },
   { value: "pendiente_lg", label: "Pendiente LG" },
   { value: "asignadas", label: "Asignaciones" },
   { value: "confirmadas", label: "Confirmadas" },
@@ -90,11 +91,13 @@ const ClosersContent = () => {
                   {tab.label}
                   {statusCounts[
                     tab.value === "todas" ? "" :
+                    tab.value === "nuevo" ? "Nuevo" :
                     tab.value === "asignadas" ? "Asignada" :
                     tab.value === "confirmadas" ? "Confirmada" :
                     tab.value === "completadas" ? "Completada" :
                     "No interesada"
                   ] ? ` (${statusCounts[
+                    tab.value === "nuevo" ? "Nuevo" :
                     tab.value === "asignadas" ? "Asignada" :
                     tab.value === "confirmadas" ? "Confirmada" :
                     tab.value === "completadas" ? "Completada" :
