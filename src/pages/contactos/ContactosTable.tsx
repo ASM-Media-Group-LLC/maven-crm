@@ -129,7 +129,8 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
             <TableCell className="text-sm text-muted-foreground">
               {c.whatsapp ? (
                 <a href={`https://wa.me/${c.whatsapp}`} target="_blank" rel="noopener noreferrer"
-                  className="text-primary hover:underline">
+                  className="flex items-center gap-1.5 text-primary hover:underline">
+                  <MessageCircle className="h-3.5 w-3.5" />
                   {c.country_code}{c.phone}
                 </a>
               ) : c.phone ? `${c.country_code || ""}${c.phone}` : "—"}
@@ -138,17 +139,6 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
               <Badge variant={categoryVariant[c.categoria] ?? "secondary-soft"} className="font-normal">
                 {c.categoria}
               </Badge>
-            </TableCell>
-            <TableCell>
-              <a
-                href={`https://wa.me/${c.whatsapp}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                Chat
-              </a>
             </TableCell>
             <TableCell className="text-center text-sm">{c.interacciones}</TableCell>
             <TableCell className="sticky right-0 z-10 bg-card">
