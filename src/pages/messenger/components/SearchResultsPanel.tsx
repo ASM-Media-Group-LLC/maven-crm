@@ -72,7 +72,7 @@ export default function SearchResultsPanel({
   }, [results]);
 
   return (
-    <div className="w-full sm:w-80 shrink-0 bg-card sm:rounded-l-3xl flex flex-col h-full absolute inset-0 sm:relative sm:inset-auto z-20">
+    <div className="absolute inset-0 sm:inset-y-0 sm:left-auto sm:right-0 z-30 w-full sm:w-[380px] bg-card sm:rounded-l-3xl sm:shadow-xl flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-primary/[0.03] shrink-0">
         <Search className="h-4 w-4 text-muted-foreground shrink-0" />
