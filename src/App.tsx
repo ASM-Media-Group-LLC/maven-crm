@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,105 +10,139 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 import { OnlinePresenceProvider } from "@/hooks/useOnlinePresence";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionRoute from "@/components/PermissionRoute";
+import AdminRoute from "./components/AdminRoute";
+
+// Eagerly loaded (public / shell)
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import DesignSystem from "./pages/DesignSystem";
-import Docs from "./pages/Docs";
-import SalesDashboard from "./pages/SalesDashboard";
-import SalesOverview from "./pages/SalesOverview";
-import ComparativasPage from "./pages/sales-overview/ComparativasPage";
-import Top10Page from "./pages/sales-overview/Top10Page";
-import SubiendoPage from "./pages/sales-overview/SubiendoPage";
-import BajandoPage from "./pages/sales-overview/BajandoPage";
-import AltoPotencialPage from "./pages/sales-overview/AltoPotencialPage";
-import EnRiesgoPage from "./pages/sales-overview/EnRiesgoPage";
-
-import AiSales from "./pages/AiSales";
-import AiSalesConfig from "./pages/AiSalesConfig";
-import Dashboard from "./pages/Dashboard";
-import Creadores from "./pages/Creadores";
-import OnboardingPage from "./pages/creadores/onboarding/OnboardingPage";
-import OnboardingWizardPage from "./pages/creadores/onboarding/OnboardingWizardPage";
-import OffboardingListPage from "./pages/creadores/offboarding/OffboardingListPage";
-import OffboardingDetailPage from "./pages/creadores/offboarding/OffboardingDetailPage";
-import CreadorasDashboardPage from "./pages/creadores/CreadorasDashboardPage";
-import NuevoCreador from "./pages/NuevoCreador";
-import CreadorProfile from "./pages/CreadorProfile";
-import Eventos from "./pages/Eventos";
-import NuevoEvento from "./pages/NuevoEvento";
-import EditEvento from "./pages/EditEvento";
-import EventoDetail from "./pages/EventoDetail";
-import EventoSharePage from "./pages/eventos/EventoSharePage";
-import SharedAgendaPage from "./pages/eventos/SharedAgendaPage";
-import LeadGen from "./pages/LeadGen";
-import LeadGenBaseDatos from "./pages/LeadGenBaseDatos";
-import Closers from "./pages/Closers";
-import Tickets from "./pages/Tickets";
-import Promolog from "./pages/Promolog";
-import Contactos from "./pages/Contactos";
-import NuevoContacto from "./pages/NuevoContacto";
-import Tareas from "./pages/Tareas";
-import TareaProject from "./pages/TareaProject";
-import TaskSharePage from "./pages/tareas/TaskSharePage";
-import ProjectSharePage from "./pages/tareas/ProjectSharePage";
-import AdminUsuarios from "./pages/admin/AdminUsuarios";
-import AuditoriaRoles from "./pages/admin/AuditoriaRoles";
-import AdminRoute from "./components/AdminRoute";
-import Roadmap from "./pages/Roadmap";
-import Messenger from "./pages/Messenger";
-import Notificaciones from "./pages/Notificaciones";
-import NotificacionesSettings from "./pages/ajustes/NotificacionesSettings";
 import NotFound from "./pages/NotFound";
-import HRDashboard from "./pages/hr/HRDashboard";
-import EmployeeDirectory from "./pages/hr/EmployeeDirectory";
-import EmployeeNew from "./pages/hr/EmployeeNew";
-import EmployeeProfile from "./pages/hr/EmployeeProfile";
-import HRAbsences from "./pages/hr/HRAbsences";
-import HRIncidents from "./pages/hr/HRIncidents";
-import HRApplicants from "./pages/hr/HRApplicants";
-import HRTraining from "./pages/hr/HRTraining";
-import HRTrainingChatters from "./pages/hr/HRTrainingChatters";
-import HRTrainingTech from "./pages/hr/HRTrainingTech";
-import HRPerformance from "./pages/hr/HRPerformance";
-import HRPerformanceNew from "./pages/hr/HRPerformanceNew";
-import HRLayout from "./pages/hr/HRLayout";
-import HRAttendance from "./pages/hr/HRAttendance";
-import HRVacations from "./pages/hr/HRVacations";
-import HRPermisos from "./pages/hr/HRPermisos";
-import HRSchedules from "./pages/hr/HRSchedules";
-import HROvertimeDetail from "./pages/hr/HROvertimeDetail";
-import HRHourBank from "./pages/hr/HRHourBank";
-import HRChatterSchedules from "./pages/hr/HRChatterSchedules";
-import HRIncidentNew from "./pages/hr/HRIncidentNew";
-import HRApplicantNew from "./pages/hr/HRApplicantNew";
-import HROnboarding from "./pages/hr/HROnboarding";
-import HROnboardingNew from "./pages/hr/HROnboardingNew";
-import HROffboarding from "./pages/hr/HROffboarding";
-import HROffboardingNew from "./pages/hr/HROffboardingNew";
-import HRMonitoring from "./pages/hr/HRMonitoring";
-import HRDirectoryLookup from "./pages/hr/HRDirectoryLookup";
-import HROrganigrama from "./pages/hr/HROrganigrama";
-import HRDeductions from "./pages/hr/HRDeductions";
-import HRDeductionNew from "./pages/hr/HRDeductionNew";
-import HRAnnouncements from "./pages/hr/HRAnnouncements";
-import FinanzasLayout from "./pages/finanzas/FinanzasLayout";
-import FinanzasDashboard from "./pages/finanzas/FinanzasDashboard";
-import NominaPage from "./pages/finanzas/nomina/NominaPage";
-import FacturacionPage from "./pages/finanzas/facturacion/FacturacionPage";
-import ControlFinancieroPage from "./pages/finanzas/control/ControlFinancieroPage";
-import ReportesPage from "./pages/finanzas/reportes/ReportesPage";
-import ConfiguracionPage from "./pages/finanzas/configuracion/ConfiguracionPage";
-import CollectionsPage from "./pages/finanzas/collections/CollectionsPage";
-import HorasVariablesPage from "./pages/finanzas/horas-variables/HorasVariablesPage";
-import PersonalizadosPage from "./pages/creadores/personalizados/PersonalizadosPage";
-import VideoCallPage from "./pages/VideoCallPage";
-import CoworkPage from "./pages/cowork/CoworkPage";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const DesignSystem = lazy(() => import("./pages/DesignSystem"));
+const Docs = lazy(() => import("./pages/Docs"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+
+// Sales
+const SalesDashboard = lazy(() => import("./pages/SalesDashboard"));
+const SalesOverview = lazy(() => import("./pages/SalesOverview"));
+const ComparativasPage = lazy(() => import("./pages/sales-overview/ComparativasPage"));
+const Top10Page = lazy(() => import("./pages/sales-overview/Top10Page"));
+const SubiendoPage = lazy(() => import("./pages/sales-overview/SubiendoPage"));
+const BajandoPage = lazy(() => import("./pages/sales-overview/BajandoPage"));
+const AltoPotencialPage = lazy(() => import("./pages/sales-overview/AltoPotencialPage"));
+const EnRiesgoPage = lazy(() => import("./pages/sales-overview/EnRiesgoPage"));
+const AiSales = lazy(() => import("./pages/AiSales"));
+const AiSalesConfig = lazy(() => import("./pages/AiSalesConfig"));
+
+// Creadores
+const Creadores = lazy(() => import("./pages/Creadores"));
+const CreadorasDashboardPage = lazy(() => import("./pages/creadores/CreadorasDashboardPage"));
+const OnboardingPage = lazy(() => import("./pages/creadores/onboarding/OnboardingPage"));
+const OnboardingWizardPage = lazy(() => import("./pages/creadores/onboarding/OnboardingWizardPage"));
+const OffboardingListPage = lazy(() => import("./pages/creadores/offboarding/OffboardingListPage"));
+const OffboardingDetailPage = lazy(() => import("./pages/creadores/offboarding/OffboardingDetailPage"));
+const NuevoCreador = lazy(() => import("./pages/NuevoCreador"));
+const CreadorProfile = lazy(() => import("./pages/CreadorProfile"));
+const PersonalizadosPage = lazy(() => import("./pages/creadores/personalizados/PersonalizadosPage"));
+
+// Eventos
+const Eventos = lazy(() => import("./pages/Eventos"));
+const NuevoEvento = lazy(() => import("./pages/NuevoEvento"));
+const EditEvento = lazy(() => import("./pages/EditEvento"));
+const EventoDetail = lazy(() => import("./pages/EventoDetail"));
+const EventoSharePage = lazy(() => import("./pages/eventos/EventoSharePage"));
+const SharedAgendaPage = lazy(() => import("./pages/eventos/SharedAgendaPage"));
+
+// LeadGen / Closers / Contactos
+const LeadGen = lazy(() => import("./pages/LeadGen"));
+const LeadGenBaseDatos = lazy(() => import("./pages/LeadGenBaseDatos"));
+const Closers = lazy(() => import("./pages/Closers"));
+const Tickets = lazy(() => import("./pages/Tickets"));
+const Promolog = lazy(() => import("./pages/Promolog"));
+const Contactos = lazy(() => import("./pages/Contactos"));
+const NuevoContacto = lazy(() => import("./pages/NuevoContacto"));
+
+// Tareas
+const Tareas = lazy(() => import("./pages/Tareas"));
+const TareaProject = lazy(() => import("./pages/TareaProject"));
+const TaskSharePage = lazy(() => import("./pages/tareas/TaskSharePage"));
+const ProjectSharePage = lazy(() => import("./pages/tareas/ProjectSharePage"));
+
+// Admin
+const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
+const AuditoriaRoles = lazy(() => import("./pages/admin/AuditoriaRoles"));
+
+// Misc
+const Roadmap = lazy(() => import("./pages/Roadmap"));
+const Messenger = lazy(() => import("./pages/Messenger"));
+const Notificaciones = lazy(() => import("./pages/Notificaciones"));
+const NotificacionesSettings = lazy(() => import("./pages/ajustes/NotificacionesSettings"));
+const VideoCallPage = lazy(() => import("./pages/VideoCallPage"));
+const CoworkPage = lazy(() => import("./pages/cowork/CoworkPage"));
+
+// HR
+const HRLayout = lazy(() => import("./pages/hr/HRLayout"));
+const HRDashboard = lazy(() => import("./pages/hr/HRDashboard"));
+const EmployeeDirectory = lazy(() => import("./pages/hr/EmployeeDirectory"));
+const EmployeeNew = lazy(() => import("./pages/hr/EmployeeNew"));
+const EmployeeProfile = lazy(() => import("./pages/hr/EmployeeProfile"));
+const HRAbsences = lazy(() => import("./pages/hr/HRAbsences"));
+const HRIncidents = lazy(() => import("./pages/hr/HRIncidents"));
+const HRApplicants = lazy(() => import("./pages/hr/HRApplicants"));
+const HRTraining = lazy(() => import("./pages/hr/HRTraining"));
+const HRTrainingChatters = lazy(() => import("./pages/hr/HRTrainingChatters"));
+const HRTrainingTech = lazy(() => import("./pages/hr/HRTrainingTech"));
+const HRPerformance = lazy(() => import("./pages/hr/HRPerformance"));
+const HRPerformanceNew = lazy(() => import("./pages/hr/HRPerformanceNew"));
+const HRAttendance = lazy(() => import("./pages/hr/HRAttendance"));
+const HRVacations = lazy(() => import("./pages/hr/HRVacations"));
+const HRPermisos = lazy(() => import("./pages/hr/HRPermisos"));
+const HRSchedules = lazy(() => import("./pages/hr/HRSchedules"));
+const HROvertimeDetail = lazy(() => import("./pages/hr/HROvertimeDetail"));
+const HRHourBank = lazy(() => import("./pages/hr/HRHourBank"));
+const HRChatterSchedules = lazy(() => import("./pages/hr/HRChatterSchedules"));
+const HRIncidentNew = lazy(() => import("./pages/hr/HRIncidentNew"));
+const HRApplicantNew = lazy(() => import("./pages/hr/HRApplicantNew"));
+const HROnboarding = lazy(() => import("./pages/hr/HROnboarding"));
+const HROnboardingNew = lazy(() => import("./pages/hr/HROnboardingNew"));
+const HROffboarding = lazy(() => import("./pages/hr/HROffboarding"));
+const HROffboardingNew = lazy(() => import("./pages/hr/HROffboardingNew"));
+const HRMonitoring = lazy(() => import("./pages/hr/HRMonitoring"));
+const HRDirectoryLookup = lazy(() => import("./pages/hr/HRDirectoryLookup"));
+const HROrganigrama = lazy(() => import("./pages/hr/HROrganigrama"));
+const HRDeductions = lazy(() => import("./pages/hr/HRDeductions"));
+const HRDeductionNew = lazy(() => import("./pages/hr/HRDeductionNew"));
+const HRAnnouncements = lazy(() => import("./pages/hr/HRAnnouncements"));
+
+// Finanzas
+const FinanzasLayout = lazy(() => import("./pages/finanzas/FinanzasLayout"));
+const FinanzasDashboard = lazy(() => import("./pages/finanzas/FinanzasDashboard"));
+const NominaPage = lazy(() => import("./pages/finanzas/nomina/NominaPage"));
+const FacturacionPage = lazy(() => import("./pages/finanzas/facturacion/FacturacionPage"));
+const ControlFinancieroPage = lazy(() => import("./pages/finanzas/control/ControlFinancieroPage"));
+const ReportesPage = lazy(() => import("./pages/finanzas/reportes/ReportesPage"));
+const ConfiguracionPage = lazy(() => import("./pages/finanzas/configuracion/ConfiguracionPage"));
+const CollectionsPage = lazy(() => import("./pages/finanzas/collections/CollectionsPage"));
+const HorasVariablesPage = lazy(() => import("./pages/finanzas/horas-variables/HorasVariablesPage"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    },
+  },
+});
+
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -119,6 +154,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Landing />} />
@@ -223,6 +259,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
         </OnlinePresenceProvider>
         </AuthProvider>
