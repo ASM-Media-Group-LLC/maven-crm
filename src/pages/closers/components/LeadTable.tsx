@@ -461,8 +461,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow>
             <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha asignación</TableHead>
@@ -478,8 +478,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow>
             <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
@@ -495,8 +495,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow>
             <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
@@ -508,8 +508,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow>
             <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Closer</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Último contacto</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Motivo rechazo</TableHead>
@@ -549,8 +549,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow>
             <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Estado</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
@@ -585,8 +585,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>{igLink}</TableCell>
             <TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
             </TableCell>
@@ -658,8 +658,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <>
             <TableRow key={c.id}>
               <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-              <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+              <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
               <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
               <TableCell>
@@ -717,8 +717,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell className="text-sm">${Number(c.estimated_monetization || 0).toLocaleString()}</TableCell>
             <TableCell className="text-sm">{Number(c.agency_commission || 0)}%</TableCell>
@@ -731,8 +731,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">
               {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
@@ -819,8 +819,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell>{igLink}</TableCell>
             <TableCell>
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={false} />
             </TableCell>
