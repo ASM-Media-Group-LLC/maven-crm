@@ -247,7 +247,7 @@ export const useCloserLeads = () => {
 
       return { creators: enriched, total: count || 0 };
     },
-    placeholderData: keepPreviousData,
+    
     enabled: !!user?.id && !!role,
   });
 
