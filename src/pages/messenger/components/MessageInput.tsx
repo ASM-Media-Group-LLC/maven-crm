@@ -12,23 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import VoiceNoteRecorder from "./VoiceNoteRecorder";
 
-const EMOJIS = [
-  "😀","😂","😍","🥰","😎","🤔","👍","👋","🎉","🔥",
-  "❤️","💯","🚀","✅","⭐","💪","🙏","😊","🤩","👏",
-  "😅","🫡","🤝","💀","🥲","😤","🤓","🫠","🙌","💜",
-];
-
-const MAX_FILES = 20;
-const MAX_FILE_SIZE_MB = 350;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-const TUS_CHUNK_SIZE_BYTES = 6 * 1024 * 1024;
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
+import { EMOJIS, MAX_FILES, MAX_FILE_SIZE_MB, MAX_FILE_SIZE_BYTES, formatFileSize, uploadFileWithTUS } from "../uploadUtils";
 
 interface PendingFile {
   file: File;
