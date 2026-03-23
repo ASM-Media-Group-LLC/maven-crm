@@ -1,34 +1,96 @@
 
 
-## Plan: Compactar stats cards de LeadGen para dar más espacio a la tabla
+## Plan: Messenger Module M3 Redesign + Thread Fix + Code Cleanup
 
-### Problema
-Las dos KPI cards (Cantidad y Estados) ocupan demasiado espacio vertical (~200px+), dejando poco espacio para la tabla. En un viewport de 887px, después del header, KPIs, tabs y filtros, quedan apenas ~250px para la tabla — insuficiente para mostrar 5 filas.
+### Problem
+1. **Thread panel cuts off**: At 1311px viewport, sidebar (320px) + chat area + thread panel (380px) overflow. The thread panel gets clipped on the right edge.
+2. **Inconsistent M3 styling**: While some M3 patterns exist, the module lacks cohesive Material You polish across all components.
+3. **Orphan/duplicate code**: TUS upload logic is duplicated in both `MessageInput.tsx` and `ThreadPanel.tsx` (~180 lines each). `formatFileSize` is defined in 3 places. `ThreadPanel` re-implements message rendering instead of reusing `MessageBubble`.
 
-### Solución
-Compactar ambas cards para que ocupen ~50% del espacio actual, pasando de layout vertical a horizontal dentro de cada card.
+### Solution
 
-### Cambios
+#### Phase 1: Fix Thread Panel Overflow (Critical Bug)
+**File: `ChatView.tsx`**
+- Change side panels (Thread, Search, SharedFiles, GroupMembers) from `sm:relative` siblings in a flex row to **overlay panels** that float on top of the chat area on all screen sizes
+- Use `absolute right-0 inset-y-0` with a backdrop shadow instead of adding width to the flex container
+- This prevents the combined width from exceeding the viewport
 
-#### 1. `LeadGenCantidadCard.tsx`
-- Reducir padding del CardHeader y CardContent (`pb-1`, `p-4 pt-0`)
-- Cambiar los botones de categoría: reducir padding de `p-2` a `p-1.5`, font del número de `text-xl` a `text-base`
-- Reducir la fila Total/QA: padding de `px-3 py-2` a `px-2 py-1`, font de `text-lg` a `text-sm`
-- Reducir `mb-3` a `mb-1.5` entre las dos secciones
+**Files: `ThreadPanel.tsx`, `SearchResultsPanel.tsx`, `SharedFilesGallery.tsx`, `GroupMembersPanel.tsx`**
+- Remove `sm:relative sm:inset-auto` — always render as overlay positioned panels
+- Add consistent class: `absolute right-0 top-0 bottom-0 z-20 w-full sm:w-[380px] bg-card shadow-xl sm:rounded-l-3xl flex flex-col`
+- Add a semi-transparent backdrop click-to-close on mobile
 
-#### 2. `LeadGenEstadosCard.tsx`
-- Reducir padding de cada botón de estado de `py-2.5` a `py-1.5`
-- Reducir `space-y-1` a `space-y-0.5`
-- Reducir padding del CardHeader y CardContent (`pb-1`, `p-4 pt-0`)
+#### Phase 2: M3 Visual Polish
+**File: `ChatSidebar.tsx`**
+- Refine header surface: consistent `bg-surface-container-low` pattern using `bg-card`
+- Clean up spacing inconsistencies in quick access buttons
+- Improve conversation item hover/active states with M3 state layers
 
-#### 3. `LeadGenContent.tsx` (línea 235)
-- Reducir padding del contenedor de KPIs de `py-4` a `py-2`
+**File: `ChatHeader.tsx`**
+- Add subtle bottom border or elevation shadow for separation
+- Consistent icon button sizing (all `h-10 w-10` on mobile, `h-9 w-9` on desktop)
 
-### Resultado
-Las cards pasan de ~200px a ~130px de alto, liberando ~70px adicionales para la tabla — suficiente para mostrar al menos 5 filas de leads con la paginación visible.
+**File: `MessageBubble.tsx`**
+- Refine bubble radius logic for cleaner M3 shape (keep existing tail logic)
+- Improve hover action positioning to prevent clipping near edges
 
-### Archivos a modificar
-- `src/pages/leadgen/LeadGenCantidadCard.tsx`
-- `src/pages/leadgen/LeadGenEstadosCard.tsx`
-- `src/pages/leadgen/LeadGenContent.tsx`
+**File: `MessageInput.tsx`**
+- Consistent input container with `rounded-3xl` surface
+- Unified action button sizes
+
+**File: `MessageList.tsx`**
+- Improve date separator chip styling
+- Better empty state with M3 illustration pattern
+
+#### Phase 3: Responsive Improvements
+**All side panels** (Thread, Search, SharedFiles, GroupMembers):
+- Mobile (<640px): Full-screen overlay with slide-in animation + `rounded-t-3xl` top corners
+- Tablet/Desktop (>=640px): Right-aligned overlay panel with `w-[380px]` and shadow
+
+**ChatView + MessengerPage:**
+- Ensure chat view takes full width when a panel is open (panel overlays, doesn't push)
+- Touch targets: all interactive elements minimum `h-11` (44px) on mobile
+
+#### Phase 4: Code Cleanup
+**Extract shared TUS upload utility** (`src/pages/messenger/uploadUtils.ts`):
+- Move TUS upload logic from `MessageInput.tsx` (lines 99-277) and `ThreadPanel.tsx` (lines 94-176)
+- Single `uploadFileWithTUS(file, path, callbacks)` function
+- Single `formatFileSize(bytes)` function (currently in MessageInput, ThreadPanel, and SharedFilesGallery)
+
+**ThreadPanel.tsx simplification:**
+- Remove duplicated `renderMessageContent` (~80 lines) — extract to a shared utility or lightweight component in `utils.ts`
+- Remove duplicated EMOJIS constant (defined in both MessageInput and ThreadPanel)
+
+**Remove orphan code:**
+- `ContactsListPanel.tsx` — check if imported anywhere; if not, delete
+- `VideoCallView.tsx` — verify if still used or replaced by `/call/:roomName` route
+
+### Files to modify
+1. `src/pages/messenger/ChatView.tsx` — side panel layout change
+2. `src/pages/messenger/components/ThreadPanel.tsx` — overlay positioning + extract upload
+3. `src/pages/messenger/components/SearchResultsPanel.tsx` — overlay positioning
+4. `src/pages/messenger/components/SharedFilesGallery.tsx` — overlay positioning
+5. `src/pages/messenger/components/GroupMembersPanel.tsx` — overlay positioning
+6. `src/pages/messenger/components/MessageInput.tsx` — extract upload, M3 polish
+7. `src/pages/messenger/components/MessageBubble.tsx` — M3 refinement
+8. `src/pages/messenger/components/MessageList.tsx` — M3 refinement
+9. `src/pages/messenger/ChatSidebar.tsx` — M3 polish
+10. `src/pages/messenger/components/ChatHeader.tsx` — M3 polish
+11. `src/pages/messenger/uploadUtils.ts` — NEW: shared upload utility
+12. `src/pages/messenger/ContactsListPanel.tsx` — potentially delete
+13. `src/pages/messenger/VideoCallView.tsx` — potentially delete
+
+### Files NOT modified (no changes needed)
+- `MessengerPage.tsx` — layout is correct, only child components change
+- `types.ts`, `utils.ts` — already clean
+- `NewChatModal.tsx`, `VideoRoomsPanel.tsx` — already M3-compliant
+- `NotificationSettings.tsx`, `StatusPicker.tsx`, `ReactionPicker.tsx`, `ReactionsDisplay.tsx`, `ReadReceiptIndicator.tsx`, `ImageLightbox.tsx`, `VoiceNoteRecorder.tsx`, `MentionAutocomplete.tsx`, `AvatarUpload.tsx`, `DeleteChatDialog.tsx`, `GlobalSearchPanel.tsx`, `IncomingCallModal.tsx` — already clean or minimal
+
+### Execution order
+1. Extract `uploadUtils.ts` first (no UI impact, unblocks ThreadPanel cleanup)
+2. Fix side panel overlay layout (ChatView + all 4 panels)
+3. Clean ThreadPanel (remove duplicated rendering/upload code)
+4. M3 polish pass on remaining components
+5. Delete orphan files
+6. Verify responsive behavior
 
