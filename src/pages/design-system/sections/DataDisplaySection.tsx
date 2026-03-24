@@ -42,7 +42,26 @@ const standardColumns = [
   { name: "Acciones", desc: "Sticky right, DropdownMenu con 3-dot trigger" },
 ];
 
-export const DataDisplaySection = () => (
+const allMockRows = Array.from({ length: 24 }, (_, i) => ({
+  date: `${String(24 - i).padStart(2, "0")}/03/2026`,
+  ig: `@creadora_${i + 1}`,
+  agent: ["María G.", "Carlos R.", "Ana L.", "Luis M.", "Sara P.", "Pedro J."][i % 6],
+  status: ["Nuevo", "Asignada", "Confirmada", "Nuevo", "Asignada", "Completada"][i % 6],
+  cat: (["A+", "A", "B+", "B", "C"] as const)[i % 5],
+  phone: ["+52 55 1234", "+57 300 5678", "+34 612 9012", "—", "+1 305 3456", "+52 55 7890"][i % 6],
+  email: [`ejemplo${i + 1}@mail.com`],
+  platform: ["OnlyFans", "Fansly", "OnlyFans", "Fansly"][i % 4],
+  notes: ["Contacto vía DM", "Pendiente llamada", "—", "Revisar perfil", "Interesada en plan", "Referida por agencia", "Seguimiento semanal", "Primera interacción"][i % 8],
+}));
+
+export const DataDisplaySection = () => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const totalCount = allMockRows.length;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const rows = useMemo(() => allMockRows.slice((page - 1) * pageSize, page * pageSize), [page, pageSize]);
+
+  return (
   <section id="data-display" className="space-y-8">
     <div>
       <h2 className="text-3xl font-semibold mb-2">2.7 Data Display</h2>
