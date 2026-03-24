@@ -257,32 +257,6 @@ const SharedAgendaPage = () => {
               </div>
             </div>
 
-            {/* Projects filter */}
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-3">Proyectos</p>
-              <div className="flex flex-col gap-0.5">
-                {PROJECT_TABS.map((tab) => {
-                  const isActive = projectFilter === tab;
-                  const colors = PROJECT_COLORS[tab];
-                  const count = tab === "Todos"
-                    ? events.length
-                    : events.filter((e) => e.project_type === tab).length;
-                  return (
-                    <button key={tab} onClick={() => setProjectFilter(tab)}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all text-left",
-                        isActive
-                          ? colors ? `${colors.bg} ${colors.text}` : "bg-muted text-foreground"
-                          : "hover:bg-muted/40 text-muted-foreground"
-                      )}>
-                      <span className={cn("h-2 w-2 rounded-full shrink-0", colors?.dot ?? "bg-muted-foreground")} />
-                      <span className="flex-1">{tab}</span>
-                      <span className={cn("text-[11px] tabular-nums", isActive ? "font-semibold" : "opacity-60")}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           {/* RIGHT: Events feed */}
