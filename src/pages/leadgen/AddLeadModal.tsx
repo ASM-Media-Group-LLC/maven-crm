@@ -164,54 +164,27 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // Duplicate check in leadgen_entries
-      const { data: existing } = await supabase
-        .from("leadgen_entries")
-        .select("id, model_handle, company")
-        .ilike("model_handle", normalizedHandle)
-        .eq("platform", data.platform)
-        .limit(1)
-        .maybeSingle();
-      if (existing) {
-        toast({
-          title: "Duplicado detectado",
-          description: `Ya existe un lead con este handle en ${existing.company}: @${existing.model_handle}`,
-          variant: "destructive",
-        });
+      // Duplicate check by phone number across all tables
+      const phoneNormalized = data.phone_raw.replace(/\s+/g, "").trim();
+      
+      const [{ data: phoneLG }, { data: phoneCloser }, { data: phoneCreator }] = await Promise.all([
+        supabase.from("leadgen_entries").select("id, model_handle, company").eq("phone_raw", phoneNormalized).limit(1).maybeSingle(),
+        supabase.from("closers_contacts").select("id, handle, company").eq("phone", phoneNormalized).limit(1).maybeSingle(),
+        supabase.from("creators").select("id, instagram_handle, name").eq("phone", phoneNormalized).limit(1).maybeSingle(),
+      ]);
+
+      if (phoneLG) {
+        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en LeadGen: @${phoneLG.model_handle} (${phoneLG.company || ""})`, variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
-
-      // Cross-table duplicate check: closers_contacts
-      const { data: existingCloser } = await supabase
-        .from("closers_contacts")
-        .select("id, handle, company")
-        .ilike("handle", normalizedHandle)
-        .limit(1)
-        .maybeSingle();
-      if (existingCloser) {
-        toast({
-          title: "Duplicado detectado",
-          description: `Este handle ya existe en Closers (${existingCloser.company || "sin compañía"}): @${existingCloser.handle}`,
-          variant: "destructive",
-        });
+      if (phoneCloser) {
+        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en Contactos: @${phoneCloser.handle} (${phoneCloser.company || ""})`, variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
-
-      // Cross-table duplicate check: creators
-      const { data: existingCreator } = await supabase
-        .from("creators")
-        .select("id, instagram_handle, name")
-        .ilike("instagram_handle", normalizedHandle)
-        .limit(1)
-        .maybeSingle();
-      if (existingCreator) {
-        toast({
-          title: "Duplicado detectado",
-          description: `Este handle ya existe como Creadora: ${existingCreator.name} (@${existingCreator.instagram_handle})`,
-          variant: "destructive",
-        });
+      if (phoneCreator) {
+        toast({ title: "Número ya registrado", description: `Este teléfono ya existe como Creadora: ${phoneCreator.name} (@${phoneCreator.instagram_handle})`, variant: "destructive" });
         setIsSubmitting(false);
         return;
       }
@@ -224,6 +197,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
+        phone_raw: phoneNormalized,
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
