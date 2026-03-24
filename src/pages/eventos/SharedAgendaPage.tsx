@@ -297,7 +297,7 @@ const SharedAgendaPage = () => {
                 <div key={d} className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground py-2">{d}</div>
               ))}
               {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-11" />
+                <div key={`empty-${i}`} className="h-9" />
               ))}
               {daysInMonth.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd");
@@ -317,7 +317,7 @@ const SharedAgendaPage = () => {
                     key={dateStr}
                     onClick={() => setSelectedDate(isSelected ? null : day)}
                     className={cn(
-                      "relative flex flex-col items-center justify-center rounded-lg h-11 text-sm transition-all duration-150 hover:scale-105",
+                      "relative flex flex-col items-center justify-center rounded-lg h-9 text-sm transition-all duration-150 hover:scale-105",
                       isSelected
                         ? "bg-primary text-primary-foreground font-semibold shadow-md"
                         : today
@@ -329,7 +329,7 @@ const SharedAgendaPage = () => {
                   >
                     {format(day, "d")}
                     {hasEvent && !isSelected && (
-                      <span className="absolute bottom-1 flex gap-0.5 calendar-day-has-event">
+                      <span className="absolute bottom-0.5 flex gap-0.5 calendar-day-has-event">
                         {dayProjectColors.map((dotColor, i) => (
                           <span key={i} className={`h-1 w-1 rounded-full ${dotColor}`} />
                         ))}
@@ -338,16 +338,6 @@ const SharedAgendaPage = () => {
                   </button>
                 );
               })}
-            </div>
-
-            {/* Calendar Footer - gradient summary */}
-            <div className="mt-4 rounded-xl bg-gradient-to-r from-primary/5 via-accent/5 to-transparent px-4 py-3 flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-                <CalendarDays className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{eventsThisMonth}</span> eventos programados este mes
-              </p>
             </div>
           </CardContent>
         </Card>
