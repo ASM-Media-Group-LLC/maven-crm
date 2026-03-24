@@ -611,12 +611,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <div className="flex gap-1">
                 {followUpPending && (
-                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5">
+                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap">
                     <AlertTriangle className="h-3 w-3" /> Follow-up
                   </Badge>
                 )}
                 {isLastAttempt && (
-                  <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5">
+                  <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
                     <Clock className="h-3 w-3" /> Último intento
                   </Badge>
                 )}
