@@ -32,7 +32,7 @@ const EVENT_TYPES = [
 ];
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
 function computeDuration(startH: string, startM: string, endH: string, endM: string): string {
   if (!startH || !endH) return "";
