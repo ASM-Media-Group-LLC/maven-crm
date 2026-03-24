@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       // Find event by external token
       const { data: event, error: eventErr } = await supabase
         .from("events")
-        .select("id, name, date, end_date, start_time, end_time, location, event_type, external_link_expires_at")
+        .select("id, name, date, end_date, start_time, end_time, location, event_type, description, project_type, status, external_link_expires_at")
         .eq("external_token", token)
         .single();
 
@@ -72,6 +72,9 @@ Deno.serve(async (req) => {
             end_time: event.end_time,
             location: event.location,
             event_type: event.event_type,
+            description: event.description,
+            project_type: event.project_type,
+            status: event.status,
           },
           guests: guestList,
         }),

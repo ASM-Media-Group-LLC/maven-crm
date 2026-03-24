@@ -32,7 +32,7 @@ const EVENT_TYPES = [
 ];
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
 function computeDuration(startH: string, startM: string, endH: string, endM: string): string {
   if (!startH || !endH) return "";
@@ -81,6 +81,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity?.toString() ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [includeVideoCall, setIncludeVideoCall] = useState(!!(event as any)?.video_call_room_id);
+  const [showCustomProject, setShowCustomProject] = useState(false);
+  const [customProject, setCustomProject] = useState("");
 
   // Guests
   const [guests, setGuests] = useState<LocalGuest[]>(existingGuests ?? []);
@@ -98,7 +100,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !eventType || !date || !projectType) {
+    const finalProject = showCustomProject ? customProject.trim() : projectType;
+    if (!name.trim() || !eventType || !date || !finalProject) {
       toast({ title: "Completa los campos obligatorios (nombre, tipo, proyecto, fecha)", variant: "destructive" });
       return;
     }
@@ -108,7 +111,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
     const formData = {
       name: name.trim(),
       event_type: eventType,
-      project_type: projectType,
+      project_type: finalProject,
       description: description || null,
       date: format(date, "yyyy-MM-dd"),
       end_date: multiDay && endDate ? format(endDate, "yyyy-MM-dd") : null,
@@ -214,14 +217,43 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
 
                   <div className="space-y-2">
                     <Label>Proyecto *</Label>
-                    <Select value={projectType} onValueChange={setProjectType}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
-                      <SelectContent>
-                        {PROJECT_TYPES.map((p) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {showCustomProject ? (
+                      <div className="flex gap-2">
+                        <Input
+                          value={customProject}
+                          onChange={(e) => setCustomProject(e.target.value)}
+                          placeholder="Nombre del nuevo proyecto"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setShowCustomProject(false); setCustomProject(""); }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select value={projectType} onValueChange={(val) => {
+                        if (val === "__custom__") {
+                          setShowCustomProject(true);
+                          setProjectType("");
+                        } else {
+                          setProjectType(val);
+                        }
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
+                        <SelectContent>
+                          {PROJECT_TYPES.map((p) => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                          <SelectItem value="__custom__" className="text-primary font-medium">
+                            + Agregar proyecto
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
