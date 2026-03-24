@@ -210,22 +210,26 @@ const EventoSharePage = () => {
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{event.name}</h1>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <TypeIcon className="h-4 w-4" />
-              <span className="text-sm font-medium">{event.event_type}</span>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button variant="outline" size="sm" className="gap-2" asChild>
-                <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Google Calendar
-                </a>
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadICS(event)}>
-                <Download className="h-3.5 w-3.5" />
-                Descargar .ics
-              </Button>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1.5 min-w-0">
+                <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{event.name}</h1>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <TypeIcon className="h-4 w-4" />
+                  <span className="text-sm font-medium">{event.event_type}</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0 pt-1">
+                <Button variant="outline" size="sm" className="gap-2" asChild>
+                  <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Google Calendar
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadICS(event)}>
+                  <Download className="h-3.5 w-3.5" />
+                  Descargar .ics
+                </Button>
+              </div>
             </div>
           </section>
 
