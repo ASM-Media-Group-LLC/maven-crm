@@ -220,11 +220,11 @@ const SharedAgendaPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-y-1">
+              <div className="grid grid-cols-7 gap-y-1.5">
                 {WEEKDAYS.map((d) => (
                   <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground/60 py-2.5">{d}</div>
                 ))}
-                {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`e-${i}`} className="h-10" />)}
+                {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`e-${i}`} className="h-11" />)}
                 {daysInMonth.map((day) => {
                   const dateStr = format(day, "yyyy-MM-dd");
                   const dayEvents = eventDatesMap.get(dateStr);
