@@ -109,15 +109,6 @@ const EventosCalendar = ({ events }: Props) => {
             }}
           />
 
-          {/* Footer */}
-          <div className="mt-4 rounded-xl bg-gradient-to-r from-primary/5 via-accent/5 to-transparent px-4 py-3 flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-              <CalendarDays className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">{eventsThisMonth}</span> eventos programados este mes
-            </p>
-          </div>
         </CardContent>
       </Card>
 
