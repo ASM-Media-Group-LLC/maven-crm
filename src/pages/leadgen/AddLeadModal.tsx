@@ -92,6 +92,7 @@ const leadSchema = z.object({
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
+  phone_raw: z.string().min(5, "Teléfono requerido (mínimo 5 dígitos)"),
   country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
 });
