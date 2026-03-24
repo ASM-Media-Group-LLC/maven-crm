@@ -201,7 +201,7 @@ const SharedAgendaPage = () => {
           {/* LEFT: Calendar + Projects */}
           <div className="space-y-5 lg:sticky lg:top-20 lg:self-start">
             {/* Calendar */}
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-xl border border-border bg-card p-5 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold capitalize tracking-tight">
                   {format(currentMonth, "MMMM yyyy", { locale: es })}
@@ -220,11 +220,11 @@ const SharedAgendaPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-y-1">
+              <div className="grid grid-cols-7 gap-y-1.5">
                 {WEEKDAYS.map((d) => (
                   <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground/60 py-2.5">{d}</div>
                 ))}
-                {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`e-${i}`} className="h-10" />)}
+                {Array.from({ length: startDayOfWeek }).map((_, i) => <div key={`e-${i}`} className="h-11" />)}
                 {daysInMonth.map((day) => {
                   const dateStr = format(day, "yyyy-MM-dd");
                   const dayEvents = eventDatesMap.get(dateStr);
@@ -239,7 +239,7 @@ const SharedAgendaPage = () => {
                   return (
                     <button key={dateStr} onClick={() => setSelectedDate(isSelected ? null : day)}
                       className={cn(
-                        "relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all",
+                        "relative flex flex-col items-center justify-center rounded-lg h-11 text-sm transition-all",
                         isSelected ? "bg-primary text-primary-foreground font-bold shadow-sm"
                           : today ? "bg-primary/15 text-primary font-bold"
                           : hasEvent ? "hover:bg-muted font-medium text-foreground"
