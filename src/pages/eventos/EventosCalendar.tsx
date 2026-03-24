@@ -53,9 +53,9 @@ const EventosCalendar = ({ events }: Props) => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendar Card */}
       <Card className="lg:col-span-2 overflow-hidden">
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <h3 className="text-xl font-bold capitalize tracking-tight">
                 {format(month, "MMMM yyyy", { locale: es })}
