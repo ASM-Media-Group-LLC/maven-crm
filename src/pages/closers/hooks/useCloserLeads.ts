@@ -245,6 +245,7 @@ export const useCloserLeads = () => {
     },
     
     enabled: !!user?.id && !!role,
+    staleTime: 30_000,
   });
 
   const creators = creatorsData?.creators || [];

@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Info, ArrowUpDown, MoreHorizontal } from "lucide-react";
 
 const solidBadges = ["default", "secondary", "destructive", "success", "warning", "info"] as const;
 const softBadges = ["primary-soft", "secondary-soft", "destructive-soft", "success-soft", "warning-soft"] as const;
@@ -24,6 +24,20 @@ const tableData = [
   { id: "INV-001", nombre: "Plan Pro", estado: "success", monto: "$29.00" },
   { id: "INV-002", nombre: "Plan Business", estado: "warning", monto: "$99.00" },
   { id: "INV-003", nombre: "Add-on Storage", estado: "destructive", monto: "$9.00" },
+];
+
+const STICKY_HEADER_CLASS = "sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]";
+const STICKY_ACTION_CLASS = "sticky right-0 z-10 bg-card";
+const STICKY_ACTION_HEADER_CLASS = "sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]";
+
+const standardColumns = [
+  { name: "Creación", desc: "Fecha dd/MM/yyyy, ordenable" },
+  { name: "Handle / Instagram", desc: "Con icono + link externo" },
+  { name: "Agente / Creado por", desc: "Nombre del usuario responsable" },
+  { name: "Estado", desc: "Solo si la tabla es de gestión (pipeline)" },
+  { name: "Categoría", desc: "Badge soft: A+, A, B+, B, C" },
+  { name: "Contacto", desc: "Teléfono + link WhatsApp" },
+  { name: "Acciones", desc: "Sticky right, DropdownMenu con 3-dot trigger" },
 ];
 
 export const DataDisplaySection = () => (
@@ -35,6 +49,228 @@ export const DataDisplaySection = () => (
       </p>
     </div>
 
+    {/* ── Data Table Standard ── */}
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-medium mb-2 text-muted-foreground">
+          Data Table Standard
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-2xl mb-4">
+          Patrón canónico para todas las tablas de alto volumen en la plataforma.
+          Referencia: <code className="text-xs bg-muted px-1.5 py-0.5 rounded">ContactosTable.tsx</code>
+        </p>
+      </div>
+
+      {/* Layout diagram */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <div className="bg-muted/50 px-4 py-2 border-b border-border">
+          <span className="text-xs font-mono text-muted-foreground">Layout Structure</span>
+        </div>
+        <div className="p-4 space-y-2 font-mono text-xs">
+          <div className="rounded border border-dashed border-border p-3 space-y-2">
+            <p className="text-muted-foreground">{"<DataTableShell className=\"flex-1 min-h-0\">"}</p>
+            <div className="ml-4 space-y-1.5">
+              <div className="rounded bg-primary/10 px-3 py-1.5 text-primary">
+                ↕ Scrollable area (flex-1 overflow-auto)
+              </div>
+              <div className="ml-4 space-y-1">
+                <div className="rounded bg-accent/50 px-3 py-1">
+                  TableHeader — sticky top-0 z-20, per-cell
+                </div>
+                <div className="rounded bg-accent/30 px-3 py-1">
+                  TableBody — rows with sticky right actions
+                </div>
+              </div>
+              <div className="rounded bg-secondary px-3 py-1.5 text-secondary-foreground">
+                Pagination footer — shrink-0, always visible
+              </div>
+            </div>
+            <p className="text-muted-foreground">{"</DataTableShell>"}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Column order */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Orden de columnas estándar</h4>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[180px]">Columna</TableHead>
+                <TableHead>Descripción</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {standardColumns.map((col) => (
+                <TableRow key={col.name}>
+                  <TableCell className="font-medium text-sm">{col.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{col.desc}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* CSS Classes reference */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Clases CSS estándar</h4>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">Elemento</TableHead>
+                <TableHead>Clase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Header cell</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    {STICKY_HEADER_CLASS}
+                  </code>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Action header</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    {STICKY_ACTION_HEADER_CLASS}
+                  </code>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Action cell (row)</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    {STICKY_ACTION_CLASS}
+                  </code>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Sort header button</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    variant="ghost" size="sm" className="-ml-3 h-8 text-xs"
+                  </code>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Table min-width</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    min-w-[1000px]
+                  </code>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium text-sm">Empty state</TableCell>
+                <TableCell>
+                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">
+                    {"colSpan={totalColumns} className=\"h-24 text-center text-muted-foreground\""}
+                  </code>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Live example */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Ejemplo: header sticky + acciones sticky</h4>
+        <div className="rounded-lg border border-border overflow-auto max-h-[200px]">
+          <Table className="min-w-[700px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className={STICKY_HEADER_CLASS}>
+                  <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
+                    Creación <ArrowUpDown className="ml-1 h-3 w-3" />
+                  </Button>
+                </TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>
+                  <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
+                    Instagram <ArrowUpDown className="ml-1 h-3 w-3" />
+                  </Button>
+                </TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>Agente</TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>Categoría</TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>Contacto</TableHead>
+                <TableHead className={STICKY_ACTION_HEADER_CLASS}></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[
+                { date: "15/03/2026", ig: "@ejemplo_1", agent: "María G.", cat: "A+", phone: "+52 55 1234" },
+                { date: "14/03/2026", ig: "@ejemplo_2", agent: "Carlos R.", cat: "B+", phone: "+57 300 5678" },
+                { date: "13/03/2026", ig: "@ejemplo_3", agent: "Ana L.", cat: "A", phone: "+34 612 9012" },
+                { date: "12/03/2026", ig: "@ejemplo_4", agent: "Luis M.", cat: "C", phone: "—" },
+                { date: "11/03/2026", ig: "@ejemplo_5", agent: "Sara P.", cat: "B", phone: "+1 305 3456" },
+              ].map((r, i) => (
+                <TableRow key={i}>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{r.date}</TableCell>
+                  <TableCell className="text-sm font-medium">{r.ig}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{r.agent}</TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      r.cat === "A+" ? "success-soft" :
+                      r.cat === "A" ? "primary-soft" :
+                      r.cat === "B+" ? "warning-soft" :
+                      r.cat === "B" ? "secondary-soft" : "destructive-soft"
+                    } className="font-normal">{r.cat}</Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
+                  <TableCell className={STICKY_ACTION_CLASS}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Rules */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Reglas de implementación</h4>
+        <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-5">
+          <li>
+            <strong>DataTableShell</strong>: usar siempre como wrapper. Modo internal scroll con{" "}
+            <code className="text-xs bg-muted px-1 rounded">className="flex-1 min-h-0"</code>.
+          </li>
+          <li>
+            <strong>Sticky headers</strong>: aplicar por celda (<code className="text-xs bg-muted px-1 rounded">TableHead</code>),
+            no en <code className="text-xs bg-muted px-1 rounded">TableHeader</code>.
+          </li>
+          <li>
+            <strong>Acciones</strong>: siempre <code className="text-xs bg-muted px-1 rounded">sticky right-0</code> con
+            fondo sólido <code className="text-xs bg-muted px-1 rounded">bg-card</code>.
+          </li>
+          <li>
+            <strong>Terminología</strong>: siempre "Categoría" (no "Calidad"). Valores: A+, A, B+, B, C.
+          </li>
+          <li>
+            <strong>Orden de columnas</strong>: Creación siempre precede al Handle/Instagram.
+          </li>
+          <li>
+            <strong>Edición inline</strong>: usar <code className="text-xs bg-muted px-1 rounded">InlineCategorySelect</code> e{" "}
+            <code className="text-xs bg-muted px-1 rounded">InlineStageSelect</code> en tablas de gestión (pipelines).
+          </li>
+          <li>
+            <strong>Paginación server-side</strong>: obligatorio para datasets {">"} 100 registros. Usar <code className="text-xs bg-muted px-1 rounded">.range()</code> con <code className="text-xs bg-muted px-1 rounded">{"{ count: \"exact\" }"}</code>.
+          </li>
+          <li>
+            <strong>No usar TabsContent</strong>: para evitar romper el flujo flex, usar renderizado condicional manual.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    {/* ── Original sections below ── */}
     <div>
       <h3 className="text-xl font-medium mb-4 text-muted-foreground">Table</h3>
       <div className="rounded-lg border border-border overflow-hidden">
