@@ -1,26 +1,22 @@
 
 
-## Plan: Default a mostrar todos los registros sin filtros previos
+## Diagnóstico: Los cambios ya existen en el código
 
-### Problema
-En `/closers`, el tab por defecto es `"asignadas"` para usuarios normales (solo se redirige a `"todas"` si es admin/manager). El usuario quiere que **todos los módulos muestren todos los registros por defecto**, sin filtros preseleccionados.
+Revisé ambos archivos y las rutas:
 
-### Análisis por módulo
-- **Closers**: default `"asignadas"` → debe ser `"todas"`
-- **LeadGen**: default `"leads"` → ya muestra todos, correcto
-- **Contactos**: default sin filtros de estado → ya muestra todos, correcto
+- **`EventoSharePage.tsx`** (320 líneas) — ya tiene el rediseño completo: hero con badge de proyecto, grid 2x2 (fecha, horario, ubicación, invitados), notas del evento, lista de invitados con avatares, botones de Google Calendar y .ics. Sin RSVP.
+- **`SharedAgendaPage.tsx`** (430 líneas) — ya tiene el layout de 2 columnas: calendario compacto + filtros de proyecto a la izquierda, feed de eventos agrupados por día a la derecha, con DayHeader y CompactEventCard.
+- Las rutas están correctas: `/eventos/share/:token` y `/shared/agenda/:token`
+- Los links se generan usando `getPublicBaseUrl()` → `https://maven.asmtech.ai`
 
-El único cambio real necesario es en **Closers**.
+### El problema probable
 
-### Cambios
+Los enlaces públicos apuntan a `https://maven.asmtech.ai` (dominio publicado). Si no has **republicado** el proyecto después de los cambios, el sitio publicado sigue sirviendo la versión anterior.
 
-#### `src/pages/closers/hooks/useCloserLeads.ts`
-- Cambiar `useState("asignadas")` → `useState("todas")`
+### Solución
 
-#### `src/pages/closers/ClosersContent.tsx`
-- Eliminar el `useEffect` que redirige admins de `"asignadas"` a `"todas"` (ya no necesario porque el default ya es `"todas"`)
+1. **Republicar el proyecto** desde Lovable para que `maven.asmtech.ai` refleje los cambios actuales del código
+2. Después de republicar, verificar los links de compartir agenda y evento individual
 
-### Archivos
-1. `src/pages/closers/hooks/useCloserLeads.ts` — línea 98: default tab a `"todas"`
-2. `src/pages/closers/ClosersContent.tsx` — eliminar useEffect de redirección (líneas ~56-59)
+No se necesitan cambios de código — solo republicar.
 
