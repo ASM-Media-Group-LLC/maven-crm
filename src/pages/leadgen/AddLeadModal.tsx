@@ -13,7 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { getMiamiDateStr } from "./timezoneUtils";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 import { useToast } from "@/hooks/use-toast";
-import { Phone, Upload, X, ChevronsUpDown, Check } from "lucide-react";
+import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
