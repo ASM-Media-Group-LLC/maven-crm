@@ -245,5 +245,49 @@ export const useUpdateLeadField = () => {
   });
 };
 
+/** Fetch lightweight agent stats across ALL leads in a date range (no pagination limit) */
+export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
+  useQuery({
+    queryKey: ["leadgen-agent-stats", dateFrom, dateTo],
+    queryFn: async () => {
+      const baseQuery = () => {
+        let q = supabase
+          .from("leadgen_entries")
+          .select("lg_user_id, quality, created_at");
+        if (dateFrom && dateTo) {
+          q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
+        }
+        return q;
+      };
+
+      let all: Array<{ lg_user_id: string; quality: string; created_at: string }> = [];
+      let page = 0;
+      while (true) {
+        const { data, error } = await baseQuery()
+          .order("created_at", { ascending: false })
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) throw error;
+        all = all.concat((data || []) as any);
+        if (!data || data.length < 1000) break;
+        page++;
+      }
+
+      const byAgent: Record<string, { total: number; byQuality: Record<string, number>; firstLead: string }> = {};
+      all.forEach((r) => {
+        if (!byAgent[r.lg_user_id]) {
+          byAgent[r.lg_user_id] = { total: 0, byQuality: {}, firstLead: r.created_at };
+        }
+        byAgent[r.lg_user_id].total++;
+        const q = r.quality?.toLowerCase() || "c";
+        byAgent[r.lg_user_id].byQuality[q] = (byAgent[r.lg_user_id].byQuality[q] || 0) + 1;
+        if (r.created_at < byAgent[r.lg_user_id].firstLead) {
+          byAgent[r.lg_user_id].firstLead = r.created_at;
+        }
+      });
+      return byAgent;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
 // Legacy alias
 export const useUpdateLeadCategoria = useUpdateLeadQuality;

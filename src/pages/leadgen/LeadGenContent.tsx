@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useLeadGenByDateRange, useLeadGenProfiles } from "./useLeadGen";
+import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
@@ -152,26 +152,18 @@ const LeadGenContent = () => {
     });
   }, [enrichedLeads, searchQuery, agencyFilter, qualityFilter, activeFilter]);
 
-  // Agent stats
+  // Agent stats — from dedicated server-side query (all leads in range, not just current page)
+  const { data: agentStatsRaw } = useLeadGenAgentStats(dateFromStr, dateToStr);
   const agentStats = useMemo(() => {
-    const byAgent: Record<string, { id: string; name: string; total: number; byQuality: Record<string, number>; firstLead: string }> = {};
-    enrichedLeads.forEach(l => {
-      if (!byAgent[l.lg_user_id]) {
-        byAgent[l.lg_user_id] = {
-          id: l.lg_user_id,
-          name: profilesMap[l.lg_user_id] || l.company || "Agente",
-          total: 0,
-          byQuality: {},
-          firstLead: l.created_at,
-        };
-      }
-      byAgent[l.lg_user_id].total++;
-      const q = l.quality?.toLowerCase() || "c";
-      byAgent[l.lg_user_id].byQuality[q] = (byAgent[l.lg_user_id].byQuality[q] || 0) + 1;
-      if (l.created_at < byAgent[l.lg_user_id].firstLead) byAgent[l.lg_user_id].firstLead = l.created_at;
-    });
-    return Object.values(byAgent).sort((a, b) => b.total - a.total);
-  }, [enrichedLeads, profilesMap]);
+    if (!agentStatsRaw) return [];
+    return Object.entries(agentStatsRaw).map(([agentId, stats]) => ({
+      id: agentId,
+      name: profilesMap[agentId] || "Agente",
+      total: stats.total,
+      byQuality: stats.byQuality,
+      firstLead: stats.firstLead,
+    })).sort((a, b) => b.total - a.total);
+  }, [agentStatsRaw, profilesMap]);
 
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
     setDateFrom(from);
