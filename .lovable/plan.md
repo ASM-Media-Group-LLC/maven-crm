@@ -1,22 +1,48 @@
 
 
-## Diagnóstico: Los cambios ya existen en el código
+## Plan: Mejorar vistas compartidas de evento y agenda
 
-Revisé ambos archivos y las rutas:
+### Cambios
 
-- **`EventoSharePage.tsx`** (320 líneas) — ya tiene el rediseño completo: hero con badge de proyecto, grid 2x2 (fecha, horario, ubicación, invitados), notas del evento, lista de invitados con avatares, botones de Google Calendar y .ics. Sin RSVP.
-- **`SharedAgendaPage.tsx`** (430 líneas) — ya tiene el layout de 2 columnas: calendario compacto + filtros de proyecto a la izquierda, feed de eventos agrupados por día a la derecha, con DayHeader y CompactEventCard.
-- Las rutas están correctas: `/eventos/share/:token` y `/shared/agenda/:token`
-- Los links se generan usando `getPublicBaseUrl()` → `https://maven.asmtech.ai`
+#### 1. Edge Function `event-external-action` — incluir `instagram_handle` en guests
 
-### El problema probable
+En la query de guests (línea 55), agregar `instagram_handle` del creator:
 
-Los enlaces públicos apuntan a `https://maven.asmtech.ai` (dominio publicado). Si no has **republicado** el proyecto después de los cambios, el sitio publicado sigue sirviendo la versión anterior.
+```sql
+.select("id, guest_name, guest_type, status, creator_id, creators(name, artistic_name, instagram_handle)")
+```
 
-### Solución
+Y en el mapping de guestList agregar:
+```typescript
+instagram_handle: g.creators?.instagram_handle ?? null,
+```
 
-1. **Republicar el proyecto** desde Lovable para que `maven.asmtech.ai` refleje los cambios actuales del código
-2. Después de republicar, verificar los links de compartir agenda y evento individual
+Redeployar la edge function.
 
-No se necesitan cambios de código — solo republicar.
+#### 2. `EventoSharePage.tsx` — modo claro/oscuro + responsivo
+
+- Ya muestra `instagram_handle` como link clickeable (líneas 279-284) — verificar que funcione con los datos del edge function actualizados
+- Agregar toggle de tema (Sun/Moon) en el header
+- Agregar estado local `theme` que alterna `document.documentElement.classList` entre `dark` y `light`
+- Revisar responsividad: el grid 2x2 ya usa `grid-cols-2 md:grid-cols-4`, se ve bien en mobile
+
+#### 3. `SharedAgendaPage.tsx` — más detalle en eventos + buscador + tema
+
+**Más detalle en cada evento card** (`CompactEventCard`):
+- Mostrar `description` truncada (1 línea) si existe
+- Mostrar lista de invitados con nombre + link clickeable a Instagram (no solo avatares)
+- Expandir la card para mostrar: hora, nombre, tipo, proyecto, ubicación, descripción, y lista de invitados con sus @handles como links
+
+**Buscador**:
+- Agregar `Input` con icono `Search` en el header, al lado del título
+- Estado `searchQuery` que filtra eventos por nombre, ubicación, o nombre de invitado
+
+**Toggle claro/oscuro**:
+- Agregar botón Sun/Moon en el header
+- Mismo patrón que EventoSharePage: alternar clase `dark`/`light` en `documentElement`
+
+### Archivos a modificar
+1. `supabase/functions/event-external-action/index.ts` — agregar `instagram_handle` a la response de guests
+2. `src/pages/eventos/EventoSharePage.tsx` — toggle de tema
+3. `src/pages/eventos/SharedAgendaPage.tsx` — detalle expandido en cards, buscador, toggle de tema
 
