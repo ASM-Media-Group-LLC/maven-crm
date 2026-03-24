@@ -197,7 +197,7 @@ const SharedAgendaPage = () => {
 
       {/* Body */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-6 py-6">
-        <div className="grid lg:grid-cols-[300px_1fr] gap-8">
+        <div className="grid lg:grid-cols-[340px_1fr] gap-8">
           {/* LEFT: Calendar + Projects */}
           <div className="space-y-5 lg:sticky lg:top-20 lg:self-start">
             {/* Calendar */}
