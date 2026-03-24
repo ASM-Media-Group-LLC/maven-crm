@@ -48,12 +48,12 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
 
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
-      <CardHeader className="pb-1 p-4">
+      <CardHeader className="pb-0.5 px-3 pt-2">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Cantidad
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 pt-0">
+      <CardContent className="px-3 pb-2 pt-0">
         <div className="grid grid-cols-5 gap-1.5 mb-1.5">
           {categoryConfig.map((cat) => {
             const count = counts[cat.key] ?? 0;

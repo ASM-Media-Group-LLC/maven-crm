@@ -183,6 +183,9 @@ export const useCloserLeads = () => {
         query = query.eq("stage", stageFilter[0]);
       } else if (stageFilter.length > 1) {
         query = query.in("stage", stageFilter);
+      } else {
+        // Tab "todas": exclude "Pendiente LG" and "Nuevo" (those have their own tabs)
+        query = query.not("stage", "eq", "Pendiente LG");
       }
 
       // Role-based filter: closers only see assigned
