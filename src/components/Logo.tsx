@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 const sizeClasses = {
   xs: "text-base gap-1",
-  sm: "text-2xl gap-2",
+  sm: "text-[1.65rem] gap-1.5",
   md: "text-4xl gap-2",
   lg: "text-7xl md:text-9xl gap-3",
 } as const;
