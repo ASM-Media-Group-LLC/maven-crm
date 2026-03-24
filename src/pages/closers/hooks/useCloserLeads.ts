@@ -86,7 +86,7 @@ export const isFollowUpPending = (lastContactDate: string | null): boolean => {
 
 export type DateFieldType = "passed_date" | "lg_entry_date";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 export const useCloserLeads = () => {
   const { toast } = useToast();
