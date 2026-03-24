@@ -86,7 +86,7 @@ export const isFollowUpPending = (lastContactDate: string | null): boolean => {
 
 export type DateFieldType = "passed_date" | "lg_entry_date";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 export const useCloserLeads = () => {
   const { toast } = useToast();
@@ -205,31 +205,27 @@ export const useCloserLeads = () => {
 
       const closerRows = (data || []) as any[];
 
-      // Collect agent IDs for profiles
+      // Fetch profiles and contact counts in parallel
       const agentIds = [...new Set(closerRows.map((c) => c.assigned_to).filter(Boolean))] as string[];
+      const creatorIds = closerRows.map((c) => c.id);
 
-      let profilesMap: Record<string, string> = {};
-      if (agentIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .in("id", agentIds);
-        for (const p of profiles || []) {
-          profilesMap[p.id] = p.full_name || "Sin nombre";
-        }
+      const [profilesResult, contactsResult] = await Promise.all([
+        agentIds.length > 0
+          ? supabase.from("profiles").select("id, full_name").in("id", agentIds)
+          : Promise.resolve({ data: [] }),
+        creatorIds.length > 0
+          ? supabase.from("closer_contact_history").select("creator_id").in("creator_id", creatorIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const profilesMap: Record<string, string> = {};
+      for (const p of profilesResult.data || []) {
+        profilesMap[(p as any).id] = (p as any).full_name || "Sin nombre";
       }
 
-      // Fetch contact counts per creator
-      const creatorIds = closerRows.map((c) => c.id);
-      let contactCountMap: Record<string, number> = {};
-      if (creatorIds.length > 0) {
-        const { data: contacts } = await supabase
-          .from("closer_contact_history")
-          .select("creator_id")
-          .in("creator_id", creatorIds);
-        for (const c of contacts || []) {
-          contactCountMap[c.creator_id] = (contactCountMap[c.creator_id] || 0) + 1;
-        }
+      const contactCountMap: Record<string, number> = {};
+      for (const c of contactsResult.data || []) {
+        contactCountMap[(c as any).creator_id] = (contactCountMap[(c as any).creator_id] || 0) + 1;
       }
 
       const enriched: CloserCreatorRow[] = closerRows.map((c) => ({
@@ -249,6 +245,7 @@ export const useCloserLeads = () => {
     },
     
     enabled: !!user?.id && !!role,
+    staleTime: 30_000,
   });
 
   const creators = creatorsData?.creators || [];
