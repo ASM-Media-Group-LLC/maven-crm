@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+
 import { cn } from "@/lib/utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 
@@ -193,7 +193,7 @@ const EventoSharePage = () => {
       </header>
 
       <div className="flex-1 px-4 py-8">
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto space-y-5">
 
           {/* ── Hero ── */}
           <section className="space-y-3">
@@ -215,11 +215,23 @@ const EventoSharePage = () => {
               <TypeIcon className="h-4 w-4" />
               <span className="text-sm font-medium">{event.event_type}</span>
             </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Google Calendar
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadICS(event)}>
+                <Download className="h-3.5 w-3.5" />
+                Descargar .ics
+              </Button>
+            </div>
           </section>
 
           {/* ── Event details ── */}
           <section className="rounded-xl border border-border bg-card p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6">
               <DetailItem
                 icon={CalendarDays}
                 label="Fecha"
@@ -235,18 +247,6 @@ const EventoSharePage = () => {
                 icon={MapPin}
                 label="Ubicación"
                 value={event.location || "Por definir"}
-              />
-              <DetailItem
-                icon={Users}
-                label="Invitados"
-                value={`${guests.length} persona${guests.length !== 1 ? "s" : ""}`}
-                sub={
-                  [
-                    confirmedCount > 0 ? `${confirmedCount} confirmado${confirmedCount !== 1 ? "s" : ""}` : "",
-                    pendingCount > 0 ? `${pendingCount} pendiente${pendingCount !== 1 ? "s" : ""}` : "",
-                    cancelledCount > 0 ? `${cancelledCount} cancelado${cancelledCount !== 1 ? "s" : ""}` : "",
-                  ].filter(Boolean).join(" · ") || undefined
-                }
               />
             </div>
           </section>
@@ -270,7 +270,18 @@ const EventoSharePage = () => {
               <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/30">
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Invitados</span>
-                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{guests.length}</span>
+                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                  {guests.length}
+                  {(confirmedCount > 0 || pendingCount > 0 || cancelledCount > 0) && (
+                    <span className="ml-2">
+                      — {[
+                        confirmedCount > 0 ? `${confirmedCount} confirmado${confirmedCount !== 1 ? "s" : ""}` : "",
+                        pendingCount > 0 ? `${pendingCount} pendiente${pendingCount !== 1 ? "s" : ""}` : "",
+                        cancelledCount > 0 ? `${cancelledCount} cancelado${cancelledCount !== 1 ? "s" : ""}` : "",
+                      ].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </span>
               </div>
               <ul className="divide-y divide-border">
                 {guests.map((g) => {
@@ -315,20 +326,6 @@ const EventoSharePage = () => {
             </section>
           )}
 
-          {/* ── Calendar actions ── */}
-          <Separator />
-          <section className="flex flex-wrap gap-3">
-            <Button variant="outline" className="gap-2" asChild>
-              <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Google Calendar
-              </a>
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => downloadICS(event)}>
-              <Download className="h-4 w-4" />
-              Descargar .ics
-            </Button>
-          </section>
         </div>
       </div>
 
