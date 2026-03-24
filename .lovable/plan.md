@@ -1,48 +1,22 @@
 
 
-## Plan: Mejorar vistas compartidas de evento y agenda
+## Plan: Quitar campo teléfono del formulario de leads
 
-### Cambios
+### Contexto
+El usuario aclara que un lead **no tiene número de teléfono** porque es precisamente un lead (aún no se ha contactado). La validación de duplicados por teléfono debe ocurrir más adelante, cuando el contacto ya se guarde en el sistema (ej: en Closers/Contactos), no al momento de crear el lead.
 
-#### 1. Edge Function `event-external-action` — incluir `instagram_handle` en guests
+### Cambios en `src/pages/leadgen/AddLeadModal.tsx`
 
-En la query de guests (línea 55), agregar `instagram_handle` del creator:
+1. **Schema**: Quitar `phone_raw` de `leadSchema` (línea 95)
+2. **Default values**: Quitar `phone_raw: ""` (línea 124)
+3. **Duplicate check**: Eliminar todo el bloque de validación por teléfono (líneas 167-190) — las queries a `leadgen_entries`, `closers_contacts` y `creators` por phone
+4. **Insert**: Quitar `phone_raw: phoneNormalized` del insert (línea 200)
+5. **Campo de formulario**: Eliminar el `FormField` de "Teléfono de Contacto" completo (líneas 384-403)
+6. **Import**: Quitar `Phone` del import de lucide-react (línea 16) y el icono `<Phone>` del botón submit (línea 484)
 
-```sql
-.select("id, guest_name, guest_type, status, creator_id, creators(name, artistic_name, instagram_handle)")
-```
+### Resultado
+El formulario de lead solo pedirá: URL del perfil, plataforma, categoría, compañía, país, notas y evidencia. Sin teléfono.
 
-Y en el mapping de guestList agregar:
-```typescript
-instagram_handle: g.creators?.instagram_handle ?? null,
-```
-
-Redeployar la edge function.
-
-#### 2. `EventoSharePage.tsx` — modo claro/oscuro + responsivo
-
-- Ya muestra `instagram_handle` como link clickeable (líneas 279-284) — verificar que funcione con los datos del edge function actualizados
-- Agregar toggle de tema (Sun/Moon) en el header
-- Agregar estado local `theme` que alterna `document.documentElement.classList` entre `dark` y `light`
-- Revisar responsividad: el grid 2x2 ya usa `grid-cols-2 md:grid-cols-4`, se ve bien en mobile
-
-#### 3. `SharedAgendaPage.tsx` — más detalle en eventos + buscador + tema
-
-**Más detalle en cada evento card** (`CompactEventCard`):
-- Mostrar `description` truncada (1 línea) si existe
-- Mostrar lista de invitados con nombre + link clickeable a Instagram (no solo avatares)
-- Expandir la card para mostrar: hora, nombre, tipo, proyecto, ubicación, descripción, y lista de invitados con sus @handles como links
-
-**Buscador**:
-- Agregar `Input` con icono `Search` en el header, al lado del título
-- Estado `searchQuery` que filtra eventos por nombre, ubicación, o nombre de invitado
-
-**Toggle claro/oscuro**:
-- Agregar botón Sun/Moon en el header
-- Mismo patrón que EventoSharePage: alternar clase `dark`/`light` en `documentElement`
-
-### Archivos a modificar
-1. `supabase/functions/event-external-action/index.ts` — agregar `instagram_handle` a la response de guests
-2. `src/pages/eventos/EventoSharePage.tsx` — toggle de tema
-3. `src/pages/eventos/SharedAgendaPage.tsx` — detalle expandido en cards, buscador, toggle de tema
+### Archivo
+- `src/pages/leadgen/AddLeadModal.tsx`
 
