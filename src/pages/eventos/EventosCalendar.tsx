@@ -114,12 +114,12 @@ const EventosCalendar = ({ events }: Props) => {
 
       {/* Upcoming Events Card */}
       <Card className="overflow-hidden">
-        <CardContent className="p-5">
+        <CardContent className="p-4 max-h-[320px] overflow-auto">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-accent" />
             <h3 className="text-sm font-bold tracking-tight">Próximos eventos</h3>
           </div>
-          <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent mb-5" />
+          <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent mb-3" />
 
           {upcoming.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
