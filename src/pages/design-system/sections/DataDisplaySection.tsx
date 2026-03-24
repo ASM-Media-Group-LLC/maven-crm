@@ -434,4 +434,5 @@ export const DataDisplaySection = () => {
       </div>
     </div>
   </section>
-);
+  );
+};
