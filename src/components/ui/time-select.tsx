@@ -29,7 +29,7 @@ const TimeSelect = ({ value, onChange, disabled, className }: TimeSelectProps) =
         </SelectContent>
       </Select>
       <span className="text-muted-foreground font-medium">:</span>
-      <Select value={snappedMinute} onValueChange={(m) => onChange(`${hour}:${m}`)} disabled={disabled}>
+      <Select value={currentMinute} onValueChange={(m) => onChange(`${hour}:${m}`)} disabled={disabled}>
         <SelectTrigger className="flex-1">
           <SelectValue placeholder="mm" />
         </SelectTrigger>

@@ -217,14 +217,43 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
 
                   <div className="space-y-2">
                     <Label>Proyecto *</Label>
-                    <Select value={projectType} onValueChange={setProjectType}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
-                      <SelectContent>
-                        {PROJECT_TYPES.map((p) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {showCustomProject ? (
+                      <div className="flex gap-2">
+                        <Input
+                          value={customProject}
+                          onChange={(e) => setCustomProject(e.target.value)}
+                          placeholder="Nombre del nuevo proyecto"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setShowCustomProject(false); setCustomProject(""); }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select value={projectType} onValueChange={(val) => {
+                        if (val === "__custom__") {
+                          setShowCustomProject(true);
+                          setProjectType("");
+                        } else {
+                          setProjectType(val);
+                        }
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar proyecto" /></SelectTrigger>
+                        <SelectContent>
+                          {PROJECT_TYPES.map((p) => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                          <SelectItem value="__custom__" className="text-primary font-medium">
+                            + Agregar proyecto
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
