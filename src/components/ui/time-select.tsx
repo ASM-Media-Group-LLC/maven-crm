@@ -14,10 +14,7 @@ interface TimeSelectProps {
 const TimeSelect = ({ value, onChange, disabled, className }: TimeSelectProps) => {
   const [hour, minute] = (value || "08:00").split(":");
 
-  // Snap minute to nearest 5
-  const snappedMinute = MINUTES.reduce((prev, curr) =>
-    Math.abs(parseInt(curr) - parseInt(minute)) < Math.abs(parseInt(prev) - parseInt(minute)) ? curr : prev
-  );
+  const currentMinute = MINUTES.includes(minute) ? minute : "00";
 
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
