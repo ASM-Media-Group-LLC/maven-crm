@@ -1,71 +1,46 @@
 
-## Plan: Hacer visible el scroll lateral y documentar paginación obligatoria en el estándar de tablas
 
-### Diagnóstico
-El ejemplo actual del Design System no está mostrando lo que quieres por 2 razones:
+## Plan: Corregir Closers (tab Todas, velocidad, inline editing) y reducir KPIs en LeadGen
 
-1. **No usa `DataTableShell` realmente**
-   - La documentación habla de paginación fija abajo, pero el ejemplo “live” está renderizando solo un `div overflow-auto` con `<Table>`.
-   - Por eso **no aparece el footer con paginador**.
+### Problemas identificados
 
-2. **No se fuerza overflow horizontal en el viewport actual**
-   - La tabla tiene `min-w-[1000px]`, pero tu viewport visible es bastante ancho.
-   - Resultado: aunque el contenedor tenga `overflow-auto`, **no hay scroll lateral visible** porque la tabla todavía cabe.
+1. **Tab "Todas" muestra "Sin registros"**: La query para "todas" usa `TAB_STAGE_MAP["todas"] = []` (sin filtro de stage), pero aplica filtro de rol (`assigned_to = user.id` para non-admin). Si el usuario es admin, debería ver todo. El problema real: para admins se redirige a "todas" en el `useEffect`, pero la query probablemente incluye stages como "Pendiente LG" que tienen `assigned_to = NULL`. Necesita excluir "Pendiente LG" del tab "Todas" para que solo muestre el pipeline manual.
 
-### Qué voy a cambiar
+2. **Tab "Nuevo" con 420 registros**: El count viene del RPC `get_closer_stage_counts` que cuenta TODOS los `closer_creators` con stage "Nuevo", incluyendo los que vienen de leadgen. Pero la query del tab "Nuevo" filtra por `source_contact_id IS NOT NULL`. El count del badge no coincide con los datos reales del tab. Necesito verificar si realmente hay 420 contactos legítimos con `source_contact_id`.
 
-#### 1. Convertir el ejemplo del Design System en el patrón real
-En `src/pages/design-system/sections/DataDisplaySection.tsx`:
-- Reemplazar el demo actual por un ejemplo montado con **`DataTableShell`**
-- Usar estado local simple de paginación (`currentPage`, `pageSize`)
-- Mostrar el footer inferior real:
-  - contador de registros
-  - selector de filas
-  - paginador
+3. **Inline editing falta en tabs "asignadas" y "todas"**: Cuenta origen, categoría, estado y notas necesitan dropdowns inline en todos los tabs, no solo en "nuevo".
 
-Así el Design System deja de “describir” el patrón y pasa a **demostrarlo**.
+4. **Badges de alertas cortados en "asignadas"**: Los badges "Follow-up" y "Último intento" se truncan visualmente.
 
-#### 2. Hacer el scroll lateral claramente visible
-En ese mismo ejemplo:
-- Encerrar la demo en un ancho deliberadamente más estrecho que la tabla
-- Aumentar el ancho mínimo de la tabla a algo como `min-w-[1200px]` o similar
-- Mantener suficientes columnas para que el overflow horizontal sea obvio
-- Si hace falta, añadir una nota visual breve tipo “desplaza horizontalmente para ver más columnas”
+5. **KPIs de LeadGen ocupan demasiado espacio**: Las 2 cards ocupan ~50% de la pantalla. Necesitan ser más compactas.
 
-Con esto el scroll lateral sí se verá en `/design-system`.
+6. **Filtro "Calidad" en LeadGen**: En la barra de filtros (línea 284) aún dice "Calidad" como placeholder en lugar de "Categoría".
 
-#### 3. Mantener al menos 6 filas visibles
-- Ajustar la altura del área scrollable del ejemplo para que muestre mínimo 6 filas antes de hacer scroll vertical
-- Mantener dataset de ejemplo suficiente para que se vea también el comportamiento con paginación
+### Cambios
 
-#### 4. Dejar “Acciones” visible en el header
-- Mantener el header sticky de la última columna con texto **“Acciones”**
-- Alinear header y celdas para que el patrón quede correcto como referencia oficial
+#### 1. `src/pages/closers/hooks/useCloserLeads.ts`
+- **Tab "todas"**: Excluir stage "Pendiente LG" de la query. Cambiar `TAB_STAGE_MAP["todas"]` o agregar `.not("stage", "eq", "Pendiente LG")` en la query cuando `stageFilter` está vacío.
+- **Badge count para "Nuevo"**: El RPC cuenta todos los "Nuevo" incluyendo los sin `source_contact_id`. Considerar ajustar o aceptar la discrepancia.
 
-#### 5. Endurecer la documentación del estándar
-En la misma sección del Design System voy a dejar explícito que:
-- **todas las tablas de alto volumen deben usar `DataTableShell`**
-- **toda tabla grande debe tener paginación inferior**
-- **la tabla debe soportar scroll horizontal cuando excede el ancho disponible**
-- el patrón base de referencia seguirá siendo **Contactos**
+#### 2. `src/pages/closers/components/LeadTable.tsx`
+- **Tab "asignadas"**: Cambiar cuenta origen a `InlineSourceSelect`, categoría ya usa `InlineCategorySelect` (ok). Agregar columna de notas con `InlineText`.
+- **Tab "todas"**: Ya tiene inline editing para estado, cuenta origen, categoría y notas — verificar que funcione.
+- **Badges cortados en "asignadas"**: Agregar `whitespace-nowrap` a los badges de alerta para evitar truncamiento.
 
-### Archivos a tocar
-1. `src/pages/design-system/sections/DataDisplaySection.tsx`
-   - migrar el demo a `DataTableShell`
-   - hacer visible el scroll horizontal
-   - mostrar paginación real
-   - ajustar alto para 6+ filas
-   - reforzar la documentación del estándar
+#### 3. `src/pages/leadgen/LeadGenContent.tsx`
+- Reducir el padding y spacing de las KPI cards: cambiar `gap-6` a `gap-3`, reducir `py-2` container.
 
-2. `src/components/ui/data-table-shell.tsx` *(solo si hace falta)*
-   - revisar si necesita un pequeño ajuste visual para que el footer/paginador quede más claro en demos y tablas reales
-   - no lo tocaría salvo que el ejemplo revele una limitación real del shell
+#### 4. `src/pages/leadgen/LeadGenCantidadCard.tsx` y `LeadGenEstadosCard.tsx`
+- Reducir padding interno de las cards para que sean más compactas.
+- Cambiar `p-4` a `p-3`, reducir tamaños de fuente donde sea posible.
 
-### Resultado esperado
-- En `/design-system` se verá claramente:
-  - **scroll lateral**
-  - **scroll vertical**
-  - **header sticky**
-  - **columna Acciones sticky**
-  - **footer con paginación**
-- El componente quedará documentado como el estándar oficial para reutilizarlo luego en Closers, LeadGen y el resto del sistema sin inconsistencias.
+#### 5. `src/pages/leadgen/LeadGenContent.tsx` línea 284
+- Cambiar placeholder "Calidad" a "Categoría".
+
+### Archivos a modificar
+1. `src/pages/closers/hooks/useCloserLeads.ts` — excluir "Pendiente LG" del tab "todas"
+2. `src/pages/closers/components/LeadTable.tsx` — inline editing en asignadas, badges sin truncar
+3. `src/pages/leadgen/LeadGenContent.tsx` — KPIs más compactas, label "Categoría"
+4. `src/pages/leadgen/LeadGenCantidadCard.tsx` — padding reducido
+5. `src/pages/leadgen/LeadGenEstadosCard.tsx` — padding reducido
+
