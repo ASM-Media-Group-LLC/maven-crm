@@ -239,7 +239,7 @@ const SharedAgendaPage = () => {
                   return (
                     <button key={dateStr} onClick={() => setSelectedDate(isSelected ? null : day)}
                       className={cn(
-                        "relative flex flex-col items-center justify-center rounded-lg h-10 text-sm transition-all",
+                        "relative flex flex-col items-center justify-center rounded-lg h-11 text-sm transition-all",
                         isSelected ? "bg-primary text-primary-foreground font-bold shadow-sm"
                           : today ? "bg-primary/15 text-primary font-bold"
                           : hasEvent ? "hover:bg-muted font-medium text-foreground"
