@@ -261,8 +261,8 @@ const SharedAgendaPage = () => {
 
           {/* RIGHT: Events feed */}
           <div className="space-y-8">
-            {/* Section title */}
-            <div>
+            {/* Section title + project chips */}
+            <div className="space-y-3">
               <div className="flex items-center gap-2.5">
                 <Sparkles className="h-4.5 w-4.5 text-primary" />
                 <h3 className="text-lg font-bold tracking-tight">
@@ -274,6 +274,30 @@ const SharedAgendaPage = () => {
                     Ver todos
                   </Button>
                 )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {PROJECT_TABS.map((tab) => {
+                  const isActive = projectFilter === tab;
+                  const colors = PROJECT_COLORS[tab];
+                  const count = tab === "Todos"
+                    ? events.length
+                    : events.filter((e) => e.project_type === tab).length;
+                  return (
+                    <button key={tab} onClick={() => setProjectFilter(tab)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all border",
+                        isActive
+                          ? colors
+                            ? `${colors.bg} ${colors.text} border-transparent`
+                            : "bg-muted text-foreground border-transparent"
+                          : "border-border hover:bg-muted/50 text-muted-foreground"
+                      )}>
+                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", colors?.dot ?? "bg-muted-foreground")} />
+                      <span>{tab}</span>
+                      <span className={cn("text-[10px] tabular-nums ml-0.5", isActive ? "font-semibold" : "opacity-50")}>{count}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
