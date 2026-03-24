@@ -1,21 +1,21 @@
 
 
-## Plan: Mostrar todos los leads por defecto en /leadgen
+## Plan: Restaurar filtro de fecha por defecto a "hoy" en LeadGen
 
 ### Problema
-El estado inicial de `dateFrom` y `dateTo` es `new Date()` (hoy), por lo que la query solo trae los leads del día actual. Por eso no salen todos los registros.
+Al cambiar `dateFrom`/`dateTo` a `undefined`, la query trae TODOS los leads históricos (80K+) sin filtro de fecha. Los 194 leads de hoy se "pierden" en las primeras 2 páginas de un dataset enorme, y los KPIs solo reflejan los 100 de la página actual.
+
+La solicitud anterior de "mostrar todos los leads" se refería a no filtrar por usuario/rol, no a quitar el filtro de fecha. Para una herramienta de operaciones diarias, el default lógico es mostrar los leads del día.
 
 ### Solución
 
 #### `src/pages/leadgen/LeadGenContent.tsx`
-- Cambiar las líneas 64-65:
-  - `useState<Date | undefined>(new Date())` → `useState<Date | undefined>(undefined)`
-  - Para ambos: `dateFrom` y `dateTo`
-- Esto hace que al cargar la página, `dateFromStr` y `dateToStr` sean `undefined`, y la query en `fetchEntriesByDateRange` omite el filtro de fecha, trayendo **todos** los leads paginados
-
-### Resultado
-Al entrar a `/leadgen`, se mostrarán todos los leads sin filtro de fecha. Cuando el usuario seleccione un rango de fechas, se aplicará el filtro.
+- Restaurar `dateFrom` y `dateTo` a `new Date()` como valor por defecto
+- Esto mostrará los 194 leads de hoy: 100 en página 1, 94 en página 2
+- El paginador funcionará correctamente con `totalLeads = 194` y `totalPages = 2`
+- Los KPIs reflejarán correctamente los datos de hoy
+- El usuario puede cambiar el rango de fechas o limpiarlo si quiere ver otro período
 
 ### Archivo
-1. `src/pages/leadgen/LeadGenContent.tsx` — cambiar default de `dateFrom`/`dateTo` a `undefined`
+1. `src/pages/leadgen/LeadGenContent.tsx` — líneas 64-65: cambiar `undefined` → `new Date()`
 
