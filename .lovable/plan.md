@@ -1,40 +1,43 @@
 
 
-## Plan: Rediseñar layout de /eventos y verificar funcionalidad de compartir
+## Plan: Mejorar formulario de eventos, minutos completos, y vistas de compartir
 
-### Cambios de layout
+### Cambios
 
-#### 1. Calendario más compacto (`EventosCalendar.tsx`)
-- Reducir padding del `CardContent` de `p-5` a `p-4`
-- Reducir altura de las celdas del calendario de `h-11` a `h-9`
-- Eliminar el footer con gradiente ("X eventos programados este mes") — ya está en el badge del header
-- Reducir `mb-5` del header a `mb-3`
-- Cambiar el grid de `lg:grid-cols-3` con sidebar de "Próximos eventos" a una sola fila: calendario a la izquierda (`lg:col-span-2`) y próximos eventos más compactos a la derecha, pero con altura limitada (`max-h-[320px] overflow-auto`)
+#### 1. Select de proyecto con opción "Agregar nuevo" (`NuevoEventoForm.tsx`)
+- Agregar un estado `customProject` y un flag `showCustomProject`
+- En el `<Select>` de proyecto, agregar un `<SelectItem>` final con valor `__custom__` que diga "+ Agregar proyecto"
+- Al seleccionarlo, mostrar un `<Input>` para escribir el nombre del nuevo proyecto
+- Al hacer submit, usar el valor del input como `project_type`
 
-#### 2. Quitar labels "Proyecto" y "Estado" (`EventosContent.tsx`)
-- Eliminar los `<span>` con texto "Proyecto" y "Estado" (líneas 126 y 143)
-- Dejar solo los tab bars directamente, sin label encima
-- Poner ambos tab bars en una sola fila con `flex-row` y gap entre ellos para ahorrar espacio vertical
+#### 2. Minutos completos (00-59) en el formulario de eventos (`NuevoEventoForm.tsx`)
+- Cambiar `const MINUTES = ["00", "15", "30", "45"]` a `Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))`
+- Esto aplica a los 4 selects de minutos (inicio y fin)
 
-#### 3. Reducir spacing general
-- Cambiar `space-y-6` del contenedor principal a `space-y-4`
+#### 3. También actualizar `TimeSelect` component (`time-select.tsx`)
+- Cambiar `MINUTES` de intervalos de 5 min a todos los 60 minutos para consistencia global
 
-### Verificación de funcionalidad de compartir
+#### 4. Rediseñar `EventoSharePage.tsx` — vista de evento compartido
+- Agregar `description`, `project_type` y `status` al response de la Edge Function (`event-external-action`)
+- Rediseñar la UI para mostrar todos los detalles del evento: nombre, tipo, proyecto (con badge de color), descripción, fecha, hora, ubicación, estado
+- Mostrar la lista de invitados con sus estados (confirmed/pending/cancelled) con avatares y badges de color, similar a la SharedAgendaPage
+- Layout más visual con card hero, iconos, y mejor tipografía
 
-#### Compartir Agenda (funciona)
-- El flujo `handleShareAgenda` en `EventosContent.tsx` crea/recupera un token de `agenda_share_tokens` y genera link a `/shared/agenda/:token`
-- La página `SharedAgendaPage.tsx` llama al RPC `get_agenda_by_share_token` que valida el token y retorna eventos
-- Todo está conectado correctamente
+#### 5. Rediseñar `SharedAgendaPage.tsx` — vista de agenda compartida
+- Hacer el calendario más compacto (reducir a `h-9` las celdas)
+- Quitar el footer redundante del calendario ("X eventos programados este mes" ya está en el badge)
+- Mejorar la sección de próximos eventos: hacerla más compacta, con cards más pequeñas
+- Agregar un hero/banner sutil en el header con branding más pulido
+- Mejorar la responsividad en mobile
 
-#### Compartir Evento individual (funciona)
-- `EventoSharePage.tsx` llama al edge function `event-external-action` con GET para obtener info del evento por `external_token`
-- El POST permite confirmar/cancelar asistencia
-- El sharelink se copia desde `EventosTable.tsx` y `EventosGrid.tsx` usando `external_token`
-- Depende de que cada evento tenga un `external_token` generado — si no lo tiene, muestra "No hay sharelink disponible"
-
-Ambas funcionalidades están implementadas y conectadas. No hay bugs evidentes en el código.
+#### 6. Edge Function `event-external-action` — agregar campos faltantes
+- En el SELECT del GET, agregar `description, project_type, status`
+- Incluirlos en el response JSON
 
 ### Archivos a modificar
-1. **`src/pages/eventos/EventosCalendar.tsx`** — hacer calendario más compacto (padding, altura celdas, quitar footer redundante)
-2. **`src/pages/eventos/EventosContent.tsx`** — quitar labels "Proyecto"/"Estado", poner tabs en una fila, reducir spacing
+1. `src/pages/eventos/NuevoEventoForm.tsx` — proyecto custom + minutos 00-59
+2. `src/components/ui/time-select.tsx` — minutos 00-59
+3. `src/pages/eventos/EventoSharePage.tsx` — rediseño completo con todos los detalles e invitados
+4. `src/pages/eventos/SharedAgendaPage.tsx` — layout más compacto y pulido
+5. `supabase/functions/event-external-action/index.ts` — agregar description, project_type, status al response
 
