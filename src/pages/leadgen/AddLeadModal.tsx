@@ -13,7 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { getMiamiDateStr } from "./timezoneUtils";
 import { LEADGEN_COMPANIES } from "./leadgenConstants";
 import { useToast } from "@/hooks/use-toast";
-import { Phone, Upload, X, ChevronsUpDown, Check } from "lucide-react";
+import { Upload, X, ChevronsUpDown, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeHandle, detectPlatformFromUrl } from "@/lib/handle-utils";
@@ -92,7 +92,7 @@ const leadSchema = z.object({
   platform: z.string().min(1, "Plataforma requerida"),
   quality: z.string().min(1, "Categoría requerida"),
   company: z.string().min(1, "Compañía requerida"),
-  phone_raw: z.string().min(5, "Teléfono requerido (mínimo 5 dígitos)"),
+  
   country_code: z.string().optional(),
   notes: z.string().max(500, "Máximo 500 caracteres").optional(),
 });
@@ -121,7 +121,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
-      phone_raw: "",
+      
       country_code: "",
       notes: "",
     },
@@ -164,31 +164,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // Duplicate check by phone number across all tables
-      const phoneNormalized = data.phone_raw.replace(/\s+/g, "").trim();
-      
-      const [{ data: phoneLG }, { data: phoneCloser }, { data: phoneCreator }] = await Promise.all([
-        supabase.from("leadgen_entries").select("id, model_handle, company").eq("phone_raw", phoneNormalized).limit(1).maybeSingle(),
-        supabase.from("closers_contacts").select("id, handle, company").eq("phone", phoneNormalized).limit(1).maybeSingle(),
-        supabase.from("creators").select("id, instagram_handle, name").eq("phone", phoneNormalized).limit(1).maybeSingle(),
-      ]);
-
-      if (phoneLG) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en LeadGen: @${phoneLG.model_handle} (${phoneLG.company || ""})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      if (phoneCloser) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en Contactos: @${phoneCloser.handle} (${phoneCloser.company || ""})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      if (phoneCreator) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe como Creadora: ${phoneCreator.name} (@${phoneCreator.instagram_handle})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
         platform: data.platform,
@@ -197,7 +172,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
-        phone_raw: phoneNormalized,
+        
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
@@ -381,26 +356,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
               />
 
 
-              <FormField
-                control={form.control}
-                name="phone_raw"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Teléfono de Contacto *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="tel"
-                        placeholder="+57 300 000 0000"
-                        {...field}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">
-                      Incluye código de país. Ej: +57 3001234567
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}
@@ -481,7 +436,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
 
             <DialogFooter className="pt-4">
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                <Phone className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" />
                 {isSubmitting ? "Guardando..." : "Guardar Lead"}
               </Button>
             </DialogFooter>
