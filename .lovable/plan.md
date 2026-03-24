@@ -1,46 +1,40 @@
 
 
-## Plan: Corregir Closers (tab Todas, velocidad, inline editing) y reducir KPIs en LeadGen
+## Plan: Rediseñar layout de /eventos y verificar funcionalidad de compartir
 
-### Problemas identificados
+### Cambios de layout
 
-1. **Tab "Todas" muestra "Sin registros"**: La query para "todas" usa `TAB_STAGE_MAP["todas"] = []` (sin filtro de stage), pero aplica filtro de rol (`assigned_to = user.id` para non-admin). Si el usuario es admin, debería ver todo. El problema real: para admins se redirige a "todas" en el `useEffect`, pero la query probablemente incluye stages como "Pendiente LG" que tienen `assigned_to = NULL`. Necesita excluir "Pendiente LG" del tab "Todas" para que solo muestre el pipeline manual.
+#### 1. Calendario más compacto (`EventosCalendar.tsx`)
+- Reducir padding del `CardContent` de `p-5` a `p-4`
+- Reducir altura de las celdas del calendario de `h-11` a `h-9`
+- Eliminar el footer con gradiente ("X eventos programados este mes") — ya está en el badge del header
+- Reducir `mb-5` del header a `mb-3`
+- Cambiar el grid de `lg:grid-cols-3` con sidebar de "Próximos eventos" a una sola fila: calendario a la izquierda (`lg:col-span-2`) y próximos eventos más compactos a la derecha, pero con altura limitada (`max-h-[320px] overflow-auto`)
 
-2. **Tab "Nuevo" con 420 registros**: El count viene del RPC `get_closer_stage_counts` que cuenta TODOS los `closer_creators` con stage "Nuevo", incluyendo los que vienen de leadgen. Pero la query del tab "Nuevo" filtra por `source_contact_id IS NOT NULL`. El count del badge no coincide con los datos reales del tab. Necesito verificar si realmente hay 420 contactos legítimos con `source_contact_id`.
+#### 2. Quitar labels "Proyecto" y "Estado" (`EventosContent.tsx`)
+- Eliminar los `<span>` con texto "Proyecto" y "Estado" (líneas 126 y 143)
+- Dejar solo los tab bars directamente, sin label encima
+- Poner ambos tab bars en una sola fila con `flex-row` y gap entre ellos para ahorrar espacio vertical
 
-3. **Inline editing falta en tabs "asignadas" y "todas"**: Cuenta origen, categoría, estado y notas necesitan dropdowns inline en todos los tabs, no solo en "nuevo".
+#### 3. Reducir spacing general
+- Cambiar `space-y-6` del contenedor principal a `space-y-4`
 
-4. **Badges de alertas cortados en "asignadas"**: Los badges "Follow-up" y "Último intento" se truncan visualmente.
+### Verificación de funcionalidad de compartir
 
-5. **KPIs de LeadGen ocupan demasiado espacio**: Las 2 cards ocupan ~50% de la pantalla. Necesitan ser más compactas.
+#### Compartir Agenda (funciona)
+- El flujo `handleShareAgenda` en `EventosContent.tsx` crea/recupera un token de `agenda_share_tokens` y genera link a `/shared/agenda/:token`
+- La página `SharedAgendaPage.tsx` llama al RPC `get_agenda_by_share_token` que valida el token y retorna eventos
+- Todo está conectado correctamente
 
-6. **Filtro "Calidad" en LeadGen**: En la barra de filtros (línea 284) aún dice "Calidad" como placeholder en lugar de "Categoría".
+#### Compartir Evento individual (funciona)
+- `EventoSharePage.tsx` llama al edge function `event-external-action` con GET para obtener info del evento por `external_token`
+- El POST permite confirmar/cancelar asistencia
+- El sharelink se copia desde `EventosTable.tsx` y `EventosGrid.tsx` usando `external_token`
+- Depende de que cada evento tenga un `external_token` generado — si no lo tiene, muestra "No hay sharelink disponible"
 
-### Cambios
-
-#### 1. `src/pages/closers/hooks/useCloserLeads.ts`
-- **Tab "todas"**: Excluir stage "Pendiente LG" de la query. Cambiar `TAB_STAGE_MAP["todas"]` o agregar `.not("stage", "eq", "Pendiente LG")` en la query cuando `stageFilter` está vacío.
-- **Badge count para "Nuevo"**: El RPC cuenta todos los "Nuevo" incluyendo los sin `source_contact_id`. Considerar ajustar o aceptar la discrepancia.
-
-#### 2. `src/pages/closers/components/LeadTable.tsx`
-- **Tab "asignadas"**: Cambiar cuenta origen a `InlineSourceSelect`, categoría ya usa `InlineCategorySelect` (ok). Agregar columna de notas con `InlineText`.
-- **Tab "todas"**: Ya tiene inline editing para estado, cuenta origen, categoría y notas — verificar que funcione.
-- **Badges cortados en "asignadas"**: Agregar `whitespace-nowrap` a los badges de alerta para evitar truncamiento.
-
-#### 3. `src/pages/leadgen/LeadGenContent.tsx`
-- Reducir el padding y spacing de las KPI cards: cambiar `gap-6` a `gap-3`, reducir `py-2` container.
-
-#### 4. `src/pages/leadgen/LeadGenCantidadCard.tsx` y `LeadGenEstadosCard.tsx`
-- Reducir padding interno de las cards para que sean más compactas.
-- Cambiar `p-4` a `p-3`, reducir tamaños de fuente donde sea posible.
-
-#### 5. `src/pages/leadgen/LeadGenContent.tsx` línea 284
-- Cambiar placeholder "Calidad" a "Categoría".
+Ambas funcionalidades están implementadas y conectadas. No hay bugs evidentes en el código.
 
 ### Archivos a modificar
-1. `src/pages/closers/hooks/useCloserLeads.ts` — excluir "Pendiente LG" del tab "todas"
-2. `src/pages/closers/components/LeadTable.tsx` — inline editing en asignadas, badges sin truncar
-3. `src/pages/leadgen/LeadGenContent.tsx` — KPIs más compactas, label "Categoría"
-4. `src/pages/leadgen/LeadGenCantidadCard.tsx` — padding reducido
-5. `src/pages/leadgen/LeadGenEstadosCard.tsx` — padding reducido
+1. **`src/pages/eventos/EventosCalendar.tsx`** — hacer calendario más compacto (padding, altura celdas, quitar footer redundante)
+2. **`src/pages/eventos/EventosContent.tsx`** — quitar labels "Proyecto"/"Estado", poner tabs en una fila, reducir spacing
 
