@@ -199,71 +199,86 @@ export const DataDisplaySection = () => {
         </div>
       </div>
 
-      {/* Live example */}
+      {/* Live example with DataTableShell */}
       <div>
-        <h4 className="text-sm font-medium mb-3">Ejemplo: header sticky + acciones sticky</h4>
-        <div className="rounded-lg border border-border overflow-auto max-h-[340px]">
-          <Table className="min-w-[1000px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className={STICKY_HEADER_CLASS}>
-                  <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
-                    Creación <ArrowUpDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>
-                  <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
-                    Instagram <ArrowUpDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>Agente</TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>Estado</TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>Categoría</TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>Contacto</TableHead>
-                <TableHead className={STICKY_HEADER_CLASS}>Notas</TableHead>
-                <TableHead className={STICKY_ACTION_HEADER_CLASS}>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[
-                { date: "15/03/2026", ig: "@ejemplo_1", agent: "María G.", status: "Nuevo", cat: "A+", phone: "+52 55 1234", notes: "Contacto vía DM" },
-                { date: "14/03/2026", ig: "@ejemplo_2", agent: "Carlos R.", status: "Asignada", cat: "B+", phone: "+57 300 5678", notes: "Pendiente llamada" },
-                { date: "13/03/2026", ig: "@ejemplo_3", agent: "Ana L.", status: "Nuevo", cat: "A", phone: "+34 612 9012", notes: "—" },
-                { date: "12/03/2026", ig: "@ejemplo_4", agent: "Luis M.", status: "Confirmada", cat: "C", phone: "—", notes: "Revisar perfil" },
-                { date: "11/03/2026", ig: "@ejemplo_5", agent: "Sara P.", status: "Asignada", cat: "B", phone: "+1 305 3456", notes: "Interesada en plan" },
-                { date: "10/03/2026", ig: "@ejemplo_6", agent: "María G.", status: "Nuevo", cat: "A+", phone: "+52 55 7890", notes: "Referida por agencia" },
-                { date: "09/03/2026", ig: "@ejemplo_7", agent: "Carlos R.", status: "Confirmada", cat: "B+", phone: "+57 311 2345", notes: "—" },
-                { date: "08/03/2026", ig: "@ejemplo_8", agent: "Ana L.", status: "Nuevo", cat: "A", phone: "+34 622 6789", notes: "Seguimiento semanal" },
-              ].map((r, i) => (
-                <TableRow key={i}>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{r.date}</TableCell>
-                  <TableCell className="text-sm font-medium">{r.ig}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{r.agent}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      r.status === "Nuevo" ? "secondary" :
-                      r.status === "Asignada" ? "default" : "success-soft"
-                    } className="font-normal">{r.status}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      r.cat === "A+" ? "success-soft" :
-                      r.cat === "A" ? "primary-soft" :
-                      r.cat === "B+" ? "warning-soft" :
-                      r.cat === "B" ? "secondary-soft" : "destructive-soft"
-                    } className="font-normal">{r.cat}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground truncate max-w-[150px]">{r.notes}</TableCell>
-                  <TableCell className={STICKY_ACTION_CLASS}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal className="h-4 w-4" />
+        <h4 className="text-sm font-medium mb-3">Ejemplo interactivo — DataTableShell con paginación y scroll</h4>
+        <p className="text-xs text-muted-foreground mb-3">
+          Desplaza horizontalmente para ver todas las columnas. El paginador inferior siempre es visible.
+        </p>
+        <div className="max-w-4xl">
+          <DataTableShell
+            currentPage={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            className="h-[420px]"
+          >
+            <Table className="min-w-[1200px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className={STICKY_HEADER_CLASS}>
+                    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
+                      Creación <ArrowUpDown className="ml-1 h-3 w-3" />
                     </Button>
-                  </TableCell>
+                  </TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>
+                    <Button variant="ghost" size="sm" className="-ml-3 h-8 text-xs">
+                      Instagram <ArrowUpDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Agente</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Estado</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Categoría</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Contacto</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Email</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Plataforma</TableHead>
+                  <TableHead className={STICKY_HEADER_CLASS}>Notas</TableHead>
+                  <TableHead className={STICKY_ACTION_HEADER_CLASS}>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                      Sin resultados.
+                    </TableCell>
+                  </TableRow>
+                ) : rows.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{r.date}</TableCell>
+                    <TableCell className="text-sm font-medium">{r.ig}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.agent}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        r.status === "Nuevo" ? "secondary" :
+                        r.status === "Asignada" ? "default" :
+                        r.status === "Completada" ? "success" : "success-soft"
+                      } className="font-normal">{r.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        r.cat === "A+" ? "success-soft" :
+                        r.cat === "A" ? "primary-soft" :
+                        r.cat === "B+" ? "warning-soft" :
+                        r.cat === "B" ? "secondary-soft" : "destructive-soft"
+                      } className="font-normal">{r.cat}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.email}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.platform}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground truncate max-w-[150px]">{r.notes}</TableCell>
+                    <TableCell className={STICKY_ACTION_CLASS}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </DataTableShell>
         </div>
       </div>
 
