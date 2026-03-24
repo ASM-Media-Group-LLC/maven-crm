@@ -181,8 +181,8 @@ export const DataDisplaySection = () => (
       {/* Live example */}
       <div>
         <h4 className="text-sm font-medium mb-3">Ejemplo: header sticky + acciones sticky</h4>
-        <div className="rounded-lg border border-border overflow-auto max-h-[200px]">
-          <Table className="min-w-[700px]">
+        <div className="rounded-lg border border-border overflow-auto max-h-[340px]">
+          <Table className="min-w-[1000px]">
             <TableHeader>
               <TableRow>
                 <TableHead className={STICKY_HEADER_CLASS}>
@@ -196,23 +196,34 @@ export const DataDisplaySection = () => (
                   </Button>
                 </TableHead>
                 <TableHead className={STICKY_HEADER_CLASS}>Agente</TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>Estado</TableHead>
                 <TableHead className={STICKY_HEADER_CLASS}>Categoría</TableHead>
                 <TableHead className={STICKY_HEADER_CLASS}>Contacto</TableHead>
-                <TableHead className={STICKY_ACTION_HEADER_CLASS}></TableHead>
+                <TableHead className={STICKY_HEADER_CLASS}>Notas</TableHead>
+                <TableHead className={STICKY_ACTION_HEADER_CLASS}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {[
-                { date: "15/03/2026", ig: "@ejemplo_1", agent: "María G.", cat: "A+", phone: "+52 55 1234" },
-                { date: "14/03/2026", ig: "@ejemplo_2", agent: "Carlos R.", cat: "B+", phone: "+57 300 5678" },
-                { date: "13/03/2026", ig: "@ejemplo_3", agent: "Ana L.", cat: "A", phone: "+34 612 9012" },
-                { date: "12/03/2026", ig: "@ejemplo_4", agent: "Luis M.", cat: "C", phone: "—" },
-                { date: "11/03/2026", ig: "@ejemplo_5", agent: "Sara P.", cat: "B", phone: "+1 305 3456" },
+                { date: "15/03/2026", ig: "@ejemplo_1", agent: "María G.", status: "Nuevo", cat: "A+", phone: "+52 55 1234", notes: "Contacto vía DM" },
+                { date: "14/03/2026", ig: "@ejemplo_2", agent: "Carlos R.", status: "Asignada", cat: "B+", phone: "+57 300 5678", notes: "Pendiente llamada" },
+                { date: "13/03/2026", ig: "@ejemplo_3", agent: "Ana L.", status: "Nuevo", cat: "A", phone: "+34 612 9012", notes: "—" },
+                { date: "12/03/2026", ig: "@ejemplo_4", agent: "Luis M.", status: "Confirmada", cat: "C", phone: "—", notes: "Revisar perfil" },
+                { date: "11/03/2026", ig: "@ejemplo_5", agent: "Sara P.", status: "Asignada", cat: "B", phone: "+1 305 3456", notes: "Interesada en plan" },
+                { date: "10/03/2026", ig: "@ejemplo_6", agent: "María G.", status: "Nuevo", cat: "A+", phone: "+52 55 7890", notes: "Referida por agencia" },
+                { date: "09/03/2026", ig: "@ejemplo_7", agent: "Carlos R.", status: "Confirmada", cat: "B+", phone: "+57 311 2345", notes: "—" },
+                { date: "08/03/2026", ig: "@ejemplo_8", agent: "Ana L.", status: "Nuevo", cat: "A", phone: "+34 622 6789", notes: "Seguimiento semanal" },
               ].map((r, i) => (
                 <TableRow key={i}>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{r.date}</TableCell>
                   <TableCell className="text-sm font-medium">{r.ig}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.agent}</TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      r.status === "Nuevo" ? "secondary" :
+                      r.status === "Asignada" ? "default" : "success-soft"
+                    } className="font-normal">{r.status}</Badge>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={
                       r.cat === "A+" ? "success-soft" :
@@ -222,6 +233,7 @@ export const DataDisplaySection = () => (
                     } className="font-normal">{r.cat}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground truncate max-w-[150px]">{r.notes}</TableCell>
                   <TableCell className={STICKY_ACTION_CLASS}>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
                       <MoreHorizontal className="h-4 w-4" />
