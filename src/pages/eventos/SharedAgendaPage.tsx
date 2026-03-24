@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,15 +15,17 @@ import {
 import { es } from "date-fns/locale";
 import {
   CalendarDays, MapPin, Clock, ChevronLeft, ChevronRight,
-  Users, Camera, Mic, Video, Sparkles,
+  Users, Camera, Mic, Video, Sparkles, Search, Sun, Moon, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import InstagramIcon from "@/components/icons/InstagramIcon";
 
 interface AgendaGuest {
   guest_name: string;
@@ -54,6 +56,12 @@ const PROJECT_COLORS: Record<string, { bg: string; dot: string; text: string; bo
   Unlok: { bg: "bg-emerald-500/15", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300", border: "border-l-emerald-500" },
 };
 
+const GUEST_STATUS: Record<string, { dot: string; label: string }> = {
+  confirmed: { dot: "bg-emerald-500", label: "Confirmado" },
+  cancelled: { dot: "bg-red-500", label: "Cancelado" },
+  pending: { dot: "bg-amber-500", label: "Pendiente" },
+};
+
 const typeIcons: Record<string, React.ElementType> = {
   Shooting: Camera, Podcast: Mic, Casting: Users, Reunion: Video, Otro: CalendarDays,
 };
@@ -74,6 +82,15 @@ const SharedAgendaPage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [projectFilter, setProjectFilter] = useState("Todos");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+    return "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   const { data: events = [], isLoading, isError } = useQuery({
     queryKey: ["shared-agenda", token],
@@ -86,11 +103,18 @@ const SharedAgendaPage = () => {
   });
 
   const filteredEvents = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return events.filter((e) => {
       if (projectFilter !== "Todos" && e.project_type !== projectFilter) return false;
+      if (q) {
+        const matchName = e.name.toLowerCase().includes(q);
+        const matchLocation = e.location?.toLowerCase().includes(q);
+        const matchGuest = e.guests.some((g) => g.guest_name?.toLowerCase().includes(q) || g.instagram_handle?.toLowerCase().includes(q));
+        if (!matchName && !matchLocation && !matchGuest) return false;
+      }
       return true;
     });
-  }, [events, projectFilter]);
+  }, [events, projectFilter, searchQuery]);
 
   const eventDatesMap = useMemo(() => {
     const map = new Map<string, AgendaEvent[]>();
@@ -112,7 +136,6 @@ const SharedAgendaPage = () => {
     ? filteredEvents.filter((e) => isSameDay(new Date(e.date), selectedDate))
     : [];
 
-  // Group upcoming by date
   const groupedUpcoming = useMemo(() => {
     const map = new Map<string, AgendaEvent[]>();
     upcomingEvents.forEach((ev) => {
@@ -126,7 +149,6 @@ const SharedAgendaPage = () => {
     ? [{ date: format(selectedDate, "yyyy-MM-dd"), events: selectedDayEvents }]
     : groupedUpcoming.map(([date, evs]) => ({ date, events: evs }));
 
-  /* Calendar */
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -162,16 +184,30 @@ const SharedAgendaPage = () => {
         <div className="max-w-7xl mx-auto flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
           <span className="font-bold text-lg">Maven CRM</span>
-          <span className="text-muted-foreground text-sm ml-1">· Agenda</span>
+          <span className="text-muted-foreground text-sm ml-1 hidden sm:inline">· Agenda</span>
+          <div className="flex-1 max-w-xs ml-auto mr-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar evento, lugar, invitado..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </div>
       </header>
 
-      {/* Body: 2-column layout */}
+      {/* Body */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-6 py-5">
         <div className="grid lg:grid-cols-[340px_1fr] gap-6">
-          {/* LEFT: Calendar + Projects (sticky) */}
+          {/* LEFT: Calendar + Projects */}
           <div className="space-y-4 lg:sticky lg:top-5 lg:self-start">
-            {/* Calendar */}
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -263,7 +299,6 @@ const SharedAgendaPage = () => {
 
           {/* RIGHT: Events feed */}
           <div className="space-y-6">
-            {/* Section title */}
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Sparkles className="h-4 w-4 text-accent" />
@@ -331,7 +366,6 @@ const CompactEventCard = ({ event }: { event: AgendaEvent }) => {
   const confirmedCount = event.guests.filter((g) => g.status === "confirmed").length;
   const pendingCount = event.guests.filter((g) => g.status === "pending").length;
 
-  // Duration
   let duration = "";
   if (event.start_time && event.end_time) {
     const [sh, sm] = event.start_time.split(":").map(Number);
@@ -389,35 +423,52 @@ const CompactEventCard = ({ event }: { event: AgendaEvent }) => {
               )}
             </div>
 
-            {/* Guests row */}
+            {/* Description */}
+            {event.description && (
+              <p className="text-[11px] text-muted-foreground line-clamp-1">{event.description}</p>
+            )}
+
+            {/* Guests with details */}
             {event.guests.length > 0 && (
-              <div className="flex items-center gap-2 pt-0.5">
-                <div className="flex -space-x-1.5">
-                  {event.guests.slice(0, 4).map((g, i) => (
-                    <Avatar key={i} className="h-5 w-5 border border-background">
-                      <AvatarImage src={g.profile_photo_url ?? undefined} />
-                      <AvatarFallback className="text-[8px]">{g.guest_name?.charAt(0)?.toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                  ))}
-                  {event.guests.length > 4 && (
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted border border-background text-[8px] font-semibold">
-                      +{event.guests.length - 4}
-                    </div>
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center gap-2">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[10px] font-semibold text-muted-foreground">
+                    {event.guests.length} invitado{event.guests.length !== 1 ? "s" : ""}
+                  </span>
+                  {confirmedCount > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{confirmedCount}
+                    </span>
+                  )}
+                  {pendingCount > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{pendingCount}
+                    </span>
                   )}
                 </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {event.guests.length} invitado{event.guests.length !== 1 ? "s" : ""}
-                </span>
-                {confirmedCount > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{confirmedCount}
-                  </span>
-                )}
-                {pendingCount > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{pendingCount}
-                  </span>
-                )}
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {event.guests.map((g, i) => {
+                    const gs = GUEST_STATUS[g.status] ?? GUEST_STATUS.pending;
+                    return (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Avatar className="h-5 w-5 border border-background">
+                          <AvatarImage src={g.profile_photo_url ?? undefined} />
+                          <AvatarFallback className="text-[8px]">{g.guest_name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-[11px] font-medium">{g.guest_name}</span>
+                        {g.instagram_handle && (
+                          <a href={`https://instagram.com/${g.instagram_handle}`} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-pink-500 transition-colors">
+                            <InstagramIcon className="h-2.5 w-2.5" />
+                            @{g.instagram_handle}
+                          </a>
+                        )}
+                        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", gs.dot)} />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

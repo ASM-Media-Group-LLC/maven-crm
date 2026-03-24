@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import {
   CalendarDays, MapPin, Clock, Loader2, XCircle,
   Users, Camera, Mic, Video, FileText, Download, ExternalLink,
+  Sun, Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,6 +101,14 @@ const EventoSharePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [guests, setGuests] = useState<GuestInfo[]>([]);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+    return "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -137,7 +146,6 @@ const EventoSharePage = () => {
   const confirmedCount = guests.filter((g) => g.status === "confirmed").length;
   const pendingCount = guests.filter((g) => g.status === "pending").length;
 
-  // Duration
   let duration = "";
   if (event.start_time && event.end_time) {
     const [sh, sm] = event.start_time.split(":").map(Number);
@@ -158,6 +166,10 @@ const EventoSharePage = () => {
           <CalendarDays className="h-5 w-5 text-primary" />
           <span className="font-bold text-lg">Maven CRM</span>
           <span className="text-muted-foreground text-sm ml-1">· Evento</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
         </div>
       </header>
 
@@ -188,7 +200,6 @@ const EventoSharePage = () => {
 
           {/* Detail cards grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Date */}
             <Card>
               <CardContent className="p-4 text-center space-y-1">
                 <CalendarDays className="h-5 w-5 mx-auto text-primary" />
@@ -202,7 +213,6 @@ const EventoSharePage = () => {
               </CardContent>
             </Card>
 
-            {/* Time */}
             <Card>
               <CardContent className="p-4 text-center space-y-1">
                 <Clock className="h-5 w-5 mx-auto text-primary" />
@@ -215,7 +225,6 @@ const EventoSharePage = () => {
               </CardContent>
             </Card>
 
-            {/* Location */}
             <Card>
               <CardContent className="p-4 text-center space-y-1">
                 <MapPin className="h-5 w-5 mx-auto text-primary" />
@@ -224,7 +233,6 @@ const EventoSharePage = () => {
               </CardContent>
             </Card>
 
-            {/* Guests */}
             <Card>
               <CardContent className="p-4 text-center space-y-1">
                 <Users className="h-5 w-5 mx-auto text-primary" />
