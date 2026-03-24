@@ -53,9 +53,9 @@ const EventosCalendar = ({ events }: Props) => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendar Card */}
       <Card className="lg:col-span-2 overflow-hidden">
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <h3 className="text-xl font-bold capitalize tracking-tight">
                 {format(month, "MMMM yyyy", { locale: es })}
@@ -99,7 +99,7 @@ const EventosCalendar = ({ events }: Props) => {
               cell: "flex-1 text-center p-0 relative",
               day: cn(
                 buttonVariants({ variant: "ghost" }),
-                "h-11 w-full p-0 text-sm rounded-lg font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-105"
+                "h-9 w-full p-0 text-sm rounded-lg font-medium aria-selected:opacity-100 transition-all duration-150 hover:scale-105"
               ),
               day_selected: "bg-primary text-primary-foreground hover:bg-primary shadow-md",
               day_today: "calendar-day-today",
@@ -109,26 +109,17 @@ const EventosCalendar = ({ events }: Props) => {
             }}
           />
 
-          {/* Footer */}
-          <div className="mt-4 rounded-xl bg-gradient-to-r from-primary/5 via-accent/5 to-transparent px-4 py-3 flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-              <CalendarDays className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              <span className="font-semibold text-foreground">{eventsThisMonth}</span> eventos programados este mes
-            </p>
-          </div>
         </CardContent>
       </Card>
 
       {/* Upcoming Events Card */}
       <Card className="overflow-hidden">
-        <CardContent className="p-5">
+        <CardContent className="p-4 max-h-[320px] overflow-auto">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-accent" />
             <h3 className="text-sm font-bold tracking-tight">Próximos eventos</h3>
           </div>
-          <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent mb-5" />
+          <div className="h-0.5 w-12 rounded-full bg-gradient-to-r from-primary to-accent mb-3" />
 
           {upcoming.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">

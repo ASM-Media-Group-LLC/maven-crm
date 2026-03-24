@@ -117,42 +117,36 @@ const EventosContent = () => {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex-1 overflow-auto p-6 space-y-4">
           <EventosCalendar events={allEvents} />
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Project type tabs */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">Proyecto</span>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-                {projectTabs.map((tab) => (
-                  <Button
-                    key={tab.value}
-                    variant={filters.projectType === tab.value ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => updateFilters({ projectType: tab.value })}
-                  >
-                    {tab.label}
-                  </Button>
-                ))}
-              </div>
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              {projectTabs.map((tab) => (
+                <Button
+                  key={tab.value}
+                  variant={filters.projectType === tab.value ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => updateFilters({ projectType: tab.value })}
+                >
+                  {tab.label}
+                </Button>
+              ))}
             </div>
 
             {/* Status tabs */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1">Estado</span>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-                {statusTabs.map((tab) => (
-                  <Button
-                    key={tab.value}
-                    variant={filters.status === tab.value ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => updateFilters({ status: tab.value })}
-                  >
-                    {tab.label}
-                  </Button>
-                ))}
-              </div>
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+              {statusTabs.map((tab) => (
+                <Button
+                  key={tab.value}
+                  variant={filters.status === tab.value ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => updateFilters({ status: tab.value })}
+                >
+                  {tab.label}
+                </Button>
+              ))}
             </div>
           </div>
 
