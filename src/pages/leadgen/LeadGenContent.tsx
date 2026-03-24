@@ -476,12 +476,16 @@ const LeadGenContent = () => {
 
           {/* === SUPERVISORS TAB === */}
           {activeTab === "supervisores" && (
-            <LeadGenSupervisorView leads={enrichedLeads} profiles={profiles} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <LeadGenSupervisorView leads={enrichedLeads} profiles={profiles} />
+            </div>
           )}
 
           {/* === PERFORMANCE TAB === */}
           {activeTab === "rendimiento" && (
-            <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+            </div>
           )}
         </div>
 
