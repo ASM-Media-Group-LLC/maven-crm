@@ -121,6 +121,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
       platform: "",
       quality: "",
       company: "",
+      phone_raw: "",
       country_code: "",
       notes: "",
     },
