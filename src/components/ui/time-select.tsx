@@ -18,7 +18,7 @@ const TimeSelect = ({ value, onChange, disabled, className }: TimeSelectProps) =
 
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
-      <Select value={hour} onValueChange={(h) => onChange(`${h}:${snappedMinute}`)} disabled={disabled}>
+      <Select value={hour} onValueChange={(h) => onChange(`${h}:${currentMinute}`)} disabled={disabled}>
         <SelectTrigger className="flex-1">
           <SelectValue placeholder="HH" />
         </SelectTrigger>
