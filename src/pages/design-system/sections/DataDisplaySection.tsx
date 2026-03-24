@@ -308,9 +308,12 @@ export const DataDisplaySection = () => {
             <strong>Edición inline</strong>: usar <code className="text-xs bg-muted px-1 rounded">InlineCategorySelect</code> e{" "}
             <code className="text-xs bg-muted px-1 rounded">InlineStageSelect</code> en tablas de gestión (pipelines).
           </li>
-          <li>
-            <strong>Paginación server-side</strong>: obligatorio para datasets {">"} 100 registros. Usar <code className="text-xs bg-muted px-1 rounded">.range()</code> con <code className="text-xs bg-muted px-1 rounded">{"{ count: \"exact\" }"}</code>.
-          </li>
+           <li>
+276:             <strong>Paginación server-side</strong>: obligatorio para datasets {">"} 100 registros. Todas las tablas de alto volumen <strong>deben usar DataTableShell</strong> con paginación inferior siempre visible.
+           </li>
+           <li>
+             <strong>Scroll horizontal</strong>: usar <code className="text-xs bg-muted px-1 rounded">min-w-[1000px+]</code> en la tabla dentro del contenedor <code className="text-xs bg-muted px-1 rounded">overflow-auto</code> de DataTableShell para garantizar scroll lateral.
+           </li>
           <li>
             <strong>No usar TabsContent</strong>: para evitar romper el flujo flex, usar renderizado condicional manual.
           </li>
