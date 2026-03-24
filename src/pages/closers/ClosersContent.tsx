@@ -52,12 +52,6 @@ const ClosersContent = () => {
     [creators]
   );
 
-  // Redirect to "todas" when admin/manager role resolves
-  useEffect(() => {
-    if ((isAdmin || isManager) && activeTab === "asignadas") {
-      setActiveTab("todas");
-    }
-  }, [isAdmin, isManager]);
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
