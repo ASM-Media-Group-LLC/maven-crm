@@ -172,7 +172,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         country_code: data.country_code || null,
         notes: data.notes || null,
         source_link: data.source_link,
-        phone_raw: phoneNormalized,
+        
         lg_user_id: user.id,
         entry_date: getMiamiDateStr(),
       } as any).select("id").single();
