@@ -164,31 +164,6 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
         return;
       }
 
-      // Duplicate check by phone number across all tables
-      const phoneNormalized = data.phone_raw.replace(/\s+/g, "").trim();
-      
-      const [{ data: phoneLG }, { data: phoneCloser }, { data: phoneCreator }] = await Promise.all([
-        supabase.from("leadgen_entries").select("id, model_handle, company").eq("phone_raw", phoneNormalized).limit(1).maybeSingle(),
-        supabase.from("closers_contacts").select("id, handle, company").eq("phone", phoneNormalized).limit(1).maybeSingle(),
-        supabase.from("creators").select("id, instagram_handle, name").eq("phone", phoneNormalized).limit(1).maybeSingle(),
-      ]);
-
-      if (phoneLG) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en LeadGen: @${phoneLG.model_handle} (${phoneLG.company || ""})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      if (phoneCloser) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe en Contactos: @${phoneCloser.handle} (${phoneCloser.company || ""})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      if (phoneCreator) {
-        toast({ title: "Número ya registrado", description: `Este teléfono ya existe como Creadora: ${phoneCreator.name} (@${phoneCreator.instagram_handle})`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-
       const { data: inserted, error } = await supabase.from("leadgen_entries").insert({
         model_handle: normalizedHandle,
         platform: data.platform,
