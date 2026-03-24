@@ -400,6 +400,7 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     <FormMessage />
                   </FormItem>
                 )}
+              />
 
               <FormField
                 control={form.control}
