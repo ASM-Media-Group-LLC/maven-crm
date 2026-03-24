@@ -8,9 +8,9 @@ import {
   Sun, Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 
@@ -94,6 +94,20 @@ const downloadICS = (ev: EventInfo) => {
   a.click(); URL.revokeObjectURL(url);
 };
 
+/* ─── Detail Item ─── */
+const DetailItem = ({ icon: Icon, label, value, sub }: { icon: React.ElementType; label: string; value: string; sub?: string }) => (
+  <div className="flex items-start gap-3 py-3">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+      <Icon className="h-4 w-4 text-primary" />
+    </div>
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="text-sm font-semibold leading-snug">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  </div>
+);
+
 /* ─── Main ─── */
 const EventoSharePage = () => {
   const { token } = useParams<{ token: string }>();
@@ -145,6 +159,7 @@ const EventoSharePage = () => {
   const projectStyle = event.project_type ? PROJECT_COLORS[event.project_type] : null;
   const confirmedCount = guests.filter((g) => g.status === "confirmed").length;
   const pendingCount = guests.filter((g) => g.status === "pending").length;
+  const cancelledCount = guests.filter((g) => g.status === "cancelled").length;
 
   let duration = "";
   if (event.start_time && event.end_time) {
@@ -158,11 +173,15 @@ const EventoSharePage = () => {
     }
   }
 
+  const timeDisplay = event.start_time
+    ? `${event.start_time.slice(0, 5)}${event.end_time ? ` – ${event.end_time.slice(0, 5)}` : ""}`
+    : "Por definir";
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card px-4 md:px-6 py-3 shrink-0">
-        <div className="max-w-3xl mx-auto flex items-center gap-2">
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6 py-3 shrink-0 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-primary" />
           <span className="font-bold text-lg">Maven CRM</span>
           <span className="text-muted-foreground text-sm ml-1">· Evento</span>
@@ -173,154 +192,147 @@ const EventoSharePage = () => {
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-5">
+      <div className="flex-1 px-4 py-8">
+        <div className="max-w-2xl mx-auto space-y-6">
 
-          {/* Hero */}
-          <div className="space-y-2">
-            {event.project_type && projectStyle && (
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold", projectStyle.bg, projectStyle.text)}>
-                <span className={cn("h-2 w-2 rounded-full", projectStyle.dot)} />
-                {event.project_type}
-              </span>
-            )}
-            <h1 className="text-2xl md:text-3xl font-bold leading-tight">{event.name}</h1>
+          {/* ── Hero ── */}
+          <section className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <TypeIcon className="h-4 w-4" />
-                <span className="text-sm">{event.event_type}</span>
-              </div>
+              {event.project_type && projectStyle && (
+                <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold", projectStyle.bg, projectStyle.text)}>
+                  <span className={cn("h-2 w-2 rounded-full", projectStyle.dot)} />
+                  {event.project_type}
+                </span>
+              )}
               {event.status && (
                 <Badge variant="secondary" className="text-[11px]">
                   {STATUS_LABELS[event.status] ?? event.status}
                 </Badge>
               )}
             </div>
-          </div>
+            <h1 className="text-3xl md:text-4xl font-bold leading-tight tracking-tight">{event.name}</h1>
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <TypeIcon className="h-4 w-4" />
+              <span className="text-sm font-medium">{event.event_type}</span>
+            </div>
+          </section>
 
-          {/* Detail cards grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card>
-              <CardContent className="p-4 text-center space-y-1">
-                <CalendarDays className="h-5 w-5 mx-auto text-primary" />
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Fecha</p>
-                <p className="text-sm font-bold capitalize">
-                  {format(new Date(event.date + "T12:00:00"), "EEE d MMM", { locale: es })}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {format(new Date(event.date + "T12:00:00"), "yyyy")}
-                </p>
-              </CardContent>
-            </Card>
+          {/* ── Event details ── */}
+          <section className="rounded-xl border border-border bg-card p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+              <DetailItem
+                icon={CalendarDays}
+                label="Fecha"
+                value={format(new Date(event.date + "T12:00:00"), "EEEE d 'de' MMMM, yyyy", { locale: es })}
+              />
+              <DetailItem
+                icon={Clock}
+                label="Horario"
+                value={timeDisplay}
+                sub={duration || undefined}
+              />
+              <DetailItem
+                icon={MapPin}
+                label="Ubicación"
+                value={event.location || "Por definir"}
+              />
+              <DetailItem
+                icon={Users}
+                label="Invitados"
+                value={`${guests.length} persona${guests.length !== 1 ? "s" : ""}`}
+                sub={
+                  [
+                    confirmedCount > 0 ? `${confirmedCount} confirmado${confirmedCount !== 1 ? "s" : ""}` : "",
+                    pendingCount > 0 ? `${pendingCount} pendiente${pendingCount !== 1 ? "s" : ""}` : "",
+                    cancelledCount > 0 ? `${cancelledCount} cancelado${cancelledCount !== 1 ? "s" : ""}` : "",
+                  ].filter(Boolean).join(" · ") || undefined
+                }
+              />
+            </div>
+          </section>
 
-            <Card>
-              <CardContent className="p-4 text-center space-y-1">
-                <Clock className="h-5 w-5 mx-auto text-primary" />
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Horario</p>
-                <p className="text-sm font-bold">
-                  {event.start_time?.slice(0, 5) ?? "—"}
-                  {event.end_time ? ` – ${event.end_time.slice(0, 5)}` : ""}
-                </p>
-                {duration && <p className="text-[11px] text-muted-foreground">{duration}</p>}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4 text-center space-y-1">
-                <MapPin className="h-5 w-5 mx-auto text-primary" />
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Ubicación</p>
-                <p className="text-sm font-bold truncate">{event.location || "Por definir"}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4 text-center space-y-1">
-                <Users className="h-5 w-5 mx-auto text-primary" />
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Invitados</p>
-                <p className="text-sm font-bold">{guests.length}</p>
-                <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
-                  {confirmedCount > 0 && (
-                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{confirmedCount}</span>
-                  )}
-                  {pendingCount > 0 && (
-                    <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />{pendingCount}</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Notes */}
+          {/* ── Notes ── */}
           {event.description && (
-            <Card className="border-l-[3px] border-l-accent">
-              <CardContent className="p-4 space-y-1.5">
-                <div className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Notas del evento</span>
-                </div>
-                <p className="text-sm text-foreground/80 whitespace-pre-line">{event.description}</p>
-              </CardContent>
-            </Card>
+            <section className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/30">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Notas del evento</span>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-sm text-foreground/80 whitespace-pre-line leading-relaxed">{event.description}</p>
+              </div>
+            </section>
           )}
 
-          {/* Guests list */}
+          {/* ── Guests list ── */}
           {guests.length > 0 && (
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Invitados</span>
-                  <span className="text-[10px] text-muted-foreground ml-auto">{guests.length} total</span>
-                </div>
-                <div className="divide-y divide-border">
-                  {guests.map((g) => {
-                    const gs = GUEST_STATUS[g.status] ?? GUEST_STATUS.pending;
-                    return (
-                      <div key={g.id} className="flex items-center gap-3 py-2.5">
-                        <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarFallback className="text-xs font-semibold">
-                            {g.name?.charAt(0)?.toUpperCase() ?? "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{g.name}</p>
-                          {g.instagram_handle && (
-                            <a href={`https://instagram.com/${g.instagram_handle}`} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-pink-500 transition-colors">
-                              <InstagramIcon className="h-3 w-3" />
-                              @{g.instagram_handle}
-                            </a>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={cn("h-2 w-2 rounded-full", gs.dot)} />
-                          <span className="text-[11px] text-muted-foreground">{gs.label}</span>
-                        </div>
+            <section className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/30">
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Invitados</span>
+                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{guests.length}</span>
+              </div>
+              <ul className="divide-y divide-border">
+                {guests.map((g) => {
+                  const gs = GUEST_STATUS[g.status] ?? GUEST_STATUS.pending;
+                  return (
+                    <li key={g.id} className="flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                      <Avatar className="h-9 w-9 shrink-0">
+                        <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
+                          {g.name?.charAt(0)?.toUpperCase() ?? "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{g.name}</p>
+                        {g.instagram_handle && (
+                          <a
+                            href={`https://instagram.com/${g.instagram_handle}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-pink-500 transition-colors"
+                          >
+                            <InstagramIcon className="h-3 w-3" />
+                            @{g.instagram_handle}
+                          </a>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "shrink-0 gap-1.5 text-[10px] font-medium border-transparent",
+                          g.status === "confirmed" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                          g.status === "cancelled" && "bg-red-500/10 text-red-600 dark:text-red-400",
+                          g.status === "pending" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                        )}
+                      >
+                        <span className={cn("h-1.5 w-1.5 rounded-full", gs.dot)} />
+                        {gs.label}
+                      </Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           )}
 
-          {/* Calendar buttons */}
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
+          {/* ── Calendar actions ── */}
+          <Separator />
+          <section className="flex flex-wrap gap-3">
+            <Button variant="outline" className="gap-2" asChild>
               <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                <ExternalLink className="h-4 w-4" />
                 Google Calendar
               </a>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => downloadICS(event)}>
-              <Download className="h-3.5 w-3.5 mr-1.5" />
+            <Button variant="outline" className="gap-2" onClick={() => downloadICS(event)}>
+              <Download className="h-4 w-4" />
               Descargar .ics
             </Button>
-          </div>
+          </section>
         </div>
       </div>
 
-      <footer className="border-t border-border py-3 text-center text-xs text-muted-foreground shrink-0">
+      <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground shrink-0">
         Maven CRM — Kash Agency
       </footer>
     </div>
