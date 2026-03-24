@@ -349,8 +349,8 @@ const LeadGenContent = () => {
                 className="flex-1 min-h-0"
                 currentPage={page + 1}
                 totalPages={totalPages}
-                totalCount={filteredLeads.length}
-                pageSize={50}
+                totalCount={totalLeads}
+                pageSize={100}
                 onPageChange={(p) => setPage(p - 1)}
               >
                 <LeadGenTable
