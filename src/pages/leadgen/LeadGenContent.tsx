@@ -349,8 +349,8 @@ const LeadGenContent = () => {
                 className="flex-1 min-h-0"
                 currentPage={page + 1}
                 totalPages={totalPages}
-                totalCount={filteredLeads.length}
-                pageSize={50}
+                totalCount={totalLeads}
+                pageSize={100}
                 onPageChange={(p) => setPage(p - 1)}
               >
                 <LeadGenTable
@@ -364,7 +364,7 @@ const LeadGenContent = () => {
 
           {/* === AGENTS TAB === */}
           {activeTab === "agentes" && (
-            <div className="space-y-6">
+            <div className="flex-1 min-h-0 overflow-auto space-y-6">
               <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
                 <div className="p-6 flex items-center justify-between">
                   <div>
@@ -476,12 +476,16 @@ const LeadGenContent = () => {
 
           {/* === SUPERVISORS TAB === */}
           {activeTab === "supervisores" && (
-            <LeadGenSupervisorView leads={enrichedLeads} profiles={profiles} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <LeadGenSupervisorView leads={enrichedLeads} profiles={profiles} />
+            </div>
           )}
 
           {/* === PERFORMANCE TAB === */}
           {activeTab === "rendimiento" && (
-            <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+            <div className="flex-1 min-h-0 overflow-auto">
+              <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+            </div>
           )}
         </div>
 
