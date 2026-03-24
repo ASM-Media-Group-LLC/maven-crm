@@ -100,7 +100,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || !eventType || !date || !projectType) {
+    const finalProject = showCustomProject ? customProject.trim() : projectType;
+    if (!name.trim() || !eventType || !date || !finalProject) {
       toast({ title: "Completa los campos obligatorios (nombre, tipo, proyecto, fecha)", variant: "destructive" });
       return;
     }
