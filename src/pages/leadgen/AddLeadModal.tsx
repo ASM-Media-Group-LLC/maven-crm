@@ -380,9 +380,27 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                 )}
               />
 
+
               <FormField
                 control={form.control}
-                name="country_code"
+                name="phone_raw"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Teléfono de Contacto *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="+57 300 000 0000"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Incluye código de país. Ej: +57 3001234567
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
                 render={({ field }) => {
                   const selected = ALL_COUNTRIES.find(c => c.code === field.value);
                   return (
