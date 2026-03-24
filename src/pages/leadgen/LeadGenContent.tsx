@@ -364,7 +364,7 @@ const LeadGenContent = () => {
 
           {/* === AGENTS TAB === */}
           {activeTab === "agentes" && (
-            <div className="space-y-6">
+            <div className="flex-1 min-h-0 overflow-auto space-y-6">
               <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
                 <div className="p-6 flex items-center justify-between">
                   <div>
