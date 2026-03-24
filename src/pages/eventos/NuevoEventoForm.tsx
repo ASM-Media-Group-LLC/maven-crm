@@ -81,6 +81,8 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
   const [maxCapacity, setMaxCapacity] = useState(event?.max_capacity?.toString() ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
   const [includeVideoCall, setIncludeVideoCall] = useState(!!(event as any)?.video_call_room_id);
+  const [showCustomProject, setShowCustomProject] = useState(false);
+  const [customProject, setCustomProject] = useState("");
 
   // Guests
   const [guests, setGuests] = useState<LocalGuest[]>(existingGuests ?? []);
