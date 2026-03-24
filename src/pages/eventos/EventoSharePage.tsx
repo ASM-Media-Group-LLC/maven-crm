@@ -231,7 +231,7 @@ const EventoSharePage = () => {
 
           {/* ── Event details ── */}
           <section className="rounded-xl border border-border bg-card p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6">
               <DetailItem
                 icon={CalendarDays}
                 label="Fecha"
@@ -247,18 +247,6 @@ const EventoSharePage = () => {
                 icon={MapPin}
                 label="Ubicación"
                 value={event.location || "Por definir"}
-              />
-              <DetailItem
-                icon={Users}
-                label="Invitados"
-                value={`${guests.length} persona${guests.length !== 1 ? "s" : ""}`}
-                sub={
-                  [
-                    confirmedCount > 0 ? `${confirmedCount} confirmado${confirmedCount !== 1 ? "s" : ""}` : "",
-                    pendingCount > 0 ? `${pendingCount} pendiente${pendingCount !== 1 ? "s" : ""}` : "",
-                    cancelledCount > 0 ? `${cancelledCount} cancelado${cancelledCount !== 1 ? "s" : ""}` : "",
-                  ].filter(Boolean).join(" · ") || undefined
-                }
               />
             </div>
           </section>
