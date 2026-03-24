@@ -1,26 +1,26 @@
 
 
-## Plan: Fix paginador en LeadGen y scroll interno en tabs Agentes/Supervisores/Rendimiento
+## Plan: Default a mostrar todos los registros sin filtros previos
 
-### Problemas
+### Problema
+En `/closers`, el tab por defecto es `"asignadas"` para usuarios normales (solo se redirige a `"todas"` si es admin/manager). El usuario quiere que **todos los módulos muestren todos los registros por defecto**, sin filtros preseleccionados.
 
-1. **Tab "Leads" sin paginador visible**: `DataTableShell` recibe `totalCount={filteredLeads.length}` y `pageSize={50}`, pero el fetch usa `PAGE_SIZE=100`. Como `filteredLeads.length` es <= 100 (una página), `totalPages` calcula como 1 y el paginador no aparece. Debe usar `totalCount={totalLeads}` (el count real del servidor) y `pageSize={100}` para que coincida con el fetch.
+### Análisis por módulo
+- **Closers**: default `"asignadas"` → debe ser `"todas"`
+- **LeadGen**: default `"leads"` → ya muestra todos, correcto
+- **Contactos**: default sin filtros de estado → ya muestra todos, correcto
 
-2. **Tabs Agentes/Supervisores/Rendimiento sin scroll**: El contenedor padre es `flex-1 min-h-0 flex flex-col` pero el contenido de estos tabs no tiene `overflow-auto`. El contenido crece más allá del viewport y no se puede hacer scroll down.
+El único cambio real necesario es en **Closers**.
 
 ### Cambios
 
-#### `src/pages/leadgen/LeadGenContent.tsx`
+#### `src/pages/closers/hooks/useCloserLeads.ts`
+- Cambiar `useState("asignadas")` → `useState("todas")`
 
-**Fix paginador (tab leads)**:
-- Línea 353: Cambiar `totalCount={filteredLeads.length}` → `totalCount={totalLeads}`
-- Línea 354: Cambiar `pageSize={50}` → `pageSize={100}` (para coincidir con el fetch real)
-
-**Fix scroll en tabs agentes/supervisores/rendimiento**:
-- Línea 367: Envolver el contenido del tab "agentes" en `<div className="flex-1 min-h-0 overflow-auto">` en lugar del `<div className="space-y-6">` actual (combinar: `flex-1 min-h-0 overflow-auto space-y-6`)
-- Línea 478-479: Envolver `LeadGenSupervisorView` en `<div className="flex-1 min-h-0 overflow-auto">`
-- Línea 483-484: Envolver `LeadGenPerformanceView` en `<div className="flex-1 min-h-0 overflow-auto">`
+#### `src/pages/closers/ClosersContent.tsx`
+- Eliminar el `useEffect` que redirige admins de `"asignadas"` a `"todas"` (ya no necesario porque el default ya es `"todas"`)
 
 ### Archivos
-1. `src/pages/leadgen/LeadGenContent.tsx` — 4 cambios puntuales
+1. `src/pages/closers/hooks/useCloserLeads.ts` — línea 98: default tab a `"todas"`
+2. `src/pages/closers/ClosersContent.tsx` — eliminar useEffect de redirección (líneas ~56-59)
 
