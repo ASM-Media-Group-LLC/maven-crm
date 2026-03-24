@@ -201,7 +201,7 @@ const SharedAgendaPage = () => {
           {/* LEFT: Calendar + Projects */}
           <div className="space-y-5 lg:sticky lg:top-20 lg:self-start">
             {/* Calendar */}
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-xl border border-border bg-card p-5 pb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold capitalize tracking-tight">
                   {format(currentMonth, "MMMM yyyy", { locale: es })}
