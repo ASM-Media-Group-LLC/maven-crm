@@ -1,48 +1,54 @@
 
 
-## Plan: Corregir visibilidad de datos en Contactos y Closers
+## Plan: Optimizar rendimiento de Closers y documentar estándar de tablas en Design System
 
-### Diagnóstico
+### Problema 1: /closers carga lento
 
-Encontré **2 causas raíz** de por qué no se ven los datos correctos:
+La query principal en `useCloserLeads.ts` hace **3 queries secuenciales** en cada fetch:
+1. Fetch de `closer_creators` (paginada)
+2. Fetch de `profiles` para agent names
+3. Fetch de `closer_contact_history` para contact counts
 
-#### 1. Closers — RLS bloquea el tab "Nuevo" para usuarios no-admin
+Estas 3 queries se ejecutan en serie dentro de un solo `queryFn`, bloqueando el render. Además, el `PAGE_SIZE` es 100, innecesariamente alto.
 
-La tabla `closer_creators` tiene RLS habilitado con estas políticas de SELECT:
-- **Admins**: ven todo
-- **Managers**: ven todo  
-- **Closers/Agents**: solo ven registros donde `assigned_to = auth.uid()`
+**Solución**:
+- Reducir `PAGE_SIZE` de 100 a 50 (consistente con Contactos)
+- Ejecutar las queries de `profiles` y `contact_history` en **paralelo** con `Promise.all` en vez de secuencial
+- Agregar `staleTime: 30_000` a la query principal para evitar refetches innecesarios
 
-El problema: los 420 registros en stage "Nuevo" tienen `assigned_to = NULL` (son contactos recién creados, aún no asignados). Entonces un closer o agent **no ve ninguno** aunque el RPC de conteos (que usa `SECURITY DEFINER`) sí los cuenta. El usuario ve los KPIs con números pero la tabla vacía.
+### Problema 2: Tablas inconsistentes entre vistas
 
-**Solución**: Agregar una política RLS que permita a los usuarios ver los registros de `closer_creators` que ellos mismos crearon (`created_by = auth.uid()`). Esto cubre el tab "Nuevo" donde los agentes deben ver sus propios contactos.
+Contactos y Closers usan patrones de tabla diferentes: headers distintos, estilos de sticky distintos, estructura de columnas sin un estándar documentado. El Design System actual tiene un ejemplo genérico de tabla pero no documenta el patrón real de DataTableShell + sticky headers + columnas estándar.
 
-#### 2. Closers — `keepPreviousData` muestra datos del tab anterior
+**Solución**: Crear una nueva sección **"Data Table Pattern"** en el Design System (dentro de `LayoutPatternsSection.tsx` o como nueva sección en `DataDisplaySection.tsx`) que documente:
 
-El hook usa `placeholderData: keepPreviousData`, lo que causa que al cambiar de tab se muestren brevemente los datos del tab anterior, dando la impresión de "datos incorrectos" o "versión vieja".
+1. **Estructura de página con tabla** — el layout ContactosContent como referencia canónica
+2. **Patrón de headers sticky** — la clase estándar: `sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]`
+3. **Columna de acciones sticky** — `sticky right-0 z-30 bg-card`
+4. **Orden de columnas estándar** — #, Creación, Handle, Agente/Creado por, Estado (si aplica), Categoría, Contacto, Notas, Acciones
+5. **DataTableShell** — modo internal scroll (`className="flex-1 min-h-0"`)
+6. **Código de referencia** — snippet de ContactosTable como ejemplo canónico
 
-**Solución**: Eliminar `placeholderData: keepPreviousData` para que al cambiar de tab se muestre el loading state en lugar de datos stale de otro tab.
+### Cambios
 
-#### 3. Contactos — funciona correctamente
+#### 1. `src/pages/closers/hooks/useCloserLeads.ts` — Rendimiento
+- Cambiar `PAGE_SIZE` de 100 a 50
+- En el branch "all other tabs" (líneas 174-248): ejecutar fetch de `profiles` y `closer_contact_history` en paralelo con `Promise.all`
+- Agregar `staleTime: 30_000` a la query principal
 
-La tabla `closers_contacts` tiene RLS **deshabilitado**, y la query con paginación (50 por página) funciona bien. Los 475 registros están accesibles. Si el usuario no ve todos, es porque debe navegar las páginas. El total se muestra correctamente en el header.
+#### 2. `src/pages/design-system/sections/DataDisplaySection.tsx` — Documentar patrón de tablas
+Agregar subsección **"Data Table Standard"** con:
+- Diagrama visual del layout (header fijo, tabla con scroll, paginador fijo)
+- Snippet de código mostrando la estructura canónica (ContactosTable como modelo)
+- Tabla de clases CSS estándar para headers sticky, acciones sticky, empty state
+- Reglas: orden de columnas, uso de DataTableShell, SortHeader pattern
+- Referencia a los componentes inline editables (InlineCategorySelect, InlineStageSelect) para tablas de gestión
 
-### Cambios propuestos
-
-#### Archivo 1: Migration SQL
-```sql
--- Permitir a usuarios ver los closer_creators que ellos crearon
-CREATE POLICY "Users see own created closer_creators"
-ON public.closer_creators FOR SELECT
-TO authenticated
-USING (created_by = auth.uid());
-```
-
-#### Archivo 2: `src/pages/closers/hooks/useCloserLeads.ts`
-- Eliminar `placeholderData: keepPreviousData` de la query principal para evitar flash de datos incorrectos al cambiar tabs
+### Archivos a modificar
+1. **`src/pages/closers/hooks/useCloserLeads.ts`** — PAGE_SIZE, Promise.all, staleTime
+2. **`src/pages/design-system/sections/DataDisplaySection.tsx`** — nueva subsección "Data Table Standard"
 
 ### Resultado
-- Los agentes verán sus propios contactos en el tab "Nuevo"
-- Al cambiar de tab no se mostrarán datos de otro tab temporalmente
-- Contactos sigue funcionando correctamente con paginación
+- /closers cargará notablemente más rápido (queries en paralelo + menos filas)
+- El Design System tendrá documentación clara del patrón de tabla que sirve como referencia para mantener consistencia en todas las vistas
 
