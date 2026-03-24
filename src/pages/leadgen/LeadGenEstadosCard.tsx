@@ -77,12 +77,12 @@ const LeadGenEstadosCard = ({ leads = [], activeFilter, onFilterChange }: Props)
 
   return (
     <Card className="transition-all duration-200 hover:shadow-md hover:border-primary/30">
-      <CardHeader className="pb-1 p-4">
+      <CardHeader className="pb-0.5 px-3 pt-2">
         <CardTitle className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
           Estados
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-0.5 p-4 pt-0">
+      <CardContent className="space-y-0 px-3 pb-2 pt-0">
         {estadoConfig.map((estado) => {
           const count = estado.count(leads);
           const active = isActive(estado.key);

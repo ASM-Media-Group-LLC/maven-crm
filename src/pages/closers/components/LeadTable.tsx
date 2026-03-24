@@ -611,12 +611,12 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <div className="flex gap-1">
                 {followUpPending && (
-                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5">
+                  <Badge variant="destructive" className="text-[10px] h-5 gap-0.5 whitespace-nowrap">
                     <AlertTriangle className="h-3 w-3" /> Follow-up
                   </Badge>
                 )}
                 {isLastAttempt && (
-                  <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5">
+                  <Badge className="text-[10px] h-5 bg-warning/20 text-warning gap-0.5 whitespace-nowrap">
                     <Clock className="h-3 w-3" /> Último intento
                   </Badge>
                 )}
@@ -754,7 +754,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell className="text-sm">{c.source_account || "—"}</TableCell>
+            <TableCell>
+              <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
+            </TableCell>
             <TableCell>
               <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
