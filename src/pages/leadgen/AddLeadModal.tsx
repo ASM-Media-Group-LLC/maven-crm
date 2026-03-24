@@ -400,7 +400,10 @@ const AddLeadModal = ({ open, onOpenChange }: AddLeadModalProps) => {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+
+              <FormField
+                control={form.control}
+                name="country_code"
                 render={({ field }) => {
                   const selected = ALL_COUNTRIES.find(c => c.code === field.value);
                   return (
