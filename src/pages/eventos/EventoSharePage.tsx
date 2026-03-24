@@ -215,6 +215,18 @@ const EventoSharePage = () => {
               <TypeIcon className="h-4 w-4" />
               <span className="text-sm font-medium">{event.event_type}</span>
             </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Google Calendar
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadICS(event)}>
+                <Download className="h-3.5 w-3.5" />
+                Descargar .ics
+              </Button>
+            </div>
           </section>
 
           {/* ── Event details ── */}
