@@ -193,7 +193,7 @@ const EventoSharePage = () => {
       </header>
 
       <div className="flex-1 px-4 py-8">
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-2xl mx-auto space-y-5">
 
           {/* ── Hero ── */}
           <section className="space-y-3">
