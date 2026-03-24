@@ -326,20 +326,6 @@ const EventoSharePage = () => {
             </section>
           )}
 
-          {/* ── Calendar actions ── */}
-          <Separator />
-          <section className="flex flex-wrap gap-3">
-            <Button variant="outline" className="gap-2" asChild>
-              <a href={buildGoogleCalUrl(event)} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Google Calendar
-              </a>
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => downloadICS(event)}>
-              <Download className="h-4 w-4" />
-              Descargar .ics
-            </Button>
-          </section>
         </div>
       </div>
 
