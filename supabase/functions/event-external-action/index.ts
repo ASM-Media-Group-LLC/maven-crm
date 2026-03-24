@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       // Get guests (only public info)
       const { data: guests } = await supabase
         .from("event_guests")
-        .select("id, guest_name, guest_type, status, creator_id, creators(name, artistic_name)")
+        .select("id, guest_name, guest_type, status, creator_id, creators(name, artistic_name, instagram_handle)")
         .eq("event_id", event.id);
 
       const guestList = (guests ?? []).map((g: any) => ({
@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
         name: g.creators?.artistic_name || g.creators?.name || g.guest_name || "Invitado",
         type: g.guest_type,
         status: g.status,
+        instagram_handle: g.creators?.instagram_handle ?? null,
       }));
 
       return new Response(
