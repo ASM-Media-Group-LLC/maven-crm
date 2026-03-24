@@ -270,7 +270,18 @@ const EventoSharePage = () => {
               <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/30">
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Invitados</span>
-                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{guests.length}</span>
+                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                  {guests.length}
+                  {(confirmedCount > 0 || pendingCount > 0 || cancelledCount > 0) && (
+                    <span className="ml-2">
+                      — {[
+                        confirmedCount > 0 ? `${confirmedCount} confirmado${confirmedCount !== 1 ? "s" : ""}` : "",
+                        pendingCount > 0 ? `${pendingCount} pendiente${pendingCount !== 1 ? "s" : ""}` : "",
+                        cancelledCount > 0 ? `${cancelledCount} cancelado${cancelledCount !== 1 ? "s" : ""}` : "",
+                      ].filter(Boolean).join(" · ")}
+                    </span>
+                  )}
+                </span>
               </div>
               <ul className="divide-y divide-border">
                 {guests.map((g) => {
