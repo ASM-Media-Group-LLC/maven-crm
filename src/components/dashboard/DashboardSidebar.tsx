@@ -192,7 +192,7 @@ const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="flex h-14 items-center justify-start px-5 border-b border-border shrink-0">
         <Logo size="sm" collapsed={collapsed} />
       </SidebarHeader>
 
