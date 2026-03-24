@@ -111,7 +111,7 @@ const NuevoEventoForm = ({ event, existingGuests }: NuevoEventoFormProps) => {
     const formData = {
       name: name.trim(),
       event_type: eventType,
-      project_type: projectType,
+      project_type: finalProject,
       description: description || null,
       date: format(date, "yyyy-MM-dd"),
       end_date: multiDay && endDate ? format(endDate, "yyyy-MM-dd") : null,
