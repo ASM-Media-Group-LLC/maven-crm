@@ -1,34 +1,26 @@
 
 
-## Plan: Cambiar lógica de duplicados en LeadGen de handle a teléfono
+## Plan: Fix paginador en LeadGen y scroll interno en tabs Agentes/Supervisores/Rendimiento
 
-### Regla de negocio nueva
-- Un agente puede subir el mismo handle/link cuantas veces quiera
-- La validación de duplicado se basa en el **número de teléfono**: si el teléfono ya existe en el sistema, se bloquea; si no, pasa
+### Problemas
 
-### Problema actual
-1. El formulario `AddLeadModal` no tiene campo de teléfono — `phone_raw` existe en la tabla pero no se recolecta
-2. Hay 3 checks de duplicado por handle (leadgen_entries, closers_contacts, creators) que bloquean el submit
-3. Existe un unique index `uq_leadgen_handle_platform` en `(model_handle, platform)` que impide insertar el mismo handle dos veces
+1. **Tab "Leads" sin paginador visible**: `DataTableShell` recibe `totalCount={filteredLeads.length}` y `pageSize={50}`, pero el fetch usa `PAGE_SIZE=100`. Como `filteredLeads.length` es <= 100 (una página), `totalPages` calcula como 1 y el paginador no aparece. Debe usar `totalCount={totalLeads}` (el count real del servidor) y `pageSize={100}` para que coincida con el fetch.
+
+2. **Tabs Agentes/Supervisores/Rendimiento sin scroll**: El contenedor padre es `flex-1 min-h-0 flex flex-col` pero el contenido de estos tabs no tiene `overflow-auto`. El contenido crece más allá del viewport y no se puede hacer scroll down.
 
 ### Cambios
 
-#### 1. Migration SQL — quitar unique index de handle
-```sql
-DROP INDEX IF EXISTS uq_leadgen_handle_platform;
-```
-Esto permite insertar el mismo handle múltiples veces.
+#### `src/pages/leadgen/LeadGenContent.tsx`
 
-#### 2. `src/pages/leadgen/AddLeadModal.tsx` — agregar campo teléfono y cambiar validación
-- Agregar `phone_raw: z.string().min(5, "Teléfono requerido")` al schema
-- Agregar campo de input de teléfono en el formulario
-- **Eliminar** los 3 checks de duplicado por handle (leadgen_entries, closers_contacts, creators)
-- **Agregar** check de duplicado por teléfono: buscar `phone_raw` en `leadgen_entries`, `closers_contacts` (campo `phone`), y `creators` (campo `phone`)
-- Si el teléfono ya existe en cualquiera de las 3 tablas → bloquear con toast "Este número ya está registrado"
-- Si no existe → permitir el insert
-- Incluir `phone_raw` en el insert a `leadgen_entries`
+**Fix paginador (tab leads)**:
+- Línea 353: Cambiar `totalCount={filteredLeads.length}` → `totalCount={totalLeads}`
+- Línea 354: Cambiar `pageSize={50}` → `pageSize={100}` (para coincidir con el fetch real)
 
-### Archivos a modificar
-1. **Migration SQL** — drop unique index `uq_leadgen_handle_platform`
-2. **`src/pages/leadgen/AddLeadModal.tsx`** — agregar campo teléfono, reemplazar validación de handle por validación de teléfono
+**Fix scroll en tabs agentes/supervisores/rendimiento**:
+- Línea 367: Envolver el contenido del tab "agentes" en `<div className="flex-1 min-h-0 overflow-auto">` en lugar del `<div className="space-y-6">` actual (combinar: `flex-1 min-h-0 overflow-auto space-y-6`)
+- Línea 478-479: Envolver `LeadGenSupervisorView` en `<div className="flex-1 min-h-0 overflow-auto">`
+- Línea 483-484: Envolver `LeadGenPerformanceView` en `<div className="flex-1 min-h-0 overflow-auto">`
+
+### Archivos
+1. `src/pages/leadgen/LeadGenContent.tsx` — 4 cambios puntuales
 
