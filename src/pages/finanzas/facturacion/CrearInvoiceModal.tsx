@@ -91,10 +91,10 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
         </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 p-6">
-          <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
+        <div className="flex-1 min-h-0 overflow-hidden p-6">
+          <div className="grid grid-cols-[400px_1fr] gap-6 h-full min-h-0">
             {/* Left: Form */}
-            <div className="space-y-4 overflow-y-auto">
+            <div className="space-y-4 overflow-y-auto min-h-0 h-full">
               <div>
                 <Label>Creador</Label>
                 <Select value={creatorId || undefined} onValueChange={setCreatorId}>
@@ -152,10 +152,10 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             </div>
 
             {/* Right: Preview block */}
-            <div className="flex flex-col min-h-0">
-              <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 overflow-hidden">
+            <div className="flex flex-col min-h-0 h-full overflow-hidden">
+              <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Preview header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 shrink-0">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vista previa</p>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}>
@@ -172,8 +172,8 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                 </div>
 
                 {/* A4 viewer */}
-                <div className="flex-1 overflow-auto">
-                  <div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48, minWidth: A4_W * zoom + 48 }}>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <div className="flex justify-center p-4" style={{ minHeight: A4_H * zoom + 32, minWidth: A4_W * zoom + 32 }}>
                     <div
                       style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       className="bg-white rounded shadow-2xl border border-border/50 shrink-0 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
