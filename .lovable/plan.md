@@ -1,48 +1,84 @@
 
 
-## Plan: Reestructurar modal a patrón header/content/footer unificado
+## Plan: Corregir layout del preview para contención total sin scroll en el modal
+
+### Problema actual
+
+La sección de contenido usa `overflow-y-auto` lo que permite scroll en todo el modal. El grid interno usa `h-full` pero su padre no tiene altura definida (depende del contenido), así que el preview no se contiene correctamente y puede desbordar.
 
 ### Cambios en `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
 
-Reorganizar el `DialogContent` de un grid de dos columnas de borde a borde a un layout vertical con 3 zonas:
+**1. Content zone: de scrollable a flex con altura controlada**
 
-**1. Header (shrink-0, border-b, px-6 py-4)**
-- `DialogHeader` con `DialogTitle` "Crear Invoice" alineado a la izquierda
-- El botón X ya lo provee `DialogContent` automáticamente
+Cambiar línea 94:
+```
+// De:
+<div className="flex-1 overflow-y-auto p-6">
+  <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
 
-**2. Content (flex-1, overflow-y-auto, p-6)**
-- Grid interno `grid-cols-[400px_1fr] gap-6`
-- **Columna izquierda**: Campos del formulario (sin botones de acción, sin DialogHeader)
-- **Columna derecha**: Bloque contenido de preview con `bg-muted/40 rounded-xl border` y padding interno. Dentro:
-  - Mini-header propio: "Vista previa" a la izquierda + controles de zoom a la derecha
-  - Área scrollable con el documento A4 centrado (misma lógica de zoom actual)
-
-**3. Footer (shrink-0, border-t, px-6 py-4)**
-- Botones "Cancelar" y "Crear Invoice" alineados a la derecha con `flex justify-end gap-2`
-
-### Estructura visual
-
-```text
-┌──────────────────────────────────────┐
-│ Crear Invoice                      X │  ← header
-├──────────────────────────────────────┤
-│  Form fields   │  ┌──────────────┐  │
-│  Creador       │  │Vista prev [±]│  │
-│  Monto         │  │ ┌──────────┐ │  │
-│  Fee / Método  │  │ │  A4 doc  │ │  │
-│  Fecha         │  │ └──────────┘ │  │
-│  Notas         │  └──────────────┘  │  ← content
-├──────────────────────────────────────┤
-│                 Cancelar   Crear Inv │  ← footer
-└──────────────────────────────────────┘
+// A:
+<div className="flex-1 min-h-0 p-6">
+  <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
 ```
 
-### Detalles clave
+- `flex-1 min-h-0` garantiza que el contenedor tome exactamente el espacio restante (entre header y footer) sin crecer.
+- Se elimina `overflow-y-auto` del padre — el scroll no debe existir a nivel del modal.
 
-- `DialogContent`: `max-w-5xl p-0 gap-0 flex flex-col max-h-[85vh]`
-- El preview block es un `div` redondeado con padding generoso, NO una columna completa de borde a borde — se siente como un componente independiente dentro del espacio
-- El `viewerRef` se mueve al bloque de preview contenido
-- Contenido del documento A4, lógica de zoom y cálculos de fee no cambian
-- Se elimina el `DialogHeader` de la columna izquierda y se mueve al header global
-- Se eliminan los botones de la columna izquierda y se mueven al footer global
+**2. Columna izquierda (form): scroll propio**
+
+Cambiar línea 97:
+```
+// De:
+<div className="space-y-4">
+
+// A:
+<div className="space-y-4 overflow-y-auto">
+```
+
+El formulario puede scrollear internamente si tiene muchos campos, sin afectar el layout general.
+
+**3. Columna derecha (preview): altura controlada con min-h-0**
+
+Cambiar línea 155:
+```
+// De:
+<div className="flex flex-col">
+
+// A:
+<div className="flex flex-col min-h-0">
+```
+
+Y el viewer container (línea 156) ya tiene `flex-1 overflow-hidden`, lo cual es correcto. El `min-h-0` en el padre permite que flex funcione sin desbordar.
+
+**4. Área del documento A4: scroll solo interno**
+
+Línea 175 ya tiene `overflow-auto` en el viewer interno — esto es correcto. Solo se ajusta el `minHeight` del wrapper para usar el tamaño escalado real:
+
+```
+// De:
+<div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48 }}>
+
+// A:  
+<div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48, minWidth: A4_W * zoom + 48 }}>
+```
+
+Esto asegura scroll horizontal también cuando el zoom excede el ancho.
+
+### Resumen de la cadena flex
+
+```text
+DialogContent  flex flex-col max-h-[85vh] overflow-hidden
+├── Header     shrink-0
+├── Content    flex-1 min-h-0 p-6          ← NO scroll aquí
+│   └── Grid   h-full
+│       ├── Form       overflow-y-auto     ← scroll propio
+│       └── Preview    flex flex-col min-h-0
+│           └── Viewer flex-1 overflow-hidden
+│               ├── Toolbar  shrink-0
+│               └── A4 area  flex-1 overflow-auto  ← ÚNICO scroll del doc
+└── Footer     shrink-0
+```
+
+### Sin cambios en
+- Contenido del documento A4, lógica de zoom, cálculos, ni submit.
 
