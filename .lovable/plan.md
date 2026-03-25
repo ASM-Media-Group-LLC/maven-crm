@@ -1,34 +1,29 @@
 
-Actualizaré el enfoque para corregir `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` pensando en la columna derecha completa, no solo en el A4.
+Corregiré `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` para que al hacer zoom solo crezca el contenido interno scrolleable del preview, nunca la altura visual de la columna derecha.
 
 Plan:
-1. Tratar la columna derecha como un bloque estrictamente acotado entre header y footer:
-   - mantener el modal con `flex flex-col max-h-[85vh] overflow-hidden`
-   - asegurar que la zona central y la columna derecha usen `flex-1 min-h-0 h-full overflow-hidden`
-   - evitar cualquier altura implícita que haga crecer el preview hacia el footer
+1. Blindar la altura de la columna derecha
+- Mantener la columna como `h-full min-h-0 overflow-hidden`
+- Asegurar que el bloque `viewerRef` también use `flex-1 min-h-0 overflow-hidden`
+- Evitar que cualquier hijo pueda expandir la altura del grid por contenido interno
 
-2. Separar claramente la columna derecha en dos zonas:
-   - header interno del preview (`shrink-0`)
-   - body del preview (`flex-1 min-h-0 overflow-hidden`)
-   Así todo el bloque derecho queda contenido y nunca invade el footer.
+2. Separar estrictamente header y viewport del preview
+- Dejar la barra “Vista previa” como `shrink-0`
+- Convertir el área inferior en un viewport fijo: `flex-1 min-h-0 overflow-auto`
+- Así, cuando suba el zoom, solo aparece scroll interno dentro del viewport
 
-3. Cambiar el cálculo de escala para basarlo en el espacio real utilizable del body derecho:
-   - medir el área disponible debajo del mini-header “Vista previa”
-   - calcular el zoom con ese espacio real, no con el contenedor externo completo
-   - usar el menor ratio ancho/alto para que el contenido visible del preview quepa entero
+3. Corregir el contenedor escalado que hoy empuja el layout
+- Revisar el wrapper que usa `style={{ height: A4_H * zoom + 32 }}` porque esa altura variable puede estar forzando crecimiento visual del bloque derecho
+- Reemplazarlo por una estructura donde el tamaño variable viva solo dentro del área scrolleable, sin afectar la caja externa del preview
+- Mantener el documento centrado horizontalmente
 
-4. Evitar que el wrapper interno fuerce recorte de la columna derecha:
-   - reemplazar `minHeight` / `minWidth` del wrapper del documento por dimensiones exactas escaladas
-   - centrar el contenido dentro del body sin permitir que empuje el layout
-   - dejar el overflow interno solo como fallback si luego el usuario aumenta el zoom manualmente
+4. Ajustar el cálculo de “fit” sin alterar la altura de la columna
+- Seguir calculando el zoom con el espacio real disponible del body
+- El botón “Ajustar” volverá al encaje automático
+- El zoom manual `+/-` no modificará la altura del panel, solo el tamaño del contenido interno
 
-5. Hacer el ajuste reactivo:
-   - reemplazar el `setTimeout` inicial por un `ResizeObserver`
-   - recalcular la escala al abrir el modal y cuando cambie el tamaño disponible
-   - el botón “Ajustar” seguirá devolviendo el preview al tamaño correcto de encaje
-
-Resultado esperado:
-- la columna derecha completa queda visible dentro de la zona central
-- no se corta por abajo ni se monta sobre el footer
-- header del modal, contenido y footer permanecen siempre visibles
-- el preview entra ajustado por defecto dentro del espacio disponible
+5. Resultado esperado
+- la columna derecha queda siempre completa entre header y footer del modal
+- al aumentar zoom, no se corta por el footer
+- el contenido del preview crece dentro de su propio scroll interno
+- el footer permanece visible y fijo
