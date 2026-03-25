@@ -2,27 +2,34 @@
 
 ## Problem
 
-The `contain: "size layout"` on the content wrapper (line 98) is the root cause. CSS size containment makes the element's intrinsic size independent of its children, which can cause it to collapse or miscalculate height within a flex container. Combined with previous attempts, the layout chain is fragile.
+The A4 preview element (595×842px) is scaled via CSS `transform: scale(zoom)` but `transform` doesn't affect layout flow — the element still occupies its full 595×842px in the document flow regardless of zoom. This causes the scroll container to be larger than necessary and can push content beyond the visible area.
 
-## Fix — Complete rewrite of the modal's layout structure
+## Fix
 
-Replace the current content area with a bulletproof flex layout chain where every intermediate container has `min-h-0` (to allow flex shrinking below content size) and `overflow-hidden` (to trap content), with only the leaf scroll containers using `overflow-auto`.
+Wrap the A4 element in a container whose `width` and `height` are explicitly set to the **scaled** dimensions (`A4_W * zoom` × `A4_H * zoom`). This makes the layout-flow size match the visual size, so the scroll container only grows as much as the actual visible preview needs.
 
 ### Changes in `CrearInvoiceModal.tsx`
 
-**Line 91** — DialogContent: keep `flex flex-col max-h-[85vh] overflow-hidden` but remove `gap-0` noise.
+**Line 180-183** — Replace the current inner wrapper with a sized container:
 
-**Line 98** — Content wrapper: Remove `contain: "size layout"` style. Use only `flex-1 min-h-0 overflow-hidden` (no padding here — move padding to children to avoid height miscalculation).
+```tsx
+{/* Current */}
+<div className="flex justify-center items-start p-4">
+  <div
+    style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
+    className="bg-white rounded shadow-2xl ..."
+  >
 
-**Line 99** — Grid: Use `grid grid-cols-[400px_1fr] gap-6 h-full` with no extra constraints. The parent's `overflow-hidden` + `min-h-0` already bounds it.
+{/* New */}
+<div className="flex justify-center items-start p-4">
+  <div style={{ width: A4_W * zoom, height: A4_H * zoom }} className="shrink-0">
+    <div
+      style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
+      className="bg-white rounded shadow-2xl ..."
+    >
+```
 
-**Line 101** — Left column (form): `overflow-y-auto min-h-0 pr-1 py-6 pl-6` — scrollable, with padding moved here.
+This adds a wrapper div whose dimensions match the scaled output, containing the transform within a properly-sized box. The `transformOrigin` changes to `top left` to align with the wrapper's top-left corner. The outer flex container centers this wrapper naturally.
 
-**Line 159** — Right column wrapper: `min-h-0 overflow-hidden py-6 pr-6` — padding moved here.
-
-**Line 179** — A4 viewer scroll area: keep `flex-1 min-h-0 overflow-auto`.
-
-**Line 180** — Inner A4 wrapper: Remove `minHeight`/`minWidth` style entirely. The scroll container handles overflow naturally. Just use `flex justify-center items-start p-4`.
-
-This removes all hacks (`contain`, `minHeight`, `grid-rows-[1fr]`) and uses a clean flex+grid chain where height flows from `max-h-[85vh]` → header(shrink-0) → content(flex-1 min-h-0 overflow-hidden) → grid(h-full) → columns(min-h-0 overflow-auto/hidden) → footer(shrink-0).
+Single file change, minimal diff.
 
