@@ -1,35 +1,42 @@
 
+Corregiré el preview para que el área visible quede siempre fija y el crecimiento por zoom ocurra solo dentro del scroll interno, no en el contenedor del modal.
 
-## Problem
+**Problema detectado**
+El elemento seleccionado (`line 180`) sigue participando con altura “auto”, así que cuando el wrapper escalado (`line 181`) crece por encima de 50%, ese contenedor intermedio también intenta crecer visualmente y termina dando la sensación de corte/expansión. El zoom debe afectar solo al documento, no al viewport del preview.
 
-The A4 preview element (595×842px) is scaled via CSS `transform: scale(zoom)` but `transform` doesn't affect layout flow — the element still occupies its full 595×842px in the document flow regardless of zoom. This causes the scroll container to be larger than necessary and can push content beyond the visible area.
+**Ajuste propuesto**
+1. Mantener la tarjeta de preview con altura fija dentro de la columna derecha:
+   - conservar `flex-1 min-h-0` en la tarjeta y en `bodyRef`
+   - el footer del modal no se toca
 
-## Fix
+2. Convertir `bodyRef` en el único viewport real del preview:
+   - dejar `overflow-auto` solo ahí
+   - asegurar que su altura quede totalmente limitada por el padre
 
-Wrap the A4 element in a container whose `width` and `height` are explicitly set to the **scaled** dimensions (`A4_W * zoom` × `A4_H * zoom`). This makes the layout-flow size match the visual size, so the scroll container only grows as much as the actual visible preview needs.
+3. Cambiar el wrapper interno de `line 180` para que ocupe siempre el alto disponible del viewport, en vez de crecer con el documento:
+   - pasar de un contenedor “auto-height” a uno tipo `min-h-full min-w-full`
+   - centrar el documento dentro de ese espacio
+   - mantener padding interno sin alterar la altura externa
 
-### Changes in `CrearInvoiceModal.tsx`
+4. Mantener el documento A4 escalado dentro de su wrapper dimensionado:
+   - conservar el wrapper con `width: A4_W * zoom` y `height: A4_H * zoom`
+   - conservar `transformOrigin: "top left"`
+   - así el scroll aparece dentro del viewport cuando el zoom supera el fit, pero el panel no cambia de tamaño
 
-**Line 180-183** — Replace the current inner wrapper with a sized container:
+5. Eliminar cualquier clipping intermedio que impida el scroll correcto:
+   - revisar el `overflow-hidden` del contenedor de la tarjeta para que no recorte antes de que `bodyRef` pueda scrollear
 
-```tsx
-{/* Current */}
-<div className="flex justify-center items-start p-4">
-  <div
-    style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
-    className="bg-white rounded shadow-2xl ..."
-  >
+**Resultado esperado**
+- A 40%, 50%, 60% o más, la caja de preview mantiene la misma altura visible
+- el documento se sigue centrando
+- si el zoom excede el espacio, aparece scroll dentro del preview
+- ni el contenido central ni el footer del modal cambian de posición
 
-{/* New */}
-<div className="flex justify-center items-start p-4">
-  <div style={{ width: A4_W * zoom, height: A4_H * zoom }} className="shrink-0">
-    <div
-      style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
-      className="bg-white rounded shadow-2xl ..."
-    >
-```
+**Archivo a ajustar**
+- `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
 
-This adds a wrapper div whose dimensions match the scaled output, containing the transform within a properly-sized box. The `transformOrigin` changes to `top left` to align with the wrapper's top-left corner. The outer flex container centers this wrapper naturally.
-
-Single file change, minimal diff.
-
+**Implementación concreta**
+- `line 160`: relajar el clipping intermedio si está bloqueando el scroll
+- `line 179`: dejar este contenedor como viewport fijo (`flex-1 min-h-0 overflow-auto`)
+- `line 180`: cambiarlo a un contenedor que llene el viewport (`min-h-full min-w-full`) y centre el A4 sin crecer con él
+- `line 181-183`: conservar el wrapper escalado actual porque ya corrige el tamaño visual del documento
