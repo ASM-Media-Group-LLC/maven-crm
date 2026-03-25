@@ -88,17 +88,17 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl p-0 gap-0 flex flex-col max-h-[85vh] overflow-hidden">
+      <DialogContent className="max-w-5xl p-0 flex flex-col max-h-[85vh] overflow-hidden">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
           <DialogTitle>Crear Invoice</DialogTitle>
         </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-hidden p-6" style={{ contain: "size layout" }}>
-          <div className="grid grid-cols-[400px_1fr] grid-rows-[1fr] gap-6 h-full min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
             {/* Left: Form */}
-            <div className="space-y-4 overflow-y-auto min-h-0 h-full">
+            <div className="space-y-4 overflow-y-auto min-h-0 py-6 pl-6 pr-1">
               <div>
                 <Label>Creador</Label>
                 <Select value={creatorId || undefined} onValueChange={setCreatorId}>
@@ -156,7 +156,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             </div>
 
             {/* Right: Preview block */}
-            <div className="flex flex-col min-h-0 h-full overflow-hidden">
+            <div className="flex flex-col min-h-0 overflow-hidden py-6 pr-6">
               <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Preview header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 shrink-0">
@@ -177,7 +177,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
                 {/* A4 viewer */}
                 <div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
-                  <div className="flex justify-center items-start p-4" style={{ minHeight: A4_H * zoom + 32, minWidth: A4_W * zoom + 32 }}>
+                  <div className="flex justify-center items-start p-4">
                     <div
                       style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       className="bg-white rounded shadow-2xl border border-border/50 shrink-0 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
