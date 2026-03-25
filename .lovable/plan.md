@@ -1,44 +1,44 @@
 
 
-## Plan: Preview en tiempo real tipo PDF dentro del modal "Crear Invoice"
+## Plan: Visor de PDF profesional con zoom en el preview del Invoice
 
 ### Resumen
 
-Reorganizar el modal `CrearInvoiceModal` a dos columnas: formulario a la izquierda, preview tipo hoja A4 a la derecha que se actualiza en tiempo real con los datos del formulario.
+Convertir el panel derecho del modal en un visor de documentos profesional con zoom controlable, donde la hoja A4 escale dinámicamente y permita scroll cuando excede el viewport.
 
-### Cambios en un solo archivo
+### Cambios en `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
 
-**`src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`**
+1. **Nuevo estado `zoom`** — `useState(0.65)` (valor por defecto que garantiza que la hoja A4 completa sea visible sin recortes).
 
-1. **Ampliar el modal** — Cambiar `max-w-lg` a `max-w-5xl` para acomodar dos columnas.
+2. **Controles de zoom flotantes** — Barra sticky/fixed dentro del panel derecho (parte superior o inferior) con botones para niveles predefinidos (80%, 100%, 120%, 150%) o botones +/- con paso de 10%. Usar `z-10` y fondo semi-transparente con blur para que floten sobre el contenido al hacer scroll.
 
-2. **Layout de dos columnas** — Dividir el contenido en `grid grid-cols-[1fr_1fr]` (o `grid-cols-[420px_1fr]`):
-   - **Columna izquierda**: El formulario actual completo (campos + botones), con scroll vertical si es necesario (`overflow-y-auto max-h-[75vh]`).
-   - **Columna derecha**: El preview del invoice.
+3. **Reestructurar el contenedor del preview**:
+   - El panel derecho pasa a ser `relative` con `overflow-y-auto` (scrollable).
+   - Dentro, un contenedor centrado (`flex items-start justify-center py-8 min-h-full`).
+   - La hoja A4 tiene dimensiones fijas en px (ej. `595px x 842px`, las dimensiones reales de A4 a 72dpi) y se escala con `transform: scale(zoom)` + `transform-origin: top center`.
+   - Cuando zoom > fit, el contenedor se agranda y aparece scroll natural.
 
-3. **Componente InvoicePreview (inline)** — Renderizar dentro del mismo archivo un div con aspecto de hoja A4:
-   - Contenedor con `aspect-[210/297]` (proporciones A4), fondo blanco, sombra, bordes suaves, escalado con `transform scale` para caber en el espacio disponible.
-   - **Encabezado**: Logo "Maven CRM" en la esquina superior izquierda, número de invoice placeholder (ej. "INV-XXXX"), fecha actual.
-   - **Datos del creador**: Nombre del creador seleccionado (tomado del array `creators`).
-   - **Tabla de detalle**: Concepto, monto, fee, neto — con líneas divisorias simuladas con bordes CSS.
-   - **Método de pago y fecha de vencimiento**.
-   - **Notas** si existen.
-   - **Footer**: Disclaimer y fecha de generación.
-   - Todo el contenido reactivo a las variables de estado existentes (`amt`, `feeAmount`, `netAmount`, `paymentMethod`, `dueDate`, `notes`, `creatorId`).
+4. **Cálculo de fit automático** — Al montar o cambiar tamaño, calcular el scale que hace que 842px de alto quepa en el espacio disponible. Usar ese valor como zoom por defecto. Opcionalmente un botón "Ajustar" que vuelva al fit.
 
-4. **Eliminar el bloque "Preview del Cálculo"** actual (líneas 121-126) ya que el preview visual lo reemplaza.
+5. **Visual** — Fondo `bg-gray-100` (gris suave tipo visor), la hoja con `shadow-xl` y bordes definidos para simular hoja flotante. Los controles de zoom con `backdrop-blur-sm bg-background/80 rounded-lg border shadow-sm`.
 
-5. **Mover los botones del footer** debajo de la columna izquierda (dentro del formulario) para mantener la acción cerca de los campos.
+6. **Sin cambios** en la columna izquierda (formulario), lógica de submit, ni contenido del documento A4.
 
-### Detalles técnicos del preview
+### Estructura resultante del panel derecho
 
-- Tipografía: `font-serif` para simular aspecto de documento impreso, tamaños pequeños (`text-[10px]`, `text-[11px]`) dentro del contenedor escalado.
-- El preview se envuelve en un contenedor con `bg-muted/20 rounded-lg p-4` y un label "Vista previa" encima.
-- La hoja A4 se centra verticalmente con `flex items-center justify-center`.
-- Se usa `overflow-hidden` para evitar desborde visual.
-
-### Sin cambios en
-
-- Lógica de `onSubmit`, query de creators, cálculos de fees, ni estructura de datos enviados.
-- No se crea archivo ni componente nuevo.
+```text
+┌─────────────────────────────┐
+│ [Vista previa]   [-][80%][+]│  ← sticky toolbar
+│─────────────────────────────│
+│                             │
+│     ┌───────────────┐       │  ← scrollable area
+│     │               │       │
+│     │   A4 Sheet    │       │
+│     │  595 x 842px  │       │
+│     │  scale(zoom)  │       │
+│     │               │       │
+│     └───────────────┘       │
+│                             │
+└─────────────────────────────┘
+```
 
