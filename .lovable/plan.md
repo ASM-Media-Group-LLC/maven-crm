@@ -1,54 +1,44 @@
 
 
-## Plan: Rediseño UX/UI de EventoSharePage
+## Plan: Preview en tiempo real tipo PDF dentro del modal "Crear Invoice"
 
-### Problemas identificados
-1. **Duplicación de invitados**: La sección de detalles muestra un `DetailItem` con conteo de invitados (línea 239-250) Y luego hay una lista completa de invitados más abajo (línea 267-316). Información redundante.
-2. **Botones de calendario al fondo**: Google Calendar y Descargar .ics están al final de la página, poco accesibles.
-3. **Oportunidades de mejora visual**: Jerarquía y espaciado pueden optimizarse.
+### Resumen
 
-### Cambios en `src/pages/eventos/EventoSharePage.tsx`
+Reorganizar el modal `CrearInvoiceModal` a dos columnas: formulario a la izquierda, preview tipo hoja A4 a la derecha que se actualiza en tiempo real con los datos del formulario.
 
-#### 1. Mover botones de calendario a la sección hero (superior izquierda)
-- Colocar los botones Google Calendar y Descargar .ics justo debajo del título del evento, alineados a la izquierda junto al tipo de evento.
-- Eliminar la sección inferior de botones y el `Separator` que la precede.
+### Cambios en un solo archivo
 
-#### 2. Eliminar duplicación de invitados
-- Remover el `DetailItem` de "Invitados" del grid de detalles (líneas 239-250).
-- Mantener únicamente la lista detallada de invitados con avatares y estados.
-- Cambiar el grid a `grid-cols-3` en pantallas `sm` ya que quedan solo 3 items (Fecha, Horario, Ubicación).
+**`src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`**
 
-#### 3. Mejoras de UI
-- Reducir el `space-y-6` del contenedor a `space-y-5` para un layout más compacto.
-- Agregar el conteo total y resumen de estados directamente en el header de la sección de invitados (ya existe parcialmente, se mejora con los conteos por estado como subtexto).
-- Eliminar el footer separador innecesario que queda sin los botones.
+1. **Ampliar el modal** — Cambiar `max-w-lg` a `max-w-5xl` para acomodar dos columnas.
 
-### Resultado visual esperado
-```text
-┌─ Header (Maven CRM · Evento) ──────────────────────┐
-│                                                      │
-│  ● Kash          Próximo                             │
-│  TestGui                                             │
-│  🎙 Podcast                                          │
-│  [Google Calendar]  [Descargar .ics]                 │
-│                                                      │
-│  ┌─ Detalles ─────────────────────────────────────┐  │
-│  │  📅 Fecha    🕐 Horario    📍 Ubicación        │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│  ┌─ Notas ────────────────────────────────────────┐  │
-│  │  Evento de prueba                               │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│  ┌─ Invitados (4) ── 2 confirmados · 2 pendientes ┐ │
-│  │  T  test              ● Pendiente               │ │
-│  │  T  TEST              ● Pendiente               │ │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│  Footer                                              │
-└──────────────────────────────────────────────────────┘
-```
+2. **Layout de dos columnas** — Dividir el contenido en `grid grid-cols-[1fr_1fr]` (o `grid-cols-[420px_1fr]`):
+   - **Columna izquierda**: El formulario actual completo (campos + botones), con scroll vertical si es necesario (`overflow-y-auto max-h-[75vh]`).
+   - **Columna derecha**: El preview del invoice.
 
-### Archivo a modificar
-- `src/pages/eventos/EventoSharePage.tsx`
+3. **Componente InvoicePreview (inline)** — Renderizar dentro del mismo archivo un div con aspecto de hoja A4:
+   - Contenedor con `aspect-[210/297]` (proporciones A4), fondo blanco, sombra, bordes suaves, escalado con `transform scale` para caber en el espacio disponible.
+   - **Encabezado**: Logo "Maven CRM" en la esquina superior izquierda, número de invoice placeholder (ej. "INV-XXXX"), fecha actual.
+   - **Datos del creador**: Nombre del creador seleccionado (tomado del array `creators`).
+   - **Tabla de detalle**: Concepto, monto, fee, neto — con líneas divisorias simuladas con bordes CSS.
+   - **Método de pago y fecha de vencimiento**.
+   - **Notas** si existen.
+   - **Footer**: Disclaimer y fecha de generación.
+   - Todo el contenido reactivo a las variables de estado existentes (`amt`, `feeAmount`, `netAmount`, `paymentMethod`, `dueDate`, `notes`, `creatorId`).
+
+4. **Eliminar el bloque "Preview del Cálculo"** actual (líneas 121-126) ya que el preview visual lo reemplaza.
+
+5. **Mover los botones del footer** debajo de la columna izquierda (dentro del formulario) para mantener la acción cerca de los campos.
+
+### Detalles técnicos del preview
+
+- Tipografía: `font-serif` para simular aspecto de documento impreso, tamaños pequeños (`text-[10px]`, `text-[11px]`) dentro del contenedor escalado.
+- El preview se envuelve en un contenedor con `bg-muted/20 rounded-lg p-4` y un label "Vista previa" encima.
+- La hoja A4 se centra verticalmente con `flex items-center justify-center`.
+- Se usa `overflow-hidden` para evitar desborde visual.
+
+### Sin cambios en
+
+- Lógica de `onSubmit`, query de creators, cálculos de fees, ni estructura de datos enviados.
+- No se crea archivo ni componente nuevo.
 
