@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
@@ -22,7 +23,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-import CrearInvoiceModal from "./CrearInvoiceModal";
+// CrearInvoiceModal removed — now uses /finanzas/facturacion/nuevo
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
@@ -44,6 +45,7 @@ function fmt(n: number) {
 }
 
 export default function FacturacionPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
@@ -126,7 +128,7 @@ export default function FacturacionPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [viewItem, setViewItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // showCreateModal removed — navigation used instead
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -409,7 +411,7 @@ export default function FacturacionPage() {
             <p className="text-sm text-muted-foreground">Gestión de invoices a creadores · {invoices.length} registros</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setShowCreateModal(true)}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
+            <Button size="sm" onClick={() => navigate("/finanzas/facturacion/nuevo")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
             <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
               <Download className="h-4 w-4 mr-1" />Exportar
             </Button>
@@ -472,7 +474,7 @@ export default function FacturacionPage() {
         {renderTabContent()}
       </div>
 
-      <CrearInvoiceModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onSubmit={data => createInvoice.mutate(data)} isPending={createInvoice.isPending} />
+      {/* CrearInvoiceModal removed — now uses dedicated page */}
       <ReversarInvoiceModal open={!!reverseItem} onClose={() => setReverseItem(null)} invoice={reverseItem} onSubmit={(id, reason) => reverseMutation.mutate({ id, reason })} isPending={reverseMutation.isPending} />
 
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
