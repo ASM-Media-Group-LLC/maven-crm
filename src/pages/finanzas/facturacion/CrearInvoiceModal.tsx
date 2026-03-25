@@ -187,11 +187,11 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                           <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
                           <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
                           <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
-                          <p className="text-[9px] text-gray-400">33131-2176</p>
                           <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
+                          <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
                         </div>
                         <div>
-                          <img src={kashLogo} alt="KASH" className="h-10 object-contain" />
+                          <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
                         </div>
                       </div>
 
