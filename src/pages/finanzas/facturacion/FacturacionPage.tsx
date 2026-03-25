@@ -57,6 +57,17 @@ export default function FacturacionPage() {
     },
   });
 
+  // Realtime subscription for invoices
+  useEffect(() => {
+    const channel = supabase
+      .channel("invoices-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
       const { data: user } = await supabase.auth.getUser();
