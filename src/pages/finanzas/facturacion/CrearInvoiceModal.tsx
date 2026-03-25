@@ -30,22 +30,26 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const [notes, setNotes] = useState("");
   const [zoom, setZoom] = useState(0.65);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const A4_W = 595;
   const A4_H = 842;
 
+
   const calcFitZoom = useCallback(() => {
-    if (!viewerRef.current) return 0.65;
-    const h = viewerRef.current.clientHeight - 80;
-    const w = viewerRef.current.clientWidth - 64;
+    if (!bodyRef.current) return 0.55;
+    const h = bodyRef.current.clientHeight - 32; // padding
+    const w = bodyRef.current.clientWidth - 32;
     return Math.min(w / A4_W, h / A4_H, 1);
   }, []);
 
   useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => setZoom(calcFitZoom()), 50);
-      return () => clearTimeout(t);
-    }
+    if (!open) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setZoom(calcFitZoom()));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [open, calcFitZoom]);
 
   const { data: creators = [] } = useQuery({
@@ -172,8 +176,8 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                 </div>
 
                 {/* A4 viewer */}
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <div className="flex justify-center p-4" style={{ minHeight: A4_H * zoom + 32, minWidth: A4_W * zoom + 32 }}>
+                <div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
+                  <div className="flex justify-center items-start p-4" style={{ height: A4_H * zoom + 32, width: '100%' }}>
                     <div
                       style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       className="bg-white rounded shadow-2xl border border-border/50 shrink-0 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
