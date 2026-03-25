@@ -122,6 +122,7 @@ const FinanzasLayout = lazy(() => import("./pages/finanzas/FinanzasLayout"));
 const FinanzasDashboard = lazy(() => import("./pages/finanzas/FinanzasDashboard"));
 const NominaPage = lazy(() => import("./pages/finanzas/nomina/NominaPage"));
 const FacturacionPage = lazy(() => import("./pages/finanzas/facturacion/FacturacionPage"));
+const NuevoInvoice = lazy(() => import("./pages/finanzas/facturacion/NuevoInvoice"));
 const ControlFinancieroPage = lazy(() => import("./pages/finanzas/control/ControlFinancieroPage"));
 const ReportesPage = lazy(() => import("./pages/finanzas/reportes/ReportesPage"));
 const ConfiguracionPage = lazy(() => import("./pages/finanzas/configuracion/ConfiguracionPage"));
@@ -248,6 +249,7 @@ const App = () => (
               <Route path="/finanzas" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/nomina" element={<PermissionRoute module="Finanzas"><FinanzasLayout><NominaPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/facturacion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion/nuevo" element={<PermissionRoute module="Finanzas"><NuevoInvoice /></PermissionRoute>} />
               <Route path="/finanzas/control" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ControlFinancieroPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/reportes" element={<PermissionRoute module="Finanzas"><FinanzasLayout><ReportesPage /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/collections" element={<PermissionRoute module="Finanzas"><FinanzasLayout><CollectionsPage /></FinanzasLayout></PermissionRoute>} />
