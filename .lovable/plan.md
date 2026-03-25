@@ -1,42 +1,44 @@
 
-Corregiré el preview para que el área visible quede siempre fija y el crecimiento por zoom ocurra solo dentro del scroll interno, no en el contenedor del modal.
 
-**Problema detectado**
-El elemento seleccionado (`line 180`) sigue participando con altura “auto”, así que cuando el wrapper escalado (`line 181`) crece por encima de 50%, ese contenedor intermedio también intenta crecer visualmente y termina dando la sensación de corte/expansión. El zoom debe afectar solo al documento, no al viewport del preview.
+## Diagnóstico
 
-**Ajuste propuesto**
-1. Mantener la tarjeta de preview con altura fija dentro de la columna derecha:
-   - conservar `flex-1 min-h-0` en la tarjeta y en `bodyRef`
-   - el footer del modal no se toca
+La tarjeta del visor cambia de altura porque la cadena de constraints no está correctamente cerrada:
 
-2. Convertir `bodyRef` en el único viewport real del preview:
-   - dejar `overflow-auto` solo ahí
-   - asegurar que su altura quede totalmente limitada por el padre
+- **Línea 160** (tarjeta) tiene `flex-1 min-h-0` pero **sin `overflow-hidden`**, así que su contenido intrínseco puede influir en su tamaño antes de que flex lo restrinja.
+- **Línea 159** (columna derecha) tiene `overflow-hidden` que luego recorta el exceso, causando el corte visual.
 
-3. Cambiar el wrapper interno de `line 180` para que ocupe siempre el alto disponible del viewport, en vez de crecer con el documento:
-   - pasar de un contenedor “auto-height” a uno tipo `min-h-full min-w-full`
-   - centrar el documento dentro de ese espacio
-   - mantener padding interno sin alterar la altura externa
+La solución es asegurar que la tarjeta (línea 160) tenga `overflow-hidden` para contener a sus hijos, y que el scroll viva exclusivamente en `bodyRef` (línea 179).
 
-4. Mantener el documento A4 escalado dentro de su wrapper dimensionado:
-   - conservar el wrapper con `width: A4_W * zoom` y `height: A4_H * zoom`
-   - conservar `transformOrigin: "top left"`
-   - así el scroll aparece dentro del viewport cuando el zoom supera el fit, pero el panel no cambia de tamaño
+## Cambio propuesto
 
-5. Eliminar cualquier clipping intermedio que impida el scroll correcto:
-   - revisar el `overflow-hidden` del contenedor de la tarjeta para que no recorte antes de que `bodyRef` pueda scrollear
+**Archivo**: `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
 
-**Resultado esperado**
-- A 40%, 50%, 60% o más, la caja de preview mantiene la misma altura visible
-- el documento se sigue centrando
-- si el zoom excede el espacio, aparece scroll dentro del preview
-- ni el contenido central ni el footer del modal cambian de posición
+**Línea 160** — Agregar `overflow-hidden` de vuelta a la tarjeta del visor:
+```tsx
+// De:
+className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0"
+// A:
+className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0 overflow-hidden"
+```
 
-**Archivo a ajustar**
-- `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
+**Línea 180** — Cambiar `h-full w-full` por dimensiones mínimas para que el contenido pueda crecer y activar el scroll del padre:
+```tsx
+// De:
+className="h-full w-full box-border flex justify-center items-start p-4"
+// A:
+className="inline-flex justify-center p-4"
+```
 
-**Implementación concreta**
-- `line 160`: relajar el clipping intermedio si está bloqueando el scroll
-- `line 179`: dejar este contenedor como viewport fijo (`flex-1 min-h-0 overflow-auto`)
-- `line 180`: cambiarlo a un contenedor que llene el viewport (`min-h-full min-w-full`) y centre el A4 sin crecer con él
-- `line 181-183`: conservar el wrapper escalado actual porque ya corrige el tamaño visual del documento
+Y envolver con un contenedor que garantice centrado cuando el documento es más pequeño que el viewport:
+```tsx
+<div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
+  <div className="min-h-full min-w-full inline-flex justify-center items-start p-4">
+    <div style={{ width: A4_W * zoom, height: A4_H * zoom }} className="shrink-0">
+      ...
+    </div>
+  </div>
+</div>
+```
+
+Con `min-h-full min-w-full`, el contenedor llena el viewport cuando el documento es pequeño (centrado), pero crece más allá cuando el documento escalado es grande (activando scroll). `overflow-hidden` en la tarjeta evita que su tamaño crezca — el scroll vive solo en `bodyRef`.
+
