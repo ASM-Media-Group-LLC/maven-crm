@@ -153,88 +153,110 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             </div>
           </div>
 
-          {/* Right: A4 Preview */}
-          <div className="bg-muted/30 p-6 flex flex-col max-h-[80vh]">
-            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Vista previa</p>
-            <div className="flex-1 flex items-start justify-center overflow-hidden">
-              <div className="w-full aspect-[210/297] bg-white rounded shadow-2xl border border-border/50 p-8 font-serif text-black text-[11px] leading-relaxed flex flex-col">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h2 className="text-lg font-bold tracking-tight text-gray-900">Maven CRM</h2>
-                    <p className="text-[9px] text-gray-400 mt-0.5">Management & Operations</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-base font-bold text-gray-900">INVOICE</p>
-                    <p className="text-[9px] text-gray-400">INV-XXXX</p>
-                    <p className="text-[9px] text-gray-400">{today}</p>
-                  </div>
-                </div>
+          {/* Right: PDF Viewer */}
+          <div ref={viewerRef} className="relative flex flex-col max-h-[80vh] bg-muted/40">
+            {/* Sticky zoom toolbar */}
+            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-2 border-b border-border bg-background/80 backdrop-blur-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vista previa</p>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}>
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs font-medium w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={() => setZoom(calcFitZoom())} title="Ajustar">
+                  <Maximize className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
 
-                <div className="h-px bg-gray-200 mb-4" />
-
-                {/* Bill to */}
-                <div className="mb-5">
-                  <p className="text-[9px] uppercase tracking-wider text-gray-400 mb-1">Facturar a</p>
-                  <p className="font-semibold text-gray-800">
-                    {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}
-                  </p>
-                </div>
-
-                {/* Table */}
-                <div className="flex-1">
-                  <table className="w-full text-[10px]">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Concepto</th>
-                        <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2 text-gray-700">Servicios de gestión</td>
-                        <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
-                      </tr>
-                      {feeAmount > 0 && (
-                        <tr className="border-b border-gray-100">
-                          <td className="py-2 text-gray-500">Fee ({feeType === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
-                          <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
-                        <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                {/* Details */}
-                <div className="mt-auto space-y-2 pt-4">
-                  <div className="flex gap-8 text-[9px]">
+            {/* Scrollable viewer area */}
+            <div className="flex-1 overflow-auto">
+              <div className="flex justify-center p-8" style={{ minHeight: A4_H * zoom + 64 }}>
+                <div
+                  style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
+                  className="bg-white rounded shadow-2xl border border-border/50 shrink-0 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
+                >
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-6">
                     <div>
-                      <span className="text-gray-400">Método de pago: </span>
-                      <span className="text-gray-700 font-medium">{paymentMethod}</span>
+                      <h2 className="text-lg font-bold tracking-tight text-gray-900">Maven CRM</h2>
+                      <p className="text-[9px] text-gray-400 mt-0.5">Management & Operations</p>
                     </div>
-                    {dueDate && (
+                    <div className="text-right">
+                      <p className="text-base font-bold text-gray-900">INVOICE</p>
+                      <p className="text-[9px] text-gray-400">INV-XXXX</p>
+                      <p className="text-[9px] text-gray-400">{today}</p>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-gray-200 mb-4" />
+
+                  {/* Bill to */}
+                  <div className="mb-5">
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400 mb-1">Facturar a</p>
+                    <p className="font-semibold text-gray-800">
+                      {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}
+                    </p>
+                  </div>
+
+                  {/* Table */}
+                  <div className="flex-1">
+                    <table className="w-full text-[10px]">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Concepto</th>
+                          <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-gray-100">
+                          <td className="py-2 text-gray-700">Servicios de gestión</td>
+                          <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
+                        </tr>
+                        {feeAmount > 0 && (
+                          <tr className="border-b border-gray-100">
+                            <td className="py-2 text-gray-500">Fee ({feeType === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
+                            <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
+                          <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Details */}
+                  <div className="mt-auto space-y-2 pt-4">
+                    <div className="flex gap-8 text-[9px]">
                       <div>
-                        <span className="text-gray-400">Vencimiento: </span>
-                        <span className="text-gray-700 font-medium">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span>
+                        <span className="text-gray-400">Método de pago: </span>
+                        <span className="text-gray-700 font-medium">{paymentMethod}</span>
+                      </div>
+                      {dueDate && (
+                        <div>
+                          <span className="text-gray-400">Vencimiento: </span>
+                          <span className="text-gray-700 font-medium">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span>
+                        </div>
+                      )}
+                    </div>
+                    {notes && (
+                      <div className="text-[9px]">
+                        <span className="text-gray-400">Notas: </span>
+                        <span className="text-gray-600 italic">{notes}</span>
                       </div>
                     )}
+                    <div className="h-px bg-gray-200 mt-3" />
+                    <p className="text-[8px] text-gray-300 text-center pt-1">
+                      Documento generado por Maven CRM · {today}
+                    </p>
                   </div>
-                  {notes && (
-                    <div className="text-[9px]">
-                      <span className="text-gray-400">Notas: </span>
-                      <span className="text-gray-600 italic">{notes}</span>
-                    </div>
-                  )}
-                  <div className="h-px bg-gray-200 mt-3" />
-                  <p className="text-[8px] text-gray-300 text-center pt-1">
-                    Documento generado por Maven CRM · {today}
-                  </p>
                 </div>
               </div>
             </div>
