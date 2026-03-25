@@ -1,32 +1,34 @@
 
-Corregiré `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` para que la columna derecha quede estrictamente contenida entre el header y el footer del modal, sin montarse sobre el footer.
+Actualizaré el enfoque para corregir `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` pensando en la columna derecha completa, no solo en el A4.
 
 Plan:
-1. Convertir la zona central del modal en un contenedor con altura realmente acotada:
-   - mantener `DialogContent` como `flex flex-col max-h-[85vh] overflow-hidden`
-   - cambiar la zona de contenido a `flex-1 min-h-0 overflow-hidden p-6`
+1. Tratar la columna derecha como un bloque estrictamente acotado entre header y footer:
+   - mantener el modal con `flex flex-col max-h-[85vh] overflow-hidden`
+   - asegurar que la zona central y la columna derecha usen `flex-1 min-h-0 h-full overflow-hidden`
+   - evitar cualquier altura implícita que haga crecer el preview hacia el footer
 
-2. Asegurar que el grid interno no crezca por contenido:
-   - usar `grid grid-cols-[400px_1fr] gap-6 h-full min-h-0`
-   - hacer que ambas columnas tengan `min-h-0 h-full`
+2. Separar claramente la columna derecha en dos zonas:
+   - header interno del preview (`shrink-0`)
+   - body del preview (`flex-1 min-h-0 overflow-hidden`)
+   Así todo el bloque derecho queda contenido y nunca invade el footer.
 
-3. Encapsular correctamente la columna de preview:
-   - columna derecha: `flex flex-col min-h-0 h-full`
-   - bloque de preview: `flex-1 min-h-0 h-full overflow-hidden`
-   - mantener su header propio como `shrink-0`
-   - dejar el área del documento como la única región interna que puede manejar el espacio restante
+3. Cambiar el cálculo de escala para basarlo en el espacio real utilizable del body derecho:
+   - medir el área disponible debajo del mini-header “Vista previa”
+   - calcular el zoom con ese espacio real, no con el contenedor externo completo
+   - usar el menor ratio ancho/alto para que el contenido visible del preview quepa entero
 
-4. Evitar que el preview empuje el footer:
-   - quitar cualquier comportamiento basado en altura automática del contenedor del preview
-   - si hace falta, mover el scroll únicamente al viewport interno del documento, nunca al contenedor completo del preview ni al modal
+4. Evitar que el wrapper interno fuerce recorte de la columna derecha:
+   - reemplazar `minHeight` / `minWidth` del wrapper del documento por dimensiones exactas escaladas
+   - centrar el contenido dentro del body sin permitir que empuje el layout
+   - dejar el overflow interno solo como fallback si luego el usuario aumenta el zoom manualmente
 
-5. Ajustar el wrapper del documento para que no rompa el layout:
-   - mantener el A4 escalado con `transform: scale(...)`
-   - asegurar que el tamaño del wrapper del documento no haga crecer la columna derecha por fuera de la altura disponible
+5. Hacer el ajuste reactivo:
+   - reemplazar el `setTimeout` inicial por un `ResizeObserver`
+   - recalcular la escala al abrir el modal y cuando cambie el tamaño disponible
+   - el botón “Ajustar” seguirá devolviendo el preview al tamaño correcto de encaje
 
 Resultado esperado:
-- header visible arriba
-- footer visible abajo
-- preview completamente contenido entre ambos
-- sin solapamiento con los botones de acción
-- la columna derecha ya no invade otras áreas del modal
+- la columna derecha completa queda visible dentro de la zona central
+- no se corta por abajo ni se monta sobre el footer
+- header del modal, contenido y footer permanecen siempre visibles
+- el preview entra ajustado por defecto dentro del espacio disponible
