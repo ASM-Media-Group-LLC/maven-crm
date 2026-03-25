@@ -1,29 +1,20 @@
 
-Corregiré `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` para que al hacer zoom solo crezca el contenido interno scrolleable del preview, nunca la altura visual de la columna derecha.
 
-Plan:
-1. Blindar la altura de la columna derecha
-- Mantener la columna como `h-full min-h-0 overflow-hidden`
-- Asegurar que el bloque `viewerRef` también use `flex-1 min-h-0 overflow-hidden`
-- Evitar que cualquier hijo pueda expandir la altura del grid por contenido interno
+## Problem
 
-2. Separar estrictamente header y viewport del preview
-- Dejar la barra “Vista previa” como `shrink-0`
-- Convertir el área inferior en un viewport fijo: `flex-1 min-h-0 overflow-auto`
-- Así, cuando suba el zoom, solo aparece scroll interno dentro del viewport
+The CSS grid on line 99 uses `h-full min-h-0` but grid rows default to `auto` height, meaning the right column's content can push the grid taller than the available space, causing it to overflow behind the footer.
 
-3. Corregir el contenedor escalado que hoy empuja el layout
-- Revisar el wrapper que usa `style={{ height: A4_H * zoom + 32 }}` porque esa altura variable puede estar forzando crecimiento visual del bloque derecho
-- Reemplazarlo por una estructura donde el tamaño variable viva solo dentro del área scrolleable, sin afectar la caja externa del preview
-- Mantener el documento centrado horizontalmente
+## Fix — `CrearInvoiceModal.tsx`
 
-4. Ajustar el cálculo de “fit” sin alterar la altura de la columna
-- Seguir calculando el zoom con el espacio real disponible del body
-- El botón “Ajustar” volverá al encaje automático
-- El zoom manual `+/-` no modificará la altura del panel, solo el tamaño del contenido interno
+One targeted change: add `grid-rows-[1fr]` to the grid container (line 99) so the single row is strictly bounded to the container height, preventing content from pushing past.
 
-5. Resultado esperado
-- la columna derecha queda siempre completa entre header y footer del modal
-- al aumentar zoom, no se corta por el footer
-- el contenido del preview crece dentro de su propio scroll interno
-- el footer permanece visible y fijo
+```
+// Line 99 — change:
+<div className="grid grid-cols-[400px_1fr] gap-6 h-full min-h-0">
+
+// To:
+<div className="grid grid-cols-[400px_1fr] grid-rows-[1fr] gap-6 h-full min-h-0 overflow-hidden">
+```
+
+This forces the grid row to respect the parent's height constraint. Combined with the existing `min-h-0 overflow-hidden` on the right column (line 159), the preview will scroll internally instead of pushing the layout.
+
