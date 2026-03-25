@@ -96,7 +96,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-hidden p-6">
-          <div className="grid grid-cols-[400px_1fr] gap-6 h-full min-h-0">
+          <div className="grid grid-cols-[400px_1fr] grid-rows-[1fr] gap-6 h-full min-h-0 overflow-hidden">
             {/* Left: Form */}
             <div className="space-y-4 overflow-y-auto min-h-0 h-full">
               <div>
