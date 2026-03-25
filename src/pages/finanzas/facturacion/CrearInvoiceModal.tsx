@@ -177,8 +177,8 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
                 {/* A4 viewer */}
                 <div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
-                  <div className="min-h-full min-w-full inline-flex justify-center items-start p-4">
-                    <div style={{ width: A4_W * zoom, height: A4_H * zoom }} className="shrink-0">
+                  <div style={{ display: 'grid', placeItems: 'start center', minHeight: '100%', padding: 16 }}>
+                    <div style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
                       <div
                         style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
                         className="bg-white rounded shadow-2xl border border-border/50 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
