@@ -34,18 +34,22 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const A4_W = 595;
   const A4_H = 842;
 
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   const calcFitZoom = useCallback(() => {
-    if (!viewerRef.current) return 0.65;
-    const h = viewerRef.current.clientHeight - 80;
-    const w = viewerRef.current.clientWidth - 64;
+    if (!bodyRef.current) return 0.55;
+    const h = bodyRef.current.clientHeight - 32; // padding
+    const w = bodyRef.current.clientWidth - 32;
     return Math.min(w / A4_W, h / A4_H, 1);
   }, []);
 
   useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => setZoom(calcFitZoom()), 50);
-      return () => clearTimeout(t);
-    }
+    if (!open) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setZoom(calcFitZoom()));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [open, calcFitZoom]);
 
   const { data: creators = [] } = useQuery({
