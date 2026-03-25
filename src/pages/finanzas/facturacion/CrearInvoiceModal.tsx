@@ -197,12 +197,23 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
                       <div className="h-px bg-gray-200 mb-4" />
 
-                      {/* Bill to */}
-                      <div className="mb-5">
-                        <p className="text-[9px] uppercase tracking-wider text-gray-400 mb-1">Facturar a</p>
-                        <p className="font-semibold text-gray-800">
-                          {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}
-                        </p>
+                      <div className="flex justify-between mb-5 text-[9px]">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-gray-800">Bill to</p>
+                          <p className="text-gray-600">{selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}</p>
+                          <p className="font-semibold text-gray-800 mt-2">Address</p>
+                          <p className="text-gray-600">—</p>
+                          <p className="font-semibold text-gray-800 mt-2">Phone</p>
+                          <p className="text-gray-600">—</p>
+                        </div>
+                        <div className="space-y-1 text-right">
+                          <p className="font-semibold text-gray-800">Invoice details</p>
+                          <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">—</span></p>
+                          <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{today}</span></p>
+                          {dueDate && (
+                            <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Table */}
@@ -210,54 +221,45 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                         <table className="w-full text-[10px]">
                           <thead>
                             <tr className="border-b border-gray-200">
-                              <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Concepto</th>
-                              <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Monto</th>
+                              <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Product or service</th>
+                              <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Description</th>
+                              <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Amount</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b border-gray-100">
-                              <td className="py-2 text-gray-700">Servicios de gestión</td>
+                              <td className="py-2 text-gray-700">Agency Service</td>
+                              <td className="py-2 text-gray-500"></td>
                               <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
                             </tr>
                             {feeAmount > 0 && (
                               <tr className="border-b border-gray-100">
                                 <td className="py-2 text-gray-500">Fee ({feeType === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
+                                <td className="py-2"></td>
                                 <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
                               </tr>
                             )}
                           </tbody>
                           <tfoot>
                             <tr>
-                              <td className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
+                              <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
                               <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
                             </tr>
                           </tfoot>
                         </table>
                       </div>
 
-                      {/* Details */}
+                      {/* Footer */}
                       <div className="mt-auto space-y-2 pt-4">
-                        <div className="flex gap-8 text-[9px]">
-                          <div>
-                            <span className="text-gray-400">Método de pago: </span>
-                            <span className="text-gray-700 font-medium">{paymentMethod}</span>
-                          </div>
-                          {dueDate && (
-                            <div>
-                              <span className="text-gray-400">Vencimiento: </span>
-                              <span className="text-gray-700 font-medium">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span>
-                            </div>
-                          )}
-                        </div>
                         {notes && (
                           <div className="text-[9px]">
-                            <span className="text-gray-400">Notas: </span>
+                            <span className="text-gray-400">Notes: </span>
                             <span className="text-gray-600 italic">{notes}</span>
                           </div>
                         )}
                         <div className="h-px bg-gray-200 mt-3" />
                         <p className="text-[8px] text-gray-300 text-center pt-1">
-                          Documento generado por Maven CRM · {today}
+                          Documento generado por KASH AGENCY · {today}
                         </p>
                       </div>
                     </div>
