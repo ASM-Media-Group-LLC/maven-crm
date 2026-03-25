@@ -169,9 +169,6 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}>
                       <Plus className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={() => setZoom(calcFitZoom())} title="Ajustar">
-                      <Maximize className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
 
