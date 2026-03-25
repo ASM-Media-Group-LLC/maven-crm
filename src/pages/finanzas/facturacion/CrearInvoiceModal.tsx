@@ -263,6 +263,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                       </div>
                     </div>
                   </div>
+                  </div>
                 </div>
               </div>
             </div>
