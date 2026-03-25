@@ -30,6 +30,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const [notes, setNotes] = useState("");
   const [zoom, setZoom] = useState(0.65);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const A4_W = 595;
   const A4_H = 842;
