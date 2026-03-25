@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Clock, CheckCircle2, CalendarDays, FileText, Search, ListIcon, LayoutGrid,
@@ -38,6 +39,7 @@ const PERMISSION_TYPES = [
   { value: "permiso_medico", label: "Permiso Médico", icon: Stethoscope, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30" },
   { value: "permiso_academico", label: "Permiso Académico", icon: GraduationCap, color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30" },
   { value: "permiso_diligencia", label: "Diligencia Personal", icon: Briefcase, color: "bg-rose-500/10 text-rose-600 border-rose-500/30" },
+  { value: "incapacidad", label: "Incapacidad", icon: Stethoscope, color: "bg-red-500/10 text-red-600 border-red-500/30" },
 ] as const;
 
 const PERMISSION_TYPE_VALUES = PERMISSION_TYPES.map((t) => t.value);
@@ -321,7 +323,7 @@ export default function HRPermisos() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [viewPermiso, setViewPermiso] = useState<PermisoRecord | null>(null);
   const [editData, setEditData] = useState<PermisoRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -419,7 +421,7 @@ export default function HRPermisos() {
             <h1 className="text-xl font-semibold text-foreground">Permisos</h1>
             <p className="text-sm text-muted-foreground">Gestiona las solicitudes de permisos de horario</p>
           </div>
-          <Button onClick={() => setModalOpen(true)} size="sm">
+          <Button onClick={() => navigate("/hr/permisos/nuevo")} size="sm">
             <Plus className="h-4 w-4 mr-1" />
             Solicitar Permiso
           </Button>
@@ -706,7 +708,7 @@ export default function HRPermisos() {
       </div>
 
       {/* Modals */}
-      <CreatePermisoModal open={modalOpen} onOpenChange={setModalOpen} />
+      <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
       <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
 
       {/* Edit Modal */}
