@@ -91,10 +91,10 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
         </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 min-h-0 p-6">
           <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
             {/* Left: Form */}
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto">
               <div>
                 <Label>Creador</Label>
                 <Select value={creatorId || undefined} onValueChange={setCreatorId}>
@@ -152,7 +152,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             </div>
 
             {/* Right: Preview block */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-h-0">
               <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 overflow-hidden">
                 {/* Preview header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
@@ -173,7 +173,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
                 {/* A4 viewer */}
                 <div className="flex-1 overflow-auto">
-                  <div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48 }}>
+                  <div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48, minWidth: A4_W * zoom + 48 }}>
                     <div
                       style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top center" }}
                       className="bg-white rounded shadow-2xl border border-border/50 shrink-0 p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
