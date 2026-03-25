@@ -157,7 +157,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
             {/* Right: Preview block */}
             <div className="flex flex-col min-h-0 overflow-hidden py-6 pr-6">
-              <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0">
+              <div ref={viewerRef} className="bg-muted/40 rounded-xl border border-border flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Preview header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 shrink-0">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vista previa</p>
@@ -177,7 +177,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
 
                 {/* A4 viewer */}
                 <div ref={bodyRef} className="flex-1 min-h-0 overflow-auto">
-                  <div className="h-full w-full box-border flex justify-center items-start p-4">
+                  <div className="min-h-full min-w-full inline-flex justify-center items-start p-4">
                     <div style={{ width: A4_W * zoom, height: A4_H * zoom }} className="shrink-0">
                       <div
                         style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
