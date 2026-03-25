@@ -191,7 +191,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                           <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
                         </div>
                         <div>
-                          <img src={kashLogo} alt="KASH" <img src={kashLogo} alt="KASH" className="h-14 object-contain" /> />
+                          <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
                         </div>
                       </div>
 
