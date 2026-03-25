@@ -120,7 +120,6 @@ const DashboardSidebar = () => {
           items: [
             { title: "Vacaciones", url: "/hr/vacaciones" },
             { title: "Permisos", url: "/hr/permisos" },
-            { title: "Incapacidades", url: null },
           ],
         },
       ],

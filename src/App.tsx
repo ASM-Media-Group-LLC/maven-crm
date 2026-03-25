@@ -100,6 +100,7 @@ const HRPerformanceNew = lazy(() => import("./pages/hr/HRPerformanceNew"));
 const HRAttendance = lazy(() => import("./pages/hr/HRAttendance"));
 const HRVacations = lazy(() => import("./pages/hr/HRVacations"));
 const HRPermisos = lazy(() => import("./pages/hr/HRPermisos"));
+const HRPermisoNew = lazy(() => import("./pages/hr/HRPermisoNew"));
 const HRSchedules = lazy(() => import("./pages/hr/HRSchedules"));
 const HROvertimeDetail = lazy(() => import("./pages/hr/HROvertimeDetail"));
 const HRHourBank = lazy(() => import("./pages/hr/HRHourBank"));
