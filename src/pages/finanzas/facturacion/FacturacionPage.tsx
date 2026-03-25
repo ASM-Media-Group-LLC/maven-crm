@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
@@ -56,6 +56,17 @@ export default function FacturacionPage() {
       return data ?? [];
     },
   });
+
+  // Realtime subscription for invoices
+  useEffect(() => {
+    const channel = supabase
+      .channel("invoices-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
