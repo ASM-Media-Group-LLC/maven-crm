@@ -28,6 +28,25 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
   const [paymentMethod, setPaymentMethod] = useState("PayPal");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [zoom, setZoom] = useState(0.65);
+  const viewerRef = useRef<HTMLDivElement>(null);
+
+  const A4_W = 595;
+  const A4_H = 842;
+
+  const calcFitZoom = useCallback(() => {
+    if (!viewerRef.current) return 0.65;
+    const h = viewerRef.current.clientHeight - 80;
+    const w = viewerRef.current.clientWidth - 64;
+    return Math.min(w / A4_W, h / A4_H, 1);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      const t = setTimeout(() => setZoom(calcFitZoom()), 50);
+      return () => clearTimeout(t);
+    }
+  }, [open, calcFitZoom]);
 
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-for-invoice"],
