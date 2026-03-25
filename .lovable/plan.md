@@ -1,35 +1,28 @@
 
 
-## Two Problems Identified
+## Problem
 
-### Problem 1: Layout still cut off
-The previous fix added `grid-rows-[1fr]` and `overflow-hidden` to the grid, but the issue persists because the `minHeight` / `minWidth` style on the inner wrapper (line 180) still forces the scrollable area to expand. The grid constraint helps, but the real fix needs the entire right column chain to be strictly bounded.
+The `contain: "size layout"` on the content wrapper (line 98) is the root cause. CSS size containment makes the element's intrinsic size independent of its children, which can cause it to collapse or miscalculate height within a flex container. Combined with previous attempts, the layout chain is fragile.
 
-**Fix**: Ensure the content area between header and footer has an explicit computed height rather than relying on `flex-1` alone. Add `overflow-hidden` to the content wrapper (line 98) and ensure every container in the chain uses `min-h-0 overflow-hidden` except the final scroll container which uses `overflow-auto`.
+## Fix — Complete rewrite of the modal's layout structure
 
-### Problem 2: No real-time updates for invoices
-The app uses React Query's `invalidateQueries` after mutations, which works for the current user's actions. But there's no Supabase Realtime subscription on the `invoices` table, so changes from other sources or even race conditions won't reflect without manual refresh.
+Replace the current content area with a bulletproof flex layout chain where every intermediate container has `min-h-0` (to allow flex shrinking below content size) and `overflow-hidden` (to trap content), with only the leaf scroll containers using `overflow-auto`.
 
-**Fix**:
-1. Run a migration to add `invoices` to the Supabase realtime publication
-2. Add a realtime subscription in `FacturacionPage.tsx` that invalidates the `["invoices"]` query key on any change
+### Changes in `CrearInvoiceModal.tsx`
 
----
+**Line 91** — DialogContent: keep `flex flex-col max-h-[85vh] overflow-hidden` but remove `gap-0` noise.
 
-## Changes
+**Line 98** — Content wrapper: Remove `contain: "size layout"` style. Use only `flex-1 min-h-0 overflow-hidden` (no padding here — move padding to children to avoid height miscalculation).
 
-### 1. SQL Migration
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE invoices;
-```
+**Line 99** — Grid: Use `grid grid-cols-[400px_1fr] gap-6 h-full` with no extra constraints. The parent's `overflow-hidden` + `min-h-0` already bounds it.
 
-### 2. `src/pages/finanzas/facturacion/FacturacionPage.tsx`
-Add a `useEffect` with a Supabase channel subscription for `postgres_changes` on `invoices`, invalidating `["invoices"]` on any event. Clean up channel on unmount. Pattern matches existing hooks like `useChat.ts`.
+**Line 101** — Left column (form): `overflow-y-auto min-h-0 pr-1 py-6 pl-6` — scrollable, with padding moved here.
 
-### 3. `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
-Tighten the layout chain so the right column never grows past its container:
-- Line 98: add `overflow-hidden` to the content wrapper
-- Line 180: keep `minHeight`/`minWidth` for scroll content but ensure the parent chain is fully bounded with `min-h-0 overflow-hidden`
+**Line 159** — Right column wrapper: `min-h-0 overflow-hidden py-6 pr-6` — padding moved here.
 
-This is a minimal, targeted fix following the same realtime patterns already used throughout the project (chat, cowork, notifications).
+**Line 179** — A4 viewer scroll area: keep `flex-1 min-h-0 overflow-auto`.
+
+**Line 180** — Inner A4 wrapper: Remove `minHeight`/`minWidth` style entirely. The scroll container handles overflow naturally. Just use `flex justify-center items-start p-4`.
+
+This removes all hacks (`contain`, `minHeight`, `grid-rows-[1fr]`) and uses a clean flex+grid chain where height flows from `max-h-[85vh]` → header(shrink-0) → content(flex-1 min-h-0 overflow-hidden) → grid(h-full) → columns(min-h-0 overflow-auto/hidden) → footer(shrink-0).
 
