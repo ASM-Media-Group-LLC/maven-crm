@@ -1,84 +1,32 @@
 
+Corregiré `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx` para que la columna derecha quede estrictamente contenida entre el header y el footer del modal, sin montarse sobre el footer.
 
-## Plan: Corregir layout del preview para contención total sin scroll en el modal
+Plan:
+1. Convertir la zona central del modal en un contenedor con altura realmente acotada:
+   - mantener `DialogContent` como `flex flex-col max-h-[85vh] overflow-hidden`
+   - cambiar la zona de contenido a `flex-1 min-h-0 overflow-hidden p-6`
 
-### Problema actual
+2. Asegurar que el grid interno no crezca por contenido:
+   - usar `grid grid-cols-[400px_1fr] gap-6 h-full min-h-0`
+   - hacer que ambas columnas tengan `min-h-0 h-full`
 
-La sección de contenido usa `overflow-y-auto` lo que permite scroll en todo el modal. El grid interno usa `h-full` pero su padre no tiene altura definida (depende del contenido), así que el preview no se contiene correctamente y puede desbordar.
+3. Encapsular correctamente la columna de preview:
+   - columna derecha: `flex flex-col min-h-0 h-full`
+   - bloque de preview: `flex-1 min-h-0 h-full overflow-hidden`
+   - mantener su header propio como `shrink-0`
+   - dejar el área del documento como la única región interna que puede manejar el espacio restante
 
-### Cambios en `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
+4. Evitar que el preview empuje el footer:
+   - quitar cualquier comportamiento basado en altura automática del contenedor del preview
+   - si hace falta, mover el scroll únicamente al viewport interno del documento, nunca al contenedor completo del preview ni al modal
 
-**1. Content zone: de scrollable a flex con altura controlada**
+5. Ajustar el wrapper del documento para que no rompa el layout:
+   - mantener el A4 escalado con `transform: scale(...)`
+   - asegurar que el tamaño del wrapper del documento no haga crecer la columna derecha por fuera de la altura disponible
 
-Cambiar línea 94:
-```
-// De:
-<div className="flex-1 overflow-y-auto p-6">
-  <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
-
-// A:
-<div className="flex-1 min-h-0 p-6">
-  <div className="grid grid-cols-[400px_1fr] gap-6 h-full">
-```
-
-- `flex-1 min-h-0` garantiza que el contenedor tome exactamente el espacio restante (entre header y footer) sin crecer.
-- Se elimina `overflow-y-auto` del padre — el scroll no debe existir a nivel del modal.
-
-**2. Columna izquierda (form): scroll propio**
-
-Cambiar línea 97:
-```
-// De:
-<div className="space-y-4">
-
-// A:
-<div className="space-y-4 overflow-y-auto">
-```
-
-El formulario puede scrollear internamente si tiene muchos campos, sin afectar el layout general.
-
-**3. Columna derecha (preview): altura controlada con min-h-0**
-
-Cambiar línea 155:
-```
-// De:
-<div className="flex flex-col">
-
-// A:
-<div className="flex flex-col min-h-0">
-```
-
-Y el viewer container (línea 156) ya tiene `flex-1 overflow-hidden`, lo cual es correcto. El `min-h-0` en el padre permite que flex funcione sin desbordar.
-
-**4. Área del documento A4: scroll solo interno**
-
-Línea 175 ya tiene `overflow-auto` en el viewer interno — esto es correcto. Solo se ajusta el `minHeight` del wrapper para usar el tamaño escalado real:
-
-```
-// De:
-<div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48 }}>
-
-// A:  
-<div className="flex justify-center p-6" style={{ minHeight: A4_H * zoom + 48, minWidth: A4_W * zoom + 48 }}>
-```
-
-Esto asegura scroll horizontal también cuando el zoom excede el ancho.
-
-### Resumen de la cadena flex
-
-```text
-DialogContent  flex flex-col max-h-[85vh] overflow-hidden
-├── Header     shrink-0
-├── Content    flex-1 min-h-0 p-6          ← NO scroll aquí
-│   └── Grid   h-full
-│       ├── Form       overflow-y-auto     ← scroll propio
-│       └── Preview    flex flex-col min-h-0
-│           └── Viewer flex-1 overflow-hidden
-│               ├── Toolbar  shrink-0
-│               └── A4 area  flex-1 overflow-auto  ← ÚNICO scroll del doc
-└── Footer     shrink-0
-```
-
-### Sin cambios en
-- Contenido del documento A4, lógica de zoom, cálculos, ni submit.
-
+Resultado esperado:
+- header visible arriba
+- footer visible abajo
+- preview completamente contenido entre ambos
+- sin solapamiento con los botones de acción
+- la columna derecha ya no invade otras áreas del modal
