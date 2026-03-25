@@ -1,44 +1,48 @@
 
 
-## Plan: Visor de PDF profesional con zoom en el preview del Invoice
-
-### Resumen
-
-Convertir el panel derecho del modal en un visor de documentos profesional con zoom controlable, donde la hoja A4 escale dinámicamente y permita scroll cuando excede el viewport.
+## Plan: Reestructurar modal a patrón header/content/footer unificado
 
 ### Cambios en `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
 
-1. **Nuevo estado `zoom`** — `useState(0.65)` (valor por defecto que garantiza que la hoja A4 completa sea visible sin recortes).
+Reorganizar el `DialogContent` de un grid de dos columnas de borde a borde a un layout vertical con 3 zonas:
 
-2. **Controles de zoom flotantes** — Barra sticky/fixed dentro del panel derecho (parte superior o inferior) con botones para niveles predefinidos (80%, 100%, 120%, 150%) o botones +/- con paso de 10%. Usar `z-10` y fondo semi-transparente con blur para que floten sobre el contenido al hacer scroll.
+**1. Header (shrink-0, border-b, px-6 py-4)**
+- `DialogHeader` con `DialogTitle` "Crear Invoice" alineado a la izquierda
+- El botón X ya lo provee `DialogContent` automáticamente
 
-3. **Reestructurar el contenedor del preview**:
-   - El panel derecho pasa a ser `relative` con `overflow-y-auto` (scrollable).
-   - Dentro, un contenedor centrado (`flex items-start justify-center py-8 min-h-full`).
-   - La hoja A4 tiene dimensiones fijas en px (ej. `595px x 842px`, las dimensiones reales de A4 a 72dpi) y se escala con `transform: scale(zoom)` + `transform-origin: top center`.
-   - Cuando zoom > fit, el contenedor se agranda y aparece scroll natural.
+**2. Content (flex-1, overflow-y-auto, p-6)**
+- Grid interno `grid-cols-[400px_1fr] gap-6`
+- **Columna izquierda**: Campos del formulario (sin botones de acción, sin DialogHeader)
+- **Columna derecha**: Bloque contenido de preview con `bg-muted/40 rounded-xl border` y padding interno. Dentro:
+  - Mini-header propio: "Vista previa" a la izquierda + controles de zoom a la derecha
+  - Área scrollable con el documento A4 centrado (misma lógica de zoom actual)
 
-4. **Cálculo de fit automático** — Al montar o cambiar tamaño, calcular el scale que hace que 842px de alto quepa en el espacio disponible. Usar ese valor como zoom por defecto. Opcionalmente un botón "Ajustar" que vuelva al fit.
+**3. Footer (shrink-0, border-t, px-6 py-4)**
+- Botones "Cancelar" y "Crear Invoice" alineados a la derecha con `flex justify-end gap-2`
 
-5. **Visual** — Fondo `bg-gray-100` (gris suave tipo visor), la hoja con `shadow-xl` y bordes definidos para simular hoja flotante. Los controles de zoom con `backdrop-blur-sm bg-background/80 rounded-lg border shadow-sm`.
-
-6. **Sin cambios** en la columna izquierda (formulario), lógica de submit, ni contenido del documento A4.
-
-### Estructura resultante del panel derecho
+### Estructura visual
 
 ```text
-┌─────────────────────────────┐
-│ [Vista previa]   [-][80%][+]│  ← sticky toolbar
-│─────────────────────────────│
-│                             │
-│     ┌───────────────┐       │  ← scrollable area
-│     │               │       │
-│     │   A4 Sheet    │       │
-│     │  595 x 842px  │       │
-│     │  scale(zoom)  │       │
-│     │               │       │
-│     └───────────────┘       │
-│                             │
-└─────────────────────────────┘
+┌──────────────────────────────────────┐
+│ Crear Invoice                      X │  ← header
+├──────────────────────────────────────┤
+│  Form fields   │  ┌──────────────┐  │
+│  Creador       │  │Vista prev [±]│  │
+│  Monto         │  │ ┌──────────┐ │  │
+│  Fee / Método  │  │ │  A4 doc  │ │  │
+│  Fecha         │  │ └──────────┘ │  │
+│  Notas         │  └──────────────┘  │  ← content
+├──────────────────────────────────────┤
+│                 Cancelar   Crear Inv │  ← footer
+└──────────────────────────────────────┘
 ```
+
+### Detalles clave
+
+- `DialogContent`: `max-w-5xl p-0 gap-0 flex flex-col max-h-[85vh]`
+- El preview block es un `div` redondeado con padding generoso, NO una columna completa de borde a borde — se siente como un componente independiente dentro del espacio
+- El `viewerRef` se mueve al bloque de preview contenido
+- Contenido del documento A4, lógica de zoom y cálculos de fee no cambian
+- Se elimina el `DialogHeader` de la columna izquierda y se mueve al header global
+- Se eliminan los botones de la columna izquierda y se mueven al footer global
 
