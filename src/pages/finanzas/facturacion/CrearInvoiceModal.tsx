@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import kashLogo from "@/assets/kash-logo.png";
 import { useQuery } from "@tanstack/react-query";
 import { Minus, Plus, Maximize } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -183,13 +184,14 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                       {/* Header */}
                       <div className="flex justify-between items-start mb-6">
                         <div>
-                          <h2 className="text-lg font-bold tracking-tight text-gray-900">Maven CRM</h2>
-                          <p className="text-[9px] text-gray-400 mt-0.5">Management & Operations</p>
+                          <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
+                          <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
+                          <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
+                          <p className="text-[9px] text-gray-400">33131-2176</p>
+                          <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-base font-bold text-gray-900">INVOICE</p>
-                          <p className="text-[9px] text-gray-400">INV-XXXX</p>
-                          <p className="text-[9px] text-gray-400">{today}</p>
+                        <div>
+                          <img src={kashLogo} alt="KASH" className="h-10 object-contain" />
                         </div>
                       </div>
 
