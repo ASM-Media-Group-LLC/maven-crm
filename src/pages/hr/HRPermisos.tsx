@@ -708,7 +708,7 @@ export default function HRPermisos() {
       </div>
 
       {/* Modals */}
-      <CreatePermisoModal open={modalOpen} onOpenChange={setModalOpen} />
+      <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
       <ViewPermisoModal permiso={viewPermiso} onClose={() => setViewPermiso(null)} />
 
       {/* Edit Modal */}
