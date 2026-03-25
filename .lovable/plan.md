@@ -1,87 +1,31 @@
 
 
-## Modificaciones al cuerpo del A4
+## Convertir "Crear Invoice" de modal a página completa
 
-**Archivo**: `src/pages/finanzas/facturacion/CrearInvoiceModal.tsx`
+### Resumen
+Reemplazar el modal `CrearInvoiceModal` por una página dedicada en `/finanzas/facturacion/nuevo`, siguiendo el mismo layout de `/contactos/nuevo` (header fijo, footer fijo, contenido scrollable), pero con el formulario de invoice a la izquierda y la vista previa A4 a la derecha.
 
-### 1. Sección "Bill to" + "Invoice details" (líneas 198-206)
+### Cambios
 
-Reemplazar el separador y bloque "Facturar a" con dos columnas lado a lado:
+**1. Crear `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`**
 
-- **Columna izquierda**: "Bill to" (label bold) + nombre del creador, "Address" (label bold, valor placeholder "—"), "Phone" (label bold, valor placeholder "—").
-- **Columna derecha**: "Invoice details" (label bold), "Invoice no.:" + valor placeholder, "Invoice date:" + fecha actual, "Due date:" + fecha de vencimiento (condicional).
+Estructura `main > header + content + footer` idéntica a `NuevoContactoForm`:
 
-Todo en `text-[9px]`, labels en `font-semibold text-gray-800`.
+- **Header fijo** (`shrink-0 border-b`): Breadcrumb "Facturación > Nuevo Invoice", botón "Volver" con `ArrowLeft`, título "Nuevo Invoice" con icono `FileText`, subtítulo descriptivo.
+- **Contenido** (`flex-1 overflow-auto`): Grid de dos columnas (`grid-cols-[400px_1fr]`). Columna izquierda: formulario (creador, monto, fee, metodo pago, fecha vencimiento, notas). Columna derecha: visor A4 con controles de zoom y el documento completo (header KASH, bill-to, tabla, footer).
+- **Footer fijo** (`shrink-0 border-t`): Botones "Cancelar" (navega a `/finanzas/facturacion`) y "Crear Invoice".
 
-```tsx
-<div className="h-px bg-gray-200 mb-4" />
+Se reutiliza toda la logica de estado, query de creators, calculos de fee y el documento A4 del modal actual.
 
-<div className="flex justify-between mb-5 text-[9px]">
-  <div className="space-y-1">
-    <p className="font-semibold text-gray-800">Bill to</p>
-    <p className="text-gray-600">{selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}</p>
-    <p className="font-semibold text-gray-800 mt-2">Address</p>
-    <p className="text-gray-600">—</p>
-    <p className="font-semibold text-gray-800 mt-2">Phone</p>
-    <p className="text-gray-600">—</p>
-  </div>
-  <div className="space-y-1 text-right">
-    <p className="font-semibold text-gray-800">Invoice details</p>
-    <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">—</span></p>
-    <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{today}</span></p>
-    {dueDate && (
-      <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(dueDate + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
-    )}
-  </div>
-</div>
-```
+**2. Crear `src/pages/finanzas/facturacion/NuevoInvoice.tsx`**
 
-### 2. Tabla de conceptos (líneas 208-236)
+Wrapper con `SidebarProvider + DashboardSidebar + DashboardTopbar + NuevoInvoicePage`, igual que `NuevoContacto.tsx`.
 
-- **thead**: 3 columnas — "Product or service", "Description", "Amount" (`text-[8px] uppercase text-gray-500`).
-- **tbody**: Fila "Agency Service" (descripción vacía, monto). Fee condicional en rojo.
-- **tfoot**: "Total Neto" en bold `text-[11px]` (sin cambios).
+**3. Registrar ruta en `src/App.tsx`**
 
-```tsx
-<thead>
-  <tr className="border-b border-gray-200">
-    <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Product or service</th>
-    <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Description</th>
-    <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Amount</th>
-  </tr>
-</thead>
-<tbody>
-  <tr className="border-b border-gray-100">
-    <td className="py-2 text-gray-700">Agency Service</td>
-    <td className="py-2 text-gray-500"></td>
-    <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
-  </tr>
-  {feeAmount > 0 && (
-    <tr className="border-b border-gray-100">
-      <td className="py-2 text-gray-500">Fee ({feeType === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
-      <td className="py-2"></td>
-      <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
-    </tr>
-  )}
-</tbody>
-```
+Agregar lazy import y ruta `/finanzas/facturacion/nuevo` envuelta en `PermissionRoute module="Finanzas"` y `FinanzasLayout`.
 
-### 3. Footer del documento (líneas 238-262)
+**4. Modificar `FacturacionPage.tsx`**
 
-Simplificar a solo notas condicionales (italic) y el pie de página. Eliminar método de pago y vencimiento (ya están en "Invoice details").
-
-```tsx
-<div className="mt-auto space-y-2 pt-4">
-  {notes && (
-    <div className="text-[9px]">
-      <span className="text-gray-400">Notes: </span>
-      <span className="text-gray-600 italic">{notes}</span>
-    </div>
-  )}
-  <div className="h-px bg-gray-200 mt-3" />
-  <p className="text-[8px] text-gray-300 text-center pt-1">
-    Documento generado por KASH AGENCY · {today}
-  </p>
-</div>
-```
+Cambiar el botón "Crear Invoice" de `onClick={() => setShowCreateModal(true)}` a `onClick={() => navigate("/finanzas/facturacion/nuevo")}`. Eliminar el estado `showCreateModal` y el render de `CrearInvoiceModal` si ya no se usa en ningún otro lugar.
 
