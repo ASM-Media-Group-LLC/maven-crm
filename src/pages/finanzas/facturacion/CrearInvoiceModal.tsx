@@ -115,7 +115,7 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[368px] p-0" align="start">
+                  <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]" align="start">
                     <Command>
                       <CommandInput placeholder="Buscar creador..." />
                       <CommandList>
