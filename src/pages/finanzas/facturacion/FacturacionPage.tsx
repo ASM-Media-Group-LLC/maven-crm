@@ -405,17 +405,9 @@ export default function FacturacionPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Facturación</h1>
-            <p className="text-sm text-muted-foreground">Gestión de invoices a creadores · {invoices.length} registros</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => navigate("/finanzas/facturacion/nuevo")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
-            <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
-              <Download className="h-4 w-4 mr-1" />Exportar
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Facturación</h1>
+          <p className="text-sm text-muted-foreground">Gestión de invoices a creadores · {invoices.length} registros</p>
         </div>
       </header>
 
