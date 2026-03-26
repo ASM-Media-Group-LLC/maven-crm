@@ -1,0 +1,127 @@
+import kashLogo from "@/assets/kash-logo.png";
+
+interface InvoiceData {
+  invoice_number?: string;
+  amount?: number;
+  fee_type?: string;
+  fee_amount?: number;
+  net_amount?: number;
+  payment_method?: string;
+  due_date?: string;
+  notes?: string;
+  status?: string;
+  created_at?: string;
+  creators?: { name?: string; artistic_name?: string };
+}
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+}
+
+const ZOOM = 0.82;
+const A4_W = 595;
+const A4_H = 842;
+
+export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) {
+  const amt = Number(invoice.amount) || 0;
+  const feeAmount = Number(invoice.fee_amount) || 0;
+  const netAmount = Number(invoice.net_amount) || (amt - feeAmount);
+  const creatorName = invoice.creators?.artistic_name || invoice.creators?.name || "—";
+  const invoiceDate = invoice.created_at
+    ? new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
+    : new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+
+  return (
+    <div style={{ width: A4_W * ZOOM, height: A4_H * ZOOM, flexShrink: 0 }}>
+      <div
+        style={{ width: A4_W, height: A4_H, transform: `scale(${ZOOM})`, transformOrigin: "top left" }}
+        className="bg-white rounded shadow-2xl p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
+            <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
+            <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
+            <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
+            <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
+          </div>
+          <div>
+            <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
+          </div>
+        </div>
+
+        <div className="h-px bg-gray-200 mb-4" />
+
+        <div className="flex justify-between mb-5 text-[9px]">
+          <div className="space-y-1">
+            <p className="font-semibold text-gray-800">Bill to</p>
+            <p className="text-gray-600">{creatorName}</p>
+            <p className="font-semibold text-gray-800 mt-2">Address</p>
+            <p className="text-gray-600">—</p>
+            <p className="font-semibold text-gray-800 mt-2">Phone</p>
+            <p className="text-gray-600">—</p>
+          </div>
+          <div className="space-y-1 text-right">
+            <p className="font-semibold text-gray-800">Invoice details</p>
+            <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">{invoice.invoice_number || "—"}</span></p>
+            <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{invoiceDate}</span></p>
+            {invoice.due_date && (
+              <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
+            )}
+            {invoice.payment_method && (
+              <p><span className="font-semibold text-gray-800">Payment: </span><span className="text-gray-600">{invoice.payment_method}</span></p>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1">
+          <table className="w-full text-[10px]">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Product or service</th>
+                <th className="text-left py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Description</th>
+                <th className="text-right py-1.5 font-semibold text-gray-500 uppercase tracking-wider text-[8px]">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-100">
+                <td className="py-2 text-gray-700">Agency Service</td>
+                <td className="py-2 text-gray-500"></td>
+                <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
+              </tr>
+              {feeAmount > 0 && (
+                <tr className="border-b border-gray-100">
+                  <td className="py-2 text-gray-500">Fee ({invoice.fee_type === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
+                  <td className="py-2"></td>
+                  <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
+                <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto space-y-2 pt-4">
+          {invoice.notes && (
+            <div className="text-[9px]">
+              <span className="text-gray-400">Notes: </span>
+              <span className="text-gray-600 italic">{invoice.notes}</span>
+            </div>
+          )}
+          <div className="h-px bg-gray-200 mt-3" />
+          <p className="text-[8px] text-gray-300 text-center pt-1">
+            Documento generado por KASH AGENCY · {invoiceDate}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
