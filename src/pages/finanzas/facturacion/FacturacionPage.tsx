@@ -609,12 +609,12 @@ export default function FacturacionPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar invoice?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminará el invoice #{deleteItem?.invoice_number}.</AlertDialogDescription>
+            <AlertDialogTitle>{deleteItem?._isPaymentNote ? "¿Eliminar nota de pago?" : "¿Eliminar invoice?"}</AlertDialogTitle>
+            <AlertDialogDescription>{deleteItem?._isPaymentNote ? "Se eliminará esta nota de pago permanentemente." : `Se eliminará el invoice #${deleteItem?.invoice_number}.`}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (!deleteItem) return; deleteItem._isPaymentNote ? deletePaymentNoteMutation.mutate(deleteItem.id) : deleteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
