@@ -124,6 +124,7 @@ const FinanzasDashboard = lazy(() => import("./pages/finanzas/FinanzasDashboard"
 const NominaPage = lazy(() => import("./pages/finanzas/nomina/NominaPage"));
 const FacturacionPage = lazy(() => import("./pages/finanzas/facturacion/FacturacionPage"));
 const NuevoInvoice = lazy(() => import("./pages/finanzas/facturacion/NuevoInvoice"));
+const NuevaNotaPago = lazy(() => import("./pages/finanzas/facturacion/NuevaNotaPago"));
 const ControlFinancieroPage = lazy(() => import("./pages/finanzas/control/ControlFinancieroPage"));
 const ReportesPage = lazy(() => import("./pages/finanzas/reportes/ReportesPage"));
 const ConfiguracionPage = lazy(() => import("./pages/finanzas/configuracion/ConfiguracionPage"));
