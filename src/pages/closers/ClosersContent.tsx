@@ -61,7 +61,7 @@ const ClosersContent = () => {
             <h1 className="text-2xl font-bold">Closers</h1>
             <p className="text-sm text-muted-foreground">Pipeline de cierre de modelos</p>
           </div>
-          {isAdmin && (
+          {(isAdmin || isManager) && (
             <Button size="sm" onClick={() => { setAssignTarget({ id: "", assignee: null, source: "closer" }); setAssignDialogOpen(true); }}>
               <UserPlus className="h-4 w-4 mr-1" /> Asignar
             </Button>

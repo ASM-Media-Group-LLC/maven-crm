@@ -362,12 +362,27 @@ export const useCloserLeads = () => {
 
   const assignCreator = useMutation({
     mutationFn: async ({ id, assigned_to }: { id: string; assigned_to: string }) => {
-      const { error } = await supabase.from("closer_creators").update({ assigned_to }).eq("id", id);
+      const { data: current } = await supabase
+        .from("closer_creators")
+        .select("stage")
+        .eq("id", id)
+        .maybeSingle();
+
+      const updates: Record<string, unknown> = { assigned_to };
+      if (current?.stage === "Nuevo" || current?.stage === "Pendiente LG") {
+        updates.stage = "Asignada";
+      }
+
+      const { error } = await supabase.from("closer_creators").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-creators-list"] });
+      queryClient.invalidateQueries({ queryKey: ["closer-creators-counts"] });
       toast({ title: "Creator asignada" });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Error al asignar", description: e.message, variant: "destructive" });
     },
   });
 
