@@ -1,20 +1,46 @@
 
 
-## Plan: Fix hover transparency in invoice table
+## Plan: Estado de filtros independiente por tab en Facturación
 
-### Problem
-The `TableRow` component uses `hover:bg-muted/50` (semi-transparent) which causes see-through effects. The sticky actions column uses `group-hover:bg-muted/30` which is also semi-transparent, letting the "Vencimiento" column bleed through.
+### Problema
+Los filtros `search`, `statusFilter`, `dateFrom`, `dateTo` y `viewMode` son variables de estado globales (líneas 125-135) compartidas entre todos los tabs. Cambiar un filtro en "Invoices" afecta "Notas de Pago" y viceversa.
 
-### Changes
+### Solución
+Reemplazar las variables individuales por un objeto de estado indexado por tab. Cada tab mantiene sus propios valores.
 
-**1. `src/components/ui/table.tsx` (line 41)**
-- Change `hover:bg-muted/50` → `hover:bg-muted` (fully opaque hover background).
+### Cambios en `FacturacionPage.tsx`
 
-**2. `src/pages/finanzas/facturacion/FacturacionPage.tsx` (line 208)**
-- Change `sticky right-0 bg-card group-hover:bg-muted/30` → `sticky right-0 bg-card group-hover:bg-muted` on the actions `TableCell` so it matches the row hover exactly and stays fully opaque.
+**1. Definir tipo e inicializar estado por tab (reemplaza líneas 125, 127-129, 135):**
+```tsx
+type TabFilters = { search: string; statusFilter: string; dateFrom?: Date; dateTo?: Date; viewMode: "list" | "grid" };
 
-**3. `src/pages/finanzas/facturacion/FacturacionPage.tsx` (line 176)**
-- Ensure the sticky header actions cell also has a solid `bg-card` with proper z-index (already correct).
+const defaultFilters: TabFilters = { search: "", statusFilter: "", dateFrom: undefined, dateTo: undefined, viewMode: "list" };
 
-Two files, two single-line edits each.
+const [filtersByTab, setFiltersByTab] = useState<Record<FacturaTab, TabFilters>>({
+  "Invoices": { ...defaultFilters },
+  "Notas de Pago": { ...defaultFilters },
+  "Reversos": { ...defaultFilters },
+  "Fees & Ajustes": { ...defaultFilters },
+  "Mail": { ...defaultFilters },
+  "Archivo de PagoMundo": { ...defaultFilters },
+});
+```
+
+**2. Helper para leer/actualizar filtros del tab activo:**
+```tsx
+const currentFilters = filtersByTab[facturaTab];
+const updateFilter = (patch: Partial<TabFilters>) =>
+  setFiltersByTab(prev => ({ ...prev, [facturaTab]: { ...prev[facturaTab], ...patch } }));
+```
+
+**3. Reemplazar todas las referencias:**
+- `search` → `currentFilters.search`, `setSearch(x)` → `updateFilter({ search: x })`
+- `statusFilter` → `currentFilters.statusFilter`, `setStatusFilter(x)` → `updateFilter({ statusFilter: x })`
+- `dateFrom/dateTo` → `currentFilters.dateFrom/dateTo`
+- `viewMode` → `currentFilters.viewMode`
+- `hasFilters` recalculado desde `currentFilters`
+
+**4. Eliminar** las variables individuales `search`, `statusFilter`, `dateFrom`, `dateTo`, `viewMode` (líneas 125, 127-129, 135).
+
+Un solo archivo modificado: `FacturacionPage.tsx`.
 
