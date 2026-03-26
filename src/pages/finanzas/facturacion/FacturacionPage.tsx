@@ -60,16 +60,48 @@ export default function FacturacionPage() {
     },
   });
 
-  // Realtime subscription for invoices
+  const { data: paymentNotes = [], isLoading: isLoadingNotes } = useQuery({
+    queryKey: ["payment_notes"],
+    queryFn: async () => {
+      const { data: payments, error: pErr } = await supabase.from("creator_payments").select("*").order("created_at", { ascending: false });
+      if (pErr) throw pErr;
+      const creatorIds = [...new Set((payments ?? []).map(p => p.creator_id))];
+      if (creatorIds.length === 0) return [];
+      const { data: creators } = await supabase.from("creators").select("id, name, artistic_name").in("id", creatorIds);
+      const cMap = new Map((creators ?? []).map(c => [c.id, c]));
+      return (payments ?? []).map(p => ({ ...p, _creator: cMap.get(p.creator_id) }));
+    },
+  });
+
+  // Realtime subscriptions
   useEffect(() => {
-    const channel = supabase
+    const ch1 = supabase
       .channel("invoices-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, () => {
         queryClient.invalidateQueries({ queryKey: ["invoices"] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const ch2 = supabase
+      .channel("payment-notes-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "creator_payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch1); supabase.removeChannel(ch2); };
   }, [queryClient]);
+
+  const deletePaymentNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creator_payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
+      toast({ title: "Nota de pago eliminada" });
+      setDeleteItem(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
 
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
