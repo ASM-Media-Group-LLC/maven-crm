@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 // CrearInvoiceModal removed — now uses /finanzas/facturacion/nuevo
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
+import InvoiceA4Preview from "./InvoiceA4Preview";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
