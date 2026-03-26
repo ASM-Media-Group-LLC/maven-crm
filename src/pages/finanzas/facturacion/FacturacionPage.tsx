@@ -316,7 +316,7 @@ export default function FacturacionPage() {
               </>
             )}
             <p className="text-sm text-muted-foreground">{filtered.length} invoices pagados o parciales</p>
-            {viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
+            {currentFilters.viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
           </>
         );
 
@@ -463,7 +463,7 @@ export default function FacturacionPage() {
               </>,
               true
             )}
-            {viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
+            {currentFilters.viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
           </>
         );
     }
