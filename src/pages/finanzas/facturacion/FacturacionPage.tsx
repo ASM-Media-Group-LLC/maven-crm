@@ -146,7 +146,7 @@ export default function FacturacionPage() {
   const totalPendientes = invoices.filter(i => i.status === "enviada" || i.status === "vencida").length;
   const totalMonto = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
   const totalFee = invoices.reduce((s, i) => s + (Number(i.fee_amount) || 0), 0);
-  const hasFilters = search || statusFilter || dateFrom || dateTo;
+  const hasFilters = currentFilters.search || currentFilters.statusFilter || currentFilters.dateFrom || currentFilters.dateTo;
 
   const getTabFiltered = () => {
     let base = invoices;
@@ -155,11 +155,11 @@ export default function FacturacionPage() {
 
     return base.filter(inv => {
       const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "";
-      const matchSearch = !search || creatorName.toLowerCase().includes(search.toLowerCase()) || inv.invoice_number.includes(search);
-      const matchStatus = !statusFilter || inv.status === statusFilter;
+      const matchSearch = !currentFilters.search || creatorName.toLowerCase().includes(currentFilters.search.toLowerCase()) || inv.invoice_number.includes(currentFilters.search);
+      const matchStatus = !currentFilters.statusFilter || inv.status === currentFilters.statusFilter;
       const d = new Date(inv.created_at);
-      const matchFrom = !dateFrom || d >= dateFrom;
-      const matchTo = !dateTo || d <= dateTo;
+      const matchFrom = !currentFilters.dateFrom || d >= currentFilters.dateFrom;
+      const matchTo = !currentFilters.dateTo || d <= currentFilters.dateTo;
       return matchSearch && matchStatus && matchFrom && matchTo;
     });
   };
@@ -238,10 +238,10 @@ export default function FacturacionPage() {
     <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar creador o número..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+        <Input placeholder="Buscar creador o número..." className="pl-8" value={currentFilters.search} onChange={e => updateFilter({ search: e.target.value })} />
       </div>
       {showStatusFilter && (
-        <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
+        <Select value={currentFilters.statusFilter || undefined} onValueChange={v => updateFilter({ statusFilter: v === "__all__" ? "" : v })}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todos</SelectItem>
@@ -254,14 +254,14 @@ export default function FacturacionPage() {
           </SelectContent>
         </Select>
       )}
-      <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+      <DateRangePicker from={currentFilters.dateFrom} to={currentFilters.dateTo} onApply={(f, t) => updateFilter({ dateFrom: f, dateTo: t })} />
       <div className="inline-flex items-center rounded-md border border-border">
-        <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
-        <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+        <Button variant={currentFilters.viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => updateFilter({ viewMode: "list" })}><List className="h-4 w-4" /></Button>
+        <Button variant={currentFilters.viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => updateFilter({ viewMode: "grid" })}><LayoutGrid className="h-4 w-4" /></Button>
       </div>
       {extraButtons}
       {hasFilters && (
-        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground shrink-0" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground shrink-0" onClick={() => setFiltersByTab(prev => ({ ...prev, [facturaTab]: { ...defaultFilters } }))}>
           <X className="h-3.5 w-3.5 mr-1" />Limpiar
         </Button>
       )}
