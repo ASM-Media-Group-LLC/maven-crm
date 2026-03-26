@@ -108,90 +108,86 @@ export default function HRPermisoNew() {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <header className="shrink-0 border-b bg-background px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/hr/permisos")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <Clock className="h-4.5 w-4.5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-foreground">Nueva Solicitud</h1>
-              <p className="text-xs text-muted-foreground">Registra un permiso, ausencia o incapacidad</p>
-            </div>
-          </div>
-        </div>
+    <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <header className="bg-background px-6 pt-6 pb-4 border-b border-border shrink-0">
+        <nav className="text-sm text-muted-foreground mb-2">
+          <button onClick={() => navigate("/hr/permisos")} className="hover:text-foreground transition-colors">Permisos</button>
+          <span className="mx-2">›</span>
+          <span className="text-foreground font-medium">Nueva Solicitud</span>
+        </nav>
+        <button
+          onClick={() => navigate("/hr/permisos")}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" /> Volver
+        </button>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Clock className="h-6 w-6" /> Nueva Solicitud
+        </h1>
+        <p className="text-sm text-muted-foreground">Registra un permiso, ausencia o incapacidad</p>
       </header>
 
-      {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-lg mx-auto space-y-5">
-          {/* Empleado */}
-          <div className="space-y-1.5">
-            <Label>Empleado <span className="text-destructive">*</span></Label>
-            <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
+        <div className="space-y-6 rounded-lg border border-border p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Empleado <span className="text-destructive">*</span></Label>
+              <EmployeeSearchCombobox value={employeeId} onChange={setEmployeeId} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tipo de Solicitud <span className="text-destructive">*</span></Label>
+              <Select value={permisoType} onValueChange={setPermisoType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERMISSION_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      <span className="flex items-center gap-2">
+                        <t.icon className="h-3.5 w-3.5" />
+                        {t.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Tipo */}
-          <div className="space-y-1.5">
-            <Label>Tipo de Solicitud <span className="text-destructive">*</span></Label>
-            <Select value={permisoType} onValueChange={setPermisoType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo..." />
-              </SelectTrigger>
-              <SelectContent>
-                {PERMISSION_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    <span className="flex items-center gap-2">
-                      <t.icon className="h-3.5 w-3.5" />
-                      {t.label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Fecha <span className="text-destructive">*</span></Label>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
+                    locale={es}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Horario</Label>
+              <Input
+                placeholder="Ej: 14:00 - 17:00"
+                value={horario}
+                onChange={(e) => setHorario(e.target.value)}
+              />
+            </div>
           </div>
 
-          {/* Fecha */}
-          <div className="space-y-1.5">
-            <Label>Fecha <span className="text-destructive">*</span></Label>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn("w-full justify-start font-normal", !date && "text-muted-foreground")}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "dd 'de' MMMM yyyy", { locale: es }) : "Seleccionar fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => { setDate(d); setCalendarOpen(false); }}
-                  locale={es}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Horario */}
-          <div className="space-y-1.5">
-            <Label>Horario</Label>
-            <Input
-              placeholder="Ej: 14:00 - 17:00"
-              value={horario}
-              onChange={(e) => setHorario(e.target.value)}
-            />
-          </div>
-
-          {/* Motivo */}
           <div className="space-y-1.5">
             <Label>Motivo</Label>
             <Textarea
@@ -202,7 +198,6 @@ export default function HRPermisoNew() {
             />
           </div>
 
-          {/* Adjunto */}
           <div className="space-y-1.5">
             <Label>Documento de soporte</Label>
             <p className="text-xs text-muted-foreground">Imagen o PDF (máx. 10 MB)</p>
@@ -239,12 +234,9 @@ export default function HRPermisoNew() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="shrink-0 border-t bg-background px-6 py-4">
-        <div className="flex justify-end gap-3 max-w-lg mx-auto">
-          <Button variant="outline" onClick={() => navigate("/hr/permisos")}>
-            Cancelar
-          </Button>
+      <footer className="border-t border-border bg-background px-6 py-4 shrink-0">
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => navigate("/hr/permisos")}>Cancelar</Button>
           <Button
             onClick={() => mutation.mutate()}
             disabled={!isValid || mutation.isPending || uploading}
@@ -253,6 +245,6 @@ export default function HRPermisoNew() {
           </Button>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }
