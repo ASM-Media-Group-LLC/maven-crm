@@ -60,16 +60,48 @@ export default function FacturacionPage() {
     },
   });
 
-  // Realtime subscription for invoices
+  const { data: paymentNotes = [], isLoading: isLoadingNotes } = useQuery({
+    queryKey: ["payment_notes"],
+    queryFn: async () => {
+      const { data: payments, error: pErr } = await supabase.from("creator_payments").select("*").order("created_at", { ascending: false });
+      if (pErr) throw pErr;
+      const creatorIds = [...new Set((payments ?? []).map(p => p.creator_id))];
+      if (creatorIds.length === 0) return [];
+      const { data: creators } = await supabase.from("creators").select("id, name, artistic_name").in("id", creatorIds);
+      const cMap = new Map((creators ?? []).map(c => [c.id, c]));
+      return (payments ?? []).map(p => ({ ...p, _creator: cMap.get(p.creator_id) }));
+    },
+  });
+
+  // Realtime subscriptions
   useEffect(() => {
-    const channel = supabase
+    const ch1 = supabase
       .channel("invoices-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, () => {
         queryClient.invalidateQueries({ queryKey: ["invoices"] });
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const ch2 = supabase
+      .channel("payment-notes-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "creator_payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch1); supabase.removeChannel(ch2); };
   }, [queryClient]);
+
+  const deletePaymentNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("creator_payments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
+      toast({ title: "Nota de pago eliminada" });
+      setDeleteItem(null);
+    },
+    onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
+  });
 
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
@@ -304,21 +336,85 @@ export default function FacturacionPage() {
 
   const renderTabContent = () => {
     switch (facturaTab) {
-      case "Notas de Pago":
+      case "Notas de Pago": {
+        const NOTE_STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+          pending: { variant: "outline", label: "Pendiente" },
+          paid: { variant: "default", label: "Pagada" },
+          cancelled: { variant: "destructive", label: "Cancelada" },
+        };
+        const filteredNotes = paymentNotes.filter(n => {
+          const name = n._creator?.artistic_name || n._creator?.name || "";
+          const matchSearch = !currentFilters.search || name.toLowerCase().includes(currentFilters.search.toLowerCase());
+          const matchStatus = !currentFilters.statusFilter || n.status === currentFilters.statusFilter;
+          const d = new Date(n.created_at!);
+          const matchFrom = !currentFilters.dateFrom || d >= currentFilters.dateFrom;
+          const matchTo = !currentFilters.dateTo || d <= currentFilters.dateTo;
+          return matchSearch && matchStatus && matchFrom && matchTo;
+        });
         return (
           <>
             {renderFilterBar(
               <>
                 <Button size="sm" onClick={() => navigate("/finanzas/facturacion/notasdepago/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Nota</Button>
-                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "notas-pago")}>
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filteredNotes.map(n => ({ Creador: n._creator?.artistic_name || n._creator?.name || "", Monto: n.amount, Tipo: n.payment_type, Metodo: n.payment_method, Estado: n.status, Vencimiento: n.due_date, Creado: n.created_at })), "notas-pago")}>
                   <Download className="h-4 w-4 mr-1" />Exportar
                 </Button>
               </>
             )}
-            <p className="text-sm text-muted-foreground">{filtered.length} invoices pagados o parciales</p>
-            {currentFilters.viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
+            <p className="text-sm text-muted-foreground">{filteredNotes.length} notas de pago</p>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="overflow-auto max-h-[calc(100vh-30rem)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="sticky top-0 z-10 bg-card border-b">
+                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Tipo</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Método</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground">Creado</TableHead>
+                      <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoadingNotes ? Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    )) : filteredNotes.length === 0 ? (
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-12">Sin notas de pago.</TableCell></TableRow>
+                    ) : filteredNotes.map(n => {
+                      const creatorName = n._creator?.artistic_name || n._creator?.name || "—";
+                      const initials = creatorName.slice(0, 2).toUpperCase();
+                      const badge = NOTE_STATUS_BADGE[n.status || "pending"] ?? NOTE_STATUS_BADGE.pending;
+                      return (
+                        <TableRow key={n.id} className="group hover:bg-muted/30 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-[10px] font-semibold text-primary">{initials}</span>
+                              </div>
+                              <span className="text-sm">{creatorName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm font-medium">{fmt(Number(n.amount) || 0)}</TableCell>
+                          <TableCell className="text-sm">{n.payment_type || "—"}</TableCell>
+                          <TableCell className="text-sm">{n.payment_method || "—"}</TableCell>
+                          <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{n.due_date ? format(new Date(n.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">{n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+                          <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem({ ...n, _isPaymentNote: true })}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </>
         );
+      }
 
       case "Reversos":
         return (
@@ -513,12 +609,12 @@ export default function FacturacionPage() {
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar invoice?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminará el invoice #{deleteItem?.invoice_number}.</AlertDialogDescription>
+            <AlertDialogTitle>{deleteItem?._isPaymentNote ? "¿Eliminar nota de pago?" : "¿Eliminar invoice?"}</AlertDialogTitle>
+            <AlertDialogDescription>{deleteItem?._isPaymentNote ? "Se eliminará esta nota de pago permanentemente." : `Se eliminará el invoice #${deleteItem?.invoice_number}.`}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogAction onClick={() => { if (!deleteItem) return; deleteItem._isPaymentNote ? deletePaymentNoteMutation.mutate(deleteItem.id) : deleteMutation.mutate(deleteItem.id); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -69,7 +69,7 @@ export default function NuevaNotaPagoPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["creator-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["payment_notes"] });
       toast({ title: "Nota de pago creada" });
       navigate("/finanzas/facturacion");
     },
