@@ -122,17 +122,26 @@ export default function FacturacionPage() {
     onError: () => toast({ title: "Error al eliminar", variant: "destructive" }),
   });
 
-  const [search, setSearch] = useState("");
+  type TabFilters = { search: string; statusFilter: string; dateFrom?: Date; dateTo?: Date; viewMode: "list" | "grid" };
+  const defaultFilters: TabFilters = { search: "", statusFilter: "", dateFrom: undefined, dateTo: undefined, viewMode: "list" };
+
+  const [filtersByTab, setFiltersByTab] = useState<Record<FacturaTab, TabFilters>>({
+    "Invoices": { ...defaultFilters },
+    "Notas de Pago": { ...defaultFilters },
+    "Reversos": { ...defaultFilters },
+    "Fees & Ajustes": { ...defaultFilters },
+    "Mail": { ...defaultFilters },
+    "Archivo de PagoMundo": { ...defaultFilters },
+  });
   const [facturaTab, setFacturaTab] = useState<FacturaTab>("Invoices");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [viewItem, setViewItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
-  // showCreateModal removed — navigation used instead
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const currentFilters = filtersByTab[facturaTab];
+  const updateFilter = (patch: Partial<TabFilters>) =>
+    setFiltersByTab(prev => ({ ...prev, [facturaTab]: { ...prev[facturaTab], ...patch } }));
 
   const totalPendientes = invoices.filter(i => i.status === "enviada" || i.status === "vencida").length;
   const totalMonto = invoices.reduce((s, i) => s + (Number(i.amount) || 0), 0);
