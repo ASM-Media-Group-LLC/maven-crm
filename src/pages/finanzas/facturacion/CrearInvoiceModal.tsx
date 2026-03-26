@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import kashLogo from "@/assets/kash-logo.png";
 import { useQuery } from "@tanstack/react-query";
-import { Minus, Plus, Maximize } from "lucide-react";
+import { Minus, Plus, Maximize, Check, ChevronsUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
@@ -23,6 +26,7 @@ function fmt(n: number) {
 
 export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }: Props) {
   const [creatorId, setCreatorId] = useState("");
+  const [creatorOpen, setCreatorOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [feeType, setFeeType] = useState("paypal");
   const [customFee, setCustomFee] = useState("");
@@ -58,7 +62,9 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
     queryFn: async () => {
       const { data, error } = await supabase.from("creators").select("id, name, artistic_name").order("name");
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).sort((a, b) =>
+        (a.artistic_name || a.name).localeCompare(b.artistic_name || b.name)
+      );
     },
     enabled: open,
   });
@@ -102,14 +108,34 @@ export default function CrearInvoiceModal({ open, onClose, onSubmit, isPending }
             <div className="space-y-4 overflow-y-auto min-h-0 py-6 pl-6 pr-1">
               <div>
                 <Label>Creador</Label>
-                <Select value={creatorId || undefined} onValueChange={setCreatorId}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar creador" /></SelectTrigger>
-                  <SelectContent>
-                    {creators.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.artistic_name || c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={creatorOpen} onOpenChange={setCreatorOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={creatorOpen} className="w-full justify-between font-normal">
+                      {selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "Seleccionar creador"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[368px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar creador..." />
+                      <CommandList>
+                        <CommandEmpty>No se encontró creador.</CommandEmpty>
+                        <CommandGroup>
+                          {creators.map(c => (
+                            <CommandItem
+                              key={c.id}
+                              value={c.artistic_name || c.name}
+                              onSelect={() => { setCreatorId(c.id); setCreatorOpen(false); }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", creatorId === c.id ? "opacity-100" : "opacity-0")} />
+                              {c.artistic_name || c.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>Monto</Label>
