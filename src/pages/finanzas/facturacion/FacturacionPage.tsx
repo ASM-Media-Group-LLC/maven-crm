@@ -224,13 +224,89 @@ export default function FacturacionPage() {
     </div>
   );
 
+  const renderFilterBar = (extraButtons?: React.ReactNode, showStatusFilter = false) => (
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar creador o número..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      {showStatusFilter && (
+        <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todos</SelectItem>
+            <SelectItem value="borrador">Borrador</SelectItem>
+            <SelectItem value="enviada">Enviada</SelectItem>
+            <SelectItem value="pagada">Pagada</SelectItem>
+            <SelectItem value="parcial">Parcial</SelectItem>
+            <SelectItem value="vencida">Vencida</SelectItem>
+            <SelectItem value="reversada">Reversada</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+      <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
+      <div className="inline-flex items-center rounded-md border border-border">
+        <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
+        <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
+      </div>
+      {extraButtons}
+      {hasFilters && (
+        <Button variant="ghost" size="sm" className="text-xs text-muted-foreground shrink-0" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+          <X className="h-3.5 w-3.5 mr-1" />Limpiar
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderInvoiceGrid = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {filtered.length === 0 ? (
+        <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
+      ) : filtered.map(inv => {
+        const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
+        const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
+        return (
+          <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
+              <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
+            </div>
+            <p className="text-sm font-medium truncate">{creatorName}</p>
+            <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
+            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+              <span>Fee: {fmt(Number(inv.fee_amount) || 0)}</span>
+              <span>{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</span>
+            </div>
+            <div className="flex items-center gap-1 mt-3">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
+              {(inv.status === "borrador" || inv.status === "enviada") && (
+                <>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const renderTabContent = () => {
     switch (facturaTab) {
       case "Notas de Pago":
         return (
           <>
+            {renderFilterBar(
+              <>
+                <Button size="sm" onClick={() => toast({ title: "Crear Nota de Pago", description: "Funcionalidad próximamente" })}><Plus className="h-4 w-4 mr-1" />Crear Nota</Button>
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "notas-pago")}>
+                  <Download className="h-4 w-4 mr-1" />Exportar
+                </Button>
+              </>
+            )}
             <p className="text-sm text-muted-foreground">{filtered.length} invoices pagados o parciales</p>
-            {renderInvoiceTable()}
+            {viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
           </>
         );
 
@@ -366,38 +442,19 @@ export default function FacturacionPage() {
         );
 
       default: // Invoices
-        return viewMode === "list" ? renderInvoiceTable() : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.length === 0 ? (
-              <div className="col-span-full text-center text-muted-foreground py-12">Sin resultados.</div>
-            ) : filtered.map(inv => {
-              const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
-              const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
-              return (
-                <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
-                    <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
-                  </div>
-                  <p className="text-sm font-medium truncate">{creatorName}</p>
-                  <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
-                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                    <span>Fee: {fmt(Number(inv.fee_amount) || 0)}</span>
-                    <span>{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-3">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
-                    {(inv.status === "borrador" || inv.status === "enviada") && (
-                      <>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setReverseItem(inv)}><RotateCcw className="h-3.5 w-3.5" /></Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        return (
+          <>
+            {renderFilterBar(
+              <>
+                <Button size="sm" onClick={() => navigate("/finanzas/facturacion/nuevo")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
+                  <Download className="h-4 w-4 mr-1" />Exportar
+                </Button>
+              </>,
+              true
+            )}
+            {viewMode === "list" ? renderInvoiceTable() : renderInvoiceGrid()}
+          </>
         );
     }
   };
@@ -405,17 +462,9 @@ export default function FacturacionPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <header className="shrink-0 bg-background border-b border-border px-6 pt-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Facturación</h1>
-            <p className="text-sm text-muted-foreground">Gestión de invoices a creadores · {invoices.length} registros</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => navigate("/finanzas/facturacion/nuevo")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
-            <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
-              <Download className="h-4 w-4 mr-1" />Exportar
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Facturación</h1>
+          <p className="text-sm text-muted-foreground">Gestión de invoices a creadores · {invoices.length} registros</p>
         </div>
       </header>
 
@@ -437,38 +486,6 @@ export default function FacturacionPage() {
           {FACTURA_TABS.map(t => (
             <Button key={t} variant={facturaTab === t ? "secondary" : "ghost"} size="sm" onClick={() => { setFacturaTab(t); setBulkSelected([]); }}>{t}</Button>
           ))}
-        </div>
-
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar creador o número..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          {facturaTab === "Invoices" && (
-            <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                <SelectItem value="borrador">Borrador</SelectItem>
-                <SelectItem value="enviada">Enviada</SelectItem>
-                <SelectItem value="pagada">Pagada</SelectItem>
-                <SelectItem value="parcial">Parcial</SelectItem>
-                <SelectItem value="vencida">Vencida</SelectItem>
-                <SelectItem value="reversada">Reversada</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
-          <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
-          </div>
-          {hasFilters && (
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar
-            </Button>
-          )}
         </div>
 
         {renderTabContent()}
