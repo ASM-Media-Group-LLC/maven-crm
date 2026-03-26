@@ -495,21 +495,8 @@ export default function FacturacionPage() {
       <ReversarInvoiceModal open={!!reverseItem} onClose={() => setReverseItem(null)} invoice={reverseItem} onSubmit={(id, reason) => reverseMutation.mutate({ id, reason })} isPending={reverseMutation.isPending} />
 
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Invoice #{viewItem?.invoice_number}</DialogTitle></DialogHeader>
-          {viewItem && (
-            <div className="space-y-3 text-sm">
-              <p><strong>Creador:</strong> {(viewItem as any).creators?.artistic_name || (viewItem as any).creators?.name || "—"}</p>
-              <p><strong>Monto:</strong> {fmt(Number(viewItem.amount) || 0)}</p>
-              <p><strong>Fee ({viewItem.fee_type}):</strong> {fmt(Number(viewItem.fee_amount) || 0)}</p>
-              <p><strong>Neto:</strong> {fmt(Number(viewItem.net_amount) || 0)}</p>
-              <p><strong>Método:</strong> {viewItem.payment_method || "—"}</p>
-              <p><strong>Estado:</strong> {viewItem.status}</p>
-              <p><strong>Vencimiento:</strong> {viewItem.due_date || "—"}</p>
-              {viewItem.notes && <p><strong>Notas:</strong> {viewItem.notes}</p>}
-              {viewItem.reversal_reason && <p><strong>Razón reverso:</strong> {viewItem.reversal_reason}</p>}
-            </div>
-          )}
+        <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button]:hidden">
+          {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
         </DialogContent>
       </Dialog>
 
