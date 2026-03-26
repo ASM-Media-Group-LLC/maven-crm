@@ -1,27 +1,29 @@
 
 
-## Plan: Selector de creador con búsqueda y orden alfabético
+## Plan actualizado: Botones contextuales por tab en Facturación
 
-### Problema
-El dropdown de creador en la página de nuevo invoice usa un `Select` básico sin búsqueda, y los creadores no están ordenados alfabéticamente por nombre artístico.
+### Cambio solicitado
+Agregar botón **"+ Crear Nota"** al tab de **Notas de Pago**, además de "Exportar".
 
-### Cambios en `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`
+### Tabla de botones por tab actualizada
 
-**1. Reemplazar Select por Popover + Command (patrón searchable)**
-- Importar `Popover`, `PopoverTrigger`, `PopoverContent`, `Command`, `CommandInput`, `CommandList`, `CommandEmpty`, `CommandGroup`, `CommandItem`, `Check`, `ChevronsUpDown`.
-- Agregar estado `const [creatorOpen, setCreatorOpen] = useState(false)`.
-- Reemplazar el bloque `<Select>` del creador (líneas 123-130) por el patrón Popover+Command con input de búsqueda, igual al usado en `ContactosFilters` y `EmployeeSearchCombobox`.
+| Tab | Botones |
+|-----|---------|
+| **Invoices** | `+ Crear Invoice`, `Exportar` |
+| **Notas de Pago** | `+ Crear Nota`, `Exportar` |
+| **Reversos** | (sin botones) |
+| **Fees & Ajustes** | (sin botones) |
+| **Mail** | Botón "Enviar" ya existe inline |
+| **Archivo de PagoMundo** | Botón "Generar Archivo" ya existe inline |
 
-**2. Ordenar alfabéticamente**
-- La query ya ordena por `name`. Agregar ordenamiento secundario por `artistic_name` para que la lista visual (que muestra `artistic_name || name`) quede en orden alfabético:
-  ```ts
-  const sorted = [...data].sort((a, b) => 
-    (a.artistic_name || a.name).localeCompare(b.artistic_name || b.name)
-  );
-  ```
+### Cambios en `src/pages/finanzas/facturacion/FacturacionPage.tsx`
 
-**3. Aplicar el mismo cambio en `CrearInvoiceModal.tsx`** (líneas 105-110) para mantener consistencia.
+1. **Eliminar botones globales del header** — quitar "Crear Invoice" y "Exportar" de la barra superior.
+2. **Insertar botones contextuales en la barra de filtros de cada tab**:
+   - Tab Invoices: `+ Crear Invoice` + `Exportar` alineados a la derecha.
+   - Tab Notas de Pago: `+ Crear Nota` + `Exportar` alineados a la derecha. El botón "Crear Nota" abrirá el mismo modal/flujo de creación de nota de pago existente.
+3. **Mantener el mismo estilo visual** que el patrón de Comisiones en `HorasVariablesPage.tsx`.
 
 ### Resultado
-El selector de creador tendrá búsqueda interna y los nombres aparecerán en orden alfabético, siguiendo el patrón establecido en la plataforma.
+Cada tab muestra solo sus botones de acción relevantes, incluyendo "Crear Nota" en Notas de Pago.
 
