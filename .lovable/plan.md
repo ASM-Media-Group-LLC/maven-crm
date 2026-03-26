@@ -1,41 +1,20 @@
 
 
-## Plan: Modal A4 simple sin fondo ni controles
+## Plan: Fix hover transparency in invoice table
 
-### Cambio
-Reemplazar el Dialog de texto (líneas 497-514 de `FacturacionPage.tsx`) por un modal limpio que solo muestre el documento A4 centrado, sin fondo gris, sin controles de zoom, sin header de "Vista previa".
+### Problem
+The `TableRow` component uses `hover:bg-muted/50` (semi-transparent) which causes see-through effects. The sticky actions column uses `group-hover:bg-muted/30` which is also semi-transparent, letting the "Vencimiento" column bleed through.
 
-### Implementación en `FacturacionPage.tsx`
+### Changes
 
-Reemplazar el `<Dialog>` actual por uno con:
-- `max-w-fit` y fondo transparente (`bg-transparent shadow-none border-none`)
-- Sin `DialogHeader` / `DialogTitle`
-- Solo el div A4 (595x842) con el template del invoice idéntico al de `CrearInvoiceModal.tsx`
-- Zoom fijo (ej. 0.85) para que quepa en el viewport sin scroll
-- El A4 se centra automáticamente por el layout del `DialogContent`
+**1. `src/components/ui/table.tsx` (line 41)**
+- Change `hover:bg-muted/50` → `hover:bg-muted` (fully opaque hover background).
 
-### Archivos
+**2. `src/pages/finanzas/facturacion/FacturacionPage.tsx` (line 208)**
+- Change `sticky right-0 bg-card group-hover:bg-muted/30` → `sticky right-0 bg-card group-hover:bg-muted` on the actions `TableCell` so it matches the row hover exactly and stays fully opaque.
 
-| Archivo | Acción |
-|---------|--------|
-| `InvoiceA4Preview.tsx` | **Crear** — componente puro que recibe datos del invoice y renderiza el A4 (extraído del template en `CrearInvoiceModal`) |
-| `FacturacionPage.tsx` | **Editar** — reemplazar Dialog líneas 497-514 por modal limpio con `InvoiceA4Preview` |
+**3. `src/pages/finanzas/facturacion/FacturacionPage.tsx` (line 176)**
+- Ensure the sticky header actions cell also has a solid `bg-card` with proper z-index (already correct).
 
-### Detalle del componente `InvoiceA4Preview`
-
-Props: `{ invoice: { invoice_number, amount, fee_type, fee_amount, net_amount, payment_method, due_date, notes, status, creators?: { name, artistic_name } }, createdAt?: string }`
-
-Renderiza exactamente el mismo template A4 del `CrearInvoiceModal`: logo KASH, header corporativo, Bill to, tabla de servicios, fee, neto, notas, footer. Solo lectura, sin formulario.
-
-### Detalle del modal en `FacturacionPage`
-
-```tsx
-<Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-  <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0">
-    <InvoiceA4Preview invoice={viewItem} />
-  </DialogContent>
-</Dialog>
-```
-
-El A4 se renderiza a escala fija (0.85) directamente centrado en el overlay del dialog.
+Two files, two single-line edits each.
 
