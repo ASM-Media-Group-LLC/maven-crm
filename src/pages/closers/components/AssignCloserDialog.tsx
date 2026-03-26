@@ -36,7 +36,7 @@ const AssignCloserDialog = ({ creatorId, currentAssignee, open, onOpenChange, on
       const { data, error } = await supabase
         .from("user_roles")
         .select("user_id")
-        .eq("role", "closer");
+        .in("role", ["closer", "admin", "supervisor"]);
       if (error) throw error;
       const userIds = data.map((r) => r.user_id);
       if (userIds.length === 0) return [];
