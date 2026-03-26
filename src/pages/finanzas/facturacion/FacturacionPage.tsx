@@ -205,7 +205,7 @@ export default function FacturacionPage() {
                   <TableCell className="text-sm font-medium">{fmt(Number(inv.net_amount) || 0)}</TableCell>
                   <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</TableCell>
-                  <TableCell className="sticky right-0 bg-card group-hover:bg-muted/30">
+                  <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                     <div className="flex items-center gap-1">
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
                       {canEdit && (
