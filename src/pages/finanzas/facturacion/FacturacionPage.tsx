@@ -431,38 +431,6 @@ export default function FacturacionPage() {
           ))}
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Buscar creador o número..." className="pl-8" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          {facturaTab === "Invoices" && (
-            <Select value={statusFilter || undefined} onValueChange={v => setStatusFilter(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="Estado" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                <SelectItem value="borrador">Borrador</SelectItem>
-                <SelectItem value="enviada">Enviada</SelectItem>
-                <SelectItem value="pagada">Pagada</SelectItem>
-                <SelectItem value="parcial">Parcial</SelectItem>
-                <SelectItem value="vencida">Vencida</SelectItem>
-                <SelectItem value="reversada">Reversada</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          <DateRangePicker from={dateFrom} to={dateTo} onApply={(f, t) => { setDateFrom(f); setDateTo(t); }} />
-          <div className="inline-flex items-center rounded-md border border-border">
-            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-r-none" onClick={() => setViewMode("list")}><List className="h-4 w-4" /></Button>
-            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="sm" className="h-8 w-8 p-0 rounded-l-none" onClick={() => setViewMode("grid")}><LayoutGrid className="h-4 w-4" /></Button>
-          </div>
-          {hasFilters && (
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setSearch(""); setStatusFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
-              <X className="h-3.5 w-3.5 mr-1" />Limpiar
-            </Button>
-          )}
-        </div>
-
         {renderTabContent()}
       </div>
 
