@@ -6,10 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Trash2 } from "lucide-react";
 import { PLATFORMS } from "../hooks/useCloserLeads";
 
 interface PlatformSale {
@@ -31,10 +30,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
-  const [platform, setPlatform] = useState("");
-  const [product, setProduct] = useState("");
-  const [price, setPrice] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string>>({});
 
   const { data: sales = [] } = useQuery({
     queryKey: ["closer-platform-sales", creatorId],
@@ -50,27 +46,29 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
     enabled: !!creatorId && open,
   });
 
-  const addSale = useMutation({
+  const existingPlatforms = new Set(sales.map((s) => s.platform));
+  const availablePlatforms = PLATFORMS.filter((p) => !existingPlatforms.has(p));
+  const selectedCount = Object.keys(selectedPlatforms).length;
+
+  const addSales = useMutation({
     mutationFn: async () => {
-      if (!user || !platform) throw new Error("Datos incompletos");
-      const { error } = await supabase.from("closer_platform_sales").insert({
+      if (!user) throw new Error("No autenticado");
+      const entries = Object.entries(selectedPlatforms).map(([platform, price]) => ({
         creator_id: creatorId,
         platform,
-        product: product || null,
         price: Number(price) || 0,
         created_by: user.id,
-      });
+      }));
+      if (entries.length === 0) throw new Error("Sin plataformas seleccionadas");
+      const { error } = await supabase.from("closer_platform_sales").insert(entries);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales", creatorId] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-revenue"] });
       queryClient.invalidateQueries({ queryKey: ["closer-platform-sales-all"] });
-      setShowForm(false);
-      setPlatform("");
-      setProduct("");
-      setPrice("");
-      toast({ title: "Venta registrada" });
+      setSelectedPlatforms({});
+      toast({ title: "Ventas registradas" });
     },
     onError: (e: Error) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -89,6 +87,15 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
     },
   });
 
+  const togglePlatform = (platform: string, checked: boolean) => {
+    setSelectedPlatforms((prev) => {
+      if (checked) return { ...prev, [platform]: "" };
+      const next = { ...prev };
+      delete next[platform];
+      return next;
+    });
+  };
+
   const total = sales.reduce((sum, s) => sum + Number(s.price || 0), 0);
 
   return (
@@ -100,56 +107,66 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-          {sales.length === 0 && !showForm && (
-            <p className="text-sm text-muted-foreground text-center py-4">Sin ventas registradas</p>
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {sales.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Registradas</p>
+              {sales.map((s) => (
+                <div key={s.id} className="flex items-center justify-between text-sm border border-border rounded-md px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">{s.platform}</Badge>
+                    {s.product && <span className="text-muted-foreground text-xs">– {s.product}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">${Number(s.price).toLocaleString()}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSale.mutate(s.id)}>
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
-          {sales.map((s) => (
-            <div key={s.id} className="flex items-center justify-between text-sm border border-border rounded-md px-3 py-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">{s.platform}</Badge>
-                {s.product && <span className="text-muted-foreground text-xs">– {s.product}</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">${Number(s.price).toLocaleString()}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteSale.mutate(s.id)}>
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-            </div>
-          ))}
+          {availablePlatforms.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agregar plataformas</p>
+              {availablePlatforms.map((p) => {
+                const isSelected = p in selectedPlatforms;
+                return (
+                  <div key={p} className="flex items-center gap-3 py-1">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(checked) => togglePlatform(p, !!checked)}
+                      id={`plat-${p}`}
+                    />
+                    <label htmlFor={`plat-${p}`} className="text-sm flex-1 cursor-pointer">{p}</label>
+                    {isSelected && (
+                      <Input
+                        type="number"
+                        placeholder="$0"
+                        value={selectedPlatforms[p]}
+                        onChange={(e) => setSelectedPlatforms((prev) => ({ ...prev, [p]: e.target.value }))}
+                        className="h-7 w-24 text-xs"
+                        autoFocus
+                      />
+                    )}
+                  </div>
+                );
+              })}
 
-          {!showForm ? (
-            <Button variant="outline" size="sm" onClick={() => setShowForm(true)} className="w-full">
-              <Plus className="h-3 w-3 mr-1" /> Agregar venta
-            </Button>
-          ) : (
-            <div className="border border-border rounded-md p-3 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">Plataforma</Label>
-                  <Select value={platform} onValueChange={setPlatform}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="..." /></SelectTrigger>
-                    <SelectContent>
-                      {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+              {selectedCount > 0 && (
+                <div className="flex justify-end pt-1">
+                  <Button size="sm" className="h-7 text-xs" onClick={() => addSales.mutate()} disabled={addSales.isPending}>
+                    Guardar ({selectedCount})
+                  </Button>
                 </div>
-                <div>
-                  <Label className="text-xs">Producto</Label>
-                  <Input value={product} onChange={(e) => setProduct(e.target.value)} className="h-8 text-xs" placeholder="Opcional..." />
-                </div>
-                <div>
-                  <Label className="text-xs">Precio</Label>
-                  <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="h-8 text-xs" placeholder="0" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-1">
-                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancelar</Button>
-                <Button size="sm" className="h-7 text-xs" onClick={() => addSale.mutate()} disabled={!platform || addSale.isPending}>Guardar</Button>
-              </div>
+              )}
             </div>
+          )}
+
+          {sales.length === 0 && availablePlatforms.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">Todas las plataformas ya registradas</p>
           )}
         </div>
 
