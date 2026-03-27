@@ -21,6 +21,7 @@ import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import StatusPicker, { getStatusColor } from "./components/StatusPicker";
 import DeleteChatDialog from "./components/DeleteChatDialog";
 import SpacesPanel from "./components/SpacesPanel";
@@ -150,7 +151,7 @@ export default function ChatSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full bg-card/50">
+    <div className="flex flex-col h-full bg-card/50 overflow-hidden">
       {/* Header — M3 tonal surface */}
       <div className="shrink-0 px-3 sm:px-4 pt-3 pb-2 space-y-2.5 bg-primary/[0.03]">
         <div className="flex items-center justify-between">
@@ -262,6 +263,7 @@ export default function ChatSidebar({
                       onDragEnd={handleDragEnd}
                       spaces={spaces}
                       onAddToSpace={onAddConversationToSpace}
+                      isSystemAdmin={isAdmin}
                     />
                   ))
                 )}
@@ -554,7 +556,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
             </ContextMenuSubContent>
           </ContextMenuSub>
         )}
-        {(!isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
+        {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
           <ContextMenuItem
             onClick={onDelete}
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
