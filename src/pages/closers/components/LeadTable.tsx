@@ -18,6 +18,11 @@ import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
 
+interface PlatformSaleSummary {
+  platform: string;
+  price: number;
+}
+
 interface Props {
   creators: CloserCreatorRow[];
   activeTab: string;
@@ -28,6 +33,7 @@ interface Props {
   onConvertToCreator?: (creator: CloserCreatorRow) => void;
   isAdmin: boolean;
   sourceAccounts: string[];
+  platformSalesByCreator?: Record<string, PlatformSaleSummary[]>;
 }
 
 const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
@@ -719,15 +725,24 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
             <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
-            <TableCell>
-              <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
-                <SelectTrigger className="h-7 w-28 text-xs">
-                  <SelectValue placeholder="Plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <TableCell
+              className="cursor-pointer hover:bg-muted/50 rounded"
+              onClick={() => setPlatformModalId(c.id)}
+            >
+              <div className="flex flex-wrap gap-1">
+                {(platformSalesByCreator?.[c.id] || []).length > 0 ? (
+                  <>
+                    {(platformSalesByCreator?.[c.id] || []).slice(0, 2).map((s, i) => (
+                      <Badge key={i} variant="secondary" className="text-[10px] h-5">{s.platform}: ${s.price}</Badge>
+                    ))}
+                    {(platformSalesByCreator?.[c.id] || []).length > 2 && (
+                      <Badge variant="outline" className="text-[10px] h-5">+{(platformSalesByCreator?.[c.id] || []).length - 2}</Badge>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Agregar...</span>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
