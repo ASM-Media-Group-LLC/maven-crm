@@ -17,6 +17,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+const Concept = lazy(() => import("./pages/Concept"));
 
 // Lazy-loaded pages
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
