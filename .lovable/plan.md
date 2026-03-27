@@ -1,29 +1,28 @@
 
 
-## Plan: Mejorar UI del sidebar del Messenger + verificar audio en videollamadas
+## Plan: Corregir sidebar cortado + permitir a admins eliminar cualquier conversación
 
-### Problema 1: Cards de conversación cortadas en el sidebar
-
-En la screenshot se ve que las conversation cards del sidebar se cortan en la parte inferior. El `ChatSidebar` usa `ScrollArea className="flex-1"` (línea 190), pero el contenido dentro del ScrollArea no tiene padding inferior suficiente, por lo que la última conversación queda parcialmente oculta detrás del borde del viewport.
+### Problema 1: Sidebar cortado
+El `ScrollArea` con `className="flex-1"` no funciona correctamente porque el contenedor padre `div.flex.flex-col.h-full` necesita `overflow-hidden` para que el flex-1 del ScrollArea se calcule bien y no se desborde.
 
 ### Solución sidebar
+En `ChatSidebar.tsx` línea 153, agregar `overflow-hidden` al contenedor principal:
+```
+<div className="flex flex-col h-full bg-card/50 overflow-hidden">
+```
 
-**En `ChatSidebar.tsx`:**
-- Agregar `pb-6` al `div` interior del `ScrollArea` (línea 191, actualmente `pb-2`) para dar espacio de respiro al final del scroll
-- Asegurar que el `ScrollArea` tenga `overflow-hidden` en su wrapper para evitar desbordamiento visual
+### Problema 2: Admins no pueden eliminar conversaciones
+En `ConversationItem` (línea 557), la opción de eliminar solo aparece si NO es grupo o si el usuario es admin **del grupo**. Un admin del sistema (rol `admin` en `user_roles`) no tiene acceso especial.
 
-### Problema 2: Audio en videollamadas
+### Solución admin delete
+1. Pasar `isAdmin` (del `useUserRole`) como prop desde `ChatSidebar` hasta `ConversationItem`
+2. En la condición de línea 557, agregar `|| isAdmin` para que admins del sistema siempre vean la opción de eliminar
 
-El código actual del audio en `ParticipantTile.tsx` ya fue corregido con el `AudioContext` compartido singleton. Sin embargo, hay un problema potencial: el `GainNode` y el pipeline se crean pero **no se almacenan en refs**, por lo que no pueden limpiarse individualmente. Solo `gainSourceRef` (el source node) se guarda, pero el `GainNode` se pierde.
-
-### Solución audio
-
-**En `ParticipantTile.tsx`:**
-- Agregar un `gainNodeRef` para almacenar el `GainNode` y poder desconectarlo en cleanup
-- En el cleanup (línea 338), desconectar tanto `gainSourceRef` como `gainNodeRef`
-- Agregar un log de debug temporal (`console.debug`) al attach de audio para facilitar verificación
+Flujo de props:
+- `ChatSidebar` ya usa `useAuth`, agregar `useUserRole` para obtener `isAdmin`
+- Pasar `isAdmin` a cada `ConversationItem`
+- Cambiar condición: `{(isSystemAdmin || !isGroup || conversation.participants.find(...)) && ...}`
 
 ### Archivos
-- **Modificar**: `src/pages/messenger/ChatSidebar.tsx` — padding inferior del ScrollArea
-- **Modificar**: `src/pages/messenger/videocall/ParticipantTile.tsx` — cleanup correcto del GainNode
+- **Modificar**: `src/pages/messenger/ChatSidebar.tsx`
 
