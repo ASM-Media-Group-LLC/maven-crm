@@ -2,6 +2,41 @@ import { useEffect, useRef, memo, useCallback, useState } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX } from "lucide-react";
+
+// ── Shared AudioContext singleton ────────────────────────────────
+let sharedAudioCtx: AudioContext | null = null;
+let sharedAudioCtxRefCount = 0;
+
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof AudioContext === "undefined") return null;
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+    sharedAudioCtx = new AudioContext();
+    const resumeOnInteraction = () => {
+      if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
+        sharedAudioCtx.resume().catch(() => {});
+      }
+    };
+    document.addEventListener("click", resumeOnInteraction, { once: false });
+    document.addEventListener("touchstart", resumeOnInteraction, { once: false });
+  }
+  return sharedAudioCtx;
+}
+
+function acquireSharedAudioContext(): AudioContext | null {
+  sharedAudioCtxRefCount++;
+  return getSharedAudioContext();
+}
+
+function releaseSharedAudioContext() {
+  sharedAudioCtxRefCount--;
+  if (sharedAudioCtxRefCount <= 0) {
+    sharedAudioCtxRefCount = 0;
+    if (sharedAudioCtx && sharedAudioCtx.state !== "closed") {
+      try { sharedAudioCtx.close(); } catch {}
+    }
+    sharedAudioCtx = null;
+  }
+}
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";
@@ -95,7 +130,6 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
@@ -131,32 +165,32 @@ const ParticipantTile = memo(function ParticipantTile({
         attachedAudioTrackRef.current = audioTrack.track;
         audioEl.volume = 1;
 
-        // ── Output gain boost (1.4x ≈ +3dB) to match Google Meet levels ──
+        // ── Output gain boost (1.4x ≈ +3dB) via shared AudioContext ──
         try {
           // Clean up previous gain pipeline
           if (gainSourceRef.current) {
             try { gainSourceRef.current.disconnect(); } catch {}
             gainSourceRef.current = null;
           }
-          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-            try { audioCtxRef.current.close(); } catch {}
+
+          const ctx = getSharedAudioContext();
+
+          // Only apply gain boost if AudioContext is available and running
+          if (ctx && ctx.state === "running") {
+            const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
+            gainSourceRef.current = source;
+            const gainNode = ctx.createGain();
+            gainNode.gain.value = 1.4;
+            const destination = ctx.createMediaStreamDestination();
+
+            source.connect(gainNode);
+            gainNode.connect(destination);
+
+            audioEl.srcObject = destination.stream;
+          } else if (ctx) {
+            // Try to resume; audio plays at normal volume meanwhile
+            ctx.resume().catch(() => {});
           }
-
-          const ctx = new AudioContext();
-          audioCtxRef.current = ctx;
-
-          if (ctx.state === "suspended") ctx.resume().catch(() => {});
-
-          const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
-          gainSourceRef.current = source;
-          const gainNode = ctx.createGain();
-          gainNode.gain.value = 1.4;
-          const destination = ctx.createMediaStreamDestination();
-
-          source.connect(gainNode);
-          gainNode.connect(destination);
-
-          audioEl.srcObject = destination.stream;
         } catch {
           // Fallback: keep original stream without boost
         }
@@ -282,11 +316,13 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => {
+    // Acquire shared context ref count on mount
+    acquireSharedAudioContext();
+
     const videoElRef = videoRef;
     const audioElRef = audioRef;
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
-    const audioCtx = audioCtxRef;
     const gainSource = gainSourceRef;
     return () => {
       if (attachedVideo.current) {
@@ -303,10 +339,8 @@ const ParticipantTile = memo(function ParticipantTile({
         try { gainSource.current.disconnect(); } catch {}
         gainSource.current = null;
       }
-      if (audioCtx.current && audioCtx.current.state !== "closed") {
-        try { audioCtx.current.close(); } catch {}
-        audioCtx.current = null;
-      }
+      // Release shared AudioContext (closes when last participant unmounts)
+      releaseSharedAudioContext();
     };
   }, []);
 
