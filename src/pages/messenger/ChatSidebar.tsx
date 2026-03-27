@@ -188,7 +188,7 @@ export default function ChatSidebar({
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="pb-2">
+        <div className="pb-6">
           {/* Quick access section */}
           <CollapsibleSection label="Acceso Rápido" defaultOpen>
             <div className="px-2 pb-1">

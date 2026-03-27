@@ -131,6 +131,7 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
   const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
@@ -171,6 +172,10 @@ const ParticipantTile = memo(function ParticipantTile({
           if (gainSourceRef.current) {
             try { gainSourceRef.current.disconnect(); } catch {}
             gainSourceRef.current = null;
+          }
+          if (gainNodeRef.current) {
+            try { gainNodeRef.current.disconnect(); } catch {}
+            gainNodeRef.current = null;
           }
 
           const ctx = getSharedAudioContext();
