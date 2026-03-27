@@ -357,8 +357,9 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
-const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [platformModalId, setPlatformModalId] = useState<string | null>(null);
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
