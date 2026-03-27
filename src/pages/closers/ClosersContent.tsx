@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, UserPlus, LayoutGrid, List } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
-import { useCloserLeads, PLATFORMS, type DateFieldType } from "./hooks/useCloserLeads";
+import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
@@ -36,9 +39,29 @@ const ClosersContent = () => {
     isAdmin, isManager,
   } = useCloserLeads();
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const handleConvertToCreator = async (c: CloserCreatorRow) => {
+    try {
+      const { error } = await supabase.from("creators").insert({
+        name: c.instagram_handle,
+        instagram_handle: c.instagram_handle,
+        category: c.category,
+        phone: c.phone,
+        notes: c.notes,
+        closer_responsible_id: c.assigned_to,
+      });
+      if (error) throw error;
+      toast({ title: "Creadora creada", description: `${c.instagram_handle} fue convertida a creadora.` });
+      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
 
@@ -213,6 +236,7 @@ const ClosersContent = () => {
                   }
                 }}
                 onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
+                onConvertToCreator={handleConvertToCreator}
                 onAssign={(id, assignee, source) => {
                   setAssignTarget({ id, assignee, source: source || "closer" });
                   setAssignDialogOpen(true);
