@@ -1,40 +1,20 @@
 
 
-## Plan: Simplificar modal de comisiones con porcentaje automático del creador
+## Plan: Mejorar layout de Creadores — KPI cards + scroll de tabla
 
-### Cambios en `NuevaComisionModal.tsx`
+### Cambios
 
-**1. Campos del formulario (solo estos):**
-- Creador (combobox)
-- Fecha Inicio / Fecha Fin
-- Ganancia Total (USD)
-- Observaciones
+**1. Integrar "Total Creadoras" como primera card en la fila de KPIs**
+En `CreadoresKPICards.tsx`: eliminar la `Card` separada de "Total de Creadoras" (líneas 39-47) y añadirla como primer elemento del array `cards` con icono `Users`, estilo neutral similar al de Closers.
 
-**2. Eliminar campos:**
-- Nombre del Periodo
-- Tipo de Comisión / Porcentaje / Valor Fijo (inputs manuales)
-- Estado de Pago, Fecha de Pago, Método de Pago
+**2. Cambiar layout de contenido a flex con scroll interno (como Contactos)**
+En `CreadoresContent.tsx`: reemplazar el `div.overflow-auto` general por un layout flex donde:
+- KPI cards, tabs de agencia, filtros → `shrink-0`
+- `DataTableShell` → `className="flex-1 min-h-0"` (scroll interno, no scroll de página)
 
-**3. Obtener porcentaje automáticamente:**
-- Al seleccionar creador, query a `creator_business` para obtener `agency_percentage`
-- Mostrar en el cálculo automático como solo lectura (sin input editable)
+Esto replica el patrón de Contactos donde la tabla ocupa el espacio restante con scroll propio y el paginador siempre es visible.
 
-**4. Cálculo automático (nueva lógica):**
-```
-Ganancia de la Creadora:    $X    (= ganancia total ingresada)
-Comisión (Y%):              Y%    (= agency_percentage del creador, solo se muestra el %)
-Valor para la Empresa:      $W    (= ganancia total × agency_percentage / 100)
-```
-
-- "Comisión" solo muestra el porcentaje asignado al creador, no calcula un valor monetario propio
-- "Valor para la Empresa" = `base * (agency_percentage / 100)`
-- Si el creador no tiene porcentaje configurado, mostrar mensaje indicándolo
-
-**5. Submit simplificado:**
-- `commission_type` = `"percentage"`, `percentage` = `agency_percentage`, `status` = `"pendiente"`
-- `estimated_amount` = valor para la empresa
-- Se eliminan campos de pago del payload
-
-### Archivo a modificar
-- `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`
+### Archivos
+- **Modificar**: `src/pages/creadores/CreadoresKPICards.tsx`
+- **Modificar**: `src/pages/creadores/CreadoresContent.tsx`
 
