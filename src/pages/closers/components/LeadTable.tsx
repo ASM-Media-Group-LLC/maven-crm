@@ -25,6 +25,7 @@ interface Props {
   onStageChange: (id: string, stage: string, source?: "closer" | "leadgen") => void;
   onFieldChange: (id: string, field: string, value: any) => void;
   onAssign: (id: string, currentAssignee: string | null, source?: "closer" | "leadgen") => void;
+  onConvertToCreator?: (creator: CloserCreatorRow) => void;
   isAdmin: boolean;
   sourceAccounts: string[];
 }
