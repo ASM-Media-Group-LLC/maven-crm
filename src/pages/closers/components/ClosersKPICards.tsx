@@ -65,7 +65,7 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }:
       </div>
 
       {/* Revenue */}
-      <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
+      <div className="grid grid-cols-3 gap-3 md:grid-cols-9">
         {revenueCards.map((card) => (
           <Card key={card.label} className={`transition-all duration-200 hover:scale-[1.02] ${card.highlight ? "border-primary/30" : ""}`}>
             <CardContent className="p-3">
