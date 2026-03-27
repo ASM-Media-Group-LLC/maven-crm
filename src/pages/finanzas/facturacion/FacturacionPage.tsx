@@ -27,6 +27,7 @@ import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
+import ComisionesTab from "../comisiones/ComisionesTab";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
@@ -39,7 +40,7 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
   reversada: { variant: "destructive", label: "Reversada" },
 };
 
-const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Fees & Ajustes", "Mail", "Archivo de PagoMundo"] as const;
+const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
 
 function fmt(n: number) {
@@ -162,7 +163,7 @@ export default function FacturacionPage() {
     "Invoices": { ...defaultFilters },
     "Notas de Pago": { ...defaultFilters },
     "Reversos": { ...defaultFilters },
-    "Fees & Ajustes": { ...defaultFilters },
+    "Comisiones": { ...defaultFilters },
     "Mail": { ...defaultFilters },
     "Archivo de PagoMundo": { ...defaultFilters },
   });
@@ -456,54 +457,12 @@ export default function FacturacionPage() {
           </>
         );
 
-      case "Fees & Ajustes":
-        return (
-          <>
-            {configuredPaymentMethods.length > 0 && (
-              <div className="rounded-lg border border-border p-4 mb-4 space-y-2">
-                <p className="text-sm font-medium">Métodos de Pago Configurados</p>
-                <div className="flex flex-wrap gap-2">
-                  {configuredPaymentMethods.filter(m => m.active).map(m => (
-                    <Badge key={m.name} variant="secondary" className="text-xs">
-                      {m.name} · {m.commission_pct}%
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            <p className="text-sm text-muted-foreground">Detalle de fees aplicados a invoices</p>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="sticky top-0 z-10 bg-card border-b">
-                      <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Tipo Fee</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Fee</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Monto Neto</TableHead>
-                      <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoices.filter(i => Number(i.fee_amount) > 0).length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin fees registrados.</TableCell></TableRow>
-                    ) : invoices.filter(i => Number(i.fee_amount) > 0).map(inv => (
-                      <TableRow key={inv.id} className="hover:bg-muted/30">
-                        <TableCell className="text-sm font-mono">#{inv.invoice_number}</TableCell>
-                        <TableCell className="text-sm">{(inv as any).creators?.artistic_name || (inv as any).creators?.name || "—"}</TableCell>
-                        <TableCell className="text-sm">{inv.fee_type || "PayPal"}</TableCell>
-                        <TableCell className="text-sm font-medium text-destructive">{fmt(Number(inv.fee_amount) || 0)}</TableCell>
-                        <TableCell className="text-sm font-medium">{fmt(Number(inv.net_amount) || 0)}</TableCell>
-                        <TableCell><Badge variant={STATUS_BADGE[inv.status]?.variant || "outline"}>{STATUS_BADGE[inv.status]?.label || inv.status}</Badge></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </>
-        );
+      case "Comisiones":
+        return <ComisionesTab
+          renderFilterBar={renderFilterBar}
+          currentFilters={currentFilters}
+          setDeleteItem={setDeleteItem}
+        />;
 
       case "Mail":
         return (
