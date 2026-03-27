@@ -26,6 +26,7 @@ import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 // CrearInvoiceModal removed — now uses /finanzas/facturacion/nuevo
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
+import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
@@ -167,6 +168,7 @@ export default function FacturacionPage() {
   });
   const [facturaTab, setFacturaTab] = useState<FacturaTab>("Invoices");
   const [viewItem, setViewItem] = useState<any>(null);
+  const [viewNoteItem, setViewNoteItem] = useState<any>(null);
   const [deleteItem, setDeleteItem] = useState<any>(null);
   const [reverseItem, setReverseItem] = useState<any>(null);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
@@ -403,7 +405,10 @@ export default function FacturacionPage() {
                           <TableCell className="text-sm whitespace-nowrap">{n.due_date ? format(new Date(n.due_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
                           <TableCell className="text-sm whitespace-nowrap">{n.created_at ? format(new Date(n.created_at), "dd/MM/yyyy") : "—"}</TableCell>
                           <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
-                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem({ ...n, _isPaymentNote: true })}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                            <div className="flex items-center gap-1">
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem({ ...n, _isPaymentNote: true })}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -605,6 +610,14 @@ export default function FacturacionPage() {
           className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
         >
           {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewNoteItem} onOpenChange={() => setViewNoteItem(null)}>
+        <DialogContent
+          className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
+        >
+          {viewNoteItem && <PaymentNoteA4Preview note={viewNoteItem} />}
         </DialogContent>
       </Dialog>
 
