@@ -1,68 +1,68 @@
 
 
-## Plan: Crear página /concept con features completas + pricing
+## Plan: Corregir lógica de revenue en Stats Cards
 
-### Resumen
-Crear una nueva página pública en `/concept` que sirva como documento de concepto comercial de Maven/Univen. Incluirá un desglose profundo de todos los módulos y sub-funciones de la plataforma (lo que ya existe y lo que está en desarrollo), objetivos de marketing, y una sección de pricing para agencias.
+### Diagnóstico
 
-### Estructura de la página
+Actualmente las KPI cards de revenue funcionan así:
 
-La página usará el mismo estilo dark de la landing (fondo `hsl(240,10%,2%)`, glass cards, ScrollReveal) pero con contenido mucho más detallado.
+1. **`platformRevenue`** — viene de `closer_platform_sales`, sumando `price` por plataforma. Esto alimenta las cards: OnlyFans, LeakHunter, Blu, Trafix, ORA, Piclink.
+2. **"Rev. OnlyFans"** — muestra `platformRevenue["OnlyFans"]`, que son las ventas registradas en `closer_platform_sales` con platform="OnlyFans".
+3. **"Rev. Plataformas"** — suma todo excepto OnlyFans (LeakHunter + Blu + Trafix + ORA + Piclink).
 
-**Secciones:**
+### Problema
 
-1. **Hero** - Branding Maven CRM + tagline comercial + badge "Concept Document"
-2. **Resumen ejecutivo** - Qué es Maven, para quién, propuesta de valor
-3. **Módulos con sub-funciones** - Los 12+ módulos, cada uno expandido con sus features específicas:
+- **"Rev. OnlyFans"** debería reflejar la **monetización estimada** (`estimated_monetization`) de los contactos completados, que es el ingreso que genera la creadora en OnlyFans. Actualmente solo muestra lo registrado en `closer_platform_sales` como "OnlyFans", que es redundante.
+- El campo `estimated_monetization` en la tabla de completadas representa el revenue de OF de ese contacto, pero no se refleja en ninguna KPI card.
+- Las ventas por plataforma (`closer_platform_sales`) registran ventas de servicios complementarios (Blu, Piclink, etc.), no la monetización principal de OF.
 
-   | Modulo | Sub-funciones |
-   |--------|--------------|
-   | **Dashboard** | KPIs globales, announcements, métricas en tiempo real, Clari AI FAB |
-   | **Gestión de Creadores** | Perfiles 360, tabs (Info, Operaciones, Lineamientos, Redes, Monetización, Documentos, Notas, Tickets, Historial), onboarding wizard, offboarding, verificación, export PDF, cambio de status, prospectos |
-   | **Creator Sales** | Sales Overview con KPIs, comparativas, top 10, subiendo/bajando, alto potencial, en riesgo, earnings por creador, heatmaps, trends, chargebacks |
-   | **AI Sales Chat** | Asistente IA para chatters, conversaciones persistentes, configuración |
-   | **Contactos** | CRM de contactos, grid/table view, creación rápida |
-   | **Closers** | Pipeline de cierre (Nuevas, Asignadas, Completadas), ventas por plataforma multi-producto, monetización inline, conversión a creadora, KPI cards con revenue por plataforma |
-   | **LeadGen & Marketing** | Captura de leads, base de datos, calificación, conversión, performance por agente, supervisor view |
-   | **Promolog** | Registro diario de promociones por creador, grid/table |
-   | **Eventos** | Creación, invitados, checklist, links compartibles, agenda compartida, calendario, cierre de evento |
-   | **Tareas & Proyectos** | Kanban + lista, subtareas, asignaciones, proyectos, carpetas, compartir externo, countdown, prioridades inline |
-   | **Messenger** | Chat real-time, rooms, archivos, reacciones, video rooms |
-   | **Video Calls** | Videollamadas integradas, cowork/lobby |
-   | **Tickets de Soporte** | Sistema de tickets, prioridades, comentarios, filtros |
-   | **HR & RRHH** | Dashboard HR, directorio, onboarding, offboarding, nómina, vacaciones, asistencia, permisos, ausencias, incidencias, monitoreo, capacitación (chatters + tech), performance, horarios, hora bank, overtime, organigrama, applicants, deducciones, announcements |
-   | **Finanzas** | Dashboard financiero, facturación (invoices A4 + notas de pago A4), comisiones, nómina, control financiero, cobranzas, reportes, horas/horas variables, configuración |
-   | **Admin** | Gestión de usuarios, roles custom, permisos granulares por módulo, auditoría |
-   | **Notificaciones** | Sistema de notificaciones global |
-   | **Design System** | Documentación interna de componentes |
-   | **Roadmap** | Roadmap público del producto |
+### Cambios propuestos
 
-4. **Objetivos de marketing** - Audiencia target, propuesta de valor, diferenciadores
-5. **Pricing** - 3 tiers (Starter, Professional, Enterprise) con tabla de features por plan
-6. **CTA final** - Contacto / demo
+**Archivo: `src/pages/closers/hooks/useCloserLeads.ts`**
 
-### Archivos
+Agregar una nueva query que sume `estimated_monetization` de todos los contactos en stage "Completada" (y opcionalmente "Confirmada"), para obtener el total de revenue de OnlyFans:
 
-- **Crear**: `src/pages/Concept.tsx` — Página principal con todas las secciones
-- **Modificar**: `src/App.tsx` — Agregar ruta pública `/concept`
-
-La página será un solo archivo largo (~400-500 líneas) con datos hardcodeados, reutilizando los componentes existentes (ScrollReveal, Logo, AnimatedGradientBackground, Badge, Button, Accordion).
-
-### Detalle técnico del pricing (propuesta)
-
-```text
-┌─────────────┬─────────────┬─────────────┐
-│   Starter   │Professional │ Enterprise  │
-│  $299/mo    │  $799/mo    │  Custom     │
-├─────────────┼─────────────┼─────────────┤
-│ 5 módulos   │ 12 módulos  │ Ilimitado   │
-│ 25 creators │ 100 creators│ Ilimitado   │
-│ 5 users     │ 25 users    │ Ilimitado   │
-│ Basic AI    │ Full AI     │ Custom AI   │
-│ Email       │ Priority    │ Dedicated   │
-│ support     │ support     │ support     │
-└─────────────┴─────────────┴─────────────┘
+```ts
+const { data: ofMonetizationTotal = 0 } = useQuery({
+  queryKey: ["closer-of-monetization", user?.id, role],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("closer_creators")
+      .select("estimated_monetization")
+      .in("stage", ["Completada", "Confirmada"]);
+    if (error) throw error;
+    return (data || []).reduce((s, r) => s + Number(r.estimated_monetization || 0), 0);
+  },
+});
 ```
 
-Los precios son placeholder editables. La sección de features por módulo será la parte más robusta, con todas las sub-funciones listadas como checkmarks organizadas por categoría.
+Exponer `ofMonetizationTotal` en el return del hook.
+
+**Archivo: `src/pages/closers/ClosersContent.tsx`**
+
+Pasar `ofMonetizationTotal` a `ClosersKPICards`.
+
+**Archivo: `src/pages/closers/components/ClosersKPICards.tsx`**
+
+- Recibir nueva prop `ofMonetizationTotal: number`
+- **"Rev. OnlyFans"** mostrará `ofMonetizationTotal` (suma de `estimated_monetization` de completadas)
+- **Card individual "OnlyFans"** en la fila de revenue seguirá mostrando `platformRevenue["OnlyFans"]` (ventas registradas como plataforma)
+- **"Rev. Plataformas"** sumará TODAS las plataformas de `platformRevenue` (incluyendo OnlyFans si fue registrada como venta de plataforma)
+- Agregar card **"Rev. Total"** = `ofMonetizationTotal + revPlataformas` como indicador global
+
+### Resultado visual
+
+```text
+Revenue cards:
+[OnlyFans $X] [LeakHunter $X] [Blu $X] [Trafix $X] [ORA $X] [Piclink $X] [Rev.Plat. $X] [Rev.OF $X] [Rev.Total $X]
+```
+
+- **Rev. Plataformas** = suma de todas las ventas en `closer_platform_sales`
+- **Rev. OF** = suma de `estimated_monetization` de contactos cerrados
+- **Rev. Total** = Rev. Plataformas + Rev. OF
+
+### Archivos
+- **Modificar**: `src/pages/closers/hooks/useCloserLeads.ts`
+- **Modificar**: `src/pages/closers/ClosersContent.tsx`
+- **Modificar**: `src/pages/closers/components/ClosersKPICards.tsx`
 
