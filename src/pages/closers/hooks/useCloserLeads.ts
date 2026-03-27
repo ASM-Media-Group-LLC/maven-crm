@@ -481,7 +481,7 @@ export const useCloserLeads = () => {
   });
 
   return {
-    creators: filtered,
+    creators,
     isLoading,
     statusCounts,
     platformRevenue,
@@ -490,13 +490,13 @@ export const useCloserLeads = () => {
     totalCount,
     totalPages,
     page, setPage,
-    search, setSearch,
+    search, setSearch: handleSetSearch,
     activeTab, setActiveTab: handleTabChange,
-    agentFilter, setAgentFilter,
-    platformFilter, setPlatformFilter,
+    agentFilter, setAgentFilter: handleSetAgentFilter,
+    platformFilter, setPlatformFilter: handleSetPlatformFilter,
     agentList,
-    dateFrom, setDateFrom,
-    dateTo, setDateTo,
+    dateFrom, setDateFrom: handleSetDateFrom,
+    dateTo, setDateTo: handleSetDateTo,
     dateField, setDateField,
     updateField,
     updateStage,
