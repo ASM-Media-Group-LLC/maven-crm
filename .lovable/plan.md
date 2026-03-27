@@ -1,66 +1,40 @@
 
-## Plan: Corregir búsqueda de Closers para links y resultados fuera de la página actual
 
-### Problema real
-El problema ya no es solo la normalización del link. Ahora mismo la búsqueda se hace **después** de traer solo 50 filas (`range(offset, limit)`), o sea:
-- la URL `instagram.com/esmeralda_arang0/` sí puede normalizarse
-- pero si ese lead no está dentro de los 50 registros cargados en la página actual, la tabla queda en “Sin registros”
-- además el `totalCount` y la paginación no reflejan la búsqueda real porque siguen viniendo del query sin search
+## Plan: Simplificar modal de comisiones con porcentaje automático del creador
 
-En resumen: la búsqueda es **client-side sobre una página parcial**, y por eso falla “aunque exista en la base”.
+### Cambios en `NuevaComisionModal.tsx`
 
-### Qué voy a cambiar
+**1. Campos del formulario (solo estos):**
+- Creador (combobox)
+- Fecha Inicio / Fecha Fin
+- Ganancia Total (USD)
+- Observaciones
 
-#### 1. Mover la búsqueda al query principal
-En `useCloserLeads.ts`:
-- construir un `normalizedSearch = normalizeHandle(search)`
-- cuando haya búsqueda, aplicar filtro en Supabase sobre `instagram_handle`
-- usar búsqueda tolerante para:
-  - handle puro
-  - handle con `@`
-  - link pegado que se normaliza a handle
+**2. Eliminar campos:**
+- Nombre del Periodo
+- Tipo de Comisión / Porcentaje / Valor Fijo (inputs manuales)
+- Estado de Pago, Fecha de Pago, Método de Pago
 
-Objetivo:
-```text
-https://instagram.com/esmeralda_arang0/
-instagram.com/esmeralda_arang0
-@esmeralda_arang0
-esmeralda_arang0
+**3. Obtener porcentaje automáticamente:**
+- Al seleccionar creador, query a `creator_business` para obtener `agency_percentage`
+- Mostrar en el cálculo automático como solo lectura (sin input editable)
+
+**4. Cálculo automático (nueva lógica):**
 ```
-todo debe encontrar el mismo registro.
+Ganancia de la Creadora:    $X    (= ganancia total ingresada)
+Comisión (Y%):              Y%    (= agency_percentage del creador, solo se muestra el %)
+Valor para la Empresa:      $W    (= ganancia total × agency_percentage / 100)
+```
 
-#### 2. Hacer que búsqueda + paginación tengan lógica correcta
-También en `useCloserLeads.ts`:
-- incluir `search` dentro del `queryKey`
-- aplicar el filtro antes de paginar
-- mantener `count: "exact"` sobre el dataset ya filtrado para que:
-  - la tabla
-  - el total de registros
-  - la paginación
-  sean coherentes con el search
+- "Comisión" solo muestra el porcentaje asignado al creador, no calcula un valor monetario propio
+- "Valor para la Empresa" = `base * (agency_percentage / 100)`
+- Si el creador no tiene porcentaje configurado, mostrar mensaje indicándolo
 
-#### 3. Resetear la página cuando cambia el buscador
-Hoy puedes quedar parado en una página donde el resultado no existe visualmente.
-Voy a hacer que al cambiar:
-- `search`
-- `agentFilter`
-- `platformFilter`
-- rango de fechas
-se vuelva a página 0.
+**5. Submit simplificado:**
+- `commission_type` = `"percentage"`, `percentage` = `agency_percentage`, `status` = `"pendiente"`
+- `estimated_amount` = valor para la empresa
+- Se eliminan campos de pago del payload
 
-#### 4. Mantener compatibilidad con tabs y roles
-La corrección respetará:
-- tabs actuales (`Todas`, `Nuevo`, `Asignadas`, etc.)
-- restricciones por rol (`closer`, `admin`, `manager`)
-- filtros existentes de agente, plataforma y fechas
+### Archivo a modificar
+- `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`
 
-### Archivos a modificar
-- `src/pages/closers/hooks/useCloserLeads.ts`
-- posible ajuste menor en `src/pages/closers/ClosersContent.tsx` si conviene centralizar el reset de página al cambiar filtros
-
-### Resultado esperado
-Cuando pegues `instagram.com/esmeralda_arang0/` en Closers:
-- debe aparecer si existe en la base
-- aunque no esté en la página actual
-- con conteo y paginación correctos
-- sin depender de que el lead esté dentro de los primeros 50 registros cargados
