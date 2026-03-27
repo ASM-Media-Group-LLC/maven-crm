@@ -602,16 +602,14 @@ export default function FacturacionPage() {
 
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button]:hidden">
-          {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
-        </DialogContent>
-        {viewItem && (
           <button
             onClick={() => setViewItem(null)}
             className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
-        )}
+          {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
+        </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!deleteItem} onOpenChange={() => setDeleteItem(null)}>
