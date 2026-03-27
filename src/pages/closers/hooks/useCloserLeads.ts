@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { normalizeHandle } from "@/lib/handle-utils";
 
 export interface CloserCreatorRow {
   id: string;
@@ -333,7 +334,11 @@ export const useCloserLeads = () => {
 
   // Client-side search + filters
   const filtered = creators.filter((c) => {
-    if (search && !c.instagram_handle.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const normalizedSearch = normalizeHandle(search);
+      const handle = c.instagram_handle.toLowerCase();
+      if (!handle.includes(normalizedSearch) && !handle.includes(search.toLowerCase())) return false;
+    }
     if (agentFilter && c.assigned_to !== agentFilter) return false;
     if (platformFilter && c.main_platform !== platformFilter) return false;
     return true;
