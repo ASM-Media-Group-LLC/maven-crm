@@ -1,26 +1,19 @@
 
 
-## Plan: Mover botón X al overlay
+## Plan: Agregar cursor pointer al botón de cierre
 
-**Archivo: `src/pages/finanzas/facturacion/FacturacionPage.tsx` (líneas 603-615)**
+### Problema
+El botón X funciona correctamente pero falta la clase `cursor-pointer` para que el cursor cambie al pasar sobre él.
 
-Sacar el botón X fuera del `DialogContent` y posicionarlo fijo dentro del `Dialog` overlay, usando `fixed top-5 right-5`:
+### Cambio
+
+**Archivo: `src/pages/finanzas/facturacion/FacturacionPage.tsx` (línea 610)**
+
+Agregar `cursor-pointer` a las clases del botón:
 
 ```tsx
-<Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-  <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button]:hidden">
-    {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
-  </DialogContent>
-  {viewItem && (
-    <button
-      onClick={() => setViewItem(null)}
-      className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors"
-    >
-      <X className="h-5 w-5" />
-    </button>
-  )}
-</Dialog>
+className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
 ```
 
-El botón queda anclado a la esquina superior derecha de la ventana (overlay), con ~20px de margen, siempre visible independientemente del tamaño del documento A4.
+Un cambio de una sola clase CSS.
 
