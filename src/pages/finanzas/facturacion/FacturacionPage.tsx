@@ -601,10 +601,12 @@ export default function FacturacionPage() {
       <ReversarInvoiceModal open={!!reverseItem} onClose={() => setReverseItem(null)} invoice={reverseItem} onSubmit={(id, reason) => reverseMutation.mutate({ id, reason })} isPending={reverseMutation.isPending} />
 
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button]:hidden">
+        <DialogContent
+          className="fixed inset-0 left-0 top-0 z-50 flex items-center justify-center max-w-none w-full h-full translate-x-0 translate-y-0 bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
+        >
           <button
             onClick={() => setViewItem(null)}
-            className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
+            className="absolute top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
