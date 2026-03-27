@@ -1,4 +1,5 @@
 import { useState, memo, useMemo } from "react";
+import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,11 @@ import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
 import { format } from "date-fns";
 
+interface PlatformSaleSummary {
+  platform: string;
+  price: number;
+}
+
 interface Props {
   creators: CloserCreatorRow[];
   activeTab: string;
@@ -28,6 +34,7 @@ interface Props {
   onConvertToCreator?: (creator: CloserCreatorRow) => void;
   isAdmin: boolean;
   sourceAccounts: string[];
+  platformSalesByCreator?: Record<string, PlatformSaleSummary[]>;
 }
 
 const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
@@ -351,8 +358,9 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
-const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [platformModalId, setPlatformModalId] = useState<string | null>(null);
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
@@ -410,8 +418,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     {(c.stage === "Confirmada" || c.stage === "Completada") && (
                       <>
                         <div>
-                          <p className="text-[10px] uppercase text-muted-foreground">Plataforma</p>
-                          <p className="font-medium">{c.main_platform || "—"}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">Plataformas</p>
+                          <div className="flex flex-wrap gap-0.5">
+                            {(platformSalesByCreator?.[c.id] || []).length > 0
+                              ? (platformSalesByCreator?.[c.id] || []).map((s, i) => (
+                                  <Badge key={i} variant="secondary" className="text-[9px] h-4">{s.platform}</Badge>
+                                ))
+                              : <p className="font-medium">{c.main_platform || "—"}</p>
+                            }
+                          </div>
                         </div>
                       </>
                     )}
@@ -719,15 +734,24 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
             <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
-            <TableCell>
-              <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
-                <SelectTrigger className="h-7 w-28 text-xs">
-                  <SelectValue placeholder="Plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <TableCell
+              className="cursor-pointer hover:bg-muted/50 rounded"
+              onClick={() => setPlatformModalId(c.id)}
+            >
+              <div className="flex flex-wrap gap-1">
+                {(platformSalesByCreator?.[c.id] || []).length > 0 ? (
+                  <>
+                    {(platformSalesByCreator?.[c.id] || []).slice(0, 2).map((s, i) => (
+                      <Badge key={i} variant="secondary" className="text-[10px] h-5">{s.platform}: ${s.price}</Badge>
+                    ))}
+                    {(platformSalesByCreator?.[c.id] || []).length > 2 && (
+                      <Badge variant="outline" className="text-[10px] h-5">+{(platformSalesByCreator?.[c.id] || []).length - 2}</Badge>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Agregar...</span>
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
@@ -929,6 +953,16 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
           </div>
         </div>
+      )}
+
+      {/* Platform Sales Modal */}
+      {platformModalId && (
+        <PlatformSalesModal
+          creatorId={platformModalId}
+          instagramHandle={creators.find(c => c.id === platformModalId)?.instagram_handle || ""}
+          open={!!platformModalId}
+          onOpenChange={(open) => { if (!open) setPlatformModalId(null); }}
+        />
       )}
     </>
   );

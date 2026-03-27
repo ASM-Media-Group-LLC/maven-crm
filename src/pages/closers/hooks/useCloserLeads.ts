@@ -292,7 +292,25 @@ export const useCloserLeads = () => {
     staleTime: 30_000,
   });
 
-  // Unique agents for filter select
+  // Platform sales grouped by creator (for completadas badges)
+  const { data: platformSalesByCreator = {} } = useQuery({
+    queryKey: ["closer-platform-sales-all", user?.id, role],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("closer_platform_sales")
+        .select("creator_id, platform, price");
+      if (error) throw error;
+      const map: Record<string, { platform: string; price: number }[]> = {};
+      for (const row of data || []) {
+        if (!map[row.creator_id]) map[row.creator_id] = [];
+        map[row.creator_id].push({ platform: row.platform, price: Number(row.price || 0) });
+      }
+      return map;
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+  });
+
   const agentList = [...new Map(
     creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
   )].map(([id, name]) => ({ id, name }));
@@ -430,6 +448,7 @@ export const useCloserLeads = () => {
     isLoading,
     statusCounts,
     platformRevenue,
+    platformSalesByCreator,
     totalCount,
     totalPages,
     page, setPage,

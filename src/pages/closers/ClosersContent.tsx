@@ -25,7 +25,7 @@ const ALL_TABS = [
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, statusCounts, platformRevenue,
+    creators, isLoading, statusCounts, platformRevenue, platformSalesByCreator,
     totalCount, totalPages, page, setPage,
     search, setSearch,
     activeTab, setActiveTab,
@@ -242,6 +242,7 @@ const ClosersContent = () => {
                   setAssignDialogOpen(true);
                 }}
                 isAdmin={isAdmin}
+                platformSalesByCreator={platformSalesByCreator}
               />
             </DataTableShell>
           </div>
