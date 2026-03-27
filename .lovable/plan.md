@@ -1,28 +1,26 @@
 
 
-## Plan: Botón X sin fondo ni borde en modal de vista previa
+## Plan: Mover botón X al overlay
 
-### Cambio
+**Archivo: `src/pages/finanzas/facturacion/FacturacionPage.tsx` (líneas 603-615)**
 
-**Archivo: `src/pages/finanzas/facturacion/FacturacionPage.tsx` (líneas 603-607)**
-
-Envolver el preview en un `div relative` y agregar un botón X minimalista (sin fondo, sin borde) en la esquina superior derecha:
+Sacar el botón X fuera del `DialogContent` y posicionarlo fijo dentro del `Dialog` overlay, usando `fixed top-5 right-5`:
 
 ```tsx
 <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
   <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button]:hidden">
-    <div className="relative">
-      <button
-        onClick={() => setViewItem(null)}
-        className="absolute -top-3 -right-3 z-50 text-white/80 hover:text-white transition-colors"
-      >
-        <X className="h-5 w-5" />
-      </button>
-      {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
-    </div>
+    {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
   </DialogContent>
+  {viewItem && (
+    <button
+      onClick={() => setViewItem(null)}
+      className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors"
+    >
+      <X className="h-5 w-5" />
+    </button>
+  )}
 </Dialog>
 ```
 
-Solo el icono X en blanco semitransparente sobre el fondo oscuro del overlay, sin círculo, sin fondo sólido, sin borde. `X` ya está importado de lucide-react.
+El botón queda anclado a la esquina superior derecha de la ventana (overlay), con ~20px de margen, siempre visible independientemente del tamaño del documento A4.
 
