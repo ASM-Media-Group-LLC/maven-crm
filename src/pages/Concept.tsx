@@ -9,7 +9,7 @@ import {
   Calendar, Target, TrendingUp, Megaphone, TicketCheck, Building2,
   Wallet, ShieldCheck, Bell, Palette, Map, Check, Star, Zap,
   Brain, ChevronRight, Globe, BarChart3, FileText, UserPlus,
-  Settings, Clock, BookOpen, HeartHandshake
+  Settings, Clock, BookOpen, HeartHandshake, Mail, Server, Plug
 } from "lucide-react";
 import {
   Accordion,
@@ -438,6 +438,63 @@ const Concept = () => {
 
       <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-accent/20 to-transparent" />
 
+      {/* Plugins */}
+      <section className="py-16">
+        <div className="mx-auto max-w-5xl px-4">
+          <ScrollReveal>
+            <div className="mb-10 text-center">
+              <Badge variant="secondary" className="mb-4 border-white/10 bg-white/5 text-white/70">
+                <Plug className="mr-1.5 inline h-3.5 w-3.5" />
+                También vendidos por separado
+              </Badge>
+              <h2 className="text-3xl font-bold md:text-4xl">Plugins Disponibles</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-white/50">
+                Módulos que se integran a la plataforma o pueden adquirirse de forma independiente.
+              </p>
+            </div>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {[
+              {
+                icon: Video,
+                name: "Video Calls",
+                description: "Videollamadas 1:1 y grupales con lobby, coworking virtual y compartir pantalla. Integración con LiveKit.",
+              },
+              {
+                icon: MessageSquare,
+                name: "Messenger",
+                description: "Mensajería en tiempo real estilo Google Chat. Canales por equipo, archivos, reacciones, hilos y espacios organizativos.",
+              },
+              {
+                icon: Mail,
+                name: "Email Server",
+                description: "Correos corporativos integrados a la plataforma. Dominio propio, bandejas por usuario y notificaciones unificadas.",
+              },
+              {
+                icon: Server,
+                name: "Organization Server",
+                description: "Servidor de organización y gestión de equipos. Estructura de departamentos, roles y permisos granulares centralizados.",
+              },
+            ].map((plugin) => (
+              <ScrollReveal key={plugin.name}>
+                <div className="glass-card flex items-start gap-4 rounded-xl border-white/[0.06] p-6">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+                    <plugin.icon className="h-5 w-5 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">{plugin.name}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-white/50">{plugin.description}</p>
+                  </div>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto h-px max-w-4xl bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+
       {/* Modules */}
       <section id="modulos" className="py-16">
         <div className="mx-auto max-w-5xl px-4">
@@ -453,7 +510,7 @@ const Concept = () => {
             </div>
           </ScrollReveal>
 
-          <Accordion type="multiple" className="space-y-3">
+          <Accordion type="multiple" defaultValue={modules.map(m => m.name)} className="space-y-3">
             {modules.map((mod, i) => (
               <ScrollReveal key={mod.name} delay={i * 40}>
                 <AccordionItem value={mod.name} className="glass-card border-white/[0.06] rounded-xl overflow-hidden">
