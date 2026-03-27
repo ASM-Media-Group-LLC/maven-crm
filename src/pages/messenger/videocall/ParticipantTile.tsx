@@ -130,7 +130,6 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
@@ -166,32 +165,33 @@ const ParticipantTile = memo(function ParticipantTile({
         attachedAudioTrackRef.current = audioTrack.track;
         audioEl.volume = 1;
 
-        // ── Output gain boost (1.4x ≈ +3dB) to match Google Meet levels ──
+        // ── Output gain boost (1.4x ≈ +3dB) via shared AudioContext ──
         try {
           // Clean up previous gain pipeline
           if (gainSourceRef.current) {
             try { gainSourceRef.current.disconnect(); } catch {}
             gainSourceRef.current = null;
           }
-          if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
-            try { audioCtxRef.current.close(); } catch {}
+
+          const ctx = getSharedAudioContext();
+
+          // Only apply gain boost if AudioContext is running
+          // If suspended, keep original stream (audible at normal volume)
+          if (ctx.state === "running") {
+            const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
+            gainSourceRef.current = source;
+            const gainNode = ctx.createGain();
+            gainNode.gain.value = 1.4;
+            const destination = ctx.createMediaStreamDestination();
+
+            source.connect(gainNode);
+            gainNode.connect(destination);
+
+            audioEl.srcObject = destination.stream;
+          } else {
+            // Try to resume; audio plays at normal volume meanwhile
+            ctx.resume().catch(() => {});
           }
-
-          const ctx = new AudioContext();
-          audioCtxRef.current = ctx;
-
-          if (ctx.state === "suspended") ctx.resume().catch(() => {});
-
-          const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
-          gainSourceRef.current = source;
-          const gainNode = ctx.createGain();
-          gainNode.gain.value = 1.4;
-          const destination = ctx.createMediaStreamDestination();
-
-          source.connect(gainNode);
-          gainNode.connect(destination);
-
-          audioEl.srcObject = destination.stream;
         } catch {
           // Fallback: keep original stream without boost
         }
