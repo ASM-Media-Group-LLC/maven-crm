@@ -171,6 +171,8 @@ export default function MessengerPage() {
               profiles={profiles}
               isPinned={isPinned}
               onTogglePin={togglePin}
+              isArchived={isArchived}
+              onToggleArchive={toggleArchive}
               spaces={spaces}
               onCreateSpace={createSpace}
               onDeleteSpace={deleteSpace}
@@ -207,6 +209,11 @@ export default function MessengerPage() {
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}
               onMembersChanged={loadConversations}
+              isPinned={isPinned(activeConv.id)}
+              onTogglePin={() => togglePin(activeConv.id)}
+              onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
+              onDelete={() => handleDeleteChat(activeConv.id)}
+              canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === conversations[0]?.participants[0]?.user_id && p.role === "admin")}
             />
           </div>
         ) : (
