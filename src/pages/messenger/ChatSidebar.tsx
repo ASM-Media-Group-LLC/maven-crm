@@ -559,6 +559,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         <ContextMenuItem onClick={onArchive}>
           <Archive className="h-3.5 w-3.5 mr-2" />
           {isArchivedChat ? "Desarchivar" : "Archivar"}
+        </ContextMenuItem>
         {spaces.length > 0 && (
           <ContextMenuSub>
             <ContextMenuSubTrigger>Agregar a espacio</ContextMenuSubTrigger>
