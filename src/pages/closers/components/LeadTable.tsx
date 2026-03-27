@@ -511,7 +511,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataformas</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Rev. Plat.</TableHead>
             <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
@@ -753,12 +754,18 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
+            <TableCell className="text-sm font-medium">
+              ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
+            </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPlatformModalId(c.id)}>
+                    Ventas por Plataforma
+                  </DropdownMenuItem>
                   {onConvertToCreator && (
                     <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
