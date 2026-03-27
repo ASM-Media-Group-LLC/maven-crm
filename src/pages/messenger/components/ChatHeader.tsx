@@ -1,10 +1,12 @@
 import {
   Video, Search, MoreVertical, ArrowLeft, Bell, FileText, Users,
+  Pin, PinOff, Archive, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails, UserProfile } from "../types";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,11 @@ interface ChatHeaderProps {
   onOpenSharedFiles: () => void;
   onOpenGroupMembers?: () => void;
   onAvatarChanged?: () => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
 }
 
 export default function ChatHeader({
@@ -34,6 +41,7 @@ export default function ChatHeader({
   onSearchToggle, onBack, onStartVideoCall,
   onOpenNotificationSettings, onOpenSharedFiles, onOpenGroupMembers,
   onAvatarChanged,
+  isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatHeaderProps) {
   const { user } = useAuth();
   const { isOnline, getStatus } = useOnlinePresence();
@@ -169,6 +177,18 @@ export default function ChatHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-2xl">
+              {onTogglePin && (
+                <DropdownMenuItem onClick={onTogglePin}>
+                  {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
+                  {isPinned ? "Desanclar" : "Anclar"}
+                </DropdownMenuItem>
+              )}
+              {onArchive && (
+                <DropdownMenuItem onClick={onArchive}>
+                  <Archive className="h-3.5 w-3.5 mr-2" /> Archivar
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onOpenSharedFiles}>
                 <FileText className="h-3.5 w-3.5 mr-2" /> Archivos compartidos
               </DropdownMenuItem>
@@ -180,6 +200,17 @@ export default function ChatHeader({
               <DropdownMenuItem onClick={onOpenNotificationSettings}>
                 <Bell className="h-3.5 w-3.5 mr-2" /> Notificaciones
               </DropdownMenuItem>
+              {canDelete && onDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar {isGroup ? "grupo" : "chat"}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
