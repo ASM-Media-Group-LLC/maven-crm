@@ -106,6 +106,14 @@ export const useCloserLeads = () => {
   const [dateField, setDateField] = useState<DateFieldType>("passed_date");
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
+  const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
+  const handleSetAgentFilter = (v: string | null) => { setAgentFilter(v); setPage(0); };
+  const handleSetPlatformFilter = (v: string | null) => { setPlatformFilter(v); setPage(0); };
+  const handleSetDateFrom = (v: Date | undefined) => { setDateFrom(v); setPage(0); };
+  const handleSetDateTo = (v: Date | undefined) => { setDateTo(v); setPage(0); };
+
+  // Normalize search for server-side filtering
+  const normalizedSearch = search ? normalizeHandle(search) : "";
 
   // Main query: closer_creators (all tabs except pendiente_lg) or leadgen_entries (pendiente_lg tab)
   const { data: creatorsData, isLoading } = useQuery({
