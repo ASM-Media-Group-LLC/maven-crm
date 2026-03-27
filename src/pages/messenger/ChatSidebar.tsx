@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive } from "lucide-react";
+import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive, MoreVertical, Trash2 } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -17,6 +17,15 @@ import {
   ContextMenuSubContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu";
 import { ConversationWithDetails } from "./types";
 import { cn } from "@/lib/utils";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
@@ -486,7 +495,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           onDragEnd={onDragEnd}
           onClick={onClick}
           className={cn(
-            "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group",
+            "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",
             isActive
               ? "bg-primary/12"
               : "hover:bg-primary/5",
@@ -529,7 +538,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
                 {conversation.displayName}
               </span>
               <span className={cn(
-                "text-[10px] shrink-0 ml-2",
+                "text-[10px] shrink-0 ml-2 mr-5",
                 hasUnread ? "text-primary font-semibold" : "text-muted-foreground"
               )}>
                 {formatTime(conversation.lastMessage?.created_at)}
@@ -549,6 +558,50 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
               )}
             </div>
           </div>
+          {/* 3-dot menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={e => e.stopPropagation()}
+                className="absolute top-1.5 right-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity z-10"
+              >
+                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onClick={onTogglePin}>
+                {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
+                {isPinned ? "Desanclar" : "Anclar"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onArchive}>
+                <Archive className="h-3.5 w-3.5 mr-2" />
+                {isArchivedChat ? "Desarchivar" : "Archivar"}
+              </DropdownMenuItem>
+              {spaces.length > 0 && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Agregar a espacio</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="rounded-2xl">
+                    {spaces.map(space => (
+                      <DropdownMenuItem key={space.id} onClick={() => onAddToSpace(space.id, conversation.id)}>
+                        {space.icon} {space.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+              {(isSystemAdmin || !isGroup || conversation.participants.find(p => p.user_id === user?.id)?.role === "admin") && (
+                <DropdownMenuItem
+                  onClick={onDelete}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                  Eliminar {isGroup ? "grupo" : "chat"}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent className="rounded-2xl">
