@@ -7,10 +7,10 @@ import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX } from
 let sharedAudioCtx: AudioContext | null = null;
 let sharedAudioCtxRefCount = 0;
 
-function getSharedAudioContext(): AudioContext {
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof AudioContext === "undefined") return null;
   if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
     sharedAudioCtx = new AudioContext();
-    // Listen for user interaction to resume suspended contexts
     const resumeOnInteraction = () => {
       if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
         sharedAudioCtx.resume().catch(() => {});
@@ -22,7 +22,7 @@ function getSharedAudioContext(): AudioContext {
   return sharedAudioCtx;
 }
 
-function acquireSharedAudioContext(): AudioContext {
+function acquireSharedAudioContext(): AudioContext | null {
   sharedAudioCtxRefCount++;
   return getSharedAudioContext();
 }
