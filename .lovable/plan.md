@@ -1,33 +1,38 @@
 
 
-## Plan: Quitar botón close y centrar A4 en el modal
+## Plan: Agregar acción "Ver" en la tabla de Notas de Pago
 
-### Problema
-El modal tiene un botón X custom y clases `relative` innecesarias. El usuario quiere eliminar el botón y dejar solo el A4 centrado usando el comportamiento por defecto de `DialogContent`.
+### Resumen
+Crear un componente `PaymentNoteA4Preview` (similar a `InvoiceA4Preview`) y agregar un botón "Ver" antes del botón "Eliminar" en la tabla de Notas de Pago. Al hacer clic, se abre el mismo tipo de modal transparente centrado que ya se usa para invoices.
 
-### Cambio
+### Cambios
 
-**Archivo: `src/pages/finanzas/facturacion/FacturacionPage.tsx` (líneas 603-615)**
+**1. Crear `src/pages/finanzas/facturacion/PaymentNoteA4Preview.tsx`**
 
-Reemplazar el bloque actual por:
+Componente A4 de solo lectura que recibe los datos de una nota de pago (`amount`, `payment_type`, `payment_method`, `due_date`, `notes`, `created_at`, `_creator`). Replica la estructura visual de la vista previa de `NuevaNotaPagoPage` (título "Nota de Pago", sección "Pay to", tabla con concepto/descripción/monto, footer KASH AGENCY) con zoom fijo `0.82` igual que `InvoiceA4Preview`.
 
-```tsx
-<Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-  <DialogContent
-    className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
-  >
-    {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
-  </DialogContent>
-</Dialog>
-```
+**2. Modificar `src/pages/finanzas/facturacion/FacturacionPage.tsx`**
 
-### Qué cambia
-- Se elimina el `<button>` custom con el icono X (6 líneas)
-- Se quita `relative` del className (ya no hay hijo absoluto)
-- El centrado lo maneja `DialogContent` por defecto (`left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]` definidos en `dialog.tsx`)
-- `max-w-fit` permite que el contenedor se ajuste al tamaño del A4
-- `[&>button:last-child]:hidden` oculta el botón nativo de Radix
-- El cierre funciona vía clic en overlay o tecla Escape
+- Importar `PaymentNoteA4Preview`.
+- Añadir estado `viewNoteItem` separado para notas de pago (o reutilizar `viewItem` con un flag `_isPaymentNote`).
+- En la tabla de Notas de Pago (línea ~405-407), agregar un botón `Eye` **antes** del botón `Trash2`:
+  ```tsx
+  <Tooltip><TooltipTrigger asChild>
+    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}>
+      <Eye className="h-3.5 w-3.5" />
+    </Button>
+  </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+  ```
+- Agregar un segundo `Dialog` al final del archivo para la vista de nota de pago, con el mismo estilo del modal de invoices:
+  ```tsx
+  <Dialog open={!!viewNoteItem} onOpenChange={() => setViewNoteItem(null)}>
+    <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden">
+      {viewNoteItem && <PaymentNoteA4Preview note={viewNoteItem} />}
+    </DialogContent>
+  </Dialog>
+  ```
 
-Un solo archivo, se eliminan líneas.
+### Archivos
+- **Crear**: `src/pages/finanzas/facturacion/PaymentNoteA4Preview.tsx`
+- **Modificar**: `src/pages/finanzas/facturacion/FacturacionPage.tsx`
 
