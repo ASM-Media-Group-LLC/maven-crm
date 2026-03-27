@@ -117,7 +117,7 @@ export const useCloserLeads = () => {
 
   // Main query: closer_creators (all tabs except pendiente_lg) or leadgen_entries (pendiente_lg tab)
   const { data: creatorsData, isLoading } = useQuery({
-    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
+    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
     queryFn: async () => {
       // ── Pendiente LG tab: closer_creators with stage 'Pendiente LG' ──
       // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
@@ -127,6 +127,11 @@ export const useCloserLeads = () => {
           .from("closer_creators")
           .select("*", { count: "exact" })
           .eq("stage", stageValue);
+
+        // Server-side search filter
+        if (normalizedSearch) {
+          query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
+        }
 
         // For "Nuevo" tab, only show rows originating from closers_contacts (not leadgen)
         if (activeTab === "nuevo") {
@@ -196,6 +201,21 @@ export const useCloserLeads = () => {
       } else {
         // Tab "todas": exclude "Pendiente LG" and "Nuevo" (those have their own tabs)
         query = query.not("stage", "eq", "Pendiente LG");
+      }
+
+      // Server-side search filter
+      if (normalizedSearch) {
+        query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
+      }
+
+      // Server-side agent filter
+      if (agentFilter) {
+        query = query.eq("assigned_to", agentFilter);
+      }
+
+      // Server-side platform filter
+      if (platformFilter) {
+        query = query.eq("main_platform", platformFilter);
       }
 
       // Role-based filter: closers only see assigned
