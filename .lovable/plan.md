@@ -1,54 +1,36 @@
 
 
-## Plan: Acciones completas en sidebar y header + sonidos de notificación
+## Plan: Agregar botón de 3 puntos a las conversation cards + verificar sonido de notificaciones
 
-### 1. Agregar Fijar, Archivar y Eliminar al menú de 3 puntos del ChatHeader
+### Problema 1: Sin menú de 3 puntos en el sidebar
+Las acciones (anclar, archivar, eliminar) solo están disponibles via **ContextMenu** (clic derecho), que no es descubrible en móvil ni intuitivo. Se necesita un botón de 3 puntos visible al hacer hover sobre cada conversation card.
 
-**En `ChatHeader.tsx`:** Agregar nuevas props (`onTogglePin`, `isPinned`, `onDelete`, `onArchive`) y añadir al `DropdownMenuContent` existente (línea 171) las opciones:
-- **Anclar/Desanclar** con icono `Pin`/`PinOff`
-- **Archivar** con icono `Archive`
-- **Eliminar** con icono `Trash2` (solo visible si admin del sistema o admin del grupo o chat directo)
+### Problema 2: Sonido de notificaciones
+El código de sonido está correcto: `playNotificationSound()` se llama en `notify()` que se invoca en `handleNewMessage` cuando llega un mensaje a un chat diferente al activo. El archivo `/sounds/message.wav` existe. El sonido debería funcionar siempre que el navegador haya tenido una interacción previa del usuario (política de autoplay). Se verificará en el navegador.
 
-**En `ChatView.tsx`:** Pasar las nuevas props desde ChatView a ChatHeader. Agregar props al interface de ChatView.
+### Solución sidebar — botón de 3 puntos
 
-**En `MessengerPage.tsx`:** Pasar `isPinned`, `togglePin`, `handleDeleteChat` y un nuevo `handleArchive` a ChatView.
+**En `ChatSidebar.tsx`, dentro del `ConversationItem`:**
 
-### 2. Agregar "Archivar" al ContextMenu del sidebar
+Agregar un botón `MoreVertical` que aparezca en hover (esquina superior derecha del card), envuelto en un `DropdownMenu` con las mismas opciones que el `ContextMenu`:
+- Anclar / Desanclar
+- Archivar / Desarchivar
+- Eliminar (condicional por permisos)
 
-**En `ChatSidebar.tsx`:** En el `ContextMenuContent` del `ConversationItem` (línea 544), añadir opción "Archivar" con icono `Archive` entre "Anclar" y "Eliminar".
-
-### 3. Funcionalidad de Archivar
-
-No existe tabla de archivado. Crear una tabla `chat_archived` similar a `chat_pinned`:
-- `id`, `user_id`, `conversation_id`, `created_at`
-- RLS: usuario solo ve/modifica sus propios registros
-
-Crear hook `useArchivedChats.ts` (patrón idéntico a `usePinnedChats.ts`) con `toggleArchive`, `isArchived`.
-
-En el sidebar, filtrar conversaciones archivadas de la lista principal y opcionalmente mostrar sección "Archivados" colapsable.
-
-### 4. Sonidos de notificación en chat
-
-**Crear `/public/sounds/message.mp3`**: Usar un sonido corto de notificación generado como data URI o un archivo estático simple.
-
-**En `useBrowserNotifications.ts`:** Agregar reproducción de sonido en la función `notify`:
-```ts
-const audio = new Audio("/sounds/message.mp3");
-audio.volume = 0.5;
-audio.play().catch(() => {}); // catch para autoplay policy
+```text
+┌──────────────────────────────────┐
+│ 👤 Jonathan Pacheco    18:48  ⋮  │  ← ⋮ visible on hover
+│    Videollamada iniciada...      │
+└──────────────────────────────────┘
 ```
 
-El sonido se reproduce cuando llega un mensaje y el tab está oculto (misma condición que la notificación del navegador). También agregar sonido cuando el tab está visible pero el chat activo es diferente al del mensaje entrante.
+El botón se posiciona con `absolute top-1 right-1` dentro del card (que ya es `group` para hover). Se muestra con `opacity-0 group-hover:opacity-100`. En móvil, se muestra siempre con `sm:opacity-0 sm:group-hover:opacity-100`.
 
-**En `MessengerPage.tsx`:** Modificar `handleNewMessage` para reproducir sonido incluso cuando el tab está visible (siempre que no sea el chat activo).
+Las opciones del `DropdownMenu` replican exactamente las del `ContextMenuContent` existente para evitar duplicación de lógica.
 
-### Archivos
-- **Migración SQL**: crear tabla `chat_archived` con RLS
-- **Crear**: `src/hooks/useArchivedChats.ts`
-- **Crear**: `public/sounds/message.mp3` (sonido de notificación)
-- **Modificar**: `src/hooks/useBrowserNotifications.ts` (agregar sonido)
-- **Modificar**: `src/pages/messenger/components/ChatHeader.tsx` (acciones en dropdown)
-- **Modificar**: `src/pages/messenger/ChatView.tsx` (pasar props)
-- **Modificar**: `src/pages/messenger/MessengerPage.tsx` (conectar archive, pin, delete, sonido)
-- **Modificar**: `src/pages/messenger/ChatSidebar.tsx` (archivar en context menu + filtrar archivados)
+### Verificación de sonido
+Usar las herramientas del navegador para confirmar que el archivo de audio se carga correctamente y que `notify()` se ejecuta al recibir mensajes.
+
+### Archivo
+- **Modificar**: `src/pages/messenger/ChatSidebar.tsx` — agregar `DropdownMenu` con `MoreVertical` al `ConversationItem`
 
