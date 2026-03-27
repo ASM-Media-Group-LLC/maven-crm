@@ -1143,8 +1143,13 @@ export type Database = {
           final_amount: number | null
           id: string
           notes: string | null
+          payment_date: string | null
+          payment_method: string | null
           percentage: number | null
           period: string
+          period_end: string | null
+          period_name: string | null
+          period_start: string | null
           status: string
           updated_at: string
         }
@@ -1163,8 +1168,13 @@ export type Database = {
           final_amount?: number | null
           id?: string
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           percentage?: number | null
           period: string
+          period_end?: string | null
+          period_name?: string | null
+          period_start?: string | null
           status?: string
           updated_at?: string
         }
@@ -1183,8 +1193,13 @@ export type Database = {
           final_amount?: number | null
           id?: string
           notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
           percentage?: number | null
           period?: string
+          period_end?: string | null
+          period_name?: string | null
+          period_start?: string | null
           status?: string
           updated_at?: string
         }
