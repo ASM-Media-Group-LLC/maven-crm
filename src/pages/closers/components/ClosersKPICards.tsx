@@ -15,13 +15,13 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }:
   const cerradas = confirmadas + completadas;
   const total = asignadas + confirmadas + completadas + noInteresadas;
 
+  const salePlatforms = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"];
   const revTrafix = platformRevenue["Trafix"] || 0;
   const revBlu = platformRevenue["Blu"] || 0;
   const revPiclink = platformRevenue["Piclink"] || 0;
   const revLeakHunter = platformRevenue["LeakHunter"] || 0;
   const revORA = platformRevenue["ORA"] || 0;
-  const revOnlyFansSales = platformRevenue["OnlyFans"] || 0;
-  const revPlataformas = Object.values(platformRevenue).reduce((s, v) => s + v, 0);
+  const revPlataformas = salePlatforms.reduce((s, p) => s + (platformRevenue[p] || 0), 0);
   const revTotal = ofMonetizationTotal + revPlataformas;
 
   const pipelineCards = [
@@ -34,7 +34,6 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }:
   ];
 
   const revenueCards = [
-    { label: "OnlyFans", amount: revOnlyFansSales },
     { label: "LeakHunter", amount: revLeakHunter },
     { label: "Blu", amount: revBlu },
     { label: "Trafix", amount: revTrafix },
@@ -65,7 +64,7 @@ const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }:
       </div>
 
       {/* Revenue */}
-      <div className="grid grid-cols-3 gap-3 md:grid-cols-9">
+      <div className="grid grid-cols-3 gap-3 md:grid-cols-8">
         {revenueCards.map((card) => (
           <Card key={card.label} className={`transition-all duration-200 hover:scale-[1.02] ${card.highlight ? "border-primary/30" : ""}`}>
             <CardContent className="p-3">
