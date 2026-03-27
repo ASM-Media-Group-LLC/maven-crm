@@ -175,9 +175,8 @@ const ParticipantTile = memo(function ParticipantTile({
 
           const ctx = getSharedAudioContext();
 
-          // Only apply gain boost if AudioContext is running
-          // If suspended, keep original stream (audible at normal volume)
-          if (ctx.state === "running") {
+          // Only apply gain boost if AudioContext is available and running
+          if (ctx && ctx.state === "running") {
             const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
             gainSourceRef.current = source;
             const gainNode = ctx.createGain();
@@ -188,7 +187,7 @@ const ParticipantTile = memo(function ParticipantTile({
             gainNode.connect(destination);
 
             audioEl.srcObject = destination.stream;
-          } else {
+          } else if (ctx) {
             // Try to resume; audio plays at normal volume meanwhile
             ctx.resume().catch(() => {});
           }
