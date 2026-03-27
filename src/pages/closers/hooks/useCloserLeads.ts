@@ -360,22 +360,10 @@ export const useCloserLeads = () => {
     creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
   )].map(([id, name]) => ({ id, name }));
 
-  // Client-side search + filters
-  const filtered = creators.filter((c) => {
-    if (search) {
-      const normalizedSearch = normalizeHandle(search);
-      const handle = c.instagram_handle.toLowerCase();
-      if (!handle.includes(normalizedSearch) && !handle.includes(search.toLowerCase())) return false;
-    }
-    if (agentFilter && c.assigned_to !== agentFilter) return false;
-    if (platformFilter && c.main_platform !== platformFilter) return false;
-    return true;
-  });
-
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
-      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
+      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
       (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
         if (!old) return old;
         return {
