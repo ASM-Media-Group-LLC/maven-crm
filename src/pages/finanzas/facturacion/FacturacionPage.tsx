@@ -39,7 +39,7 @@ const STATUS_BADGE: Record<string, { variant: "default" | "secondary" | "destruc
   reversada: { variant: "destructive", label: "Reversada" },
 };
 
-const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Fees & Ajustes", "Mail", "Archivo de PagoMundo"] as const;
+const FACTURA_TABS = ["Invoices", "Notas de Pago", "Reversos", "Comisiones", "Mail", "Archivo de PagoMundo"] as const;
 type FacturaTab = typeof FACTURA_TABS[number];
 
 function fmt(n: number) {
