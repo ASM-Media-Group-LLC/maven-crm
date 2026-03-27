@@ -118,7 +118,7 @@ const PlatformSalesPanel = ({ creatorId }: Props) => {
               <Select value={platform} onValueChange={setPlatform}>
                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="..." /></SelectTrigger>
                 <SelectContent>
-                  {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {SALE_PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
