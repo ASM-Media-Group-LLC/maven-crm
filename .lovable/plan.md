@@ -1,57 +1,68 @@
 
 
-## Plan: Rediseñar PlatformSalesModal con selección directa de plataformas
+## Plan: Crear página /concept con features completas + pricing
 
-### Problema actual
-El modal requiere hacer clic en "Agregar venta" para mostrar un formulario oculto, y solo permite seleccionar una plataforma a la vez.
+### Resumen
+Crear una nueva página pública en `/concept` que sirva como documento de concepto comercial de Maven/Univen. Incluirá un desglose profundo de todos los módulos y sub-funciones de la plataforma (lo que ya existe y lo que está en desarrollo), objetivos de marketing, y una sección de pricing para agencias.
 
-### Nuevo diseño
-Al abrir el modal, se muestran directamente todas las plataformas disponibles como checkboxes/chips. Al seleccionar una plataforma, aparece inmediatamente un campo de precio a su lado. Las plataformas seleccionadas se van listando con su precio. Al guardar, se insertan todas las plataformas seleccionadas de una vez.
+### Estructura de la página
 
-### Cambio en `PlatformSalesModal.tsx`
+La página usará el mismo estilo dark de la landing (fondo `hsl(240,10%,2%)`, glass cards, ScrollReveal) pero con contenido mucho más detallado.
 
-**Reemplazar todo el contenido del modal por:**
+**Secciones:**
 
-1. **Header**: Mantiene título "Ventas por plataforma — @handle"
-2. **Lista de ventas existentes**: Se mantiene igual (badge + precio + botón eliminar)
-3. **Sección de agregar** (siempre visible, sin botón "Agregar venta"):
-   - Lista todas las `PLATFORMS` como chips/checkboxes
-   - Al hacer clic en una plataforma, se agrega a un estado local `selectedPlatforms: Record<string, string>` (key = plataforma, value = precio)
-   - Cada plataforma seleccionada muestra un input de precio inline al lado
-   - Al deseleccionar, se elimina del record
-   - Botón "Guardar" al final que inserta todas las plataformas seleccionadas en batch
-4. **Footer total**: Se mantiene
+1. **Hero** - Branding Maven CRM + tagline comercial + badge "Concept Document"
+2. **Resumen ejecutivo** - Qué es Maven, para quién, propuesta de valor
+3. **Módulos con sub-funciones** - Los 12+ módulos, cada uno expandido con sus features específicas:
+
+   | Modulo | Sub-funciones |
+   |--------|--------------|
+   | **Dashboard** | KPIs globales, announcements, métricas en tiempo real, Clari AI FAB |
+   | **Gestión de Creadores** | Perfiles 360, tabs (Info, Operaciones, Lineamientos, Redes, Monetización, Documentos, Notas, Tickets, Historial), onboarding wizard, offboarding, verificación, export PDF, cambio de status, prospectos |
+   | **Creator Sales** | Sales Overview con KPIs, comparativas, top 10, subiendo/bajando, alto potencial, en riesgo, earnings por creador, heatmaps, trends, chargebacks |
+   | **AI Sales Chat** | Asistente IA para chatters, conversaciones persistentes, configuración |
+   | **Contactos** | CRM de contactos, grid/table view, creación rápida |
+   | **Closers** | Pipeline de cierre (Nuevas, Asignadas, Completadas), ventas por plataforma multi-producto, monetización inline, conversión a creadora, KPI cards con revenue por plataforma |
+   | **LeadGen & Marketing** | Captura de leads, base de datos, calificación, conversión, performance por agente, supervisor view |
+   | **Promolog** | Registro diario de promociones por creador, grid/table |
+   | **Eventos** | Creación, invitados, checklist, links compartibles, agenda compartida, calendario, cierre de evento |
+   | **Tareas & Proyectos** | Kanban + lista, subtareas, asignaciones, proyectos, carpetas, compartir externo, countdown, prioridades inline |
+   | **Messenger** | Chat real-time, rooms, archivos, reacciones, video rooms |
+   | **Video Calls** | Videollamadas integradas, cowork/lobby |
+   | **Tickets de Soporte** | Sistema de tickets, prioridades, comentarios, filtros |
+   | **HR & RRHH** | Dashboard HR, directorio, onboarding, offboarding, nómina, vacaciones, asistencia, permisos, ausencias, incidencias, monitoreo, capacitación (chatters + tech), performance, horarios, hora bank, overtime, organigrama, applicants, deducciones, announcements |
+   | **Finanzas** | Dashboard financiero, facturación (invoices A4 + notas de pago A4), comisiones, nómina, control financiero, cobranzas, reportes, horas/horas variables, configuración |
+   | **Admin** | Gestión de usuarios, roles custom, permisos granulares por módulo, auditoría |
+   | **Notificaciones** | Sistema de notificaciones global |
+   | **Design System** | Documentación interna de componentes |
+   | **Roadmap** | Roadmap público del producto |
+
+4. **Objetivos de marketing** - Audiencia target, propuesta de valor, diferenciadores
+5. **Pricing** - 3 tiers (Starter, Professional, Enterprise) con tabla de features por plan
+6. **CTA final** - Contacto / demo
+
+### Archivos
+
+- **Crear**: `src/pages/Concept.tsx` — Página principal con todas las secciones
+- **Modificar**: `src/App.tsx` — Agregar ruta pública `/concept`
+
+La página será un solo archivo largo (~400-500 líneas) con datos hardcodeados, reutilizando los componentes existentes (ScrollReveal, Logo, AnimatedGradientBackground, Badge, Button, Accordion).
+
+### Detalle técnico del pricing (propuesta)
 
 ```text
-┌──── PlatformSalesModal ─────────────────────┐
-│  Ventas por plataforma — @maria             │
-│                                             │
-│  ── Ventas registradas ──                   │
-│  [Blu] – Suscripción         $150    🗑     │
-│  [Piclink]                   $80     🗑     │
-│                                             │
-│  ── Agregar plataformas ──                  │
-│  ☑ OnlyFans       [$___200__]               │
-│  ☐ LeakHunter                               │
-│  ☑ Trafix         [$___100__]               │
-│  ☐ ORA                                     │
-│  ☐ Blu                                     │
-│  ☐ Piclink                                 │
-│                                             │
-│                              [Guardar (2)]  │
-│                                             │
-│  Total registrado: $230                     │
-└─────────────────────────────────────────────┘
+┌─────────────┬─────────────┬─────────────┐
+│   Starter   │Professional │ Enterprise  │
+│  $299/mo    │  $799/mo    │  Custom     │
+├─────────────┼─────────────┼─────────────┤
+│ 5 módulos   │ 12 módulos  │ Ilimitado   │
+│ 25 creators │ 100 creators│ Ilimitado   │
+│ 5 users     │ 25 users    │ Ilimitado   │
+│ Basic AI    │ Full AI     │ Custom AI   │
+│ Email       │ Priority    │ Dedicated   │
+│ support     │ support     │ support     │
+└─────────────┴─────────────┴─────────────┘
 ```
 
-### Detalle técnico
-
-- Estado: `selectedPlatforms` como `Record<string, string>` (plataforma → precio string)
-- Al toggle checkbox: si se activa, añade con precio ""; si se desactiva, elimina del record
-- Filtrar plataformas ya registradas (que ya existen en `sales`) para no duplicar
-- Botón "Guardar" hace batch insert de todas las seleccionadas con `supabase.from("closer_platform_sales").insert([...])` 
-- Después de guardar, limpia `selectedPlatforms` e invalida queries
-
-### Archivo
-- **Modificar**: `src/pages/closers/components/PlatformSalesModal.tsx`
+Los precios son placeholder editables. La sección de features por módulo será la parte más robusta, con todas las sub-funciones listadas como checkmarks organizadas por categoría.
 
