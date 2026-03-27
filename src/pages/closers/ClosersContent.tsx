@@ -236,6 +236,7 @@ const ClosersContent = () => {
                   }
                 }}
                 onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
+                onConvertToCreator={handleConvertToCreator}
                 onAssign={(id, assignee, source) => {
                   setAssignTarget({ id, assignee, source: source || "closer" });
                   setAssignDialogOpen(true);
