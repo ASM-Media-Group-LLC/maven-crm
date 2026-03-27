@@ -4,9 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 interface Props {
   statusCounts: Record<string, number>;
   platformRevenue: Record<string, number>;
+  ofMonetizationTotal: number;
 }
 
-const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
+const ClosersKPICards = ({ statusCounts, platformRevenue, ofMonetizationTotal }: Props) => {
   const asignadas = statusCounts["Asignada"] || 0;
   const confirmadas = statusCounts["Confirmada"] || 0;
   const completadas = statusCounts["Completada"] || 0;
@@ -14,13 +15,14 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
   const cerradas = confirmadas + completadas;
   const total = asignadas + confirmadas + completadas + noInteresadas;
 
-  const revOF = platformRevenue["OnlyFans"] || 0;
   const revTrafix = platformRevenue["Trafix"] || 0;
   const revBlu = platformRevenue["Blu"] || 0;
   const revPiclink = platformRevenue["Piclink"] || 0;
   const revLeakHunter = platformRevenue["LeakHunter"] || 0;
   const revORA = platformRevenue["ORA"] || 0;
-  const revPlataformas = revLeakHunter + revBlu + revTrafix + revORA + revPiclink;
+  const revOnlyFansSales = platformRevenue["OnlyFans"] || 0;
+  const revPlataformas = Object.values(platformRevenue).reduce((s, v) => s + v, 0);
+  const revTotal = ofMonetizationTotal + revPlataformas;
 
   const pipelineCards = [
     { label: "Total", count: total, icon: Users, colorClass: "text-muted-foreground", bgClass: "bg-muted" },
@@ -32,14 +34,15 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
   ];
 
   const revenueCards = [
-    { label: "OnlyFans", amount: revOF },
+    { label: "OnlyFans", amount: revOnlyFansSales },
     { label: "LeakHunter", amount: revLeakHunter },
     { label: "Blu", amount: revBlu },
     { label: "Trafix", amount: revTrafix },
     { label: "ORA", amount: revORA },
     { label: "Piclink", amount: revPiclink },
     { label: "Rev. Plataformas", amount: revPlataformas, highlight: true },
-    { label: "Rev. OnlyFans", amount: revOF, highlight: true },
+    { label: "Rev. OF", amount: ofMonetizationTotal, highlight: true },
+    { label: "Rev. Total", amount: revTotal, highlight: true },
   ];
 
   return (
@@ -62,7 +65,7 @@ const ClosersKPICards = ({ statusCounts, platformRevenue }: Props) => {
       </div>
 
       {/* Revenue */}
-      <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
+      <div className="grid grid-cols-3 gap-3 md:grid-cols-9">
         {revenueCards.map((card) => (
           <Card key={card.label} className={`transition-all duration-200 hover:scale-[1.02] ${card.highlight ? "border-primary/30" : ""}`}>
             <CardContent className="p-3">

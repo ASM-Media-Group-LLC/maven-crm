@@ -25,7 +25,7 @@ const ALL_TABS = [
 
 const ClosersContent = () => {
   const {
-    creators, isLoading, statusCounts, platformRevenue, platformSalesByCreator,
+    creators, isLoading, statusCounts, platformRevenue, platformSalesByCreator, ofMonetizationTotal,
     totalCount, totalPages, page, setPage,
     search, setSearch,
     activeTab, setActiveTab,
@@ -99,7 +99,7 @@ const ClosersContent = () => {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="shrink-0 px-6 pt-4 pb-2 space-y-4 bg-background border-b border-border">
-            <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} />
+            <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
 
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
