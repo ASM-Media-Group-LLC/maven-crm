@@ -213,7 +213,7 @@ export default function MessengerPage() {
               onTogglePin={() => togglePin(activeConv.id)}
               onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
               onDelete={() => handleDeleteChat(activeConv.id)}
-              canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === conversations[0]?.participants[0]?.user_id && p.role === "admin")}
+              canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === user?.id && p.role === "admin")}
             />
           </div>
         ) : (
