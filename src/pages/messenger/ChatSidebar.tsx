@@ -73,6 +73,7 @@ export default function ChatSidebar({
   onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { isOnline, getStatus } = useOnlinePresence();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
@@ -423,7 +424,7 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onDragStart, onDragEnd, spaces, onAddToSpace }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
@@ -434,6 +435,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
   onDragEnd: () => void;
   spaces: ChatSpace[];
   onAddToSpace: (spaceId: string, convId: string) => Promise<boolean>;
+  isSystemAdmin?: boolean;
 }) {
   const { user } = useAuth();
   const isGroup = conversation.type === "group";
