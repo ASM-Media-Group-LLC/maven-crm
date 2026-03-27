@@ -131,6 +131,7 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
   const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
@@ -172,6 +173,10 @@ const ParticipantTile = memo(function ParticipantTile({
             try { gainSourceRef.current.disconnect(); } catch {}
             gainSourceRef.current = null;
           }
+          if (gainNodeRef.current) {
+            try { gainNodeRef.current.disconnect(); } catch {}
+            gainNodeRef.current = null;
+          }
 
           const ctx = getSharedAudioContext();
 
@@ -180,6 +185,7 @@ const ParticipantTile = memo(function ParticipantTile({
             const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
             gainSourceRef.current = source;
             const gainNode = ctx.createGain();
+            gainNodeRef.current = gainNode;
             gainNode.gain.value = 1.4;
             const destination = ctx.createMediaStreamDestination();
 
@@ -324,6 +330,7 @@ const ParticipantTile = memo(function ParticipantTile({
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
     const gainSource = gainSourceRef;
+    const gainNode = gainNodeRef;
     return () => {
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
@@ -338,6 +345,10 @@ const ParticipantTile = memo(function ParticipantTile({
       if (gainSource.current) {
         try { gainSource.current.disconnect(); } catch {}
         gainSource.current = null;
+      }
+      if (gainNode.current) {
+        try { gainNode.current.disconnect(); } catch {}
+        gainNode.current = null;
       }
       // Release shared AudioContext (closes when last participant unmounts)
       releaseSharedAudioContext();
