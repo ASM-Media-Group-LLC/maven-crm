@@ -946,6 +946,16 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           </div>
         </div>
       )}
+
+      {/* Platform Sales Modal */}
+      {platformModalId && (
+        <PlatformSalesModal
+          creatorId={platformModalId}
+          instagramHandle={creators.find(c => c.id === platformModalId)?.instagram_handle || ""}
+          open={!!platformModalId}
+          onOpenChange={(open) => { if (!open) setPlatformModalId(null); }}
+        />
+      )}
     </>
   );
 };
