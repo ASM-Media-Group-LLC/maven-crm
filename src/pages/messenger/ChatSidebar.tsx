@@ -556,6 +556,9 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
           {isPinned ? "Desanclar" : "Anclar"}
         </ContextMenuItem>
+        <ContextMenuItem onClick={onArchive}>
+          <Archive className="h-3.5 w-3.5 mr-2" />
+          {isArchivedChat ? "Desarchivar" : "Archivar"}
         {spaces.length > 0 && (
           <ContextMenuSub>
             <ContextMenuSubTrigger>Agregar a espacio</ContextMenuSubTrigger>
