@@ -34,6 +34,7 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
+  const { user } = useAuth();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
