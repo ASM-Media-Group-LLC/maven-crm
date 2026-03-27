@@ -364,14 +364,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
-      const rev = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+      const platSales = (platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0);
       return {
         monetization: acc.monetization + Number(c.estimated_monetization || 0),
-        revenue: acc.revenue + rev,
+        platformRev: acc.platformRev + platSales,
         count: acc.count + 1,
       };
     },
-    { monetization: 0, revenue: 0, count: 0 }
+    { monetization: 0, platformRev: 0, count: 0 }
   ) : null;
 
   const isCloserRow = (c: CloserCreatorRow) => c._source === "closer";
@@ -457,6 +457,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
             <div className="flex gap-6">
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
             </div>
           </div>
         )}
@@ -958,6 +959,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
           <div className="flex gap-6">
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
           </div>
         </div>
       )}
