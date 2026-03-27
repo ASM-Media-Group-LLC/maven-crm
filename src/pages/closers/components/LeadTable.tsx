@@ -418,8 +418,15 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                     {(c.stage === "Confirmada" || c.stage === "Completada") && (
                       <>
                         <div>
-                          <p className="text-[10px] uppercase text-muted-foreground">Plataforma</p>
-                          <p className="font-medium">{c.main_platform || "—"}</p>
+                          <p className="text-[10px] uppercase text-muted-foreground">Plataformas</p>
+                          <div className="flex flex-wrap gap-0.5">
+                            {(platformSalesByCreator?.[c.id] || []).length > 0
+                              ? (platformSalesByCreator?.[c.id] || []).map((s, i) => (
+                                  <Badge key={i} variant="secondary" className="text-[9px] h-4">{s.platform}</Badge>
+                                ))
+                              : <p className="font-medium">{c.main_platform || "—"}</p>
+                            }
+                          </div>
                         </div>
                       </>
                     )}
