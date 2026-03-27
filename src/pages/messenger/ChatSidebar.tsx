@@ -495,7 +495,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
           onDragEnd={onDragEnd}
           onClick={onClick}
           className={cn(
-            "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group",
+            "w-full flex items-center gap-2.5 px-2.5 py-2.5 sm:py-2 rounded-2xl text-left transition-all duration-150 group relative",
             isActive
               ? "bg-primary/12"
               : "hover:bg-primary/5",
