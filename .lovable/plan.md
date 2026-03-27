@@ -1,38 +1,55 @@
 
 
-## Plan: Agregar acción "Ver" en la tabla de Notas de Pago
+## Plan: Edición inline en Completadas y quitar columna Revenue
 
 ### Resumen
-Crear un componente `PaymentNoteA4Preview` (similar a `InvoiceA4Preview`) y agregar un botón "Ver" antes del botón "Eliminar" en la tabla de Notas de Pago. Al hacer clic, se abre el mismo tipo de modal transparente centrado que ya se usa para invoices.
+En la pestaña "Completadas" de Closers, quitar la columna Revenue y hacer que Monetización, Comisión y Extras sean editables inline.
 
 ### Cambios
 
-**1. Crear `src/pages/finanzas/facturacion/PaymentNoteA4Preview.tsx`**
+**Archivo: `src/pages/closers/components/LeadTable.tsx`**
 
-Componente A4 de solo lectura que recibe los datos de una nota de pago (`amount`, `payment_type`, `payment_method`, `due_date`, `notes`, `created_at`, `_creator`). Replica la estructura visual de la vista previa de `NuevaNotaPagoPage` (título "Nota de Pago", sección "Pay to", tabla con concepto/descripción/monto, footer KASH AGENCY) con zoom fijo `0.82` igual que `InvoiceA4Preview`.
+**1. Crear componente `InlineNumber`** (junto a `InlineText`, ~línea 118)
+- Similar a `InlineText` pero con `type="number"` y convierte el valor a número al guardar.
+- Acepta un `prefix` opcional (`$` o `%`) para mostrar junto al valor en modo lectura.
 
-**2. Modificar `src/pages/finanzas/facturacion/FacturacionPage.tsx`**
+**2. Header de "completadas"** (líneas 494-506)
+- Quitar `<TableHead>Revenue</TableHead>` (línea 504).
 
-- Importar `PaymentNoteA4Preview`.
-- Añadir estado `viewNoteItem` separado para notas de pago (o reutilizar `viewItem` con un flag `_isPaymentNote`).
-- En la tabla de Notas de Pago (línea ~405-407), agregar un botón `Eye` **antes** del botón `Trash2`:
-  ```tsx
-  <Tooltip><TooltipTrigger asChild>
-    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewNoteItem(n)}>
-      <Eye className="h-3.5 w-3.5" />
-    </Button>
-  </TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
-  ```
-- Agregar un segundo `Dialog` al final del archivo para la vista de nota de pago, con el mismo estilo del modal de invoices:
-  ```tsx
-  <Dialog open={!!viewNoteItem} onOpenChange={() => setViewNoteItem(null)}>
-    <DialogContent className="max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden">
-      {viewNoteItem && <PaymentNoteA4Preview note={viewNoteItem} />}
-    </DialogContent>
-  </Dialog>
-  ```
+**3. Filas de "completadas"** (líneas 717-729)
+- Reemplazar las 3 celdas estáticas de Monetización, Comisión y Extras por `InlineNumber` usando `onFieldChange`:
+  - `estimated_monetization` con prefix `$`
+  - `agency_commission` con suffix `%`
+  - `extras` con prefix `$`
+- Quitar la celda de Revenue (línea 727).
 
-### Archivos
-- **Crear**: `src/pages/finanzas/facturacion/PaymentNoteA4Preview.tsx`
-- **Modificar**: `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+**4. Footer totals** (líneas 903-910)
+- Quitar la línea de Revenue del footer, dejar solo Monetización.
+
+**5. Grid view completadas** (líneas 443-449)
+- Quitar Revenue del resumen del grid view también.
+
+### Detalle técnico
+
+```tsx
+// InlineNumber component
+const InlineNumber = memo(({ value, onSave, prefix = "", suffix = "" }) => {
+  const [editing, setEditing] = useState(false);
+  const [num, setNum] = useState(String(value || 0));
+  const save = () => {
+    setEditing(false);
+    const n = Number(num) || 0;
+    if (n !== Number(value || 0)) onSave(n);
+  };
+  if (!editing) return (
+    <span className="cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 text-sm"
+      onClick={() => { setNum(String(value || 0)); setEditing(true); }}>
+      {prefix}{Number(value || 0).toLocaleString()}{suffix}
+    </span>
+  );
+  return <Input type="number" value={num} onChange={e => setNum(e.target.value)}
+    onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+    onBlur={save} autoFocus className="h-7 text-sm w-24" />;
+});
+```
 
