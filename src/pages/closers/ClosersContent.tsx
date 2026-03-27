@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, X, UserPlus, LayoutGrid, List } from "lucide-react";
 import DataTableShell from "@/components/ui/data-table-shell";
-import { useCloserLeads, PLATFORMS, type DateFieldType } from "./hooks/useCloserLeads";
+import { useCloserLeads, PLATFORMS, type DateFieldType, type CloserCreatorRow } from "./hooks/useCloserLeads";
 import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ALL_TABS = [
   { value: "todas", label: "Todas" },
