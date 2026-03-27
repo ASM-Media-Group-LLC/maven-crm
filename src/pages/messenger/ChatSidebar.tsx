@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare } from "lucide-react";
+import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -41,6 +41,8 @@ interface ChatSidebarProps {
   profiles: Record<string, import("./types").UserProfile>;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
+  isArchived: (id: string) => boolean;
+  onToggleArchive: (id: string) => void;
   spaces: ChatSpace[];
   onCreateSpace: (name: string) => Promise<string | null>;
   onDeleteSpace: (id: string) => Promise<boolean>;
