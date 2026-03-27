@@ -32,6 +32,11 @@ interface ChatViewProps {
   loadingMore?: boolean;
   onLoadMore?: () => void;
   onMembersChanged?: () => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
 }
 
 export default function ChatView({
@@ -39,6 +44,7 @@ export default function ChatView({
   onEditMessage, onDeleteMessage, onBack, onStartVideoCall, loading,
   getReactionsForMessage, onToggleReaction, getReadByUsers,
   hasMore, loadingMore, onLoadMore, onMembersChanged,
+  isPinned, onTogglePin, onArchive, onDelete, canDelete,
 }: ChatViewProps) {
   const { user } = useAuth();
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -181,6 +187,11 @@ export default function ChatView({
         onOpenSharedFiles={() => { closeSidePanels("files"); setShowSharedFiles(true); }}
         onOpenGroupMembers={() => { closeSidePanels("members"); setShowGroupMembers(true); }}
         onAvatarChanged={onMembersChanged}
+        isPinned={isPinned}
+        onTogglePin={onTogglePin}
+        onArchive={onArchive}
+        onDelete={onDelete}
+        canDelete={canDelete}
       />
 
       <MessageList

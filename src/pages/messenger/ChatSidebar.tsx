@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare } from "lucide-react";
+import { Search, Users, Video, Pin, PinOff, GripVertical, Home, AtSign, Star, Mail, ChevronDown, ChevronRight, MessageSquarePlus, X, User, MessageSquare, Archive } from "lucide-react";
 import { useGlobalSearch, type GlobalSearchResult } from "@/hooks/useGlobalSearch";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -41,6 +41,8 @@ interface ChatSidebarProps {
   profiles: Record<string, import("./types").UserProfile>;
   isPinned: (id: string) => boolean;
   onTogglePin: (id: string) => void;
+  isArchived: (id: string) => boolean;
+  onToggleArchive: (id: string) => void;
   spaces: ChatSpace[];
   onCreateSpace: (name: string) => Promise<string | null>;
   onDeleteSpace: (id: string) => Promise<boolean>;
@@ -68,7 +70,7 @@ function truncate(text: string, max: number) {
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewGroup, onOpenVideoRooms,
   onSelectContact, onDeleteChat, loading, profiles,
-  isPinned, onTogglePin,
+  isPinned, onTogglePin, isArchived, onToggleArchive,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
   onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
@@ -99,14 +101,18 @@ export default function ChatSidebar({
 
   const filtered = useMemo(() => {
     return conversations.filter(c => {
+      // Hide archived unless specifically searching
+      if (isArchived(c.id) && tab !== "all") return false;
       const matchesSearch = c.displayName.toLowerCase().includes(search.toLowerCase());
       if (tab === "unread") return matchesSearch && c.unreadCount > 0;
       if (tab === "groups") return matchesSearch && c.type === "group";
       if (tab === "pinned") return matchesSearch && isPinned(c.id);
       if (tab === "mentions") return matchesSearch && mentionedIds.has(c.id);
+      // In "all" tab, hide archived unless searching
+      if (!search && isArchived(c.id)) return false;
       return matchesSearch;
     });
-  }, [conversations, search, tab, isPinned, mentionedIds]);
+  }, [conversations, search, tab, isPinned, mentionedIds, isArchived]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -260,6 +266,8 @@ export default function ChatSidebar({
                       onDelete={() => setDeleteTarget(conv)}
                       isPinned={isPinned(conv.id)}
                       onTogglePin={() => onTogglePin(conv.id)}
+                      onArchive={() => onToggleArchive(conv.id)}
+                      isArchivedChat={isArchived(conv.id)}
                       onDragStart={(e) => handleDragStart(e, conv.id)}
                       onDragEnd={handleDragEnd}
                       spaces={spaces}
@@ -424,13 +432,15 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
   onDelete: () => void;
   isPinned: boolean;
   onTogglePin: () => void;
+  onArchive: () => void;
+  isArchivedChat: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   spaces: ChatSpace[];
@@ -545,6 +555,10 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned,
         <ContextMenuItem onClick={onTogglePin}>
           {isPinned ? <PinOff className="h-3.5 w-3.5 mr-2" /> : <Pin className="h-3.5 w-3.5 mr-2" />}
           {isPinned ? "Desanclar" : "Anclar"}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={onArchive}>
+          <Archive className="h-3.5 w-3.5 mr-2" />
+          {isArchivedChat ? "Desarchivar" : "Archivar"}
         </ContextMenuItem>
         {spaces.length > 0 && (
           <ContextMenuSub>

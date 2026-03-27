@@ -9,6 +9,27 @@ export function useNotificationPermission() {
   }, []);
 }
 
+// Preload audio once
+let cachedAudio: HTMLAudioElement | null = null;
+function getNotificationAudio(): HTMLAudioElement {
+  if (!cachedAudio) {
+    cachedAudio = new Audio("/sounds/message.wav");
+    cachedAudio.volume = 0.5;
+  }
+  return cachedAudio;
+}
+
+/** Play notification sound */
+export function playNotificationSound() {
+  try {
+    const audio = getNotificationAudio();
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+
 /** Show a browser notification when the tab is hidden */
 export function useBrowserNotifications() {
   const enabled = useRef(typeof document !== "undefined" ? document.hidden : false);
@@ -21,6 +42,9 @@ export function useBrowserNotifications() {
   }, []);
 
   const notify = useCallback((title: string, body: string, onClick?: () => void) => {
+    // Always play sound for notifications
+    playNotificationSound();
+
     if (
       !enabled.current ||
       !("Notification" in window) ||
@@ -30,7 +54,7 @@ export function useBrowserNotifications() {
     const n = new Notification(title, {
       body,
       icon: "/favicon.ico",
-      tag: "chat-message", // collapses repeated notifications
+      tag: "chat-message",
     });
 
     if (onClick) {
@@ -41,7 +65,6 @@ export function useBrowserNotifications() {
       };
     }
 
-    // Auto-close after 5s
     setTimeout(() => n.close(), 5000);
   }, []);
 

@@ -12,9 +12,12 @@ import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import { useAuth } from "@/hooks/useAuth";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { useSpaces } from "@/hooks/useSpaces";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
+import { useArchivedChats } from "@/hooks/useArchivedChats";
+import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -31,11 +34,14 @@ function openCallInNewTab(roomName: string, isAdmin: boolean, displayName?: stri
 export default function MessengerPage() {
   const { conversations, loading, profiles, createDirectChat, createGroupChat, deleteConversation, loadConversations, markConversationRead } = useChat();
   const { isOnline, onlineUsers, getStatus } = useOnlinePresence();
+  const { user } = useAuth();
   useNotificationPermission();
   const { notify } = useBrowserNotifications();
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin } = usePinnedChats();
+  const { isArchived, toggleArchive } = useArchivedChats();
+  const { isAdmin: isSystemAdmin } = useUserRole();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const activeChatIdRef = useRef<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
@@ -167,6 +173,8 @@ export default function MessengerPage() {
               profiles={profiles}
               isPinned={isPinned}
               onTogglePin={togglePin}
+              isArchived={isArchived}
+              onToggleArchive={toggleArchive}
               spaces={spaces}
               onCreateSpace={createSpace}
               onDeleteSpace={deleteSpace}
@@ -203,6 +211,11 @@ export default function MessengerPage() {
               loadingMore={loadingMore}
               onLoadMore={loadOlderMessages}
               onMembersChanged={loadConversations}
+              isPinned={isPinned(activeConv.id)}
+              onTogglePin={() => togglePin(activeConv.id)}
+              onArchive={() => { toggleArchive(activeConv.id); selectChat(null); }}
+              onDelete={() => handleDeleteChat(activeConv.id)}
+              canDelete={isSystemAdmin || activeConv.type !== "group" || activeConv.participants.some(p => p.user_id === user?.id && p.role === "admin")}
             />
           </div>
         ) : (
