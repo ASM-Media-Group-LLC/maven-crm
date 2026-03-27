@@ -106,10 +106,18 @@ export const useCloserLeads = () => {
   const [dateField, setDateField] = useState<DateFieldType>("passed_date");
 
   const handleTabChange = (tab: string) => { setActiveTab(tab); setPage(0); };
+  const handleSetSearch = (v: string) => { setSearch(v); setPage(0); };
+  const handleSetAgentFilter = (v: string | null) => { setAgentFilter(v); setPage(0); };
+  const handleSetPlatformFilter = (v: string | null) => { setPlatformFilter(v); setPage(0); };
+  const handleSetDateFrom = (v: Date | undefined) => { setDateFrom(v); setPage(0); };
+  const handleSetDateTo = (v: Date | undefined) => { setDateTo(v); setPage(0); };
+
+  // Normalize search for server-side filtering
+  const normalizedSearch = search ? normalizeHandle(search) : "";
 
   // Main query: closer_creators (all tabs except pendiente_lg) or leadgen_entries (pendiente_lg tab)
   const { data: creatorsData, isLoading } = useQuery({
-    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
+    queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
     queryFn: async () => {
       // ── Pendiente LG tab: closer_creators with stage 'Pendiente LG' ──
       // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
@@ -119,6 +127,11 @@ export const useCloserLeads = () => {
           .from("closer_creators")
           .select("*", { count: "exact" })
           .eq("stage", stageValue);
+
+        // Server-side search filter
+        if (normalizedSearch) {
+          query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
+        }
 
         // For "Nuevo" tab, only show rows originating from closers_contacts (not leadgen)
         if (activeTab === "nuevo") {
@@ -188,6 +201,21 @@ export const useCloserLeads = () => {
       } else {
         // Tab "todas": exclude "Pendiente LG" and "Nuevo" (those have their own tabs)
         query = query.not("stage", "eq", "Pendiente LG");
+      }
+
+      // Server-side search filter
+      if (normalizedSearch) {
+        query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
+      }
+
+      // Server-side agent filter
+      if (agentFilter) {
+        query = query.eq("assigned_to", agentFilter);
+      }
+
+      // Server-side platform filter
+      if (platformFilter) {
+        query = query.eq("main_platform", platformFilter);
       }
 
       // Role-based filter: closers only see assigned
@@ -332,22 +360,10 @@ export const useCloserLeads = () => {
     creators.filter(c => c.agent_name).map(c => [c.assigned_to!, c.agent_name!])
   )].map(([id, name]) => ({ id, name }));
 
-  // Client-side search + filters
-  const filtered = creators.filter((c) => {
-    if (search) {
-      const normalizedSearch = normalizeHandle(search);
-      const handle = c.instagram_handle.toLowerCase();
-      if (!handle.includes(normalizedSearch) && !handle.includes(search.toLowerCase())) return false;
-    }
-    if (agentFilter && c.assigned_to !== agentFilter) return false;
-    if (platformFilter && c.main_platform !== platformFilter) return false;
-    return true;
-  });
-
   // Optimistic update
   const optimisticUpdate = (id: string, updates: Partial<CloserCreatorRow>) => {
     queryClient.setQueryData(
-      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField],
+      ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
       (old: { creators: CloserCreatorRow[]; total: number } | undefined) => {
         if (!old) return old;
         return {
@@ -465,7 +481,7 @@ export const useCloserLeads = () => {
   });
 
   return {
-    creators: filtered,
+    creators,
     isLoading,
     statusCounts,
     platformRevenue,
@@ -474,13 +490,13 @@ export const useCloserLeads = () => {
     totalCount,
     totalPages,
     page, setPage,
-    search, setSearch,
+    search, setSearch: handleSetSearch,
     activeTab, setActiveTab: handleTabChange,
-    agentFilter, setAgentFilter,
-    platformFilter, setPlatformFilter,
+    agentFilter, setAgentFilter: handleSetAgentFilter,
+    platformFilter, setPlatformFilter: handleSetPlatformFilter,
     agentList,
-    dateFrom, setDateFrom,
-    dateTo, setDateTo,
+    dateFrom, setDateFrom: handleSetDateFrom,
+    dateTo, setDateTo: handleSetDateTo,
     dateField, setDateField,
     updateField,
     updateStage,
