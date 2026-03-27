@@ -292,6 +292,21 @@ export const useCloserLeads = () => {
     staleTime: 30_000,
   });
 
+  // OF monetization total (estimated_monetization from completed/confirmed)
+  const { data: ofMonetizationTotal = 0 } = useQuery({
+    queryKey: ["closer-of-monetization", user?.id, role],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("closer_creators")
+        .select("estimated_monetization")
+        .in("stage", ["Completada", "Confirmada"]);
+      if (error) throw error;
+      return (data || []).reduce((s, r) => s + Number(r.estimated_monetization || 0), 0);
+    },
+    enabled: !!user?.id && !!role,
+    staleTime: 30_000,
+  });
+
   // Platform sales grouped by creator (for completadas badges)
   const { data: platformSalesByCreator = {} } = useQuery({
     queryKey: ["closer-platform-sales-all", user?.id, role],
@@ -449,6 +464,7 @@ export const useCloserLeads = () => {
     statusCounts,
     platformRevenue,
     platformSalesByCreator,
+    ofMonetizationTotal,
     totalCount,
     totalPages,
     page, setPage,
