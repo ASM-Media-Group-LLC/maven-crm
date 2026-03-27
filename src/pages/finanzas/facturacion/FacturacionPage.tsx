@@ -602,13 +602,13 @@ export default function FacturacionPage() {
 
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent
-          className="fixed inset-0 left-0 top-0 z-50 flex items-center justify-center max-w-none w-full h-full translate-x-0 translate-y-0 bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
+          className="relative max-w-fit bg-transparent border-none shadow-none p-0 [&>button:last-child]:hidden"
         >
           <button
             onClick={() => setViewItem(null)}
-            className="absolute top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
+            className="absolute -top-4 -right-4 z-[60] bg-black/60 rounded-full p-1.5 text-white/90 hover:text-white hover:bg-black/80 transition-colors cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
           {viewItem && <InvoiceA4Preview invoice={viewItem as any} />}
         </DialogContent>
