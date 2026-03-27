@@ -101,14 +101,18 @@ export default function ChatSidebar({
 
   const filtered = useMemo(() => {
     return conversations.filter(c => {
+      // Hide archived unless specifically searching
+      if (isArchived(c.id) && tab !== "all") return false;
       const matchesSearch = c.displayName.toLowerCase().includes(search.toLowerCase());
       if (tab === "unread") return matchesSearch && c.unreadCount > 0;
       if (tab === "groups") return matchesSearch && c.type === "group";
       if (tab === "pinned") return matchesSearch && isPinned(c.id);
       if (tab === "mentions") return matchesSearch && mentionedIds.has(c.id);
+      // In "all" tab, hide archived unless searching
+      if (!search && isArchived(c.id)) return false;
       return matchesSearch;
     });
-  }, [conversations, search, tab, isPinned, mentionedIds]);
+  }, [conversations, search, tab, isPinned, mentionedIds, isArchived]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -262,6 +266,8 @@ export default function ChatSidebar({
                       onDelete={() => setDeleteTarget(conv)}
                       isPinned={isPinned(conv.id)}
                       onTogglePin={() => onTogglePin(conv.id)}
+                      onArchive={() => onToggleArchive(conv.id)}
+                      isArchivedChat={isArchived(conv.id)}
                       onDragStart={(e) => handleDragStart(e, conv.id)}
                       onDragEnd={handleDragEnd}
                       spaces={spaces}
@@ -426,13 +432,15 @@ function CollapsibleSection({ label, defaultOpen = true, children }: { label: st
 }
 
 /* ── Conversation Item — M3 ── */
-function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
+function ConversationItem({ conversation, isActive, onClick, onDelete, isPinned, onTogglePin, onArchive, isArchivedChat, onDragStart, onDragEnd, spaces, onAddToSpace, isSystemAdmin }: {
   conversation: ConversationWithDetails;
   isActive: boolean;
   onClick: () => void;
   onDelete: () => void;
   isPinned: boolean;
   onTogglePin: () => void;
+  onArchive: () => void;
+  isArchivedChat: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   spaces: ChatSpace[];
