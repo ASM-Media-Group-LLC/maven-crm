@@ -15,6 +15,8 @@ import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useB
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { useSpaces } from "@/hooks/useSpaces";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
+import { useArchivedChats } from "@/hooks/useArchivedChats";
+import { useUserRole } from "@/hooks/useUserRole";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -36,6 +38,8 @@ export default function MessengerPage() {
   const { incomingCall, acceptCall, declineCall } = useVideoCall();
   const { spaces, createSpace, deleteSpace, renameSpace, addConversationToSpace, removeConversationFromSpace } = useSpaces();
   const { isPinned, togglePin } = usePinnedChats();
+  const { isArchived, toggleArchive } = useArchivedChats();
+  const { isAdmin: isSystemAdmin } = useUserRole();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const activeChatIdRef = useRef<string | null>(null);
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
