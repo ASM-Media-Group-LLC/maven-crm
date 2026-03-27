@@ -61,10 +61,12 @@ const CreadoresContent = () => {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-6 space-y-6">
-          <CreadoresKPICards counts={statusCounts} />
+        <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
+          <div className="shrink-0">
+            <CreadoresKPICards counts={statusCounts} />
+          </div>
 
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+          <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
             <Button
               variant={filters.agency === "" ? "secondary" : "ghost"}
               size="sm"
@@ -84,21 +86,24 @@ const CreadoresContent = () => {
             ))}
           </div>
 
-          <CreadoresFilters
-            filters={filters}
-            onChange={updateFilters}
-            categories={categories}
-            countries={countries}
-            cities={cities}
-            managers={managers}
-            view={view}
-            onViewChange={setView}
-            hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager)}
-            onClear={() => setFilters(emptyFilters)}
-          />
+          <div className="shrink-0">
+            <CreadoresFilters
+              filters={filters}
+              onChange={updateFilters}
+              categories={categories}
+              countries={countries}
+              cities={cities}
+              managers={managers}
+              view={view}
+              onViewChange={setView}
+              hasActiveFilters={!!(filters.search || filters.status || filters.category || filters.country || filters.city || filters.manager)}
+              onClear={() => setFilters(emptyFilters)}
+            />
+          </div>
 
           {view === "table" ? (
             <DataTableShell
+              className="flex-1 min-h-0"
               currentPage={page}
               totalPages={totalPages}
               totalCount={totalCount}
@@ -109,7 +114,9 @@ const CreadoresContent = () => {
               <CreadoresTable creators={creators} />
             </DataTableShell>
           ) : (
-            <CreadoresGrid creators={creators} />
+            <div className="flex-1 overflow-auto">
+              <CreadoresGrid creators={creators} />
+            </div>
           )}
         </div>
       )}
