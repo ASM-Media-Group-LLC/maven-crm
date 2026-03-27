@@ -1,81 +1,70 @@
 
 
-## Plan: Cambiar "Extras" por "Plataformas" y agregar acciones en Completadas
+## Plan: Modal de plataformas en Completadas + verificar stats
 
-### Resumen
-1. Reemplazar la columna "Extras" por "Plataformas" (editable inline con select) en la pestaña Completadas.
-2. Agregar columna "Acciones" con dropdown que permita: **Convertir a Creadora** (inserta en tabla `creators`) y **Devolver a Contacto** (cambia stage de vuelta a "Asignada" o "Nuevo").
+### Contexto actual
+- Ya existe la tabla `closer_platform_sales` con `creator_id`, `platform`, `product`, `price`
+- Ya existe `PlatformSalesPanel` que permite agregar/eliminar ventas por plataforma (usado en tab "asignadas" como fila expandible)
+- Las KPI cards ya leen `platformRevenue` desde `closer_platform_sales` y muestran Rev por plataforma individual + Rev. Plataformas total + Rev. OnlyFans
+- En "Completadas", la columna "Plataforma" actualmente usa un `Select` inline que solo guarda UNA plataforma en `main_platform`
 
 ### Cambios
 
-**Archivo: `src/pages/closers/components/LeadTable.tsx`**
+**1. Crear `PlatformSalesModal.tsx`** — Modal (Dialog) que se abre al hacer clic en la celda de plataforma en Completadas
+- Muestra las ventas existentes del `closer_platform_sales` para ese `creator_id`
+- Permite agregar múltiples plataformas con precio (reutiliza la lógica de `PlatformSalesPanel`)
+- Muestra badges/chips con las plataformas vendidas y el total
+- Botón "Agregar venta" con select de plataforma + input de precio + producto opcional
+- Lista de ventas existentes con opción de eliminar
+- Footer con total de ventas
 
-**1. Header de "completadas" (línea 502)**
-- Cambiar `<TableHead>Extras</TableHead>` → `<TableHead>Plataformas</TableHead>`
-- Agregar `<TableHead>Acciones</TableHead>` al final
+**2. Modificar `LeadTable.tsx` — Tab Completadas**
+- Reemplazar el `Select` inline de plataforma (líneas 722-730) por un botón/celda clickeable que:
+  - Muestra badges de las plataformas vendidas (obtenidas de `closer_platform_sales`)
+  - Al hacer clic abre el `PlatformSalesModal`
+- Agregar estado `platformModalId` para controlar qué creator tiene el modal abierto
+- Necesita cargar las ventas por plataforma de todos los creators en Completadas (query adicional o pasar datos desde el hook)
 
-**2. Filas de "completadas" (líneas 722-724)**
-- Reemplazar la celda `InlineNumber` de `extras` por un `Select` de plataformas (igual al que ya existe en "asignadas" línea 674) usando `main_platform` y `onFieldChange`
-- Agregar celda de acciones con `DropdownMenu` que incluya:
-  - "Convertir a Creadora" → llama nuevo callback `onConvertToCreator(c)`
-  - "Devolver a Contacto" → llama `onStageChange(c.id, "Asignada")`
+**3. Modificar `useCloserLeads.ts`**
+- Agregar query para cargar `closer_platform_sales` agrupadas por `creator_id` cuando el tab es "completadas", para mostrar los badges en cada fila
+- Retornar `platformSalesByCreator: Record<string, { platform: string; price: number }[]>`
 
-**3. Props del componente (línea 21)**
-- Agregar prop `onConvertToCreator: (creator: CloserCreatorRow) => void`
-
-**Archivo: `src/pages/closers/ClosersContent.tsx`** (o donde se renderiza `LeadTable`)
-
-**4. Lógica de conversión a creadora**
-- Crear función `handleConvertToCreator` que:
-  1. Inserta en tabla `creators` (name: instagram_handle, instagram_handle, category, phone, source: "closer", status: "pendiente")
-  2. Opcionalmente marca el closer_creator con un flag o lo deja en "Completada"
-  3. Muestra toast de confirmación
-- Pasar como prop `onConvertToCreator` al `LeadTable`
-
-**5. Grid view completadas (líneas 410-414)**
-- Cambiar "Extras" por "Plataforma" en el resumen del grid view, mostrando `c.main_platform` en lugar de extras
+**4. Verificar KPI cards** — Ya funcionan correctamente:
+- `platformRevenue` suma precios de `closer_platform_sales` agrupados por plataforma
+- `Rev. Plataformas` = suma de LeakHunter + Blu + Trafix + ORA + Piclink
+- `Rev. OnlyFans` = suma de OnlyFans
+- Cuando se agregan ventas desde el modal, se invalida `closer-platform-revenue` (ya lo hace `PlatformSalesPanel`)
 
 ### Detalle técnico
 
-```tsx
-// Completadas header
-<TableHead>Plataformas</TableHead>
-<TableHead className="text-right sticky top-0 right-0 z-30 bg-card">Acciones</TableHead>
+```text
+┌─────────────────────────────────────────────┐
+│  Completadas Table Row                      │
+│  ... │ Plataforma          │ Acciones       │
+│  ... │ [Blu] [Piclink] +2  │ ⋮              │  ← click abre modal
+│  ... │ [OnlyFans]          │ ⋮              │
+└─────────────────────────────────────────────┘
 
-// Completadas row - reemplazar extras por plataforma select
-<TableCell>
-  <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
-    <SelectTrigger className="h-7 w-28 text-xs">
-      <SelectValue placeholder="Plataforma" />
-    </SelectTrigger>
-    <SelectContent>
-      {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-    </SelectContent>
-  </Select>
-</TableCell>
-
-// Acciones dropdown
-<TableCell className="text-right sticky right-0 bg-background z-20">
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
-        Convertir a Creadora
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
-        Devolver a Asignada
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-</TableCell>
+┌──── PlatformSalesModal ─────────────────────┐
+│  Ventas por plataforma — @maria             │
+│                                             │
+│  Blu – Suscripción         $150    🗑       │
+│  Piclink – Pack            $80     🗑       │
+│                                             │
+│  Total: $230                                │
+│                                             │
+│  [+ Agregar venta]                          │
+│  ┌─ Plataforma ─┐ ┌─ Producto ─┐ ┌ Precio ┐│
+│  │ Select...     │ │ Opcional   │ │ $0     ││
+│  └───────────────┘ └───────────┘ └────────┘│
+│                          [Cancelar] [Guardar]│
+└─────────────────────────────────────────────┘
 ```
 
-La conversión a creadora reutiliza la lógica existente de `ConvertContactoModal` (insertar en `creators` con datos mapeados del closer_creator). "Devolver a Contacto" simplemente mueve el stage de vuelta a "Asignada" usando `onStageChange` que ya existe.
+### Archivos
+- **Crear**: `src/pages/closers/components/PlatformSalesModal.tsx`
+- **Modificar**: `src/pages/closers/components/LeadTable.tsx`
+- **Modificar**: `src/pages/closers/hooks/useCloserLeads.ts`
 
-### Archivos a modificar
-- `src/pages/closers/components/LeadTable.tsx`
-- `src/pages/closers/ClosersContent.tsx` (o el componente padre que maneja la lógica)
+Las KPI cards no requieren cambios — ya reflejan correctamente los datos de `closer_platform_sales`.
 
