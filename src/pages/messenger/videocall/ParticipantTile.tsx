@@ -185,6 +185,7 @@ const ParticipantTile = memo(function ParticipantTile({
             const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
             gainSourceRef.current = source;
             const gainNode = ctx.createGain();
+            gainNodeRef.current = gainNode;
             gainNode.gain.value = 1.4;
             const destination = ctx.createMediaStreamDestination();
 
@@ -329,6 +330,7 @@ const ParticipantTile = memo(function ParticipantTile({
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
     const gainSource = gainSourceRef;
+    const gainNode = gainNodeRef;
     return () => {
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
@@ -343,6 +345,10 @@ const ParticipantTile = memo(function ParticipantTile({
       if (gainSource.current) {
         try { gainSource.current.disconnect(); } catch {}
         gainSource.current = null;
+      }
+      if (gainNode.current) {
+        try { gainNode.current.disconnect(); } catch {}
+        gainNode.current = null;
       }
       // Release shared AudioContext (closes when last participant unmounts)
       releaseSharedAudioContext();
