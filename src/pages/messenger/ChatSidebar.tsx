@@ -70,7 +70,7 @@ function truncate(text: string, max: number) {
 export default function ChatSidebar({
   conversations, activeChatId, onSelectChat, onNewGroup, onOpenVideoRooms,
   onSelectContact, onDeleteChat, loading, profiles,
-  isPinned, onTogglePin,
+  isPinned, onTogglePin, isArchived, onToggleArchive,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
   onAddConversationToSpace, onRemoveConversationFromSpace,
 }: ChatSidebarProps) {
