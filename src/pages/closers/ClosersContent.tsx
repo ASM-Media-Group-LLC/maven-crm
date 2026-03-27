@@ -39,9 +39,29 @@ const ClosersContent = () => {
     isAdmin, isManager,
   } = useCloserLeads();
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const handleConvertToCreator = async (c: CloserCreatorRow) => {
+    try {
+      const { error } = await supabase.from("creators").insert({
+        name: c.instagram_handle,
+        instagram_handle: c.instagram_handle,
+        category: c.category,
+        phone: c.phone,
+        notes: c.notes,
+        closer_responsible_id: c.assigned_to,
+      });
+      if (error) throw error;
+      toast({ title: "Creadora creada", description: `${c.instagram_handle} fue convertida a creadora.` });
+      queryClient.invalidateQueries({ queryKey: ["closer-leads"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
 
   const hasFilters = !!(search || agentFilter || platformFilter || dateFrom || dateTo);
 
