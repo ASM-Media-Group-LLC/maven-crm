@@ -445,7 +445,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
             <div className="flex gap-6">
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
-              <span>Revenue: <strong className="text-primary">${completadasTotals.revenue.toLocaleString()}</strong></span>
             </div>
           </div>
         )}
@@ -501,7 +500,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Extras</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Revenue</TableHead>
           </TableRow>
         );
       case "no_interesadas":
@@ -721,10 +719,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
-            <TableCell className="text-sm">${Number(c.estimated_monetization || 0).toLocaleString()}</TableCell>
-            <TableCell className="text-sm">{Number(c.agency_commission || 0)}%</TableCell>
-            <TableCell className="text-sm">${Number(c.extras || 0).toLocaleString()}</TableCell>
-            <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
+            <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
+            <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
+            <TableCell><InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} /></TableCell>
           </TableRow>
         );
 
@@ -904,8 +901,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/30 text-sm">
           <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
           <div className="flex gap-6">
-            <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
-            <span>Revenue: <strong className="text-primary">${completadasTotals.revenue.toLocaleString()}</strong></span>
+              <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
           </div>
         </div>
       )}
