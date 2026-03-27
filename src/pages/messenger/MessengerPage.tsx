@@ -12,6 +12,7 @@ import { useReactions } from "@/hooks/useReactions";
 import { useReadReceipts } from "@/hooks/useReadReceipts";
 import { useOnlinePresence } from "@/hooks/useOnlinePresence";
 import { useNotificationPermission, useBrowserNotifications } from "@/hooks/useBrowserNotifications";
+import { useAuth } from "@/hooks/useAuth";
 import { useVideoCall } from "@/hooks/useVideoCall";
 import { useSpaces } from "@/hooks/useSpaces";
 import { usePinnedChats } from "@/hooks/usePinnedChats";
