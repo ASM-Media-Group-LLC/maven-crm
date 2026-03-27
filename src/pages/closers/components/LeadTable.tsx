@@ -364,14 +364,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
-      const rev = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
+      const platSales = (platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0);
       return {
         monetization: acc.monetization + Number(c.estimated_monetization || 0),
-        revenue: acc.revenue + rev,
+        platformRev: acc.platformRev + platSales,
         count: acc.count + 1,
       };
     },
-    { monetization: 0, revenue: 0, count: 0 }
+    { monetization: 0, platformRev: 0, count: 0 }
   ) : null;
 
   const isCloserRow = (c: CloserCreatorRow) => c._source === "closer";
@@ -457,6 +457,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
             <div className="flex gap-6">
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
             </div>
           </div>
         )}
@@ -511,7 +512,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataformas</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Rev. Plat.</TableHead>
             <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
@@ -753,12 +755,18 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 )}
               </div>
             </TableCell>
+            <TableCell className="text-sm font-medium">
+              ${(platformSalesByCreator?.[c.id] || []).reduce((s, x) => s + x.price, 0).toLocaleString()}
+            </TableCell>
             <TableCell className="text-right sticky right-0 bg-background z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPlatformModalId(c.id)}>
+                    Ventas por Plataforma
+                  </DropdownMenuItem>
                   {onConvertToCreator && (
                     <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
                       <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
@@ -951,6 +959,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <span className="font-medium">{completadasTotals.count} modelos cerradas</span>
           <div className="flex gap-6">
               <span>Monetización: <strong>${completadasTotals.monetization.toLocaleString()}</strong></span>
+              <span>Rev. Plataformas: <strong>${completadasTotals.platformRev.toLocaleString()}</strong></span>
           </div>
         </div>
       )}
