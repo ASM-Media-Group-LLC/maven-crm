@@ -63,6 +63,7 @@ export const TAB_STAGE_MAP: Record<string, string[]> = {
 };
 
 export const PLATFORMS = ["OnlyFans", "Trafix", "Blu", "Piclink", "LeakHunter", "ORA", "Otra"] as const;
+export const SALE_PLATFORMS = ["Trafix", "Blu", "Piclink", "LeakHunter", "ORA"] as const;
 export const CHANNELS = ["Instagram", "WhatsApp", "Telegram"] as const;
 export const RESULTS = ["Contestó", "No contestó", "Interesada", "No interesada", "Pendiente"] as const;
 

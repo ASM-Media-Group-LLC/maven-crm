@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2 } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -765,6 +765,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setPlatformModalId(c.id)}>
+                    <ShoppingCart className="mr-2 h-4 w-4" />
                     Ventas por Plataforma
                   </DropdownMenuItem>
                   {onConvertToCreator && (
@@ -774,6 +775,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                    <Undo2 className="mr-2 h-4 w-4" />
                     Devolver a Asignada
                   </DropdownMenuItem>
                 </DropdownMenuContent>

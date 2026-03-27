@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2 } from "lucide-react";
-import { PLATFORMS } from "../hooks/useCloserLeads";
+import { SALE_PLATFORMS } from "../hooks/useCloserLeads";
 
 interface PlatformSale {
   id: string;
@@ -47,7 +47,7 @@ const PlatformSalesModal = ({ creatorId, instagramHandle, open, onOpenChange }: 
   });
 
   const existingPlatforms = new Set(sales.map((s) => s.platform));
-  const availablePlatforms = PLATFORMS.filter((p) => !existingPlatforms.has(p));
+  const availablePlatforms = SALE_PLATFORMS.filter((p) => !existingPlatforms.has(p));
   const selectedCount = Object.keys(selectedPlatforms).length;
 
   const addSales = useMutation({
