@@ -351,7 +351,7 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
-const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, isAdmin, sourceAccounts }: Props) => {
+const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
@@ -412,10 +412,6 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                         <div>
                           <p className="text-[10px] uppercase text-muted-foreground">Plataforma</p>
                           <p className="font-medium">{c.main_platform || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase text-muted-foreground">Revenue</p>
-                          <p className="font-semibold text-primary">${revenue.toLocaleString()}</p>
                         </div>
                       </>
                     )}
@@ -500,7 +496,8 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Extras</TableHead>
+            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
+            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
           </TableRow>
         );
       case "no_interesadas":
@@ -722,7 +719,34 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
             <TableCell><InlineNumber value={c.agency_commission} suffix="%" onSave={(v) => onFieldChange(c.id, "agency_commission", v)} /></TableCell>
-            <TableCell><InlineNumber value={c.extras} prefix="$" onSave={(v) => onFieldChange(c.id, "extras", v)} /></TableCell>
+            <TableCell>
+              <Select value={c.main_platform || ""} onValueChange={(v) => onFieldChange(c.id, "main_platform", v)}>
+                <SelectTrigger className="h-7 w-28 text-xs">
+                  <SelectValue placeholder="Plataforma" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </TableCell>
+            <TableCell className="text-right sticky right-0 bg-background z-20">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onConvertToCreator && (
+                    <DropdownMenuItem onClick={() => onConvertToCreator(c)}>
+                      <UserPlus className="h-4 w-4 mr-2" /> Convertir a Creadora
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onStageChange(c.id, "Asignada")}>
+                    Devolver a Asignada
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
           </TableRow>
         );
 
