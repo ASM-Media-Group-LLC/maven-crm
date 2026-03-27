@@ -27,6 +27,7 @@ import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
+import ComisionesTab from "../comisiones/ComisionesTab";
 import { exportTableToExcel } from "@/pages/finanzas/reportes/generateReport";
 import { format } from "date-fns";
 
