@@ -607,7 +607,7 @@ export default function FacturacionPage() {
         {viewItem && (
           <button
             onClick={() => setViewItem(null)}
-            className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors"
+            className="fixed top-5 right-5 z-[60] text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
