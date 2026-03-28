@@ -5,6 +5,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { useUnreadChatCount } from "@/hooks/useUnreadChatCount";
+import { useSidebarBadges } from "@/hooks/useSidebarBadges";
 import { useLocation, useNavigate } from "react-router-dom";
 import { NavLink } from "@/components/NavLink";
 import Logo from "@/components/Logo";
@@ -34,6 +35,7 @@ const DashboardSidebar = () => {
   const { canAccess } = usePermissions();
 
   const unreadChatCount = useUnreadChatCount();
+  const { promologCount, leadgenCount, closersCount } = useSidebarBadges();
 
   const mainMenuAll: { title: string; url: string; icon: any; module: string; badge?: number }[] = [
     { title: t("nav.dashboard"), url: "/dashboard", icon: LayoutDashboard, module: "Dashboard" },
@@ -67,9 +69,9 @@ const DashboardSidebar = () => {
   ];
 
   const operationsMenuAll = [
-    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: 97, module: "Promolog" },
-    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, module: "LeadGen" },
-    { title: t("nav.closers"), url: "/closers", icon: Phone, module: "Closers" },
+    { title: t("nav.promolog"), url: "/promolog", icon: Megaphone, badge: promologCount || undefined, module: "Promolog" },
+    { title: t("nav.leadgen"), url: "/leadgen", icon: Activity, badge: leadgenCount || undefined, module: "LeadGen" },
+    { title: t("nav.closers"), url: "/closers", icon: Phone, badge: closersCount || undefined, module: "Closers" },
     { title: t("nav.tickets"), url: "/tickets", icon: Ticket, module: "Tickets" },
   ];
   const operationsMenu = operationsMenuAll.filter((item) => canAccess(item.module));
