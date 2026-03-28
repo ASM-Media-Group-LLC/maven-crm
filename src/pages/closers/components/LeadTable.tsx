@@ -584,7 +584,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
               <InlineSourceSelect value={c.source_account} onSave={(v) => onFieldChange(c.id, "source_account", v)} options={LEADGEN_COMPANIES} />
@@ -592,13 +592,13 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <TableCell>
               <InlineCategorySelect value={c.category} onSave={(v) => onFieldChange(c.id, "category", v)} />
             </TableCell>
-            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm">{c.passed_date ? format(new Date(c.passed_date), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "Sin asignar"}</TableCell>
             <TableCell>
               <ContactCountCell creatorId={c.id} count={c.contact_count} />
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">
-              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
+              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
               {nextDate && (
                 <p className="text-[10px] text-muted-foreground/70">
                   Próximo: {format(nextDate, "dd/MM")}
@@ -657,7 +657,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           <>
             <TableRow key={c.id}>
               <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
               <TableCell>{igLink}</TableCell>
               <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
               <TableCell><PhoneWhatsApp phone={c.phone} /></TableCell>
@@ -716,7 +716,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell><InlineNumber value={c.estimated_monetization} prefix="$" onSave={(v) => onFieldChange(c.id, "estimated_monetization", v)} /></TableCell>
@@ -773,11 +773,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell className="text-sm text-muted-foreground">
-              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy") : "—"}
+              {c.last_contact_date ? format(new Date(c.last_contact_date), "dd/MM/yyyy hh:mm a") : "—"}
             </TableCell>
             <TableCell>
               <InlineText value={c.rejection_reason} onSave={(v) => onFieldChange(c.id, "rejection_reason", v)} placeholder="Sin motivo" />
@@ -792,7 +792,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell className="text-sm">{c.agent_name || "—"}</TableCell>
             <TableCell>
@@ -833,7 +833,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
         return (
           <TableRow key={c.id}>
             <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
-            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy") : "—"}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "dd/MM/yyyy hh:mm a") : "—"}</TableCell>
             <TableCell>{igLink}</TableCell>
             <TableCell>
               <InlineStageSelect value={c.stage} onSave={(v) => onStageChange(c.id, v, c._source)} disabled={false} />
