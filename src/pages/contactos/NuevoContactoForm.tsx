@@ -139,6 +139,40 @@ const NuevoContactoForm = () => {
 
     setIsSaving(true);
     try {
+      // Phone duplicate check
+      const trimmedPhone = form.phone?.trim();
+      if (trimmedPhone) {
+        const fullPhone = `${form.countryCode}${trimmedPhone}`;
+        const { data: phoneInContacts } = await supabase
+          .from("closers_contacts")
+          .select("id, name")
+          .eq("phone", trimmedPhone)
+          .maybeSingle();
+        if (phoneInContacts) {
+          toast({
+            title: "Teléfono duplicado",
+            description: `Este número ya está registrado para: ${phoneInContacts.name}`,
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+        const { data: phoneInCreators } = await supabase
+          .from("creators")
+          .select("id, name, phone")
+          .eq("phone", fullPhone)
+          .maybeSingle();
+        if (phoneInCreators) {
+          toast({
+            title: "Teléfono duplicado",
+            description: `Este número ya está registrado en creators: ${phoneInCreators.name}`,
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
+
       const handle = normalizeHandle(form.accountLink.trim());
       const { error } = await supabase.from("closers_contacts").insert({
         name: form.nombre.trim(),
