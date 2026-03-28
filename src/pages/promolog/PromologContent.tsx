@@ -85,12 +85,12 @@ const promotedToResult = (promoted: string | null): string => {
   }
 };
 
-const resultToBadgeClass = (result: string): string => {
+const resultToBadgeVariant = (result: string): "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft" => {
   switch (result) {
-    case "Sí": return "bg-green-500 text-white hover:bg-green-600 border-transparent";
-    case "No": return "bg-destructive text-destructive-foreground hover:bg-destructive/90 border-transparent";
-    case "Parcial": return "bg-yellow-500 text-white hover:bg-yellow-600 border-transparent";
-    default: return "bg-muted text-muted-foreground border-transparent";
+    case "Sí": return "success-soft";
+    case "No": return "destructive-soft";
+    case "Parcial": return "warning-soft";
+    default: return "secondary-soft";
   }
 };
 
