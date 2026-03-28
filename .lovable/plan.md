@@ -1,55 +1,43 @@
 
 
-## Diagnóstico y Plan: Problemas de Caché y Despliegue en Maven
+## Plan: Ajustar tabla de Invoices y agregar descarga PDF
 
-### Diagnóstico
+### Problema
+1. La tabla muestra columnas innecesarias (Monto, Fee, Neto, Estado). Se requiere solo: Número, Creador, Periodo, Vencimiento, Acciones.
+2. No existe funcionalidad de descarga PDF.
+3. La tabla `invoices` no almacena `period_start` / `period_end` — se necesitan agregar.
 
-**Causa raíz identificada: El Service Worker (PWA) está cacheando agresivamente todo, incluyendo `index.html`.**
+### Cambios
 
-La configuración actual de `vite-plugin-pwa` tiene `globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"]` — esto precachea el `index.html` en el service worker. Aunque `skipWaiting` y `clientsClaim` están activos, el navegador puede seguir sirviendo la versión cacheada del HTML hasta que el SW se actualice, lo cual no es instantáneo. Esto es la causa principal de que los usuarios vean versiones antiguas.
+#### 1. Migración SQL — agregar columnas de periodo
+Agregar `period_start` y `period_end` (tipo `date`, nullable) a la tabla `invoices`. Actualizar también el insert en `NuevoInvoicePage.tsx` para persistir estos valores.
 
-**Sobre cache-busting de JS/CSS:** Vite ya genera hashes en los nombres de archivo por defecto (ej: `assets/index-a1b2c3.js`). Esto no requiere cambios.
+#### 2. `FacturacionPage.tsx` — simplificar columnas de la tabla
+Reemplazar las columnas actuales (Monto, Fee, Neto, Estado) por:
+- **Número** (`#invoice_number`)
+- **Creador** (avatar + nombre)
+- **Periodo** (`period_start — period_end`, formateado `dd/MM/yyyy`)
+- **Vencimiento** (`due_date`, formateado `dd/MM/yyyy`)
+- **Acciones** — mantener Ver y agregar botón Descargar PDF
 
-### Resumen de últimos 3 cambios importantes
-1. Sincronización del Invoice (persistir `agency_amount`, `blue_amount`, `paypal_amount` en DB y actualizar `InvoiceA4Preview.tsx`)
-2. Desglose en preview A4 (Agency Services + Blue + PayPal con cálculos dinámicos)
-3. Corrección del botón duplicado en `ForgotPassword.tsx`
+Ajustar `colSpan` en filas de loading/vacío.
 
----
+#### 3. `FacturacionPage.tsx` — botón Descargar PDF en Acciones
+Agregar un botón con icono `Download` que genera el PDF del invoice al hacer clic. La generación usará `html2canvas` + `jspdf`:
+- Renderizar el componente `InvoiceA4Preview` en un contenedor oculto (off-screen)
+- Capturarlo con `html2canvas` a escala 2x para calidad
+- Insertar la imagen en un documento `jsPDF` formato A4
+- Descargar como `Invoice-{number}.pdf`
 
-### Cambios a implementar
+#### 4. `NuevoInvoicePage.tsx` — persistir periodo
+Agregar `period_start: dateFrom` y `period_end: dateTo` al payload del insert.
 
-#### 1. `index.html` — Headers anti-caché
-Agregar meta tags de control de caché en el `<head>`:
-```html
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="0" />
-```
-
-#### 2. `vite.config.ts` — Excluir HTML del precache del SW
-Cambiar `globPatterns` para excluir `html`:
-```
-globPatterns: ["**/*.{js,css,ico,png,svg,woff2}"]
-```
-Agregar `navigateFallback: undefined` explícitamente para evitar que el SW intercepte la navegación con un HTML cacheado.
-
-Agregar runtime caching para el HTML con `NetworkFirst`:
-```ts
-{
-  urlPattern: /\/$/,
-  handler: "NetworkFirst",
-  options: {
-    cacheName: "html-cache",
-    expiration: { maxEntries: 10, maxAgeSeconds: 300 },
-  },
-}
-```
-
-#### 3. Despliegue limpio
-Después de aplicar estos cambios, el usuario deberá hacer **Publish → Update** desde Lovable para forzar un despliegue limpio. Los usuarios existentes recibirán el nuevo SW que dejará de servir HTML obsoleto.
+### Dependencias a instalar
+- `jspdf` y `html2canvas-pro` (o `html2canvas`)
 
 ### Archivos a modificar
-- `index.html` (meta tags anti-caché)
-- `vite.config.ts` (ajustar PWA/workbox config)
+- **Nueva migración SQL** (add `period_start`, `period_end` to `invoices`)
+- `src/pages/finanzas/facturacion/FacturacionPage.tsx`
+- `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`
+- `src/integrations/supabase/types.ts` (se sincronizará automáticamente)
 
