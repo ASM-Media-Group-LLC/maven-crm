@@ -292,6 +292,14 @@ const PromologContent = () => {
     setSelectedEntry(entry);
     setDeleteEntryOpen(true);
   };
+  const handleNotesChange = async (entryId: string, notes: string | null) => {
+    const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+  };
 
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [campaignCreator, setCampaignCreator] = useState("");
