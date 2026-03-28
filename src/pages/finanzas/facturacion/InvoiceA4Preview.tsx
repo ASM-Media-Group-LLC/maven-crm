@@ -3,8 +3,9 @@ import kashLogo from "@/assets/kash-logo.png";
 interface InvoiceData {
   invoice_number?: string;
   amount?: number;
-  fee_type?: string;
-  fee_amount?: number;
+  agency_amount?: number;
+  blue_amount?: number;
+  paypal_amount?: number;
   net_amount?: number;
   payment_method?: string;
   due_date?: string;
@@ -23,9 +24,10 @@ const A4_W = 595;
 const A4_H = 842;
 
 export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) {
-  const amt = Number(invoice.amount) || 0;
-  const feeAmount = Number(invoice.fee_amount) || 0;
-  const netAmount = Number(invoice.net_amount) || (amt - feeAmount);
+  const agencyAmount = Number(invoice.agency_amount) || 0;
+  const blueAmount = Number(invoice.blue_amount) || 0;
+  const paypalAmount = Number(invoice.paypal_amount) || 0;
+  const grandTotal = Number(invoice.amount) || (agencyAmount + blueAmount + paypalAmount);
   const creatorName = invoice.creators?.artistic_name || invoice.creators?.name || "—";
   const invoiceDate = invoice.created_at
     ? new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
@@ -87,22 +89,29 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
             </thead>
             <tbody>
               <tr className="border-b border-gray-100">
-                <td className="py-2 text-gray-700">Agency Service</td>
+                <td className="py-2 text-gray-700">Agency Services</td>
                 <td className="py-2 text-gray-500"></td>
-                <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
+                <td className="py-2 text-right text-gray-800 font-medium">{fmt(agencyAmount)}</td>
               </tr>
-              {feeAmount > 0 && (
+              {blueAmount > 0 && (
                 <tr className="border-b border-gray-100">
-                  <td className="py-2 text-gray-500">Fee ({invoice.fee_type === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
-                  <td className="py-2"></td>
-                  <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
+                  <td className="py-2 text-gray-700">Blue</td>
+                  <td className="py-2 text-gray-500"></td>
+                  <td className="py-2 text-right text-gray-800 font-medium">{fmt(blueAmount)}</td>
+                </tr>
+              )}
+              {paypalAmount > 0 && (
+                <tr className="border-b border-gray-100">
+                  <td className="py-2 text-gray-700">PayPal</td>
+                  <td className="py-2 text-gray-500">5% del restante</td>
+                  <td className="py-2 text-right text-gray-800 font-medium">{fmt(paypalAmount)}</td>
                 </tr>
               )}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
-                <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
+                <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total</td>
+                <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(grandTotal)}</td>
               </tr>
             </tfoot>
           </table>

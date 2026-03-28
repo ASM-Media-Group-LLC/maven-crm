@@ -136,11 +136,14 @@ export default function NuevoInvoicePage() {
     createInvoice.mutate({
       creator_id: creatorId,
       amount: grandTotal,
+      agency_amount: agencyTotal,
+      blue_amount: blueTotal,
+      paypal_amount: paypalAmount,
       net_amount: grandTotal,
       due_date: dueDate || null,
       notes: notes || null,
       status: "borrador",
-    });
+    } as any);
   };
 
   return (
