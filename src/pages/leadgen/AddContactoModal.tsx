@@ -89,6 +89,42 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
         }
       }
 
+      // Phone duplicate check (only if phone was provided)
+      const trimmedPhone = data.telefono?.trim();
+      if (trimmedPhone) {
+        const fullPhone = `${data.paisCodigo}${trimmedPhone}`;
+        // Check in closers_contacts
+        const { data: phoneInContacts } = await supabase
+          .from("closers_contacts")
+          .select("id, name")
+          .eq("phone", trimmedPhone)
+          .maybeSingle();
+        if (phoneInContacts) {
+          toast({
+            title: "Teléfono duplicado",
+            description: `Este número ya está registrado para: ${phoneInContacts.name}`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        // Check in creators
+        const { data: phoneInCreators } = await supabase
+          .from("creators")
+          .select("id, name, phone")
+          .eq("phone", fullPhone)
+          .maybeSingle();
+        if (phoneInCreators) {
+          toast({
+            title: "Teléfono duplicado",
+            description: `Este número ya está registrado en creators: ${phoneInCreators.name}`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from("closers_contacts").insert({
         name: data.nombre,
         handle: normalizedIg || data.instagram,
