@@ -442,14 +442,14 @@ const PromologContent = () => {
       {/* KPI Cards */}
       <div className="shrink-0 px-6 pt-4 pb-2">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setCreatorsModalOpen(true)}>
+          <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
-                <Users className="h-4 w-4 text-accent" />
+                <Table2 className="h-4 w-4 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-success">{creators.length}</p>
-                <p className="text-xs text-muted-foreground">Modelos</p>
+                <p className="text-2xl font-bold text-accent">{filteredEntries.length}</p>
+                <p className="text-xs text-muted-foreground">Total Promos</p>
               </div>
             </CardContent>
           </Card>
@@ -560,9 +560,10 @@ const PromologContent = () => {
           </div>
 
           {/* Table area */}
-          <div className="flex-1 min-h-0 overflow-auto px-6 pb-4">
+          <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
             {entryView === "list" ? (
               <DataTableShell
+                className="flex-1 min-h-0"
                 currentPage={promoPage}
                 totalPages={Math.max(1, Math.ceil(filteredEntries.length / promoPageSize))}
                 totalCount={filteredEntries.length}
@@ -578,7 +579,9 @@ const PromologContent = () => {
                 />
               </DataTableShell>
             ) : (
-              <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+              <div className="flex-1 min-h-0 overflow-auto">
+                <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
+              </div>
             )}
           </div>
         </>

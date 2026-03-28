@@ -30,11 +30,10 @@ interface Props {
   onDelete?: (entry: PromologEntry) => void;
 }
 
-type SortKey = "ticket" | "model" | "network" | "platform" | "result" | "agent" | "date";
+type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
 
 const getSortValue = (entry: PromologEntry, key: SortKey): string => {
   switch (key) {
-    case "ticket": return entry.ticketNumber;
     case "model": return entry.name.toLowerCase();
     case "network": return entry.network;
     case "platform": return entry.platform;
@@ -117,21 +116,25 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
     <Table containerClassName="overflow-visible" className="min-w-[900px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" sortKeyName="ticket" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[50px]">#</TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" sortKeyName="date" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Modelo" sortKeyName="model" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Red Social" sortKeyName="network" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" sortKeyName="date" /></TableHead></TableHead>
           <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {sorted.map((entry) => (
+        {sorted.map((entry, idx) => (
           <TableRow key={entry.id} className="cursor-pointer" onClick={() => onEdit?.(entry)}>
-            <TableCell>
-              <Badge variant="outline" className="text-xs font-mono">{entry.ticketNumber}</Badge>
+            <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+              <div className="flex flex-col">
+                <span>{entry.date}</span>
+                <span className="text-xs">{entry.time}</span>
+              </div>
             </TableCell>
             <TableCell className="min-w-[180px]">
               <div className="flex flex-col">
@@ -158,12 +161,6 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
               </Badge>
             </TableCell>
             <TableCell className="text-sm text-muted-foreground">@{entry.agent}</TableCell>
-            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-              <div className="flex flex-col">
-                <span>{entry.date}</span>
-                <span className="text-xs">{entry.time}</span>
-              </div>
-            </TableCell>
             <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-end">
                 <DropdownMenu>
