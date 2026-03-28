@@ -1,45 +1,53 @@
 
 
-## Plan: Badges dinámicos para Promolog, LeadGen, Closers y Messenger
+## Plan: Mostrar toda la data por defecto + badge de Promolog correcto
 
-### Problema actual
-- **Promolog**: badge hardcodeado como `97` (no es dato real)
-- **LeadGen**: sin badge
-- **Closers**: sin badge
-- **Messenger**: ya funciona con `useUnreadChatCount()`
+### Cambio de filosofía
+Actualmente Promolog y LeadGen inician filtrados por "hoy", lo que causa que el badge (25,371 sin revisar) no coincida con la vista (0 entradas de hoy). La solución correcta es: **todas las vistas muestran toda la data por defecto** (sin filtro de fecha), y el badge cuenta todos los pendientes sin filtro de fecha (como ya lo hace).
 
-### Qué representará cada badge
-Basado en "pendientes por revisar":
-- **Promolog**: entradas donde `reviewed_by IS NULL` (sin revisar)
-- **LeadGen**: entradas donde `quality = 'pending'` o `status IS NULL` (sin calificar)
-- **Closers**: leads en stage `'Nuevo'` (sin asignar/gestionar)
-- **Messenger**: ya funciona correctamente
+### Cambios
 
-### Implementación
-
-**1. Crear hook `useSidebarBadges.ts`**
-Un solo hook que hace 3 queries ligeras (count only) en paralelo y devuelve `{ promologCount, leadgenCount, closersCount }`:
-
+**1. Promolog — quitar filtro de fecha por defecto**
+En `src/pages/promolog/PromologContent.tsx` línea 143-144:
 ```ts
-// Promolog: entries sin revisar
-supabase.from("promolog_entries").select("id", { count: "exact", head: true }).is("reviewed_by", null)
+// Antes
+const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
-// LeadGen: entries pendientes de calificación
-supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending")
-
-// Closers: leads en etapa "Nuevo"
-supabase.from("closer_creators").select("id", { count: "exact", head: true }).eq("stage", "Nuevo")
+// Después
+const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 ```
 
-Usa `useQuery` con `refetchInterval: 60000` (1 min) para mantener actualizados sin ser agresivo. Se cachea con React Query.
+**2. LeadGen — quitar filtro de fecha por defecto**
+En `src/pages/leadgen/LeadGenContent.tsx` línea 64-65:
+```ts
+// Antes
+const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
+const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
 
-**2. Modificar `DashboardSidebar.tsx`**
-- Importar `useSidebarBadges`
-- Reemplazar el `badge: 97` hardcodeado de Promolog con `badge: promologCount || undefined`
-- Agregar `badge: leadgenCount || undefined` a LeadGen
-- Agregar `badge: closersCount || undefined` a Closers
+// Después
+const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+```
+
+**3. SalesOverview — quitar filtro de fecha por defecto**
+En `src/pages/SalesOverview.tsx` línea 19-20:
+```ts
+// Antes
+const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfWeek(today, { weekStartsOn: 1 }));
+const [dateTo, setDateTo] = useState<Date | undefined>(today);
+
+// Después
+const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+```
+
+**4. Badge de Promolog — NO cambiar**
+El hook `useSidebarBadges.ts` ya cuenta todos los pendientes sin filtro de fecha. Con las vistas mostrando toda la data, el número del badge (25,371) coincidirá con lo que el usuario ve al entrar a `/promolog`.
 
 ### Archivos
-- **Crear**: `src/hooks/useSidebarBadges.ts`
-- **Modificar**: `src/components/dashboard/DashboardSidebar.tsx`
+- **Modificar**: `src/pages/promolog/PromologContent.tsx`
+- **Modificar**: `src/pages/leadgen/LeadGenContent.tsx`
+- **Modificar**: `src/pages/SalesOverview.tsx`
 
