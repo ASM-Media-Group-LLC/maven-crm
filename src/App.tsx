@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 const Concept = lazy(() => import("./pages/Concept"));
+const Credentials = lazy(() => import("./pages/Credentials"));
 
 // Lazy-loaded pages
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -165,6 +166,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/concept" element={<Concept />} />
+              <Route path="/credentials" element={<Credentials />} />
               
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
