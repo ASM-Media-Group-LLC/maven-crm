@@ -50,13 +50,11 @@ export const STAGE_LABELS: Record<string, string> = {
   Confirmada: "Confirmada",
   Completada: "Completada",
   "No interesada": "No interesada",
-  "Pendiente LG": "Pendiente LG",
 };
 
 export const TAB_STAGE_MAP: Record<string, string[]> = {
   todas: [],
   nuevo: ["Nuevo"],
-  pendiente_lg: [],
   asignadas: ["Asignada"],
   confirmadas: ["Confirmada"],
   completadas: ["Completada"],
@@ -119,23 +117,16 @@ export const useCloserLeads = () => {
   const { data: creatorsData, isLoading } = useQuery({
     queryKey: ["closer-creators-list", activeTab, page, user?.id, role, dateFrom?.toISOString(), dateTo?.toISOString(), dateField, normalizedSearch, agentFilter, platformFilter],
     queryFn: async () => {
-      // ── Pendiente LG tab: closer_creators with stage 'Pendiente LG' ──
       // ── Nuevo tab: closer_creators with stage 'Nuevo' ──
-      if (activeTab === "pendiente_lg" || activeTab === "nuevo") {
-        const stageValue = activeTab === "nuevo" ? "Nuevo" : "Pendiente LG";
+      if (activeTab === "nuevo") {
         let query = supabase
           .from("closer_creators")
           .select("*", { count: "exact" })
-          .eq("stage", stageValue);
+          .eq("stage", "Nuevo");
 
         // Server-side search filter
         if (normalizedSearch) {
           query = query.ilike("instagram_handle", `%${normalizedSearch}%`);
-        }
-
-        // For "Nuevo" tab, only show rows originating from closers_contacts (not leadgen)
-        if (activeTab === "nuevo") {
-          query = query.not("source_contact_id", "is", null);
         }
 
         query = query.order("created_at", { ascending: false });
@@ -143,8 +134,7 @@ export const useCloserLeads = () => {
         if (dateFrom && dateTo) {
           const fromStr = dateFrom.toISOString().split("T")[0];
           const toStr = dateTo.toISOString().split("T")[0];
-          const field = activeTab === "nuevo" ? "created_at" : "passed_date";
-          query = query.gte(field, fromStr).lte(field, toStr);
+          query = query.gte("created_at", fromStr).lte("created_at", toStr);
         }
 
         const from = page * PAGE_SIZE;
@@ -177,7 +167,7 @@ export const useCloserLeads = () => {
           agency_commission: c.agency_commission ?? 0,
           extras: c.extras ?? 0,
           main_platform: c.main_platform ?? null,
-          agent_name: activeTab === "nuevo" && c.created_by ? (createdByMap[c.created_by] || null) : null,
+          agent_name: c.created_by ? (createdByMap[c.created_by] || null) : null,
           contact_count: 0,
           _source: "closer" as const,
           _lg_status: null,
@@ -198,9 +188,6 @@ export const useCloserLeads = () => {
         query = query.eq("stage", stageFilter[0]);
       } else if (stageFilter.length > 1) {
         query = query.in("stage", stageFilter);
-      } else {
-        // Tab "todas": exclude "Pendiente LG" and "Nuevo" (those have their own tabs)
-        query = query.not("stage", "eq", "Pendiente LG");
       }
 
       // Server-side search filter
@@ -424,7 +411,7 @@ export const useCloserLeads = () => {
         .maybeSingle();
 
       const updates: Record<string, unknown> = { assigned_to };
-      if (current?.stage === "Nuevo" || current?.stage === "Pendiente LG") {
+      if (current?.stage === "Nuevo") {
         updates.stage = "Asignada";
       }
 
