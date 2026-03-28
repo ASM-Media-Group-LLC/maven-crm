@@ -3899,7 +3899,9 @@ export type Database = {
       }
       invoices: {
         Row: {
+          agency_amount: number | null
           amount: number
+          blue_amount: number | null
           created_at: string
           created_by: string | null
           creator_id: string | null
@@ -3912,12 +3914,15 @@ export type Database = {
           notes: string | null
           paid_date: string | null
           payment_method: string | null
+          paypal_amount: number | null
           reversal_reason: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          agency_amount?: number | null
           amount?: number
+          blue_amount?: number | null
           created_at?: string
           created_by?: string | null
           creator_id?: string | null
@@ -3930,12 +3935,15 @@ export type Database = {
           notes?: string | null
           paid_date?: string | null
           payment_method?: string | null
+          paypal_amount?: number | null
           reversal_reason?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          agency_amount?: number | null
           amount?: number
+          blue_amount?: number | null
           created_at?: string
           created_by?: string | null
           creator_id?: string | null
@@ -3948,6 +3956,7 @@ export type Database = {
           notes?: string | null
           paid_date?: string | null
           payment_method?: string | null
+          paypal_amount?: number | null
           reversal_reason?: string | null
           status?: string
           updated_at?: string
