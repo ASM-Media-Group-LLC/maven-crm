@@ -439,119 +439,58 @@ const PromologContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Cards - always visible */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
-                  <Users className="h-5 w-5 text-accent" />
-                </div>
+      {/* KPI Cards */}
+      <div className="shrink-0 px-6 pt-4 pb-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setCreatorsModalOpen(true)}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
+                <Users className="h-4 w-4 text-accent" />
               </div>
-              <p className="text-3xl font-bold text-success">{creators.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
+              <div>
+                <p className="text-2xl font-bold text-success">{creators.length}</p>
+                <p className="text-xs text-muted-foreground">Modelos</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-primary/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("ingresados")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                  <CheckCircle className="h-5 w-5 text-primary" />
-                </div>
+          <Card className="border border-primary/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("ingresados")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                <CheckCircle className="h-4 w-4 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-primary">{entries.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+              <div>
+                <p className="text-2xl font-bold text-primary">{entries.length}</p>
+                <p className="text-xs text-muted-foreground">Ingresados</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-destructive/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("no_chequeadas")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                </div>
+          <Card className="border border-destructive/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("no_chequeadas")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/20 shrink-0">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
               </div>
-              <p className="text-3xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
+              <div>
+                <p className="text-2xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
+                <p className="text-xs text-muted-foreground">Sin revisar</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-success/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("completadas")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-                  <TrendingUp className="h-5 w-5 text-success" />
-                </div>
+          <Card className="border border-success/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("completadas")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
+                <TrendingUp className="h-4 w-4 text-success" />
               </div>
-              <p className="text-3xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+              <div>
+                <p className="text-2xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
+                <p className="text-xs text-muted-foreground">Completadas</p>
+              </div>
             </CardContent>
           </Card>
         </div>
+      </div>
 
-        {/* Social & Platform Section - always visible */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">
-            Promociones por Red Social y Plataforma{" "}
-            <span className="text-sm font-normal text-muted-foreground">(solo tickets &apos;Sí&apos;)</span>
-          </h2>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Red Social</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {socialCards.map((s) => {
-                const netKey = s.name.toLowerCase();
-                const isActive = selectedNetwork === netKey;
-                return (
-                  <Card
-                    key={s.name}
-                    className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
-                    onClick={() => setSelectedNetwork(prev => prev === netKey ? "" : netKey)}
-                  >
-                    <CardContent className="flex items-center gap-3 p-4">
-                      {s.icon}
-                      <div>
-                        <p className="text-xs text-muted-foreground">{s.name}</p>
-                        <p className="text-xl font-bold">{s.value}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Plataforma</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {platformCards.map((p) => {
-                const platKey = p.name.toLowerCase();
-                const isActive = selectedCardPlatform === platKey;
-                return (
-                  <Card
-                    key={p.name}
-                    className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
-                    onClick={() => setSelectedCardPlatform(prev => prev === platKey ? "" : platKey)}
-                  >
-                    <CardContent className="flex items-center gap-3 p-4">
-                      {p.icon}
-                      <div>
-                        <p className="text-xs text-muted-foreground">{p.name}</p>
-                        <p className="text-xl font-bold">{p.value}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-          <p className="text-xs text-center text-muted-foreground">
-            Mostrando datos del {shortDate} al {shortDate}
-          </p>
-        </div>
-
-        {/* Tab bar */}
+      {/* Tabs */}
+      <div className="shrink-0 px-6 pb-2">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           {tabItems.map((tab) => (
             <Button
@@ -565,12 +504,13 @@ const PromologContent = () => {
             </Button>
           ))}
         </div>
+      </div>
 
-        {/* Tab content */}
-        {/* Promos tab */}
-        {activeTab === "promos" && (
-          <>
-            {/* Unified filters row */}
+      {/* Promos tab */}
+      {activeTab === "promos" && (
+        <>
+          {/* Filters */}
+          <div className="shrink-0 px-6 pb-2">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -617,7 +557,10 @@ const PromologContent = () => {
                 </Button>
               </div>
             </div>
+          </div>
 
+          {/* Table area */}
+          <div className="flex-1 min-h-0 overflow-auto px-6 pb-4">
             {entryView === "list" ? (
               <DataTableShell
                 currentPage={promoPage}
@@ -637,332 +580,332 @@ const PromologContent = () => {
             ) : (
               <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
             )}
-          </>
-        )}
-
-        {/* Agentes tab */}
-        {activeTab === "agentes" && (
-          <div className="space-y-6">
-            {/* Filters row */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar agente..." className="pl-9 h-9" value={searchAgent} onChange={(e) => setSearchAgent(e.target.value)} />
-              </div>
-              <DateRangePicker
-                from={agentDateFrom}
-                to={agentDateTo}
-                onApply={(from, to) => { setAgentDateFrom(from); setAgentDateTo(to); }}
-                placeholder="Selecciona fechas"
-                className="h-9"
-              />
-              {(searchAgent || agentDateFrom || agentDateTo) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchAgent(""); setAgentDateFrom(undefined); setAgentDateTo(undefined); }}>
-                  <X className="mr-1.5 h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-              <div className="ml-auto flex gap-1">
-                <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button variant={agentesView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("calendar")}>
-                  <CalendarIcon className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Banner gradient al estilo LeadGen */}
-            <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-              <div className="p-6 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {agentesView === "calendar"
-                      ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
-                      : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
-                    <p className="text-xs text-muted-foreground">Agentes Activos</p>
-                  </div>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Calendar view or agent cards */}
-            {agentesView === "calendar" ? (() => {
-              const weekDays = getAgentWeekDays(agentWeekOffset);
-              const entriesInDay = (agentName: string, day: Date) =>
-                promologEntries.filter(pe =>
-                  pe.reviewed_by === agentName &&
-                  pe.promoted === "true" &&
-                  isSameDay(new Date(pe.date), day)
-                ).length;
-              const colTotals = weekDays.map(day =>
-                agentsData.reduce((sum, ag) => sum + entriesInDay(ag.name, day), 0)
-              );
-              const grandTotal = colTotals.reduce((a, b) => a + b, 0);
-              return (
-                <Card>
-                  <CardContent className="pt-4 px-4 pb-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w - 1)}>
-                        <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
-                      </Button>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
-                      </span>
-                      <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w + 1)} disabled={agentWeekOffset >= 0}>
-                        Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="min-w-[140px]">Agente</TableHead>
-                            {weekDays.map((day, i) => (
-                              <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
-                                {DAY_LABELS_ES[i]} {format(day, "d")}
-                              </TableHead>
-                            ))}
-                            <TableHead className="text-center font-semibold">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {agentsData.map((agent) => {
-                            const dayCounts = weekDays.map(day => entriesInDay(agent.name, day));
-                            const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
-                            return (
-                              <TableRow key={agent.name}>
-                                <TableCell className="font-medium text-sm">{agent.name}</TableCell>
-                                {dayCounts.map((cnt, i) => (
-                                  <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
-                                    {isFuture(startOfDay(weekDays[i])) || cnt === 0 ? "—" : cnt}
-                                  </TableCell>
-                                ))}
-                                <TableCell className="text-center font-semibold">{rowTotal > 0 ? rowTotal : "—"}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                        <tfoot>
-                          <TableRow className="border-t-2 bg-muted/30">
-                            <TableCell className="font-bold text-sm">Total</TableCell>
-                            {colTotals.map((t, i) => (
-                              <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${(t === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
-                                {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
-                              </TableCell>
-                            ))}
-                            <TableCell className="text-center">
-                              <Badge variant="default">{grandTotal}</Badge>
-                            </TableCell>
-                          </TableRow>
-                        </tfoot>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })() : (
-            agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                      <Users className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-muted-foreground text-sm">No hay datos para esta fecha</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
-                {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
-                  <Card key={agent.name}>
-                    <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-muted">
-                          <Users className="h-5 w-5 text-muted-foreground" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
-                        <p className="text-sm font-semibold">{agent.name}</p>
-                        <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
-                      </div>
-                      <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15">
-                            <Check className="h-3 w-3 text-success" />
-                          </span>
-                          <span className="text-sm font-medium">{agent.si}</span>
-                          <span className="text-xs text-muted-foreground">Sí</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning/15">
-                            <Minus className="h-3 w-3 text-warning" />
-                          </span>
-                          <span className="text-sm font-medium">{agent.parcial}</span>
-                          <span className="text-xs text-muted-foreground">Parcial</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/15">
-                            <X className="h-3 w-3 text-destructive" />
-                          </span>
-                          <span className="text-sm font-medium">{agent.no}</span>
-                          <span className="text-xs text-muted-foreground">No</span>
-                        </div>
-                        <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
-                        <div className="flex items-center gap-1.5">
-                          {agent.badges.map((b) => (
-                            <Badge key={b.label} variant="outline" className="text-xs">
-                              {b.label} {b.value}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ))}
           </div>
-        )}
+        </>
+      )}
 
-        {/* Campañas tab */}
-        {activeTab === "campanas" && (
-          <div className="space-y-3">
-            {/* Filters row */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar campaña..." className="pl-9 h-9" value={searchCampaign} onChange={(e) => setSearchCampaign(e.target.value)} />
+      {/* Agentes tab */}
+      {activeTab === "agentes" && (
+        <div className="flex-1 min-h-0 overflow-auto p-6 space-y-6">
+          {/* Filters row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar agente..." className="pl-9 h-9" value={searchAgent} onChange={(e) => setSearchAgent(e.target.value)} />
+            </div>
+            <DateRangePicker
+              from={agentDateFrom}
+              to={agentDateTo}
+              onApply={(from, to) => { setAgentDateFrom(from); setAgentDateTo(to); }}
+              placeholder="Selecciona fechas"
+              className="h-9"
+            />
+            {(searchAgent || agentDateFrom || agentDateTo) && (
+              <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchAgent(""); setAgentDateFrom(undefined); setAgentDateTo(undefined); }}>
+                <X className="mr-1.5 h-4 w-4" />
+                Limpiar filtros
+              </Button>
+            )}
+            <div className="ml-auto flex gap-1">
+              <Button variant={agentesView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("list")}>
+                <List className="h-4 w-4" />
+              </Button>
+              <Button variant={agentesView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("grid")}>
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button variant={agentesView === "calendar" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setAgentesView("calendar")}>
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Banner gradient al estilo LeadGen */}
+          <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
+            <div className="p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {agentesView === "calendar"
+                    ? (() => { const days = getAgentWeekDays(agentWeekOffset); return `${format(days[0], "d 'de' MMMM", { locale: es })} – ${format(days[6], "d 'de' MMMM, yyyy", { locale: es })}`; })()
+                    : (dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha")}
+                </p>
               </div>
-              <Select value={campaignStatusFilter || undefined} onValueChange={(v) => setCampaignStatusFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="activa">Activa</SelectItem>
-                  <SelectItem value="finalizada">Finalizada</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                </SelectContent>
-              </Select>
-              <DateRangePicker
-                from={campDateFrom}
-                to={campDateTo}
-                onApply={(from, to) => { setCampDateFrom(from); setCampDateTo(to); }}
-                placeholder="Selecciona fechas"
-                className="h-9"
-              />
-              {(searchCampaign || campaignStatusFilter || campDateFrom || campDateTo) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchCampaign(""); setCampaignStatusFilter(""); setCampDateFrom(undefined); setCampDateTo(undefined); }}>
-                  <X className="mr-1.5 h-4 w-4" />
-                  Limpiar filtros
-                </Button>
-              )}
-              <div className="ml-auto flex gap-1">
-                <Button variant={campanasView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("list")}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={campanasView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("grid")}>
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-3xl font-bold text-primary">{agentsData.length}</p>
+                  <p className="text-xs text-muted-foreground">Agentes Activos</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
               </div>
             </div>
-            {(() => {
-              const filtered = campaigns.filter((c: any) => {
-                const creator = c.creators as any;
-                const name = (creator?.artistic_name || creator?.name || "").toLowerCase();
-                if (searchCampaign && !name.includes(searchCampaign.toLowerCase())) return false;
-                if (campaignStatusFilter && c.status !== campaignStatusFilter) return false;
-                return true;
-              });
-              if (filtered.length === 0) {
-                return (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col items-center justify-center py-16">
-                        <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                          <Target className="h-8 w-8 text-muted-foreground/50" />
-                        </div>
-                        <p className="text-muted-foreground text-sm">No hay campañas</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              }
-              if (campanasView === "list") {
-                return (
-                  <div className="rounded-md border overflow-auto">
+          </div>
+
+          {/* Calendar view or agent cards */}
+          {agentesView === "calendar" ? (() => {
+            const weekDays = getAgentWeekDays(agentWeekOffset);
+            const entriesInDay = (agentName: string, day: Date) =>
+              promologEntries.filter(pe =>
+                pe.reviewed_by === agentName &&
+                pe.promoted === "true" &&
+                isSameDay(new Date(pe.date), day)
+              ).length;
+            const colTotals = weekDays.map(day =>
+              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.name, day), 0)
+            );
+            const grandTotal = colTotals.reduce((a, b) => a + b, 0);
+            return (
+              <Card>
+                <CardContent className="pt-4 px-4 pb-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w - 1)}>
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Semana anterior
+                    </Button>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {format(weekDays[0], "d 'de' MMMM", { locale: es })} – {format(weekDays[6], "d 'de' MMMM, yyyy", { locale: es })}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setAgentWeekOffset(w => w + 1)} disabled={agentWeekOffset >= 0}>
+                      Semana siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                  <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Creadora</TableHead>
-                          <TableHead>Mes</TableHead>
-                          <TableHead className="text-right">Obj. Mensual</TableHead>
-                          <TableHead className="text-right">Obj. Semanal</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>Creada</TableHead>
+                          <TableHead className="min-w-[140px]">Agente</TableHead>
+                          {weekDays.map((day, i) => (
+                            <TableHead key={i} className={`text-center min-w-[70px] ${isToday(day) ? "bg-primary/10 text-primary font-bold" : ""}`}>
+                              {DAY_LABELS_ES[i]} {format(day, "d")}
+                            </TableHead>
+                          ))}
+                          <TableHead className="text-center font-semibold">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filtered.map((c: any) => {
-                          const creator = c.creators as any;
-                          const monthDate = new Date(c.month_year + "T00:00:00");
+                        {agentsData.map((agent) => {
+                          const dayCounts = weekDays.map(day => entriesInDay(agent.name, day));
+                          const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
                           return (
-                            <TableRow key={c.id}>
-                              <TableCell className="font-medium">{creator?.artistic_name || creator?.name || "—"}</TableCell>
-                              <TableCell className="capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</TableCell>
-                              <TableCell className="text-right">{c.goal_monthly}</TableCell>
-                              <TableCell className="text-right">{c.goal_weekly}</TableCell>
-                              <TableCell>
-                                <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
+                            <TableRow key={agent.name}>
+                              <TableCell className="font-medium text-sm">{agent.name}</TableCell>
+                              {dayCounts.map((cnt, i) => (
+                                <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                                  {isFuture(startOfDay(weekDays[i])) || cnt === 0 ? "—" : cnt}
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-center font-semibold">{rowTotal > 0 ? rowTotal : "—"}</TableCell>
                             </TableRow>
                           );
                         })}
                       </TableBody>
+                      <tfoot>
+                        <TableRow className="border-t-2 bg-muted/30">
+                          <TableCell className="font-bold text-sm">Total</TableCell>
+                          {colTotals.map((t, i) => (
+                            <TableCell key={i} className={`text-center font-bold text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary" : ""} ${(t === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
+                              {isFuture(startOfDay(weekDays[i])) || t === 0 ? "—" : t}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-center">
+                            <Badge variant="default">{grandTotal}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      </tfoot>
                     </Table>
                   </div>
-                );
-              }
+                </CardContent>
+              </Card>
+            );
+          })() : (
+          agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center justify-center py-16">
+                  <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                    <Users className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">No hay datos para esta fecha</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
+              {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
+                <Card key={agent.name}>
+                  <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-muted">
+                        <Users className="h-5 w-5 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className={cn("flex-1 min-w-0", agentesView === "grid" && "w-full")}>
+                      <p className="text-sm font-semibold">{agent.name}</p>
+                      <p className="text-xs text-muted-foreground">{agent.tickets} tickets ingresados</p>
+                    </div>
+                    <div className={cn("flex items-center gap-3", agentesView === "grid" && "flex-wrap justify-center")}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/15">
+                          <Check className="h-3 w-3 text-success" />
+                        </span>
+                        <span className="text-sm font-medium">{agent.si}</span>
+                        <span className="text-xs text-muted-foreground">Sí</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-warning/15">
+                          <Minus className="h-3 w-3 text-warning" />
+                        </span>
+                        <span className="text-sm font-medium">{agent.parcial}</span>
+                        <span className="text-xs text-muted-foreground">Parcial</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/15">
+                          <X className="h-3 w-3 text-destructive" />
+                        </span>
+                        <span className="text-sm font-medium">{agent.no}</span>
+                        <span className="text-xs text-muted-foreground">No</span>
+                      </div>
+                      <Separator orientation="vertical" className={cn("h-8", agentesView === "grid" && "hidden")} />
+                      <div className="flex items-center gap-1.5">
+                        {agent.badges.map((b) => (
+                          <Badge key={b.label} variant="outline" className="text-xs">
+                            {b.label} {b.value}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Campañas tab */}
+      {activeTab === "campanas" && (
+        <div className="flex-1 min-h-0 overflow-auto p-6 space-y-3">
+          {/* Filters row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar campaña..." className="pl-9 h-9" value={searchCampaign} onChange={(e) => setSearchCampaign(e.target.value)} />
+            </div>
+            <Select value={campaignStatusFilter || undefined} onValueChange={(v) => setCampaignStatusFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                <SelectItem value="activa">Activa</SelectItem>
+                <SelectItem value="finalizada">Finalizada</SelectItem>
+                <SelectItem value="pendiente">Pendiente</SelectItem>
+              </SelectContent>
+            </Select>
+            <DateRangePicker
+              from={campDateFrom}
+              to={campDateTo}
+              onApply={(from, to) => { setCampDateFrom(from); setCampDateTo(to); }}
+              placeholder="Selecciona fechas"
+              className="h-9"
+            />
+            {(searchCampaign || campaignStatusFilter || campDateFrom || campDateTo) && (
+              <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchCampaign(""); setCampaignStatusFilter(""); setCampDateFrom(undefined); setCampDateTo(undefined); }}>
+                <X className="mr-1.5 h-4 w-4" />
+                Limpiar filtros
+              </Button>
+            )}
+            <div className="ml-auto flex gap-1">
+              <Button variant={campanasView === "list" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("list")}>
+                <List className="h-4 w-4" />
+              </Button>
+              <Button variant={campanasView === "grid" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => setCampanasView("grid")}>
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          {(() => {
+            const filtered = campaigns.filter((c: any) => {
+              const creator = c.creators as any;
+              const name = (creator?.artistic_name || creator?.name || "").toLowerCase();
+              if (searchCampaign && !name.includes(searchCampaign.toLowerCase())) return false;
+              if (campaignStatusFilter && c.status !== campaignStatusFilter) return false;
+              return true;
+            });
+            if (filtered.length === 0) {
               return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {filtered.map((c: any) => {
-                    const creator = c.creators as any;
-                    const monthDate = new Date(c.month_year + "T00:00:00");
-                    return (
-                      <Card key={c.id}>
-                        <CardContent className="p-4 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="font-semibold text-sm">{creator?.artistic_name || creator?.name || "—"}</p>
-                            <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize text-xs">{c.status}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
-                          <div className="flex gap-4 text-xs">
-                            <span><strong>{c.goal_monthly}</strong> mensual</span>
-                            <span><strong>{c.goal_weekly}</strong> semanal</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex flex-col items-center justify-center py-16">
+                      <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                        <Target className="h-8 w-8 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-muted-foreground text-sm">No hay campañas</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+            if (campanasView === "list") {
+              return (
+                <div className="rounded-md border overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Creadora</TableHead>
+                        <TableHead>Mes</TableHead>
+                        <TableHead className="text-right">Obj. Mensual</TableHead>
+                        <TableHead className="text-right">Obj. Semanal</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Creación</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((c: any) => {
+                        const creator = c.creators as any;
+                        const monthDate = new Date(c.month_year + "T00:00:00");
+                        return (
+                          <TableRow key={c.id}>
+                            <TableCell className="font-medium">{creator?.artistic_name || creator?.name || "—"}</TableCell>
+                            <TableCell className="capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</TableCell>
+                            <TableCell className="text-right">{c.goal_monthly}</TableCell>
+                            <TableCell className="text-right">{c.goal_weekly}</TableCell>
+                            <TableCell>
+                              <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               );
-            })()}
-          </div>
-        )}
-      </div>
+            }
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filtered.map((c: any) => {
+                  const creator = c.creators as any;
+                  const monthDate = new Date(c.month_year + "T00:00:00");
+                  return (
+                    <Card key={c.id}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-sm">{creator?.artistic_name || creator?.name || "—"}</p>
+                          <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize text-xs">{c.status}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground capitalize">{monthDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                        <div className="flex gap-4 text-xs">
+                          <span><strong>{c.goal_monthly}</strong> mensual</span>
+                          <span><strong>{c.goal_weekly}</strong> semanal</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>

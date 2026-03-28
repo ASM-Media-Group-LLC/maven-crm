@@ -52,7 +52,7 @@ const AgenciasTable = ({ agencias, onView, onEdit, onDelete }: Props) => {
             <TableHead><SortHeader label="País" col="pais" /></TableHead>
             <TableHead><SortHeader label="Contacto" col="contacto_nombre" /></TableHead>
             <TableHead><SortHeader label="Instagram" col="instagram" /></TableHead>
-            <TableHead><SortHeader label="Fecha" col="created_at" /></TableHead>
+            <TableHead><TableHead><SortHeader label="Creación" col="created_at" /></TableHead></TableHead>
             <TableHead className="sticky right-0 bg-card z-20"></TableHead>
           </TableRow>
         </TableHeader>

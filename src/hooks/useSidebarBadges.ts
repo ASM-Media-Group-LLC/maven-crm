@@ -9,7 +9,7 @@ export function useSidebarBadges() {
     queryKey: ["sidebar-badges", user?.id],
     queryFn: async () => {
       const [promolog, leadgen, closers] = await Promise.all([
-        supabase.from("promolog_entries").select("id", { count: "exact", head: true }).is("reviewed_by", null),
+        supabase.from("promolog_entries").select("id", { count: "exact", head: true }).is("reviewed_by", null).gte("date", new Date().toISOString().split("T")[0]),
         supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending"),
         supabase.from("closer_creators").select("id", { count: "exact", head: true }).eq("stage", "Nuevo"),
       ]);
