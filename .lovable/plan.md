@@ -1,66 +1,74 @@
 
+## Plan: corregir definitivamente “Pendiente LG” en Closers y alinear badges de Promolog
 
-## Plan: Estandarizar badges en todas las tablas
-
-### Problema identificado
-
-Hay **3 sistemas de colores diferentes** para los mismos conceptos:
-
-| Concepto | LeadGen / Contactos / Creadores | Closers LeadTable | Closers CreatorTable |
-|----------|---|----|-----|
-| **Categoría (A+/A/B+/B/C)** | `Badge variant="success-soft"` etc. | Clases hardcoded: `border-emerald-500 text-emerald-500 bg-emerald-500/10` | No aplica |
-| **Stage** | No aplica | `stageColor()` con `bg-green-100 text-green-800` | `stageBadgeColor()` con colores similares pero diferentes |
-
-Los módulos de LeadGen, Contactos y Creadores ya usan el estándar correcto (`Badge` con variantes `-soft`). **Closers es el que está desalineado.**
-
-### Cambios
-
-#### 1. `LeadTable.tsx` — Categoría: usar Badge `-soft` variants
-
-Reemplazar `CATEGORY_BADGE_COLORS` (clases hardcoded) por el mismo mapa `calidadVariant` que usa LeadGen:
-
-```tsx
-// ANTES (hardcoded)
-"A+": "border-emerald-500 text-emerald-500 bg-emerald-500/10"
-
-// DESPUÉS (Badge variant)
-"A+": "success-soft"   // verde
-"A":  "primary-soft"   // azul
-"B+": "warning-soft"   // amarillo
-"B":  "secondary-soft"  // gris
-"C":  "destructive-soft" // rojo
+### Hallazgos
+1. En la base de datos aún existen registros con `stage = 'Pendiente LG'`:
+```text
+Nuevo: 461
+Pendiente LG: 15
+Completada: 2
+Asignada: 1
 ```
+2. El problema no es solo visual: el trigger viejo de LeadGen sigue activo en la BD:
+```text
+public.leadgen_entries → trg_auto_sync_leadgen_to_closers
+```
+3. La migración anterior intentó borrar `trg_auto_sync_leadgen`, pero el trigger real se llama `trg_auto_sync_leadgen_to_closers`, por eso se siguen generando filas con ese estado.
+4. En Promolog los badges no siguen un mismo patrón:
+   - `PromologTable.tsx` usa `outline` + clases hardcoded
+   - `PromologEntryCard.tsx` usa variantes sólidas (`success`, `destructive`, `warning`)
+   - `PromologContent.tsx` usa mapeos heredados (`default`, `success`, `warning`, `secondary`) para categorías
 
-Modificar `InlineCategorySelect` para usar `<Badge variant={...}>` en vez de clases manuales.
+### Qué haré
 
-#### 2. `LeadTable.tsx` — Stage: usar Badge `-soft` variants
+#### 1. Closers — eliminar la causa raíz
+Corregir la base para que no se vuelva a crear `Pendiente LG`:
+- crear una migración que haga `DROP TRIGGER IF EXISTS trg_auto_sync_leadgen_to_closers ON public.leadgen_entries;`
+- opcionalmente dejar también `DROP FUNCTION public.auto_sync_leadgen_to_closers()` si ya no forma parte del flujo
 
-Reemplazar `stageColor()` por variantes del componente Badge:
+#### 2. Closers — limpiar datos existentes
+Actualizar los registros residuales:
+- cambiar todos los `closer_creators.stage = 'Pendiente LG'` a `Nuevo`
 
-| Stage | Variant |
-|-------|---------|
-| Nuevo | `primary-soft` |
-| Asignada | `info` o `secondary-soft` |
-| Confirmada | `success-soft` |
-| Completada | `success` |
-| No interesada | `destructive-soft` |
-| Default (En negociación, etc.) | `warning-soft` |
+Esto corrige la pestaña **Todas** y evita que reaparezcan nuevos casos.
 
-Modificar `InlineStageSelect` para renderizar `<Badge variant={...}>`.
+#### 3. Closers — blindaje visual
+En `src/pages/closers/components/LeadTable.tsx` agregar una normalización defensiva:
+- si llega `Pendiente LG`, renderizarlo como `Nuevo`
+- usar el badge variant de `Nuevo` para ambos valores heredados
 
-#### 3. `CreatorTable.tsx` — Unificar `stageBadgeColor` con el mismo sistema
+Así, aunque aparezca un dato legacy, la UI no vuelve a mostrar ese estado.
 
-Reemplazar `stageBadgeColor()` por el mismo mapa de variantes del punto 2, usando `<Badge variant={...}>`.
+#### 4. Promolog — unificar badges con el design system
+Alinear `src/pages/promolog/PromologTable.tsx` y `src/pages/promolog/PromologEntryCard.tsx` al mismo sistema que ya usan CRM/Closers:
+- **Resultado**
+  - Sí → `success-soft`
+  - No → `destructive-soft`
+  - Parcial → `warning-soft`
+  - Pendiente → `secondary-soft`
+- **Plataforma**
+  - dejar de usar borde naranja hardcoded
+  - usar un variant consistente del sistema (`primary-soft` o `secondary-soft`, según el patrón existente)
+- **Red social**
+  - mantener estilo neutro consistente (`outline` o `secondary-soft`), pero igual en tabla y cards
 
-#### 4. Eliminar `EmployeeStatusBadge` de HR si usa colores hardcoded
+#### 5. Promolog — revisar badges secundarios del módulo
+Ajustar también donde Promolog aún usa variantes no estandarizadas:
+- `PromologContent.tsx` → `getCategoryBadgeVariant`
+- badge de resultado dentro del detalle/modal si aplica
 
-El componente `EmployeeStatusBadge` usa `getStatusColors()` con clases manuales (`bg-*`, `text-*`). Se migra al mismo patrón `Badge variant`.
+La idea es que Promolog use la misma lógica visual que Contactos, LeadGen y Closers: variantes `-soft` y sin colores manuales.
 
-### Archivos a modificar
-- `src/pages/closers/components/LeadTable.tsx` — categoría y stage badges → Badge variants
-- `src/pages/closers/components/CreatorTable.tsx` — stage badges → Badge variants
-- `src/components/hr/EmployeeStatusBadge.tsx` — migrar a Badge component
+### Archivos a tocar
+- `supabase/migrations/...sql` — borrar trigger real de LeadGen→Closers
+- operación de datos para actualizar `stage = 'Pendiente LG'` → `Nuevo`
+- `src/pages/closers/components/LeadTable.tsx`
+- `src/pages/promolog/PromologTable.tsx`
+- `src/pages/promolog/PromologEntryCard.tsx`
+- `src/pages/promolog/PromologContent.tsx`
 
-### Resultado
-Todos los badges de categoría, estado y stage usarán el componente `Badge` con las variantes `-soft` del design system, eliminando colores hardcoded.
-
+### Resultado esperado
+- En Closers ya no vuelve a aparecer “Pendiente LG”
+- La pestaña “Todas” mostrará “Nuevo” de forma consistente
+- Promolog tendrá badges homogéneos con el sistema de diseño
+- Se eliminan los estilos hardcoded que hoy rompen la consistencia visual
