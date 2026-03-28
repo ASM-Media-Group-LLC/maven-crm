@@ -439,119 +439,58 @@ const PromologContent = () => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* KPI Cards - always visible */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border border-accent/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setCreatorsModalOpen(true)}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Total Modelos</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/20">
-                  <Users className="h-5 w-5 text-accent" />
-                </div>
+      {/* KPI Cards */}
+      <div className="shrink-0 px-6 pt-4 pb-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setCreatorsModalOpen(true)}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 shrink-0">
+                <Users className="h-4 w-4 text-accent" />
               </div>
-              <p className="text-3xl font-bold text-success">{creators.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Registradas en sistema - Filtrando</p>
+              <div>
+                <p className="text-2xl font-bold text-success">{creators.length}</p>
+                <p className="text-xs text-muted-foreground">Modelos</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-primary/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("ingresados")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Tickets ingresados</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                  <CheckCircle className="h-5 w-5 text-primary" />
-                </div>
+          <Card className="border border-primary/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("ingresados")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                <CheckCircle className="h-4 w-4 text-primary" />
               </div>
-              <p className="text-3xl font-bold text-primary">{entries.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+              <div>
+                <p className="text-2xl font-bold text-primary">{entries.length}</p>
+                <p className="text-xs text-muted-foreground">Ingresados</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-destructive/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("no_chequeadas")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">NO Chequeadas</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/20">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                </div>
+          <Card className="border border-destructive/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("no_chequeadas")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/20 shrink-0">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
               </div>
-              <p className="text-3xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Equipo no las revisó</p>
+              <div>
+                <p className="text-2xl font-bold text-destructive">{entries.filter(e => e.result === "Pendiente").length}</p>
+                <p className="text-xs text-muted-foreground">Sin revisar</p>
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-success/40 bg-card/80 cursor-pointer transition-all duration-200 hover:scale-[1.03]" onClick={() => setKpiModalType("completadas")}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Completadas Hoy</p>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
-                  <TrendingUp className="h-5 w-5 text-success" />
-                </div>
+          <Card className="border border-success/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("completadas")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
+                <TrendingUp className="h-4 w-4 text-success" />
               </div>
-              <p className="text-3xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
-              <p className="text-xs text-muted-foreground mt-1">Tickets ingresados hoy</p>
+              <div>
+                <p className="text-2xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
+                <p className="text-xs text-muted-foreground">Completadas</p>
+              </div>
             </CardContent>
           </Card>
         </div>
+      </div>
 
-        {/* Social & Platform Section - always visible */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">
-            Promociones por Red Social y Plataforma{" "}
-            <span className="text-sm font-normal text-muted-foreground">(solo tickets &apos;Sí&apos;)</span>
-          </h2>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Red Social</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {socialCards.map((s) => {
-                const netKey = s.name.toLowerCase();
-                const isActive = selectedNetwork === netKey;
-                return (
-                  <Card
-                    key={s.name}
-                    className={cn(s.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
-                    onClick={() => setSelectedNetwork(prev => prev === netKey ? "" : netKey)}
-                  >
-                    <CardContent className="flex items-center gap-3 p-4">
-                      {s.icon}
-                      <div>
-                        <p className="text-xs text-muted-foreground">{s.name}</p>
-                        <p className="text-xl font-bold">{s.value}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Plataforma</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {platformCards.map((p) => {
-                const platKey = p.name.toLowerCase();
-                const isActive = selectedCardPlatform === platKey;
-                return (
-                  <Card
-                    key={p.name}
-                    className={cn(p.bg, "transition-all duration-200 cursor-pointer hover:scale-[1.03]", isActive && "ring-2 ring-primary")}
-                    onClick={() => setSelectedCardPlatform(prev => prev === platKey ? "" : platKey)}
-                  >
-                    <CardContent className="flex items-center gap-3 p-4">
-                      {p.icon}
-                      <div>
-                        <p className="text-xs text-muted-foreground">{p.name}</p>
-                        <p className="text-xl font-bold">{p.value}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-          <p className="text-xs text-center text-muted-foreground">
-            Mostrando datos del {shortDate} al {shortDate}
-          </p>
-        </div>
-
-        {/* Tab bar */}
+      {/* Tabs */}
+      <div className="shrink-0 px-6 pb-2">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           {tabItems.map((tab) => (
             <Button
@@ -565,12 +504,13 @@ const PromologContent = () => {
             </Button>
           ))}
         </div>
+      </div>
 
-        {/* Tab content */}
-        {/* Promos tab */}
-        {activeTab === "promos" && (
-          <>
-            {/* Unified filters row */}
+      {/* Promos tab */}
+      {activeTab === "promos" && (
+        <>
+          {/* Filters */}
+          <div className="shrink-0 px-6 pb-2">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -617,7 +557,10 @@ const PromologContent = () => {
                 </Button>
               </div>
             </div>
+          </div>
 
+          {/* Table area */}
+          <div className="flex-1 min-h-0 overflow-auto px-6 pb-4">
             {entryView === "list" ? (
               <DataTableShell
                 currentPage={promoPage}
@@ -637,8 +580,9 @@ const PromologContent = () => {
             ) : (
               <PromologGrid entries={filteredEntries} onView={handleViewEntry} onEdit={handleEditEntry} onDelete={handleDeleteEntry} />
             )}
-          </>
-        )}
+          </div>
+        </>
+      )}
 
         {/* Agentes tab */}
         {activeTab === "agentes" && (
