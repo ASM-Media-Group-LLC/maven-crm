@@ -70,18 +70,18 @@ const AddContactoModal = ({ open, onOpenChange }: AddContactoModalProps) => {
   const onSubmit = async (data: ContactoFormValues) => {
     setIsSubmitting(true);
     try {
-      // Duplicate check by handle in closers_contacts
+      // Duplicate check by handle in creators (official table)
       const normalizedIg = normalizeHandle(data.instagram);
       if (normalizedIg) {
         const { data: existing } = await supabase
-          .from("closers_contacts")
-          .select("id, name, handle")
-          .ilike("handle", normalizedIg)
+          .from("creators")
+          .select("id, name, instagram_handle")
+          .ilike("instagram_handle", normalizedIg)
           .maybeSingle();
         if (existing) {
           toast({
             title: "Duplicado detectado",
-            description: `Ya existe un contacto con este handle: ${existing.name}`,
+            description: `Esta creadora ya existe en el sistema: ${existing.name}`,
             variant: "destructive",
           });
           setIsSubmitting(false);
