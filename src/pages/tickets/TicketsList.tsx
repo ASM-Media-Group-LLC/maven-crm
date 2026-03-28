@@ -127,7 +127,7 @@ const TicketsList = ({ tickets, onView, onEdit, onDelete }: Props) => {
             <TableHead><SortHeader label="Estado" sortKeyName="status" /></TableHead>
             <TableHead><SortHeader label="Compañía" sortKeyName="company" /></TableHead>
             <TableHead><SortHeader label="Asignado" sortKeyName="assigned" /></TableHead>
-            <TableHead><SortHeader label="Fecha" sortKeyName="date" /></TableHead>
+            <TableHead><TableHead><SortHeader label="Creación" sortKeyName="date" /></TableHead></TableHead>
             <TableHead className="sticky right-0 bg-card z-20 text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>

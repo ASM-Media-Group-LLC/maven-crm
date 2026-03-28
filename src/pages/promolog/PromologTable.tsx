@@ -123,7 +123,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Fecha" sortKeyName="date" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" sortKeyName="date" /></TableHead></TableHead>
           <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
         </TableRow>
       </TableHeader>
