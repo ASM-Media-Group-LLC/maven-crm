@@ -1,56 +1,42 @@
 
 
-## Plan: Corregir flujo LeadGen → Closers (eliminar "Pendiente LG")
+## Plan: Limpiar registros huérfanos y agregar validación de teléfono en contactos
 
-### Flujo correcto (como lo defines)
-```text
-LeadGen entry (link de redes) 
-    ↓ agente crea un Contacto desde ese lead
-closers_contacts (trigger existente)
-    ↓ sync_closers_contact_to_creators  
-closer_creators (stage = "Nuevo") → listo para asignación
-```
+### Diagnóstico
+Confirmado: hay **84,573 registros** en `closer_creators` con `stage = 'Nuevo'` que vinieron del trigger de LeadGen (ahora eliminado). La migración anterior cambió su stage de "Pendiente LG" a "Nuevo" en vez de eliminarlos, inflando el pipeline.
 
-El entry de LeadGen por si solo NO debe pasar a Closers. Solo cuando se crea un contacto a partir de ese entry.
-
-### Problema actual
-El trigger `auto_sync_leadgen_to_closers` inserta CADA leadgen entry directamente en `closer_creators` con stage `'Pendiente LG'`, creando registros fantasma que saturan el pipeline.
+Solo **427** registros legítimos provienen de contactos reales (`source_contact_id` presente).
 
 ### Cambios
 
-#### 1. Migración SQL: desactivar el trigger de sincronización automática
-- Eliminar (DROP) el trigger que dispara `auto_sync_leadgen_to_closers` en la tabla `leadgen_entries`
-- La función se puede conservar pero el trigger debe dejar de ejecutarse
-- Esto detiene la inserción automática de entries en `closer_creators`
+#### 1. Migración SQL — limpiar registros huérfanos de LeadGen
+Eliminar de `closer_creators` todos los registros que tengan `leadgen_entry_id IS NOT NULL` y `source_contact_id IS NULL`. Estos son los 84,573 registros fantasma que nunca debieron estar ahí.
 
-#### 2. Migración SQL: limpiar registros huérfanos (opcional pero recomendado)
-- Actualizar los registros existentes con `stage = 'Pendiente LG'` a `stage = 'Nuevo'` para que entren al pipeline normal, O eliminarlos si se prefiere que solo pasen por el flujo correcto de contactos
+```sql
+DELETE FROM closer_creators
+WHERE leadgen_entry_id IS NOT NULL
+  AND source_contact_id IS NULL;
+```
 
-#### 3. `useCloserLeads.ts` — eliminar lógica de "Pendiente LG"
-- Eliminar entrada `"Pendiente LG"` de `STAGE_LABELS`
-- Eliminar `pendiente_lg` de `TAB_STAGE_MAP`
-- En el query principal: eliminar la rama `activeTab === "pendiente_lg"`
-- En el tab "Nuevo": quitar el filtro `source_contact_id IS NOT NULL` — ahora TODOS los registros con stage "Nuevo" son legítimos (solo llegan por contactos)
-- En el tab "todas": dejar de excluir "Pendiente LG" (ya no existirá)
-- En `assignCreator`: quitar la referencia a "Pendiente LG" en la condición de auto-stage
+#### 2. Validación de teléfono en `AddContactoModal.tsx` (LeadGen)
+Antes de insertar en `closers_contacts`, si el agente ingresó un número de teléfono:
+- Concatenar `paisCodigo + telefono` y buscar en `closers_contacts` y `creators` si ese número ya existe
+- Si existe, mostrar toast de duplicado y bloquear el guardado
+- Si no tiene teléfono, permitir guardar (el teléfono es opcional en este modal)
 
-#### 4. `LeadTable.tsx` — eliminar caso "pendiente_lg"
-- Eliminar el case `"pendiente_lg"` en headers y rows del switch
-- Eliminar el color badge de "Pendiente LG"
+#### 3. Validación de teléfono en `NuevoContactoForm.tsx` (Contactos)
+Misma lógica: antes de insertar, validar el número de teléfono contra `closers_contacts` y `creators`. Bloquear si ya existe.
 
-#### 5. Validación de duplicados en `AddContactoModal.tsx`
-- Cambiar la verificación de duplicados: en vez de buscar en `closers_contacts`, buscar en `creators` (tabla oficial) por handle normalizado
-- Si ya existe en `creators`, informar al usuario que esa creadora ya está en el sistema
+#### 4. Actualizar `sync_closers_contact_to_creators` (trigger DB)
+Agregar validación adicional: solo sincronizar a `closer_creators` si el contacto tiene un número de teléfono (`phone IS NOT NULL AND phone != ''`). Esto garantiza que solo contactos con teléfono validado lleguen a Closers.
 
 ### Archivos a modificar
-- **Nueva migración SQL** (drop trigger + limpiar datos)
-- `src/pages/closers/hooks/useCloserLeads.ts`
-- `src/pages/closers/components/LeadTable.tsx`
-- `src/pages/leadgen/AddContactoModal.tsx`
+- **Migración SQL**: limpieza de datos + actualización del trigger de sincronización
+- `src/pages/leadgen/AddContactoModal.tsx`: validación de teléfono duplicado
+- `src/pages/contactos/NuevoContactoForm.tsx`: validación de teléfono duplicado
 
 ### Resultado
-- LeadGen solo registra entries (prospección)
-- Solo al crear un contacto desde el lead, este pasa a Closers como "Nuevo"
-- Desaparece completamente el concepto de "Pendiente LG"
-- La validación de duplicados se hace contra `creators` (la fuente real)
+- Se eliminan ~84,500 registros fantasma de Closers
+- Solo contactos con teléfono validado (no duplicado) pasan al pipeline
+- Los entries de LeadGen (links) pueden repetirse libremente sin afectar Closers
 
