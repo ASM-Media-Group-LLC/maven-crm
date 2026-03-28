@@ -132,11 +132,11 @@ export default function NuevoInvoicePage() {
   const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
   const handleSubmit = () => {
-    if (!creatorId || !dateFrom || !dateTo || totalAmount === 0) return;
+    if (!creatorId || !dateFrom || !dateTo || grandTotal === 0) return;
     createInvoice.mutate({
       creator_id: creatorId,
-      amount: totalAmount,
-      net_amount: totalAmount,
+      amount: grandTotal,
+      net_amount: grandTotal,
       due_date: dueDate || null,
       notes: notes || null,
       status: "borrador",
@@ -219,7 +219,7 @@ export default function NuevoInvoicePage() {
                   <p className="text-muted-foreground">Buscando comisiones...</p>
                 ) : commissions.length > 0 ? (
                   <p className="text-foreground">
-                    <span className="font-semibold">{commissions.length}</span> comisión(es) encontrada(s) — Total: <span className="font-semibold">{fmt(totalAmount)}</span>
+                    <span className="font-semibold">{commissions.length}</span> comisión(es) encontrada(s) — Total: <span className="font-semibold">{fmt(grandTotal)}</span>
                   </p>
                 ) : (
                   <p className="text-muted-foreground">No se encontraron comisiones en este periodo.</p>
@@ -309,17 +309,31 @@ export default function NuevoInvoicePage() {
                           </thead>
                           <tbody>
                             <tr className="border-b border-gray-100">
-                              <td className="py-2 text-gray-700">Agency Service</td>
+                              <td className="py-2 text-gray-700">Agency Services</td>
                               <td className="py-2 text-gray-500">
                                 {dateFrom && dateTo ? `${dateFrom} — ${dateTo}` : ""}
                               </td>
-                              <td className="py-2 text-right text-gray-800 font-medium">{fmt(totalAmount)}</td>
+                              <td className="py-2 text-right text-gray-800 font-medium">{fmt(agencyTotal)}</td>
                             </tr>
+                            {blueTotal > 0 && (
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 text-gray-700">Blue</td>
+                                <td className="py-2 text-gray-500"></td>
+                                <td className="py-2 text-right text-gray-800 font-medium">{fmt(blueTotal)}</td>
+                              </tr>
+                            )}
+                            {paypalAmount > 0 && (
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 text-gray-700">PayPal</td>
+                                <td className="py-2 text-gray-500">5% del restante</td>
+                                <td className="py-2 text-right text-gray-800 font-medium">{fmt(paypalAmount)}</td>
+                              </tr>
+                            )}
                           </tbody>
                           <tfoot>
                             <tr>
                               <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total</td>
-                              <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(totalAmount)}</td>
+                              <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(grandTotal)}</td>
                             </tr>
                           </tfoot>
                         </table>
@@ -350,7 +364,7 @@ export default function NuevoInvoicePage() {
       {/* Footer */}
       <footer className="bg-background px-6 py-4 border-t border-border shrink-0 flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate("/finanzas/facturacion")}>Cancelar</Button>
-        <Button onClick={handleSubmit} disabled={!creatorId || !dateFrom || !dateTo || totalAmount === 0 || createInvoice.isPending}>
+        <Button onClick={handleSubmit} disabled={!creatorId || !dateFrom || !dateTo || grandTotal === 0 || createInvoice.isPending}>
           Crear Invoice
         </Button>
       </footer>
