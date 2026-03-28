@@ -1,74 +1,47 @@
 
-## Plan: corregir definitivamente “Pendiente LG” en Closers y alinear badges de Promolog
 
-### Hallazgos
-1. En la base de datos aún existen registros con `stage = 'Pendiente LG'`:
-```text
-Nuevo: 461
-Pendiente LG: 15
-Completada: 2
-Asignada: 1
-```
-2. El problema no es solo visual: el trigger viejo de LeadGen sigue activo en la BD:
-```text
-public.leadgen_entries → trg_auto_sync_leadgen_to_closers
-```
-3. La migración anterior intentó borrar `trg_auto_sync_leadgen`, pero el trigger real se llama `trg_auto_sync_leadgen_to_closers`, por eso se siguen generando filas con ese estado.
-4. En Promolog los badges no siguen un mismo patrón:
-   - `PromologTable.tsx` usa `outline` + clases hardcoded
-   - `PromologEntryCard.tsx` usa variantes sólidas (`success`, `destructive`, `warning`)
-   - `PromologContent.tsx` usa mapeos heredados (`default`, `success`, `warning`, `secondary`) para categorías
+## Plan: Agregar columna de Notas inline en Promolog + corregir columna Agente
 
-### Qué haré
+### Problemas identificados
 
-#### 1. Closers — eliminar la causa raíz
-Corregir la base para que no se vuelva a crear `Pendiente LG`:
-- crear una migración que haga `DROP TRIGGER IF EXISTS trg_auto_sync_leadgen_to_closers ON public.leadgen_entries;`
-- opcionalmente dejar también `DROP FUNCTION public.auto_sync_leadgen_to_closers()` si ya no forma parte del flujo
+1. **Agente vacío**: `reviewed_by` es un UUID en la BD, pero el código lo muestra directamente como texto. De 29,681 entries, 25,624 tienen `reviewed_by = NULL` y el resto tiene UUIDs que se muestran como "—" o un UUID crudo. Se necesita hacer join con `profiles` para obtener el nombre real.
 
-#### 2. Closers — limpiar datos existentes
-Actualizar los registros residuales:
-- cambiar todos los `closer_creators.stage = 'Pendiente LG'` a `Nuevo`
+2. **No hay columna de Notas**: La tabla de Promolog no tiene columna de notas editable inline, aunque el campo `notes` existe en la BD.
 
-Esto corrige la pestaña **Todas** y evita que reaparezcan nuevos casos.
+### Cambios
 
-#### 3. Closers — blindaje visual
-En `src/pages/closers/components/LeadTable.tsx` agregar una normalización defensiva:
-- si llega `Pendiente LG`, renderizarlo como `Nuevo`
-- usar el badge variant de `Nuevo` para ambos valores heredados
+#### 1. `src/pages/promolog/PromologContent.tsx` — Resolver nombres de agentes
 
-Así, aunque aparezca un dato legacy, la UI no vuelve a mostrar ese estado.
+- Agregar query a `profiles` (igual que en LeadGen):
+  ```tsx
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name");
+      return data || [];
+    },
+  });
+  ```
+- Crear `profilesMap` con `useMemo`
+- En el mapeo de entries, cambiar `agent: pe.reviewed_by || "—"` por `agent: profilesMap[pe.reviewed_by] || "—"`
 
-#### 4. Promolog — unificar badges con el design system
-Alinear `src/pages/promolog/PromologTable.tsx` y `src/pages/promolog/PromologEntryCard.tsx` al mismo sistema que ya usan CRM/Closers:
-- **Resultado**
-  - Sí → `success-soft`
-  - No → `destructive-soft`
-  - Parcial → `warning-soft`
-  - Pendiente → `secondary-soft`
-- **Plataforma**
-  - dejar de usar borde naranja hardcoded
-  - usar un variant consistente del sistema (`primary-soft` o `secondary-soft`, según el patrón existente)
-- **Red social**
-  - mantener estilo neutro consistente (`outline` o `secondary-soft`), pero igual en tabla y cards
+#### 2. `src/pages/promolog/PromologTable.tsx` — Agregar columna Notas editable inline
 
-#### 5. Promolog — revisar badges secundarios del módulo
-Ajustar también donde Promolog aún usa variantes no estandarizadas:
-- `PromologContent.tsx` → `getCategoryBadgeVariant`
-- badge de resultado dentro del detalle/modal si aplica
+- Agregar un componente `InlineNotes` similar al `InlineText` de Closers: al hacer click muestra un input editable, al blur/Enter guarda
+- Agregar nueva columna "Notas" entre "Agente" y "Acciones"
+- El `onSave` hace update directo a `promolog_entries.notes` vía Supabase
+- Requerir nuevo prop `onNotesChange?: (entryId: string, notes: string | null) => void`
 
-La idea es que Promolog use la misma lógica visual que Contactos, LeadGen y Closers: variantes `-soft` y sin colores manuales.
+#### 3. `src/pages/promolog/PromologContent.tsx` — Pasar handler de notas
 
-### Archivos a tocar
-- `supabase/migrations/...sql` — borrar trigger real de LeadGen→Closers
-- operación de datos para actualizar `stage = 'Pendiente LG'` → `Nuevo`
-- `src/pages/closers/components/LeadTable.tsx`
-- `src/pages/promolog/PromologTable.tsx`
-- `src/pages/promolog/PromologEntryCard.tsx`
-- `src/pages/promolog/PromologContent.tsx`
+- Crear función `handleNotesChange` que haga `supabase.from("promolog_entries").update({ notes }).eq("id", entryId)` e invalide la query
+- Pasarla como prop al `PromologTable`
 
-### Resultado esperado
-- En Closers ya no vuelve a aparecer “Pendiente LG”
-- La pestaña “Todas” mostrará “Nuevo” de forma consistente
-- Promolog tendrá badges homogéneos con el sistema de diseño
-- Se eliminan los estilos hardcoded que hoy rompen la consistencia visual
+#### 4. `src/pages/promolog/PromologEntryCard.tsx` — Actualizar interfaz
+
+- Agregar `agent` como campo visible que ya muestre el nombre resuelto (no el UUID)
+
+### Archivos a modificar
+- `src/pages/promolog/PromologContent.tsx` — query profiles, profilesMap, handler notas
+- `src/pages/promolog/PromologTable.tsx` — columna Notas inline, corregir display agente
+
