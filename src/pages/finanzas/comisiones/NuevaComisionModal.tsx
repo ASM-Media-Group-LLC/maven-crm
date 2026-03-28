@@ -187,6 +187,12 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
                 <span className="text-muted-foreground">—</span>
               )}
             </div>
+            {hasBlue && base > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Blue</span>
+                <span className="font-medium">{fmt(blueAmount)}</span>
+              </div>
+            )}
             <div className="border-t border-border pt-1 flex justify-between text-sm font-semibold">
               <span>Valor para la Empresa</span>
               <span className="text-primary">{fmt(companyValue)}</span>
