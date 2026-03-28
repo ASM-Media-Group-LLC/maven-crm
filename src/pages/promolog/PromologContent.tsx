@@ -610,6 +610,7 @@ const PromologContent = () => {
                   onView={handleViewEntry}
                   onEdit={handleEditEntry}
                   onDelete={handleDeleteEntry}
+                  onNotesChange={handleNotesChange}
                 />
               </DataTableShell>
             ) : (
