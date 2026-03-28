@@ -1,35 +1,40 @@
 
 
-## Plan: Crear página /credentials con acceso rápido por rol
+## Plan: Actualizar el Roadmap con el progreso de hoy
 
-### Concepto
-Página pública (sin autenticación) en `/credentials` que muestra tarjetas para cada rol del sistema (admin, manager, employee, agent, closer, supervisor). Cada tarjeta tiene un botón "Acceder" que hace `signInWithPassword` automáticamente con credenciales de cuentas de prueba predefinidas.
+### Contexto
+El roadmap se almacena en tablas de Supabase (`roadmap_categories` y `roadmap_items`). No puedo hacer queries directas en modo plan, así que el plan es agregar/actualizar items via la UI existente o mediante SQL.
 
-### Requisito previo: cuentas de prueba en Supabase
-Se necesitan 6 usuarios de prueba en Supabase Auth, cada uno con un rol asignado en `user_roles`. Las credenciales se hardcodean en el frontend (son cuentas de prueba, no producción).
+### Estrategia
+Ejecutar SQL contra Supabase para:
 
-### Implementación
+**1. Asegurar que existen las categorías relevantes**
+Verificar/crear categorías como: "Messenger", "Video Calls", "Finanzas", "Creadores", "Dashboard/Sidebar", "LeadGen/Promolog", "Auth/Testing"
 
-**1. Crear `src/pages/Credentials.tsx`**
-- Array de configuración con cada rol: nombre, descripción, email, password, icono, color
-- Al hacer clic en "Acceder": ejecuta `supabase.auth.signInWithPassword({ email, password })` y navega a `/dashboard`
-- UI: grid de cards con el estilo del proyecto (fondo oscuro, glassmorphism similar a AuthLayout)
-- Mostrar loader durante el login, toast de error si falla
-- Si ya hay sesión activa, mostrar opción de cerrar sesión primero
+**2. Insertar los 10 items completados hoy como `status = 'done'`**
 
-**2. Agregar ruta en `App.tsx`**
-- Ruta pública: `<Route path="/credentials" element={<Credentials />} />`
+```sql
+-- Ejemplo de inserts (se adaptarán a las categorías existentes)
+INSERT INTO roadmap_items (category_id, task, status, completed_at, position)
+VALUES
+  ('<messenger_cat_id>', 'Corregir sidebar cortado en cards de conversación', 'done', NOW(), ...),
+  ('<messenger_cat_id>', 'Acciones anclar/archivar/eliminar en sidebar y header', 'done', NOW(), ...),
+  ('<messenger_cat_id>', 'Admins pueden eliminar cualquier conversación', 'done', NOW(), ...),
+  ('<messenger_cat_id>', 'Sonidos de notificación en chat', 'done', NOW(), ...),
+  ('<videocalls_cat_id>', 'Corregir audio en videollamadas (AudioContext)', 'done', NOW(), ...),
+  ('<finanzas_cat_id>', 'Simplificar modal comisiones con % automático del creador', 'done', NOW(), ...),
+  ('<creadores_cat_id>', 'Mejorar layout KPIs y scroll de tabla', 'done', NOW(), ...),
+  ('<dashboard_cat_id>', 'Badges dinámicos en sidebar (Promolog, LeadGen, Closers)', 'done', NOW(), ...),
+  ('<dashboard_cat_id>', 'Quitar filtros de fecha por defecto en vistas', 'done', NOW(), ...),
+  ('<auth_cat_id>', 'Crear página /credentials con cuentas de prueba por rol', 'done', NOW(), ...);
+```
 
-**3. Cuentas de prueba necesarias**
-Se crearán 6 usuarios en Supabase Auth con emails tipo `test-admin@maven.app`, `test-manager@maven.app`, etc., y se asignarán los roles correspondientes en `user_roles`. Esto se puede hacer via SQL insert o desde el dashboard de Supabase.
+**3. Revisar items existentes que ya estaban como `todo` o `in_progress`**
+Si alguno de los cambios de hoy corresponde a items ya existentes en el roadmap, marcarlos como `done` en lugar de duplicar.
 
-### Seguridad
-- Esta página es solo para desarrollo/testing
-- Las credenciales son de cuentas de prueba sin datos sensibles
-- Se puede agregar una variable de entorno para ocultarla en producción si se desea
+### Ejecución
+Primero consultaré las categorías y items existentes en la DB para evitar duplicados, luego insertaré/actualizaré según corresponda.
 
 ### Archivos
-- **Crear**: `src/pages/Credentials.tsx`
-- **Modificar**: `src/App.tsx` (agregar ruta)
-- **Supabase**: crear 6 usuarios de prueba y asignar roles
+- Sin cambios de código — solo operaciones en base de datos (`roadmap_categories`, `roadmap_items`)
 
