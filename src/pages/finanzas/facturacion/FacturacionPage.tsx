@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Clock, CheckCircle, DollarSign, Plus, Eye, Trash2, RotateCcw, Send, Download, Mail,
   Search, X, LayoutGrid, List,
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { usePaymentMethods } from "@/hooks/useFinancialConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -203,6 +205,44 @@ export default function FacturacionPage() {
 
   const toggleBulk = (id: string) => setBulkSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPdf = useCallback(async (inv: any) => {
+    const container = pdfContainerRef.current;
+    if (!container) return;
+
+    // Render InvoiceA4Preview off-screen
+    const { createRoot } = await import("react-dom/client");
+    const { default: InvoiceA4PreviewComp } = await import("./InvoiceA4Preview");
+
+    // Create a temporary wrapper
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-9999px";
+    wrapper.style.top = "0";
+    document.body.appendChild(wrapper);
+
+    const root = createRoot(wrapper);
+    root.render(<InvoiceA4PreviewComp invoice={inv} />);
+
+    // Wait for render
+    await new Promise(r => setTimeout(r, 500));
+
+    const a4El = wrapper.querySelector("div > div") as HTMLElement;
+    if (!a4El) { root.unmount(); wrapper.remove(); return; }
+
+    const canvas = await html2canvas(a4El, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdfW = 210;
+    const pdfH = 297;
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+    pdf.save(`Invoice-${inv.invoice_number || "draft"}.pdf`);
+
+    root.unmount();
+    wrapper.remove();
+  }, []);
+
   const renderInvoiceTable = (showBulkCheckbox = false) => (
     <div className="rounded-lg border border-border overflow-hidden">
       <div className="overflow-auto max-h-[calc(100vh-30rem)]">
@@ -212,19 +252,16 @@ export default function FacturacionPage() {
               {showBulkCheckbox && <TableHead className="w-10" />}
               <TableHead className="text-xs font-medium text-muted-foreground">Número</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Creador</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Monto</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Fee</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Neto</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Vencimiento</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 9 : 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+              <TableRow key={i}>{Array.from({ length: showBulkCheckbox ? 6 : 5 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
             )) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={showBulkCheckbox ? 9 : 8} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={showBulkCheckbox ? 6 : 5} className="text-center text-muted-foreground py-12">Sin resultados.</TableCell></TableRow>
             ) : filtered.map(inv => {
               const badge = STATUS_BADGE[inv.status] ?? STATUS_BADGE.borrador;
               const creatorName = (inv as any).creators?.artistic_name || (inv as any).creators?.name || "—";
@@ -244,14 +281,16 @@ export default function FacturacionPage() {
                       <span className="text-sm">{creatorName}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm font-medium">{fmt(Number(inv.amount) || 0)}</TableCell>
-                  <TableCell className="text-sm">{fmt(Number(inv.fee_amount) || 0)}</TableCell>
-                  <TableCell className="text-sm font-medium">{fmt(Number(inv.net_amount) || 0)}</TableCell>
-                  <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {(inv as any).period_start && (inv as any).period_end
+                      ? `${format(new Date((inv as any).period_start + "T12:00:00"), "dd/MM/yyyy")} — ${format(new Date((inv as any).period_end + "T12:00:00"), "dd/MM/yyyy")}`
+                      : "—"}
+                  </TableCell>
                   <TableCell className="text-sm whitespace-nowrap">{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                     <div className="flex items-center gap-1">
                       <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Descargar PDF</TooltipContent></Tooltip>
                       {canEdit && (
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Eliminar</TooltipContent></Tooltip>
                       )}
@@ -314,16 +353,19 @@ export default function FacturacionPage() {
           <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
-              <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
             </div>
             <p className="text-sm font-medium truncate">{creatorName}</p>
-            <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
-            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-              <span>Fee: {fmt(Number(inv.fee_amount) || 0)}</span>
-              <span>{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</span>
+            <div className="mt-2 text-xs text-muted-foreground">
+              {(inv as any).period_start && (inv as any).period_end
+                ? `${format(new Date((inv as any).period_start + "T12:00:00"), "dd/MM/yyyy")} — ${format(new Date((inv as any).period_end + "T12:00:00"), "dd/MM/yyyy")}`
+                : "—"}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Vence: {inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}
             </div>
             <div className="flex items-center gap-1 mt-3">
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button>
               {(inv.status === "borrador" || inv.status === "enviada") && (
                 <>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -517,7 +559,7 @@ export default function FacturacionPage() {
             {renderFilterBar(
               <>
                 <Button size="sm" onClick={() => navigate("/finanzas/facturacion/facturas/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
-                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Periodo: ((inv as any).period_start && (inv as any).period_end) ? `${(inv as any).period_start} — ${(inv as any).period_end}` : "", Vencimiento: inv.due_date })), "invoices")}>
                   <Download className="h-4 w-4 mr-1" />Exportar
                 </Button>
               </>,

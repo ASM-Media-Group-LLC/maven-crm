@@ -1,0 +1,2 @@
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS period_start date;
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS period_end date;
