@@ -353,16 +353,19 @@ export default function FacturacionPage() {
           <div key={inv.id} className="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono text-muted-foreground">#{inv.invoice_number}</span>
-              <Badge variant={badge.variant} className="text-[10px]">{badge.label}</Badge>
             </div>
             <p className="text-sm font-medium truncate">{creatorName}</p>
-            <p className="text-lg font-bold text-foreground mt-1">{fmt(Number(inv.amount) || 0)}</p>
-            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-              <span>Fee: {fmt(Number(inv.fee_amount) || 0)}</span>
-              <span>{inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}</span>
+            <div className="mt-2 text-xs text-muted-foreground">
+              {(inv as any).period_start && (inv as any).period_end
+                ? `${format(new Date((inv as any).period_start + "T12:00:00"), "dd/MM/yyyy")} — ${format(new Date((inv as any).period_end + "T12:00:00"), "dd/MM/yyyy")}`
+                : "—"}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Vence: {inv.due_date ? format(new Date(inv.due_date), "dd/MM/yyyy") : "—"}
             </div>
             <div className="flex items-center gap-1 mt-3">
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(inv)}><Eye className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDownloadPdf(inv)}><Download className="h-3.5 w-3.5" /></Button>
               {(inv.status === "borrador" || inv.status === "enviada") && (
                 <>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => setDeleteItem(inv)}><Trash2 className="h-3.5 w-3.5" /></Button>
