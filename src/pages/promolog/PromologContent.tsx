@@ -453,14 +453,16 @@ const PromologContent = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-primary/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("ingresados")}>
+          <Card className="border border-primary/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                <CheckCircle className="h-4 w-4 text-primary" />
+                <TrendingUp className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-primary">{entries.length}</p>
-                <p className="text-xs text-muted-foreground">Ingresados</p>
+                <p className="text-2xl font-bold text-primary">
+                  {filteredEntries.length > 0 ? `${Math.round((filteredEntries.filter(e => e.result === "Sí").length / filteredEntries.length) * 100)}%` : "0%"}
+                </p>
+                <p className="text-xs text-muted-foreground">Tasa de éxito</p>
               </div>
             </CardContent>
           </Card>
@@ -475,14 +477,14 @@ const PromologContent = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-success/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => setKpiModalType("completadas")}>
+          <Card className="border border-success/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/20 shrink-0">
-                <TrendingUp className="h-4 w-4 text-success" />
+                <Users className="h-4 w-4 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-success">{entries.filter(e => e.result === "Sí").length}</p>
-                <p className="text-xs text-muted-foreground">Completadas</p>
+                <p className="text-2xl font-bold text-success">{new Set(filteredEntries.map(e => e.creator_id)).size}</p>
+                <p className="text-xs text-muted-foreground">Creadoras</p>
               </div>
             </CardContent>
           </Card>
@@ -535,6 +537,15 @@ const PromologContent = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={selectedCardPlatform || undefined} onValueChange={(v) => setSelectedCardPlatform(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todas</SelectItem>
+                  <SelectItem value="onlyfans">OnlyFans</SelectItem>
+                  <SelectItem value="unlok">Unlok</SelectItem>
+                  <SelectItem value="otra">Otra</SelectItem>
+                </SelectContent>
+              </Select>
               <DateRangePicker
                 from={dateFrom}
                 to={dateTo}
@@ -542,8 +553,8 @@ const PromologContent = () => {
                 placeholder="Selecciona fechas"
                 className="h-9"
               />
-              {(searchEntry || selectedStatus || selectedNetwork || selectedCreatorFilter || dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
+              {(searchEntry || selectedStatus || selectedNetwork || selectedCardPlatform || selectedCreatorFilter || dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={() => { setSearchEntry(""); setSelectedStatus(""); setSelectedNetwork(""); setSelectedCardPlatform(""); setSelectedCreatorFilter(""); setDateFrom(undefined); setDateTo(undefined); }}>
                   <X className="mr-1.5 h-4 w-4" />
                   Limpiar filtros
                 </Button>
