@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -28,10 +27,8 @@ export default function NuevoInvoicePage() {
 
   const [creatorId, setCreatorId] = useState("");
   const [creatorOpen, setCreatorOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [feeType, setFeeType] = useState("paypal");
-  const [customFee, setCustomFee] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("PayPal");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [zoom, setZoom] = useState(0.65);
@@ -63,6 +60,24 @@ export default function NuevoInvoicePage() {
     },
   });
 
+  // Auto-fetch commissions when creator + date range are set
+  const { data: commissions = [], isLoading: loadingCommissions } = useQuery({
+    queryKey: ["invoice-commissions", creatorId, dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("commissions")
+        .select("id, final_amount, period, period_start, period_end, calculation_config")
+        .eq("creator_id", creatorId)
+        .gte("period_start", dateFrom)
+        .lte("period_end", dateTo);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!creatorId && !!dateFrom && !!dateTo,
+  });
+
+  const totalAmount = commissions.reduce((acc, c) => acc + (Number(c.final_amount) || 0), 0);
+
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
       const { data: user } = await supabase.auth.getUser();
@@ -77,21 +92,15 @@ export default function NuevoInvoicePage() {
     onError: () => toast({ title: "Error al crear", variant: "destructive" }),
   });
 
-  const amt = Number(amount) || 0;
-  const feeAmount = feeType === "paypal" ? amt * 0.0349 + 0.49 : feeType === "standard" ? Number(customFee) || 0 : 0;
-  const netAmount = amt - feeAmount;
   const selectedCreator = creators.find(c => c.id === creatorId);
   const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
 
   const handleSubmit = () => {
-    if (!creatorId || !amount) return;
+    if (!creatorId || !dateFrom || !dateTo || totalAmount === 0) return;
     createInvoice.mutate({
       creator_id: creatorId,
-      amount: amt,
-      fee_type: feeType,
-      fee_amount: feeAmount,
-      net_amount: netAmount,
-      payment_method: paymentMethod,
+      amount: totalAmount,
+      net_amount: totalAmount,
       due_date: dueDate || null,
       notes: notes || null,
       status: "borrador",
@@ -155,41 +164,33 @@ export default function NuevoInvoicePage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div>
-              <Label>Monto</Label>
-              <Input type="number" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} />
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Tipo de Fee</Label>
-                <Select value={feeType} onValueChange={setFeeType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="paypal">PayPal (3.49% + $0.49)</SelectItem>
-                    <SelectItem value="standard">Standard (manual)</SelectItem>
-                    <SelectItem value="none">Ninguno</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Fecha inicio</Label>
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
               </div>
               <div>
-                <Label>Método de Pago</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PayPal">PayPal</SelectItem>
-                    <SelectItem value="Transferencia">Transferencia</SelectItem>
-                    <SelectItem value="Crypto">Crypto</SelectItem>
-                    <SelectItem value="Otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Fecha fin</Label>
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
               </div>
             </div>
-            {feeType === "standard" && (
-              <div>
-                <Label>Fee Manual</Label>
-                <Input type="number" placeholder="0" value={customFee} onChange={e => setCustomFee(e.target.value)} />
+
+            {/* Commission summary */}
+            {creatorId && dateFrom && dateTo && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                {loadingCommissions ? (
+                  <p className="text-muted-foreground">Buscando comisiones...</p>
+                ) : commissions.length > 0 ? (
+                  <p className="text-foreground">
+                    <span className="font-semibold">{commissions.length}</span> comisión(es) encontrada(s) — Total: <span className="font-semibold">{fmt(totalAmount)}</span>
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">No se encontraron comisiones en este periodo.</p>
+                )}
               </div>
             )}
+
             <div>
               <Label>Fecha de Vencimiento</Label>
               <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
@@ -273,21 +274,16 @@ export default function NuevoInvoicePage() {
                           <tbody>
                             <tr className="border-b border-gray-100">
                               <td className="py-2 text-gray-700">Agency Service</td>
-                              <td className="py-2 text-gray-500"></td>
-                              <td className="py-2 text-right text-gray-800 font-medium">{fmt(amt)}</td>
+                              <td className="py-2 text-gray-500">
+                                {dateFrom && dateTo ? `${dateFrom} — ${dateTo}` : ""}
+                              </td>
+                              <td className="py-2 text-right text-gray-800 font-medium">{fmt(totalAmount)}</td>
                             </tr>
-                            {feeAmount > 0 && (
-                              <tr className="border-b border-gray-100">
-                                <td className="py-2 text-gray-500">Fee ({feeType === "paypal" ? "PayPal 3.49% + $0.49" : "Manual"})</td>
-                                <td className="py-2"></td>
-                                <td className="py-2 text-right text-red-500">-{fmt(feeAmount)}</td>
-                              </tr>
-                            )}
                           </tbody>
                           <tfoot>
                             <tr>
-                              <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total Neto</td>
-                              <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(netAmount)}</td>
+                              <td colSpan={2} className="pt-3 font-bold text-gray-900 text-[11px]">Total</td>
+                              <td className="pt-3 text-right font-bold text-gray-900 text-[11px]">{fmt(totalAmount)}</td>
                             </tr>
                           </tfoot>
                         </table>
@@ -318,7 +314,9 @@ export default function NuevoInvoicePage() {
       {/* Footer */}
       <footer className="bg-background px-6 py-4 border-t border-border shrink-0 flex justify-end gap-2">
         <Button variant="outline" onClick={() => navigate("/finanzas/facturacion")}>Cancelar</Button>
-        <Button onClick={handleSubmit} disabled={!creatorId || !amount || createInvoice.isPending}>Crear Invoice</Button>
+        <Button onClick={handleSubmit} disabled={!creatorId || !dateFrom || !dateTo || totalAmount === 0 || createInvoice.isPending}>
+          Crear Invoice
+        </Button>
       </footer>
     </main>
   );
