@@ -231,15 +231,16 @@ InlineSourceSelect.displayName = "InlineSourceSelect";
 // ─── InlineStageSelect ───
 const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; onSave: (v: string) => void; disabled?: boolean }) => {
   const [open, setOpen] = useState(false);
+  const displayValue = value === "Pendiente LG" ? "Nuevo" : value;
   if (disabled) {
-    return <Badge variant={stageVariant(value)}>{value}</Badge>;
+    return <Badge variant={stageVariant(displayValue)}>{displayValue}</Badge>;
   }
   const stages = [...CLOSER_STAGES];
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <button className="inline-flex items-center gap-1 cursor-pointer">
-          <Badge variant={stageVariant(value)}>{value}</Badge>
+          <Badge variant={stageVariant(displayValue)}>{displayValue}</Badge>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
