@@ -177,19 +177,24 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Detalle de Comisión</DialogTitle></DialogHeader>
-          {viewItem && (
+          {viewItem && (() => {
+            const config = (viewItem.calculation_config || {}) as Record<string, any>;
+            return (
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Creador</span><span className="font-medium">{viewItem._creator?.artistic_name || viewItem._creator?.name || "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Periodo</span><span>{viewItem.period || "—"}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ganancia</span><span className="font-medium">{fmt(Number(viewItem.base_amount) || 0)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Comisión</span><span className="text-destructive font-medium">{fmt(Number(viewItem.estimated_amount) || 0)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Empresa</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Comisión</span><span className="text-destructive font-medium">{config.percentage ? `${config.percentage}%` : "—"}</span></div>
+              {config.blue_package && config.blue_amount > 0 && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Blue</span><span className="font-medium">{fmt(config.blue_amount)}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Valor para la Empresa</span><span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Estado</span><Badge variant={STATUS_BADGE[viewItem.status]?.variant || "outline"}>{STATUS_BADGE[viewItem.status]?.label || viewItem.status}</Badge></div>
               {viewItem.payment_method && <div className="flex justify-between"><span className="text-muted-foreground">Método de Pago</span><span>{viewItem.payment_method}</span></div>}
               {viewItem.payment_date && <div className="flex justify-between"><span className="text-muted-foreground">Fecha de Pago</span><span>{format(new Date(viewItem.payment_date + "T12:00:00"), "dd/MM/yyyy")}</span></div>}
               {viewItem.notes && <div><span className="text-muted-foreground">Notas:</span><p className="mt-1 text-foreground">{viewItem.notes}</p></div>}
-            </div>
-          )}
+            </div>);
+          })()}
         </DialogContent>
       </Dialog>
 
