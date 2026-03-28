@@ -113,7 +113,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
               Periodo: c.period,
               Ganancia: c.base_amount,
               Comision: cfg.percentage ? `${cfg.percentage}%` : "—",
-              Empresa: c.final_amount,
+              Blue: cfg.blue_package && cfg.blue_amount > 0 ? cfg.blue_amount : 0,
+              "Comision total": c.final_amount,
             };
           }), "comisiones")}>
             <Download className="h-4 w-4 mr-1" />Exportar
@@ -130,15 +131,16 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                 <TableHead className="text-xs font-medium text-muted-foreground">Periodo</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Ganancia</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Comisión</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Empresa</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Blue</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Comisión total</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
               )) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
               ) : filtered.map(c => {
                 const creatorName = c._creator?.artistic_name || c._creator?.name || "—";
                 const initials = creatorName.slice(0, 2).toUpperCase();
@@ -156,6 +158,7 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     <TableCell className="text-sm">{c.period || "—"}</TableCell>
                     <TableCell className="text-sm font-medium">{fmt(Number(c.base_amount) || 0)}</TableCell>
                     <TableCell className="text-sm text-destructive font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
+                    <TableCell className="text-sm font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.blue_package && cfg.blue_amount > 0 ? fmt(cfg.blue_amount) : "—"; })()}</TableCell>
                     <TableCell className="text-sm font-medium text-primary">{fmt(Number(c.final_amount) || 0)}</TableCell>
                     <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                       <div className="flex items-center gap-1">
