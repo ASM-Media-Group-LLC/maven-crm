@@ -1503,7 +1503,7 @@ const PromologContent = () => {
                       <TableCell className="capitalize text-sm">{entry.network}</TableCell>
                       <TableCell className="text-sm">{entry.platform}</TableCell>
                       <TableCell>
-                        <Badge className={cn("text-xs", resultToBadgeClass(entry.result))}>{entry.result}</Badge>
+                        <Badge variant={resultToBadgeVariant(entry.result)} className="text-xs">{entry.result}</Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{entry.date} {entry.time}</TableCell>
                     </TableRow>
