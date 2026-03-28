@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ interface Props {
   onView?: (entry: PromologEntry) => void;
   onEdit?: (entry: PromologEntry) => void;
   onDelete?: (entry: PromologEntry) => void;
+  onNotesChange?: (entryId: string, notes: string | null) => void;
 }
 
 type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
@@ -68,7 +69,48 @@ const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warni
   "Pendiente": "secondary-soft",
 };
 
-const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
+const InlineNotes = ({ value, onSave }: { value: string; onSave: (v: string | null) => void }) => {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setText(value); }, [value]);
+  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
+
+  const handleSave = () => {
+    setEditing(false);
+    const trimmed = text.trim();
+    if (trimmed !== value) {
+      onSave(trimmed || null);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setText(value); setEditing(false); } }}
+        className="w-full min-w-[120px] bg-transparent border-b border-primary text-sm outline-none py-0.5"
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <span
+      className="text-sm text-muted-foreground truncate max-w-[200px] block cursor-pointer hover:text-foreground"
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      title={value || "Click para agregar nota"}
+    >
+      {value || "—"}
+    </span>
+  );
+};
+
+const PromologTable = ({ entries, onView, onEdit, onDelete, onNotesChange }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -101,7 +143,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead colSpan={8} className="text-center py-16 text-muted-foreground">
+              <TableHead colSpan={9} className="text-center py-16 text-muted-foreground">
                 <p className="text-lg font-medium">No hay entradas</p>
                 <p className="text-sm">Registra una nueva entrada para comenzar</p>
               </TableHead>
@@ -113,7 +155,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
   }
 
   return (
-    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+    <Table containerClassName="overflow-visible" className="min-w-[1000px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[50px]">#</TableHead>
@@ -123,6 +165,7 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Plataforma" sortKeyName="platform" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Resultado" sortKeyName="result" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" sortKeyName="agent" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
           <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-right">Acciones</TableHead>
         </TableRow>
       </TableHeader>
@@ -160,7 +203,13 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
                 {entry.result}
               </Badge>
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground">@{entry.agent}</TableCell>
+            <TableCell className="text-sm text-muted-foreground">{entry.agent}</TableCell>
+            <TableCell onClick={(e) => e.stopPropagation()}>
+              <InlineNotes
+                value={entry.notes}
+                onSave={(v) => onNotesChange?.(entry.id, v)}
+              />
+            </TableCell>
             <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-end">
                 <DropdownMenu>
