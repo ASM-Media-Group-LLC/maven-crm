@@ -138,6 +138,21 @@ const PromologContent = () => {
     },
   });
 
+  // Fetch profiles for agent name resolution
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name");
+      return data || [];
+    },
+  });
+
+  const profilesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    profiles.forEach((p: any) => { if (p.id && p.full_name) map[p.id] = p.full_name; });
+    return map;
+  }, [profiles]);
+
   const queryClient = useQueryClient();
 
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
@@ -185,12 +200,12 @@ const PromologContent = () => {
         result: promotedToResult(pe.promoted),
         date: dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }),
         time: dateObj.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", hour12: true }),
-        agent: pe.reviewed_by || "—",
+        agent: (pe.reviewed_by && profilesMap[pe.reviewed_by]) || "—",
         notes: pe.notes || "",
         creator_id: pe.creator_id,
       };
     });
-  }, [promologEntries]);
+  }, [promologEntries, profilesMap]);
 
   // Dynamic social & platform counts (only "Sí" entries)
   const socialCards = useMemo(() => {
@@ -276,6 +291,14 @@ const PromologContent = () => {
   const handleDeleteEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
     setDeleteEntryOpen(true);
+  };
+  const handleNotesChange = async (entryId: string, notes: string | null) => {
+    const { error } = await supabase.from("promolog_entries").update({ notes }).eq("id", entryId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
   };
 
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
@@ -587,6 +610,7 @@ const PromologContent = () => {
                   onView={handleViewEntry}
                   onEdit={handleEditEntry}
                   onDelete={handleDeleteEntry}
+                  onNotesChange={handleNotesChange}
                 />
               </DataTableShell>
             ) : (
