@@ -39,15 +39,17 @@ interface Props {
 
 const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
 
-const stageColor = (s: string) => {
+const stageVariant = (s: string): "primary-soft" | "secondary-soft" | "success-soft" | "success" | "destructive-soft" | "warning-soft" => {
   switch (s) {
-    case "Asignada": return "bg-primary/10 text-primary";
-    case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-    case "No interesada": return "bg-destructive/10 text-destructive";
-    
-    case "Nuevo": return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400";
-    default: return "bg-muted text-muted-foreground";
+    case "Nuevo": return "primary-soft";
+    case "Asignada": return "secondary-soft";
+    case "En negociación": return "warning-soft";
+    case "Formulario enviado": return "warning-soft";
+    case "Acuerdo enviado": return "warning-soft";
+    case "Confirmada": return "success-soft";
+    case "Completada": return "success";
+    case "No interesada": return "destructive-soft";
+    default: return "secondary-soft";
   }
 };
 
@@ -125,24 +127,25 @@ const InlineText = memo(({ value, onSave, placeholder = "—" }: { value: string
 });
 InlineText.displayName = "InlineText";
 
-// ─── Category color map ───
-const CATEGORY_BADGE_COLORS: Record<string, string> = {
-  "A+": "border-emerald-500 text-emerald-500 bg-emerald-500/10",
-  "A": "border-amber-500 text-amber-500 bg-amber-500/10",
-  "B+": "border-blue-500 text-blue-500 bg-blue-500/10",
-  "B": "border-muted-foreground text-muted-foreground bg-muted/30",
-  "C": "border-destructive text-destructive bg-destructive/10",
+// ─── Category variant map ───
+const CATEGORY_VARIANT: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "A+": "success-soft",
+  "A": "primary-soft",
+  "B+": "warning-soft",
+  "B": "secondary-soft",
+  "C": "destructive-soft",
 };
 
 // ─── InlineCategorySelect ───
 const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; onSave: (v: string | null) => void }) => {
   const [open, setOpen] = useState(false);
-  const colorClass = value ? (CATEGORY_BADGE_COLORS[value] || "") : "";
+  const variant = value ? CATEGORY_VARIANT[value] : undefined;
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className={`cursor-pointer hover:opacity-80 rounded-full px-2.5 py-0.5 text-xs font-semibold inline-flex items-center gap-1 border ${colorClass || "border-border text-muted-foreground bg-transparent"}`}>
-          {value || "—"} <ChevronDown className="h-3 w-3" />
+        <button className="cursor-pointer hover:opacity-80 inline-flex items-center gap-1">
+          <Badge variant={variant || "outline"}>{value || "—"}</Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
@@ -150,10 +153,10 @@ const InlineCategorySelect = memo(({ value, onSave }: { value: string | null; on
           {CATEGORY_OPTIONS.map((cat) => (
             <button
               key={cat}
-              className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all hover:opacity-80 ${CATEGORY_BADGE_COLORS[cat]} ${cat === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50" : ""}`}
+              className={`cursor-pointer transition-all hover:opacity-80 ${cat === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50 rounded-full" : ""}`}
               onClick={() => { onSave(cat); setOpen(false); }}
             >
-              {cat}
+              <Badge variant={CATEGORY_VARIANT[cat]}>{cat}</Badge>
             </button>
           ))}
         </div>
@@ -228,14 +231,15 @@ InlineSourceSelect.displayName = "InlineSourceSelect";
 const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; onSave: (v: string) => void; disabled?: boolean }) => {
   const [open, setOpen] = useState(false);
   if (disabled) {
-    return <Badge className={stageColor(value)}>{value}</Badge>;
+    return <Badge variant={stageVariant(value)}>{value}</Badge>;
   }
   const stages = [...CLOSER_STAGES];
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
-        <button className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium cursor-pointer border-0 ${stageColor(value)}`}>
-          {value} <ChevronDown className="h-3 w-3" />
+        <button className="inline-flex items-center gap-1 cursor-pointer">
+          <Badge variant={stageVariant(value)}>{value}</Badge>
+          <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start" side="bottom">
@@ -243,10 +247,10 @@ const InlineStageSelect = memo(({ value, onSave, disabled }: { value: string; on
           {stages.filter((s) => s !== "Asignada").map((s) => (
             <button
               key={s}
-              className={`text-left rounded px-2 py-1 text-xs cursor-pointer hover:bg-muted ${s === value ? "ring-1 ring-primary" : ""} ${stageColor(s)}`}
+              className={`cursor-pointer hover:opacity-80 ${s === value ? "ring-2 ring-offset-1 ring-offset-background ring-primary/50 rounded-full" : ""}`}
               onClick={() => { onSave(s); setOpen(false); }}
             >
-              {s}
+              <Badge variant={stageVariant(s)}>{s}</Badge>
             </button>
           ))}
         </div>
@@ -395,7 +399,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
                       {c.instagram_handle.startsWith("@") ? c.instagram_handle : `@${c.instagram_handle}`}
                       <ExternalLink className="h-3 w-3" />
                     </a>
-                    <Badge className={`${stageColor(c.stage)} text-[10px]`}>{c.stage}</Badge>
+                    <Badge variant={stageVariant(c.stage)} className="text-[10px]">{c.stage}</Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-sm">

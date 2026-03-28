@@ -26,16 +26,17 @@ interface Props {
   showActions?: boolean;
 }
 
-const stageBadgeColor = (stage: string) => {
+const stageVariant = (stage: string): "primary-soft" | "secondary-soft" | "success-soft" | "success" | "destructive-soft" | "warning-soft" => {
   switch (stage) {
-    case "Asignada": return "bg-muted text-muted-foreground";
-    case "En negociación": return "bg-primary/10 text-primary";
-    case "Formulario enviado": return "bg-accent/10 text-accent-foreground";
-    case "Acuerdo enviado": return "bg-accent/20 text-accent-foreground";
-    case "Confirmada": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-    case "Completada": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-    case "No interesada": return "bg-destructive/10 text-destructive";
-    default: return "";
+    case "Nuevo": return "primary-soft";
+    case "Asignada": return "secondary-soft";
+    case "En negociación": return "warning-soft";
+    case "Formulario enviado": return "warning-soft";
+    case "Acuerdo enviado": return "warning-soft";
+    case "Confirmada": return "success-soft";
+    case "Completada": return "success";
+    case "No interesada": return "destructive-soft";
+    default: return "secondary-soft";
   }
 };
 
@@ -56,7 +57,7 @@ const needsReminder = (lastContact: string | null) => {
 
 const defaultRender = (creator: CloserCreator, key: string): React.ReactNode => {
   const val = (creator as unknown as Record<string, unknown>)[key];
-  if (key === "stage") return <Badge className={stageBadgeColor(String(val))}>{String(val)}</Badge>;
+  if (key === "stage") return <Badge variant={stageVariant(String(val))}>{String(val)}</Badge>;
   if (key === "estimated_monetization" || key === "monthly_monetization")
     return `$${Number(val || 0).toLocaleString()}`;
   if (key === "agency_commission") return `${Number(val || 0)}%`;

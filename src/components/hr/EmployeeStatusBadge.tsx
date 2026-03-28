@@ -1,19 +1,27 @@
-import { cn } from "@/lib/utils";
-import { getStatusColors } from "@/lib/hrAreaUtils";
+import { Badge } from "@/components/ui/badge";
 import { EMPLOYEE_STATUS_OPTIONS } from "@/lib/hrConstants";
+import { cn } from "@/lib/utils";
 
 interface EmployeeStatusBadgeProps {
   status: string | null | undefined;
   className?: string;
 }
 
+const STATUS_VARIANT: Record<string, "success-soft" | "secondary-soft" | "warning-soft" | "destructive-soft" | "primary-soft"> = {
+  activo: "success-soft",
+  inactivo: "secondary-soft",
+  en_licencia: "warning-soft",
+  suspendido: "destructive-soft",
+  vacaciones: "primary-soft",
+};
+
 export function EmployeeStatusBadge({ status, className }: EmployeeStatusBadgeProps) {
-  const colors = getStatusColors(status);
+  const variant = status ? (STATUS_VARIANT[status] || "secondary-soft") : "secondary-soft";
   const label = EMPLOYEE_STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status ?? "—";
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", colors.bg, colors.text, className)}>
+    <Badge variant={variant} className={cn(className)}>
       {label}
-    </span>
+    </Badge>
   );
 }
 
