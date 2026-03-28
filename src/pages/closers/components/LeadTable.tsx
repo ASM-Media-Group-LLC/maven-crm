@@ -40,7 +40,8 @@ interface Props {
 const CATEGORY_OPTIONS = ["A+", "A", "B+", "B", "C"];
 
 const stageVariant = (s: string): "primary-soft" | "secondary-soft" | "success-soft" | "success" | "destructive-soft" | "warning-soft" => {
-  switch (s) {
+  const normalized = s === "Pendiente LG" ? "Nuevo" : s;
+  switch (normalized) {
     case "Nuevo": return "primary-soft";
     case "Asignada": return "secondary-soft";
     case "En negociación": return "warning-soft";
