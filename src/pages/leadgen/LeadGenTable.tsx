@@ -148,7 +148,7 @@ const buildProfileUrl = (entry: LeadGenEntry) => {
 const LeadRow = React.memo(({ lead, onView }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void }) => (
   <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-      {format(new Date(lead.created_at), "hh:mm a", { locale: es })}
+      {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
     </TableCell>
     <TableCell>
       <Badge variant="outline" className="font-mono text-xs">
@@ -241,7 +241,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
     <Table containerClassName="overflow-visible" className="min-w-[900px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Hora" col="hora" /></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Fecha" col="hora" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
