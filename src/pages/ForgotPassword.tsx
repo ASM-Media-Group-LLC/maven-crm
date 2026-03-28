@@ -42,9 +42,6 @@ const ForgotPassword = () => {
       <div className="space-y-6">
         <div className="flex flex-col items-center gap-2">
           <h2 className="text-2xl font-bold text-white">Recuperar contraseña</h2>
-          <p className="text-sm text-white/50 text-center">
-            Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
-          </p>
         </div>
 
         {sent ? (
@@ -58,25 +55,27 @@ const ForgotPassword = () => {
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-white/70">Email</Label>
-              <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+          <>
+            <p className="text-sm text-white/50 text-center">
+              Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-white/70">Email</Label>
+                <Input id="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="bg-white/10 border-white/10 text-white placeholder:text-white/30" />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar enlace de recuperación
+              </Button>
+            </form>
+            <div className="flex flex-col items-center gap-2 text-sm">
+              <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
+                <ArrowLeft className="h-4 w-4" />
+                Volver a iniciar sesión
+              </Link>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Enviar enlace de recuperación
-            </Button>
-          </form>
-        )}
-
-        {!sent && (
-          <div className="flex flex-col items-center gap-2 text-sm">
-            <Link to="/login" className="inline-flex items-center gap-2 text-white/60 hover:text-white hover:underline">
-              <ArrowLeft className="h-4 w-4" />
-              Volver a iniciar sesión
-            </Link>
-          </div>
+          </>
         )}
       </div>
     </AuthLayout>
