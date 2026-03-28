@@ -140,8 +140,8 @@ const PromologContent = () => {
 
   const queryClient = useQueryClient();
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   // Fetch real promolog entries
   const { data: promologEntries = [], isLoading: entriesLoading } = useQuery({

@@ -61,8 +61,8 @@ const LeadGenContent = () => {
   }, [dataScope]);
 
   // Date range state with today as default
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(0);
 
   const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;

@@ -16,8 +16,8 @@ import ClariAiFab from "@/components/ClariAiFab";
 
 const SalesOverview = () => {
   const today = startOfToday();
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfWeek(today, { weekStartsOn: 1 }));
-  const [dateTo, setDateTo] = useState<Date | undefined>(today);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [modalType, setModalType] = useState<string | null>(null);
   const { data: allRows = [], isLoading } = useEarningsData();
 
