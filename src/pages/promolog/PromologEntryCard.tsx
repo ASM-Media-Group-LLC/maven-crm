@@ -54,12 +54,12 @@ const networkLabel = (network: string) => {
   return "X";
 };
 
-const resultBadgeVariant = (result: string): "success" | "destructive" | "warning" | "secondary" => {
+const resultBadgeVariant = (result: string): "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft" => {
   switch (result) {
-    case "Sí": return "success";
-    case "No": return "destructive";
-    case "Parcial": return "warning";
-    default: return "secondary";
+    case "Sí": return "success-soft";
+    case "No": return "destructive-soft";
+    case "Parcial": return "warning-soft";
+    default: return "secondary-soft";
   }
 };
 
@@ -159,11 +159,11 @@ const PromologEntryCard = ({ entry }: PromologEntryCardProps) => {
 
           {/* Row 4: Network + Platform badges */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className="gap-1 text-xs">
+            <Badge variant="secondary-soft" className="gap-1 text-xs">
               <NetworkIcon network={entry.network} />
               {networkLabel(entry.network)}
             </Badge>
-            <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
+            <Badge variant="primary-soft" className="text-xs">
               {entry.platform}
             </Badge>
           </div>

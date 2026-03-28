@@ -61,11 +61,11 @@ const networkLabel: Record<string, string> = {
   telegram: "Telegram",
 };
 
-const resultVariant: Record<string, string> = {
-  "Sí": "bg-green-500/15 text-green-700 border-green-300",
-  "No": "bg-red-500/15 text-red-700 border-red-300",
-  "Parcial": "bg-yellow-500/15 text-yellow-700 border-yellow-300",
-  "Pendiente": "bg-muted text-muted-foreground",
+const resultVariant: Record<string, "success-soft" | "destructive-soft" | "warning-soft" | "secondary-soft"> = {
+  "Sí": "success-soft",
+  "No": "destructive-soft",
+  "Parcial": "warning-soft",
+  "Pendiente": "secondary-soft",
 };
 
 const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
@@ -145,18 +145,18 @@ const PromologTable = ({ entries, onView, onEdit, onDelete }: Props) => {
               </div>
             </TableCell>
             <TableCell>
-              <Badge variant="outline" className="gap-1 text-xs">
+              <Badge variant="secondary-soft" className="gap-1 text-xs">
                 <NetworkIcon network={entry.network} />
                 {networkLabel[entry.network] || entry.network}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge variant="outline" className="text-xs border-orange-400 text-orange-500">
+              <Badge variant="primary-soft" className="text-xs">
                 {entry.platform}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge variant="outline" className={`text-xs ${resultVariant[entry.result] || ""}`}>
+              <Badge variant={resultVariant[entry.result] || "secondary-soft"} className="text-xs">
                 {entry.result}
               </Badge>
             </TableCell>
