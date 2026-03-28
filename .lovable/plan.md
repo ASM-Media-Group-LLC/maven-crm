@@ -1,21 +1,15 @@
 
 
-## Plan: Agregar Blue Package al cálculo automático de comisiones
+## Plan: Mostrar Blue solo cuando Blue Package está activo
 
-### Cambios en `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`
+### Cambio
+En `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`, línea 190:
 
-**1. Ampliar la query de `creator_business`** para incluir `blue_package` y `li_payment_amount` junto con `agency_percentage`.
+**Actual:** `{hasBlue && base > 0 && (`
+**Corregir a:** `{hasBlue && (`
 
-**2. Actualizar el cálculo:**
-```
-blueAmount = (blue_package && li_payment_amount > 0) ? li_payment_amount : 0
-companyValue = (base * agencyPct / 100) + blueAmount
-```
+Esto hará que la fila "Blue" se muestre siempre que el creador tenga Blue Package activo con un monto configurado, sin requerir que se haya ingresado una ganancia.
 
-**3. Agregar fila "Blue" en la sección de Cálculo Automático**, entre "Comisión" y "Valor para la Empresa". Solo se muestra si `blue_package === true` y `li_payment_amount > 0`. Muestra el monto fijo (e.g. `$500`).
-
-**4. Incluir el blue amount en el payload de `onSubmit`** dentro de `calculation_config` para trazabilidad.
-
-### Archivos
-- **Modificar**: `src/pages/finanzas/comisiones/NuevaComisionModal.tsx`
+### Archivo
+- **Modificar**: `src/pages/finanzas/comisiones/NuevaComisionModal.tsx` (1 línea)
 
