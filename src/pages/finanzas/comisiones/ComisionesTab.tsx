@@ -195,7 +195,6 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
               {viewItem.notes && <div><span className="text-muted-foreground">Notas:</span><p className="mt-1 text-foreground">{viewItem.notes}</p></div>}
             </div>);
           })()}
-          )}
         </DialogContent>
       </Dialog>
 
