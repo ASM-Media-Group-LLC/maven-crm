@@ -1,36 +1,21 @@
 
 
-## Plan: Ajustar Detalle de Comisión
+## Plan: Ajustar tabla de comisiones en facturación
 
-### Cambios en `src/pages/finanzas/comisiones/ComisionesTab.tsx` (líneas 184-186)
+### Cambios en `src/pages/finanzas/comisiones/ComisionesTab.tsx`
 
-1. **Comisión** — Mostrar solo el porcentaje desde `calculation_config.percentage` (ej: `"20%"`), sin el monto
-2. **Blue** (nueva fila) — Mostrar condicionalmente si `calculation_config.blue_package && blue_amount > 0`, con el monto formateado
-3. **Empresa → "Valor para la Empresa"** — Renombrar label
+1. **Eliminar columna "Estado"**: Quitar el `<TableHead>` de "Estado" (línea 132), la celda `<TableCell>` con el Badge (línea 159), y ajustar los `colSpan` y skeleton counts de 7 a 6.
 
-```tsx
-const config = viewItem.calculation_config || {};
+2. **Columna "Comisión" — mostrar solo porcentaje**: Cambiar línea 157 para mostrar el porcentaje desde `calculation_config` en vez del monto estimado:
+   ```tsx
+   // De:
+   {fmt(Number(c.estimated_amount) || 0)}
+   // A:
+   const config = (c.calculation_config || {}) as Record<string, any>;
+   {config.percentage ? `${config.percentage}%` : "—"}
+   ```
 
-// Línea 185: Comisión — solo porcentaje
-<div className="flex justify-between">
-  <span className="text-muted-foreground">Comisión</span>
-  <span className="text-destructive font-medium">{config.percentage ? `${config.percentage}%` : "—"}</span>
-</div>
-
-// Nueva fila: Blue (condicional)
-{config.blue_package && config.blue_amount > 0 && (
-  <div className="flex justify-between">
-    <span className="text-muted-foreground">Blue</span>
-    <span className="font-medium">{fmt(config.blue_amount)}</span>
-  </div>
-)}
-
-// Línea 186: Renombrar
-<div className="flex justify-between">
-  <span className="text-muted-foreground">Valor para la Empresa</span>
-  <span className="text-primary font-medium">{fmt(Number(viewItem.final_amount) || 0)}</span>
-</div>
-```
+3. **Exportar**: Actualizar el mapeo de exportación (líneas 109-116) para eliminar "Estado" y ajustar "Comisión" al porcentaje.
 
 ### Archivo
 - **Modificar**: `src/pages/finanzas/comisiones/ComisionesTab.tsx`
