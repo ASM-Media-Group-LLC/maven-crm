@@ -1,48 +1,45 @@
 
 
-## Plan: Estandarizar columna "Creación", corregir badge Promolog y rediseñar layout
+## Plan: Ajustes en Promolog — scroll, KPIs, columnas y limpieza
 
-### 1. Estandarizar nombre de columna de fecha
+### Problemas identificados
 
-Todas las tablas deben usar **"Creación"** como nombre de columna (estándar del Design System). Tablas que actualmente dicen "Fecha" y deben cambiar:
+1. **"Pendiente LG"**: Ya no existe en el código. Fue eliminado en cambios anteriores. No se requiere acción.
+2. **Scroll de tabla no es interno**: El contenedor de la tabla (`div.flex-1.min-h-0.overflow-auto`) envuelve tanto el `DataTableShell` como el scroll, pero el `DataTableShell` ya tiene su propio scroll interno. El div padre con `overflow-auto` causa doble scroll. Se debe quitar el `overflow-auto` del padre y dejar que `DataTableShell` con `className="flex-1 min-h-0"` maneje todo.
+3. **KPI "Total Promos" falta**: Las 4 cards actuales son: Modelos, Ingresados, Sin revisar, Completadas. Falta una card de "Total Promos" (conteo total de entries filtradas). Se reemplaza "Modelos" (que no es relevante aquí) por "Total Promos".
+4. **Columna "Creación" debe ir primero**: Actualmente el orden es Ticket → Modelo → Red → Plataforma → Resultado → Agente → Creación → Acciones. Se debe mover "Creación" a la primera posición.
+5. **Columna "Ticket"**: El `ticket_number` es un campo de la base de datos que identifica cada entry. Si no se usa en tu flujo operativo, se puede eliminar de la tabla. Se reemplaza por el # (número de fila) para mantener consistencia con el design system.
 
-- `src/pages/leadgen/LeadGenTable.tsx` — línea 244: "Fecha" → "Creación"
-- `src/pages/promolog/PromologTable.tsx` — línea 126: "Fecha" → "Creación"
-- `src/pages/contactos/AgenciasTable.tsx` — línea 55: "Fecha" → "Creación"
-- `src/pages/tickets/TicketsList.tsx` — línea 130: "Fecha" → "Creación"
-- `src/pages/eventos/EventosTable.tsx` — línea 108: ya tiene sentido como "Fecha" (es fecha del evento, no de creación) — se deja
+### Cambios
 
-### 2. Corregir badge de Promolog en sidebar
+#### 1. `PromologTable.tsx` — reordenar columnas y eliminar Ticket
+Nuevo orden de columnas:
+- **#** (índice de fila, no ticket_number)
+- **Creación** (fecha + hora)
+- **Modelo** (nombre + handle)
+- **Red Social**
+- **Plataforma**
+- **Resultado**
+- **Agente**
+- **Acciones**
 
-Actualmente `useSidebarBadges.ts` cuenta **todas** las entradas sin `reviewed_by` (25,624). El badge debe mostrar solo las del **día actual** o no mostrarse. Cambiar la query para filtrar por `date >= hoy`.
+Eliminar la columna "Ticket" y el sort key asociado. Corregir el bug de `<TableHead>` anidado en la línea 126 (hay un `<TableHead>` dentro de otro `<TableHead>`).
 
-**Archivo**: `src/hooks/useSidebarBadges.ts`
+#### 2. `PromologContent.tsx` — corregir scroll y KPIs
 
-### 3. Rediseñar layout de PromologContent
-
-El layout actual mezcla todo en un scroll largo. Se debe reorganizar para que sea consistente con Closers/LeadGen:
-
-```text
-┌─ Header (título + botones) ─────────────── shrink-0 ─┐
-├─ KPI cards compactos ───────────────────── shrink-0 ─┤
-├─ Tabs (Promos | Agentes | Campañas) ──── shrink-0 ─┤
-├─ Filtros + búsqueda ───────────────────── shrink-0 ─┤
-├─ Tabla con scroll interno ──────────── flex-1 ─────┤
-└──────────────────────────────────────────────────────┘
+**Scroll**: En línea 563, cambiar el contenedor de:
 ```
+<div className="flex-1 min-h-0 overflow-auto px-6 pb-4">
+```
+a:
+```
+<div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
+```
+Y pasar `className="flex-1 min-h-0"` al `DataTableShell` para que el scroll sea interno con footer fijo.
 
-Cambios en `src/pages/promolog/PromologContent.tsx`:
-- Mover KPI cards y tabs al área `shrink-0` (fuera del scroll)
-- Eliminar las cards de "Red Social" y "Plataforma" del área fija — moverlas como filtros o integrarlas en los KPIs
-- La tabla de promos ocupa el espacio restante con scroll interno (flex-1 min-h-0)
-- Filtros (búsqueda, estado, red social, fecha) en fila compacta similar a Closers
-- Eliminar la sección redundante de cards de redes/plataformas y usar los filtros select existentes
+**KPIs**: Reemplazar la card "Modelos" (creators.length) por "Total Promos" (filteredEntries.length o entries.length) que es más relevante para esta vista.
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenTable.tsx` — columna "Fecha" → "Creación"
-- `src/pages/promolog/PromologTable.tsx` — columna "Fecha" → "Creación"
-- `src/pages/contactos/AgenciasTable.tsx` — columna "Fecha" → "Creación"
-- `src/pages/tickets/TicketsList.tsx` — columna "Fecha" → "Creación"
-- `src/hooks/useSidebarBadges.ts` — filtrar promolog badge por fecha actual
-- `src/pages/promolog/PromologContent.tsx` — rediseñar layout (KPIs + tabs sticky, tabla con scroll interno, eliminar cards de redes/plataformas redundantes)
+- `src/pages/promolog/PromologTable.tsx` — reordenar columnas, quitar Ticket, corregir TableHead anidado
+- `src/pages/promolog/PromologContent.tsx` — scroll interno con footer fijo, ajustar KPI cards
 
