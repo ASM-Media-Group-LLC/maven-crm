@@ -1,53 +1,35 @@
 
 
-## Plan: Mostrar toda la data por defecto + badge de Promolog correcto
+## Plan: Crear página /credentials con acceso rápido por rol
 
-### Cambio de filosofía
-Actualmente Promolog y LeadGen inician filtrados por "hoy", lo que causa que el badge (25,371 sin revisar) no coincida con la vista (0 entradas de hoy). La solución correcta es: **todas las vistas muestran toda la data por defecto** (sin filtro de fecha), y el badge cuenta todos los pendientes sin filtro de fecha (como ya lo hace).
+### Concepto
+Página pública (sin autenticación) en `/credentials` que muestra tarjetas para cada rol del sistema (admin, manager, employee, agent, closer, supervisor). Cada tarjeta tiene un botón "Acceder" que hace `signInWithPassword` automáticamente con credenciales de cuentas de prueba predefinidas.
 
-### Cambios
+### Requisito previo: cuentas de prueba en Supabase
+Se necesitan 6 usuarios de prueba en Supabase Auth, cada uno con un rol asignado en `user_roles`. Las credenciales se hardcodean en el frontend (son cuentas de prueba, no producción).
 
-**1. Promolog — quitar filtro de fecha por defecto**
-En `src/pages/promolog/PromologContent.tsx` línea 143-144:
-```ts
-// Antes
-const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+### Implementación
 
-// Después
-const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-```
+**1. Crear `src/pages/Credentials.tsx`**
+- Array de configuración con cada rol: nombre, descripción, email, password, icono, color
+- Al hacer clic en "Acceder": ejecuta `supabase.auth.signInWithPassword({ email, password })` y navega a `/dashboard`
+- UI: grid de cards con el estilo del proyecto (fondo oscuro, glassmorphism similar a AuthLayout)
+- Mostrar loader durante el login, toast de error si falla
+- Si ya hay sesión activa, mostrar opción de cerrar sesión primero
 
-**2. LeadGen — quitar filtro de fecha por defecto**
-En `src/pages/leadgen/LeadGenContent.tsx` línea 64-65:
-```ts
-// Antes
-const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
-const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+**2. Agregar ruta en `App.tsx`**
+- Ruta pública: `<Route path="/credentials" element={<Credentials />} />`
 
-// Después
-const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-```
+**3. Cuentas de prueba necesarias**
+Se crearán 6 usuarios en Supabase Auth con emails tipo `test-admin@maven.app`, `test-manager@maven.app`, etc., y se asignarán los roles correspondientes en `user_roles`. Esto se puede hacer via SQL insert o desde el dashboard de Supabase.
 
-**3. SalesOverview — quitar filtro de fecha por defecto**
-En `src/pages/SalesOverview.tsx` línea 19-20:
-```ts
-// Antes
-const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfWeek(today, { weekStartsOn: 1 }));
-const [dateTo, setDateTo] = useState<Date | undefined>(today);
-
-// Después
-const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-```
-
-**4. Badge de Promolog — NO cambiar**
-El hook `useSidebarBadges.ts` ya cuenta todos los pendientes sin filtro de fecha. Con las vistas mostrando toda la data, el número del badge (25,371) coincidirá con lo que el usuario ve al entrar a `/promolog`.
+### Seguridad
+- Esta página es solo para desarrollo/testing
+- Las credenciales son de cuentas de prueba sin datos sensibles
+- Se puede agregar una variable de entorno para ocultarla en producción si se desea
 
 ### Archivos
-- **Modificar**: `src/pages/promolog/PromologContent.tsx`
-- **Modificar**: `src/pages/leadgen/LeadGenContent.tsx`
-- **Modificar**: `src/pages/SalesOverview.tsx`
+- **Crear**: `src/pages/Credentials.tsx`
+- **Modificar**: `src/App.tsx` (agregar ruta)
+- **Supabase**: crear 6 usuarios de prueba y asignar roles
 
