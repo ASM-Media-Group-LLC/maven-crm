@@ -66,7 +66,7 @@ export default function NuevoInvoicePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("commissions")
-        .select("id, final_amount, period, period_start, period_end, calculation_config")
+        .select("id, final_amount, base_amount, percentage, period, period_start, period_end, calculation_config")
         .eq("creator_id", creatorId)
         .gte("period_start", dateFrom)
         .lte("period_end", dateTo);
@@ -76,7 +76,43 @@ export default function NuevoInvoicePage() {
     enabled: !!creatorId && !!dateFrom && !!dateTo,
   });
 
-  const totalAmount = commissions.reduce((acc, c) => acc + (Number(c.final_amount) || 0), 0);
+  // Fetch creator_business for payment_method
+  const { data: creatorBusiness } = useQuery({
+    queryKey: ["creator-business-invoice", creatorId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_business")
+        .select("payment_method")
+        .eq("creator_id", creatorId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!creatorId,
+  });
+
+  // Calculate breakdown from commissions
+  const agencyTotal = commissions.reduce((acc, c) => {
+    const cfg = (c.calculation_config || {}) as Record<string, any>;
+    const pct = Number(cfg.percentage || c.percentage || 0);
+    return acc + (Number(c.base_amount) || 0) * (pct / 100);
+  }, 0);
+
+  const blueTotal = commissions.reduce((acc, c) => {
+    const cfg = (c.calculation_config || {}) as Record<string, any>;
+    return acc + (cfg.blue_package ? Number(cfg.blue_amount || 0) : 0);
+  }, 0);
+
+  const restante = commissions.reduce((acc, c) => {
+    const cfg = (c.calculation_config || {}) as Record<string, any>;
+    const pct = Number(cfg.percentage || c.percentage || 0);
+    const base = Number(c.base_amount) || 0;
+    return acc + (base - base * (pct / 100));
+  }, 0);
+
+  const paymentMethod = creatorBusiness?.payment_method || "";
+  const paypalAmount = paymentMethod === "PayPal" ? restante * 0.05 : 0;
+  const grandTotal = agencyTotal + blueTotal + paypalAmount;
 
   const createInvoice = useMutation({
     mutationFn: async (payload: any) => {
