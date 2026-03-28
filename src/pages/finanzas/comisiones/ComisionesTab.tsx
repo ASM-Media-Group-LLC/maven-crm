@@ -129,15 +129,14 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                 <TableHead className="text-xs font-medium text-muted-foreground">Ganancia</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Comisión</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Empresa</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Estado</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground sticky right-0 bg-card">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>{Array.from({ length: 7 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                <TableRow key={i}>{Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
               )) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-12">Sin comisiones registradas.</TableCell></TableRow>
               ) : filtered.map(c => {
                 const creatorName = c._creator?.artistic_name || c._creator?.name || "—";
                 const initials = creatorName.slice(0, 2).toUpperCase();
@@ -154,9 +153,8 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
                     </TableCell>
                     <TableCell className="text-sm">{c.period || "—"}</TableCell>
                     <TableCell className="text-sm font-medium">{fmt(Number(c.base_amount) || 0)}</TableCell>
-                    <TableCell className="text-sm text-destructive font-medium">{fmt(Number(c.estimated_amount) || 0)}</TableCell>
+                    <TableCell className="text-sm text-destructive font-medium">{(() => { const cfg = (c.calculation_config || {}) as Record<string, any>; return cfg.percentage ? `${cfg.percentage}%` : "—"; })()}</TableCell>
                     <TableCell className="text-sm font-medium text-primary">{fmt(Number(c.final_amount) || 0)}</TableCell>
-                    <TableCell><Badge variant={badge.variant}>{badge.label}</Badge></TableCell>
                     <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                       <div className="flex items-center gap-1">
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setViewItem(c)}><Eye className="h-3.5 w-3.5" /></Button></TooltipTrigger><TooltipContent side="left">Ver</TooltipContent></Tooltip>
