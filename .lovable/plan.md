@@ -1,22 +1,39 @@
 
 
-## Plan: Agregar columna "Blue" y renombrar "Empresa" a "Comisión total"
+## Plan: Ajustar preview A4 con desglose de Agency Services, Blue y PayPal
 
-### Cambios en `src/pages/finanzas/comisiones/ComisionesTab.tsx`
+### Resumen
+Modificar el query de comisiones y el preview A4 en `NuevoInvoicePage.tsx` para mostrar un desglose detallado: Agency Services (ganancia * %), Blue Package (si aplica), y PayPal 5% del restante (si el método de pago es PayPal). Todos los datos provienen de las comisiones y del `creator_business`.
 
-**1. Header — agregar columna "Blue" y renombrar "Empresa"**
-- Insertar `<TableHead>Blue</TableHead>` entre "Comisión" y "Empresa" (línea 133)
-- Renombrar "Empresa" a "Comisión total"
+### Cambios en `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`
 
-**2. Body — agregar celda Blue**
-- Extraer `calculation_config` y mostrar `blue_amount` formateado si `blue_package` está activo, sino "—"
-- Insertar la celda entre Comisión y Comisión total
-- Ajustar skeleton count y colSpan de 6 a 7
+**1. Ampliar query de comisiones**
+- Agregar `base_amount` al select de comisiones (ya tiene `calculation_config` con percentage, blue_package, blue_amount)
 
-**3. Export — actualizar mapeo**
-- Agregar campo "Blue" al export con el monto del blue package
-- Renombrar "Empresa" a "Comision total"
+**2. Agregar query de `creator_business`**
+- Nuevo `useQuery` para obtener `payment_method` del creador seleccionado:
+  ```tsx
+  supabase.from("creator_business").select("payment_method").eq("creator_id", creatorId).maybeSingle()
+  ```
+
+**3. Calcular los montos desglosados**
+- De las comisiones, agregar por separado:
+  - `agencyTotal` = suma de `base_amount * (cfg.percentage / 100)` por cada comisión
+  - `blueTotal` = suma de `cfg.blue_amount` donde `cfg.blue_package === true`
+  - `restante` = suma de `base_amount - (base_amount * cfg.percentage / 100)` por cada comisión
+  - `paypalAmount` = si payment_method es "PayPal", entonces `restante * 0.05`, sino 0
+  - `grandTotal` = `agencyTotal + blueTotal + paypalAmount`
+
+**4. Actualizar el preview A4 (tabla)**
+- Fila 1: "Agency Services" → Amount = `agencyTotal`
+- Fila 2 (condicional): "Blue" → Amount = `blueTotal` (solo si blueTotal > 0)
+- Fila 3 (condicional): "PayPal" → Amount = `paypalAmount` (solo si payment_method es PayPal)
+- Total = `grandTotal`
+
+**5. Actualizar resumen de comisiones y submit**
+- El resumen muestra el `grandTotal` en vez de solo `totalAmount`
+- El payload de submit usa `grandTotal` como `amount` y `net_amount`
 
 ### Archivo
-- **Modificar**: `src/pages/finanzas/comisiones/ComisionesTab.tsx`
+- **Modificar**: `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`
 
