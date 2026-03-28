@@ -3915,6 +3915,8 @@ export type Database = {
           paid_date: string | null
           payment_method: string | null
           paypal_amount: number | null
+          period_end: string | null
+          period_start: string | null
           reversal_reason: string | null
           status: string
           updated_at: string
@@ -3936,6 +3938,8 @@ export type Database = {
           paid_date?: string | null
           payment_method?: string | null
           paypal_amount?: number | null
+          period_end?: string | null
+          period_start?: string | null
           reversal_reason?: string | null
           status?: string
           updated_at?: string
@@ -3957,6 +3961,8 @@ export type Database = {
           paid_date?: string | null
           payment_method?: string | null
           paypal_amount?: number | null
+          period_end?: string | null
+          period_start?: string | null
           reversal_reason?: string | null
           status?: string
           updated_at?: string
