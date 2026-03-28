@@ -106,14 +106,16 @@ export default function ComisionesTab({ renderFilterBar, currentFilters }: Props
       {renderFilterBar(
         <>
           <Button size="sm" onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" />Crear Comisión</Button>
-          <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(c => ({
-            Creador: c._creator?.artistic_name || c._creator?.name || "",
-            Periodo: c.period,
-            Ganancia: c.base_amount,
-            Comision: c.estimated_amount,
-            Empresa: c.final_amount,
-            Estado: c.status,
-          })), "comisiones")}>
+          <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(c => {
+            const cfg = (c.calculation_config || {}) as Record<string, any>;
+            return {
+              Creador: c._creator?.artistic_name || c._creator?.name || "",
+              Periodo: c.period,
+              Ganancia: c.base_amount,
+              Comision: cfg.percentage ? `${cfg.percentage}%` : "—",
+              Empresa: c.final_amount,
+            };
+          }), "comisiones")}>
             <Download className="h-4 w-4 mr-1" />Exportar
           </Button>
         </>
