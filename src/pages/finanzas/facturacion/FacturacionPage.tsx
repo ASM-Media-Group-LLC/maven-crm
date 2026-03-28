@@ -205,6 +205,44 @@ export default function FacturacionPage() {
 
   const toggleBulk = (id: string) => setBulkSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPdf = useCallback(async (inv: any) => {
+    const container = pdfContainerRef.current;
+    if (!container) return;
+
+    // Render InvoiceA4Preview off-screen
+    const { createRoot } = await import("react-dom/client");
+    const { default: InvoiceA4PreviewComp } = await import("./InvoiceA4Preview");
+
+    // Create a temporary wrapper
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-9999px";
+    wrapper.style.top = "0";
+    document.body.appendChild(wrapper);
+
+    const root = createRoot(wrapper);
+    root.render(<InvoiceA4PreviewComp invoice={inv} />);
+
+    // Wait for render
+    await new Promise(r => setTimeout(r, 500));
+
+    const a4El = wrapper.querySelector("div > div") as HTMLElement;
+    if (!a4El) { root.unmount(); wrapper.remove(); return; }
+
+    const canvas = await html2canvas(a4El, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdfW = 210;
+    const pdfH = 297;
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+    pdf.save(`Invoice-${inv.invoice_number || "draft"}.pdf`);
+
+    root.unmount();
+    wrapper.remove();
+  }, []);
+
   const renderInvoiceTable = (showBulkCheckbox = false) => (
     <div className="rounded-lg border border-border overflow-hidden">
       <div className="overflow-auto max-h-[calc(100vh-30rem)]">
@@ -518,7 +556,7 @@ export default function FacturacionPage() {
             {renderFilterBar(
               <>
                 <Button size="sm" onClick={() => navigate("/finanzas/facturacion/facturas/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
-                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Monto: inv.amount, Fee: inv.fee_amount, Neto: inv.net_amount, Estado: inv.status, Metodo: inv.payment_method, Vencimiento: inv.due_date })), "invoices")}>
+                <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Periodo: ((inv as any).period_start && (inv as any).period_end) ? `${(inv as any).period_start} — ${(inv as any).period_end}` : "", Vencimiento: inv.due_date })), "invoices")}>
                   <Download className="h-4 w-4 mr-1" />Exportar
                 </Button>
               </>,

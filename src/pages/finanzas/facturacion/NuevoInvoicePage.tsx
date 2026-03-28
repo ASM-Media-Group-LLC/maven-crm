@@ -143,6 +143,8 @@ export default function NuevoInvoicePage() {
       due_date: dueDate || null,
       notes: notes || null,
       status: "borrador",
+      period_start: dateFrom || null,
+      period_end: dateTo || null,
     } as any);
   };
 
