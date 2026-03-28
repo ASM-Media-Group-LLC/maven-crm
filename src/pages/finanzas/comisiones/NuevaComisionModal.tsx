@@ -47,7 +47,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
     queryFn: async () => {
       const { data } = await supabase
         .from("creator_business")
-        .select("agency_percentage")
+        .select("agency_percentage, blue_package, li_payment_amount")
         .eq("creator_id", creatorId)
         .maybeSingle();
       return data;
@@ -67,7 +67,9 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
 
   const base = Number(baseAmount) || 0;
   const agencyPct = creatorBusiness?.agency_percentage ?? 0;
-  const companyValue = base * (agencyPct / 100);
+  const hasBlue = creatorBusiness?.blue_package === true && (creatorBusiness?.li_payment_amount ?? 0) > 0;
+  const blueAmount = hasBlue ? creatorBusiness!.li_payment_amount! : 0;
+  const companyValue = base * (agencyPct / 100) + (base > 0 ? blueAmount : 0);
 
   const selectedCreator = creators.find(c => c.id === creatorId);
   const creatorLabel = selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "";
@@ -90,7 +92,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
       status: "pendiente",
       notes: notes || null,
       calculation_method: "fixed_percentage",
-      calculation_config: { percentage: agencyPct },
+      calculation_config: { percentage: agencyPct, blue_package: hasBlue, blue_amount: blueAmount },
     });
   };
 
@@ -185,6 +187,12 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
                 <span className="text-muted-foreground">—</span>
               )}
             </div>
+            {hasBlue && base > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Blue</span>
+                <span className="font-medium">{fmt(blueAmount)}</span>
+              </div>
+            )}
             <div className="border-t border-border pt-1 flex justify-between text-sm font-semibold">
               <span>Valor para la Empresa</span>
               <span className="text-primary">{fmt(companyValue)}</span>
