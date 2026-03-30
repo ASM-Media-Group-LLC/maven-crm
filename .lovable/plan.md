@@ -1,31 +1,49 @@
 
 
-## Plan: Unificar estilo de tablas en Agentes y Detalle de Agente
+## Plan: Reestructurar Billing & Details en Invoice A4
 
-### Problemas identificados
+### Cambio solicitado
+Reemplazar el layout actual de 2 columnas (Bill to / Invoice details) por 4 columnas:
 
-1. **Tabla de agentes (tab "Agentes" en LeadGenContent)**: Tiene un estilo diferente — header con gradiente, sin columna de Acciones, sin sticky headers, sin `SortHeader`.
+```text
+Col 1 (Labels)    Col 2 (Creator data)              Col 3 (Label)   Col 4 (ID data)
+─────────────     ──────────────────────             ─────────────   ───────────────
+Bill to           Creator name (artistic/real)       ID              Creator UUID
+Address           billing_address del creador        (vacío)         (vacío)
+Phone             phone del creador                  (vacío)         (vacío)
+```
 
-2. **Tabla de leads en AgentDetailView**: Handle muestra `@Ver` en vez del handle real con link. Categoría usa un badge estático en vez del `QualityCell` inline editable. La columna Acciones tiene un select de categoría duplicado (ya está en la columna Categoría). No usa el componente `LeadGenTable` estándar.
+La sección "Invoice details" (nº, fecha, vencimiento, payment) permanece a la derecha como está.
 
 ### Cambios
 
-#### 1. Tabla de agentes en `LeadGenContent.tsx` (líneas 422-467)
-- Agregar columna **Acciones** con botón "Ver detalle" (Eye icon)
-- Aplicar sticky headers con el mismo patrón del `LeadGenTable`
-- Agregar `SortHeader` en columnas (Agente, Total, A+, A, B+, B, C)
-- Eliminar el header con gradiente decorativo (líneas 363-383) — usar estilo neutro consistente
+#### 1. Ampliar la interfaz `InvoiceData` en `InvoiceA4Preview.tsx`
+Agregar `billing_address`, `phone` e `id` (creator UUID) al tipo `creators`:
+```ts
+creators?: { 
+  id?: string;
+  name?: string; 
+  artistic_name?: string; 
+  billing_address?: string; 
+  phone?: string;
+};
+```
 
-#### 2. Tabla de leads en `AgentDetailView.tsx` (líneas 278-349)
-- Reemplazar la tabla manual por el componente `LeadGenTable` reutilizado, que ya tiene:
-  - Handle con `@model_handle` + link externo
-  - `QualityCell` inline editable
-  - Columna de Acciones con botón Eye
-  - Sticky headers y `SortHeader`
-- Pasar `profiles` como prop para mantener la funcionalidad de reasignación
-- Eliminar el select de categoría duplicado en Acciones
+#### 2. Actualizar el select de Supabase en `FacturacionPage.tsx` (línea 61)
+Cambiar el select para traer los campos adicionales:
+```ts
+.select("*, creators(id, name, artistic_name, billing_address, phone)")
+```
+Aplicar el mismo cambio en los otros archivos que usan el mismo select si alimentan el preview (CollectionsPage, ReportesPage).
+
+#### 3. Rediseñar la sección Billing & Details en el componente (líneas 58-78)
+Reemplazar el `flex justify-between` actual por un layout con las 4 columnas de datos del creador a la izquierda y los Invoice details a la derecha. Usar un grid de 4 columnas para la parte izquierda donde:
+- Col 1: Labels en bold ("Bill to", "Address", "Phone")
+- Col 2: Valores del creador (nombre, billing_address, phone)
+- Col 3: Label "ID" solo en la primera fila
+- Col 4: Creator ID solo en la primera fila
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — tabla de agentes: agregar Acciones, sticky headers, sort
-- `src/pages/leadgen/AgentDetailView.tsx` — reemplazar tabla manual por `LeadGenTable`
+- `src/pages/finanzas/facturacion/InvoiceA4Preview.tsx` — tipo + layout
+- `src/pages/finanzas/facturacion/FacturacionPage.tsx` — select query (línea 61)
 
