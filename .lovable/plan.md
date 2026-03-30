@@ -1,26 +1,17 @@
 
 
-## Plan: Agregar campo "Dirección de facturación" en Condiciones Comerciales
+## Plan: Asegurar que el campo "Dirección de Facturación" sea visible en Condiciones Comerciales
 
-### Cambios
+### Diagnóstico
+El campo ya existe en el código fuente (línea 557-559 de `NuevoCreadorForm.tsx`), ubicado dentro del grid de 2 columnas justo después de "Periodicidad de Cobro". Sin embargo, es posible que el cambio previo no se haya aplicado correctamente al preview.
 
-#### 1. Migración de base de datos
-Agregar columna `billing_address` (text, nullable) a `creator_business`:
-```sql
-ALTER TABLE public.creator_business
-ADD COLUMN IF NOT EXISTS billing_address text;
-```
+### Acción
+Re-aplicar el campo en `NuevoCreadorForm.tsx` para asegurar que renderice correctamente:
 
-#### 2. `NuevoCreadorForm.tsx`
-- Agregar `billing_address: string` al estado del formulario (inicializado en `""`)
-- Después del campo "Periodicidad de Cobro" (línea 552), insertar un nuevo `<Field>` con un `<Input>` o `<Textarea>` para la dirección
-- Incluir `billing_address` en el payload de guardado junto a `billing_frequency`
+- **Ubicación**: Inmediatamente después del `<Field>` de "Periodicidad de Cobro" (línea 556), dentro del grid `md:grid-cols-2`
+- **Componente**: `<Input>` con placeholder descriptivo
+- El campo ocupará la columna derecha, al lado de "Periodicidad de Cobro" en pantallas medianas y grandes
 
-#### 3. `InfoTabContent.tsx`
-- Mostrar el campo "Dirección de facturación" en la sección de lectura de condiciones comerciales
-
-### Archivos
-- **Migración SQL**: nueva columna en `creator_business`
-- **Modificar**: `NuevoCreadorForm.tsx` — estado + campo + guardado
-- **Modificar**: `InfoTabContent.tsx` — lectura del campo
+### Archivo
+- `src/pages/creadores/NuevoCreadorForm.tsx` — confirmar/re-insertar el campo de dirección de facturación
 
