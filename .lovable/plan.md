@@ -1,33 +1,28 @@
 
 
-## Plan: Corregir audio silenciado en videollamadas
+## Plan: Separar botones de "Nuevo Chat Directo" y "Nuevo Grupo" en Messenger
 
-### Problema identificado
-
-Hay dos causas probables de silencio total:
-
-**1. Gain boost mata el audio cuando AudioContext se suspende**
-En `ParticipantTile.tsx` línea 184-195, cuando el `AudioContext` está "running", el código reemplaza el `srcObject` del audio element con un stream procesado por Web Audio API. Si el AudioContext se suspende después (tab en background, política del navegador), el pipeline deja de procesar y el audio element reproduce silencio — y el stream original de LiveKit ya fue reemplazado, no hay fallback.
-
-**2. Cancelación de ruido demasiado agresiva en el sender**
-`loadNCPreference()` retorna `true` por defecto (cuando no hay valor en localStorage). El worklet aplica un noise gate que podría silenciar voces suaves. Si el worklet falla al cargar, `setProcessor` podría dejar el track en un estado roto.
+### Problema
+El sidebar del messenger solo tiene un botón (MessageSquarePlus) que siempre abre el modal en modo grupo (`isGroup={true}`). No hay forma de iniciar un chat directo 1-a-1 desde la UI, aunque la lógica (`handleSelectUser` → `createDirectChat`) ya existe.
 
 ### Solución
 
-#### 1. `ParticipantTile.tsx` — Eliminar gain boost, reproducir audio directo
-- Eliminar toda la lógica de `sharedAudioCtx`, `gainNode`, `MediaStreamAudioDestinationNode`
-- Dejar que LiveKit maneje el audio directamente: `audioTrack.track.attach(audioEl)` + `audioEl.play()`
-- Esto elimina la dependencia del AudioContext para la reproducción
-- El gain de 1.4x (+3dB) no justifica el riesgo de silenciar todo el audio
+#### 1. `ChatSidebar.tsx` — Agregar botón de nuevo chat directo
+- Agregar una nueva prop `onNewChat: () => void`
+- Agregar un segundo botón junto al de "Nuevo grupo", con ícono `MessageCirclePlus` o similar, con title "Nuevo chat"
+- El botón de grupo se mantiene con su ícono actual (`MessageSquarePlus`) y title "Nuevo grupo"
 
-#### 2. `src/hooks/useLiveKit.ts` — Hacer noise cancellation opt-in, no opt-out
-- Cambiar `loadNCPreference()` para que retorne `false` cuando no hay valor guardado (en vez de `true`)
-- Agregar mejor manejo de errores en `setProcessor`: si falla, asegurar que el track sigue publicando sin procesador
+#### 2. `MessengerPage.tsx` — Agregar estado y modal para chat directo
+- Agregar estado `newChatOpen` (boolean)
+- Pasar `onNewChat={() => setNewChatOpen(true)}` al sidebar
+- Agregar un segundo `<NewChatModal>` con `isGroup={false}`, `onSelectUser={handleSelectUser}` (en vez del `() => {}` actual)
+- Alternativamente, reusar el mismo modal con una variable que controle si es grupo o directo
 
-#### 3. `src/lib/noise-suppression-processor.ts` — Cambiar default
-- Línea 102: cambiar `return val === null ? true : val === "true"` a `return val === "true"` (default a desactivado)
+### Resultado
+- Dos botones claros: uno para chat directo (seleccionar usuario → abre conversación 1-a-1) y otro para crear grupo
+- El modal de chat directo muestra la lista de usuarios y al hacer clic en uno se abre/crea la conversación directa
 
 ### Archivos a modificar
-- `src/pages/messenger/videocall/ParticipantTile.tsx` — eliminar gain boost pipeline
-- `src/lib/noise-suppression-processor.ts` — cambiar default NC a false
+- `src/pages/messenger/ChatSidebar.tsx` — nueva prop + botón
+- `src/pages/messenger/MessengerPage.tsx` — estado + modal para chat directo
 
