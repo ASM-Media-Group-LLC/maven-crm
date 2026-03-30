@@ -313,7 +313,11 @@ const LeadGenContent = () => {
       </div>
 
       {/* Tab content - fills remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef} onScroll={handleContentScroll}>
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-auto" ref={scrollRef} onScroll={handleContentScroll}>
+        {/* KPI Cards — collapse on scroll */}
+        <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
+          <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        </div>
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
           <div className="flex-1 min-h-0 overflow-auto">
