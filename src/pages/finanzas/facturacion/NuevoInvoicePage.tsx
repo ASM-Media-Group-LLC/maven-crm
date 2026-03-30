@@ -284,14 +284,30 @@ export default function NuevoInvoicePage() {
                       <div className="h-px bg-gray-200 mb-4" />
 
                       <div className="flex justify-between mb-5 text-[9px]">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-gray-800">Bill to</p>
-                          <p className="text-gray-600">{selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—"}</p>
-                          <p className="font-semibold text-gray-800 mt-2">Address</p>
-                          <p className="text-gray-600">—</p>
-                          <p className="font-semibold text-gray-800 mt-2">Phone</p>
-                          <p className="text-gray-600">—</p>
-                        </div>
+                        {(() => {
+                          const creatorName = selectedCreator ? (selectedCreator.artistic_name || selectedCreator.name) : "—";
+                          const cb = selectedCreator?.creator_business;
+                          const biz = Array.isArray(cb) ? cb[0] : cb;
+                          const billingAddress = biz?.billing_address || "—";
+                          const creatorPhone = selectedCreator?.phone || "—";
+                          const creatorUuid = selectedCreator?.id || "—";
+                          return (
+                            <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-4 gap-y-1">
+                              <p className="font-semibold text-gray-800">Bill to</p>
+                              <p className="text-gray-600">{creatorName}</p>
+                              <p className="font-semibold text-gray-800">ID</p>
+                              <p className="text-gray-600 text-[7px] leading-relaxed break-all">{creatorUuid}</p>
+
+                              <p className="font-semibold text-gray-800">Address</p>
+                              <p className="text-gray-600">{billingAddress}</p>
+                              <p /><p />
+
+                              <p className="font-semibold text-gray-800">Phone</p>
+                              <p className="text-gray-600">{creatorPhone}</p>
+                              <p /><p />
+                            </div>
+                          );
+                        })()}
                         <div className="space-y-1 text-right">
                           <p className="font-semibold text-gray-800">Invoice details</p>
                           <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">—</span></p>
