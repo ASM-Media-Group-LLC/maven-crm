@@ -373,7 +373,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             const avgPerDay = (agentLeads.length / daysWithActivity).toFixed(1);
 
             return (
-              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6">
+              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6" onScroll={handleContentScroll}>
                 <Card>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
