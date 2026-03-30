@@ -1,22 +1,24 @@
 
 
-## Plan: Rediseñar stats cards de LeadGen + filtrar por usuario
+## Plan: Rediseñar stats cards de LeadGen al estilo KPI estándar
 
-### 1. Fix runtime error
-`LeadGenContent.tsx` still references `LeadGenEstadosCard` somewhere (line 418 per error). Remove any remaining reference.
+### Referencia
+La imagen muestra tarjetas tipo KPI como las de `CreadoresKPICards`: cada card ocupa espacio equitativo en un grid, con label arriba a la izquierda, icono con badge de color arriba a la derecha, y valor grande abajo a la izquierda. Sin porcentajes debajo.
 
-### 2. Rediseñar `LeadGenCantidadCard.tsx`
-- Remove the wrapping `<Card>` container — render category buttons, Total, and QA as individual standalone cards in a flat flex/grid row
-- Remove the "Cantidad" label/header entirely
-- For Total and QA cards: fix text overlap by stacking label above value vertically instead of side-by-side in a cramped container
-- Each element gets its own card-like styling with proper spacing
+### Cambios en `LeadGenCantidadCard.tsx`
 
-### 3. Stats filtradas por usuario (agentes/closers ven su propio rendimiento)
-- Add optional `userId` param to `useLeadGenSummaryStats(dateFrom, dateTo, userId?)` — when provided, filter by `lg_user_id`
-- In `LeadGenContent.tsx`, pass `user?.id` when `viewMode === "agent"` so agents see only their own stats in the cards
+Reemplazar el layout actual (botones compactos centrados) por un grid de cards siguiendo el patrón de `CreadoresKPICards`:
 
-### Archivos a modificar
-- `src/pages/leadgen/LeadGenCantidadCard.tsx` — rediseño visual completo
-- `src/pages/leadgen/LeadGenContent.tsx` — remove LeadGenEstadosCard reference, pass userId to summary stats
-- `src/pages/leadgen/useLeadGen.ts` — add userId filter to `useLeadGenSummaryStats`
+- **Layout**: `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7` (5 categorías + Total + QA)
+- **Cada card**: Usar `Card`/`CardContent` de Shadcn con:
+  - Label (`text-sm text-muted-foreground`) arriba izquierda
+  - Icono en badge coloreado (`h-8 w-8 rounded-md`) arriba derecha
+  - Valor grande (`text-2xl font-bold`) abajo izquierda con color del estado
+  - Hover: `hover:scale-[1.03]` + gradiente sutil
+- **Eliminar**: porcentaje debajo del valor, layout centrado vertical
+- **Mantener**: funcionalidad de filtro por click en categorías, estado activo con borde/fondo de color
+- **Iconos**: Usar iconos de Lucide apropiados por categoría (Star para A+, TrendingUp para A, etc.), Users para Total, PhoneCall para QA
+
+### Archivo
+- `src/pages/leadgen/LeadGenCantidadCard.tsx` — rediseño completo
 
