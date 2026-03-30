@@ -107,6 +107,11 @@ const LeadGenContent = () => {
   }, [viewMode]);
 
   // UI state
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
   const [activeTab, setActiveTab] = useState("leads");
   const [listView, setListView] = useState<"list" | "grid" | "calendar">("list");
   const [weekOffset, setWeekOffset] = useState(0);
