@@ -1,30 +1,25 @@
 
 
-## Plan: Estandarizar tablas y ocultar stats cards al hacer scroll en /leadgen
+## Plan: Estandarizar tablas de Agentes y Detalle de Agente con DataTableShell
 
 ### Problema
-1. La tabla de agentes en el tab "Agentes" tiene un estilo diferente al estándar `LeadGenTable` (sin `DataTableShell`, sin `SortHeader`)
-2. En `AgentDetailView`, las KPI cards usan `border-t-[3px]` con gradientes y las quality cards usan gradientes oscuros (`from-emerald-600 to-emerald-900`), completamente fuera del sistema de diseño estándar
-3. Las stats cards ocupan espacio fijo y no se ocultan al hacer scroll, reduciendo el espacio disponible para la tabla
+1. **Tab Agentes** (LeadGenContent líneas 417-464): la tabla de agentes se renderiza con `<Table>` directo, sin `DataTableShell` — no tiene bordes redondeados ni paginador
+2. **AgentDetailView** (línea 290): `<LeadGenTable>` se renderiza sin `DataTableShell` — tampoco tiene bordes redondeados ni paginador
 
 ### Cambios
 
-#### 1. Ocultar stats cards al hacer scroll (`LeadGenContent.tsx`)
-- Detectar scroll en el contenedor principal del tab content
-- Cuando el usuario scrollea hacia abajo, colapsar las stats cards con una transición suave (`max-height` + `opacity` + `overflow-hidden`)
-- Cuando vuelve arriba (scroll top < umbral), mostrarlas de nuevo
-- Usar un `useState` + `onScroll` handler en el contenedor de tabs
+#### 1. Tab Agentes — envolver en DataTableShell (`LeadGenContent.tsx`)
+- Envolver la tabla de agentes (listView === "list") en `<DataTableShell>` con los mismos props estándar (currentPage, totalPages, totalCount, pageSize, onPageChange)
+- Agregar estado de paginación local para agentes (probablemente no necesite server-side ya que son pocos, pero mantener la consistencia visual)
+- pageSize de 50, paginación client-side sobre `agentStats`
 
-#### 2. Estandarizar tabla de agentes (`LeadGenContent.tsx`, tab "Agentes")
-- Envolver la tabla en `DataTableShell` para consistencia
-- Agregar `SortHeader` a las columnas (Agente, Total, A+, A, B+, B, C)
-- Usar el mismo patrón de sticky headers y columna de Acciones del estándar
-
-#### 3. Estandarizar cards en `AgentDetailView.tsx`
-- **KPI Cards** (Última Hora, Total Hoy, Promedio por Hora): Reemplazar el estilo `border-t-[3px]` por el patrón estándar KPI — label arriba izquierda, icono con badge de color arriba derecha, valor grande abajo izquierda, con hover scale
-- **Quality Cards** (A+, A, B+, B, C): Reemplazar los gradientes oscuros por el mismo estilo usado en `LeadGenCantidadCard` — cards con `Card`/`CardContent`, icono con badge de color, hover con gradiente sutil, colores semánticos (primary, success, warning, muted-foreground)
+#### 2. AgentDetailView — envolver LeadGenTable en DataTableShell (`AgentDetailView.tsx`)
+- Agregar estado de paginación client-side (`agentPage`)
+- Paginar `filteredLeads` con slice
+- Envolver `<LeadGenTable>` en `<DataTableShell>` con bordes redondeados y paginador
+- pageSize de 100 para consistencia con la tabla principal
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — auto-hide stats cards en scroll, DataTableShell + SortHeader en tabla agentes
-- `src/pages/leadgen/AgentDetailView.tsx` — estandarizar KPI cards y quality cards al design system
+- `src/pages/leadgen/LeadGenContent.tsx` — DataTableShell en tabla de agentes
+- `src/pages/leadgen/AgentDetailView.tsx` — DataTableShell envolviendo LeadGenTable
 
