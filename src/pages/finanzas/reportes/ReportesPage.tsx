@@ -120,7 +120,7 @@ export default function ReportesPage() {
   const { data: invoices = [] } = useQuery({
     queryKey: ["reportes-invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("*, creators(name, artistic_name)").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("invoices").select("*, creators(id, name, artistic_name, phone, creator_business(billing_address))").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
