@@ -453,7 +453,7 @@ const LeadGenContent = () => {
                           <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["c"] || 0}</TableCell>
-                          <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="sticky right-0 bg-card w-[80px]" onClick={(e) => e.stopPropagation()}>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
                               <Eye className="h-4 w-4" />
                             </Button>
