@@ -449,7 +449,6 @@ export const useCloserLeads = () => {
     updateField,
     updateStage,
     assignCreator,
-    convertLeadgenEntry,
     isAdmin,
     isManager,
   };

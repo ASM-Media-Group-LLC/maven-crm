@@ -251,11 +251,7 @@ const ClosersContent = () => {
         open={assignDialogOpen}
         onOpenChange={setAssignDialogOpen}
         onAssign={(id, assignedTo) => {
-          if (assignTarget?.source === "leadgen") {
-            convertLeadgenEntry.mutate({ leadgenEntryId: id, stage: "Asignada", assigned_to: assignedTo });
-          } else {
-            assignCreator.mutate({ id, assigned_to: assignedTo });
-          }
+          assignCreator.mutate({ id, assigned_to: assignedTo });
           setAssignDialogOpen(false);
         }}
       />
