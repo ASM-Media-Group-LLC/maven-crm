@@ -42,6 +42,7 @@ interface ChatSidebarProps {
   conversations: ConversationWithDetails[];
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
+  onNewChat: () => void;
   onNewGroup: () => void;
   onOpenVideoRooms: () => void;
   onSelectContact: (userId: string) => void;
