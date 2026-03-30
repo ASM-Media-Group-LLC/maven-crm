@@ -25,7 +25,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
-import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import LeadGenTable from "./LeadGenTable";
 import LeadGenGrid from "./LeadGenGrid";
 import AddLeadModal from "./AddLeadModal";
