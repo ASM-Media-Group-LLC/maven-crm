@@ -1,27 +1,31 @@
 
 
-## Plan: Ocultar agentes huérfanos y añadir opción de vincular leads a un agente
+## Plan: Unificar estilo de tablas en Agentes y Detalle de Agente
 
-### Problema
-Los `agentStats` incluyen agentes cuyo `lg_user_id` no tiene perfil en la tabla `profiles`, mostrando "Agente" genérico en la tabla de rendimiento y en el dropdown de PerformanceView. Esto genera confusión con datos de prueba/legacy.
+### Problemas identificados
+
+1. **Tabla de agentes (tab "Agentes" en LeadGenContent)**: Tiene un estilo diferente — header con gradiente, sin columna de Acciones, sin sticky headers, sin `SortHeader`.
+
+2. **Tabla de leads en AgentDetailView**: Handle muestra `@Ver` en vez del handle real con link. Categoría usa un badge estático en vez del `QualityCell` inline editable. La columna Acciones tiene un select de categoría duplicado (ya está en la columna Categoría). No usa el componente `LeadGenTable` estándar.
 
 ### Cambios
 
-#### 1. Filtrar agentes huérfanos en `LeadGenContent.tsx` (línea ~160-168)
-En el `useMemo` que construye `agentStats`, filtrar solo agentes que existen en `profilesMap`:
-```ts
-// Antes del .sort(), agregar:
-.filter(agent => !!profilesMap[agent.id])
-```
-Esto oculta de las tabs "Agentes", "Rendimiento" y "Supervisores" cualquier ID sin perfil real.
+#### 1. Tabla de agentes en `LeadGenContent.tsx` (líneas 422-467)
+- Agregar columna **Acciones** con botón "Ver detalle" (Eye icon)
+- Aplicar sticky headers con el mismo patrón del `LeadGenTable`
+- Agregar `SortHeader` en columnas (Agente, Total, A+, A, B+, B, C)
+- Eliminar el header con gradiente decorativo (líneas 363-383) — usar estilo neutro consistente
 
-#### 2. También filtrar en la tabla de leads (línea ~87)
-En `enrichedLeads`, los leads huérfanos seguirán apareciendo con `agent_name: "—"` — esto está bien, no se ocultan los leads, solo los agentes fantasma de las vistas de rendimiento.
-
-#### 3. Añadir opción de reasignar agente en leads huérfanos
-En `LeadGenTable.tsx` (o equivalente), para leads cuyo `lg_user_id` no existe en `profilesMap`, mostrar un dropdown/botón en la columna "Agente" que permita seleccionar un agente real y actualizar el `lg_user_id` del lead usando `useUpdateLeadField`.
+#### 2. Tabla de leads en `AgentDetailView.tsx` (líneas 278-349)
+- Reemplazar la tabla manual por el componente `LeadGenTable` reutilizado, que ya tiene:
+  - Handle con `@model_handle` + link externo
+  - `QualityCell` inline editable
+  - Columna de Acciones con botón Eye
+  - Sticky headers y `SortHeader`
+- Pasar `profiles` como prop para mantener la funcionalidad de reasignación
+- Eliminar el select de categoría duplicado en Acciones
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — filtrar agentes huérfanos del array `agentStats`
-- `src/pages/leadgen/LeadGenTable.tsx` — añadir opción de reasignar agente para leads sin perfil válido
+- `src/pages/leadgen/LeadGenContent.tsx` — tabla de agentes: agregar Acciones, sticky headers, sort
+- `src/pages/leadgen/AgentDetailView.tsx` — reemplazar tabla manual por `LeadGenTable`
 
