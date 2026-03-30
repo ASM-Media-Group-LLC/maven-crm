@@ -1,21 +1,29 @@
 
 
-## Plan: Auto-ocultar stats cards en scroll para LeadGen y Closers
+## Plan: Corregir auto-hide de stats cards y espaciado de columna Acciones
 
-### Contexto
-LeadGen ya tiene el patrón `statsCollapsed` implementado. Closers no lo tiene — las `ClosersKPICards` están dentro de un `div.shrink-0` fijo que nunca se oculta.
+### Problema 1: Stats cards no se ocultan al hacer scroll
+En ambos módulos (LeadGen y Closers), las KPI cards están **fuera** del contenedor scrollable. El `onScroll` handler está en el div de contenido de la tabla, pero las cards están en un `shrink-0` div hermano superior. Como el scroll solo ocurre dentro del contenedor de la tabla, las cards nunca reciben la señal de colapso.
 
-### Cambios
+### Problema 2: Columna Acciones con exceso de espacio
+La columna Acciones en la tabla de agentes (LeadGenContent) y en LeadGenTable usa `sticky right-0` sin ancho fijo, lo que genera un ancho excesivo en pantallas anchas.
 
-#### 1. `ClosersContent.tsx` — Aplicar el mismo patrón de LeadGen
-- Agregar `useState(false)` para `statsCollapsed` y `useRef` + `useCallback` para `handleContentScroll`
-- Extraer `ClosersKPICards` fuera del bloque `shrink-0` que contiene tabs+filtros, envolverlo en un div con `transition-all duration-300 overflow-hidden` y clases condicionales (`max-h-0 opacity-0` vs `max-h-[200px] opacity-100`)
-- Añadir `onScroll={handleContentScroll}` al contenedor scrollable de la tabla (el div `flex-1 min-h-0`)
+### Solución
 
-#### 2. `LeadGenContent.tsx` — Verificar que el scroll listener esté correctamente conectado
-El patrón ya existe (línea 111-115). Confirmar que el `onScroll` handler está en el contenedor correcto para que funcione con el layout actual.
+#### 1. Reestructurar layout para auto-hide (`LeadGenContent.tsx`)
+- Mover las KPI cards **dentro** del contenedor scrollable (el div con `onScroll`)
+- Las cards serán el primer hijo del div scrollable, seguidas por el contenido del tab activo
+- Así, al scrollear la tabla hacia abajo, `scrollTop > 40` se activará y colapsará las cards
+
+#### 2. Mismo ajuste en Closers (`ClosersContent.tsx`)
+- Mover `ClosersKPICards` dentro del div scrollable (`flex-1 min-h-0 overflow-auto onScroll`)
+- Mismo patrón: cards como primer hijo del contenedor scrollable
+
+#### 3. Limitar ancho de columna Acciones
+- En `LeadGenContent.tsx` (tabla agentes) y `LeadGenTable.tsx`: agregar `w-[80px]` al `TableHead` y `TableCell` de Acciones para evitar que se expanda innecesariamente
 
 ### Archivos a modificar
-- `src/pages/closers/ClosersContent.tsx` — agregar auto-hide de KPI cards en scroll
-- `src/pages/leadgen/LeadGenContent.tsx` — verificar/ajustar si el scroll handler necesita reubicación
+- `src/pages/leadgen/LeadGenContent.tsx` — mover KPI cards dentro del scroll container, fijar ancho Acciones
+- `src/pages/closers/ClosersContent.tsx` — mover KPI cards dentro del scroll container
+- `src/pages/leadgen/LeadGenTable.tsx` — fijar ancho columna Acciones
 
