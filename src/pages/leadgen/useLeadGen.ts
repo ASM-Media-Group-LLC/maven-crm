@@ -340,7 +340,7 @@ export const useLeadGenAgentLeads = (agentId: string | null, dateFrom?: string, 
       const baseQuery = () => {
         let q = supabase
           .from("leadgen_entries")
-          .select("id, lg_user_id, created_at, entry_date, quality, phone_raw, phone_e164");
+          .select(ENTRY_COLUMNS);
         q = q.eq("lg_user_id", agentId);
         if (dateFrom && dateTo) {
           q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
