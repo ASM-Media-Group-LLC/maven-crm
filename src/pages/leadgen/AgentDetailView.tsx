@@ -523,13 +523,15 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Handle</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">País</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">QA</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pagedQaLeads.map((lead) => {
                         const cat = lead.quality?.toLowerCase() || "c";
+                        const existingQa = qaMap[lead.id];
+                        const qaOpt = existingQa ? QA_RATING_OPTIONS.find(o => o.value === existingQa.rating) : null;
                         return (
                           <TableRow key={lead.id}>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -542,7 +544,65 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                               </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{lead.country_code || "—"}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{lead.notes || "—"}</TableCell>
+                            <TableCell>
+                              {existingQa ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <Badge variant={qaOpt?.variant ?? "secondary-soft"}>{qaOpt?.label ?? existingQa.rating}</Badge>
+                                  {existingQa.comment && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{existingQa.comment}</span>}
+                                </div>
+                              ) : canReview ? (
+                                <Popover open={qaOpenId === lead.id} onOpenChange={(o) => { setQaOpenId(o ? lead.id : null); if (!o) { setQaRating(prev => { const n = {...prev}; delete n[lead.id]; return n; }); setQaComment(prev => { const n = {...prev}; delete n[lead.id]; return n; }); } }}>
+                                  <PopoverTrigger asChild>
+                                    <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                      <ClipboardCheck className="h-3.5 w-3.5" />
+                                      <span>Revisar</span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64 p-3" align="start">
+                                    <p className="text-xs font-medium mb-2">Calificar lead</p>
+                                    <div className="flex gap-1 mb-2">
+                                      {QA_RATING_OPTIONS.map((opt) => (
+                                        <Button
+                                          key={opt.value}
+                                          size="sm"
+                                          variant={qaRating[lead.id] === opt.value ? "default" : "outline"}
+                                          className="flex-1 h-7 text-xs"
+                                          onClick={() => setQaRating(prev => ({...prev, [lead.id]: opt.value}))}
+                                        >
+                                          {opt.label}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                    <Textarea
+                                      placeholder="Comentario (opcional)"
+                                      value={qaComment[lead.id] || ""}
+                                      onChange={(e) => setQaComment(prev => ({...prev, [lead.id]: e.target.value}))}
+                                      className="text-xs h-16 mb-2"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="w-full h-7 text-xs"
+                                      disabled={!qaRating[lead.id] || createQA.isPending}
+                                      onClick={() => {
+                                        if (!qaRating[lead.id] || !user?.id) return;
+                                        createQA.mutate({
+                                          entry_id: lead.id,
+                                          supervisor_id: user.id,
+                                          score: qaRating[lead.id],
+                                          rating: qaRating[lead.id],
+                                          comment: qaComment[lead.id]?.trim() || undefined,
+                                        });
+                                        setQaOpenId(null);
+                                      }}
+                                    >
+                                      {createQA.isPending ? "Guardando..." : "Guardar"}
+                                    </Button>
+                                  </PopoverContent>
+                                </Popover>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">—</span>
+                              )}
+                            </TableCell>
                             <TableCell className="w-[80px]">
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedLead(lead)}>
                                 <Eye className="h-4 w-4" />
