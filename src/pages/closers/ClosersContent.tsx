@@ -103,7 +103,9 @@ const ClosersContent = () => {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="shrink-0 px-6 pt-4 pb-2 space-y-4 bg-background border-b border-border">
-            <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+            <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
+              <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+            </div>
 
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
