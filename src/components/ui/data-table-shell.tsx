@@ -16,6 +16,8 @@ export interface DataTableShellProps {
   onPageSizeChange?: (size: number) => void;
   /** Extra classes on the scroll area */
   className?: string;
+  /** Forward scroll events from the internal scrollable area */
+  onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 }
 
 /**
