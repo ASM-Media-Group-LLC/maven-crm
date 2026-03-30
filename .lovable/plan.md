@@ -1,17 +1,27 @@
 
 
-## Plan: Asegurar que el campo "Dirección de Facturación" sea visible en Condiciones Comerciales
+## Plan: Corregir mensaje "Sin porcentaje configurado" en comisiones por tramos
 
-### Diagnóstico
-El campo ya existe en el código fuente (línea 557-559 de `NuevoCreadorForm.tsx`), ubicado dentro del grid de 2 columnas justo después de "Periodicidad de Cobro". Sin embargo, es posible que el cambio previo no se haya aplicado correctamente al preview.
+### Problema
+En `NuevaComisionModal.tsx` (líneas 191-199), cuando hay un creador seleccionado con comisión por tramos pero no se han ingresado ganancias (`base === 0`), `agencyPct` es 0 y se muestra erróneamente "Sin porcentaje configurado". El porcentaje no se puede determinar hasta que se ingrese un monto.
 
-### Acción
-Re-aplicar el campo en `NuevoCreadorForm.tsx` para asegurar que renderice correctamente:
+### Cambio
+En la condición de la línea 193, agregar una verificación: si el tipo de comisión es `tiered` y `base === 0`, mostrar "—" en lugar del mensaje de error. Solo mostrar "Sin porcentaje configurado" cuando realmente no hay porcentaje configurado (tipo fijo con 0%).
 
-- **Ubicación**: Inmediatamente después del `<Field>` de "Periodicidad de Cobro" (línea 556), dentro del grid `md:grid-cols-2`
-- **Componente**: `<Input>` con placeholder descriptivo
-- El campo ocupará la columna derecha, al lado de "Periodicidad de Cobro" en pantallas medianas y grandes
+**Archivo**: `src/pages/finanzas/comisiones/NuevaComisionModal.tsx` (líneas 191-199)
 
-### Archivo
-- `src/pages/creadores/NuevoCreadorForm.tsx` — confirmar/re-insertar el campo de dirección de facturación
+Lógica actualizada:
+```tsx
+{creatorId && agencyPct > 0 ? (
+  <span className="font-medium">{agencyPct}%</span>
+) : creatorId && agencyPct === 0 && commType === "fixed" ? (
+  <span className="text-destructive text-xs flex items-center gap-1">
+    <AlertCircle className="h-3 w-3" /> Sin porcentaje configurado
+  </span>
+) : (
+  <span className="text-muted-foreground">—</span>
+)}
+```
+
+Esto muestra el error solo cuando el tipo es fijo y el porcentaje es 0 (realmente no configurado). Para tramos sin ganancias ingresadas, muestra "—".
 
