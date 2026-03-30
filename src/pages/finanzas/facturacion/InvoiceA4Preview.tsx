@@ -35,6 +35,10 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
   const paypalAmount = Number(invoice.paypal_amount) || 0;
   const grandTotal = Number(invoice.amount) || (agencyAmount + blueAmount + paypalAmount);
   const creatorName = invoice.creators?.artistic_name || invoice.creators?.name || "—";
+  const creatorId = invoice.creators?.id || "—";
+  const creatorPhone = invoice.creators?.phone || "—";
+  const rawBiz = invoice.creators?.creator_business;
+  const billingAddress = (Array.isArray(rawBiz) ? rawBiz[0]?.billing_address : rawBiz?.billing_address) || "—";
   const invoiceDate = invoice.created_at
     ? new Date(invoice.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })
     : new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
