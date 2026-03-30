@@ -1,33 +1,32 @@
 
 
-## Plan: Corregir funcionalidad y vista en AgentDetailView
+## Plan: Estandarizar estilo de AgentHourlyPerformance al design system
 
-### Problemas identificados
+### Problema
+El componente `AgentHourlyPerformance.tsx` (usado en la vista "Rendimiento por Hora" de LeadGen) tiene:
+1. **KPI cards con `border-t-[3px]`** — no sigue el estándar (label arriba-izquierda, icono en badge arriba-derecha, hover con scale 1.03 y gradiente sutil)
+2. **Quality cards con gradientes oscuros** (`from-emerald-600 to-emerald-900`, etc.) — debería usar `Card`/`CardContent` con badge de color y hover sutil, igual que `LeadGenCantidadCard`
 
-1. **Acciones sin funcionalidad**: `LeadGenTable` recibe `onView` prop pero `AgentDetailView` no la pasa — el botón Eye no hace nada
-2. **QA tab vacío**: Solo muestra placeholder "no disponible aún" (línea 459-465)
-3. **Stats no se ocultan en tab Rendimiento**: El tab "rendimiento" usa su propio `overflow-auto` (línea 372), independiente del `DataTableShell`, así que el `handleContentScroll` nunca se dispara
-4. **Quality cards con estilo inconsistente**: En el screenshot se ven las cards A+/A/B+/B/C con gradientes oscuros (verde-azul-púrpura) — esto no coincide con el design system estándar de `Card`/`CardContent` con badge + hover sutil
+### Cambios en `AgentHourlyPerformance.tsx`
 
-### Cambios
+#### 1. Reemplazar qualityCards config (líneas 16-22)
+Usar el mismo patrón de `LeadGenCantidadCard.categoryConfig`:
+- `Card` + `CardContent` con `p-4`
+- Label arriba-izquierda, badge con icono arriba-derecha
+- Valor bold grande con color semántico
+- Hover: `hover:scale-[1.03]` + gradiente sutil
 
-#### 1. Acciones funcionales (`AgentDetailView.tsx`)
-- Agregar estado `selectedLead` para mostrar un modal/panel de detalle al hacer click en Eye
-- Pasar `onView={(lead) => setSelectedLead(lead)}` al `LeadGenTable`
-- Renderizar un Dialog con los datos del lead seleccionado (handle, categoría, teléfono, notas, fecha, país)
+#### 2. Reemplazar KPI cards (líneas 133-167)
+Cambiar las 3 cards (Última Hora, Total Hoy, Promedio por Hora) de `border-t-[3px]` a:
+- Label arriba-izquierda (`text-sm text-muted-foreground`)
+- Icono en badge coloreado arriba-derecha (`h-8 w-8 rounded-md bg-{color}/20`)
+- Valor grande con color semántico
+- Subtítulo descriptivo
+- Hover con `scale-[1.03]` y gradiente sutil
 
-#### 2. Tab QA — implementación básica (`AgentDetailView.tsx`)
-- Reemplazar el placeholder por una tabla simple con los leads del agente que tienen `quality` asignada
-- Mostrar: Handle, Categoría actual, Fecha, un campo de notas/retroalimentación inline (editable)
-- Usar `DataTableShell` con `onScroll={handleContentScroll}` para consistencia y auto-hide
+#### 3. Renderizado de quality cards (líneas 170-178)
+Reemplazar los `div` con gradientes por `Card`/`CardContent` con el estilo estándar
 
-#### 3. Auto-hide en tab Rendimiento (`AgentDetailView.tsx`)
-- Cambiar el div `overflow-auto` del tab rendimiento (línea 372) por un `DataTableShell`-like scroll container
-- Agregar `onScroll={handleContentScroll}` al div scrollable para que las stats se oculten al hacer scroll en los charts también
-
-#### 4. Quality cards estandarizadas (ya corregidas)
-- Las quality cards en `AgentDetailView` ya usan el estilo correcto (`Card`/`CardContent` con hover sutil) — confirmar que el screenshot de la imagen corresponde al estado actual o a un estado anterior con gradientes oscuros. Si persisten los gradientes, reemplazarlos por el estilo de `qualityCardConfig` actual (líneas 23-29)
-
-### Archivos a modificar
-- `src/pages/leadgen/AgentDetailView.tsx` — todas las correcciones
+### Archivo a modificar
+- `src/pages/leadgen/AgentHourlyPerformance.tsx`
 
