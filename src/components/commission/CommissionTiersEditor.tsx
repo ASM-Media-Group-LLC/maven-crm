@@ -58,7 +58,7 @@ export default function CommissionTiersEditor({
     if (newTiers.length > 0 && newTiers[newTiers.length - 1].max_revenue === null) {
       newTiers[newTiers.length - 1] = { ...newTiers[newTiers.length - 1], max_revenue: lastMax || 10000 };
     }
-    const newMin = newTiers.length > 0 ? (newTiers[newTiers.length - 1].max_revenue ?? 0) : 0;
+    const newMin = newTiers.length > 0 ? ((newTiers[newTiers.length - 1].max_revenue ?? 0) + 1) : 0;
     newTiers.push({ min_revenue: newMin, max_revenue: null, percentage: 0 });
     onTiersChange(newTiers);
     setError(null);
