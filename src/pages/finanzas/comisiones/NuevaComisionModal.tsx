@@ -190,7 +190,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
               <span className="text-muted-foreground">Comisión</span>
               {creatorId && agencyPct > 0 ? (
                 <span className="font-medium">{agencyPct}%</span>
-              ) : creatorId && agencyPct === 0 ? (
+              ) : creatorId && agencyPct === 0 && commType === "fixed" ? (
                 <span className="text-destructive text-xs flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" /> Sin porcentaje configurado
                 </span>
