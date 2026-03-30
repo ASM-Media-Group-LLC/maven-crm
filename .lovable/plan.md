@@ -1,17 +1,30 @@
 
 
-## Plan: Corregir descarga PDF de Invoices
+## Plan: Agregar campos "Fecha de inicio de cobro" y "Periodicidad de Cobro"
 
-### Problema
-`handleDownloadPdf` tiene un guard `if (!container) return;` que usa `pdfContainerRef`, pero ese ref **nunca se asigna a ningún elemento del DOM**. La función siempre sale en la primera linea sin hacer nada.
-
-### Solución
-El `pdfContainerRef` no se necesita realmente — la función ya crea su propio `wrapper` temporal y lo agrega al DOM directamente. Solo hay que eliminar el guard inútil.
+### Resumen
+Agregar dos nuevos campos en la sección "Condiciones Comerciales" del formulario de nuevo creador, justo después de "Método de Pago".
 
 ### Cambios
 
-**`src/pages/finanzas/facturacion/FacturacionPage.tsx`**:
-- Eliminar `const pdfContainerRef = useRef<HTMLDivElement>(null);`
-- Eliminar las lineas 211-212 (`const container = pdfContainerRef.current; if (!container) return;`)
-- El resto de la función ya funciona correctamente: crea un wrapper temporal, renderiza el componente, captura con html2canvas y genera el PDF
+#### 1. Migración — Agregar columnas a `creator_business`
+```sql
+ALTER TABLE creator_business
+  ADD COLUMN billing_start_date date,
+  ADD COLUMN billing_frequency text;
+```
+
+#### 2. `src/pages/creadores/NuevoCreadorForm.tsx`
+- Agregar `billing_start_date: string` y `billing_frequency: string` al `FormData` interface y `defaultForm`
+- En la sección "Condiciones Comerciales", después del campo "Método de Pago", agregar:
+  - **Fecha en la que inicia a cobrar**: campo tipo date input
+  - **Periodicidad de Cobro**: Select con opciones: **Semanal**, **Quincenal**, **Mensual**
+- Incluir ambos campos en el objeto `business` que se envía al hook de guardado
+
+#### 3. Regenerar tipos de Supabase
+Los tipos se actualizarán automáticamente al crear la migración.
+
+### Archivos a modificar
+- Nueva migración SQL
+- `src/pages/creadores/NuevoCreadorForm.tsx`
 
