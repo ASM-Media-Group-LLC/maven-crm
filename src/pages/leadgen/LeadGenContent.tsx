@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats } from "./useLeadGen";
+import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLeadGenSummaryStats } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
