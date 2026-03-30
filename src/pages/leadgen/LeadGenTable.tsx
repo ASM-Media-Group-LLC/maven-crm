@@ -53,6 +53,12 @@ const cleanPhoneForWhatsApp = (phone: string) =>
 
 type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa";
 
+const QA_RATING_OPTIONS = [
+  { value: "bien", label: "Bien", variant: "success-soft" as const },
+  { value: "regular", label: "Regular", variant: "warning-soft" as const },
+  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+];
+
 interface Props {
   leads: LeadGenEntry[];
   onView?: (lead: LeadGenEntry) => void;
