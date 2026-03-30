@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
 import type { LeadGenEntry } from "./useLeadGen";
 
@@ -18,12 +19,12 @@ interface AgentDetailViewProps {
   onBack: () => void;
 }
 
-const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100", border: "border-emerald-500" },
-  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100", border: "border-blue-500" },
-  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100", border: "border-cyan-500" },
-  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100", border: "border-violet-500" },
-  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground", border: "border-border" },
+const qualityCardConfig = [
+  { key: "a+", label: "A+", icon: Star, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+  { key: "a", label: "A", icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+  { key: "b+", label: "B+", icon: ArrowUpRight, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+  { key: "b", label: "B", icon: ArrowRight, colorClass: "text-warning/80", bgClass: "bg-warning/15", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent hover:border-warning/30" },
+  { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
 const qualityBadgeColors: Record<string, string> = {
@@ -168,42 +169,43 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         {/* KPI Cards */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-4">
-            <Card className="border-t-[3px] border-t-primary">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
+            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground">Última Hora</p>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
                 </div>
-                <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+                <p className="mt-2 text-2xl font-bold text-primary">{lastHourLeads.length}</p>
               </CardContent>
             </Card>
-            <Card className="border-t-[3px] border-t-accent">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="h-4 w-4 text-muted-foreground" />
+            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
                   <p className="text-sm text-muted-foreground">Total Hoy</p>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success/20">
+                    <Target className="h-4 w-4 text-success" />
+                  </div>
                 </div>
-                <p className="text-3xl font-bold text-primary">{todayLeads.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
+                <p className="mt-2 text-2xl font-bold text-success">{todayLeads.length}</p>
               </CardContent>
             </Card>
-            <Card className="border-t-[3px] border-t-accent">
-              <CardContent className="p-5">
+            <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40">
+              <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Promedio por Hora</p>
-                    </div>
-                    <p className="text-3xl font-bold text-primary">{avgPerHour}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
-                    <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
-                      Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Promedio por Hora</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
                   </div>
-                  <Button variant="outline" size="sm" className="text-xs">Ver QA (0)</Button>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning/20">
+                    <TrendingUp className="h-4 w-4 text-warning" />
+                  </div>
                 </div>
+                <p className="mt-2 text-2xl font-bold text-warning">{avgPerHour}</p>
+                <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-success" : "text-destructive"}`}>
+                  Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -212,13 +214,22 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         {/* Quality Cards */}
         <div className="px-6 pb-4">
           <div className="grid grid-cols-5 gap-3">
-            {qualityCards.map((q) => (
-              <div key={q.key} className={`rounded-xl p-4 border-l-[3px] ${q.border} ${q.bg}`}>
-                <p className={`text-xs ${q.text} opacity-70`}>{q.key.toUpperCase()}</p>
-                <p className={`text-3xl font-bold ${q.text}`}>{qualityCounts[q.key]}</p>
-                <p className={`text-xs mt-1 ${q.text} opacity-80`}>{q.label}</p>
-              </div>
-            ))}
+            {qualityCardConfig.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <Card key={cat.key} className={cn("transition-all duration-200", cat.hoverClass)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm text-muted-foreground">Cat. {cat.label}</p>
+                      <div className={cn("flex h-8 w-8 items-center justify-center rounded-md", cat.bgClass)}>
+                        <Icon className={cn("h-4 w-4", cat.colorClass)} />
+                      </div>
+                    </div>
+                    <p className={cn("mt-2 text-2xl font-bold", cat.colorClass)}>{qualityCounts[cat.key]}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
 

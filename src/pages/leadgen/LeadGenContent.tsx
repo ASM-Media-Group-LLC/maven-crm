@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useNavigate } from "react-router-dom";
 import {
@@ -107,6 +107,11 @@ const LeadGenContent = () => {
   }, [viewMode]);
 
   // UI state
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
   const [activeTab, setActiveTab] = useState("leads");
   const [listView, setListView] = useState<"list" | "grid" | "calendar">("list");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -228,8 +233,8 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="shrink-0 px-6 py-2">
+      {/* KPI Cards — collapse on scroll */}
+      <div className={`shrink-0 px-6 py-2 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100"}`}>
         <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
       </div>
 
@@ -312,7 +317,7 @@ const LeadGenContent = () => {
       </div>
 
       {/* Tab content - fills remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4">
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef} onScroll={handleContentScroll}>
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
           <div className="flex-1 min-h-0 overflow-auto">
