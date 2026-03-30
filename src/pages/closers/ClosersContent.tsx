@@ -9,7 +9,7 @@ import ClosersKPICards from "./components/ClosersKPICards";
 import CloserTable from "./components/LeadTable";
 import AssignCloserDialog from "./components/AssignCloserDialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,10 @@ const ClosersContent = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
 
   const handleConvertToCreator = async (c: CloserCreatorRow) => {
     try {
@@ -99,7 +103,9 @@ const ClosersContent = () => {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="shrink-0 px-6 pt-4 pb-2 space-y-4 bg-background border-b border-border">
-            <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+            <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
+              <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+            </div>
 
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
@@ -214,7 +220,7 @@ const ClosersContent = () => {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
+          <div className="flex-1 min-h-0 flex flex-col px-6 py-4 overflow-auto" onScroll={handleContentScroll}>
             <DataTableShell
               className="flex-1 min-h-0"
               currentPage={page + 1}
