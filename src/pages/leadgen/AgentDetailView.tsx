@@ -52,6 +52,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
+  const [qaPage, setQaPage] = useState(1);
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
