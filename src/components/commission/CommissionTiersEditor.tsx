@@ -31,7 +31,7 @@ function validateTiers(tiers: CommissionTier[]): string | null {
     const t = tiers[i];
     if (t.percentage < 0 || t.percentage > 100) return `Tramo ${i + 1}: porcentaje debe estar entre 0 y 100`;
     if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return `Tramo ${i + 1}: máximo debe ser mayor al mínimo`;
-    if (i > 0 && t.min_revenue !== (tiers[i - 1].max_revenue ?? t.min_revenue)) {
+    if (i > 0 && tiers[i - 1].max_revenue !== null && t.min_revenue !== tiers[i - 1].max_revenue + 1) {
       return `Tramo ${i + 1}: el mínimo debe coincidir con el máximo del tramo anterior`;
     }
     if (i < tiers.length - 1 && t.max_revenue === null) return `Solo el último tramo puede tener máximo "Sin límite"`;
@@ -58,7 +58,7 @@ export default function CommissionTiersEditor({
     if (newTiers.length > 0 && newTiers[newTiers.length - 1].max_revenue === null) {
       newTiers[newTiers.length - 1] = { ...newTiers[newTiers.length - 1], max_revenue: lastMax || 10000 };
     }
-    const newMin = newTiers.length > 0 ? (newTiers[newTiers.length - 1].max_revenue ?? 0) : 0;
+    const newMin = newTiers.length > 0 ? ((newTiers[newTiers.length - 1].max_revenue ?? 0) + 1) : 0;
     newTiers.push({ min_revenue: newMin, max_revenue: null, percentage: 0 });
     onTiersChange(newTiers);
     setError(null);
@@ -68,7 +68,7 @@ export default function CommissionTiersEditor({
     const newTiers = tiers.filter((_, i) => i !== index);
     // Fix continuity
     for (let i = 1; i < newTiers.length; i++) {
-      newTiers[i] = { ...newTiers[i], min_revenue: newTiers[i - 1].max_revenue ?? newTiers[i].min_revenue };
+      newTiers[i] = { ...newTiers[i], min_revenue: newTiers[i - 1].max_revenue !== null ? newTiers[i - 1].max_revenue + 1 : newTiers[i].min_revenue };
     }
     onTiersChange(newTiers);
     setError(null);
@@ -79,7 +79,7 @@ export default function CommissionTiersEditor({
     newTiers[index] = { ...newTiers[index], [field]: value };
     // Auto-update next tier's min to match this tier's max
     if (field === "max_revenue" && index < newTiers.length - 1 && value !== null) {
-      newTiers[index + 1] = { ...newTiers[index + 1], min_revenue: value };
+      newTiers[index + 1] = { ...newTiers[index + 1], min_revenue: value + 1 };
     }
     onTiersChange(newTiers);
     const err = validateTiers(newTiers);
