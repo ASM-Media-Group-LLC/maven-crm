@@ -159,6 +159,8 @@ const testData: FormData = {
   has_piclink: true,
   agency_percentage: 20,
   payment_method: "Transferencia",
+  billing_start_date: "2026-03-01",
+  billing_frequency: "mensual",
   blue_package: true,
   blue_package_amount: 500,
   main_platform: "Onlyfans",
