@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAddCreadorWithBusiness } from "./useCreadores";
+import CommissionTiersEditor, { type CommissionTier } from "@/components/commission/CommissionTiersEditor";
 
 const AGENCIES = ["Atomic Agency", "Elite Models", "Kash Agency", "Unlok Platform", "Trafix", "ORA Agency", "Exchange", "Otra"];
 const LANGUAGES = ["Español", "English", "Italiano", "Português", "Français", "Deutsch", "Русский"];
