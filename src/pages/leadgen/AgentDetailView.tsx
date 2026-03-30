@@ -513,7 +513,6 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                     <TableBody>
                       {pagedQaLeads.map((lead) => {
                         const cat = lead.quality?.toLowerCase() || "c";
-                        const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
                         return (
                           <TableRow key={lead.id}>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -521,9 +520,9 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             </TableCell>
                             <TableCell className="font-medium text-sm">@{lead.model_handle}</TableCell>
                             <TableCell>
-                              <span className={`inline-flex items-center justify-center h-6 px-2 rounded-full text-xs font-bold ${badgeClass}`}>
+                              <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
                                 {lead.quality?.toUpperCase()}
-                              </span>
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{lead.country_code || "—"}</TableCell>
                             <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{lead.notes || "—"}</TableCell>
