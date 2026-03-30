@@ -519,6 +519,19 @@ const NuevoCreadorForm = () => {
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="Fecha en la que inicia a cobrar">
+              <DateInput value={form.billing_start_date} onChange={(v) => set("billing_start_date", v)} />
+            </Field>
+            <Field label="Periodicidad de Cobro">
+              <Select value={form.billing_frequency} onValueChange={(v) => set("billing_frequency", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar periodicidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
+                  <SelectItem value="mensual">Mensual</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
           <div className="rounded-lg border p-4 flex items-center justify-between">
             <div>
