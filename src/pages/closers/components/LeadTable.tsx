@@ -1,4 +1,4 @@
-import { useState, memo, useMemo } from "react";
+import { useState, memo, useMemo, useCallback } from "react";
 import PlatformSalesModal from "./PlatformSalesModal";
 import { LEADGEN_COMPANIES } from "@/pages/leadgen/leadgenConstants";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2 } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Phone, AlertTriangle, Clock, ChevronDown, UserPlus, ShoppingCart, Undo2, ArrowUpDown } from "lucide-react";
 import { CloserCreatorRow, CLOSER_STAGES, PLATFORMS, CHANNELS, RESULTS, isFollowUpPending, getNextContactDate } from "../hooks/useCloserLeads";
 import { useContactHistory } from "../useContactHistory";
 import PlatformSalesPanel from "./PlatformSalesPanel";
@@ -364,9 +364,50 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
+// ─── SortHeader ───
+const SortHeader = ({ label, sortKey: key, currentKey, asc, onSort, className = "" }: {
+  label: string; sortKey: string; currentKey: string | null; asc: boolean;
+  onSort: (key: string) => void; className?: string;
+}) => (
+  <TableHead className={`sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] ${className}`}>
+    <Button variant="ghost" size="sm" className="h-7 -ml-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+      onClick={() => onSort(key)}>
+      {label}
+      <ArrowUpDown className={`ml-1 h-3 w-3 ${currentKey === key ? "text-foreground" : "text-muted-foreground/50"}`} />
+    </Button>
+  </TableHead>
+);
+
 const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [platformModalId, setPlatformModalId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = useCallback((key: string) => {
+    if (sortKey === key) {
+      setSortAsc((prev) => !prev);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  }, [sortKey]);
+
+  const sortedCreators = useMemo(() => {
+    if (!sortKey) return creators;
+    return [...creators].sort((a, b) => {
+      let aVal: any = (a as any)[sortKey];
+      let bVal: any = (b as any)[sortKey];
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortAsc ? aVal - bVal : bVal - aVal;
+      }
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      return sortAsc ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+  }, [creators, sortKey, sortAsc]);
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
@@ -386,11 +427,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   if (viewMode === "grid") {
     return (
       <div>
-        {creators.length === 0 ? (
+        {sortedCreators.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">Sin registros</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {creators.map((c) => {
+            {sortedCreators.map((c) => {
               const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
               return (
@@ -474,97 +515,101 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   // ========= LIST VIEW =========
 
   const renderHeaders = () => {
+    const sp = { currentKey: sortKey, asc: sortAsc, onSort: handleSort };
+    const stickyBase = "sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]";
+    const stickyAction = "text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]";
+
     switch (activeTab) {
       case "asignadas":
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha asignación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"># Contactos</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Último contacto</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Alertas</TableHead>
-            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
+            <SortHeader label="Categoría" sortKey="category" {...sp} />
+            <SortHeader label="Fecha asignación" sortKey="passed_date" {...sp} />
+            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
+            <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
+            <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
+            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>Alertas</TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "confirmadas":
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Extras</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataforma</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Revenue</TableHead>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"></TableHead>
-            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
+            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
+            <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
+            <TableHead className={stickyBase}>Extras</TableHead>
+            <TableHead className={stickyBase}>Plataforma</TableHead>
+            <TableHead className={stickyBase}>Revenue</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}></TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "completadas":
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Monetización</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">% Comisión</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Plataformas</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Rev. Plat.</TableHead>
-            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
+            <SortHeader label="Monetización" sortKey="estimated_monetization" {...sp} />
+            <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
+            <TableHead className={stickyBase}>Plataformas</TableHead>
+            <TableHead className={stickyBase}>Rev. Plat.</TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       case "no_interesadas":
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Closer</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Último contacto</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Motivo rechazo</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Closer" sortKey="agent_name" {...sp} />
+            <SortHeader label="Último contacto" sortKey="last_contact_date" {...sp} />
+            <TableHead className={stickyBase}>Motivo rechazo</TableHead>
+            <TableHead className={stickyBase}>Notas</TableHead>
           </TableRow>
         );
       case "nuevo":
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creado por</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Estado</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
-            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Creado por" sortKey="agent_name" {...sp} />
+            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
+            <SortHeader label="Categoría" sortKey="category" {...sp} />
+            <SortHeader label="Estado" sortKey="stage" {...sp} />
+            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>Notas</TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
       default: // todas
         return (
           <TableRow>
-            <TableHead className="w-10 sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">#</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Creación</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Instagram</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Estado</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Cuenta origen</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"># Contactos</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Teléfono</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">OF URL</TableHead>
-            <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
-            <TableHead className="text-right sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+            <TableHead className={`w-10 ${stickyBase}`}>#</TableHead>
+            <SortHeader label="Creación" sortKey="created_at" {...sp} />
+            <SortHeader label="Instagram" sortKey="instagram_handle" {...sp} />
+            <SortHeader label="Estado" sortKey="stage" {...sp} />
+            <SortHeader label="Cuenta origen" sortKey="source_account" {...sp} />
+            <SortHeader label="Categoría" sortKey="category" {...sp} />
+            <SortHeader label="Agente" sortKey="agent_name" {...sp} />
+            <SortHeader label="# Contactos" sortKey="contact_count" {...sp} />
+            <SortHeader label="Teléfono" sortKey="phone" {...sp} />
+            <TableHead className={stickyBase}>OF URL</TableHead>
+            <TableHead className={stickyBase}>Notas</TableHead>
+            <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
     }
@@ -902,14 +947,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           {renderHeaders()}
         </TableHeader>
         <TableBody>
-          {creators.length === 0 ? (
+          {sortedCreators.length === 0 ? (
             <TableRow>
               <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                 Sin registros
               </TableCell>
             </TableRow>
           ) : (
-            creators.map((c, idx) => renderRow(c, idx))
+            sortedCreators.map((c, idx) => renderRow(c, idx))
           )}
         </TableBody>
       </Table>
