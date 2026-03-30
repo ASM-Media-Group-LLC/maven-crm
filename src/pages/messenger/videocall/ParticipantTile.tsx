@@ -95,8 +95,6 @@ const ParticipantTile = memo(function ParticipantTile({
   const attachedVideoTrackRef = useRef<any>(null);
   const attachedVideoElRef = useRef<HTMLVideoElement | null>(null);
   const attachedAudioTrackRef = useRef<any>(null);
-  const gainSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
 
   const showVideo = !participant.isCameraOff || participant.isScreenSharing;
 
