@@ -1,39 +1,37 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, subDays, isSameDay, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, ResponsiveContainer } from "recharts";
 import { BarChart3, Clock, Users, ChevronsUpDown, Check } from "lucide-react";
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
+import { useLeadGenAgentLeads } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface Props {
-  leads: LeadGenEntry[];
   profiles: Array<{ id: string; full_name: string | null }>;
+  agentIds: string[];
+  dateFrom?: string;
+  dateTo?: string;
 }
 
-const LeadGenPerformanceView = ({ leads, profiles }: Props) => {
-  const [selectedAgent, setSelectedAgent] = useState("todos");
+const LeadGenPerformanceView = ({ profiles, agentIds, dateFrom, dateTo }: Props) => {
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   const agents = useMemo(() => {
-    const ids = [...new Set(leads.map(l => l.lg_user_id))];
-    return ids.map(id => {
+    return agentIds.map(id => {
       const p = profiles.find(pr => pr.id === id);
       return { id, name: p?.full_name || `Agente ${id.slice(0, 6)}` };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [leads, profiles]);
+  }, [agentIds, profiles]);
 
-  const agentLeads = useMemo(() => {
-    if (selectedAgent === "todos") return leads;
-    return leads.filter(l => l.lg_user_id === selectedAgent);
-  }, [leads, selectedAgent]);
+  // Fetch ALL leads for selected agent (no pagination limit)
+  const { data: agentLeads = [], isLoading } = useLeadGenAgentLeads(selectedAgent, dateFrom, dateTo);
 
-  const selectedName = selectedAgent === "todos" ? "Todos los agentes" : (agents.find(a => a.id === selectedAgent)?.name || "Agente");
+  const selectedName = !selectedAgent ? "Seleccionar agente" : (agents.find(a => a.id === selectedAgent)?.name || "Agente");
 
   const now = new Date();
 
@@ -91,10 +89,6 @@ const LeadGenPerformanceView = ({ leads, profiles }: Props) => {
                 <CommandInput placeholder="Buscar agente..." />
                 <CommandList>
                   <CommandEmpty>No encontrado</CommandEmpty>
-                  <CommandItem onSelect={() => { setSelectedAgent("todos"); setOpen(false); }}>
-                    Todos los agentes
-                    {selectedAgent === "todos" && <Check className="ml-auto h-4 w-4" />}
-                  </CommandItem>
                   {agents.map(a => (
                     <CommandItem key={a.id} onSelect={() => { setSelectedAgent(a.id); setOpen(false); }}>
                       {a.name}
@@ -107,12 +101,16 @@ const LeadGenPerformanceView = ({ leads, profiles }: Props) => {
           </Popover>
         </div>
 
-        {selectedAgent === "todos" ? (
+        {!selectedAgent ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
               <BarChart3 className="h-8 w-8 text-muted-foreground/50" />
             </div>
             <p className="text-muted-foreground text-sm">Selecciona un agente para ver su rendimiento</p>
+          </div>
+        ) : isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <p className="text-muted-foreground text-sm">Cargando datos del agente...</p>
           </div>
         ) : (
           <div className="space-y-6">

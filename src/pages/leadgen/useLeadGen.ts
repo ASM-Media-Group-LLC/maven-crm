@@ -289,5 +289,78 @@ export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
     staleTime: 2 * 60 * 1000,
   });
 
+/** Fetch summary stats across ALL leads in a date range (no pagination limit) */
+export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string) =>
+  useQuery({
+    queryKey: ["leadgen-summary-stats", dateFrom, dateTo],
+    queryFn: async () => {
+      const baseQuery = () => {
+        let q = supabase
+          .from("leadgen_entries")
+          .select("quality, phone_raw, phone_e164");
+        if (dateFrom && dateTo) {
+          q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
+        }
+        return q;
+      };
+
+      let all: Array<{ quality: string; phone_raw: string | null; phone_e164: string | null }> = [];
+      let page = 0;
+      while (true) {
+        const { data, error } = await baseQuery()
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) throw error;
+        all = all.concat((data || []) as any);
+        if (!data || data.length < 1000) break;
+        page++;
+      }
+
+      const byQuality: Record<string, number> = { "a+": 0, a: 0, "b+": 0, b: 0, c: 0 };
+      let qa = 0;
+      all.forEach(r => {
+        const q = r.quality?.toLowerCase() || "c";
+        if (q in byQuality) byQuality[q]++;
+        if (r.phone_raw || r.phone_e164) qa++;
+      });
+
+      return { total: all.length, qa, byQuality };
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+
+/** Fetch ALL leads for a specific agent in a date range (for performance charts) */
+export const useLeadGenAgentLeads = (agentId: string | null, dateFrom?: string, dateTo?: string) =>
+  useQuery({
+    queryKey: ["leadgen-agent-leads", agentId, dateFrom, dateTo],
+    queryFn: async () => {
+      if (!agentId) return [];
+      const baseQuery = () => {
+        let q = supabase
+          .from("leadgen_entries")
+          .select("id, lg_user_id, created_at, entry_date, quality, phone_raw, phone_e164");
+        q = q.eq("lg_user_id", agentId);
+        if (dateFrom && dateTo) {
+          q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
+        }
+        return q;
+      };
+
+      let all: any[] = [];
+      let page = 0;
+      while (true) {
+        const { data, error } = await baseQuery()
+          .order("created_at", { ascending: false })
+          .range(page * 1000, (page + 1) * 1000 - 1);
+        if (error) throw error;
+        all = all.concat(data || []);
+        if (!data || data.length < 1000) break;
+        page++;
+      }
+      return all as LeadGenEntry[];
+    },
+    enabled: !!agentId,
+    staleTime: 2 * 60 * 1000,
+  });
+
 // Legacy alias
 export const useUpdateLeadCategoria = useUpdateLeadQuality;
