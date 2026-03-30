@@ -304,6 +304,9 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
           {activeTab === "rendimiento" && (() => {
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
