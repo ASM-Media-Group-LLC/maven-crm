@@ -1,29 +1,29 @@
 
 
-## Plan: Corregir auto-hide de stats cards y espaciado de columna Acciones
+## Plan: Revertir layout y corregir auto-hide de stats cards
 
-### Problema 1: Stats cards no se ocultan al hacer scroll
-En ambos módulos (LeadGen y Closers), las KPI cards están **fuera** del contenedor scrollable. El `onScroll` handler está en el div de contenido de la tabla, pero las cards están en un `shrink-0` div hermano superior. Como el scroll solo ocurre dentro del contenedor de la tabla, las cards nunca reciben la señal de colapso.
-
-### Problema 2: Columna Acciones con exceso de espacio
-La columna Acciones en la tabla de agentes (LeadGenContent) y en LeadGenTable usa `sticky right-0` sin ancho fijo, lo que genera un ancho excesivo en pantallas anchas.
+### Problema raíz
+El scroll real ocurre **dentro** de `DataTableShell` (su div interno `overflow-auto` en línea 48), no en el contenedor externo. Por eso `handleContentScroll` nunca detecta `scrollTop > 40` — el div externo no scrollea realmente.
 
 ### Solución
 
-#### 1. Reestructurar layout para auto-hide (`LeadGenContent.tsx`)
-- Mover las KPI cards **dentro** del contenedor scrollable (el div con `onScroll`)
-- Las cards serán el primer hijo del div scrollable, seguidas por el contenido del tab activo
-- Así, al scrollear la tabla hacia abajo, `scrollTop > 40` se activará y colapsará las cards
+#### 1. Agregar prop `onScroll` a `DataTableShell` (`data-table-shell.tsx`)
+- Añadir prop opcional `onScroll?: (e: React.UIEvent<HTMLDivElement>) => void`
+- Forwarded al div interno scrollable (línea 48)
 
-#### 2. Mismo ajuste en Closers (`ClosersContent.tsx`)
-- Mover `ClosersKPICards` dentro del div scrollable (`flex-1 min-h-0 overflow-auto onScroll`)
-- Mismo patrón: cards como primer hijo del contenedor scrollable
+#### 2. Revertir layout en `ClosersContent.tsx`
+- Sacar `ClosersKPICards` del div scrollable y devolverlo al layout original (como `shrink-0` antes del `DataTableShell`)
+- Envolver las cards en el div con transición `max-h` condicional
+- Pasar `onScroll={handleContentScroll}` al `DataTableShell`
 
-#### 3. Limitar ancho de columna Acciones
-- En `LeadGenContent.tsx` (tabla agentes) y `LeadGenTable.tsx`: agregar `w-[80px]` al `TableHead` y `TableCell` de Acciones para evitar que se expanda innecesariamente
+#### 3. Revertir layout en `LeadGenContent.tsx`
+- Sacar `LeadGenCantidadCard` del div scrollable interno
+- Colocarlo como hermano anterior al contenido de tabs, envuelto en transición
+- Pasar `onScroll={handleContentScroll}` al `DataTableShell` del tab leads
+- El div externo (línea 316) vuelve a no tener `onScroll` ni `overflow-auto` propio
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — mover KPI cards dentro del scroll container, fijar ancho Acciones
-- `src/pages/closers/ClosersContent.tsx` — mover KPI cards dentro del scroll container
-- `src/pages/leadgen/LeadGenTable.tsx` — fijar ancho columna Acciones
+- `src/components/ui/data-table-shell.tsx` — agregar prop `onScroll`
+- `src/pages/closers/ClosersContent.tsx` — revertir layout, usar `onScroll` en DataTableShell
+- `src/pages/leadgen/LeadGenContent.tsx` — revertir layout, usar `onScroll` en DataTableShell
 
