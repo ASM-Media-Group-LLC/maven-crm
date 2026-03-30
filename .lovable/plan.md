@@ -1,30 +1,30 @@
 
 
-## Plan: Actualizar preview inline en NuevoInvoicePage
+## Plan: Estandarizar tablas y ocultar stats cards al hacer scroll en /leadgen
 
 ### Problema
-El archivo `NuevoInvoicePage.tsx` tiene su propio preview A4 inline (no usa el componente `InvoiceA4Preview`), por lo que los cambios de layout de 4 columnas no se reflejan ahí.
+1. La tabla de agentes en el tab "Agentes" tiene un estilo diferente al estándar `LeadGenTable` (sin `DataTableShell`, sin `SortHeader`)
+2. En `AgentDetailView`, las KPI cards usan `border-t-[3px]` con gradientes y las quality cards usan gradientes oscuros (`from-emerald-600 to-emerald-900`), completamente fuera del sistema de diseño estándar
+3. Las stats cards ocupan espacio fijo y no se ocultan al hacer scroll, reduciendo el espacio disponible para la tabla
 
 ### Cambios
 
-#### 1. Ampliar el query de creators en `NuevoInvoicePage.tsx` (línea 55)
-Agregar `phone` y `creator_business(billing_address)` al select:
-```ts
-.select("id, name, artistic_name, phone, creator_business(billing_address)")
-```
+#### 1. Ocultar stats cards al hacer scroll (`LeadGenContent.tsx`)
+- Detectar scroll en el contenedor principal del tab content
+- Cuando el usuario scrollea hacia abajo, colapsar las stats cards con una transición suave (`max-height` + `opacity` + `overflow-hidden`)
+- Cuando vuelve arriba (scroll top < umbral), mostrarlas de nuevo
+- Usar un `useState` + `onScroll` handler en el contenedor de tabs
 
-#### 2. Reemplazar la sección Billing del preview inline (líneas 286-303)
-Cambiar el layout actual de 2 columnas verticales por el grid de 4 columnas idéntico al de `InvoiceA4Preview.tsx`:
+#### 2. Estandarizar tabla de agentes (`LeadGenContent.tsx`, tab "Agentes")
+- Envolver la tabla en `DataTableShell` para consistencia
+- Agregar `SortHeader` a las columnas (Agente, Total, A+, A, B+, B, C)
+- Usar el mismo patrón de sticky headers y columna de Acciones del estándar
 
-```text
-Col 1 (Label)   Col 2 (Value)              Col 3 (Label)   Col 4 (Value)
-Bill to         Creator name               ID              Creator UUID
-Address         billing_address            (vacío)         (vacío)
-Phone           phone                      (vacío)         (vacío)
-```
+#### 3. Estandarizar cards en `AgentDetailView.tsx`
+- **KPI Cards** (Última Hora, Total Hoy, Promedio por Hora): Reemplazar el estilo `border-t-[3px]` por el patrón estándar KPI — label arriba izquierda, icono con badge de color arriba derecha, valor grande abajo izquierda, con hover scale
+- **Quality Cards** (A+, A, B+, B, C): Reemplazar los gradientes oscuros por el mismo estilo usado en `LeadGenCantidadCard` — cards con `Card`/`CardContent`, icono con badge de color, hover con gradiente sutil, colores semánticos (primary, success, warning, muted-foreground)
 
-Se extraerá `billing_address` del join `creator_business` y `phone` directamente del creator seleccionado.
-
-### Archivo a modificar
-- `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx`
+### Archivos a modificar
+- `src/pages/leadgen/LeadGenContent.tsx` — auto-hide stats cards en scroll, DataTableShell + SortHeader en tabla agentes
+- `src/pages/leadgen/AgentDetailView.tsx` — estandarizar KPI cards y quality cards al design system
 
