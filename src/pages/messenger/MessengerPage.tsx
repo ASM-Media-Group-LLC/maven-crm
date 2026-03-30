@@ -166,6 +166,7 @@ export default function MessengerPage() {
               conversations={conversations}
               activeChatId={activeChatId}
               onSelectChat={selectChat}
+              onNewChat={() => setNewChatOpen(true)}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
               onSelectContact={handleSelectUser}
