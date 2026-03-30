@@ -427,11 +427,11 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
   if (viewMode === "grid") {
     return (
       <div>
-        {creators.length === 0 ? (
+        {sortedCreators.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">Sin registros</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {creators.map((c) => {
+            {sortedCreators.map((c) => {
               const revenue = (Number(c.estimated_monetization || 0) * Number(c.agency_commission || 0) / 100) + Number(c.extras || 0);
               const followUpPending = c.stage === "Asignada" && isFollowUpPending(c.last_contact_date);
               return (
