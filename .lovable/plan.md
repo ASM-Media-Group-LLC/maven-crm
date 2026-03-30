@@ -1,25 +1,21 @@
 
 
-## Plan: Estandarizar tablas de Agentes y Detalle de Agente con DataTableShell
+## Plan: Auto-ocultar stats cards en scroll para LeadGen y Closers
 
-### Problema
-1. **Tab Agentes** (LeadGenContent líneas 417-464): la tabla de agentes se renderiza con `<Table>` directo, sin `DataTableShell` — no tiene bordes redondeados ni paginador
-2. **AgentDetailView** (línea 290): `<LeadGenTable>` se renderiza sin `DataTableShell` — tampoco tiene bordes redondeados ni paginador
+### Contexto
+LeadGen ya tiene el patrón `statsCollapsed` implementado. Closers no lo tiene — las `ClosersKPICards` están dentro de un `div.shrink-0` fijo que nunca se oculta.
 
 ### Cambios
 
-#### 1. Tab Agentes — envolver en DataTableShell (`LeadGenContent.tsx`)
-- Envolver la tabla de agentes (listView === "list") en `<DataTableShell>` con los mismos props estándar (currentPage, totalPages, totalCount, pageSize, onPageChange)
-- Agregar estado de paginación local para agentes (probablemente no necesite server-side ya que son pocos, pero mantener la consistencia visual)
-- pageSize de 50, paginación client-side sobre `agentStats`
+#### 1. `ClosersContent.tsx` — Aplicar el mismo patrón de LeadGen
+- Agregar `useState(false)` para `statsCollapsed` y `useRef` + `useCallback` para `handleContentScroll`
+- Extraer `ClosersKPICards` fuera del bloque `shrink-0` que contiene tabs+filtros, envolverlo en un div con `transition-all duration-300 overflow-hidden` y clases condicionales (`max-h-0 opacity-0` vs `max-h-[200px] opacity-100`)
+- Añadir `onScroll={handleContentScroll}` al contenedor scrollable de la tabla (el div `flex-1 min-h-0`)
 
-#### 2. AgentDetailView — envolver LeadGenTable en DataTableShell (`AgentDetailView.tsx`)
-- Agregar estado de paginación client-side (`agentPage`)
-- Paginar `filteredLeads` con slice
-- Envolver `<LeadGenTable>` en `<DataTableShell>` con bordes redondeados y paginador
-- pageSize de 100 para consistencia con la tabla principal
+#### 2. `LeadGenContent.tsx` — Verificar que el scroll listener esté correctamente conectado
+El patrón ya existe (línea 111-115). Confirmar que el `onScroll` handler está en el contenedor correcto para que funcione con el layout actual.
 
 ### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — DataTableShell en tabla de agentes
-- `src/pages/leadgen/AgentDetailView.tsx` — DataTableShell envolviendo LeadGenTable
+- `src/pages/closers/ClosersContent.tsx` — agregar auto-hide de KPI cards en scroll
+- `src/pages/leadgen/LeadGenContent.tsx` — verificar/ajustar si el scroll handler necesita reubicación
 
