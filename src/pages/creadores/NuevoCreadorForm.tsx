@@ -271,6 +271,8 @@ const NuevoCreadorForm = () => {
           secondary_platform: form.secondary_platform || null,
           platform_username: form.platform_username || null,
           start_date: form.start_date || null,
+          billing_start_date: form.billing_start_date || null,
+          billing_frequency: form.billing_frequency || null,
         },
         documents,
       });
