@@ -485,7 +485,7 @@ const LeadGenContent = () => {
 
           {/* === PERFORMANCE TAB === */}
           {activeTab === "rendimiento" && (
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div className="flex-1 min-h-0 overflow-auto" onScroll={handleContentScroll}>
               <LeadGenPerformanceView
                 profiles={profiles}
                 agentIds={agentStats.map(a => a.id)}
