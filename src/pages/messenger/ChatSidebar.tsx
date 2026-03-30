@@ -78,7 +78,7 @@ function truncate(text: string, max: number) {
 }
 
 export default function ChatSidebar({
-  conversations, activeChatId, onSelectChat, onNewGroup, onOpenVideoRooms,
+  conversations, activeChatId, onSelectChat, onNewChat, onNewGroup, onOpenVideoRooms,
   onSelectContact, onDeleteChat, loading, profiles,
   isPinned, onTogglePin, isArchived, onToggleArchive,
   spaces, onCreateSpace, onDeleteSpace, onRenameSpace,
