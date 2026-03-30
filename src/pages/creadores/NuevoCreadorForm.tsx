@@ -285,6 +285,7 @@ const NuevoCreadorForm = () => {
           start_date: form.start_date || null,
           billing_start_date: form.billing_start_date || null,
           billing_frequency: form.billing_frequency || null,
+          billing_address: form.billing_address || null,
         },
         documents,
       });
