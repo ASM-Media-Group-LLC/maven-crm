@@ -49,6 +49,13 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+
+  const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    if (scrollTop > 40) setStatsCollapsed(true);
+    else if (scrollTop < 10) setStatsCollapsed(false);
+  };
   
   const [filterContacto, setFilterContacto] = useState("");
   const [detailPage, setDetailPage] = useState(1);
@@ -167,8 +174,9 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto">
-        {/* KPI Cards */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* KPI Cards + Quality Cards — auto-hide on scroll */}
+        <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[400px] opacity-100"}`}>
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-4">
             <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
@@ -234,6 +242,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             })}
           </div>
         </div>
+        </div>{/* end auto-hide wrapper */}
 
         {/* Tab bar */}
         <div className="px-6 py-2">
@@ -247,9 +256,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         </div>
 
         {/* Tab Content */}
-        <div className="p-6">
-          {activeTab === "leads" && (
-            <div className="space-y-4">
+        {activeTab === "leads" && (
+          <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4 gap-4">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -283,21 +291,23 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 Leads Encontrados: <span className="font-semibold text-foreground">{filteredLeads.length}</span>
               </p>
 
-              {filteredLeads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
-                </div>
-              ) : viewMode === "list" ? (
-                <DataTableShell
-                  currentPage={detailPage}
-                  totalPages={Math.ceil(filteredLeads.length / 100)}
-                  totalCount={filteredLeads.length}
-                  pageSize={100}
-                  onPageChange={setDetailPage}
-                >
-                  <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
-                </DataTableShell>
+            {filteredLeads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
+              </div>
+            ) : viewMode === "list" ? (
+              <DataTableShell
+                currentPage={detailPage}
+                totalPages={Math.ceil(filteredLeads.length / 100)}
+                totalCount={filteredLeads.length}
+                pageSize={100}
+                onPageChange={setDetailPage}
+                onScroll={handleContentScroll}
+                className="flex-1 min-h-0"
+              >
+                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
+              </DataTableShell>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
@@ -325,10 +335,10 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   })}
                 </div>
               )}
-            </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === "rendimiento" && (() => {
+        {activeTab === "rendimiento" && (() => {
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
               return {
@@ -359,7 +369,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             const avgPerDay = (agentLeads.length / daysWithActivity).toFixed(1);
 
             return (
-              <div className="space-y-6">
+              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6">
                 <Card>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
@@ -446,15 +456,14 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             );
           })()}
 
-          {activeTab === "qa" && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
+        {activeTab === "qa" && (
+          <div className="flex-1 flex flex-col items-center justify-center py-20">
+            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <FileText className="h-8 w-8 text-muted-foreground/50" />
             </div>
-          )}
-        </div>
+            <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
+          </div>
+        )}
       </div>
     </main>
   );
