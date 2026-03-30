@@ -553,6 +553,9 @@ const NuevoCreadorForm = () => {
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="Dirección de Facturación">
+              <Input value={form.billing_address} onChange={(e) => set("billing_address", e.target.value)} placeholder="Dirección completa para facturación" />
+            </Field>
           </div>
           <div className="rounded-lg border p-4 flex items-center justify-between">
             <div>
