@@ -234,6 +234,11 @@ const LeadGenContent = () => {
         </div>
       </header>
 
+      {/* KPI Cards — collapse on table scroll */}
+      <div className={`shrink-0 px-6 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pt-4 pb-2"}`}>
+        <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+      </div>
+
       {/* Tab bar */}
       <div className="shrink-0 px-6 py-2 flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
@@ -314,10 +319,6 @@ const LeadGenContent = () => {
 
       {/* Tab content - fills remaining space */}
       <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef}>
-        {/* KPI Cards — collapse on scroll */}
-        <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
-          <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-        </div>
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
           <div className="flex-1 min-h-0 overflow-auto">
