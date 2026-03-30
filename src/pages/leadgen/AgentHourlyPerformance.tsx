@@ -14,11 +14,11 @@ interface AgentHourlyPerformanceProps {
 const OBJETIVO_POR_HORA = 20;
 
 const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100", border: "border-emerald-500" },
-  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100", border: "border-blue-500" },
-  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100", border: "border-cyan-500" },
-  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100", border: "border-violet-500" },
-  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground", border: "border-border" },
+  { key: "a+", label: "Top Quality", color: "text-emerald-500", bgIcon: "bg-emerald-500/20", hoverBg: "group-hover:bg-emerald-500/5" },
+  { key: "a", label: "Excelente", color: "text-blue-500", bgIcon: "bg-blue-500/20", hoverBg: "group-hover:bg-blue-500/5" },
+  { key: "b+", label: "Buena", color: "text-cyan-500", bgIcon: "bg-cyan-500/20", hoverBg: "group-hover:bg-cyan-500/5" },
+  { key: "b", label: "Regular", color: "text-violet-500", bgIcon: "bg-violet-500/20", hoverBg: "group-hover:bg-violet-500/5" },
+  { key: "c", label: "Básica", color: "text-muted-foreground", bgIcon: "bg-muted", hoverBg: "group-hover:bg-muted/50" },
 ];
 
 const qualityBarColors: Record<string, string> = {
@@ -131,37 +131,52 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-t-[3px] border-t-primary">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Última Hora</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Última Hora</p>
+                <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center text-primary">
+                  <Clock className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
             </div>
-            <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-accent">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Total Hoy</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Hoy</p>
+                <div className="h-8 w-8 rounded-md bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                  <Target className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-emerald-500">{todayLeads.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
             </div>
-            <p className="text-3xl font-bold text-primary">{todayLeads.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-accent">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Promedio por Hora</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Promedio por Hora</p>
+                <div className="h-8 w-8 rounded-md bg-violet-500/20 flex items-center justify-center text-violet-500">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-violet-500">{avgPerHour}</p>
+              <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
+              <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
+                Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+              </p>
             </div>
-            <p className="text-3xl font-bold text-primary">{avgPerHour}</p>
-            <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
-            <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
-              Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -169,11 +184,21 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       {/* Quality Cards */}
       <div className="grid grid-cols-5 gap-3">
         {qualityCards.map((q) => (
-          <div key={q.key} className={`rounded-xl p-4 border-l-[3px] ${q.border} ${q.bg}`}>
-            <p className={`text-xs ${q.text} opacity-70`}>{q.key.toUpperCase()}</p>
-            <p className={`text-3xl font-bold ${q.text}`}>{qualityCounts[q.key]}</p>
-            <p className={`text-xs mt-1 ${q.text} opacity-80`}>{q.label}</p>
-          </div>
+          <Card key={q.key} className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+            <CardContent className="p-4 relative">
+              <div className={`absolute inset-0 ${q.hoverBg} opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{q.key.toUpperCase()}</p>
+                  <div className={`h-6 w-6 rounded-md ${q.bgIcon} flex items-center justify-center`}>
+                    <span className={`text-xs font-bold ${q.color}`}>{q.key.toUpperCase()}</span>
+                  </div>
+                </div>
+                <p className={`text-2xl font-bold ${q.color}`}>{qualityCounts[q.key]}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{q.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
