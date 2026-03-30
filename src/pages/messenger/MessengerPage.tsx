@@ -47,6 +47,7 @@ export default function MessengerPage() {
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   
   const joinedFromLinkRef = useRef(false);
 
