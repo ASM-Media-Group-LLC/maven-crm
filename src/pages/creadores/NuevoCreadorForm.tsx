@@ -83,6 +83,8 @@ interface FormData {
   has_piclink: boolean;
   agency_percentage: number;
   payment_method: string;
+  billing_start_date: string;
+  billing_frequency: string;
   blue_package: boolean;
   blue_package_amount: number;
   main_platform: string;
@@ -119,6 +121,8 @@ const defaultForm: FormData = {
   has_piclink: false,
   agency_percentage: 15,
   payment_method: "",
+  billing_start_date: "",
+  billing_frequency: "",
   blue_package: false,
   blue_package_amount: 0,
   main_platform: "",
@@ -155,6 +159,8 @@ const testData: FormData = {
   has_piclink: true,
   agency_percentage: 20,
   payment_method: "Transferencia",
+  billing_start_date: "2026-03-01",
+  billing_frequency: "mensual",
   blue_package: true,
   blue_package_amount: 500,
   main_platform: "Onlyfans",
@@ -265,6 +271,8 @@ const NuevoCreadorForm = () => {
           secondary_platform: form.secondary_platform || null,
           platform_username: form.platform_username || null,
           start_date: form.start_date || null,
+          billing_start_date: form.billing_start_date || null,
+          billing_frequency: form.billing_frequency || null,
         },
         documents,
       });
@@ -510,6 +518,19 @@ const NuevoCreadorForm = () => {
                 <SelectTrigger className={errors.payment_method ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Fecha en la que inicia a cobrar">
+              <DateInput value={form.billing_start_date} onChange={(v) => set("billing_start_date", v)} />
+            </Field>
+            <Field label="Periodicidad de Cobro">
+              <Select value={form.billing_frequency} onValueChange={(v) => set("billing_frequency", v)}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar periodicidad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quincenal">Quincenal</SelectItem>
+                  <SelectItem value="mensual">Mensual</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
