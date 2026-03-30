@@ -251,15 +251,10 @@ const ParticipantTile = memo(function ParticipantTile({
 
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => {
-    // Acquire shared context ref count on mount
-    acquireSharedAudioContext();
-
     const videoElRef = videoRef;
     const audioElRef = audioRef;
     const attachedVideo = attachedVideoTrackRef;
     const attachedAudio = attachedAudioTrackRef;
-    const gainSource = gainSourceRef;
-    const gainNode = gainNodeRef;
     return () => {
       if (attachedVideo.current) {
         try { attachedVideo.current.detach(videoElRef.current!); } catch {}
@@ -271,16 +266,6 @@ const ParticipantTile = memo(function ParticipantTile({
         try { attachedAudio.current.detach(); } catch {}
         attachedAudio.current = null;
       }
-      if (gainSource.current) {
-        try { gainSource.current.disconnect(); } catch {}
-        gainSource.current = null;
-      }
-      if (gainNode.current) {
-        try { gainNode.current.disconnect(); } catch {}
-        gainNode.current = null;
-      }
-      // Release shared AudioContext (closes when last participant unmounts)
-      releaseSharedAudioContext();
     };
   }, []);
 
