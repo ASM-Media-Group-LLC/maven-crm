@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
 import type { LeadGenEntry } from "./useLeadGen";
 
@@ -18,12 +19,12 @@ interface AgentDetailViewProps {
   onBack: () => void;
 }
 
-const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100", border: "border-emerald-500" },
-  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100", border: "border-blue-500" },
-  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100", border: "border-cyan-500" },
-  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100", border: "border-violet-500" },
-  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground", border: "border-border" },
+const qualityCardConfig = [
+  { key: "a+", label: "A+", icon: Star, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40" },
+  { key: "a", label: "A", icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40" },
+  { key: "b+", label: "B+", icon: ArrowUpRight, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40" },
+  { key: "b", label: "B", icon: ArrowRight, colorClass: "text-warning/80", bgClass: "bg-warning/15", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent hover:border-warning/30" },
+  { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
 const qualityBadgeColors: Record<string, string> = {
