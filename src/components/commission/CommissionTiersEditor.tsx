@@ -31,7 +31,7 @@ function validateTiers(tiers: CommissionTier[]): string | null {
     const t = tiers[i];
     if (t.percentage < 0 || t.percentage > 100) return `Tramo ${i + 1}: porcentaje debe estar entre 0 y 100`;
     if (t.max_revenue !== null && t.max_revenue <= t.min_revenue) return `Tramo ${i + 1}: máximo debe ser mayor al mínimo`;
-    if (i > 0 && t.min_revenue !== (tiers[i - 1].max_revenue ?? t.min_revenue)) {
+    if (i > 0 && tiers[i - 1].max_revenue !== null && t.min_revenue !== tiers[i - 1].max_revenue + 1) {
       return `Tramo ${i + 1}: el mínimo debe coincidir con el máximo del tramo anterior`;
     }
     if (i < tiers.length - 1 && t.max_revenue === null) return `Solo el último tramo puede tener máximo "Sin límite"`;
