@@ -121,6 +121,8 @@ const defaultForm: FormData = {
   has_piclink: false,
   agency_percentage: 15,
   payment_method: "",
+  billing_start_date: "",
+  billing_frequency: "",
   blue_package: false,
   blue_package_amount: 0,
   main_platform: "",
