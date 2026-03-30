@@ -1,42 +1,7 @@
-import { useEffect, useRef, memo, useCallback, useState } from "react";
+import { useEffect, useRef, memo, useCallback } from "react";
 import { Track, Room } from "livekit-client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MicOff, Hand, Monitor, WifiOff, Pin, PinOff, MoreVertical, UserX } from "lucide-react";
-
-// ── Shared AudioContext singleton ────────────────────────────────
-let sharedAudioCtx: AudioContext | null = null;
-let sharedAudioCtxRefCount = 0;
-
-function getSharedAudioContext(): AudioContext | null {
-  if (typeof AudioContext === "undefined") return null;
-  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
-    sharedAudioCtx = new AudioContext();
-    const resumeOnInteraction = () => {
-      if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
-        sharedAudioCtx.resume().catch(() => {});
-      }
-    };
-    document.addEventListener("click", resumeOnInteraction, { once: false });
-    document.addEventListener("touchstart", resumeOnInteraction, { once: false });
-  }
-  return sharedAudioCtx;
-}
-
-function acquireSharedAudioContext(): AudioContext | null {
-  sharedAudioCtxRefCount++;
-  return getSharedAudioContext();
-}
-
-function releaseSharedAudioContext() {
-  sharedAudioCtxRefCount--;
-  if (sharedAudioCtxRefCount <= 0) {
-    sharedAudioCtxRefCount = 0;
-    if (sharedAudioCtx && sharedAudioCtx.state !== "closed") {
-      try { sharedAudioCtx.close(); } catch {}
-    }
-    sharedAudioCtx = null;
-  }
-}
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LKParticipant } from "@/hooks/useLiveKit";
 import { cn } from "@/lib/utils";

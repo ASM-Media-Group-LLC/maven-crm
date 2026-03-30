@@ -100,7 +100,7 @@ const NC_STORAGE_KEY = "call-noise-cancellation-enabled";
 export function loadNCPreference(): boolean {
   try {
     const val = localStorage.getItem(NC_STORAGE_KEY);
-    return val === null ? true : val === "true";
+    return val === "true";
   } catch {
     return false;
   }
