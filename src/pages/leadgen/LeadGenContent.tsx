@@ -351,6 +351,7 @@ const LeadGenContent = () => {
                 totalCount={totalLeads}
                 pageSize={100}
                 onPageChange={(p) => setPage(p - 1)}
+                onScroll={handleContentScroll}
               >
                 <LeadGenTable
                   leads={filteredLeads}

@@ -40,6 +40,7 @@ const DataTableShell = ({
   onPageChange,
   onPageSizeChange,
   className,
+  onScroll,
 }: DataTableShellProps) => {
   const from = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const to = Math.min(currentPage * pageSize, totalCount);
@@ -47,7 +48,7 @@ const DataTableShell = ({
   return (
     <div className={cn("flex flex-col", className)}>
       {/* Scrollable table area */}
-      <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border">
+      <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-border" onScroll={onScroll}>
         {children}
       </div>
 
