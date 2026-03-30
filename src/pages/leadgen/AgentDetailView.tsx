@@ -36,13 +36,19 @@ const qualityCardConfig = [
   { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
-const qualityBadgeColors: Record<string, string> = {
-  "a+": "bg-emerald-500 text-white",
-  "a": "bg-blue-500 text-white",
-  "b+": "bg-cyan-600 text-white",
-  "b": "bg-violet-500 text-white",
-  "c": "bg-muted text-muted-foreground",
+const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "a+": "success-soft",
+  a: "primary-soft",
+  "b+": "warning-soft",
+  b: "secondary-soft",
+  c: "destructive-soft",
 };
+
+const QA_RATING_OPTIONS = [
+  { value: "bien", label: "Bien", variant: "success-soft" as const },
+  { value: "regular", label: "Regular", variant: "warning-soft" as const },
+  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+];
 
 const tabs = [
   { id: "leads", label: "Leads" },
