@@ -1,21 +1,25 @@
 import { useState, useMemo, useEffect } from "react";
 import DataTableShell from "@/components/ui/data-table-shell";
-import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye, ClipboardCheck } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
-import { useLeadGenAgentLeads } from "./useLeadGen";
+import { useLeadGenAgentLeads, useLeadGenQA, useCreateQAReview } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AgentDetailViewProps {
   agent: { name: string; email?: string; id?: string };
@@ -32,13 +36,19 @@ const qualityCardConfig = [
   { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20" },
 ];
 
-const qualityBadgeColors: Record<string, string> = {
-  "a+": "bg-emerald-500 text-white",
-  "a": "bg-blue-500 text-white",
-  "b+": "bg-cyan-600 text-white",
-  "b": "bg-violet-500 text-white",
-  "c": "bg-muted text-muted-foreground",
+const calidadVariant: Record<string, "success-soft" | "primary-soft" | "warning-soft" | "secondary-soft" | "destructive-soft"> = {
+  "a+": "success-soft",
+  a: "primary-soft",
+  "b+": "warning-soft",
+  b: "secondary-soft",
+  c: "destructive-soft",
 };
+
+const QA_RATING_OPTIONS = [
+  { value: "bien", label: "Bien", variant: "success-soft" as const },
+  { value: "regular", label: "Regular", variant: "warning-soft" as const },
+  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+];
 
 const tabs = [
   { id: "leads", label: "Leads" },
@@ -56,6 +66,13 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [qaPage, setQaPage] = useState(1);
+  const [qaRating, setQaRating] = useState<Record<string, string>>({});
+  const [qaComment, setQaComment] = useState<Record<string, string>>({});
+  const [qaOpenId, setQaOpenId] = useState<string | null>(null);
+  const { isAdmin, isSupervisor } = useUserRole();
+  const { user } = useAuth();
+  const canReview = isAdmin || isSupervisor;
+  const createQA = useCreateQAReview();
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
@@ -85,6 +102,16 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
   );
 
   const agentLeads = fetchedLeads as LeadGenEntry[];
+
+  const qaEntryIds = useMemo(() => agentLeads.map(l => l.id), [agentLeads]);
+  const { data: qaReviews = [] } = useLeadGenQA(qaEntryIds);
+  const qaMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of qaReviews) {
+      if (r.entry_id && !map[r.entry_id]) map[r.entry_id] = r;
+    }
+    return map;
+  }, [qaReviews]);
 
   const todayLeads = useMemo(() =>
     agentLeads.filter(l => isSameDay(new Date(l.created_at), now)),
@@ -323,7 +350,6 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
                     const cat = lead.quality?.toLowerCase() || "c";
-                    const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
                     return (
                       <Card key={lead.id}>
                         <CardContent className="p-4">
@@ -332,9 +358,9 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                               <span className="text-xs font-mono text-muted-foreground">#{lead.ticket_number || "—"}</span>
                               <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
                             </div>
-                            <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
+                            <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
                               {lead.quality?.toUpperCase()}
-                            </span>
+                            </Badge>
                           </div>
                           <div className="flex items-center justify-end text-xs text-muted-foreground">
                             <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
@@ -497,14 +523,15 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Handle</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">País</TableHead>
-                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">QA</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pagedQaLeads.map((lead) => {
                         const cat = lead.quality?.toLowerCase() || "c";
-                        const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
+                        const existingQa = qaMap[lead.id];
+                        const qaOpt = existingQa ? QA_RATING_OPTIONS.find(o => o.value === existingQa.rating) : null;
                         return (
                           <TableRow key={lead.id}>
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
@@ -512,12 +539,70 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             </TableCell>
                             <TableCell className="font-medium text-sm">@{lead.model_handle}</TableCell>
                             <TableCell>
-                              <span className={`inline-flex items-center justify-center h-6 px-2 rounded-full text-xs font-bold ${badgeClass}`}>
+                              <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
                                 {lead.quality?.toUpperCase()}
-                              </span>
+                              </Badge>
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">{lead.country_code || "—"}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{lead.notes || "—"}</TableCell>
+                            <TableCell>
+                              {existingQa ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <Badge variant={qaOpt?.variant ?? "secondary-soft"}>{qaOpt?.label ?? existingQa.rating}</Badge>
+                                  {existingQa.comment && <span className="text-xs text-muted-foreground truncate max-w-[150px]">{existingQa.comment}</span>}
+                                </div>
+                              ) : canReview ? (
+                                <Popover open={qaOpenId === lead.id} onOpenChange={(o) => { setQaOpenId(o ? lead.id : null); if (!o) { setQaRating(prev => { const n = {...prev}; delete n[lead.id]; return n; }); setQaComment(prev => { const n = {...prev}; delete n[lead.id]; return n; }); } }}>
+                                  <PopoverTrigger asChild>
+                                    <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                      <ClipboardCheck className="h-3.5 w-3.5" />
+                                      <span>Revisar</span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64 p-3" align="start">
+                                    <p className="text-xs font-medium mb-2">Calificar lead</p>
+                                    <div className="flex gap-1 mb-2">
+                                      {QA_RATING_OPTIONS.map((opt) => (
+                                        <Button
+                                          key={opt.value}
+                                          size="sm"
+                                          variant={qaRating[lead.id] === opt.value ? "default" : "outline"}
+                                          className="flex-1 h-7 text-xs"
+                                          onClick={() => setQaRating(prev => ({...prev, [lead.id]: opt.value}))}
+                                        >
+                                          {opt.label}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                    <Textarea
+                                      placeholder="Comentario (opcional)"
+                                      value={qaComment[lead.id] || ""}
+                                      onChange={(e) => setQaComment(prev => ({...prev, [lead.id]: e.target.value}))}
+                                      className="text-xs h-16 mb-2"
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="w-full h-7 text-xs"
+                                      disabled={!qaRating[lead.id] || createQA.isPending}
+                                      onClick={() => {
+                                        if (!qaRating[lead.id] || !user?.id) return;
+                                        createQA.mutate({
+                                          entry_id: lead.id,
+                                          supervisor_id: user.id,
+                                          score: qaRating[lead.id],
+                                          rating: qaRating[lead.id],
+                                          comment: qaComment[lead.id]?.trim() || undefined,
+                                        });
+                                        setQaOpenId(null);
+                                      }}
+                                    >
+                                      {createQA.isPending ? "Guardando..." : "Guardar"}
+                                    </Button>
+                                  </PopoverContent>
+                                </Popover>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">—</span>
+                              )}
+                            </TableCell>
                             <TableCell className="w-[80px]">
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedLead(lead)}>
                                 <Eye className="h-4 w-4" />

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -15,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUpdateLeadQuality, useUpdateLeadField } from "./useLeadGen";
+import { useUpdateLeadQuality, useUpdateLeadField, useLeadGenQA, useCreateQAReview } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 
 const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
 
@@ -49,6 +52,12 @@ const cleanPhoneForWhatsApp = (phone: string) =>
   phone.replace(/[^\d]/g, "");
 
 type SortKey = "hora" | "ticket" | "handle" | "agente" | "agencia" | "categoria" | "pais" | "contacto" | "qa";
+
+const QA_RATING_OPTIONS = [
+  { value: "bien", label: "Bien", variant: "success-soft" as const },
+  { value: "regular", label: "Regular", variant: "warning-soft" as const },
+  { value: "mal", label: "Mal", variant: "destructive-soft" as const },
+];
 
 interface Props {
   leads: LeadGenEntry[];
@@ -176,8 +185,84 @@ const AgentReassignCell = React.memo(({ lead, profiles }: { lead: LeadGenEntry; 
 });
 AgentReassignCell.displayName = "AgentReassignCell";
 
+// QA Review Cell
+const QACell = React.memo(({ lead, qaMap, canReview }: { lead: LeadGenEntry; qaMap: Record<string, any>; canReview: boolean }) => {
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState("");
+  const [comment, setComment] = useState("");
+  const createQA = useCreateQAReview();
+  const { user } = useAuth();
+
+  const existing = qaMap[lead.id];
+
+  if (existing) {
+    const opt = QA_RATING_OPTIONS.find(o => o.value === existing.rating);
+    return (
+      <Badge variant={opt?.variant ?? "secondary-soft"}>
+        {opt?.label ?? existing.rating}
+      </Badge>
+    );
+  }
+
+  if (!canReview) return <span className="text-muted-foreground">—</span>;
+
+  const handleSave = () => {
+    if (!rating || !user?.id) return;
+    createQA.mutate({
+      entry_id: lead.id,
+      supervisor_id: user.id,
+      score: rating,
+      rating,
+      comment: comment.trim() || undefined,
+    });
+    setOpen(false);
+    setRating("");
+    setComment("");
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ClipboardCheck className="h-3.5 w-3.5" />
+          <span>Revisar</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="start" onClick={(e) => e.stopPropagation()}>
+        <p className="text-xs font-medium mb-2">Calificar lead</p>
+        <div className="flex gap-1 mb-2">
+          {QA_RATING_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={rating === opt.value ? "default" : "outline"}
+              className="flex-1 h-7 text-xs"
+              onClick={() => setRating(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+        <Textarea
+          placeholder="Comentario (opcional)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          className="text-xs h-16 mb-2"
+        />
+        <Button size="sm" className="w-full h-7 text-xs" disabled={!rating || createQA.isPending} onClick={handleSave}>
+          {createQA.isPending ? "Guardando..." : "Guardar"}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+});
+QACell.displayName = "QACell";
+
 // Memoized row
-const LeadRow = React.memo(({ lead, onView, profiles }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[] }) => {
+const LeadRow = React.memo(({ lead, onView, profiles, qaMap, canReview }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[]; qaMap: Record<string, any>; canReview: boolean }) => {
   const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
 
   return (
@@ -230,7 +315,9 @@ const LeadRow = React.memo(({ lead, onView, profiles }: { lead: LeadGenEntry; on
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
+      <TableCell className="text-center text-sm" onClick={(e) => e.stopPropagation()}>
+        <QACell lead={lead} qaMap={qaMap} canReview={canReview} />
+      </TableCell>
       <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
           <Eye className="h-4 w-4" />
@@ -244,6 +331,18 @@ LeadRow.displayName = "LeadRow";
 const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
+  const { isAdmin, isSupervisor } = useUserRole();
+  const canReview = isAdmin || isSupervisor;
+
+  const entryIds = useMemo(() => leads.map(l => l.id), [leads]);
+  const { data: qaReviews = [] } = useLeadGenQA(entryIds);
+  const qaMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of qaReviews) {
+      if (r.entry_id && !map[r.entry_id]) map[r.entry_id] = r;
+    }
+    return map;
+  }, [qaReviews]);
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
@@ -267,7 +366,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       case "categoria": va = a.quality; vb = b.quality; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
-      case "qa": va = ""; vb = ""; break;
+      case "qa": va = qaMap[a.id]?.rating ?? ""; vb = qaMap[b.id]?.rating ?? ""; break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
   });
@@ -283,7 +382,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
     <Table containerClassName="overflow-visible" className="min-w-[900px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
@@ -297,7 +396,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} />
+          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} qaMap={qaMap} canReview={canReview} />
         ))}
         {sorted.length === 0 && (
           <TableRow>
