@@ -129,40 +129,6 @@ const ParticipantTile = memo(function ParticipantTile({
         attachedAudioTrackRef.current = audioTrack.track;
         audioEl.volume = 1;
 
-        // ── Output gain boost (1.4x ≈ +3dB) via shared AudioContext ──
-        try {
-          // Clean up previous gain pipeline
-          if (gainSourceRef.current) {
-            try { gainSourceRef.current.disconnect(); } catch {}
-            gainSourceRef.current = null;
-          }
-          if (gainNodeRef.current) {
-            try { gainNodeRef.current.disconnect(); } catch {}
-            gainNodeRef.current = null;
-          }
-
-          const ctx = getSharedAudioContext();
-
-          // Only apply gain boost if AudioContext is available and running
-          if (ctx && ctx.state === "running") {
-            const source = ctx.createMediaStreamSource(audioEl.srcObject as MediaStream);
-            gainSourceRef.current = source;
-            const gainNode = ctx.createGain();
-            gainNodeRef.current = gainNode;
-            gainNode.gain.value = 1.4;
-            const destination = ctx.createMediaStreamDestination();
-
-            source.connect(gainNode);
-            gainNode.connect(destination);
-
-            audioEl.srcObject = destination.stream;
-          } else if (ctx) {
-            // Try to resume; audio plays at normal volume meanwhile
-            ctx.resume().catch(() => {});
-          }
-        } catch {
-          // Fallback: keep original stream without boost
-        }
 
         // Set audio output device
         const mediaEl = audioEl as HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void>; sinkId?: string };
