@@ -83,6 +83,8 @@ interface FormData {
   start_date: string;
   has_piclink: boolean;
   agency_percentage: number;
+  commission_type: "fixed" | "tiered";
+  commission_tiers: CommissionTier[];
   payment_method: string;
   billing_start_date: string;
   billing_frequency: string;
