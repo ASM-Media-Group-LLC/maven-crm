@@ -47,6 +47,7 @@ export default function MessengerPage() {
   const [videoRooms, setVideoRooms] = useState<VideoRoom[]>([]);
   const [showVideoRooms, setShowVideoRooms] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
   
   const joinedFromLinkRef = useRef(false);
 
@@ -165,6 +166,7 @@ export default function MessengerPage() {
               conversations={conversations}
               activeChatId={activeChatId}
               onSelectChat={selectChat}
+              onNewChat={() => setNewChatOpen(true)}
               onNewGroup={() => setNewGroupOpen(true)}
               onOpenVideoRooms={() => setShowVideoRooms(true)}
               onSelectContact={handleSelectUser}
@@ -242,6 +244,15 @@ export default function MessengerPage() {
           onDecline={declineCall}
         />
       )}
+
+      <NewChatModal
+        open={newChatOpen}
+        onClose={() => setNewChatOpen(false)}
+        profiles={profiles}
+        onSelectUser={(userId) => { handleSelectUser(userId); setNewChatOpen(false); }}
+        isOnlineFn={isOnline}
+        getStatusFn={getStatus}
+      />
 
       <NewChatModal
         open={newGroupOpen}
