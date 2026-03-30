@@ -79,7 +79,7 @@ export default function CommissionTiersEditor({
     newTiers[index] = { ...newTiers[index], [field]: value };
     // Auto-update next tier's min to match this tier's max
     if (field === "max_revenue" && index < newTiers.length - 1 && value !== null) {
-      newTiers[index + 1] = { ...newTiers[index + 1], min_revenue: value };
+      newTiers[index + 1] = { ...newTiers[index + 1], min_revenue: value + 1 };
     }
     onTiersChange(newTiers);
     const err = validateTiers(newTiers);
