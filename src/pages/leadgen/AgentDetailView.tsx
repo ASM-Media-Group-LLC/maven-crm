@@ -103,6 +103,16 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
 
   const agentLeads = fetchedLeads as LeadGenEntry[];
 
+  const qaEntryIds = useMemo(() => agentLeads.map(l => l.id), [agentLeads]);
+  const { data: qaReviews = [] } = useLeadGenQA(qaEntryIds);
+  const qaMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of qaReviews) {
+      if (r.entry_id && !map[r.entry_id]) map[r.entry_id] = r;
+    }
+    return map;
+  }, [qaReviews]);
+
   const todayLeads = useMemo(() =>
     agentLeads.filter(l => isSameDay(new Date(l.created_at), now)),
     [agentLeads, now]);
