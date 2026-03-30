@@ -14,11 +14,11 @@ interface AgentHourlyPerformanceProps {
 const OBJETIVO_POR_HORA = 20;
 
 const qualityCards = [
-  { key: "a+", label: "Top Quality", bg: "bg-gradient-to-br from-emerald-600 to-emerald-900", text: "text-emerald-100", border: "border-emerald-500" },
-  { key: "a", label: "Excelente", bg: "bg-gradient-to-br from-blue-600 to-blue-900", text: "text-blue-100", border: "border-blue-500" },
-  { key: "b+", label: "Buena", bg: "bg-gradient-to-br from-cyan-600 to-cyan-900", text: "text-cyan-100", border: "border-cyan-500" },
-  { key: "b", label: "Regular", bg: "bg-gradient-to-br from-violet-600 to-violet-900", text: "text-violet-100", border: "border-violet-500" },
-  { key: "c", label: "Básica", bg: "border bg-card", text: "text-foreground", border: "border-border" },
+  { key: "a+", label: "Top Quality", color: "text-emerald-500", bgIcon: "bg-emerald-500/20", hoverBg: "group-hover:bg-emerald-500/5" },
+  { key: "a", label: "Excelente", color: "text-blue-500", bgIcon: "bg-blue-500/20", hoverBg: "group-hover:bg-blue-500/5" },
+  { key: "b+", label: "Buena", color: "text-cyan-500", bgIcon: "bg-cyan-500/20", hoverBg: "group-hover:bg-cyan-500/5" },
+  { key: "b", label: "Regular", color: "text-violet-500", bgIcon: "bg-violet-500/20", hoverBg: "group-hover:bg-violet-500/5" },
+  { key: "c", label: "Básica", color: "text-muted-foreground", bgIcon: "bg-muted", hoverBg: "group-hover:bg-muted/50" },
 ];
 
 const qualityBarColors: Record<string, string> = {
