@@ -242,6 +242,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             })}
           </div>
         </div>
+        </div>{/* end auto-hide wrapper */}
 
         {/* Tab bar */}
         <div className="px-6 py-2">
