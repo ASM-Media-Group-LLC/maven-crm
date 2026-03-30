@@ -184,11 +184,21 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
       {/* Quality Cards */}
       <div className="grid grid-cols-5 gap-3">
         {qualityCards.map((q) => (
-          <div key={q.key} className={`rounded-xl p-4 border-l-[3px] ${q.border} ${q.bg}`}>
-            <p className={`text-xs ${q.text} opacity-70`}>{q.key.toUpperCase()}</p>
-            <p className={`text-3xl font-bold ${q.text}`}>{qualityCounts[q.key]}</p>
-            <p className={`text-xs mt-1 ${q.text} opacity-80`}>{q.label}</p>
-          </div>
+          <Card key={q.key} className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+            <CardContent className="p-4 relative">
+              <div className={`absolute inset-0 ${q.hoverBg} opacity-0 group-hover:opacity-100 transition-opacity`} />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{q.key.toUpperCase()}</p>
+                  <div className={`h-6 w-6 rounded-md ${q.bgIcon} flex items-center justify-center`}>
+                    <span className={`text-xs font-bold ${q.color}`}>{q.key.toUpperCase()}</span>
+                  </div>
+                </div>
+                <p className={`text-2xl font-bold ${q.color}`}>{qualityCounts[q.key]}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{q.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
