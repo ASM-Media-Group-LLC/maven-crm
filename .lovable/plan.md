@@ -1,24 +1,27 @@
 
 
-## Plan: Rediseñar stats cards de LeadGen al estilo KPI estándar
+## Plan: Ocultar agentes huérfanos y añadir opción de vincular leads a un agente
 
-### Referencia
-La imagen muestra tarjetas tipo KPI como las de `CreadoresKPICards`: cada card ocupa espacio equitativo en un grid, con label arriba a la izquierda, icono con badge de color arriba a la derecha, y valor grande abajo a la izquierda. Sin porcentajes debajo.
+### Problema
+Los `agentStats` incluyen agentes cuyo `lg_user_id` no tiene perfil en la tabla `profiles`, mostrando "Agente" genérico en la tabla de rendimiento y en el dropdown de PerformanceView. Esto genera confusión con datos de prueba/legacy.
 
-### Cambios en `LeadGenCantidadCard.tsx`
+### Cambios
 
-Reemplazar el layout actual (botones compactos centrados) por un grid de cards siguiendo el patrón de `CreadoresKPICards`:
+#### 1. Filtrar agentes huérfanos en `LeadGenContent.tsx` (línea ~160-168)
+En el `useMemo` que construye `agentStats`, filtrar solo agentes que existen en `profilesMap`:
+```ts
+// Antes del .sort(), agregar:
+.filter(agent => !!profilesMap[agent.id])
+```
+Esto oculta de las tabs "Agentes", "Rendimiento" y "Supervisores" cualquier ID sin perfil real.
 
-- **Layout**: `grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7` (5 categorías + Total + QA)
-- **Cada card**: Usar `Card`/`CardContent` de Shadcn con:
-  - Label (`text-sm text-muted-foreground`) arriba izquierda
-  - Icono en badge coloreado (`h-8 w-8 rounded-md`) arriba derecha
-  - Valor grande (`text-2xl font-bold`) abajo izquierda con color del estado
-  - Hover: `hover:scale-[1.03]` + gradiente sutil
-- **Eliminar**: porcentaje debajo del valor, layout centrado vertical
-- **Mantener**: funcionalidad de filtro por click en categorías, estado activo con borde/fondo de color
-- **Iconos**: Usar iconos de Lucide apropiados por categoría (Star para A+, TrendingUp para A, etc.), Users para Total, PhoneCall para QA
+#### 2. También filtrar en la tabla de leads (línea ~87)
+En `enrichedLeads`, los leads huérfanos seguirán apareciendo con `agent_name: "—"` — esto está bien, no se ocultan los leads, solo los agentes fantasma de las vistas de rendimiento.
 
-### Archivo
-- `src/pages/leadgen/LeadGenCantidadCard.tsx` — rediseño completo
+#### 3. Añadir opción de reasignar agente en leads huérfanos
+En `LeadGenTable.tsx` (o equivalente), para leads cuyo `lg_user_id` no existe en `profilesMap`, mostrar un dropdown/botón en la columna "Agente" que permita seleccionar un agente real y actualizar el `lg_user_id` del lead usando `useUpdateLeadField`.
+
+### Archivos a modificar
+- `src/pages/leadgen/LeadGenContent.tsx` — filtrar agentes huérfanos del array `agentStats`
+- `src/pages/leadgen/LeadGenTable.tsx` — añadir opción de reasignar agente para leads sin perfil válido
 
