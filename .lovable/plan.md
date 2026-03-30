@@ -1,19 +1,26 @@
 
 
-## Plan: Corregir solapamiento de tramos — usar `max + 1` como mínimo del siguiente
+## Plan: Agregar campo "Dirección de facturación" en Condiciones Comerciales
 
-### Problema
-Cuando se agrega un nuevo tramo, el `min_revenue` se establece igual al `max_revenue` del tramo anterior, causando solapamiento (ej: tramo 1 termina en 999, tramo 2 empieza en 999).
+### Cambios
 
-### Cambios en `CommissionTiersEditor.tsx`
+#### 1. Migración de base de datos
+Agregar columna `billing_address` (text, nullable) a `creator_business`:
+```sql
+ALTER TABLE public.creator_business
+ADD COLUMN IF NOT EXISTS billing_address text;
+```
 
-Hay 4 puntos donde se calcula el `min` del siguiente tramo que deben usar `max + 1`:
+#### 2. `NuevoCreadorForm.tsx`
+- Agregar `billing_address: string` al estado del formulario (inicializado en `""`)
+- Después del campo "Periodicidad de Cobro" (línea 552), insertar un nuevo `<Field>` con un `<Input>` o `<Textarea>` para la dirección
+- Incluir `billing_address` en el payload de guardado junto a `billing_frequency`
 
-1. **`addTier()` (línea 61-62)**: Cambiar `newMin = max_revenue` → `newMin = max_revenue + 1`
-2. **`removeTier()` (línea 71)**: Al recalcular continuidad, usar `max_revenue + 1` en vez de `max_revenue`
-3. **`updateTier()` (línea 82)**: Al auto-actualizar el siguiente tramo, usar `value + 1`
-4. **`validateTiers()` (línea 34)**: Cambiar la validación de continuidad de `min === prev.max` a `min === prev.max + 1`
+#### 3. `InfoTabContent.tsx`
+- Mostrar el campo "Dirección de facturación" en la sección de lectura de condiciones comerciales
 
-### Archivo
-- `src/components/commission/CommissionTiersEditor.tsx`
+### Archivos
+- **Migración SQL**: nueva columna en `creator_business`
+- **Modificar**: `NuevoCreadorForm.tsx` — estado + campo + guardado
+- **Modificar**: `InfoTabContent.tsx` — lectura del campo
 
