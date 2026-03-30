@@ -288,7 +288,15 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
                 </div>
               ) : viewMode === "list" ? (
-                <LeadGenTable leads={filteredLeads} />
+                <DataTableShell
+                  currentPage={detailPage}
+                  totalPages={Math.ceil(filteredLeads.length / 100)}
+                  totalCount={filteredLeads.length}
+                  pageSize={100}
+                  onPageChange={setDetailPage}
+                >
+                  <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
+                </DataTableShell>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
