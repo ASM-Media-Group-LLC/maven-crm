@@ -240,7 +240,7 @@ const LeadRow = React.memo(({ lead, onView, profiles }: { lead: LeadGenEntry; on
 });
 LeadRow.displayName = "LeadRow";
 
-const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
+const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
 
