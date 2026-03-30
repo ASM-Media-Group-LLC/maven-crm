@@ -222,9 +222,6 @@ const ClosersContent = () => {
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
-            <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
-              <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
-            </div>
             <DataTableShell
               className="flex-1 min-h-0"
               currentPage={page + 1}
