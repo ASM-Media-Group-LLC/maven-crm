@@ -947,14 +947,14 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
           {renderHeaders()}
         </TableHeader>
         <TableBody>
-          {creators.length === 0 ? (
+          {sortedCreators.length === 0 ? (
             <TableRow>
               <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                 Sin registros
               </TableCell>
             </TableRow>
           ) : (
-            creators.map((c, idx) => renderRow(c, idx))
+            sortedCreators.map((c, idx) => renderRow(c, idx))
           )}
         </TableBody>
       </Table>
