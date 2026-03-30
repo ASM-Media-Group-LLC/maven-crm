@@ -205,12 +205,7 @@ export default function FacturacionPage() {
 
   const toggleBulk = (id: string) => setBulkSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const pdfContainerRef = useRef<HTMLDivElement>(null);
-
   const handleDownloadPdf = useCallback(async (inv: any) => {
-    const container = pdfContainerRef.current;
-    if (!container) return;
-
     // Render InvoiceA4Preview off-screen
     const { createRoot } = await import("react-dom/client");
     const { default: InvoiceA4PreviewComp } = await import("./InvoiceA4Preview");
