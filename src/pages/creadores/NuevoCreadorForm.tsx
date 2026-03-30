@@ -83,6 +83,8 @@ interface FormData {
   has_piclink: boolean;
   agency_percentage: number;
   payment_method: string;
+  billing_start_date: string;
+  billing_frequency: string;
   blue_package: boolean;
   blue_package_amount: number;
   main_platform: string;
