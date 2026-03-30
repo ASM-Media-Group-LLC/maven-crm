@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from "react";
-import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone } from "lucide-react";
+import React, { useState, useCallback, useMemo } from "react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";

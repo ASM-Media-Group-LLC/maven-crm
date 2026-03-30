@@ -350,6 +350,7 @@ const LeadGenContent = () => {
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                  profiles={profiles}
                 />
               </DataTableShell>
             )}
