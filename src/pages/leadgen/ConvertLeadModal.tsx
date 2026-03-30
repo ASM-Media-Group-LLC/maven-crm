@@ -29,43 +29,8 @@ const ConvertLeadModal = ({ open, onOpenChange, lead, onConverted }: Props) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
 
-      // Check if a closer_creators row already exists for this lead (auto-synced by trigger)
-      const { data: existing } = await supabase
-        .from("closer_creators")
-        .select("id")
-        .eq("leadgen_entry_id", lead.id)
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing row to "Asignada"
-        const { error: updateError } = await supabase
-          .from("closer_creators")
-          .update({
-            stage: "Asignada",
-            assigned_to: user.id,
-          } as any)
-          .eq("id", existing.id);
-        if (updateError) throw updateError;
-      } else {
-        // Insert new row (fallback for leads created before trigger)
-        const { error: insertError } = await supabase.from("closer_creators").insert({
-          instagram_handle: lead.model_handle,
-          source_account: lead.company || null,
-          category: lead.quality || null,
-          phone: lead.phone_raw || null,
-          onlyfans_url: lead.source_link || null,
-          passed_date: lead.entry_date || new Date().toISOString().slice(0, 10),
-          stage: "Asignada",
-          estimated_monetization: 0,
-          agency_commission: 0,
-          created_by: user.id,
-          assigned_to: user.id,
-          leadgen_entry_id: lead.id,
-        } as any);
-        if (insertError) throw insertError;
-      }
-
-      // Also insert into closers_contacts for traceability
+      // Insert into closers_contacts — the trigger sync_closers_contact_to_creators
+      // will automatically create the closer_creators row if phone is present
       const ticketId = lead.ticket_number || `#LG${lead.id.slice(-7).toUpperCase()}`;
       await supabase.from("closers_contacts").insert({
         name: lead.model_handle,

@@ -35,7 +35,7 @@ const ClosersContent = () => {
     dateFrom, setDateFrom,
     dateTo, setDateTo,
     dateField, setDateField,
-    updateField, updateStage, assignCreator, convertLeadgenEntry,
+    updateField, updateStage, assignCreator,
     isAdmin, isManager,
   } = useCloserLeads();
 
@@ -228,12 +228,8 @@ const ClosersContent = () => {
                 creators={creators}
                 activeTab={activeTab}
                 viewMode={viewMode}
-                onStageChange={(id, stage, source) => {
-                  if (source === "leadgen") {
-                    convertLeadgenEntry.mutate({ leadgenEntryId: id, stage });
-                  } else {
-                    updateStage.mutate({ id, stage });
-                  }
+                onStageChange={(id, stage) => {
+                  updateStage.mutate({ id, stage });
                 }}
                 onFieldChange={(id, field, value) => updateField.mutate({ id, field, value })}
                 onConvertToCreator={handleConvertToCreator}
@@ -255,11 +251,7 @@ const ClosersContent = () => {
         open={assignDialogOpen}
         onOpenChange={setAssignDialogOpen}
         onAssign={(id, assignedTo) => {
-          if (assignTarget?.source === "leadgen") {
-            convertLeadgenEntry.mutate({ leadgenEntryId: id, stage: "Asignada", assigned_to: assignedTo });
-          } else {
-            assignCreator.mutate({ id, assigned_to: assignedTo });
-          }
+          assignCreator.mutate({ id, assigned_to: assignedTo });
           setAssignDialogOpen(false);
         }}
       />
