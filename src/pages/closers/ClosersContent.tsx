@@ -44,6 +44,10 @@ const ClosersContent = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ id: string; assignee: string | null; source: string } | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
 
   const handleConvertToCreator = async (c: CloserCreatorRow) => {
     try {
