@@ -321,7 +321,7 @@ const LeadGenContent = () => {
       <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef}>
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
-          <div className="flex-1 min-h-0 overflow-auto">
+          <div className="flex-1 min-h-0 overflow-auto" onScroll={handleContentScroll}>
             <AgentHourlyPerformance leads={enrichedLeads} />
           </div>
         )}
