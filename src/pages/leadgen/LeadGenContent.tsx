@@ -476,7 +476,12 @@ const LeadGenContent = () => {
           {/* === PERFORMANCE TAB === */}
           {activeTab === "rendimiento" && (
             <div className="flex-1 min-h-0 overflow-auto">
-              <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+              <LeadGenPerformanceView
+                profiles={profiles}
+                agentIds={agentStats.map(a => a.id)}
+                dateFrom={dateFromStr}
+                dateTo={dateToStr}
+              />
             </div>
           )}
         </div>
