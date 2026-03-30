@@ -1,34 +1,41 @@
 
 
-## Plan: Mover stats cards arriba de tabs y filtros en LeadGen y Closers
+## Plan: Scroll interno, paginador y auto-hide en AgentDetailView
 
 ### Problema
-En `/contactos` el orden es: **Stats Cards → Tabs → Filtros → Tabla**. Pero en LeadGen y Closers las stats cards están dentro del área scrollable de la tabla (debajo de tabs y filtros), lo cual rompe la consistencia visual.
+`AgentDetailView` usa un solo `div.overflow-auto` (línea 170) que envuelve todo el contenido (KPI cards, quality cards, tabs, tabla). Esto hace que:
+1. La tabla no tenga scroll interno propio — todo scrollea junto
+2. No hay auto-hide de las stats cards al scrollear la tabla
+3. El `DataTableShell` no tiene altura restringida (`flex-1 min-h-0`) para activar su scroll interno
 
 ### Cambios
 
-#### 1. `LeadGenContent.tsx`
-- Mover el bloque de `LeadGenCantidadCard` (líneas 317-320) desde dentro del div `flex-1 min-h-0` (línea 316) hacia **arriba**, justo después del header y antes del div de tabs (línea ~230)
-- Mantener el wrapper con transición `max-h` para auto-hide
-- El `onScroll` en `DataTableShell` sigue funcionando igual para detectar scroll
+#### 1. Reestructurar layout (`AgentDetailView.tsx`)
+- Cambiar el div `flex-1 overflow-auto` (línea 170) a `flex-1 flex flex-col min-h-0` (sin overflow-auto propio)
+- KPI cards y quality cards: envolverlas en un `shrink-0` con transición `max-h` + `opacity` controlada por `statsCollapsed`
+- Tab bar: `shrink-0`
+- Tab content (leads): cambiar de `div.p-6` a `flex-1 flex flex-col min-h-0 p-6` para que el DataTableShell ocupe el espacio restante
+- El `DataTableShell` ya existe (línea 292) — agregarle `onScroll={handleContentScroll}` y envolverlo en un contenedor `flex-1 min-h-0`
 
-#### 2. `ClosersContent.tsx`
-- Mover el bloque de `ClosersKPICards` (líneas 220-222) desde dentro del div `flex-1 min-h-0` (línea 219) hacia **arriba**, justo antes del div `shrink-0` que contiene TabsList y filtros (línea 105)
-- Mantener wrapper con transición `max-h` para auto-hide
-- `onScroll` en `DataTableShell` sigue igual
+#### 2. Agregar estado y handler de auto-hide
+- `useState(false)` para `statsCollapsed`
+- `handleContentScroll` igual que en LeadGenContent: `scrollTop > 40` → collapse, `scrollTop < 10` → expand
+- Pasar `onScroll` al `DataTableShell`
 
-### Resultado esperado
+#### 3. Ajustar contenedor del DataTableShell
+- Agregar `className="flex-1 min-h-0"` al DataTableShell para que use todo el espacio vertical disponible y active su scroll interno
+
+### Resultado
 ```text
-Header
-├─ Stats Cards (auto-hide on scroll)  ← movidas aquí
-├─ Tabs bar
-├─ Filters bar
-└─ DataTableShell (scrollable)
+Header (shrink-0)
+├─ KPI Cards (shrink-0, auto-hide on scroll)
+├─ Quality Cards (shrink-0, auto-hide on scroll)
+├─ Tab bar (shrink-0)
+└─ Tab content (flex-1 min-h-0)
+   └─ Filters (shrink-0)
+   └─ DataTableShell (flex-1 min-h-0, scroll interno, onScroll → auto-hide)
 ```
 
-Consistente con `/contactos` y `/creadores`.
-
-### Archivos a modificar
-- `src/pages/leadgen/LeadGenContent.tsx`
-- `src/pages/closers/ClosersContent.tsx`
+### Archivo a modificar
+- `src/pages/leadgen/AgentDetailView.tsx`
 
