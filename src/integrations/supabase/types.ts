@@ -1690,6 +1690,7 @@ export type Database = {
           assigned_manager_profile_id: string | null
           assigned_specialist_id: string | null
           assigned_specialist_profile_id: string | null
+          billing_address: string | null
           billing_frequency: string | null
           billing_start_date: string | null
           blue_package: boolean | null
@@ -1723,6 +1724,7 @@ export type Database = {
           assigned_manager_profile_id?: string | null
           assigned_specialist_id?: string | null
           assigned_specialist_profile_id?: string | null
+          billing_address?: string | null
           billing_frequency?: string | null
           billing_start_date?: string | null
           blue_package?: boolean | null
@@ -1756,6 +1758,7 @@ export type Database = {
           assigned_manager_profile_id?: string | null
           assigned_specialist_id?: string | null
           assigned_specialist_profile_id?: string | null
+          billing_address?: string | null
           billing_frequency?: string | null
           billing_start_date?: string | null
           blue_package?: boolean | null

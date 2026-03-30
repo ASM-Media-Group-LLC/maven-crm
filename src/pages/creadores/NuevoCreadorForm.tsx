@@ -129,6 +129,7 @@ const defaultForm: FormData = {
   payment_method: "",
   billing_start_date: "",
   billing_frequency: "",
+  billing_address: "",
   blue_package: false,
   blue_package_amount: 0,
   main_platform: "",
