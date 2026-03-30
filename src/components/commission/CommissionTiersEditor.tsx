@@ -68,7 +68,7 @@ export default function CommissionTiersEditor({
     const newTiers = tiers.filter((_, i) => i !== index);
     // Fix continuity
     for (let i = 1; i < newTiers.length; i++) {
-      newTiers[i] = { ...newTiers[i], min_revenue: newTiers[i - 1].max_revenue ?? newTiers[i].min_revenue };
+      newTiers[i] = { ...newTiers[i], min_revenue: newTiers[i - 1].max_revenue !== null ? newTiers[i - 1].max_revenue + 1 : newTiers[i].min_revenue };
     }
     onTiersChange(newTiers);
     setError(null);
