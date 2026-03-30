@@ -88,6 +88,7 @@ interface FormData {
   payment_method: string;
   billing_start_date: string;
   billing_frequency: string;
+  billing_address: string;
   blue_package: boolean;
   blue_package_amount: number;
   main_platform: string;
