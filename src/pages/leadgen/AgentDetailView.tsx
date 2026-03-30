@@ -333,7 +333,6 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
                     const cat = lead.quality?.toLowerCase() || "c";
-                    const cat = lead.quality?.toLowerCase() || "c";
                     return (
                       <Card key={lead.id}>
                         <CardContent className="p-4">
