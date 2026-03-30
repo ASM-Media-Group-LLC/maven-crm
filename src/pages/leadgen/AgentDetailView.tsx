@@ -48,7 +48,7 @@ const tabs = [
 
 const OBJETIVO_POR_HORA = 20;
 
-const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
+const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: AgentDetailViewProps) => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
