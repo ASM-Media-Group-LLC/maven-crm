@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { ArrowLeft, Plus, UserPlus, Clock, Eye, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Instagram } from "lucide-react";
-import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
+import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp } from "lucide-react";
+import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import LeadGenTable from "./LeadGenTable";
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
