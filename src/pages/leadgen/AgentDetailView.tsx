@@ -310,7 +310,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 onScroll={handleContentScroll}
                 className="flex-1 min-h-0"
               >
-                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
+                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} onView={(lead) => setSelectedLead(lead)} />
               </DataTableShell>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
