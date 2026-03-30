@@ -284,7 +284,20 @@ const InfoTabContent = ({ creator, creatorId }: InfoTabContentProps) => {
         )}
 
         {/* Porcentaje con Agencia (read-only always) */}
-        <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
+        {biz?.commission_type === "tiered" && Array.isArray(biz?.commission_tiers) && (biz.commission_tiers as any[]).length > 0 ? (
+          <div className="py-3 sm:col-span-2">
+            <p className="text-xs text-muted-foreground mb-1">Comisión por Rangos</p>
+            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
+              {(biz.commission_tiers as any[]).map((t: any, i: number) => (
+                <p key={i} className="text-sm">
+                  ${t.min_revenue?.toLocaleString()} – {t.max_revenue != null ? `$${t.max_revenue.toLocaleString()}` : "∞"}: <span className="font-semibold">{t.percentage}%</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <InfoField label="Porcentaje con Agencia" value={biz?.agency_percentage != null ? `${biz.agency_percentage}%` : null} />
+        )}
 
         {/* Whaticket (read-only always) */}
         <InfoField label="Whaticket" value={

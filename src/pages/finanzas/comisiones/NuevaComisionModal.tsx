@@ -66,7 +66,18 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
   }, [open]);
 
   const base = Number(baseAmount) || 0;
-  const agencyPct = creatorBusiness?.agency_percentage ?? 0;
+  const commType = (creatorBusiness as any)?.commission_type ?? "fixed";
+  const commTiers = (creatorBusiness as any)?.commission_tiers as { min_revenue: number; max_revenue: number | null; percentage: number }[] | undefined;
+
+  // Resolve effective percentage
+  let agencyPct = creatorBusiness?.agency_percentage ?? 0;
+  if (commType === "tiered" && Array.isArray(commTiers) && commTiers.length > 0 && base > 0) {
+    const matchedTier = commTiers.find(
+      (t) => base >= t.min_revenue && (t.max_revenue === null || base <= t.max_revenue)
+    );
+    agencyPct = matchedTier?.percentage ?? 0;
+  }
+
   const hasBlue = creatorBusiness?.blue_package === true && (creatorBusiness?.li_payment_amount ?? 0) > 0;
   const blueAmount = hasBlue ? creatorBusiness!.li_payment_amount! : 0;
   const companyValue = base * (agencyPct / 100) + (base > 0 ? blueAmount : 0);

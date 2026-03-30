@@ -519,9 +519,16 @@ const NuevoCreadorForm = () => {
         {/* Seccion 7 - Condiciones Comerciales */}
         <Section icon={<DollarSign className="h-5 w-5" />} title="Condiciones Comerciales">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Porcentaje Agencia (%)">
-              <Input type="number" value={form.agency_percentage} onChange={(e) => set("agency_percentage", Number(e.target.value))} min={0} max={100} />
-            </Field>
+            <div className="md:col-span-2">
+              <CommissionTiersEditor
+                commissionType={form.commission_type}
+                fixedPercentage={form.agency_percentage}
+                tiers={form.commission_tiers}
+                onTypeChange={(t) => set("commission_type", t)}
+                onFixedPercentageChange={(v) => set("agency_percentage", v)}
+                onTiersChange={(t) => set("commission_tiers", t)}
+              />
+            </div>
             <Field label="Método de Pago *" error={errors.payment_method} fieldKey="payment_method">
               <Select value={form.payment_method} onValueChange={(v) => set("payment_method", v)}>
                 <SelectTrigger className={errors.payment_method ? "border-destructive focus-visible:ring-destructive" : ""}><SelectValue placeholder="Seleccionar método" /></SelectTrigger>
