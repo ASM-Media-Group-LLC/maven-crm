@@ -1,40 +1,43 @@
 
 
-## Plan: Corregir sincronización de datos en AgentDetailView
+## Plan: Estandarizar badges de categoría en QA y agregar funcionalidad de QA para supervisores/admins
 
-### Problema raíz
-`AgentDetailView` recibe los leads como prop desde `LeadGenContent` (línea 190):
-```
-leads={enrichedLeads.filter(l => l.lg_user_id === selectedAgent.id)}
-```
-Pero `enrichedLeads` es solo la **página actual** de la consulta paginada (100 registros máximo). Si el agente tiene 500 leads, solo se ven los que caen en la página actual del listado principal. Todas las métricas (KPIs, quality counts, charts, "Total Hoy", "Promedio por Hora") están calculadas sobre datos incompletos.
+### Problemas identificados
 
-Ya existe el hook `useLeadGenAgentLeads` que hace fetch de **todos** los leads del agente sin límite de paginación, pero no se usa en AgentDetailView.
+1. **Badges inconsistentes**: En `AgentDetailView` (tab QA, línea 515), las categorías usan `qualityBadgeColors` con clases hardcoded (`bg-emerald-500 text-white`, etc.) en vez del componente `Badge` con variantes `-soft` estándar (`calidadVariant` de `LeadGenTable`).
 
-Además, el filtro fallback por `company` (línea 79) es incorrecto — mezcla leads de otros agentes que casualmente comparten nombre de empresa.
+2. **Columna QA sin funcionalidad**: En `LeadGenTable` (línea 233), la columna QA siempre muestra "—". No hay forma de que un supervisor/admin haga QA review de un lead desde la tabla principal.
 
-### Cambios en `AgentDetailView.tsx`
+3. **Tab QA en AgentDetailView**: Solo muestra leads con categoría asignada en una tabla pasiva — no permite al supervisor/admin dar feedback o calificar leads.
 
-#### 1. Usar `useLeadGenAgentLeads` en lugar de prop `leads`
-- Importar `useLeadGenAgentLeads` desde `useLeadGen`
-- Llamar al hook con `agent.id` y el rango de fechas seleccionado
-- Eliminar la prop `leads` del componente (o hacerla opcional/ignorarla)
-- Actualizar `AgentDetailViewProps` para no requerir `leads`
+### Cambios
 
-#### 2. Eliminar filtro fallback por `company`
-- Quitar la línea 79 (`l.company?.toLowerCase() === agent.name.toLowerCase()`)
-- El hook ya filtra por `lg_user_id` en el servidor
+#### 1. `AgentDetailView.tsx` — Estandarizar badges en tab QA
+- Eliminar `qualityBadgeColors` (líneas 35-41)
+- Importar `calidadVariant` o replicar el mismo mapeo de variantes `-soft`
+- Reemplazar el `<span className={badgeClass}>` (línea 515) por `<Badge variant={calidadVariant[cat]}>` 
 
-#### 3. Ajustar `LeadGenContent.tsx` línea 186-193
-- Dejar de pasar `leads` como prop (o pasar array vacío para compatibilidad)
-- Pasar `dateFrom`/`dateTo` strings al componente para que el hook funcione correctamente
+#### 2. `LeadGenTable.tsx` — Columna QA funcional (solo supervisor/admin)
+- Importar `useUserRole` y `useCreateQAReview` + `useAuth`
+- En `LeadRow`, si el usuario es supervisor o admin, mostrar un botón/popover en la celda QA que permita:
+  - Seleccionar un rating (Bien / Regular / Mal)
+  - Agregar un comentario opcional
+  - Guardar con `useCreateQAReview`
+- Si el usuario NO es supervisor/admin, mostrar el estado QA existente (check si ya fue revisado) o "—"
+- Si ya tiene QA review, mostrar badge con el rating
 
-### Resultado
-- Las métricas reflejan **todos** los leads del agente, no solo los de la página actual
-- KPIs, quality cards, charts y tabla muestran datos correctos y sincronizados con la DB
-- Sin cambios en la DB, solo corrección del flujo de datos en el frontend
+#### 3. `LeadGenTable.tsx` — Mostrar estado QA de leads
+- Usar `useLeadGenQA` para fetch QA reviews de los leads visibles
+- Mostrar badge con el rating si ya fue revisado
+- Si no ha sido revisado y el user es supervisor/admin, mostrar botón "Revisar"
+
+#### 4. `AgentDetailView.tsx` — Tab QA con funcionalidad de review
+- Agregar botón de acción en cada fila del tab QA para que supervisor/admin pueda:
+  - Dar feedback (rating + comentario) usando `useCreateQAReview`
+  - Modificar la categoría del lead
+- Usar `useUserRole` para condicionar la visibilidad de estas acciones
 
 ### Archivos a modificar
-- `src/pages/leadgen/AgentDetailView.tsx` — usar hook propio, quitar dependencia de prop leads
-- `src/pages/leadgen/LeadGenContent.tsx` — actualizar props pasadas a AgentDetailView
+- `src/pages/leadgen/LeadGenTable.tsx` — badges QA, celda QA funcional con popover de review
+- `src/pages/leadgen/AgentDetailView.tsx` — badges estandarizados, acciones de QA en tab
 
