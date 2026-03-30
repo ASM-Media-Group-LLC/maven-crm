@@ -1695,6 +1695,8 @@ export type Database = {
           blue_package: boolean | null
           closer_responsible_id: string | null
           closer_responsible_profile_id: string | null
+          commission_tiers: Json | null
+          commission_type: string | null
           created_at: string | null
           creator_id: string
           has_piclink: boolean | null
@@ -1726,6 +1728,8 @@ export type Database = {
           blue_package?: boolean | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          commission_tiers?: Json | null
+          commission_type?: string | null
           created_at?: string | null
           creator_id: string
           has_piclink?: boolean | null
@@ -1757,6 +1761,8 @@ export type Database = {
           blue_package?: boolean | null
           closer_responsible_id?: string | null
           closer_responsible_profile_id?: string | null
+          commission_tiers?: Json | null
+          commission_type?: string | null
           created_at?: string | null
           creator_id?: string
           has_piclink?: boolean | null
