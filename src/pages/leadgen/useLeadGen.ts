@@ -290,9 +290,9 @@ export const useLeadGenAgentStats = (dateFrom?: string, dateTo?: string) =>
   });
 
 /** Fetch summary stats across ALL leads in a date range (no pagination limit) */
-export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string) =>
+export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string, userId?: string) =>
   useQuery({
-    queryKey: ["leadgen-summary-stats", dateFrom, dateTo],
+    queryKey: ["leadgen-summary-stats", dateFrom, dateTo, userId],
     queryFn: async () => {
       const baseQuery = () => {
         let q = supabase
@@ -300,6 +300,9 @@ export const useLeadGenSummaryStats = (dateFrom?: string, dateTo?: string) =>
           .select("quality, phone_raw, phone_e164");
         if (dateFrom && dateTo) {
           q = q.gte("entry_date", dateFrom).lte("entry_date", dateTo);
+        }
+        if (userId) {
+          q = q.eq("lg_user_id", userId);
         }
         return q;
       };
