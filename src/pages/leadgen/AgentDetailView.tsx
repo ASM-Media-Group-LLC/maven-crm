@@ -291,21 +291,23 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 Leads Encontrados: <span className="font-semibold text-foreground">{filteredLeads.length}</span>
               </p>
 
-              {filteredLeads.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
-                </div>
-              ) : viewMode === "list" ? (
-                <DataTableShell
-                  currentPage={detailPage}
-                  totalPages={Math.ceil(filteredLeads.length / 100)}
-                  totalCount={filteredLeads.length}
-                  pageSize={100}
-                  onPageChange={setDetailPage}
-                >
-                  <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
-                </DataTableShell>
+            {filteredLeads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
+              </div>
+            ) : viewMode === "list" ? (
+              <DataTableShell
+                currentPage={detailPage}
+                totalPages={Math.ceil(filteredLeads.length / 100)}
+                totalCount={filteredLeads.length}
+                pageSize={100}
+                onPageChange={setDetailPage}
+                onScroll={handleContentScroll}
+                className="flex-1 min-h-0"
+              >
+                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
+              </DataTableShell>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
