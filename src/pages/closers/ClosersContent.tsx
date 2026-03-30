@@ -220,7 +220,7 @@ const ClosersContent = () => {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
+          <div className="flex-1 min-h-0 flex flex-col px-6 py-4 overflow-auto" onScroll={handleContentScroll}>
             <DataTableShell
               className="flex-1 min-h-0"
               currentPage={page + 1}
