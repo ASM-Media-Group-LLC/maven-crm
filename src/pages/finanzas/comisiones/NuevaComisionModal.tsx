@@ -47,7 +47,7 @@ export default function NuevaComisionModal({ open, onClose, onSubmit, isPending 
     queryFn: async () => {
       const { data } = await supabase
         .from("creator_business")
-        .select("agency_percentage, blue_package, li_payment_amount")
+        .select("agency_percentage, blue_package, li_payment_amount, commission_type, commission_tiers")
         .eq("creator_id", creatorId)
         .maybeSingle();
       return data;
