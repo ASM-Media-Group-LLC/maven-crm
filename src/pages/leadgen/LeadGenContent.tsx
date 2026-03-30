@@ -63,6 +63,7 @@ const LeadGenContent = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(0);
+  const [agentPage, setAgentPage] = useState(1);
 
   const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined;
   const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : undefined;

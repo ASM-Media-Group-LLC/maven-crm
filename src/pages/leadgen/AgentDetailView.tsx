@@ -51,6 +51,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [filterCalidad, setFilterCalidad] = useState("");
   
   const [filterContacto, setFilterContacto] = useState("");
+  const [detailPage, setDetailPage] = useState(1);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(new Date());
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
   const [now, setNow] = useState(new Date());
