@@ -1,31 +1,30 @@
 
 
-## Plan: Limpiar closer_creators — conservar solo los que tienen teléfono
+## Plan: Agregar ordenamiento por columnas en Closers + verificar sincronización Contactos → Closers
 
-### Hallazgos
+### Parte 1: Ordenamiento por columnas en LeadTable (Closers)
 
-De los 483 registros en `closer_creators`:
-- **428** con stage "Nuevo" **tienen teléfono** → se conservan
-- **52** con stage "Nuevo" **no tienen teléfono** (vienen del viejo flujo directo de LeadGen) → se eliminan
-- **3** en otros stages (2 Completada, 1 Asignada) → se conservan
+**Problema**: Los encabezados de las tablas en `/closers` son texto plano sin capacidad de ordenamiento. En `/contactos` cada columna tiene un botón `SortHeader` con icono `ArrowUpDown` que permite ordenar ascendente/descendente.
 
-### Cambios
+**Solución**: Agregar el mismo patrón de ordenamiento que usa `ContactosTable` a `LeadTable.tsx`.
 
-#### 1. Migración SQL — Eliminar registros sin teléfono
-```sql
-DELETE FROM closer_creators
-WHERE (phone IS NULL OR trim(phone) = '')
-  AND stage = 'Nuevo';
-```
-Esto elimina los 52 registros que entraron directamente desde LeadGen sin pasar por `/contactos`.
+**Cambios en `src/pages/closers/components/LeadTable.tsx`**:
 
-#### 2. No se requieren cambios de código
-El trigger `sync_closers_contact_to_creators` ya valida que el contacto tenga teléfono antes de sincronizar, por lo que esto no volverá a ocurrir.
+1. Agregar estado de sorting: `sortKey` y `sortAsc` al componente `CloserTable`
+2. Crear componente `SortHeader` igual al de ContactosTable (botón ghost con `ArrowUpDown`)
+3. Reemplazar los `TableHead` planos por `SortHeader` en los headers de cada pestaña (todas, nuevo, asignadas, confirmadas, completadas, no_interesadas)
+4. Ordenar `creators` con `useMemo` según `sortKey`/`sortAsc` antes de renderizar
+5. Columnas ordenables: Creación, Instagram, Estado, Cuenta origen, Categoría, Agente, Teléfono, Monetización, Comisión
 
-### Resultado
-- De ~483 registros → ~431 registros legítimos con teléfono
-- Solo contactos que pasaron por `/contactos` con teléfono validado
+### Parte 2: Verificar sincronización Contactos → Closers
+
+Revisar con una consulta a la BD que:
+- Los contactos con teléfono en `closers_contacts` tengan su correspondiente registro en `closer_creators` via `source_contact_id`
+- No existan duplicados (mismo handle apareciendo más de una vez)
+- Los datos (handle, phone, category) estén sincronizados entre ambas tablas
+
+Esto se hace vía consulta SQL de verificación. Si hay inconsistencias, se corrigen con una migración de datos.
 
 ### Archivos a modificar
-- Una migración SQL (DELETE)
+- `src/pages/closers/components/LeadTable.tsx` — agregar sorting a todas las pestañas
 
