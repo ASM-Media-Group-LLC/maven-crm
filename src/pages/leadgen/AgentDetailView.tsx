@@ -335,10 +335,10 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   })}
                 </div>
               )}
-            </div>
-          )}
+          </div>
+        )}
 
-          {activeTab === "rendimiento" && (() => {
+        {activeTab === "rendimiento" && (() => {
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
               return {
@@ -369,7 +369,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             const avgPerDay = (agentLeads.length / daysWithActivity).toFixed(1);
 
             return (
-              <div className="space-y-6">
+              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6">
                 <Card>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
@@ -456,15 +456,14 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             );
           })()}
 
-          {activeTab === "qa" && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
+        {activeTab === "qa" && (
+          <div className="flex-1 flex flex-col items-center justify-center py-20">
+            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <FileText className="h-8 w-8 text-muted-foreground/50" />
             </div>
-          )}
-        </div>
+            <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
+          </div>
+        )
       </div>
     </main>
   );
