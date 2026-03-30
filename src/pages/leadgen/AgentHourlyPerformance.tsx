@@ -131,37 +131,52 @@ const AgentHourlyPerformance = ({ leads }: AgentHourlyPerformanceProps) => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-t-[3px] border-t-primary">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Última Hora</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Última Hora</p>
+                <div className="h-8 w-8 rounded-md bg-primary/20 flex items-center justify-center text-primary">
+                  <Clock className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
             </div>
-            <p className="text-3xl font-bold text-primary">{lastHourLeads.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-accent">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Total Hoy</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Hoy</p>
+                <div className="h-8 w-8 rounded-md bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                  <Target className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-emerald-500">{todayLeads.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
             </div>
-            <p className="text-3xl font-bold text-primary">{todayLeads.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">Modelos contactados</p>
           </CardContent>
         </Card>
-        <Card className="border-t-[3px] border-t-accent">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Promedio por Hora</p>
+        <Card className="group transition-all duration-300 hover:scale-[1.03] hover:shadow-lg overflow-hidden border-none bg-card/50">
+          <CardContent className="p-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Promedio por Hora</p>
+                <div className="h-8 w-8 rounded-md bg-violet-500/20 flex items-center justify-center text-violet-500">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-violet-500">{avgPerHour}</p>
+              <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
+              <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
+                Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
+              </p>
             </div>
-            <p className="text-3xl font-bold text-primary">{avgPerHour}</p>
-            <p className="text-xs text-muted-foreground mt-1">Objetivo: {OBJETIVO_POR_HORA}/hora</p>
-            <p className={`text-xs font-semibold mt-0.5 ${diferencia >= 0 ? "text-emerald-400" : "text-destructive"}`}>
-              Esperados: {esperados} | {diferencia >= 0 ? `+${diferencia}` : diferencia}
-            </p>
           </CardContent>
         </Card>
       </div>
