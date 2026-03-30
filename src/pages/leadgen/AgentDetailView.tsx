@@ -276,77 +276,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   <p className="text-muted-foreground text-sm">No hay leads para este agente con estos filtros</p>
                 </div>
               ) : viewMode === "list" ? (
-                <Card>
-                  <CardContent className="pt-4 px-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Ticket</TableHead>
-                          <TableHead className="text-xs">Handle</TableHead>
-                          <TableHead className="text-xs">Categoría</TableHead>
-                          
-                          <TableHead className="text-xs">País</TableHead>
-                          <TableHead className="text-xs">Fecha</TableHead>
-                          <TableHead className="text-xs text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredLeads.map((lead) => {
-                          const cat = lead.quality?.toLowerCase() || "c";
-                          const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
-                          return (
-                            <TableRow key={lead.id}>
-                              <TableCell>
-                                <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                  #{lead.ticket_number || "—"}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <Instagram className="h-3.5 w-3.5 text-pink-500" />
-                                  <a
-                                    href={lead.source_link || `https://instagram.com/${lead.model_handle}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm font-medium text-primary hover:underline"
-                                  >
-                                    @Ver
-                                  </a>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
-                                  {lead.quality?.toUpperCase()}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-sm">{lead.country_code || "—"}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {format(new Date(lead.created_at), "d MMM", { locale: es })}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><Eye className="h-4 w-4" /></Button>
-                                  <Select defaultValue={cat}>
-                                    <SelectTrigger className="h-7 w-16 text-xs font-semibold">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="a+">A+</SelectItem>
-                                      <SelectItem value="a">A</SelectItem>
-                                      <SelectItem value="b+">B+</SelectItem>
-                                      <SelectItem value="b">B</SelectItem>
-                                      <SelectItem value="c">C</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <LeadGenTable leads={filteredLeads} />
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredLeads.map((lead) => {
@@ -358,7 +288,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs font-mono text-muted-foreground">#{lead.ticket_number || "—"}</span>
-                              <Instagram className="h-3.5 w-3.5 text-pink-500" />
                               <p className="font-medium text-sm truncate">@{lead.model_handle}</p>
                             </div>
                             <span className={`inline-flex items-center justify-center h-6 w-8 rounded-full text-xs font-bold ${badgeClass}`}>
@@ -375,9 +304,6 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                   })}
                 </div>
               )}
-            </div>
-          )}
-
           {activeTab === "rendimiento" && (() => {
             const dailyData = Array.from({ length: 7 }, (_, i) => {
               const day = subDays(now, 6 - i);
