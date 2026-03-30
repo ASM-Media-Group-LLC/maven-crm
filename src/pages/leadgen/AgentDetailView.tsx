@@ -66,6 +66,13 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
   const [statsCollapsed, setStatsCollapsed] = useState(false);
   const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
   const [qaPage, setQaPage] = useState(1);
+  const [qaRating, setQaRating] = useState<Record<string, string>>({});
+  const [qaComment, setQaComment] = useState<Record<string, string>>({});
+  const [qaOpenId, setQaOpenId] = useState<string | null>(null);
+  const { isAdmin, isSupervisor } = useUserRole();
+  const { user } = useAuth();
+  const canReview = isAdmin || isSupervisor;
+  const createQA = useCreateQAReview();
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
