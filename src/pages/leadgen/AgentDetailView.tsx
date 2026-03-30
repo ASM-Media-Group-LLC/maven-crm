@@ -49,6 +49,13 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+
+  const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    if (scrollTop > 40) setStatsCollapsed(true);
+    else if (scrollTop < 10) setStatsCollapsed(false);
+  };
   
   const [filterContacto, setFilterContacto] = useState("");
   const [detailPage, setDetailPage] = useState(1);
