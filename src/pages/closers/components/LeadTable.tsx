@@ -364,9 +364,50 @@ const PhoneWhatsApp = ({ phone }: { phone: string | null }) => {
   );
 };
 
+// ─── SortHeader ───
+const SortHeader = ({ label, sortKey: key, currentKey, asc, onSort, className = "" }: {
+  label: string; sortKey: string; currentKey: string | null; asc: boolean;
+  onSort: (key: string) => void; className?: string;
+}) => (
+  <TableHead className={`sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] ${className}`}>
+    <Button variant="ghost" size="sm" className="h-7 -ml-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+      onClick={() => onSort(key)}>
+      {label}
+      <ArrowUpDown className={`ml-1 h-3 w-3 ${currentKey === key ? "text-foreground" : "text-muted-foreground/50"}`} />
+    </Button>
+  </TableHead>
+);
+
 const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChange, onAssign, onConvertToCreator, isAdmin, sourceAccounts, platformSalesByCreator }: Props) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [platformModalId, setPlatformModalId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = useCallback((key: string) => {
+    if (sortKey === key) {
+      setSortAsc((prev) => !prev);
+    } else {
+      setSortKey(key);
+      setSortAsc(true);
+    }
+  }, [sortKey]);
+
+  const sortedCreators = useMemo(() => {
+    if (!sortKey) return creators;
+    return [...creators].sort((a, b) => {
+      let aVal: any = (a as any)[sortKey];
+      let bVal: any = (b as any)[sortKey];
+      if (aVal == null) aVal = "";
+      if (bVal == null) bVal = "";
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortAsc ? aVal - bVal : bVal - aVal;
+      }
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      return sortAsc ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+  }, [creators, sortKey, sortAsc]);
 
   const completadasTotals = activeTab === "completadas" ? creators.reduce(
     (acc, c) => {
