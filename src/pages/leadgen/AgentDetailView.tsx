@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import DataTableShell from "@/components/ui/data-table-shell";
-import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight, Eye } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
 import type { LeadGenEntry } from "./useLeadGen";
@@ -50,6 +52,8 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCalidad, setFilterCalidad] = useState("");
   const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<LeadGenEntry | null>(null);
+  const [qaPage, setQaPage] = useState(1);
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const scrollTop = e.currentTarget.scrollTop;
@@ -306,7 +310,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
                 onScroll={handleContentScroll}
                 className="flex-1 min-h-0"
               >
-                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} />
+                <LeadGenTable leads={filteredLeads.slice((detailPage - 1) * 100, detailPage * 100)} onView={(lead) => setSelectedLead(lead)} />
               </DataTableShell>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -369,7 +373,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             const avgPerDay = (agentLeads.length / daysWithActivity).toFixed(1);
 
             return (
-              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6">
+              <div className="flex-1 overflow-auto px-6 pb-6 pt-4 space-y-6" onScroll={handleContentScroll}>
                 <Card>
                   <CardContent className="p-5">
                     <div className="flex items-center gap-2 mb-4">
@@ -456,15 +460,124 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             );
           })()}
 
-        {activeTab === "qa" && (
-          <div className="flex-1 flex flex-col items-center justify-center py-20">
-            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-              <FileText className="h-8 w-8 text-muted-foreground/50" />
+        {activeTab === "qa" && (() => {
+          const qaLeads = agentLeads.filter(l => l.quality);
+          const pagedQaLeads = qaLeads.slice((qaPage - 1) * 50, qaPage * 50);
+          return (
+            <div className="flex-1 flex flex-col min-h-0 px-6 pb-6 pt-4 gap-4">
+              <p className="text-sm text-muted-foreground">
+                Leads con categoría asignada: <span className="font-semibold text-foreground">{qaLeads.length}</span>
+              </p>
+              {qaLeads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground text-sm">No hay leads con categoría asignada</p>
+                </div>
+              ) : (
+                <DataTableShell
+                  currentPage={qaPage}
+                  totalPages={Math.ceil(qaLeads.length / 50)}
+                  totalCount={qaLeads.length}
+                  pageSize={50}
+                  onPageChange={setQaPage}
+                  onScroll={handleContentScroll}
+                  className="flex-1 min-h-0"
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Fecha</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Handle</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Categoría</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">País</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Notas</TableHead>
+                        <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedQaLeads.map((lead) => {
+                        const cat = lead.quality?.toLowerCase() || "c";
+                        const badgeClass = qualityBadgeColors[cat] || qualityBadgeColors["c"];
+                        return (
+                          <TableRow key={lead.id}>
+                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {format(new Date(lead.created_at), "dd/MM/yyyy", { locale: es })}
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">@{lead.model_handle}</TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center justify-center h-6 px-2 rounded-full text-xs font-bold ${badgeClass}`}>
+                                {lead.quality?.toUpperCase()}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{lead.country_code || "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{lead.notes || "—"}</TableCell>
+                            <TableCell className="w-[80px]">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedLead(lead)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </DataTableShell>
+              )}
             </div>
-            <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
-          </div>
-        )}
+          );
+        })()}
       </div>
+
+      {/* Lead Detail Dialog */}
+      <Dialog open={!!selectedLead} onOpenChange={(open) => { if (!open) setSelectedLead(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalle del Lead</DialogTitle>
+          </DialogHeader>
+          {selectedLead && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Handle</p>
+                  <p className="text-sm font-medium">@{selectedLead.model_handle}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Ticket</p>
+                  <p className="text-sm font-medium">#{selectedLead.ticket_number || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Categoría</p>
+                  <p className="text-sm font-medium">{selectedLead.quality?.toUpperCase() || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">País</p>
+                  <p className="text-sm font-medium">{selectedLead.country_code || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <p className="text-sm font-medium">{selectedLead.phone_e164 || selectedLead.phone_raw || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Fecha</p>
+                  <p className="text-sm font-medium">{format(new Date(selectedLead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}</p>
+                </div>
+              </div>
+              {selectedLead.notes && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Notas</p>
+                  <p className="text-sm bg-muted/50 rounded-md p-3">{selectedLead.notes}</p>
+                </div>
+              )}
+              {selectedLead.company && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Agente</p>
+                  <p className="text-sm font-medium">{selectedLead.company}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
