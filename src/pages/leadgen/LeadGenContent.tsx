@@ -159,13 +159,15 @@ const LeadGenContent = () => {
   const { data: agentStatsRaw } = useLeadGenAgentStats(dateFromStr, dateToStr);
   const agentStats = useMemo(() => {
     if (!agentStatsRaw) return [];
-    return Object.entries(agentStatsRaw).map(([agentId, stats]) => ({
-      id: agentId,
-      name: profilesMap[agentId] || "Agente",
-      total: stats.total,
-      byQuality: stats.byQuality,
-      firstLead: stats.firstLead,
-    })).sort((a, b) => b.total - a.total);
+    return Object.entries(agentStatsRaw)
+      .filter(([agentId]) => !!profilesMap[agentId])
+      .map(([agentId, stats]) => ({
+        id: agentId,
+        name: profilesMap[agentId] || "Agente",
+        total: stats.total,
+        byQuality: stats.byQuality,
+        firstLead: stats.firstLead,
+      })).sort((a, b) => b.total - a.total);
   }, [agentStatsRaw, profilesMap]);
 
   const handleDateApply = useCallback((from: Date | undefined, to: Date | undefined) => {
@@ -348,6 +350,7 @@ const LeadGenContent = () => {
                 <LeadGenTable
                   leads={filteredLeads}
                   onView={lead => { setSelectedLead(lead); setViewLeadOpen(true); }}
+                  profiles={profiles}
                 />
               </DataTableShell>
             )}

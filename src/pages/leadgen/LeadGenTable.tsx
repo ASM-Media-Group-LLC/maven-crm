@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from "react";
-import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone } from "lucide-react";
+import React, { useState, useCallback, useMemo } from "react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import XIcon from "@/components/icons/XIcon";
@@ -53,6 +54,7 @@ interface Props {
   leads: LeadGenEntry[];
   onView?: (lead: LeadGenEntry) => void;
   onEdit?: (lead: LeadGenEntry) => void;
+  profiles?: { id: string; full_name: string | null }[];
 }
 
 // Inline quality editor
@@ -144,62 +146,101 @@ const buildProfileUrl = (entry: LeadGenEntry) => {
   return `https://${entry.model_handle}`;
 };
 
-// Memoized row
-const LeadRow = React.memo(({ lead, onView }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void }) => (
-  <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
-    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-      {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
-    </TableCell>
-    <TableCell>
-      <Badge variant="outline" className="font-mono text-xs">
-        {getTicketId(lead)}
-      </Badge>
-    </TableCell>
-    <TableCell>
-      <a
-        href={buildProfileUrl(lead)}
-        target="_blank"
-        rel="noopener noreferrer"
+// Inline agent reassignment for orphan leads
+const AgentReassignCell = React.memo(({ lead, profiles }: { lead: LeadGenEntry; profiles: { id: string; full_name: string | null }[] }) => {
+  const updateField = useUpdateLeadField();
+
+  return (
+    <Select
+      onValueChange={(val) => {
+        updateField.mutate({ id: lead.id, field: "lg_user_id", value: val });
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-[140px] text-xs border-dashed border-warning text-warning"
         onClick={(e) => e.stopPropagation()}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        {getPlatformIcon(lead.platform)}
-        <span className="truncate max-w-[140px]">@{lead.model_handle}</span>
-        <ExternalLink className="h-3 w-3" />
-      </a>
-    </TableCell>
-    <TableCell className="text-sm text-muted-foreground">{lead.agent_name || "—"}</TableCell>
-    <TableCell onClick={(e) => e.stopPropagation()}>
-      <InlineSourceCell lead={lead} />
-    </TableCell>
-    <TableCell><QualityCell lead={lead} /></TableCell>
-    <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
-    <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
-      {lead.phone_raw ? (
+        <UserPlus className="h-3 w-3 mr-1" />
+        <SelectValue placeholder="Vincular agente" />
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {profiles.map((p) => (
+          <SelectItem key={p.id} value={p.id} className="text-xs">
+            {p.full_name || "Sin nombre"}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+});
+AgentReassignCell.displayName = "AgentReassignCell";
+
+// Memoized row
+const LeadRow = React.memo(({ lead, onView, profiles }: { lead: LeadGenEntry; onView?: (lead: LeadGenEntry) => void; profiles?: { id: string; full_name: string | null }[] }) => {
+  const isOrphan = lead.agent_name === "—" && profiles && profiles.length > 0;
+
+  return (
+    <TableRow className="cursor-pointer" onClick={() => onView?.(lead)}>
+      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+        {format(new Date(lead.created_at), "dd/MM/yyyy hh:mm a", { locale: es })}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="font-mono text-xs">
+          {getTicketId(lead)}
+        </Badge>
+      </TableCell>
+      <TableCell>
         <a
-          href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_e164 || lead.phone_raw)}`}
+          href={buildProfileUrl(lead)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-primary hover:underline"
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
-          <Phone className="h-3 w-3" />
-          <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
+          {getPlatformIcon(lead.platform)}
+          <span className="truncate max-w-[140px]">@{lead.model_handle}</span>
+          <ExternalLink className="h-3 w-3" />
         </a>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      )}
-    </TableCell>
-    <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
-    <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
-        <Eye className="h-4 w-4" />
-      </Button>
-    </TableCell>
-  </TableRow>
-));
+      </TableCell>
+      <TableCell className="text-sm text-muted-foreground" onClick={(e) => isOrphan && e.stopPropagation()}>
+        {isOrphan ? (
+          <AgentReassignCell lead={lead} profiles={profiles!} />
+        ) : (
+          lead.agent_name || "—"
+        )}
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <InlineSourceCell lead={lead} />
+      </TableCell>
+      <TableCell><QualityCell lead={lead} /></TableCell>
+      <TableCell className="text-center text-lg">{countryToFlag(lead.country_code)}</TableCell>
+      <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}>
+        {lead.phone_raw ? (
+          <a
+            href={`https://wa.me/${cleanPhoneForWhatsApp(lead.phone_e164 || lead.phone_raw)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-primary hover:underline"
+          >
+            <Phone className="h-3 w-3" />
+            <span className="truncate max-w-[100px]">{lead.phone_raw}</span>
+          </a>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
+      <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView?.(lead)}>
+          <Eye className="h-4 w-4" />
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+});
 LeadRow.displayName = "LeadRow";
 
-const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
+const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -255,7 +296,7 @@ const LeadGenTable = ({ leads, onView, onEdit }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onView={onView} />
+          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} />
         ))}
         {sorted.length === 0 && (
           <TableRow>
