@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Eye, ChevronDown, Phone, UserPlus, CheckCircle2, ClipboardCheck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
@@ -15,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { useUpdateLeadQuality, useUpdateLeadField } from "./useLeadGen";
+import { useUpdateLeadQuality, useUpdateLeadField, useLeadGenQA, useCreateQAReview } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/hooks/useAuth";
 
 const QUALITY_OPTIONS = ["a+", "a", "b+", "b", "c"] as const;
 
