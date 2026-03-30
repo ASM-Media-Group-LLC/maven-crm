@@ -12,7 +12,13 @@ interface InvoiceData {
   notes?: string;
   status?: string;
   created_at?: string;
-  creators?: { name?: string; artistic_name?: string };
+  creators?: {
+    id?: string;
+    name?: string;
+    artistic_name?: string;
+    phone?: string;
+    creator_business?: { billing_address?: string | null }[] | { billing_address?: string | null } | null;
+  };
 }
 
 function fmt(n: number) {
