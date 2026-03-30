@@ -1,17 +1,40 @@
 
 
-## Plan: Agregar auto-hide de stats cards en tabs leads-hora y rendimiento
+## Plan: Corregir sincronización de datos en AgentDetailView
 
-### Problema
-Solo el tab "leads" (DataTableShell) pasa `onScroll={handleContentScroll}`. Los tabs "leads-hora" y "rendimiento" usan `<div className="flex-1 min-h-0 overflow-auto">` sin `onScroll`, por lo que las stats cards nunca se ocultan al scrollear en esos tabs.
+### Problema raíz
+`AgentDetailView` recibe los leads como prop desde `LeadGenContent` (línea 190):
+```
+leads={enrichedLeads.filter(l => l.lg_user_id === selectedAgent.id)}
+```
+Pero `enrichedLeads` es solo la **página actual** de la consulta paginada (100 registros máximo). Si el agente tiene 500 leads, solo se ven los que caen en la página actual del listado principal. Todas las métricas (KPIs, quality counts, charts, "Total Hoy", "Promedio por Hora") están calculadas sobre datos incompletos.
 
-### Cambios en `LeadGenContent.tsx`
+Ya existe el hook `useLeadGenAgentLeads` que hace fetch de **todos** los leads del agente sin límite de paginación, pero no se usa en AgentDetailView.
 
-1. **Tab "leads-hora"** (línea 324): agregar `onScroll={handleContentScroll}` al div wrapper
-2. **Tab "rendimiento"** (línea 488): agregar `onScroll={handleContentScroll}` al div wrapper
+Además, el filtro fallback por `company` (línea 79) es incorrecto — mezcla leads de otros agentes que casualmente comparten nombre de empresa.
 
-Cambio mínimo — solo agregar el handler a los 2 divs existentes.
+### Cambios en `AgentDetailView.tsx`
 
-### Archivo a modificar
-- `src/pages/leadgen/LeadGenContent.tsx` — líneas 324 y 488
+#### 1. Usar `useLeadGenAgentLeads` en lugar de prop `leads`
+- Importar `useLeadGenAgentLeads` desde `useLeadGen`
+- Llamar al hook con `agent.id` y el rango de fechas seleccionado
+- Eliminar la prop `leads` del componente (o hacerla opcional/ignorarla)
+- Actualizar `AgentDetailViewProps` para no requerir `leads`
+
+#### 2. Eliminar filtro fallback por `company`
+- Quitar la línea 79 (`l.company?.toLowerCase() === agent.name.toLowerCase()`)
+- El hook ya filtra por `lg_user_id` en el servidor
+
+#### 3. Ajustar `LeadGenContent.tsx` línea 186-193
+- Dejar de pasar `leads` como prop (o pasar array vacío para compatibilidad)
+- Pasar `dateFrom`/`dateTo` strings al componente para que el hook funcione correctamente
+
+### Resultado
+- Las métricas reflejan **todos** los leads del agente, no solo los de la página actual
+- KPIs, quality cards, charts y tabla muestran datos correctos y sincronizados con la DB
+- Sin cambios en la DB, solo corrección del flujo de datos en el frontend
+
+### Archivos a modificar
+- `src/pages/leadgen/AgentDetailView.tsx` — usar hook propio, quitar dependencia de prop leads
+- `src/pages/leadgen/LeadGenContent.tsx` — actualizar props pasadas a AgentDetailView
 
