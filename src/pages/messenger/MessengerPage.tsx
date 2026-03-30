@@ -246,6 +246,15 @@ export default function MessengerPage() {
       )}
 
       <NewChatModal
+        open={newChatOpen}
+        onClose={() => setNewChatOpen(false)}
+        profiles={profiles}
+        onSelectUser={(userId) => { handleSelectUser(userId); setNewChatOpen(false); }}
+        isOnlineFn={isOnline}
+        getStatusFn={getStatus}
+      />
+
+      <NewChatModal
         open={newGroupOpen}
         onClose={() => setNewGroupOpen(false)}
         profiles={profiles}
