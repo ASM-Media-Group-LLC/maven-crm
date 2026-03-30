@@ -1,3 +1,5 @@
+import { Star, TrendingUp, ArrowUpRight, ArrowRight, ArrowDownRight, Users, PhoneCall } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface ActiveFilter {
@@ -18,11 +20,11 @@ interface Props {
 }
 
 const categoryConfig = [
-  { key: "a+", label: "A+", activeClass: "bg-primary/15 border-primary text-primary", hoverClass: "hover:bg-primary/10 hover:border-primary/40 hover:scale-[1.03] hover:shadow-sm" },
-  { key: "a",  label: "A",  activeClass: "bg-success/15 border-success text-success",   hoverClass: "hover:bg-success/10 hover:border-success/40 hover:scale-[1.03] hover:shadow-sm" },
-  { key: "b+", label: "B+", activeClass: "bg-warning/15 border-warning text-warning",   hoverClass: "hover:bg-warning/10 hover:border-warning/40 hover:scale-[1.03] hover:shadow-sm" },
-  { key: "b",  label: "B",  activeClass: "bg-warning/10 border-warning/50 text-warning/80", hoverClass: "hover:bg-warning/8 hover:border-warning/30 hover:scale-[1.03] hover:shadow-sm" },
-  { key: "c",  label: "C",  activeClass: "bg-muted border-muted-foreground/50 text-muted-foreground", hoverClass: "hover:bg-muted-foreground/10 hover:border-muted-foreground/40 hover:scale-[1.03] hover:shadow-sm" },
+  { key: "a+", label: "A+", icon: Star, colorClass: "text-primary", bgClass: "bg-primary/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40", activeClass: "border-primary bg-primary/10" },
+  { key: "a", label: "A", icon: TrendingUp, colorClass: "text-success", bgClass: "bg-success/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-success/15 hover:to-transparent hover:border-success/40", activeClass: "border-success bg-success/10" },
+  { key: "b+", label: "B+", icon: ArrowUpRight, colorClass: "text-warning", bgClass: "bg-warning/20", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/15 hover:to-transparent hover:border-warning/40", activeClass: "border-warning bg-warning/10" },
+  { key: "b", label: "B", icon: ArrowRight, colorClass: "text-warning/80", bgClass: "bg-warning/15", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-warning/10 hover:to-transparent hover:border-warning/30", activeClass: "border-warning/60 bg-warning/8" },
+  { key: "c", label: "C", icon: ArrowDownRight, colorClass: "text-muted-foreground", bgClass: "bg-muted", hoverClass: "hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20", activeClass: "border-muted-foreground/50 bg-muted" },
 ];
 
 const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => {
@@ -41,45 +43,58 @@ const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => 
     activeFilter?.type === "categoria" && activeFilter.value === key;
 
   return (
-    <div className="flex items-stretch gap-2">
-      {/* Category cards */}
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
       {categoryConfig.map((cat) => {
         const count = byQuality[cat.key] ?? 0;
-        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
         const active = isActive(cat.key);
+        const Icon = cat.icon;
         return (
-          <button
+          <Card
             key={cat.key}
             onClick={() => handleClick(cat.key)}
             className={cn(
-              "flex flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-all duration-200 cursor-pointer min-w-[64px]",
-              active
-                ? cat.activeClass
-                : cn("border-border bg-card text-foreground", cat.hoverClass)
+              "cursor-pointer transition-all duration-200",
+              active ? cat.activeClass : cat.hoverClass
             )}
           >
-            <span className={cn("text-[10px] font-bold uppercase tracking-wide", active ? "" : "text-muted-foreground")}>
-              {cat.label}
-            </span>
-            <span className="text-lg font-bold tabular-nums leading-none">{count}</span>
-            <span className={cn("text-[10px] tabular-nums", active ? "opacity-80" : "text-muted-foreground")}>
-              {pct}%
-            </span>
-          </button>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-muted-foreground">Cat. {cat.label}</p>
+                <div className={cn("flex h-8 w-8 items-center justify-center rounded-md", cat.bgClass)}>
+                  <Icon className={cn("h-4 w-4", cat.colorClass)} />
+                </div>
+              </div>
+              <p className={cn("mt-2 text-2xl font-bold", cat.colorClass)}>{count}</p>
+            </CardContent>
+          </Card>
         );
       })}
 
-      {/* Total card */}
-      <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-muted/30 px-4 py-2 min-w-[72px]">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Total</span>
-        <span className="text-lg font-bold tabular-nums leading-none mt-0.5">{total}</span>
-      </div>
+      {/* Total */}
+      <Card className="transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-muted-foreground/10 hover:to-transparent hover:border-muted-foreground/20">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <p className="text-sm text-muted-foreground">Total</p>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+              <Users className="h-4 w-4 text-foreground" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-bold">{total}</p>
+        </CardContent>
+      </Card>
 
-      {/* QA card */}
-      <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-muted/30 px-4 py-2 min-w-[72px]">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">QA</span>
-        <span className="text-lg font-bold tabular-nums leading-none mt-0.5 text-primary">{qa}</span>
-      </div>
+      {/* QA */}
+      <Card className="transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <p className="text-sm text-muted-foreground">QA</p>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/20">
+              <PhoneCall className="h-4 w-4 text-primary" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-bold text-primary">{qa}</p>
+        </CardContent>
+      </Card>
     </div>
   );
 };
