@@ -1,41 +1,33 @@
 
 
-## Plan: Scroll interno, paginador y auto-hide en AgentDetailView
+## Plan: Corregir funcionalidad y vista en AgentDetailView
 
-### Problema
-`AgentDetailView` usa un solo `div.overflow-auto` (línea 170) que envuelve todo el contenido (KPI cards, quality cards, tabs, tabla). Esto hace que:
-1. La tabla no tenga scroll interno propio — todo scrollea junto
-2. No hay auto-hide de las stats cards al scrollear la tabla
-3. El `DataTableShell` no tiene altura restringida (`flex-1 min-h-0`) para activar su scroll interno
+### Problemas identificados
+
+1. **Acciones sin funcionalidad**: `LeadGenTable` recibe `onView` prop pero `AgentDetailView` no la pasa — el botón Eye no hace nada
+2. **QA tab vacío**: Solo muestra placeholder "no disponible aún" (línea 459-465)
+3. **Stats no se ocultan en tab Rendimiento**: El tab "rendimiento" usa su propio `overflow-auto` (línea 372), independiente del `DataTableShell`, así que el `handleContentScroll` nunca se dispara
+4. **Quality cards con estilo inconsistente**: En el screenshot se ven las cards A+/A/B+/B/C con gradientes oscuros (verde-azul-púrpura) — esto no coincide con el design system estándar de `Card`/`CardContent` con badge + hover sutil
 
 ### Cambios
 
-#### 1. Reestructurar layout (`AgentDetailView.tsx`)
-- Cambiar el div `flex-1 overflow-auto` (línea 170) a `flex-1 flex flex-col min-h-0` (sin overflow-auto propio)
-- KPI cards y quality cards: envolverlas en un `shrink-0` con transición `max-h` + `opacity` controlada por `statsCollapsed`
-- Tab bar: `shrink-0`
-- Tab content (leads): cambiar de `div.p-6` a `flex-1 flex flex-col min-h-0 p-6` para que el DataTableShell ocupe el espacio restante
-- El `DataTableShell` ya existe (línea 292) — agregarle `onScroll={handleContentScroll}` y envolverlo en un contenedor `flex-1 min-h-0`
+#### 1. Acciones funcionales (`AgentDetailView.tsx`)
+- Agregar estado `selectedLead` para mostrar un modal/panel de detalle al hacer click en Eye
+- Pasar `onView={(lead) => setSelectedLead(lead)}` al `LeadGenTable`
+- Renderizar un Dialog con los datos del lead seleccionado (handle, categoría, teléfono, notas, fecha, país)
 
-#### 2. Agregar estado y handler de auto-hide
-- `useState(false)` para `statsCollapsed`
-- `handleContentScroll` igual que en LeadGenContent: `scrollTop > 40` → collapse, `scrollTop < 10` → expand
-- Pasar `onScroll` al `DataTableShell`
+#### 2. Tab QA — implementación básica (`AgentDetailView.tsx`)
+- Reemplazar el placeholder por una tabla simple con los leads del agente que tienen `quality` asignada
+- Mostrar: Handle, Categoría actual, Fecha, un campo de notas/retroalimentación inline (editable)
+- Usar `DataTableShell` con `onScroll={handleContentScroll}` para consistencia y auto-hide
 
-#### 3. Ajustar contenedor del DataTableShell
-- Agregar `className="flex-1 min-h-0"` al DataTableShell para que use todo el espacio vertical disponible y active su scroll interno
+#### 3. Auto-hide en tab Rendimiento (`AgentDetailView.tsx`)
+- Cambiar el div `overflow-auto` del tab rendimiento (línea 372) por un `DataTableShell`-like scroll container
+- Agregar `onScroll={handleContentScroll}` al div scrollable para que las stats se oculten al hacer scroll en los charts también
 
-### Resultado
-```text
-Header (shrink-0)
-├─ KPI Cards (shrink-0, auto-hide on scroll)
-├─ Quality Cards (shrink-0, auto-hide on scroll)
-├─ Tab bar (shrink-0)
-└─ Tab content (flex-1 min-h-0)
-   └─ Filters (shrink-0)
-   └─ DataTableShell (flex-1 min-h-0, scroll interno, onScroll → auto-hide)
-```
+#### 4. Quality cards estandarizadas (ya corregidas)
+- Las quality cards en `AgentDetailView` ya usan el estilo correcto (`Card`/`CardContent` con hover sutil) — confirmar que el screenshot de la imagen corresponde al estado actual o a un estado anterior con gradientes oscuros. Si persisten los gradientes, reemplazarlos por el estilo de `qualityCardConfig` actual (líneas 23-29)
 
-### Archivo a modificar
-- `src/pages/leadgen/AgentDetailView.tsx`
+### Archivos a modificar
+- `src/pages/leadgen/AgentDetailView.tsx` — todas las correcciones
 
