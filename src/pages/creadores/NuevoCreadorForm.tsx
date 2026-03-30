@@ -123,6 +123,8 @@ const defaultForm: FormData = {
   start_date: "",
   has_piclink: false,
   agency_percentage: 15,
+  commission_type: "fixed",
+  commission_tiers: [],
   payment_method: "",
   billing_start_date: "",
   billing_frequency: "",
