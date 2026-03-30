@@ -163,6 +163,8 @@ const testData: FormData = {
   start_date: "2026-02-01",
   has_piclink: true,
   agency_percentage: 20,
+  commission_type: "fixed",
+  commission_tiers: [],
   payment_method: "Transferencia",
   billing_start_date: "2026-03-01",
   billing_frequency: "mensual",
