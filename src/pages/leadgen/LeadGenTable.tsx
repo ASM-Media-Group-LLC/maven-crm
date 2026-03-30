@@ -331,6 +331,18 @@ LeadRow.displayName = "LeadRow";
 const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("hora");
   const [sortAsc, setSortAsc] = useState(false);
+  const { isAdmin, isSupervisor } = useUserRole();
+  const canReview = isAdmin || isSupervisor;
+
+  const entryIds = useMemo(() => leads.map(l => l.id), [leads]);
+  const { data: qaReviews = [] } = useLeadGenQA(entryIds);
+  const qaMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const r of qaReviews) {
+      if (r.entry_id && !map[r.entry_id]) map[r.entry_id] = r;
+    }
+    return map;
+  }, [qaReviews]);
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
@@ -354,7 +366,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       case "categoria": va = a.quality; vb = b.quality; break;
       case "pais": va = a.country_code ?? ""; vb = b.country_code ?? ""; break;
       case "contacto": va = ""; vb = ""; break;
-      case "qa": va = ""; vb = ""; break;
+      case "qa": va = qaMap[a.id]?.rating ?? ""; vb = qaMap[b.id]?.rating ?? ""; break;
     }
     return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
   });
@@ -370,7 +382,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
     <Table containerClassName="overflow-visible" className="min-w-[900px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead></TableHead>
+          <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Ticket" col="ticket" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Handle" col="handle" /></TableHead>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Agente" col="agente" /></TableHead>
@@ -384,7 +396,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} />
+          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} qaMap={qaMap} canReview={canReview} />
         ))}
         {sorted.length === 0 && (
           <TableRow>
