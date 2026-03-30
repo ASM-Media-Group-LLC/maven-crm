@@ -8,9 +8,11 @@ const corsHeaders = {
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  const buf = new Uint32Array(12);
+  crypto.getRandomValues(buf);
   let result = "";
-  for (let i = 0; i < 10; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 12; i++) {
+    result += chars[buf[i] % chars.length];
   }
   return result;
 }
@@ -256,7 +258,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: unknown) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+    console.error("[admin-user-actions] Internal error:", err);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
