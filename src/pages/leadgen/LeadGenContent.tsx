@@ -419,52 +419,54 @@ const LeadGenContent = () => {
                   ))}
                 </div>
               ) : (
-                <Card>
-                  <CardContent className="pt-6 px-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Agente</TableHead>
-                          <TableHead className="text-center">Total</TableHead>
-                          <TableHead className="text-center">A+</TableHead>
-                          <TableHead className="text-center">A</TableHead>
-                          <TableHead className="text-center">B+</TableHead>
-                          <TableHead className="text-center">B</TableHead>
-                          <TableHead className="text-center">C</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {agentStats.map(ag => (
-                          <TableRow key={ag.id} className="cursor-pointer" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                    {ag.name.slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium text-sm">{ag.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center"><Badge>{ag.total}</Badge></TableCell>
-                            <TableCell className="text-center font-medium text-emerald-400">{ag.byQuality["a+"] || 0}</TableCell>
-                            <TableCell className="text-center font-medium text-blue-400">{ag.byQuality["a"] || 0}</TableCell>
-                            <TableCell className="text-center font-medium text-violet-400">{ag.byQuality["b+"] || 0}</TableCell>
-                            <TableCell className="text-center font-medium text-cyan-400">{ag.byQuality["b"] || 0}</TableCell>
-                            <TableCell className="text-center font-medium text-slate-400">{ag.byQuality["c"] || 0}</TableCell>
-                          </TableRow>
-                        ))}
-                        {agentStats.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                              No hay agentes con leads en este rango
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <Table containerClassName="overflow-visible" className="min-w-[700px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Agente</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">Total</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A+</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">A</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B+</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B</TableHead>
+                      <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">C</TableHead>
+                      <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agentStats.map(ag => (
+                      <TableRow key={ag.id} className="cursor-pointer" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                                {ag.name.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-sm">{ag.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center"><Badge>{ag.total}</Badge></TableCell>
+                        <TableCell className="text-center font-medium">{ag.byQuality["a+"] || 0}</TableCell>
+                        <TableCell className="text-center font-medium">{ag.byQuality["a"] || 0}</TableCell>
+                        <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
+                        <TableCell className="text-center font-medium">{ag.byQuality["b"] || 0}</TableCell>
+                        <TableCell className="text-center font-medium">{ag.byQuality["c"] || 0}</TableCell>
+                        <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {agentStats.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          No hay agentes con leads en este rango
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               )}
             </div>
           )}
