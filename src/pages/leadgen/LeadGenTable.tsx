@@ -296,7 +296,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
       </TableHeader>
       <TableBody>
         {sorted.map((lead) => (
-          <LeadRow key={lead.id} lead={lead} onView={onView} />
+          <LeadRow key={lead.id} lead={lead} onView={onView} profiles={profiles} />
         ))}
         {sorted.length === 0 && (
           <TableRow>
