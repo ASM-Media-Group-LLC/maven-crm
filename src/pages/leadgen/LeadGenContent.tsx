@@ -151,6 +151,10 @@ const LeadGenContent = () => {
     });
   }, [enrichedLeads, searchQuery, agencyFilter, qualityFilter, activeFilter]);
 
+  // Summary stats — all leads in range (no pagination limit)
+  const { data: summaryStats } = useLeadGenSummaryStats(dateFromStr, dateToStr);
+  const statsForCard = summaryStats || { total: 0, qa: 0, byQuality: { "a+": 0, a: 0, "b+": 0, b: 0, c: 0 } };
+
   // Agent stats — from dedicated server-side query (all leads in range, not just current page)
   const { data: agentStatsRaw } = useLeadGenAgentStats(dateFromStr, dateToStr);
   const agentStats = useMemo(() => {
