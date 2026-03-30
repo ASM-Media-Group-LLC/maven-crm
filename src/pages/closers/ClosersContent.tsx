@@ -103,10 +103,6 @@ const ClosersContent = () => {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="shrink-0 px-6 pt-4 pb-2 space-y-4 bg-background border-b border-border">
-            <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
-              <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
-            </div>
-
             <TabsList className="flex-wrap">
               {TABS.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value}>
@@ -221,6 +217,9 @@ const ClosersContent = () => {
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col px-6 py-4 overflow-auto" onScroll={handleContentScroll}>
+            <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
+              <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
+            </div>
             <DataTableShell
               className="flex-1 min-h-0"
               currentPage={page + 1}

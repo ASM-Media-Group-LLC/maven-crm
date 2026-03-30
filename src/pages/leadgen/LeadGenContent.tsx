@@ -234,11 +234,6 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards — collapse on scroll */}
-      <div className={`shrink-0 px-6 py-2 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100"}`}>
-        <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-      </div>
-
       {/* Tab bar */}
       <div className="shrink-0 px-6 py-2 flex items-center justify-between gap-4">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
@@ -318,7 +313,11 @@ const LeadGenContent = () => {
       </div>
 
       {/* Tab content - fills remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4" ref={scrollRef} onScroll={handleContentScroll}>
+      <div className="flex-1 min-h-0 flex flex-col px-6 pb-4 overflow-auto" ref={scrollRef} onScroll={handleContentScroll}>
+        {/* KPI Cards — collapse on scroll */}
+        <div className={`transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 mb-0" : "max-h-[200px] opacity-100 mb-2"}`}>
+          <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        </div>
         {/* === LEADS TAB === */}
         {activeTab === "leads-hora" && (
           <div className="flex-1 min-h-0 overflow-auto">
@@ -432,7 +431,7 @@ const LeadGenContent = () => {
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B+</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">B</TableHead>
                         <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))] text-center">C</TableHead>
-                        <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">Acciones</TableHead>
+                        <TableHead className="sticky top-0 right-0 z-30 bg-card shadow-[0_1px_0_0_hsl(var(--border))] w-[80px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -454,7 +453,7 @@ const LeadGenContent = () => {
                           <TableCell className="text-center font-medium">{ag.byQuality["b+"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["b"] || 0}</TableCell>
                           <TableCell className="text-center font-medium">{ag.byQuality["c"] || 0}</TableCell>
-                          <TableCell className="sticky right-0 bg-card" onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="sticky right-0 bg-card w-[80px]" onClick={(e) => e.stopPropagation()}>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedAgent({ id: ag.id, name: ag.name })}>
                               <Eye className="h-4 w-4" />
                             </Button>
