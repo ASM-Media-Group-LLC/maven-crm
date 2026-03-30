@@ -75,11 +75,16 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
     return () => clearInterval(interval);
   }, []);
 
-  const agentLeads = useMemo(() =>
-    leads.filter(l =>
-      (agent.id && l.lg_user_id === agent.id) ||
-      l.company?.toLowerCase() === agent.name.toLowerCase()
-    ), [leads, agent]);
+  // Fetch ALL leads for this agent from DB (not limited by parent pagination)
+  const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : initialDateFrom;
+  const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : initialDateTo;
+  const { data: fetchedLeads = [], isLoading: leadsLoading } = useLeadGenAgentLeads(
+    agent.id || null,
+    dateFromStr,
+    dateToStr
+  );
+
+  const agentLeads = fetchedLeads as LeadGenEntry[];
 
   const todayLeads = useMemo(() =>
     agentLeads.filter(l => isSameDay(new Date(l.created_at), now)),

@@ -187,8 +187,9 @@ const LeadGenContent = () => {
     return (
       <AgentDetailView
         agent={selectedAgent}
-        leads={enrichedLeads.filter(l => l.lg_user_id === selectedAgent.id)}
         onBack={() => setSelectedAgent(null)}
+        initialDateFrom={dateFrom ? format(dateFrom, "yyyy-MM-dd") : undefined}
+        initialDateTo={dateTo ? format(dateTo, "yyyy-MM-dd") : undefined}
       />
     );
   }
