@@ -14,12 +14,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
+import { useLeadGenAgentLeads } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
   agent: { name: string; email?: string; id?: string };
-  leads: LeadGenEntry[];
   onBack: () => void;
+  initialDateFrom?: string;
+  initialDateTo?: string;
 }
 
 const qualityCardConfig = [
@@ -46,7 +48,7 @@ const tabs = [
 
 const OBJETIVO_POR_HORA = 20;
 
-const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
+const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: AgentDetailViewProps) => {
   const [activeTab, setActiveTab] = useState("leads");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchTerm, setSearchTerm] = useState("");
@@ -73,11 +75,16 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const agentLeads = useMemo(() =>
-    leads.filter(l =>
-      (agent.id && l.lg_user_id === agent.id) ||
-      l.company?.toLowerCase() === agent.name.toLowerCase()
-    ), [leads, agent]);
+  // Fetch ALL leads for this agent from DB (not limited by parent pagination)
+  const dateFromStr = dateFrom ? format(dateFrom, "yyyy-MM-dd") : initialDateFrom;
+  const dateToStr = dateTo ? format(dateTo, "yyyy-MM-dd") : initialDateTo;
+  const { data: fetchedLeads = [], isLoading: leadsLoading } = useLeadGenAgentLeads(
+    agent.id || null,
+    dateFromStr,
+    dateToStr
+  );
+
+  const agentLeads = fetchedLeads as LeadGenEntry[];
 
   const todayLeads = useMemo(() =>
     agentLeads.filter(l => isSameDay(new Date(l.created_at), now)),
