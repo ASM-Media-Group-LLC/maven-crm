@@ -344,7 +344,7 @@ const AgentDetailView = ({ agent, onBack, initialDateFrom, initialDateTo }: Agen
                             </div>
                             <Badge variant={calidadVariant[cat] ?? "secondary-soft"}>
                               {lead.quality?.toUpperCase()}
-                            </span>
+                            </Badge>
                           </div>
                           <div className="flex items-center justify-end text-xs text-muted-foreground">
                             <span>{format(new Date(lead.created_at), "d MMM", { locale: es })}</span>
