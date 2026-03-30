@@ -174,8 +174,9 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto">
-        {/* KPI Cards */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* KPI Cards + Quality Cards — auto-hide on scroll */}
+        <div className={`shrink-0 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[400px] opacity-100"}`}>
         <div className="px-6 py-4">
           <div className="grid grid-cols-3 gap-4">
             <Card className="cursor-default transition-all duration-200 hover:scale-[1.03] hover:bg-gradient-to-br hover:from-primary/15 hover:to-transparent hover:border-primary/40">
