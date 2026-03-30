@@ -1,59 +1,19 @@
 
 
-## Plan: Comisión por rangos de ingresos en Condiciones Comerciales
+## Plan: Corregir solapamiento de tramos — usar `max + 1` como mínimo del siguiente
 
-### Contexto actual
-El campo `agency_percentage` en `creator_business` es un `number | null` que almacena un porcentaje fijo. Se usa en:
-- **NuevoCreadorForm.tsx** — input numérico simple
-- **InfoTabContent.tsx** — lectura "20%"
-- **NuevaComisionModal.tsx** — cálculo de comisión: `base * (agencyPct / 100)`
+### Problema
+Cuando se agrega un nuevo tramo, el `min_revenue` se establece igual al `max_revenue` del tramo anterior, causando solapamiento (ej: tramo 1 termina en 999, tramo 2 empieza en 999).
 
-### Cambios necesarios
+### Cambios en `CommissionTiersEditor.tsx`
 
-#### 1. Migración de base de datos
-Agregar una columna `commission_tiers` de tipo `jsonb` a `creator_business`:
-```sql
-ALTER TABLE creator_business 
-ADD COLUMN commission_type text DEFAULT 'fixed',
-ADD COLUMN commission_tiers jsonb DEFAULT '[]';
-```
-- `commission_type`: `'fixed'` o `'tiered'`
-- `commission_tiers`: array de objetos `{ min_revenue: number, max_revenue: number | null, percentage: number }`
-- Se conserva `agency_percentage` para el modo fijo (retrocompatibilidad total)
+Hay 4 puntos donde se calcula el `min` del siguiente tramo que deben usar `max + 1`:
 
-#### 2. Componente `CommissionTiersEditor` (nuevo)
-Componente reutilizable que renderiza:
-- **Toggle** (Switch o RadioGroup): "Fijo" vs "Por rangos"
-- **Modo fijo**: Input numérico actual (sin cambios visuales)
-- **Modo por rangos**: Tabla/lista editable con filas:
-  - Ingreso mínimo ($), Ingreso máximo ($), Porcentaje (%)
-  - Botón "Agregar tramo" al final
-  - Botón eliminar (X) por fila
-  - Validaciones:
-    - El mínimo de cada tramo = máximo del anterior (continuidad)
-    - No solapamientos
-    - El último tramo puede tener máximo vacío (= "sin límite")
-    - Porcentaje entre 0 y 100
-- Transición animada suave entre modos
+1. **`addTier()` (línea 61-62)**: Cambiar `newMin = max_revenue` → `newMin = max_revenue + 1`
+2. **`removeTier()` (línea 71)**: Al recalcular continuidad, usar `max_revenue + 1` en vez de `max_revenue`
+3. **`updateTier()` (línea 82)**: Al auto-actualizar el siguiente tramo, usar `value + 1`
+4. **`validateTiers()` (línea 34)**: Cambiar la validación de continuidad de `min === prev.max` a `min === prev.max + 1`
 
-#### 3. Integración en `NuevoCreadorForm.tsx`
-- Reemplazar el `<Input type="number">` del campo "Porcentaje Agencia (%)" por `<CommissionTiersEditor>`
-- Agregar `commission_type` y `commission_tiers` al estado del formulario
-- Enviar ambos campos en el `business` payload al guardar
-
-#### 4. Lectura en `InfoTabContent.tsx`
-- Si `commission_type === 'fixed'`: mostrar "20%" como antes
-- Si `commission_type === 'tiered'`: mostrar tabla resumida con los tramos
-
-#### 5. Cálculo en `NuevaComisionModal.tsx`
-- Leer `commission_type` y `commission_tiers` del creator_business
-- Si es `fixed`: cálculo actual `base * (pct / 100)`
-- Si es `tiered`: buscar el tramo que corresponde al `base_amount` y aplicar el porcentaje de ese tramo
-
-### Archivos a crear/modificar
-- **Nuevo**: `src/components/commission/CommissionTiersEditor.tsx`
-- **Migración SQL**: nueva columna en `creator_business`
-- **Modificar**: `NuevoCreadorForm.tsx` — integrar componente
-- **Modificar**: `InfoTabContent.tsx` — renderizar tramos en lectura
-- **Modificar**: `NuevaComisionModal.tsx` — lógica de cálculo por tramos
+### Archivo
+- `src/components/commission/CommissionTiersEditor.tsx`
 
