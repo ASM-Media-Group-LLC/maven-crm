@@ -360,25 +360,15 @@ const LeadGenContent = () => {
           {/* === AGENTS TAB === */}
           {activeTab === "agentes" && (
             <div className="flex-1 min-h-0 overflow-auto space-y-6">
-              <div className="rounded-lg border overflow-hidden bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border-l-[3px] border-l-primary">
-                <div className="p-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-primary">Rendimiento de Agentes</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {dateFrom && dateTo
-                        ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} — ${format(dateTo, "d 'de' MMMM, yyyy", { locale: es })}`
-                        : format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 text-right">
-                    <div>
-                      <p className="text-3xl font-bold text-primary">{agentStats.length}</p>
-                      <p className="text-xs text-muted-foreground">Agentes Activos</p>
-                    </div>
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Rendimiento de Agentes</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {dateFrom && dateTo
+                      ? `${format(dateFrom, "d 'de' MMMM", { locale: es })} — ${format(dateTo, "d 'de' MMMM, yyyy", { locale: es })}`
+                      : format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}
+                    {" · "}{agentStats.length} agentes activos
+                  </p>
                 </div>
               </div>
 
