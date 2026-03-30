@@ -14,12 +14,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import LeadGenTable from "./LeadGenTable";
+import { useLeadGenAgentLeads } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 
 interface AgentDetailViewProps {
   agent: { name: string; email?: string; id?: string };
-  leads: LeadGenEntry[];
   onBack: () => void;
+  initialDateFrom?: string;
+  initialDateTo?: string;
 }
 
 const qualityCardConfig = [
