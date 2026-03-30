@@ -463,7 +463,7 @@ const AgentDetailView = ({ agent, leads, onBack }: AgentDetailViewProps) => {
             </div>
             <p className="text-muted-foreground text-sm">QA / Retroalimentación no disponible aún</p>
           </div>
-        )
+        )}
       </div>
     </main>
   );
