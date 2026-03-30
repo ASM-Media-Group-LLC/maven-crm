@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import DataTableShell from "@/components/ui/data-table-shell";
 import { ArrowLeft, Plus, UserPlus, Clock, Search, List, LayoutGrid, FileText, BarChart3, Target, TrendingUp, Star, ArrowUpRight, ArrowRight, ArrowDownRight } from "lucide-react";
 import { format, isSameDay, differenceInMinutes, differenceInSeconds, startOfDay, endOfDay, subDays } from "date-fns";
 import { es } from "date-fns/locale";
