@@ -1,0 +1,1 @@
+ALTER TABLE public.creator_business ADD COLUMN IF NOT EXISTS billing_address text;

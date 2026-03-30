@@ -88,6 +88,7 @@ interface FormData {
   payment_method: string;
   billing_start_date: string;
   billing_frequency: string;
+  billing_address: string;
   blue_package: boolean;
   blue_package_amount: number;
   main_platform: string;
@@ -128,6 +129,7 @@ const defaultForm: FormData = {
   payment_method: "",
   billing_start_date: "",
   billing_frequency: "",
+  billing_address: "",
   blue_package: false,
   blue_package_amount: 0,
   main_platform: "",
@@ -168,6 +170,7 @@ const testData: FormData = {
   payment_method: "Transferencia",
   billing_start_date: "2026-03-01",
   billing_frequency: "mensual",
+  billing_address: "Calle 45 #12-34, Medellín, Colombia",
   blue_package: true,
   blue_package_amount: 500,
   main_platform: "Onlyfans",
@@ -282,6 +285,7 @@ const NuevoCreadorForm = () => {
           start_date: form.start_date || null,
           billing_start_date: form.billing_start_date || null,
           billing_frequency: form.billing_frequency || null,
+          billing_address: form.billing_address || null,
         },
         documents,
       });
@@ -549,6 +553,9 @@ const NuevoCreadorForm = () => {
                   <SelectItem value="mensual">Mensual</SelectItem>
                 </SelectContent>
               </Select>
+            </Field>
+            <Field label="Dirección de Facturación">
+              <Input value={form.billing_address} onChange={(e) => set("billing_address", e.target.value)} placeholder="Dirección completa para facturación" />
             </Field>
           </div>
           <div className="rounded-lg border p-4 flex items-center justify-between">
