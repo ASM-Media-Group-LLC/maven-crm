@@ -18,14 +18,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats } from "./useLeadGen";
+import { useLeadGenByDateRange, useLeadGenProfiles, useLeadGenAgentStats, useLeadGenSummaryStats } from "./useLeadGen";
 import type { LeadGenEntry } from "./useLeadGen";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { LEADGEN_COMPANIES, QUALITY_OPTIONS } from "./leadgenConstants";
 
 import LeadGenCantidadCard from "./LeadGenCantidadCard";
-import LeadGenEstadosCard from "./LeadGenEstadosCard";
 import LeadGenTable from "./LeadGenTable";
 import LeadGenGrid from "./LeadGenGrid";
 import AddLeadModal from "./AddLeadModal";
@@ -152,6 +151,10 @@ const LeadGenContent = () => {
     });
   }, [enrichedLeads, searchQuery, agencyFilter, qualityFilter, activeFilter]);
 
+  // Summary stats — all leads in range (no pagination limit)
+  const { data: summaryStats } = useLeadGenSummaryStats(dateFromStr, dateToStr);
+  const statsForCard = summaryStats || { total: 0, qa: 0, byQuality: { "a+": 0, a: 0, "b+": 0, b: 0, c: 0 } };
+
   // Agent stats — from dedicated server-side query (all leads in range, not just current page)
   const { data: agentStatsRaw } = useLeadGenAgentStats(dateFromStr, dateToStr);
   const agentStats = useMemo(() => {
@@ -225,10 +228,7 @@ const LeadGenContent = () => {
 
       {/* KPI Cards */}
       <div className="shrink-0 px-6 py-2">
-        <div className="grid grid-cols-2 gap-3">
-          <LeadGenCantidadCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-          <LeadGenEstadosCard leads={enrichedLeads} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-        </div>
+        <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
       </div>
 
       {/* Tab bar */}
@@ -476,7 +476,12 @@ const LeadGenContent = () => {
           {/* === PERFORMANCE TAB === */}
           {activeTab === "rendimiento" && (
             <div className="flex-1 min-h-0 overflow-auto">
-              <LeadGenPerformanceView leads={enrichedLeads} profiles={profiles} />
+              <LeadGenPerformanceView
+                profiles={profiles}
+                agentIds={agentStats.map(a => a.id)}
+                dateFrom={dateFromStr}
+                dateTo={dateToStr}
+              />
             </div>
           )}
         </div>

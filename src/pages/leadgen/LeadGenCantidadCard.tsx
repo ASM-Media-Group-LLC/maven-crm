@@ -1,14 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { LeadGenEntry } from "./useLeadGen";
 
 interface ActiveFilter {
   type: "categoria" | "status" | null;
   value: string | null;
 }
 
+export interface SummaryStats {
+  total: number;
+  qa: number;
+  byQuality: Record<string, number>;
+}
+
 interface Props {
-  leads: LeadGenEntry[];
+  stats: SummaryStats;
   activeFilter?: ActiveFilter;
   onFilterChange?: (filter: ActiveFilter) => void;
 }
@@ -21,18 +26,8 @@ const categoryConfig = [
   { key: "c",  label: "C",  activeClass: "bg-muted border-muted-foreground/50 text-muted-foreground", hoverClass: "hover:bg-muted-foreground/10 hover:border-muted-foreground/40 hover:scale-[1.05] hover:shadow-sm" },
 ];
 
-const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props) => {
-  const total = leads.length;
-
-  const counts: Record<string, number> = {
-    "a+": leads.filter((l) => l.quality?.toLowerCase() === "a+").length,
-    a:   leads.filter((l) => l.quality?.toLowerCase() === "a").length,
-    "b+": leads.filter((l) => l.quality?.toLowerCase() === "b+").length,
-    b:   leads.filter((l) => l.quality?.toLowerCase() === "b").length,
-    c:   leads.filter((l) => l.quality?.toLowerCase() === "c").length,
-  };
-  // QA count: entries that have phone info
-  const qa = leads.filter((l) => !!l.phone_raw || !!l.phone_e164).length;
+const LeadGenCantidadCard = ({ stats, activeFilter, onFilterChange }: Props) => {
+  const { total, qa, byQuality } = stats;
 
   const handleClick = (key: string) => {
     if (!onFilterChange) return;
@@ -54,9 +49,9 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-2 pt-0">
-        <div className="grid grid-cols-5 gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1.5 mb-1.5">
           {categoryConfig.map((cat) => {
-            const count = counts[cat.key] ?? 0;
+            const count = byQuality[cat.key] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
             const active = isActive(cat.key);
             return (
@@ -64,7 +59,7 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
                 key={cat.key}
                 onClick={() => handleClick(cat.key)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-lg border p-1.5 transition-all duration-200 cursor-pointer",
+                  "flex flex-col items-center gap-0.5 rounded-lg border p-1.5 transition-all duration-200 cursor-pointer flex-1",
                   active
                     ? cat.activeClass
                     : cn("border-border bg-card text-foreground", cat.hoverClass)
@@ -80,16 +75,16 @@ const LeadGenCantidadCard = ({ leads = [], activeFilter, onFilterChange }: Props
               </button>
             );
           })}
-        </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
-            <span className="text-xs font-medium text-muted-foreground">Total</span>
-            <span className="text-sm font-bold tabular-nums">{total}</span>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2 py-1">
-            <span className="text-xs font-medium text-muted-foreground">QA</span>
-            <span className="text-sm font-bold tabular-nums text-primary">{qa}</span>
+          <div className="flex flex-col gap-1 ml-1">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2.5 py-1 min-w-[80px]">
+              <span className="text-xs font-medium text-muted-foreground">Total</span>
+              <span className="text-sm font-bold tabular-nums">{total}</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2.5 py-1 min-w-[80px]">
+              <span className="text-xs font-medium text-muted-foreground">QA</span>
+              <span className="text-sm font-bold tabular-nums text-primary">{qa}</span>
+            </div>
           </div>
         </div>
       </CardContent>
