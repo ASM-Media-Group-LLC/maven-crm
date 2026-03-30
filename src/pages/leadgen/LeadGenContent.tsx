@@ -228,8 +228,8 @@ const LeadGenContent = () => {
         </div>
       </header>
 
-      {/* KPI Cards */}
-      <div className="shrink-0 px-6 py-2">
+      {/* KPI Cards — collapse on scroll */}
+      <div className={`shrink-0 px-6 py-2 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100"}`}>
         <LeadGenCantidadCard stats={statsForCard} activeFilter={activeFilter} onFilterChange={setActiveFilter} />
       </div>
 
