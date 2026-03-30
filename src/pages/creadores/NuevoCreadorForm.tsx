@@ -269,7 +269,7 @@ const NuevoCreadorForm = () => {
           assigned_agency: form.assigned_agency || null,
           agency_percentage: form.commission_type === "fixed" ? (form.agency_percentage || null) : null,
           commission_type: form.commission_type,
-          commission_tiers: form.commission_type === "tiered" ? form.commission_tiers : [],
+          commission_tiers: form.commission_type === "tiered" ? (form.commission_tiers as any) : [],
           payment_method: form.payment_method || null,
           blue_package: form.blue_package,
           li_payment_amount: form.blue_package ? form.blue_package_amount : null,
