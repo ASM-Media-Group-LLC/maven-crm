@@ -66,13 +66,22 @@ export default function InvoiceA4Preview({ invoice }: { invoice: InvoiceData }) 
         <div className="h-px bg-gray-200 mb-4" />
 
         <div className="flex justify-between mb-5 text-[9px]">
-          <div className="space-y-1">
+          {/* 4-column billing info */}
+          <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-4 gap-y-1">
             <p className="font-semibold text-gray-800">Bill to</p>
             <p className="text-gray-600">{creatorName}</p>
-            <p className="font-semibold text-gray-800 mt-2">Address</p>
-            <p className="text-gray-600">—</p>
-            <p className="font-semibold text-gray-800 mt-2">Phone</p>
-            <p className="text-gray-600">—</p>
+            <p className="font-semibold text-gray-800">ID</p>
+            <p className="text-gray-600 text-[7px] leading-relaxed">{creatorId}</p>
+
+            <p className="font-semibold text-gray-800">Address</p>
+            <p className="text-gray-600">{billingAddress}</p>
+            <p />
+            <p />
+
+            <p className="font-semibold text-gray-800">Phone</p>
+            <p className="text-gray-600">{creatorPhone}</p>
+            <p />
+            <p />
           </div>
           <div className="space-y-1 text-right">
             <p className="font-semibold text-gray-800">Invoice details</p>
