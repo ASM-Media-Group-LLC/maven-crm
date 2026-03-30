@@ -139,11 +139,12 @@ InlineSourceCell.displayName = "InlineSourceCell";
 
 const buildProfileUrl = (entry: LeadGenEntry) => {
   if (entry.source_link) return entry.source_link;
-  const p = entry.platform.toLowerCase();
-  if (p.includes("instagram")) return `https://instagram.com/${entry.model_handle}`;
-  if (p.includes("tiktok")) return `https://tiktok.com/@${entry.model_handle}`;
-  if (p.includes("twitter") || p.includes("x")) return `https://x.com/${entry.model_handle}`;
-  return `https://${entry.model_handle}`;
+  const p = (entry.platform || "").toLowerCase();
+  const handle = entry.model_handle || "";
+  if (p.includes("instagram")) return `https://instagram.com/${handle}`;
+  if (p.includes("tiktok")) return `https://tiktok.com/@${handle}`;
+  if (p.includes("twitter") || p.includes("x")) return `https://x.com/${handle}`;
+  return handle ? `https://${handle}` : "#";
 };
 
 // Inline agent reassignment for orphan leads
