@@ -170,6 +170,7 @@ const testData: FormData = {
   payment_method: "Transferencia",
   billing_start_date: "2026-03-01",
   billing_frequency: "mensual",
+  billing_address: "Calle 45 #12-34, Medellín, Colombia",
   blue_package: true,
   blue_package_amount: 500,
   main_platform: "Onlyfans",
