@@ -3,7 +3,7 @@ import DataTableShell from "@/components/ui/data-table-shell";
 import { useNavigate } from "react-router-dom";
 import {
   Plus, UserPlus, Database, CheckSquare, Users, BarChart3, Clock,
-  Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield,
+  Search, List, LayoutGrid, FileText, Calendar, ChevronLeft, ChevronRight, Shield, Eye,
 } from "lucide-react";
 import { format, isSameDay, subDays, startOfWeek, addDays, isToday, isFuture, startOfDay, startOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
