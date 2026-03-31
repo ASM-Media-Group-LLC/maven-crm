@@ -31,6 +31,7 @@ interface Props {
   onNotesChange?: (entryId: string, notes: string | null) => void;
   onAssignAgent?: (entry: PromologEntry) => void;
   isManagement?: boolean;
+  viewOnly?: boolean;
 }
 
 type SortKey = "model" | "network" | "platform" | "result" | "agent" | "date";
