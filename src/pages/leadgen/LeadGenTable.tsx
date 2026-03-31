@@ -397,7 +397,7 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
   );
 
   return (
-    <Table containerClassName="overflow-visible" className="min-w-[900px]">
+    <Table containerClassName="overflow-visible" className="min-w-[1050px]">
       <TableHeader>
         <TableRow>
           <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="hora" /></TableHead>
