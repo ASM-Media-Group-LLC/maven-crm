@@ -309,7 +309,7 @@ const PromologContent = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+    queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
   };
 
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
