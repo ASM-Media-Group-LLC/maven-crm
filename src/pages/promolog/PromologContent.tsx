@@ -107,6 +107,7 @@ const tabItems = [
   { id: "promos" as const, label: "Promos", icon: Table2 },
   { id: "agentes" as const, label: "Agentes", icon: Users },
   { id: "campanas" as const, label: "Campañas", icon: Target },
+  { id: "rendimiento" as const, label: "Rendimiento", icon: BarChart3 },
 ];
 
 const DAY_LABELS_ES = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM"];
