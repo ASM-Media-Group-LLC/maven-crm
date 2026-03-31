@@ -91,8 +91,10 @@ const EventosContent = () => {
     toast({ title: "Enlace copiado al portapapeles" });
   };
 
-  const updateFilters = (patch: Partial<EventoFilters>) =>
+  const updateFilters = (patch: Partial<EventoFilters>) => {
+    setStatsCollapsed(false);
     setFilters((prev) => ({ ...prev, ...patch }));
+  };
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
