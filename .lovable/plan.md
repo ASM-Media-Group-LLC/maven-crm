@@ -1,103 +1,98 @@
 
 
-## Plan: Mejorar sección Beneficios (Landing) + Nuevo módulo SuperContacts
+## Plan: Subpágina "Templates" en Facturación + Aplicación dinámica al Invoice A4
 
-### Parte 1: Mejorar sección "Beneficios clave" en Landing
+### Resumen
 
-Reescribir los beneficios con un enfoque más marketing/ventas orientado a agencias. En vez de describir features técnicas, comunicar resultados y dolor que se resuelve.
-
-**Archivo:** `src/pages/landing/LandingBenefits.tsx`
-
-- Expandir de 4 a 6 beneficios en grid `sm:grid-cols-2 lg:grid-cols-3`
-- Nuevos beneficios orientados a marketing:
-  1. **Ahorra +20 horas/semana** — Automatiza nómina, comisiones, reportes y seguimiento. Tu equipo se enfoca en crecer, no en tareas repetitivas.
-  2. **Reemplaza 8+ herramientas** — Olvídate de Notion, Slack, hojas de cálculo y 5 apps más. Todo centralizado en un solo lugar.
-  3. **Escala sin caos** — De 10 a 500 creadores sin perder el control. Permisos por rol, dashboards por área y procesos estandarizados.
-  4. **Decisiones con datos** — Dashboards en tiempo real con métricas de ventas, rendimiento y operaciones. Sin esperar reportes manuales.
-  5. **IA que vende por ti** — Asistente inteligente que ayuda a tus chatters a cerrar más ventas con estrategias personalizadas por creador.
-  6. **Tu equipo, conectado** — Messenger, videollamadas, tareas y notificaciones integrados. Cero fragmentación en la comunicación.
-- Cambiar título a "¿Por qué Maven?" y subtítulo más aspiracional
-- Agregar métricas/datos de impacto debajo de cada título (ej: "20+ hrs/semana", "8 herramientas menos")
+Crear una subpágina `/finanzas/facturacion/templates` dentro de Facturación con tabla de templates, modal de creación, y aplicación dinámica de los datos del template (logo, nombre, dirección, email) al documento A4 del Invoice.
 
 ---
 
-### Parte 2: Módulo SuperContacts (nuevo, ruta `/supercontacts`)
+### 1. Base de datos — tabla `invoice_templates`
 
-Módulo independiente para gestionar una base de prospectos (Instagram creators) con importación masiva y perfiles enriquecidos.
-
-#### Base de datos — Nueva tabla `super_contacts`
+Migración SQL:
 
 ```sql
-CREATE TABLE super_contacts (
+CREATE TABLE public.invoice_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  instagram_handle TEXT NOT NULL,
-  full_name TEXT,
-  profile_photo_url TEXT,
-  followers_count INTEGER,
-  bio TEXT,
-  category TEXT,
-  country TEXT,
-  city TEXT,
-  phone TEXT,
-  email TEXT,
-  notes TEXT,
-  status TEXT DEFAULT 'nuevo', -- nuevo, contactado, interesado, no_interesado, convertido
-  enriched BOOLEAN DEFAULT FALSE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'invoice', -- 'invoice' | 'nota_pago'
+  company_name TEXT,
+  company_address TEXT,
+  company_email TEXT,
+  logo_url TEXT,
   created_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Tabla de interacciones
-CREATE TABLE super_contact_interactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  contact_id UUID REFERENCES super_contacts(id) ON DELETE CASCADE NOT NULL,
-  type TEXT NOT NULL, -- llamada, mensaje, email, nota
-  notes TEXT,
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+ALTER TABLE public.invoice_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated can view templates"
+  ON public.invoice_templates FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Authenticated can insert templates"
+  ON public.invoice_templates FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can update templates"
+  ON public.invoice_templates FOR UPDATE TO authenticated USING (true);
 ```
 
-+ RLS policies para authenticated + índice único en `instagram_handle`
++ Storage bucket `template-logos` (public) para subir logos.
 
-#### Frontend — Páginas y componentes
+### 2. Sidebar — Agregar "Templates" bajo "Invoices"
 
-1. **`src/pages/SuperContacts.tsx`** — Layout page con sidebar
-2. **`src/pages/supercontacts/SuperContactsContent.tsx`** — Contenido principal:
-   - KPI cards (total, nuevos, contactados, convertidos)
-   - Tabla con filtros (status, categoría, país)
-   - Búsqueda por handle/nombre
-3. **`src/pages/supercontacts/ImportModal.tsx`** — Modal de importación:
-   - Textarea para pegar handles (uno por línea, separados por comas, o mezclados)
-   - Upload de CSV/PDF con parsing de handles (@usuario o URLs de Instagram)
-   - Preview de handles detectados antes de importar
-   - Inserción masiva con detección de duplicados
-4. **`src/pages/supercontacts/SuperContactProfile.tsx`** — Perfil del contacto:
-   - Foto de perfil, handle, seguidores, bio
-   - Timeline de interacciones
-   - Botón para registrar nueva interacción
-   - Botón "Enriquecer" (placeholder para futura API de Instagram)
-   - Botón "Convertir a Creador" → inserta en tabla `creators`
-5. **`src/pages/supercontacts/useSuperContacts.ts`** — Hook con queries y mutations
+En `DashboardSidebar.tsx`, dentro del grupo `fin-fact` (Facturación), agregar item:
+```
+{ title: "Templates", url: "/finanzas/facturacion/templates" }
+```
 
-#### Routing
-- Agregar rutas en `App.tsx`: `/supercontacts` y `/supercontacts/:id`
-- Agregar item en sidebar bajo sección apropiada
+### 3. Ruta en App.tsx
 
-#### Enriquecimiento (fase 1 — manual + placeholder)
-- Botón "Enriquecer perfil" en cada contacto (disabled con tooltip "Próximamente — requiere API key")
-- Campo para que el usuario ingrese manualmente: foto URL, seguidores, bio
-- En fase futura: conectar API de Instagram con secret key
+Agregar lazy import y ruta:
+```
+/finanzas/facturacion/templates → TemplatesPage (dentro de FinanzasLayout)
+```
+
+### 4. Página `TemplatesPage.tsx`
+
+**Archivo:** `src/pages/finanzas/facturacion/TemplatesPage.tsx`
+
+- Header fijo con breadcrumb `Facturación › Templates` y botón "Crear Template"
+- Tabla con columnas: Nombre, Tipo (badge Invoice/Nota de pago), Fecha creación, Creador, Acciones (ver/editar)
+- Hook `useQuery` para leer `invoice_templates` con join a `profiles` para nombre del creador
+- Al hacer clic en "Crear Template" → abre modal
+
+### 5. Modal `CreateTemplateModal.tsx`
+
+**Archivo:** `src/pages/finanzas/facturacion/CreateTemplateModal.tsx`
+
+- Campo: Nombre del template (text)
+- Campo: Tipo (select: Invoice / Nota de pago)
+- Si tipo === "invoice":
+  - Nombre de la compañía (text)
+  - Dirección (text)
+  - Correo electrónico (text)
+  - Logo: Drag & drop / click para subir imagen → sube a bucket `template-logos`
+- Botón Crear → inserta en `invoice_templates`
+- También sirve para editar (recibe template opcional como prop)
+
+### 6. Aplicar template al Invoice A4
+
+Modificar `InvoiceA4Preview.tsx` y `NuevoInvoicePage.tsx`:
+
+- Agregar prop opcional `template?: { company_name, company_address, company_email, logo_url }` a `InvoiceA4Preview`
+- Si hay template: usar `template.company_name` en lugar de "KASH AGENCY", `template.logo_url` en lugar de `kashLogo`, `template.company_address` en lugar de la dirección hardcodeada, y `template.company_email` en lugar del email hardcodeado
+- Si no hay template: mantener los valores actuales de KASH AGENCY (backward compatible)
+- En `NuevoInvoicePage`: agregar selector de template (dropdown) que carga los templates tipo "invoice" y pasa el seleccionado al preview
 
 ### Archivos a crear/modificar
-- `src/pages/landing/LandingBenefits.tsx` — Reescribir contenido marketing
-- Migración SQL — tablas `super_contacts` + `super_contact_interactions` + RLS
-- `src/pages/SuperContacts.tsx` — Layout page
-- `src/pages/supercontacts/SuperContactsContent.tsx` — Lista + filtros + KPIs
-- `src/pages/supercontacts/ImportModal.tsx` — Importación CSV/paste
-- `src/pages/supercontacts/SuperContactProfile.tsx` — Perfil con interacciones
-- `src/pages/supercontacts/useSuperContacts.ts` — Hooks de datos
-- `src/App.tsx` — Rutas
-- `src/components/dashboard/DashboardSidebar.tsx` — Item de menú
+
+| Acción | Archivo |
+|--------|---------|
+| Crear | `src/pages/finanzas/facturacion/TemplatesPage.tsx` |
+| Crear | `src/pages/finanzas/facturacion/CreateTemplateModal.tsx` |
+| Modificar | `src/pages/finanzas/facturacion/InvoiceA4Preview.tsx` — prop template opcional |
+| Modificar | `src/pages/finanzas/facturacion/NuevoInvoicePage.tsx` — selector de template |
+| Modificar | `src/components/dashboard/DashboardSidebar.tsx` — item Templates |
+| Modificar | `src/App.tsx` — ruta |
+| Migración | tabla `invoice_templates` + bucket `template-logos` + RLS |
 
