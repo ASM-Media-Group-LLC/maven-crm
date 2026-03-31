@@ -8,14 +8,21 @@ export function useSidebarBadges() {
   const { data } = useQuery({
     queryKey: ["sidebar-badges", user?.id],
     queryFn: async () => {
-      const [promolog, leadgen, closers] = await Promise.all([
-        supabase.from("promolog_entries").select("id", { count: "exact", head: true }).is("reviewed_by", null).gte("date", new Date().toISOString().split("T")[0]),
+      const [promoResult, leadgen, closers] = await Promise.all([
+        supabase.from("promolog_entries").select("id, creator_id, date, network, platform, promoted").is("reviewed_by", null).gte("date", new Date().toISOString().split("T")[0]),
         supabase.from("leadgen_entries").select("id", { count: "exact", head: true }).eq("quality", "pending"),
         supabase.from("closer_creators").select("id", { count: "exact", head: true }).eq("stage", "Nuevo"),
       ]);
 
+      const promoDeduped = new Set(
+        (promoResult.data ?? []).map(e => {
+          const dayKey = e.date?.split("T")[0] ?? e.date;
+          return `${e.creator_id}|${dayKey}|${e.network}|${e.platform}|${e.promoted}`;
+        })
+      );
+
       return {
-        promologCount: promolog.count ?? 0,
+        promologCount: promoDeduped.size,
         leadgenCount: leadgen.count ?? 0,
         closersCount: closers.count ?? 0,
       };
