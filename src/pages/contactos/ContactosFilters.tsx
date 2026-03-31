@@ -40,6 +40,7 @@ interface Props {
   hasActiveFilters?: boolean;
   onClear?: () => void;
   creators?: CreatorOption[];
+  cities?: string[];
 }
 
 const ContactosFilters = ({ filters, onChange, view, onViewChange, hasActiveFilters, onClear, creators = [] }: Props) => {
