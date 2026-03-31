@@ -55,6 +55,7 @@ interface FormData {
   ciudad: string;
   plataforma: string;
   accountLink: string;
+  onlyfansUrl: string;
   ticket: string;
   notas: string;
 }
