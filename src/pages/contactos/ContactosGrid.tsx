@@ -1,5 +1,5 @@
 import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
-import { getCountryFlag } from "@/lib/country-utils";
+import { getCountryFlag, getCountryShortDisplay } from "@/lib/country-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +49,8 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
             className="overflow-hidden cursor-pointer transition-shadow duration-200 hover:shadow-md hover:border-primary/30"
             onClick={() => onView?.(c)}
           >
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="p-4 flex flex-col gap-3">
+              {/* Top row: avatar+info left, date right */}
               <div className="flex items-start gap-3">
                 <Avatar className="h-12 w-12 shrink-0">
                   <AvatarFallback className="text-sm">{initials}</AvatarFallback>
@@ -69,6 +70,34 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                     </Badge>
                   </div>
                 </div>
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                  {c.creacion}
+                </span>
+              </div>
+
+              {/* Middle: location + instagram */}
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  {c.pais ? getCountryShortDisplay(c.pais) : ""}
+                  {c.city ? `, ${c.city}` : ""}
+                </p>
+                {c.creadoPor && (
+                  <p className="text-xs text-muted-foreground">Creado por: {c.creadoPor}</p>
+                )}
+                <a
+                  href={`https://instagram.com/${c.instagram}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <InstagramIcon className="h-4 w-4" />
+                  <span className="truncate">@{c.instagram}</span>
+                </a>
+              </div>
+
+              {/* Bottom row: three dots right */}
+              <div className="flex justify-end">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                     <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
@@ -87,27 +116,6 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">
-                  {c.pais && <span className="mr-1">{getCountryFlag(c.pais)}</span>}
-                  {c.pais}{c.city ? `, ${c.city}` : ""}
-                </p>
-                {c.creadoPor && (
-                  <p className="text-xs text-muted-foreground">Creado por: {c.creadoPor}</p>
-                )}
-                <p className="text-xs text-muted-foreground">{c.creacion}</p>
-                <a
-                  href={`https://instagram.com/${c.instagram}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <InstagramIcon className="h-4 w-4" />
-                  <span className="truncate">@{c.instagram}</span>
-                </a>
               </div>
             </CardContent>
           </Card>
