@@ -108,16 +108,29 @@ const ContactosGrid = ({ contactos, onView, onEdit, onConvert }: Props) => {
                       <p className="text-xs text-muted-foreground">Agente</p>
                     </div>
                   )}
-                  <a
-                    href={`https://instagram.com/${c.instagram.replace(/^@/, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <InstagramIcon className="h-4 w-4" />
-                    <span className="truncate">@{c.instagram.replace(/^@/, "")}</span>
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`https://instagram.com/${c.instagram.replace(/^@/, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <InstagramIcon className="h-4 w-4" />
+                      <span className="truncate">@{c.instagram.replace(/^@/, "")}</span>
+                    </a>
+                    {(c as any).whatsapp && (
+                      <a
+                        href={`https://wa.me/${(c as any).whatsapp.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-green-500 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 {/* Bottom row: three dots right */}
