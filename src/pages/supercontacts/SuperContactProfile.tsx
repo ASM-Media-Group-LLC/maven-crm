@@ -307,7 +307,7 @@ const SuperContactProfile = () => {
 
   return shell(
     <div className="p-4 md:p-6 space-y-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate("/supercontacts")}>
+      <Button variant="ghost" size="sm" onClick={() => navigate("/wishlist")}>
         <ArrowLeft className="h-4 w-4 mr-2" /> Volver
       </Button>
 
