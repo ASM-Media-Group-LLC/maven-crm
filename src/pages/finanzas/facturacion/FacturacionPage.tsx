@@ -553,7 +553,7 @@ export default function FacturacionPage() {
           <>
             {renderFilterBar(
               <>
-                <Button size="sm" onClick={() => navigate("/finanzas/facturacion/facturas/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
+                <Button size="sm" onClick={() => setCrearOpen(true)}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
                 <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Periodo: ((inv as any).period_start && (inv as any).period_end) ? `${(inv as any).period_start} — ${(inv as any).period_end}` : "", Vencimiento: inv.due_date })), "invoices")}>
                   <Download className="h-4 w-4 mr-1" />Exportar
                 </Button>
