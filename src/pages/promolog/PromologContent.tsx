@@ -1061,6 +1061,13 @@ const PromologContent = () => {
         </div>
       )}
 
+      {/* Rendimiento tab */}
+      {activeTab === "rendimiento" && (
+        <div className="flex-1 min-h-0 overflow-auto p-6">
+          <PromologPerformanceView profiles={profiles} />
+        </div>
+      )}
+
       {/* Creators Selection Modal */}
         <Dialog open={creatorsModalOpen} onOpenChange={setCreatorsModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
