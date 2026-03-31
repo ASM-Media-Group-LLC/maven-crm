@@ -219,7 +219,7 @@ export default function FacturacionPage() {
     document.body.appendChild(wrapper);
 
     const root = createRoot(wrapper);
-    root.render(<InvoiceA4PreviewComp invoice={inv} />);
+    root.render(<InvoiceA4PreviewComp invoice={inv} template={inv?.invoice_templates} />);
 
     // Wait for render
     await new Promise(r => setTimeout(r, 500));
