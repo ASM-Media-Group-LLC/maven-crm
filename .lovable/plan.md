@@ -1,40 +1,32 @@
 
 
-## Plan: Auto-hide stats cards en Promolog al hacer scroll
+## Plan: Auto-generar nombre de template desde compañía + tipo
 
 ### Cambio
 
-Aplicar el mismo patrón de colapso de KPI cards que existe en LeadGen y Closers: cuando el usuario hace scroll en la tabla, las stats cards se ocultan con una transición suave.
+Eliminar el campo manual "Nombre del template" y derivar el `name` automáticamente como `"{company_name} - {tipo}"` (ej: "KASH AGENCY - Invoice"). El nombre se computa al guardar y se muestra dinámicamente en la tabla.
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `PromologContent.tsx` | Agregar state `statsCollapsed`, callback `handleContentScroll`, transición CSS en el div de KPI cards, y pasar `onScroll` al `DataTableShell` |
+| `CreateTemplateModal.tsx` | Eliminar state `name`, eliminar input de nombre, computar `name` en el payload del mutation como `${companyName} - ${typeLabel}`. Cambiar validación de disabled de `!name` a `!companyName`. |
+| `TemplatesPage.tsx` | En la columna "Nombre" de la tabla, mostrar nombre computado: `${t.company_name || "Sin compañía"} - ${t.type === "invoice" ? "Invoice" : "Nota de pago"}` en lugar de `t.name`, para que siempre refleje los datos actuales. |
 
 ### Detalle
 
-1. **Nuevo state + callback** (junto a los otros states, ~línea 420):
-```tsx
-const [statsCollapsed, setStatsCollapsed] = useState(false);
-const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-  setStatsCollapsed(e.currentTarget.scrollTop > 40);
-}, []);
-```
+**CreateTemplateModal.tsx:**
+- Eliminar línea 33 (`const [name, setName]`), línea 44 (`setName("")`), y líneas 110-113 (el div con el input de nombre).
+- En el payload (línea 77), reemplazar `name` con:
+  ```tsx
+  name: `${companyName || "Template"} - ${type === "invoice" ? "Invoice" : "Nota de pago"}`
+  ```
+- Cambiar disabled del botón (línea 183) de `!name` a `!companyName`.
 
-2. **KPI cards div** (línea 477): cambiar de clase fija a transición dinámica:
-```tsx
-// Antes
-<div className="shrink-0 px-6 pt-4 pb-2">
-
-// Después  
-<div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
-```
-
-3. **DataTableShell** (línea 610): agregar `onScroll`:
-```tsx
-<DataTableShell onScroll={handleContentScroll} ...>
-```
-
-4. Importar `useCallback` (ya está importado `useRef`, agregar `useCallback` al import de react en línea 1).
+**TemplatesPage.tsx:**
+- En la celda de nombre (línea 104), mostrar el nombre computado dinámicamente:
+  ```tsx
+  {`${t.company_name || t.name} - ${t.type === "invoice" ? "Invoice" : "Nota de pago"}`}
+  ```
+  Esto garantiza que templates existentes y nuevos muestren siempre el nombre correcto basado en los datos actuales.
 
