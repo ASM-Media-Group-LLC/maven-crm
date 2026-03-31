@@ -739,6 +739,9 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
               </TableCell>
               <TableCell className="font-semibold text-sm">${revenue.toLocaleString()}</TableCell>
               <TableCell>
+                <InlineText value={c.notes} onSave={(v) => onFieldChange(c.id, "notes", v)} />
+              </TableCell>
+              <TableCell>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
                   <ChevronDown className={`h-4 w-4 transition-transform ${expandedId === c.id ? "rotate-180" : ""}`} />
                 </Button>
