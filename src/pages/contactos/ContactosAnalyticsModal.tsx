@@ -464,12 +464,15 @@ const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }:
     if (!active || !payload?.length) return null;
     const of = payload.find((p: any) => p.dataKey === "of")?.value || 0;
     const platform = payload.find((p: any) => p.dataKey === "platform")?.value || 0;
+    const monetization = payload.find((p: any) => p.dataKey === "monetization")?.value || 0;
+    const total = of + platform + monetization;
     return (
       <div style={tooltipStyle} className="p-2 shadow-lg">
         <p className="font-semibold text-foreground">{label}</p>
         <p className="text-sm" style={{ color: "hsl(280, 60%, 55%)" }}>OF: ${of.toLocaleString()}</p>
         <p className="text-sm" style={{ color: "hsl(45, 80%, 50%)" }}>Plataformas: ${platform.toLocaleString()}</p>
-        <p className="text-sm text-muted-foreground">Total: ${(of + platform).toLocaleString()}</p>
+        {monetization > 0 && <p className="text-sm" style={{ color: "hsl(150, 60%, 45%)" }}>Monetización: ${monetization.toLocaleString()}</p>}
+        <p className="text-sm font-semibold text-foreground">Total: ${total.toLocaleString()}</p>
       </div>
     );
   };
