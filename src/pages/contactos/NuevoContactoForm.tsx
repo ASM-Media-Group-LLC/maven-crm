@@ -81,6 +81,7 @@ const NuevoContactoForm = () => {
   const { user } = useAuth();
   const [form, setForm] = useState<FormData>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [creatorAlert, setCreatorAlert] = useState<{ name: string; id: string } | null>(null);
   const [companies, setCompanies] = useState<string[]>(DEFAULT_COMPANIES);
   const [uploadModal, setUploadModal] = useState<{ open: boolean; category: UploadCategory }>({ open: false, category: "piclink" });
   const [profilePhoto, setProfilePhoto] = useState<UploadedFile | null>(null);
