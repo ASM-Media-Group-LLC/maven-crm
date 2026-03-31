@@ -366,6 +366,7 @@ const DashboardSidebar = () => {
               key: "fin-fact",
               items: [
                 { title: "Invoices", url: "/finanzas/facturacion" },
+                { title: "Templates", url: "/finanzas/facturacion/templates" },
               ],
             },
             {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export default function NuevoInvoicePage() {
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [zoom, setZoom] = useState(0.65);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const calcFitZoom = useCallback(() => {
@@ -90,6 +92,22 @@ export default function NuevoInvoicePage() {
     },
     enabled: !!creatorId,
   });
+
+  // Fetch templates
+  const { data: templates = [] } = useQuery({
+    queryKey: ["invoice-templates-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_templates")
+        .select("id, name, type, company_name, company_address, company_email, logo_url")
+        .eq("type", "invoice")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || null;
 
   // Calculate breakdown from commissions
   const agencyTotal = commissions.reduce((acc, c) => {
@@ -240,6 +258,20 @@ export default function NuevoInvoicePage() {
               <Label>Notas</Label>
               <Textarea placeholder="Notas opcionales..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
+            {templates.length > 0 && (
+              <div>
+                <Label>Template</Label>
+                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar template (opcional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin template (KASH por defecto)</SelectItem>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Right: Preview */}
@@ -271,13 +303,14 @@ export default function NuevoInvoicePage() {
                       <div className="flex justify-between items-start mb-6">
                         <div>
                           <h2 className="text-lg font-bold tracking-tight text-gray-900">Invoice</h2>
-                          <p className="text-[9px] text-gray-400 mt-0.5">KASH AGENCY</p>
-                          <p className="text-[9px] text-gray-400">333 SE 2nd Ave</p>
-                          <p className="text-[9px] text-gray-400">Miami, FL 33131-2176</p>
-                          <p className="text-[9px] text-gray-400">kash@exclusivecontent.me</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">{selectedTemplate?.company_name || "KASH AGENCY"}</p>
+                          {(selectedTemplate?.company_address || "333 SE 2nd Ave\nMiami, FL 33131-2176").split("\n").map((line, i) => (
+                            <p key={i} className="text-[9px] text-gray-400">{line}</p>
+                          ))}
+                          <p className="text-[9px] text-gray-400">{selectedTemplate?.company_email || "kash@exclusivecontent.me"}</p>
                         </div>
                         <div>
-                          <img src={kashLogo} alt="KASH" className="h-14 object-contain" />
+                          <img src={selectedTemplate?.logo_url || kashLogo} alt="Logo" className="h-14 object-contain" />
                         </div>
                       </div>
 
@@ -370,7 +403,7 @@ export default function NuevoInvoicePage() {
                         )}
                         <div className="h-px bg-gray-200 mt-3" />
                         <p className="text-[8px] text-gray-300 text-center pt-1">
-                          Documento generado por KASH AGENCY · {today}
+                          Documento generado por {selectedTemplate?.company_name || "KASH AGENCY"} · {today}
                         </p>
                       </div>
                     </div>
