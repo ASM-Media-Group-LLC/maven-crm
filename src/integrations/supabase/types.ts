@@ -1270,6 +1270,45 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_category_changes: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          contact_created_at: string | null
+          contact_handle: string
+          contact_id: string
+          contact_name: string
+          hours_since_creation: number | null
+          id: string
+          new_category: string | null
+          old_category: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          contact_created_at?: string | null
+          contact_handle: string
+          contact_id: string
+          contact_name: string
+          hours_since_creation?: number | null
+          id?: string
+          new_category?: string | null
+          old_category?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          contact_created_at?: string | null
+          contact_handle?: string
+          contact_id?: string
+          contact_name?: string
+          hours_since_creation?: number | null
+          id?: string
+          new_category?: string | null
+          old_category?: string | null
+        }
+        Relationships: []
+      }
       contact_interaction_files: {
         Row: {
           created_at: string | null
