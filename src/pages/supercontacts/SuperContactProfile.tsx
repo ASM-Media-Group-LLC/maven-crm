@@ -1052,7 +1052,7 @@ const SuperContactProfile = () => {
           </div>
         </SheetContent>
       </Sheet>
-    </>;
+    </>
   );
 };
 
