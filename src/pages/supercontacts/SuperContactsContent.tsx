@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Upload, Users, UserPlus, MessageCircle, UserCheck, Instagram } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, Upload, Users, UserPlus, MessageCircle, UserCheck, Instagram, Plus, FileSpreadsheet, ClipboardPaste, ChevronDown } from "lucide-react";
 import { useSuperContacts } from "./useSuperContacts";
 import { getCountryDisplay } from "@/lib/country-utils";
 import ImportModal from "./ImportModal";
+import AddSingleContactModal from "./AddSingleContactModal";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   nuevo: { label: "Nuevo", variant: "secondary" },
@@ -25,6 +27,7 @@ const SuperContactsContent = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
+  const [addSingleOpen, setAddSingleOpen] = useState(false);
 
   const filtered = useMemo(() => {
     let list = contacts;
@@ -74,7 +77,7 @@ const SuperContactsContent = () => {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters + Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -98,9 +101,29 @@ const SuperContactsContent = () => {
             <SelectItem value="convertido">Convertido</SelectItem>
           </SelectContent>
         </Select>
-        <Button onClick={() => setImportOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" /> Importar
-        </Button>
+
+        {/* Add contact dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" /> Agregar
+              <ChevronDown className="h-3 w-3 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setAddSingleOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" /> Agregar uno
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setImportOpen(true)}>
+              <ClipboardPaste className="h-4 w-4 mr-2" /> Pegar handles
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              setImportOpen(true);
+            }}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" /> Importar archivo
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Table */}
@@ -120,7 +143,7 @@ const SuperContactsContent = () => {
               {isLoading ? (
                 <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
               ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay contactos. Importa tu primera lista.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay contactos. Agrega tu primer contacto.</TableCell></TableRow>
               ) : (
                 filtered.map((c) => {
                   const st = statusConfig[c.status] || statusConfig.nuevo;
@@ -152,6 +175,7 @@ const SuperContactsContent = () => {
       </Card>
 
       <ImportModal open={importOpen} onOpenChange={setImportOpen} />
+      <AddSingleContactModal open={addSingleOpen} onOpenChange={setAddSingleOpen} />
     </div>
   );
 };
