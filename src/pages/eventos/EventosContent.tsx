@@ -32,8 +32,15 @@ const projectTabs = [
 const EventosContent = () => {
   const [filters, setFilters] = useState<EventoFilters>(emptyFilters);
   const [view, setView] = useState<"table" | "grid">("table");
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop > 40) {
+      setStatsCollapsed(true);
+    }
+  }, []);
 
   const { events, allEvents, isLoading } = useEventos(filters);
 
