@@ -147,7 +147,7 @@ export default function NuevoInvoicePage() {
   });
 
   const selectedCreator = creators.find(c => c.id === creatorId);
-  const today = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  
 
   const handleSubmit = () => {
     if (!creatorId || !dateFrom || !dateTo || grandTotal === 0) return;
