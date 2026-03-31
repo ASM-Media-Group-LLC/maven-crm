@@ -44,13 +44,13 @@ const BRAND_COLORS: Record<string, string> = {
   Ora: "hsl(45, 80%, 50%)",
   "Link Hunter": "hsl(150, 60%, 45%)",
   Lumina: "hsl(280, 60%, 55%)",
-  "Big Link": "hsl(0, 65%, 55%)",
+  BLU: "hsl(0, 65%, 55%)",
   Maven: "hsl(180, 50%, 45%)",
   Blue: "hsl(220, 80%, 60%)",
   Traffix: "hsl(30, 70%, 50%)",
 };
 
-const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "Big Link", "Maven", "Blue", "Traffix"];
+const BRANDS = ["Cash", "Exchange", "Ora", "Link Hunter", "Lumina", "BLU", "Maven", "Blue", "Traffix"];
 
 const SuperContactsAnalyticsModal = ({ open, onOpenChange }: Props) => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
