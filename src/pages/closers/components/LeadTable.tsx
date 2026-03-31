@@ -567,6 +567,7 @@ const CloserTable = ({ creators, activeTab, viewMode, onStageChange, onFieldChan
             <SortHeader label="% Comisión" sortKey="agency_commission" {...sp} />
             <TableHead className={stickyBase}>Plataformas</TableHead>
             <TableHead className={stickyBase}>Rev. Plat.</TableHead>
+            <TableHead className={stickyBase}>Notas</TableHead>
             <TableHead className={stickyAction}>Acciones</TableHead>
           </TableRow>
         );
