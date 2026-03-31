@@ -4,9 +4,10 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3 } from "lucide-react";
+import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3, TrendingUp } from "lucide-react";
 import SuperContactsContent from "./supercontacts/SuperContactsContent";
 import SuperContactsAnalyticsModal from "./supercontacts/SuperContactsAnalyticsModal";
+import SuperContactsProductivityModal from "./supercontacts/SuperContactsProductivityModal";
 
 const SuperContacts = () => {
   const [importOpen, setImportOpen] = useState(false);
