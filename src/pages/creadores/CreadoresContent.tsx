@@ -49,6 +49,20 @@ const CreadoresContent = () => {
   const totalCount = isCloser ? creators.length : rawTotalCount;
   const totalPages = isCloser ? Math.max(1, Math.ceil(creators.length / pageSize)) : rawTotalPages;
 
+  const closerStatusCounts = useMemo(() => {
+    if (!isCloser) return statusCounts;
+    const counts = { total: 0, active: 0, onboarding: 0, pendiente: 0, pendiente_verificacion: 0, paused: 0, leaving: 0, terminated: 0 };
+    allCreators.forEach(c => {
+      counts.total++;
+      const s = c.status?.toLowerCase();
+      if (s === "activa") counts.active++;
+      else if (s === "pausada") counts.paused++;
+      else if (s === "retiro" || s === "leaving") counts.leaving++;
+      else if (s === "terminada" || s === "terminated") counts.terminated++;
+    });
+    return counts;
+  }, [isCloser, allCreators, statusCounts]);
+
   const updateFilters = (patch: Partial<CreadorFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
     setPage(1);
@@ -64,12 +78,10 @@ const CreadoresContent = () => {
               Total: {isLoading ? "…" : allCreators.length} creadores
             </p>
           </div>
-          {!isCloser && (
-            <Button onClick={() => navigate("/creadores/nuevo")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Creador
-            </Button>
-          )}
+          <Button onClick={() => navigate("/creadores/nuevo")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Agregar Creador
+          </Button>
         </div>
       </header>
 
@@ -84,7 +96,7 @@ const CreadoresContent = () => {
       ) : (
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
           <div className="shrink-0">
-            <CreadoresKPICards counts={statusCounts} />
+            <CreadoresKPICards counts={isCloser ? closerStatusCounts : statusCounts} isCloser={isCloser} />
           </div>
 
           <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
