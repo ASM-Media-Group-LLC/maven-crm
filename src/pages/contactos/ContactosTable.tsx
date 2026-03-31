@@ -87,7 +87,7 @@ const ContactosTable = ({ contactos, onView, onEdit, onConvert }: Props) => {
 
   return (
     <TooltipProvider>
-      <Table containerClassName="overflow-visible" className="min-w-[1000px]">
+      <Table containerClassName="overflow-visible" className="min-w-[1100px]">
         <TableHeader>
           <TableRow>
             <TableHead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]"><SortHeader label="Creación" col="creacion" /></TableHead>
