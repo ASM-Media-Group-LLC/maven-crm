@@ -245,17 +245,25 @@ const ContactosContent = () => {
               Total: {totalCount} contactos
             </p>
           </div>
-          {activeTab === "contactos" ? (
-            <Button onClick={() => navigate("/contactos/nuevo")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Contacto
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Agregar Agencia
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {activeTab === "contactos" && isAdmin && (
+              <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Analítica
+              </Button>
+            )}
+            {activeTab === "contactos" ? (
+              <Button onClick={() => navigate("/contactos/nuevo")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Contacto
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setAddAgenciaOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar Agencia
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
