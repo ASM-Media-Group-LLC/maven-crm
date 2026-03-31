@@ -1,4 +1,5 @@
 import { Eye, MoreHorizontal, Pencil, Sparkles } from "lucide-react";
+import { getCountryFlag } from "@/lib/country-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
