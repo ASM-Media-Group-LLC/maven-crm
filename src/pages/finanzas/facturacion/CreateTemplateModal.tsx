@@ -177,7 +177,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!name || mutation.isPending}>
+          <Button onClick={() => mutation.mutate()} disabled={!companyName || mutation.isPending}>
             {isEdit ? "Guardar" : "Crear Template"}
           </Button>
         </DialogFooter>
