@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2, BarChart3 } from "lucide-react";
+import { Plus, Users, Building2, BarChart3, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
 import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
+import AuditLogModal from "./AuditLogModal";
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
@@ -79,6 +80,7 @@ const ContactosContent = () => {
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -293,10 +295,16 @@ const ContactosContent = () => {
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "contactos" && isAdmin && (
-              <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Analítica
-              </Button>
+              <>
+                <Button variant="outline" size="sm" onClick={() => setAuditOpen(true)} className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10">
+                  <ShieldAlert className="mr-2 h-4 w-4" />
+                  Auditoría
+                </Button>
+                <Button variant="outline" onClick={() => setAnalyticsOpen(true)}>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Analítica
+                </Button>
+              </>
             )}
             {activeTab === "contactos" ? (
               <Button onClick={() => navigate("/contactos/nuevo")}>
@@ -400,6 +408,7 @@ const ContactosContent = () => {
         onConverted={() => setConvertOpen(false)}
       />
       <ContactosAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
+      <AuditLogModal open={auditOpen} onOpenChange={setAuditOpen} />
     </main>
   );
 };
