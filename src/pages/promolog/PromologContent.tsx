@@ -1184,7 +1184,7 @@ const PromologContent = () => {
                         toast({ title: "Error", description: error.message, variant: "destructive" });
                         return;
                       }
-                      queryClient.invalidateQueries({ queryKey: ["promolog-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
                       toast({ title: "Promoción registrada", description: `La entrada para ${selectedCreatorForEntry.artistic_name || selectedCreatorForEntry.name} ha sido guardada.` });
                       resetEntryModal();
                       setEntryModalOpen(false);

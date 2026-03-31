@@ -103,7 +103,7 @@ const ClosersContent = () => {
           <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setStatsCollapsed(false); }} className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* KPI Cards — collapse on table scroll */}
           <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0" : "max-h-[200px] opacity-100 pb-2"}`}>
             <ClosersKPICards statusCounts={statusCounts} platformRevenue={platformRevenue} ofMonetizationTotal={ofMonetizationTotal} />
