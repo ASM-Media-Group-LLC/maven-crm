@@ -372,9 +372,12 @@ const LeadGenTable = ({ leads, onView, onEdit, profiles }: Props) => {
 
   const sorted = [...leads].sort((a, b) => {
     let va = "", vb = "";
-    switch (sortKey) {
+      switch (sortKey) {
       case "hora": va = a.created_at; vb = b.created_at; break;
       case "ticket": va = a.id; vb = b.id; break;
+      case "handle": va = a.model_handle; vb = b.model_handle; break;
+      case "of": va = (a as any).onlyfans_url ?? ""; vb = (b as any).onlyfans_url ?? ""; break;
+      case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "handle": va = a.model_handle; vb = b.model_handle; break;
       case "agente": va = a.agent_name ?? ""; vb = b.agent_name ?? ""; break;
       case "agencia": va = a.company ?? ""; vb = b.company ?? ""; break;
