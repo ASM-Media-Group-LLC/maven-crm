@@ -141,12 +141,12 @@ export const useUpdateSuperContact = () => {
 
 export const useCreateInteraction = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (interaction: { contact_id: string; type: string; notes?: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("super_contact_interactions")
-        .insert({ ...interaction, created_by: user?.id } as any)
+        .insert({ ...interaction, created_by: user?.id || null } as any)
         .select()
         .single();
       if (error) throw error;
