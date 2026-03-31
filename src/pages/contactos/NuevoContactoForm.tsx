@@ -308,6 +308,10 @@ const NuevoContactoForm = () => {
             </Field>
           </div>
 
+          <Field label="OnlyFans URL">
+            <Input value={form.onlyfansUrl} onChange={(e) => set("onlyfansUrl", e.target.value)} placeholder="https://onlyfans.com/usuario" />
+          </Field>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Ciudad">
               <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
