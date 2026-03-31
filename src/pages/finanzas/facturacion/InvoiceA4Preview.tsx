@@ -81,7 +81,7 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
 
         <div className="h-px bg-gray-200 mb-4" />
 
-        <div className="mb-4 text-[9px]">
+        <div className="mb-8 text-[9px]">
           <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-4 gap-y-1">
             <p className="font-semibold text-gray-800">Bill to</p>
             <p className="text-gray-600">{creatorName}</p>
