@@ -32,11 +32,11 @@ function fmt(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
-const ZOOM = 0.82;
+const DEFAULT_ZOOM = 0.82;
 const A4_W = 595;
 const A4_H = 842;
 
-export default function InvoiceA4Preview({ invoice, template }: { invoice: InvoiceData; template?: TemplateInfo | null }) {
+export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOOM }: { invoice: InvoiceData; template?: TemplateInfo | null; zoom?: number }) {
   const agencyAmount = Number(invoice.agency_amount) || 0;
   const blueAmount = Number(invoice.blue_amount) || 0;
   const paypalAmount = Number(invoice.paypal_amount) || 0;
@@ -59,9 +59,9 @@ export default function InvoiceA4Preview({ invoice, template }: { invoice: Invoi
   const addressLines = companyAddress.split("\n");
 
   return (
-    <div style={{ width: A4_W * ZOOM, height: A4_H * ZOOM, flexShrink: 0 }}>
+    <div style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
       <div
-        style={{ width: A4_W, height: A4_H, transform: `scale(${ZOOM})`, transformOrigin: "top left" }}
+        style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
         className="bg-white rounded shadow-2xl p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
       >
         {/* Header */}
