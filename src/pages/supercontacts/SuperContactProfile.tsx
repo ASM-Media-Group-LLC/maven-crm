@@ -646,6 +646,22 @@ const SuperContactProfile = () => {
                   IA Insight
                 </Button>
               </div>
+              {/* Quick summary: what was said */}
+              {entries.some(e => e.notes) && (
+                <div className="mt-2 p-2 rounded-md bg-muted/30 text-xs space-y-0.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Qué se le ha dicho:</p>
+                  {entries.filter(e => e.notes).slice(0, 4).map((e, i) => (
+                    <p key={i} className="flex items-start gap-1.5">
+                      <span className="text-muted-foreground shrink-0">•</span>
+                      <span>{e.notes}</span>
+                      {e.response && <span className="text-muted-foreground italic ml-1">↩ {e.response}</span>}
+                    </p>
+                  ))}
+                  {entries.filter(e => e.notes).length > 4 && (
+                    <p className="text-muted-foreground">+{entries.filter(e => e.notes).length - 4} más</p>
+                  )}
+                </div>
+              )}
               {/* Brand summary from AI */}
               {brandInsights[brand]?.text && (
                 <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs">
