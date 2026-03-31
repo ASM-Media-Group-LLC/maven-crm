@@ -1,25 +1,37 @@
 
 
-## Plan: Preview A4 en Templates sin datos de ejemplo
+## Plan: Mejorar Analítica de Contactos — Sumatorias y Tasa de Conversión
 
 ### Problema
-El botón "Ver" en templates muestra un modal de texto plano. Se quiere mostrar el `InvoiceA4Preview` pero **sin datos ficticios de invoice** — solo el branding del template (logo, nombre de empresa, dirección, email).
+1. **Mes de marzo confuso**: La pestaña "Por Mes" solo muestra barras sin sumatoria acumulada visible ni totales claros.
+2. **Sin tasa de conversión**: No se ve cuántos contactos de cada mes se convirtieron en creadoras. Por ejemplo, de los 106 contactos de febrero, ¿cuántos ya son creadoras?
+3. **Status inconsistente**: Solo 1 contacto tiene status `converted` (el trigger `cleanup_closer_on_creator_insert` debería marcarlos, pero la mayoría quedó como `new`).
 
-### Cambio
+### Datos actuales
+- 502 contactos totales, 495 en status `new`
+- Creadoras creadas: Oct=76, Nov=123, Dic=24, Ene=26, Feb=29, Mar=6
+- Solo 1 contacto marcado como `converted`
 
-**Archivo: `src/pages/finanzas/facturacion/TemplatesPage.tsx`**
+### Cambios
 
-Reemplazar el modal actual (líneas 137-156) por uno más amplio que renderice `InvoiceA4Preview` con:
-- `template`: datos reales del template (company_name, company_address, company_email, logo_url)
-- `invoice`: objeto vacío `{}` — sin número, sin montos, sin nombre de creador, sin fechas
+**Archivo: `ContactosAnalyticsModal.tsx`**
 
-Esto mostrará la estructura del documento A4 con el branding aplicado (header con logo y datos de empresa) pero todas las celdas de datos del invoice quedarán en blanco o con guiones ("—"), dejando claro que es solo una vista previa del template.
+1. **Pestaña "Por Mes" mejorada**:
+   - Agregar una fila de KPIs arriba del chart: total del periodo, promedio mensual, mejor mes
+   - Mostrar doble barra: contactos registrados (azul) + contactos convertidos a creadoras (verde)
+   - Para calcular conversiones: cruzar `closers_contacts.handle` con `creators.instagram_handle` por mes de creación del contacto
+   - Agregar línea acumulativa superpuesta para ver crecimiento total
+   - Tooltip mostrando: "X contactos, Y convertidos (Z%)"
 
-Modal con `max-w-2xl`, fondo oscuro, scroll interno, y botón "Cerrar".
+2. **Nuevo query de conversión**: Traer de `creators` los `instagram_handle` existentes, luego cruzar con `closers_contacts.handle` para determinar cuáles se convirtieron — independiente del campo `status` (que está desactualizado)
+
+3. **Sumatoria en cada barra**: Mantener `LabelList` con el conteo, pero agregar debajo en texto más pequeño el acumulado
+
+4. **Pestaña "Agente × Mes" mejorada**: Agregar fila de totales por mes debajo de cada barra stacked (sumatoria visible)
 
 ### Archivos a modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `TemplatesPage.tsx` | Reemplazar modal texto plano por `InvoiceA4Preview` con invoice vacío `{}` |
+| `ContactosAnalyticsModal.tsx` | Nuevo query a `creators` para cruzar handles, KPIs de resumen, doble barra contactos/convertidos en tab mensual, totales visibles en agent×month |
 
