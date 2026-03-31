@@ -82,7 +82,7 @@ const CreadoresContent = () => {
       ) : (
         <div className="flex-1 flex flex-col min-h-0 p-6 gap-4">
           <div className="shrink-0">
-            <CreadoresKPICards counts={statusCounts} />
+            <CreadoresKPICards counts={isCloser ? closerStatusCounts : statusCounts} isCloser={isCloser} />
           </div>
 
           <div className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
