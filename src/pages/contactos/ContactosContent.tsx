@@ -65,7 +65,7 @@ const PAGE_SIZE = 50;
 const ContactosContent = () => {
   const [activeTab, setActiveTab] = useState<"contactos" | "agencias">("contactos");
   const [filters, setFilters] = useState<ContactoFilters>(emptyFilters);
-  const [view, setView] = useState<"table" | "grid">("table");
+  const [view, setView] = useState<"table" | "grid">("grid");
   const [selectedContacto, setSelectedContacto] = useState<Contacto | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
