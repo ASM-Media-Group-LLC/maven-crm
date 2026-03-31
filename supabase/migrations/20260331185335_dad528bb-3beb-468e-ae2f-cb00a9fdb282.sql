@@ -1,0 +1,1 @@
+ALTER TABLE super_contacts ADD COLUMN IF NOT EXISTS check_frequency text, ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;

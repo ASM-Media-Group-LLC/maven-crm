@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import {
   ArrowLeft, Instagram, MapPin, MessageCircle, Save, Sparkles, UserCheck,
   Send, Image, Bot, Upload, Loader2, Phone, Mail,
   Clock, CheckCircle, XCircle, MinusCircle, Plus, BarChart3, Target, TrendingUp,
+  CalendarCheck, AlertTriangle, Zap,
 } from "lucide-react";
 import {
   useSuperContact, useSuperContactInteractions, useSuperContactOutreach,
@@ -118,6 +120,9 @@ const SuperContactProfile = () => {
   const [imageAnalyzing, setImageAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const drawerFileInputRef = useRef<HTMLInputElement>(null);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [brandInsights, setBrandInsights] = useState<Record<string, { loading: boolean; text: string | null }>>({});
 
   const editCities = getCitiesByCountryCode(form.country);
 
@@ -261,6 +266,51 @@ const SuperContactProfile = () => {
     }
   }, [id]);
 
+  // Monitoring helpers
+  const getNextCheckDate = useCallback(() => {
+    if (!contact) return null;
+    const freq = (contact as any).check_frequency;
+    const lastChecked = (contact as any).last_checked_at;
+    if (!freq || !lastChecked) return null;
+    const last = new Date(lastChecked);
+    const days: Record<string, number> = { diario: 1, semanal: 7, quincenal: 15, mensual: 30 };
+    const d = days[freq] || 7;
+    last.setDate(last.getDate() + d);
+    return last;
+  }, [contact]);
+
+  const isCheckOverdue = useMemo(() => {
+    const next = getNextCheckDate();
+    return next ? next < new Date() : false;
+  }, [getNextCheckDate]);
+
+  const markAsChecked = async () => {
+    if (!contact) return;
+    await updateMutation.mutateAsync({ id: contact.id, last_checked_at: new Date().toISOString() } as any);
+    toast({ title: "Marcado como chequeado ✅" });
+  };
+
+  // Brand insight via AI
+  const fetchBrandInsight = useCallback(async (brand: string, entries: SuperContactOutreach[]) => {
+    setBrandInsights(prev => ({ ...prev, [brand]: { loading: true, text: null } }));
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supercontact-ai`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          body: JSON.stringify({ action: "brand_summary", contactId: id, brand, brandOutreach: entries }),
+        }
+      );
+      if (!resp.ok) throw new Error("Failed");
+      const data = await resp.json();
+      setBrandInsights(prev => ({ ...prev, [brand]: { loading: false, text: data.summary } }));
+    } catch {
+      setBrandInsights(prev => ({ ...prev, [brand]: { loading: false, text: "Error al generar insight." } }));
+      toast({ title: "Error al obtener insight", variant: "destructive" });
+    }
+  }, [id]);
+
   const shell = (children: React.ReactNode) => (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden">
@@ -375,6 +425,46 @@ const SuperContactProfile = () => {
 
   const renderResumen = () => (
     <div className="flex-1 overflow-auto p-4 space-y-4">
+      {/* Monitoring Card */}
+      <Card className={`border-l-4 ${isCheckOverdue ? "border-l-red-500" : "border-l-green-500"}`}>
+        <CardContent className="p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {isCheckOverdue ? (
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+            ) : (
+              <CalendarCheck className="h-5 w-5 text-green-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium">
+                {(contact as any)?.check_frequency
+                  ? `Chequeo ${(contact as any).check_frequency}`
+                  : "Sin frecuencia configurada"}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {(contact as any)?.last_checked_at
+                  ? `Último: ${format(parseISO((contact as any).last_checked_at), "dd MMM yyyy · HH:mm", { locale: es })} · ${formatDistanceToNow(parseISO((contact as any).last_checked_at), { locale: es, addSuffix: true })}`
+                  : "Nunca chequeado"}
+                {getNextCheckDate() && ` · Próximo: ${format(getNextCheckDate()!, "dd MMM", { locale: es })}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={(contact as any)?.check_frequency || ""} onValueChange={v => updateMutation.mutate({ id: contact!.id, check_frequency: v } as any)}>
+              <SelectTrigger className="h-7 w-28 text-xs"><SelectValue placeholder="Frecuencia" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="diario">Diario</SelectItem>
+                <SelectItem value="semanal">Semanal</SelectItem>
+                <SelectItem value="quincenal">Quincenal</SelectItem>
+                <SelectItem value="mensual">Mensual</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={markAsChecked}>
+              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Chequeado
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <button onClick={() => setActiveTab("contactos")} className="rounded-lg border p-3 text-center hover:bg-muted/50 transition-colors cursor-pointer">
@@ -534,8 +624,22 @@ const SuperContactProfile = () => {
                   {brand.charAt(0)}
                 </div>
                 <CardTitle className="text-sm">{brand}</CardTitle>
-                <Badge variant="outline" className="ml-auto text-xs">{entries.length} contacto{entries.length !== 1 ? "s" : ""}</Badge>
+                <Badge variant="outline" className="text-xs">{entries.length} contacto{entries.length !== 1 ? "s" : ""}</Badge>
+                <span className="text-[10px] text-muted-foreground">{new Set(entries.filter(e => e.instagram_account).map(e => e.instagram_account)).size} cuentas IG</span>
+                <Button size="sm" variant="ghost" className="ml-auto h-6 text-xs gap-1" onClick={() => fetchBrandInsight(brand, entries)}
+                  disabled={brandInsights[brand]?.loading}>
+                  {brandInsights[brand]?.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                  IA Insight
+                </Button>
               </div>
+              {/* Brand summary from AI */}
+              {brandInsights[brand]?.text && (
+                <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-xs">
+                    <ReactMarkdown>{brandInsights[brand].text!}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -869,6 +973,85 @@ const SuperContactProfile = () => {
       {activeTab === "contactos" && renderContactos()}
       {activeTab === "analytics" && renderAnalytics()}
       {activeTab === "ia" && renderIA()}
+
+      {/* Floating AI Button — hidden when on IA tab */}
+      {activeTab !== "ia" && (
+        <button
+          onClick={() => setAiDrawerOpen(true)}
+          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl"
+          aria-label="Abrir IA Asistente"
+        >
+          <Bot className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* AI Drawer */}
+      <Sheet open={aiDrawerOpen} onOpenChange={setAiDrawerOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[480px] p-0 flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
+            <SheetTitle className="flex items-center gap-2 text-sm">
+              <Bot className="h-4 w-4 text-primary" /> IA Asistente
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 flex flex-col min-h-0 p-3">
+            <div className="flex-1 overflow-auto space-y-2 mb-3">
+              {aiMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-8">
+                  <Bot className="h-10 w-10 opacity-30" />
+                  <p className="text-xs text-center">Pregúntame sobre esta modelo, sube screenshots, o pide estrategias.</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {["¿Qué sabemos?", "Sugiere estrategia", "Resumen contactos"].map(q => (
+                      <Button key={q} size="sm" variant="outline" className="text-xs h-7" onClick={() => setAiInput(q)}>
+                        {q}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {aiMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted border"
+                  }`}>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : <p>{msg.content}</p>}
+                  </div>
+                </div>
+              ))}
+              {aiLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-muted border rounded-2xl px-3 py-2">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            {imageAnalyzing && (
+              <div className="flex items-center gap-2 p-2 mb-2 rounded-lg bg-primary/10 text-primary text-xs shrink-0">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analizando imagen...
+              </div>
+            )}
+            <div className="flex gap-1.5 items-end shrink-0">
+              <input ref={drawerFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => drawerFileInputRef.current?.click()} disabled={imageAnalyzing}>
+                {imageAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </Button>
+              <Input placeholder="Pregunta..." value={aiInput} onChange={e => setAiInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendAiMessage()} className="flex-1 h-8 text-sm" disabled={aiLoading} />
+              <Button size="icon" className="h-8 w-8 shrink-0" onClick={sendAiMessage} disabled={aiLoading || !aiInput.trim()}>
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 };

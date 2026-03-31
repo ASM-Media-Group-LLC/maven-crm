@@ -17,6 +17,8 @@ export interface SuperContact {
   notes: string | null;
   status: string;
   enriched: boolean;
+  check_frequency: string | null;
+  last_checked_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
