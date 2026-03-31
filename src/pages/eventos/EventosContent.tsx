@@ -183,7 +183,8 @@ const EventosContent = () => {
           ) : (
             <EventosGrid events={events} />
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Share Agenda Modal */}

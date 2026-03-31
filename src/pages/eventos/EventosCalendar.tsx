@@ -112,7 +112,7 @@ const EventosCalendar = ({ events }: Props) => {
       </Card>
 
       <Card className="overflow-hidden border-border/80">
-        <CardContent className="p-5 max-h-[360px] overflow-auto">
+        <CardContent className="p-4 max-h-[260px] overflow-auto">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-4 w-4 text-accent" />
             <h3 className="text-base font-bold tracking-tight">Próximos eventos</h3>
