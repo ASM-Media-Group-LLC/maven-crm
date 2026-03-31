@@ -165,23 +165,25 @@ function FilterSelect({
   placeholder,
   value,
   options = [],
+  labels,
   onChange,
 }: {
   placeholder: string;
   value: string;
   options: string[];
+  labels?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
   return (
     <Select value={value || undefined} onValueChange={(v) => onChange(v === "__all__" ? "" : v)}>
-      <SelectTrigger className="w-[140px]">
+      <SelectTrigger className="w-[180px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__all__">Todos</SelectItem>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
-            {o}
+            {labels?.[o] || o}
           </SelectItem>
         ))}
       </SelectContent>
