@@ -115,6 +115,10 @@ const getAgentWeekDays = (offset: number): Date[] => {
 };
 
 const PromologContent = () => {
+  const { user } = useAuth();
+  const { role } = useUserRole();
+  const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
+
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-promolog"],
     queryFn: async () => {
