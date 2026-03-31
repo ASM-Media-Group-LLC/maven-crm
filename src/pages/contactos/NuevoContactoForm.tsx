@@ -268,7 +268,11 @@ const NuevoContactoForm = () => {
             </Field>
           </div>
 
-          <Field label="Número de Ticket">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Ciudad">
+              <Input value={form.ciudad} onChange={(e) => set("ciudad", e.target.value)} placeholder="Ej: Bogotá, Medellín..." />
+            </Field>
+            <Field label="Número de Ticket">
             <Input value={form.ticket} onChange={(e) => set("ticket", e.target.value)} placeholder="Ej: CT586864" />
           </Field>
 
