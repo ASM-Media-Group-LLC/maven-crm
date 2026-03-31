@@ -62,7 +62,7 @@ const RESPONSE_STATUSES = [
 ];
 
 const BRAND_COLORS: Record<string, string> = {
-  Kashback: "hsl(var(--primary))",
+  Kash: "hsl(var(--primary))",
   Exchange: "hsl(210, 70%, 55%)",
   Ora: "hsl(45, 80%, 50%)",
   Picklink: "hsl(150, 60%, 45%)",
