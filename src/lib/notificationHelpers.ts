@@ -22,7 +22,7 @@ export function resolveDeepLink(
     employee: `/hr/empleado/${referenceId}`,
     absence: `/hr/ausencias?id=${referenceId}`,
     ticket: `/tickets?id=${referenceId}`,
-    invoice: `/finanzas/facturacion?id=${referenceId}`,
+    invoice: `/finanzas/facturacion/invoices?id=${referenceId}`,
     contract: `/hr/empleado/${referenceId}#contrato`,
     lead: `/leadgen?id=${referenceId}`,
     deal: `/closers?id=${referenceId}`,

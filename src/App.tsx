@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
@@ -262,7 +262,8 @@ const App = () => (
               {/* Finanzas routes */}
               <Route path="/finanzas" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FinanzasDashboard /></FinanzasLayout></PermissionRoute>} />
               <Route path="/finanzas/nomina" element={<PermissionRoute module="Finanzas"><FinanzasLayout><NominaPage /></FinanzasLayout></PermissionRoute>} />
-              <Route path="/finanzas/facturacion" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion/invoices" element={<PermissionRoute module="Finanzas"><FinanzasLayout><FacturacionPage /></FinanzasLayout></PermissionRoute>} />
+              <Route path="/finanzas/facturacion" element={<Navigate to="/finanzas/facturacion/invoices" replace />} />
               <Route path="/finanzas/facturacion/facturas/nueva" element={<PermissionRoute module="Finanzas"><NuevoInvoice /></PermissionRoute>} />
               <Route path="/finanzas/facturacion/notasdepago/nueva" element={<PermissionRoute module="Finanzas"><NuevaNotaPago /></PermissionRoute>} />
               <Route path="/finanzas/facturacion/templates" element={<PermissionRoute module="Finanzas"><FinanzasLayout><TemplatesPage /></FinanzasLayout></PermissionRoute>} />
