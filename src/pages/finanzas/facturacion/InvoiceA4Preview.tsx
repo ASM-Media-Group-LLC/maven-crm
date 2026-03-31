@@ -59,9 +59,9 @@ export default function InvoiceA4Preview({ invoice, template, zoom = DEFAULT_ZOO
   const addressLines = companyAddress.split("\n");
 
   return (
-    <div style={{ width: A4_W * ZOOM, height: A4_H * ZOOM, flexShrink: 0 }}>
+    <div style={{ width: A4_W * zoom, height: A4_H * zoom, flexShrink: 0 }}>
       <div
-        style={{ width: A4_W, height: A4_H, transform: `scale(${ZOOM})`, transformOrigin: "top left" }}
+        style={{ width: A4_W, height: A4_H, transform: `scale(${zoom})`, transformOrigin: "top left" }}
         className="bg-white rounded shadow-2xl p-10 font-serif text-black text-[11px] leading-relaxed flex flex-col"
       >
         {/* Header */}
