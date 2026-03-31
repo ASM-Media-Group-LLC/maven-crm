@@ -1,33 +1,21 @@
 
 
-## Reestructurar "Invoice Details" en el preview A4
+## Plan: Agregar botón de WhatsApp en las tarjetas de ContactosGrid
 
 ### Cambio
-Mover la sección "Invoice details" (líneas 101-111) de su posición actual (a la derecha del billing grid, dentro del `flex justify-between`) a una nueva sección independiente debajo del grid de billing, alineada a la izquierda.
+Agregar un icono de WhatsApp al lado del icono de Instagram en cada tarjeta del grid de Contactos. El botón redirige a `https://wa.me/{número}` sin mostrar el número en la UI.
 
-### Estructura resultante
+### Detalle técnico
 
-```text
-┌─────────────────────────────────────┐
-│  Header (Invoice + Logo)            │
-├─────────────────────────────────────┤
-│  Bill to: ...  ID: ...              │
-│  Address: ...                       │
-│  Phone: ...                         │
-├─────────────────────────────────────┤
-│  Invoice details                    │  ← ahora abajo, alineado izquierda
-│  Invoice no.: ...                   │
-│  Invoice date: ...                  │
-│  Due date: ...                      │
-│  Payment: ...                       │
-├─────────────────────────────────────┤
-│  [Tabla de servicios]               │
-└─────────────────────────────────────┘
-```
+**Archivo: `src/pages/contactos/ContactosGrid.tsx`**
 
-### Archivo a editar
-**`src/pages/finanzas/facturacion/InvoiceA4Preview.tsx`**
+1. Importar `MessageCircle` de lucide-react (ya se usa en otros componentes del módulo para WhatsApp)
+2. Después del link de Instagram (línea 120), agregar condicionalmente un link de WhatsApp si `c.whatsapp` existe:
+   - Icono `MessageCircle` con clase `h-4 w-4`
+   - Link a `https://wa.me/${c.whatsapp}` con `target="_blank"`
+   - Solo el icono, sin mostrar el número
+   - `onClick` con `stopPropagation` para no abrir el modal de detalle
+   - Mismo estilo visual que el link de Instagram (`text-muted-foreground hover:text-foreground`)
 
-1. En el `div` de línea 84 (`flex justify-between`), eliminar el segundo hijo (líneas 101-111 con "Invoice details") y dejar solo el grid de billing. Quitar `justify-between` ya que solo queda un hijo.
-2. Agregar un nuevo `div` después del cierre del bloque de billing (después de línea 112), con clase `mb-5 text-[9px]` y alineación a la izquierda, conteniendo exactamente los mismos campos de Invoice details (número, fecha, vencimiento, método de pago) pero con `text-left` en lugar de `text-right`.
+No se necesitan cambios en otros archivos — el campo `whatsapp` ya existe en el tipo `Contacto` y ya se mapea en `ContactosContent.tsx`.
 
