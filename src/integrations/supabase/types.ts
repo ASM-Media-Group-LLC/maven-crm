@@ -4024,6 +4024,7 @@ export type Database = {
           period_start: string | null
           reversal_reason: string | null
           status: string
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -4047,6 +4048,7 @@ export type Database = {
           period_start?: string | null
           reversal_reason?: string | null
           status?: string
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -4070,6 +4072,7 @@ export type Database = {
           period_start?: string | null
           reversal_reason?: string | null
           status?: string
+          template_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4078,6 +4081,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_templates"
             referencedColumns: ["id"]
           },
         ]

@@ -1,0 +1,1 @@
+ALTER TABLE public.invoices ADD COLUMN template_id uuid REFERENCES public.invoice_templates(id) ON DELETE SET NULL;
