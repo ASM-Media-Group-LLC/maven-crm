@@ -75,9 +75,11 @@ const ContactosContent = () => {
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useUserRole();
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [filters]);
