@@ -69,6 +69,7 @@ const SuperContacts = () => {
               setAddSingleOpen={setAddSingleOpen}
             />
             <SuperContactsAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
+            <SuperContactsProductivityModal open={productivityOpen} onOpenChange={setProductivityOpen} />
           </div>
         </div>
       </div>
