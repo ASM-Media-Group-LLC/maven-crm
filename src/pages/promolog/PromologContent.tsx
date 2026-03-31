@@ -27,6 +27,8 @@ import {
   ChevronsUpDown,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,7 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
+import PromologAgentDetailView from "./PromologAgentDetailView";
 import DataTableShell from "@/components/ui/data-table-shell";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -96,9 +99,7 @@ const resultToBadgeVariant = (result: string): "success-soft" | "destructive-sof
   }
 };
 
-const agentsData = [
-  { name: "lorena_lozano", tickets: 5, si: 5, parcial: 0, no: 0, badges: [{ label: "IG", value: 3 }, { label: "X", value: 2 }] },
-];
+// agentsData is now computed dynamically via useMemo inside the component
 
 const tabItems = [
   { id: "promos" as const, label: "Promos", icon: Table2 },
@@ -318,6 +319,59 @@ const PromologContent = () => {
   const [assignAgentTarget, setAssignAgentTarget] = useState<PromologEntry | null>(null);
   const [assignAgentSelected, setAssignAgentSelected] = useState<string>("");
   const [assignAgentSearch, setAssignAgentSearch] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<{ id: string; name: string } | null>(null);
+
+  // Campaign actions state
+  const [viewCampaign, setViewCampaign] = useState<any>(null);
+  const [editCampaign, setEditCampaign] = useState<any>(null);
+  const [deleteCampaign, setDeleteCampaign] = useState<any>(null);
+  const [editCampMonth, setEditCampMonth] = useState("");
+  const [editCampGoalMonthly, setEditCampGoalMonthly] = useState("");
+  const [editCampGoalWeekly, setEditCampGoalWeekly] = useState("");
+  const [editCampStatus, setEditCampStatus] = useState("");
+
+  // Dynamic agents data
+  const agentsData = useMemo(() => {
+    const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
+
+    for (const pe of promologEntries) {
+      const agentId = pe.reviewed_by || pe.created_by;
+      if (!agentId || !profilesMap[agentId]) continue;
+
+      // Date filter for agents tab
+      if (agentDateFrom) {
+        const entryDate = new Date(pe.date);
+        if (entryDate < agentDateFrom) continue;
+      }
+      if (agentDateTo) {
+        const entryDate = new Date(pe.date);
+        const toEnd = new Date(agentDateTo);
+        toEnd.setDate(toEnd.getDate() + 1);
+        if (entryDate >= toEnd) continue;
+      }
+
+      let agent = agentMap.get(agentId);
+      if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
+      agent.tickets++;
+      if (pe.promoted === "true") agent.si++;
+      else if (pe.promoted === "partial") agent.parcial++;
+      else if (pe.promoted === "false") agent.no++;
+      const net = (pe.network || "otro").toLowerCase();
+      const netLabel = net === "instagram" ? "IG" : net === "tiktok" ? "TK" : net === "x" ? "X" : net === "telegram" ? "TG" : "Otro";
+      agent.networks[netLabel] = (agent.networks[netLabel] || 0) + 1;
+      agentMap.set(agentId, agent);
+    }
+
+    return Array.from(agentMap.entries()).map(([id, d]) => ({
+      id,
+      name: profilesMap[id] || id,
+      tickets: d.tickets,
+      si: d.si,
+      parcial: d.parcial,
+      no: d.no,
+      badges: Object.entries(d.networks).map(([label, value]) => ({ label, value })),
+    }));
+  }, [promologEntries, profilesMap, agentDateFrom, agentDateTo]);
 
   const handleViewEntry = (entry: PromologEntry) => {
     setSelectedEntry(entry);
@@ -488,6 +542,16 @@ const PromologContent = () => {
 
   const formattedDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "Seleccionar fecha";
   const shortDate = dateFrom ? dateFrom.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+
+  // If agent detail is selected, render that view
+  if (selectedAgent) {
+    return (
+      <PromologAgentDetailView
+        agent={selectedAgent}
+        onBack={() => setSelectedAgent(null)}
+      />
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
@@ -735,14 +799,14 @@ const PromologContent = () => {
           {/* Calendar view or agent cards */}
           {agentesView === "calendar" ? (() => {
             const weekDays = getAgentWeekDays(agentWeekOffset);
-            const entriesInDay = (agentName: string, day: Date) =>
+            const entriesInDay = (agentId: string, day: Date) =>
               promologEntries.filter(pe =>
-                pe.reviewed_by === agentName &&
+                (pe.reviewed_by === agentId || pe.created_by === agentId) &&
                 pe.promoted === "true" &&
                 isSameDay(new Date(pe.date), day)
               ).length;
             const colTotals = weekDays.map(day =>
-              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.name, day), 0)
+              agentsData.reduce((sum, ag) => sum + entriesInDay(ag.id, day), 0)
             );
             const grandTotal = colTotals.reduce((a, b) => a + b, 0);
             return (
@@ -774,10 +838,10 @@ const PromologContent = () => {
                       </TableHeader>
                       <TableBody>
                         {agentsData.map((agent) => {
-                          const dayCounts = weekDays.map(day => entriesInDay(agent.name, day));
+                          const dayCounts = weekDays.map(day => entriesInDay(agent.id, day));
                           const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
                           return (
-                            <TableRow key={agent.name}>
+                            <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
                               <TableCell className="font-medium text-sm">{agent.name}</TableCell>
                               {dayCounts.map((cnt, i) => (
                                 <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
@@ -822,7 +886,7 @@ const PromologContent = () => {
           ) : (
             <div className={agentesView === "grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" : "space-y-3"}>
               {agentsData.filter(a => !searchAgent || a.name.toLowerCase().includes(searchAgent.toLowerCase())).map((agent) => (
-                <Card key={agent.name}>
+                <Card key={agent.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
                   <CardContent className={cn("flex items-center gap-4 p-4", agentesView === "grid" && "flex-col text-center")}>
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-muted">
@@ -863,6 +927,9 @@ const PromologContent = () => {
                           </Badge>
                         ))}
                       </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={(e) => { e.stopPropagation(); setSelectedAgent({ id: agent.id, name: agent.name }); }}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -946,6 +1013,7 @@ const PromologContent = () => {
                         <TableHead className="text-right">Obj. Semanal</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Creación</TableHead>
+                        <TableHead className="text-right w-[100px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -962,6 +1030,28 @@ const PromologContent = () => {
                               <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewCampaign(c)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                                {isManagement && (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                      setEditCampaign(c);
+                                      setEditCampGoalMonthly(String(c.goal_monthly || ""));
+                                      setEditCampGoalWeekly(String(c.goal_weekly || ""));
+                                      setEditCampStatus(c.status || "activa");
+                                    }}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteCampaign(c)}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -1666,6 +1756,125 @@ const PromologContent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Campaign Modal */}
+      {viewCampaign && (
+        <Dialog open={!!viewCampaign} onOpenChange={(open) => !open && setViewCampaign(null)}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle>Detalle de Campaña</DialogTitle>
+              <DialogDescription>Información completa de la campaña</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Creadora</p>
+                  <p className="text-sm font-medium">{(viewCampaign.creators as any)?.artistic_name || (viewCampaign.creators as any)?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Mes</p>
+                  <p className="text-sm font-medium capitalize">{new Date(viewCampaign.month_year + "T00:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Obj. Mensual</p>
+                  <p className="text-sm font-bold">{viewCampaign.goal_monthly}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Obj. Semanal</p>
+                  <p className="text-sm font-bold">{viewCampaign.goal_weekly}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                  <Badge variant={viewCampaign.status === "activa" ? "default" : "secondary"} className="capitalize mt-1">{viewCampaign.status}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Creación</p>
+                  <p className="text-sm">{new Date(viewCampaign.created_at).toLocaleDateString("es-ES")}</p>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Edit Campaign Modal */}
+      {editCampaign && (
+        <Dialog open={!!editCampaign} onOpenChange={(open) => !open && setEditCampaign(null)}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Editar Campaña</DialogTitle>
+              <DialogDescription>Modifica los objetivos o estado de la campaña</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Obj. Mensual</Label>
+                  <Input type="number" value={editCampGoalMonthly} onChange={(e) => setEditCampGoalMonthly(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Obj. Semanal</Label>
+                  <Input type="number" value={editCampGoalWeekly} onChange={(e) => setEditCampGoalWeekly(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={editCampStatus} onValueChange={setEditCampStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="activa">Activa</SelectItem>
+                    <SelectItem value="finalizada">Finalizada</SelectItem>
+                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditCampaign(null)}>Cancelar</Button>
+              <Button onClick={async () => {
+                const { error } = await supabase.from("promolog_campaigns").update({
+                  goal_monthly: parseInt(editCampGoalMonthly) || 0,
+                  goal_weekly: parseInt(editCampGoalWeekly) || 0,
+                  status: editCampStatus,
+                }).eq("id", editCampaign.id);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
+                setEditCampaign(null);
+                toast({ title: "Campaña actualizada" });
+              }}>Guardar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Campaign Modal */}
+      {deleteCampaign && (
+        <Dialog open={!!deleteCampaign} onOpenChange={(open) => !open && setDeleteCampaign(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Eliminar Campaña</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de eliminar la campaña de <span className="font-semibold">{(deleteCampaign.creators as any)?.artistic_name || (deleteCampaign.creators as any)?.name}</span>? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteCampaign(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={async () => {
+                const { error } = await supabase.from("promolog_campaigns").delete().eq("id", deleteCampaign.id);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  return;
+                }
+                queryClient.invalidateQueries({ queryKey: ["promolog-campaigns"] });
+                setDeleteCampaign(null);
+                toast({ title: "Campaña eliminada" });
+              }}>Eliminar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </main>
   );
 };
