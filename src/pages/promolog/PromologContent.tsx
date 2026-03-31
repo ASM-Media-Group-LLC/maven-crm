@@ -838,10 +838,10 @@ const PromologContent = () => {
                       </TableHeader>
                       <TableBody>
                         {agentsData.map((agent) => {
-                          const dayCounts = weekDays.map(day => entriesInDay(agent.name, day));
+                          const dayCounts = weekDays.map(day => entriesInDay(agent.id, day));
                           const rowTotal = dayCounts.reduce((a, b) => a + b, 0);
                           return (
-                            <TableRow key={agent.name}>
+                            <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedAgent({ id: agent.id, name: agent.name })}>
                               <TableCell className="font-medium text-sm">{agent.name}</TableCell>
                               {dayCounts.map((cnt, i) => (
                                 <TableCell key={i} className={`text-center text-sm ${isToday(weekDays[i]) ? "bg-primary/10 text-primary font-bold" : ""} ${(cnt === 0 || isFuture(startOfDay(weekDays[i]))) ? "text-muted-foreground" : ""}`}>
