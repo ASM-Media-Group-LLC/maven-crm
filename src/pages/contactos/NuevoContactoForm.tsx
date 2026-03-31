@@ -51,6 +51,7 @@ interface FormData {
   email: string;
   countryCode: string;
   phone: string;
+  ciudad: string;
   plataforma: string;
   accountLink: string;
   ticket: string;
@@ -64,6 +65,7 @@ const defaultForm: FormData = {
   email: "",
   countryCode: "+57",
   phone: "",
+  ciudad: "",
   plataforma: "Instagram",
   accountLink: "",
   ticket: "",
