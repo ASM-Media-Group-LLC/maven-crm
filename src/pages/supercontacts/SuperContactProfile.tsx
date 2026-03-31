@@ -313,13 +313,12 @@ const SuperContactProfile = () => {
 
       {/* === HEADER COMPACTO === */}
       <div className="flex items-center gap-4 flex-wrap">
-        {contact.profile_photo_url ? (
-          <img src={contact.profile_photo_url} alt="" className="h-14 w-14 rounded-full object-cover" />
-        ) : (
-          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-            <Instagram className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
+        <img
+          src={contact.profile_photo_url || `https://unavatar.io/instagram/${contact.instagram_handle.replace(/^@/, "")}`}
+          alt={contact.instagram_handle}
+          className="h-14 w-14 rounded-full object-cover bg-muted"
+          onError={(e) => { (e.target as HTMLImageElement).src = ""; (e.target as HTMLImageElement).style.display = "none"; }}
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold">@{contact.instagram_handle}</h1>
