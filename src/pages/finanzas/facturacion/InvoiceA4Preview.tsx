@@ -81,7 +81,7 @@ export default function InvoiceA4Preview({ invoice, template }: { invoice: Invoi
 
         <div className="h-px bg-gray-200 mb-4" />
 
-        <div className="flex justify-between mb-5 text-[9px]">
+        <div className="mb-4 text-[9px]">
           <div className="grid grid-cols-[auto_auto_auto_auto] gap-x-4 gap-y-1">
             <p className="font-semibold text-gray-800">Bill to</p>
             <p className="text-gray-600">{creatorName}</p>
@@ -98,17 +98,18 @@ export default function InvoiceA4Preview({ invoice, template }: { invoice: Invoi
             <p />
             <p />
           </div>
-          <div className="space-y-1 text-right">
-            <p className="font-semibold text-gray-800">Invoice details</p>
-            <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">{invoice.invoice_number || "—"}</span></p>
-            <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{invoiceDate}</span></p>
-            {invoice.due_date && (
-              <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
-            )}
-            {invoice.payment_method && (
-              <p><span className="font-semibold text-gray-800">Payment: </span><span className="text-gray-600">{invoice.payment_method}</span></p>
-            )}
-          </div>
+        </div>
+
+        <div className="mb-5 text-[9px] space-y-1">
+          <p className="font-semibold text-gray-800">Invoice details</p>
+          <p><span className="font-semibold text-gray-800">Invoice no.: </span><span className="text-gray-600">{invoice.invoice_number || "—"}</span></p>
+          <p><span className="font-semibold text-gray-800">Invoice date: </span><span className="text-gray-600">{invoiceDate}</span></p>
+          {invoice.due_date && (
+            <p><span className="font-semibold text-gray-800">Due date: </span><span className="text-gray-600">{new Date(invoice.due_date + "T12:00:00").toLocaleDateString("es-ES")}</span></p>
+          )}
+          {invoice.payment_method && (
+            <p><span className="font-semibold text-gray-800">Payment: </span><span className="text-gray-600">{invoice.payment_method}</span></p>
+          )}
         </div>
 
         {/* Table */}
