@@ -1,70 +1,44 @@
 
 
-## Plan: Añadir pestaña "Rendimiento" en /promolog (estilo LeadGen)
+## Plan: Fix nombres de agentes en Rendimiento de Promolog
 
 ### Problema
-No existe una vista de rendimiento global en Promolog donde se pueda seleccionar un agente y ver sus gráficos de actividad (por hora, día, semana, mes). Además, los agentes/closers no pueden ver su propio rendimiento.
 
-### Cambios
+Los agentes en el selector muestran "Agente 3a4720", "Agente 7c1eba", etc. porque son **IDs externos** provenientes del sync por webhook (`notify_promolog_webhook`). Estos IDs **no existen en la tabla `profiles`**, por lo que no tienen `full_name`.
 
-**1. Añadir tab "Rendimiento" a PromologContent.tsx**
+De 12 agentes únicos en `promolog_entries`:
+- **3 tienen perfil**: Carolina Jaramillo, Fabiana Durán, Lorena Lozano Pinzón
+- **9 son IDs fantasma**: no existen en `profiles` ni en `auth.users`
 
-Agregar un cuarto tab al array `tabItems`:
+### Solución
+
+**Archivo: `src/pages/promolog/PromologPerformanceView.tsx`**
+
+Filtrar los agentes para mostrar **solo los que tienen perfil real** (existen en `profiles` con `full_name`). Los IDs externos sin perfil no son agentes reales del sistema y no deben aparecer en el selector.
+
+Cambiar la lógica de `agents` (línea 55-60):
+
 ```tsx
-{ id: "rendimiento" as const, label: "Rendimiento", icon: BarChart3 }
+const agents = useMemo(() => {
+  return agentIds
+    .map(id => {
+      const p = profiles.find(pr => pr.id === id);
+      return p?.full_name ? { id, name: p.full_name } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}, [agentIds, profiles]);
 ```
 
-Actualizar el tipo de `activeTab` para incluir `"rendimiento"`.
+Esto elimina los "Agente xxxxx" del selector, dejando solo Carolina, Fabiana y Lorena (u otros agentes reales que se añadan).
 
-**2. Crear componente `PromologPerformanceView.tsx`**
+**Mismo fix en `PromologContent.tsx`** (sección Agentes, línea ~341-343):
 
-Replicar la estructura exacta de `LeadGenPerformanceView.tsx` adaptada a promolog:
+La línea `if (!agentId || !profilesMap[agentId]) continue;` ya filtra correctamente en la tab de Agentes. Solo falta el fix en Rendimiento.
 
-- **Selector de agente**: Combobox (Popover + Command) para elegir un agente
-- **Para roles operativos** (agent/closer/employee): auto-seleccionar su propio ID y ocultar el selector
-- **Para management**: mostrar todos los agentes que tienen entradas en promolog
-- **Datos**: Query directa a `promolog_entries` filtrada por `reviewed_by` o `created_by` del agente seleccionado
-- **Gráficos** (4 charts con Recharts, idénticos al formato LeadGen):
-  1. Promos por Hora del Día (BarChart, hoy)
-  2. Promos por Día — Última Semana (BarChart, 7 días)
-  3. Promos por Día — Últimos 30 días (LineChart)
-  4. Promos por Mes — Últimos 12 meses (BarChart)
-- **Header card**: Total de Promos del agente con gradiente primary
-- **Distribución adicional por resultado** (Sí/Parcial/No) como barras horizontales
+### Archivos a modificar
 
-**3. Auto-selección para agentes/closers**
-
-En `PromologContent.tsx`, pasar `user.id` y `role` al componente. Si el rol es agent/closer/employee, el componente fija `selectedAgent = user.id` automáticamente y no muestra el selector.
-
-### Archivos
-
-| Archivo | Acción |
+| Archivo | Cambio |
 |---------|--------|
-| `src/pages/promolog/PromologPerformanceView.tsx` | **Crear** — Vista de rendimiento con selector + 4 gráficos |
-| `src/pages/promolog/PromologContent.tsx` | Agregar tab "Rendimiento", renderizar el nuevo componente |
-
-### Detalle técnico
-
-**Query de datos del agente:**
-```tsx
-const { data } = useQuery({
-  queryKey: ["promolog-agent-performance", agentId],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("promolog_entries")
-      .select("id, date, promoted, network, created_at")
-      .or(`reviewed_by.eq.${agentId},created_by.eq.${agentId}`)
-      .order("date", { ascending: false });
-    return data ?? [];
-  },
-  enabled: !!agentId,
-});
-```
-
-**Lógica de auto-selección:**
-```tsx
-// Si es agent/closer, auto-seleccionar y ocultar combobox
-const isOperational = isAgent || isCloser || isEmployee;
-const effectiveAgent = isOperational ? userId : selectedAgent;
-```
+| `src/pages/promolog/PromologPerformanceView.tsx` | Filtrar agentes sin perfil del selector |
 
