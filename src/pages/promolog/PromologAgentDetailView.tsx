@@ -79,6 +79,7 @@ const PromologAgentDetailView = ({ agent, onBack }: PromologAgentDetailViewProps
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [viewingEntry, setViewingEntry] = useState<PromologEntry | null>(null);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (e.currentTarget.scrollTop > 40) setStatsCollapsed(true);
