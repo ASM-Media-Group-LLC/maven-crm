@@ -1400,7 +1400,19 @@ const PromologContent = () => {
               </DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDeleteEntryOpen(false)}>Cancelar</Button>
-                <Button variant="destructive" onClick={() => { setDeleteEntryOpen(false); toast({ title: "Entrada eliminada", description: `La entrada de ${selectedEntry.name} ha sido eliminada.` }); }}>Eliminar</Button>
+                <Button variant="destructive" onClick={async () => {
+                  const { error } = await supabase
+                    .from("promolog_entries")
+                    .delete()
+                    .eq("id", selectedEntry.id);
+                  if (error) {
+                    toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+                    return;
+                  }
+                  queryClient.invalidateQueries({ queryKey: ["promolog-entries", user?.id] });
+                  setDeleteEntryOpen(false);
+                  toast({ title: "Entrada eliminada", description: `La entrada de ${selectedEntry.name} ha sido eliminada.` });
+                }}>Eliminar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
