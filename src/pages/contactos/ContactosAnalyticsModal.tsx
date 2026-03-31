@@ -71,7 +71,7 @@ function resolveToISO(raw: string | null): string {
   return trimmed.toUpperCase();
 }
 
-const ContactosAnalyticsModal = ({ open, onOpenChange }: Props) => {
+const ContactosAnalyticsModal = ({ open, onOpenChange, defaultTab = "monthly" }: Props) => {
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contactos-analytics-full"],
     enabled: open,
