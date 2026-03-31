@@ -1,14 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Building2 } from "lucide-react";
+import { Plus, Users, Building2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRole } from "@/hooks/useUserRole";
 import ContactosKPICards from "./ContactosKPICards";
 import ContactosFilters, { type ContactoFilters } from "./ContactosFilters";
 import ContactosTable from "./ContactosTable";
 import ContactosGrid from "./ContactosGrid";
+import ContactosAnalyticsModal from "./ContactosAnalyticsModal";
 import ViewContactoModal from "./ViewContactoModal";
 import EditContactoModal from "./EditContactoModal";
 import DeleteContactoDialog from "./DeleteContactoDialog";
