@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 
 export interface SuperContact {
@@ -80,12 +79,12 @@ export const useSuperContactInteractions = (contactId: string | undefined) => {
 
 export const useCreateSuperContact = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (contact: Partial<SuperContact>) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("super_contacts")
-        .insert({ ...contact, created_by: user?.id } as any)
+        .insert({ ...contact, created_by: user?.id || null } as any)
         .select()
         .single();
       if (error) throw error;
@@ -99,12 +98,12 @@ export const useCreateSuperContact = () => {
 
 export const useImportSuperContacts = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (handles: string[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const rows = handles.map((h) => ({
         instagram_handle: h.replace(/^@/, "").trim(),
-        created_by: user?.id,
+        created_by: user?.id || null,
       }));
       const { data, error } = await supabase
         .from("super_contacts")
@@ -142,12 +141,12 @@ export const useUpdateSuperContact = () => {
 
 export const useCreateInteraction = () => {
   const qc = useQueryClient();
-  const { user } = useAuth();
   return useMutation({
     mutationFn: async (interaction: { contact_id: string; type: string; notes?: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from("super_contact_interactions")
-        .insert({ ...interaction, created_by: user?.id } as any)
+        .insert({ ...interaction, created_by: user?.id || null } as any)
         .select()
         .single();
       if (error) throw error;
