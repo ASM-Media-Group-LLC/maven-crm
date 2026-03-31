@@ -98,3 +98,16 @@ export function maskPhone(phone: string | null | undefined): string {
   if (digits.length <= 4) return "••••";
   return "•".repeat(digits.length - 4) + digits.slice(-4);
 }
+
+/** Get all available countries as an array for Select components */
+export function getCountryOptions(): Array<{ code: string; name: string; flag: string }> {
+  return Object.entries(COUNTRY_DATA)
+    .map(([code, { name, flag }]) => ({ code, name, flag }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Resolve any country input to its ISO code */
+export function resolveCountryCode(input: string | null | undefined): string | null {
+  if (!input) return null;
+  return resolveCode(input);
+}

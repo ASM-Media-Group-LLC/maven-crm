@@ -5506,6 +5506,56 @@ export type Database = {
           },
         ]
       }
+      super_contact_outreach: {
+        Row: {
+          brand: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          instagram_account: string | null
+          message_type: string
+          notes: string | null
+          response: string | null
+          response_status: string
+          screenshot_url: string | null
+        }
+        Insert: {
+          brand: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instagram_account?: string | null
+          message_type?: string
+          notes?: string | null
+          response?: string | null
+          response_status?: string
+          screenshot_url?: string | null
+        }
+        Update: {
+          brand?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instagram_account?: string | null
+          message_type?: string
+          notes?: string | null
+          response?: string | null
+          response_status?: string
+          screenshot_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "super_contact_outreach_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "super_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       super_contacts: {
         Row: {
           bio: string | null
