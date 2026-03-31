@@ -1,21 +1,26 @@
 
 
-## Plan: Agregar botón de WhatsApp en las tarjetas de ContactosGrid
+## Plan: Dar acceso al rol Closer a Promolog y Tickets
+
+### Problema
+El rol "closer" tiene `can_access = false` para los módulos "Promolog" y "Tickets" en la tabla `role_permissions`.
 
 ### Cambio
-Agregar un icono de WhatsApp al lado del icono de Instagram en cada tarjeta del grid de Contactos. El botón redirige a `https://wa.me/{número}` sin mostrar el número en la UI.
+Una migración SQL que actualiza los dos registros existentes:
 
-### Detalle técnico
+```sql
+UPDATE role_permissions
+SET can_access = true
+WHERE role_id = (SELECT id FROM roles_config WHERE name = 'closer')
+  AND module IN ('Promolog', 'Tickets')
+  AND submodule IS NULL;
+```
 
-**Archivo: `src/pages/contactos/ContactosGrid.tsx`**
+### Archivos a modificar
 
-1. Importar `MessageCircle` de lucide-react (ya se usa en otros componentes del módulo para WhatsApp)
-2. Después del link de Instagram (línea 120), agregar condicionalmente un link de WhatsApp si `c.whatsapp` existe:
-   - Icono `MessageCircle` con clase `h-4 w-4`
-   - Link a `https://wa.me/${c.whatsapp}` con `target="_blank"`
-   - Solo el icono, sin mostrar el número
-   - `onClick` con `stopPropagation` para no abrir el modal de detalle
-   - Mismo estilo visual que el link de Instagram (`text-muted-foreground hover:text-foreground`)
+| Archivo | Cambio |
+|---------|--------|
+| Migración SQL | UPDATE de 2 filas en `role_permissions` |
 
-No se necesitan cambios en otros archivos — el campo `whatsapp` ya existe en el tipo `Contacto` y ya se mapea en `ContactosContent.tsx`.
+No se requieren cambios en código frontend — el sistema RBAC (`usePermissions` / `canAccess`) ya lee dinámicamente de la tabla.
 
