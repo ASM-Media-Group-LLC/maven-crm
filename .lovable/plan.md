@@ -1,92 +1,111 @@
 
 
-## Plan: Agentes dinámicos + Vista detalle + Acciones en Campañas
+## Plan: Estandarizar sección de Agentes en Promolog + Fix auto-hide en LeadGen AgentDetailView
 
 ### Problema
-1. `agentsData` está **hardcodeado** con solo Lorena (línea 99-101). No se calcula dinámicamente desde los datos reales de promolog_entries.
-2. No existe vista de detalle al hacer clic en un agente (como sí existe en LeadGen con `AgentDetailView`).
-3. La tabla de Campañas no tiene columna de acciones (editar, eliminar, ver detalle).
+1. La sección "Agentes" en Promolog usa cards simples con badges de red social, pero no sigue el formato tabla que LeadGen tiene (Avatar + columnas Total, Sí, Parcial, No + Acciones).
+2. El detalle del agente en Promolog (`PromologAgentDetailView`) solo muestra KPIs básicos y tabla de entradas, pero no tiene pestanas de Rendimiento (gráficos por día/hora) ni distribución por red social como LeadGen tiene.
+3. En LeadGen `AgentDetailView`, el auto-hide de stats cards tiene `scrollTop < 10` que las re-expande (no es ratchet). Debe ser unidireccional como el resto de módulos.
 
 ### Cambios
 
-**1. Calcular `agentsData` dinámicamente desde `promologEntries` (`PromologContent.tsx`)**
+**1. Promolog — Reformatear lista de agentes como tabla (`PromologContent.tsx`)**
 
-Eliminar el array hardcodeado (líneas 99-101) y reemplazarlo con un `useMemo` que agrupe las entradas por `reviewed_by` (o `created_by` como fallback), usando `profilesMap` para resolver nombres. Para cada agente calculará:
-- `id`: UUID del agente
-- `name`: nombre completo desde profiles
-- `tickets`: total de entradas
-- `si` / `parcial` / `no`: conteos por resultado (promoted = "true"/"partial"/"false")
-- `badges`: conteo por red social (IG, X, TikTok, etc.)
+Reemplazar el bloque de cards/grid de agentes (lineas ~887-937) por una tabla `DataTableShell` con estructura idéntica a LeadGen:
+- Columnas: Agente (Avatar + nombre), Total (Badge), Sí, Parcial, No, Redes (badges IG/TK/X/TG), Acciones (Eye)
+- Avatar con iniciales coloreadas como LeadGen
+- Sticky headers y acciones fijas a la derecha
+- Mantener vistas grid y calendar como alternativas
 
-Filtrar por rango de fechas del agente (`agentDateFrom`/`agentDateTo`) si están activos.
+**2. Promolog — Enriquecer `PromologAgentDetailView.tsx`**
 
-**2. Crear `PromologAgentDetailView.tsx`** — Vista detalle del agente
+Agregar pestanas como LeadGen: "Promos" (tabla actual), "Rendimiento" (gráficos):
 
-Componente nuevo inspirado en el `AgentDetailView` de LeadGen pero adaptado a Promolog:
-- Header con botón "Volver", nombre del agente, y KPI cards (Total entradas, Sí, Parcial, No, tasa de éxito)
-- Auto-hide de KPIs al scroll (patrón ratchet estándar)
-- Tabla con las entradas del agente usando las mismas columnas de PromologTable
-- Filtros: búsqueda por modelo, red social, plataforma, rango de fechas
-- Consulta propia al servidor (no depender de datos paginados del padre)
+- **Header mejorado**: Breadcrumb (Promolog / Detalle Agente), tiempo activo hoy, contador última hora
+- **Pestaña Rendimiento**:
+  - Resumen del rango (Total Promos, Promedio/Día, Tasa de éxito %)
+  - Gráfico de barras "Promos por Día" (últimos 7 días)
+  - Gráfico de línea "Promos por Hora (Hoy)"
+  - Distribución por Red Social (barras horizontales)
+  - Distribución por Resultado (Sí/Parcial/No)
+- Usar recharts como LeadGen
 
-**3. Integrar navegación al detalle del agente (`PromologContent.tsx`)**
+**3. LeadGen — Fix ratchet en `AgentDetailView.tsx`**
 
-- Agregar estado `selectedAgent` con `{ id, name } | null`
-- Si `selectedAgent` está activo, renderizar `PromologAgentDetailView` en lugar del contenido normal
-- Hacer clickeable cada card/fila de agente para navegar al detalle
-- Agregar botón `Eye` en la vista de lista
+Cambiar linea 80:
+```tsx
+// ANTES:
+else if (scrollTop < 10) setStatsCollapsed(false);
+// DESPUÉS: eliminar esta línea (ratchet unidireccional)
+```
 
-**4. Agregar columna de Acciones a la tabla de Campañas (`PromologContent.tsx`)**
+El reset solo ocurre al cambiar de tab o filtros.
 
-En la tabla de campañas (línea ~940), agregar columna "Acciones" con:
-- **Ver detalle** (Eye): abre modal con datos completos de la campaña
-- **Editar** (Pencil): abre modal de edición (mes, objetivos, estado)
-- **Eliminar** (Trash2): confirmación + delete de `promolog_campaigns`
+**4. Actualizar memoria del design system**
 
-Solo management (admin/manager/supervisor) ve editar y eliminar. Todos ven "Ver detalle".
+Documentar que el auto-hide SIEMPRE debe ser ratchet unidireccional (solo colapsa, nunca re-expande por scroll) para evitar jitter. Reset solo por cambio de tab/filtro.
 
-### Archivos a modificar/crear
+### Archivos a modificar
 
 | Archivo | Acción |
 |---------|--------|
-| `src/pages/promolog/PromologContent.tsx` | Reemplazar agentsData hardcodeado por useMemo dinámico; agregar selectedAgent state + navegación; agregar acciones a campañas |
-| `src/pages/promolog/PromologAgentDetailView.tsx` | **Crear** — Vista detalle del agente con KPIs, tabla de entradas, filtros |
+| `src/pages/promolog/PromologContent.tsx` | Reemplazar cards de agentes por tabla estilo LeadGen |
+| `src/pages/promolog/PromologAgentDetailView.tsx` | Agregar tabs (Promos + Rendimiento), header enriquecido, gráficos recharts |
+| `src/pages/leadgen/AgentDetailView.tsx` | Eliminar re-expand en scroll (línea 80) |
 
-### Detalles técnicos
+### Detalle técnico
 
-**Cálculo dinámico de agentes:**
+**Tabla de agentes Promolog** (reemplaza el bloque de cards):
 ```tsx
-const agentsData = useMemo(() => {
-  const agentMap = new Map<string, { id: string; tickets: number; si: number; parcial: number; no: number; networks: Record<string, number> }>();
-  
-  for (const pe of promologEntries) {
-    const agentId = pe.reviewed_by || pe.created_by;
-    if (!agentId || !profilesMap[agentId]) continue;
-    // filtrar por fechas si agentDateFrom/agentDateTo están activos
-    
-    let agent = agentMap.get(agentId);
-    if (!agent) agent = { id: agentId, tickets: 0, si: 0, parcial: 0, no: 0, networks: {} };
-    agent.tickets++;
-    if (pe.promoted === "true") agent.si++;
-    else if (pe.promoted === "partial") agent.parcial++;
-    else agent.no++;
-    const net = (pe.network || "otro").toUpperCase().slice(0, 2);
-    agent.networks[net] = (agent.networks[net] || 0) + 1;
-    agentMap.set(agentId, agent);
-  }
-  
-  return Array.from(agentMap.entries()).map(([id, d]) => ({
-    id, name: profilesMap[id], ...d,
-    badges: Object.entries(d.networks).map(([label, value]) => ({ label, value }))
-  }));
-}, [promologEntries, profilesMap, agentDateFrom, agentDateTo]);
+<DataTableShell currentPage={agentPage} totalPages={...} totalCount={agentsData.length} pageSize={50} onPageChange={setAgentPage}>
+  <Table className="min-w-[700px]">
+    <TableHeader>
+      <TableRow>
+        <TableHead sticky>Agente</TableHead>
+        <TableHead sticky center>Total</TableHead>
+        <TableHead sticky center>Sí</TableHead>
+        <TableHead sticky center>Parcial</TableHead>
+        <TableHead sticky center>No</TableHead>
+        <TableHead sticky center>Redes</TableHead>
+        <TableHead sticky right>Acciones</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {agentsData.map(agent => (
+        <TableRow clickable onClick={...}>
+          <TableCell><Avatar>{initials}</Avatar> {name}</TableCell>
+          <TableCell><Badge>{agent.tickets}</Badge></TableCell>
+          <TableCell className="text-success">{agent.si}</TableCell>
+          <TableCell className="text-warning">{agent.parcial}</TableCell>
+          <TableCell className="text-destructive">{agent.no}</TableCell>
+          <TableCell>{badges}</TableCell>
+          <TableCell><Eye button/></TableCell>
+        </TableRow>
+      ))}
+    </TableBody>
+  </Table>
+</DataTableShell>
 ```
 
-**PromologAgentDetailView** realizará su propia query:
+**AgentDetailView Promolog — Tabs + Rendimiento:**
 ```tsx
-supabase.from("promolog_entries")
-  .select("*, creators(name, artistic_name, instagram_handle)")
-  .or(`reviewed_by.eq.${agentId},created_by.eq.${agentId}`)
-  .order("date", { ascending: false })
+const tabs = [
+  { id: "promos", label: "Promos" },
+  { id: "rendimiento", label: "Rendimiento" },
+];
+
+// Tab Rendimiento:
+// - Resumen: Total promos, Promedio/día, Tasa éxito
+// - BarChart: Promos por día (7 días)
+// - LineChart: Promos por hora (hoy)
+// - BarChart horizontal: Distribución por red social
+// - BarChart horizontal: Distribución por resultado
+```
+
+**LeadGen fix (1 línea):**
+```tsx
+const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+  if (e.currentTarget.scrollTop > 40) setStatsCollapsed(true);
+};
 ```
 
