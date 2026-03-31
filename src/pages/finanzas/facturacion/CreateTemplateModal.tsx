@@ -73,8 +73,9 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const mutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
+      const typeLabel = type === "invoice" ? "Invoice" : "Nota de pago";
       const payload: any = {
-        name, type,
+        name: `${companyName || "Template"} - ${typeLabel}`, type,
         company_name: type === "invoice" ? companyName || null : null,
         company_address: type === "invoice" ? companyAddress || null : null,
         company_zip: type === "invoice" ? companyZip || null : null,
