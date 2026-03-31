@@ -494,29 +494,43 @@ const SuperContactProfile = () => {
         </div>
       </div>
 
-      {/* Quick add interaction */}
+      {/* Quick add — toggle between interaction and brand outreach */}
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Registrar Actividad</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => setShowOutreachForm(!showOutreachForm)}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> {showOutreachForm ? "Cerrar" : "Contacto por Marca"}
-            </Button>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm">Registrar</CardTitle>
+            <div className="flex ml-auto rounded-lg border overflow-hidden">
+              <button
+                onClick={() => setShowOutreachForm(false)}
+                className={`px-3 py-1 text-xs font-medium transition-colors ${!showOutreachForm ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                + Contacto
+              </button>
+              <button
+                onClick={() => setShowOutreachForm(true)}
+                className={`px-3 py-1 text-xs font-medium transition-colors ${showOutreachForm ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                + Marca
+              </button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Select value={intType} onValueChange={setIntType}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-              <SelectContent>{interactionTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Input placeholder="Detalle..." value={intNotes} onChange={e => setIntNotes(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addInteraction()} className="flex-1" />
-            <Button onClick={addInteraction} disabled={createInteraction.isPending || !intNotes.trim()} size="sm">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          {showOutreachForm && renderOutreachForm()}
+          {!showOutreachForm ? (
+            <div className="flex gap-2">
+              <Select value={intType} onValueChange={setIntType}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>{interactionTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Input placeholder="Detalle..." value={intNotes} onChange={e => setIntNotes(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addInteraction()} className="flex-1" />
+              <Button onClick={addInteraction} disabled={createInteraction.isPending || !intNotes.trim()} size="sm">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            renderOutreachForm()
+          )}
         </CardContent>
       </Card>
 
@@ -632,6 +646,22 @@ const SuperContactProfile = () => {
                   IA Insight
                 </Button>
               </div>
+              {/* Quick summary: what was said */}
+              {entries.some(e => e.notes) && (
+                <div className="mt-2 p-2 rounded-md bg-muted/30 text-xs space-y-0.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Qué se le ha dicho:</p>
+                  {entries.filter(e => e.notes).slice(0, 4).map((e, i) => (
+                    <p key={i} className="flex items-start gap-1.5">
+                      <span className="text-muted-foreground shrink-0">•</span>
+                      <span>{e.notes}</span>
+                      {e.response && <span className="text-muted-foreground italic ml-1">↩ {e.response}</span>}
+                    </p>
+                  ))}
+                  {entries.filter(e => e.notes).length > 4 && (
+                    <p className="text-muted-foreground">+{entries.filter(e => e.notes).length - 4} más</p>
+                  )}
+                </div>
+              )}
               {/* Brand summary from AI */}
               {brandInsights[brand]?.text && (
                 <div className="mt-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-xs">
