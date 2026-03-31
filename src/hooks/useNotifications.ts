@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { useNotificationSettings } from "@/hooks/useNotificationSettings";
+import { playNotificationSound } from "@/hooks/useBrowserNotifications";
 
 export interface Notification {
   id: string;
@@ -37,6 +39,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const qc = useQueryClient();
   const { canAccess } = usePermissions();
   const { isTypeEnabled } = useNotificationPreferences();
+  const { settings: notifSettings } = useNotificationSettings();
 
   const query = useQuery({
     queryKey: ["notifications", options.moduleFilter, options.priorityFilter, options.statusFilter],
@@ -87,6 +90,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
           // Only add if it's for this user or role-targeted
           if (n.user_id === user.id || (n.user_id === null && n.role_target)) {
             qc.invalidateQueries({ queryKey: ["notifications"] });
+
+            // Play sound if enabled and not in DND
+            if (notifSettings.sound_enabled && !notifSettings.dnd_enabled) {
+              playNotificationSound();
+            }
           }
         },
       )
@@ -95,7 +103,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, qc]);
+  }, [user, qc, notifSettings.sound_enabled, notifSettings.dnd_enabled]);
 
   // ─── Permission-filtered notifications ───────────────────────────
   const filteredNotifications = (query.data ?? []).filter((n) => {

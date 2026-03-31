@@ -41,9 +41,11 @@ export function useBrowserNotifications() {
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  const notify = useCallback((title: string, body: string, onClick?: () => void) => {
-    // Always play sound for notifications
-    playNotificationSound();
+  const notify = useCallback((title: string, body: string, onClick?: () => void, soundEnabled = true) => {
+    // Play sound only if enabled
+    if (soundEnabled) {
+      playNotificationSound();
+    }
 
     if (
       !enabled.current ||
