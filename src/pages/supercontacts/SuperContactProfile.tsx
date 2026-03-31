@@ -438,7 +438,7 @@ const SuperContactProfile = () => {
             )}
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Último contacto</p>
           </div>
-      </div>
+        </div>
 
       {/* === MAIN LAYOUT: 2 columns === */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
