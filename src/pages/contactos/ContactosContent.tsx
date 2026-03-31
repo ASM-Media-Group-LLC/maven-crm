@@ -79,6 +79,7 @@ const ContactosContent = () => {
   const [convertRawContacto, setConvertRawContacto] = useState<any>(null);
   const [addAgenciaOpen, setAddAgenciaOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [page, setPage] = useState(1);
   const navigate = useNavigate();
   const { toast } = useToast();
