@@ -23,6 +23,7 @@ const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   PY: { name: "Paraguay", flag: "🇵🇾" },
   PE: { name: "Perú", flag: "🇵🇪" },
   PR: { name: "Puerto Rico", flag: "🇵🇷" },
+  TH: { name: "Tailandia", flag: "🇹🇭" },
   UY: { name: "Uruguay", flag: "🇺🇾" },
   VE: { name: "Venezuela", flag: "🇻🇪" },
 };
