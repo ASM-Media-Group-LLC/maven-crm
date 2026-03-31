@@ -25,7 +25,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-// CrearInvoiceModal removed — now uses /finanzas/facturacion/nuevo
+import CrearInvoiceModal from "./CrearInvoiceModal";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
@@ -54,11 +54,12 @@ export default function FacturacionPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { methods: configuredPaymentMethods } = usePaymentMethods();
+  const [crearOpen, setCrearOpen] = useState(false);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("invoices").select("*, creators(id, name, artistic_name, phone, creator_business(billing_address))").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("invoices").select("*, creators(id, name, artistic_name, phone, creator_business(billing_address)), invoice_templates(*)").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -553,7 +554,7 @@ export default function FacturacionPage() {
           <>
             {renderFilterBar(
               <>
-                <Button size="sm" onClick={() => navigate("/finanzas/facturacion/facturas/nueva")}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
+                <Button size="sm" onClick={() => setCrearOpen(true)}><Plus className="h-4 w-4 mr-1" />Crear Invoice</Button>
                 <Button size="sm" variant="outline" onClick={() => exportTableToExcel(filtered.map(inv => ({ Numero: inv.invoice_number, Creador: (inv as any).creators?.artistic_name || (inv as any).creators?.name || "", Periodo: ((inv as any).period_start && (inv as any).period_end) ? `${(inv as any).period_start} — ${(inv as any).period_end}` : "", Vencimiento: inv.due_date })), "invoices")}>
                   <Download className="h-4 w-4 mr-1" />Exportar
                 </Button>
@@ -629,6 +630,13 @@ export default function FacturacionPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CrearInvoiceModal
+        open={crearOpen}
+        onClose={() => setCrearOpen(false)}
+        onSubmit={(data) => { createInvoice.mutate(data); setCrearOpen(false); }}
+        isPending={createInvoice.isPending}
+      />
     </div>
   );
 }
