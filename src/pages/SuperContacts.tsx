@@ -4,14 +4,16 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3 } from "lucide-react";
+import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3, TrendingUp } from "lucide-react";
 import SuperContactsContent from "./supercontacts/SuperContactsContent";
 import SuperContactsAnalyticsModal from "./supercontacts/SuperContactsAnalyticsModal";
+import SuperContactsProductivityModal from "./supercontacts/SuperContactsProductivityModal";
 
 const SuperContacts = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [addSingleOpen, setAddSingleOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [productivityOpen, setProductivityOpen] = useState(false);
 
   return (
     <SidebarProvider>
@@ -23,9 +25,22 @@ const SuperContacts = () => {
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">SuperContacts</h1>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setAnalyticsOpen(true)}>
-                  <BarChart3 className="h-4 w-4 mr-2" /> Analytics
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <BarChart3 className="h-4 w-4 mr-2" /> Analytics
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setAnalyticsOpen(true)}>
+                      <BarChart3 className="h-4 w-4 mr-2" /> Gráficas
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setProductivityOpen(true)}>
+                      <TrendingUp className="h-4 w-4 mr-2" /> Productividad
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button>
@@ -54,6 +69,7 @@ const SuperContacts = () => {
               setAddSingleOpen={setAddSingleOpen}
             />
             <SuperContactsAnalyticsModal open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
+            <SuperContactsProductivityModal open={productivityOpen} onOpenChange={setProductivityOpen} />
           </div>
         </div>
       </div>
