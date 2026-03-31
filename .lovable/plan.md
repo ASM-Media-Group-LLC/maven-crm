@@ -1,43 +1,33 @@
 
 
-## Plan: Agregar Analytics a SuperContacts
+## Reestructurar "Invoice Details" en el preview A4
 
-### Qué se va a construir
-Un botón "Analytics" en la página de SuperContacts que abre un modal con múltiples pestañas de análisis visual, similar al que ya existe en Contactos (`ContactosAnalyticsModal`).
+### Cambio
+Mover la sección "Invoice details" (líneas 101-111) de su posición actual (a la derecha del billing grid, dentro del `flex justify-between`) a una nueva sección independiente debajo del grid de billing, alineada a la izquierda.
 
-### Pestañas de analytics
+### Estructura resultante
 
-1. **Por Mes** — Barras de contactos registrados por mes + línea acumulativa. KPIs arriba: total, promedio mensual, mejor mes.
+```text
+┌─────────────────────────────────────┐
+│  Header (Invoice + Logo)            │
+├─────────────────────────────────────┤
+│  Bill to: ...  ID: ...              │
+│  Address: ...                       │
+│  Phone: ...                         │
+├─────────────────────────────────────┤
+│  Invoice details                    │  ← ahora abajo, alineado izquierda
+│  Invoice no.: ...                   │
+│  Invoice date: ...                  │
+│  Due date: ...                      │
+│  Payment: ...                       │
+├─────────────────────────────────────┤
+│  [Tabla de servicios]               │
+└─────────────────────────────────────┘
+```
 
-2. **Por Estado** — Barras horizontales mostrando distribución por status (nuevo, contactado, interesado, no_interesado, convertido) con conteo y porcentaje.
+### Archivo a editar
+**`src/pages/finanzas/facturacion/InvoiceA4Preview.tsx`**
 
-3. **Por País** — Barras con bandera + código ISO, ordenadas por cantidad.
-
-4. **Por Ciudad** — Barras horizontales de ciudades más frecuentes (top 15). Si no hay datos → "Sin datos de ciudad".
-
-5. **Por Categoría** — Distribución por el campo `category` de cada contacto.
-
-6. **Enrichment** — Porcentaje de contactos enriquecidos vs no enriquecidos (campo `enriched`), con barra de progreso visual.
-
-### Cambios
-
-**Archivo nuevo: `src/pages/supercontacts/SuperContactsAnalyticsModal.tsx`**
-- Modal con `Dialog` + `Tabs` + `Recharts` (mismo patrón que `ContactosAnalyticsModal`)
-- Query a `super_contacts` trayendo: `created_at, status, country, city, category, enriched, followers_count`
-- Cada pestaña calcula sus datos con `useMemo`
-- Colores consistentes con la paleta COLORS del proyecto
-
-**Archivo: `src/pages/SuperContacts.tsx`**
-- Agregar botón "Analytics" (icono BarChart3) junto al dropdown de "Agregar Contacto"
-- Estado `analyticsOpen` + renderizar `SuperContactsAnalyticsModal`
-
-### Datos disponibles vs placeholder
-Con los campos actuales de `super_contacts` (`status`, `country`, `city`, `category`, `enriched`, `followers_count`, `created_at`) se pueden llenar todas las pestañas. Si un campo está vacío en la DB, la pestaña mostrará "Sin datos" — conforme se agreguen contactos, las gráficas se poblarán automáticamente.
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `SuperContactsAnalyticsModal.tsx` (nuevo) | Modal con 6 pestañas de analytics |
-| `SuperContacts.tsx` | Botón Analytics + estado del modal |
+1. En el `div` de línea 84 (`flex justify-between`), eliminar el segundo hijo (líneas 101-111 con "Invoice details") y dejar solo el grid de billing. Quitar `justify-between` ya que solo queda un hijo.
+2. Agregar un nuevo `div` después del cierre del bloque de billing (después de línea 112), con clase `mb-5 text-[9px]` y alineación a la izquierda, conteniendo exactamente los mismos campos de Invoice details (número, fecha, vencimiento, método de pago) pero con `text-left` en lugar de `text-right`.
 
