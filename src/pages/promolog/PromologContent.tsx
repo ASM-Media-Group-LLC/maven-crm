@@ -478,7 +478,7 @@ const PromologContent = () => {
       </header>
 
       {/* KPI Cards */}
-      <div className="shrink-0 px-6 pt-4 pb-2">
+      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
             <CardContent className="p-4 flex items-center gap-3">
