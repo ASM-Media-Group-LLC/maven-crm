@@ -102,7 +102,7 @@ export const useSuperContactOutreach = (contactId: string | undefined) => {
         .eq("contact_id", contactId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as SuperContactOutreach[];
+      return (data ?? []) as unknown as SuperContactOutreach[];
     },
   });
 };
@@ -117,7 +117,7 @@ export const useAllOutreach = (enabled: boolean) => {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as SuperContactOutreach[];
+      return (data ?? []) as unknown as SuperContactOutreach[];
     },
   });
 };
