@@ -4,6 +4,7 @@ import type { StatusCounts } from "./useCreadores";
 
 interface Props {
   counts: StatusCounts;
+  isCloser?: boolean;
 }
 
 const CreadoresKPICards = ({ counts }: Props) => {
