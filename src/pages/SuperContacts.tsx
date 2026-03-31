@@ -4,12 +4,14 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardTopbar from "@/components/dashboard/DashboardTopbar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { Plus, UserPlus, ClipboardPaste, FileSpreadsheet, ChevronDown, BarChart3 } from "lucide-react";
 import SuperContactsContent from "./supercontacts/SuperContactsContent";
+import SuperContactsAnalyticsModal from "./supercontacts/SuperContactsAnalyticsModal";
 
 const SuperContacts = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [addSingleOpen, setAddSingleOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   return (
     <SidebarProvider>
