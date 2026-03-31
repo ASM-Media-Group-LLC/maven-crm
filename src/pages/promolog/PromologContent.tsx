@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -420,6 +420,10 @@ const PromologContent = () => {
   const [searchEntry, setSearchEntry] = useState("");
   const [promoPage, setPromoPage] = useState(1);
   const [promoPageSize, setPromoPageSize] = useState(25);
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setStatsCollapsed(e.currentTarget.scrollTop > 40);
+  }, []);
 
   // KPI modal state
   const [kpiModalType, setKpiModalType] = useState<"ingresados" | "no_chequeadas" | "completadas" | null>(null);
@@ -474,7 +478,7 @@ const PromologContent = () => {
       </header>
 
       {/* KPI Cards */}
-      <div className="shrink-0 px-6 pt-4 pb-2">
+      <div className={`shrink-0 px-6 pt-4 transition-all duration-300 overflow-hidden ${statsCollapsed ? "max-h-0 opacity-0 py-0 pb-0" : "max-h-[200px] opacity-100 pb-2"}`}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Card className="border border-accent/40 bg-card/80 cursor-pointer hover:scale-[1.02] transition-transform">
             <CardContent className="p-4 flex items-center gap-3">
@@ -608,6 +612,7 @@ const PromologContent = () => {
           <div className="flex-1 min-h-0 px-6 pb-4 flex flex-col">
             {entryView === "list" ? (
               <DataTableShell
+                onScroll={handleContentScroll}
                 className="flex-1 min-h-0"
                 currentPage={promoPage}
                 totalPages={Math.max(1, Math.ceil(filteredEntries.length / promoPageSize))}
