@@ -1013,6 +1013,7 @@ const PromologContent = () => {
                         <TableHead className="text-right">Obj. Semanal</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Creación</TableHead>
+                        <TableHead className="text-right w-[100px]">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1029,6 +1030,28 @@ const PromologContent = () => {
                               <Badge variant={c.status === "activa" ? "default" : c.status === "finalizada" ? "secondary" : "outline"} className="capitalize">{c.status}</Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-ES")}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewCampaign(c)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                                {isManagement && (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                                      setEditCampaign(c);
+                                      setEditCampGoalMonthly(String(c.goal_monthly || ""));
+                                      setEditCampGoalWeekly(String(c.goal_weekly || ""));
+                                      setEditCampStatus(c.status || "activa");
+                                    }}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteCampaign(c)}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
