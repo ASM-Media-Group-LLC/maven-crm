@@ -4,6 +4,7 @@ const COUNTRY_DATA: Record<string, { name: string; flag: string }> = {
   AR: { name: "Argentina", flag: "🇦🇷" },
   BO: { name: "Bolivia", flag: "🇧🇴" },
   BR: { name: "Brasil", flag: "🇧🇷" },
+  GB: { name: "Reino Unido", flag: "🇬🇧" },
   CL: { name: "Chile", flag: "🇨🇱" },
   CO: { name: "Colombia", flag: "🇨🇴" },
   CR: { name: "Costa Rica", flag: "🇨🇷" },
