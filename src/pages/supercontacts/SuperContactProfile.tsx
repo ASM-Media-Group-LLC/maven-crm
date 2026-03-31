@@ -1093,6 +1093,11 @@ const SuperContactProfile = () => {
           <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
             <SheetTitle className="flex items-center gap-2 text-sm">
               <Bot className="h-4 w-4 text-primary" /> IA Asistente
+              {activeBrandContext && (
+                <Badge variant="outline" className="text-[10px] ml-1" style={{ borderColor: BRAND_COLORS[activeBrandContext] || "hsl(var(--primary))", color: BRAND_COLORS[activeBrandContext] || "hsl(var(--primary))" }}>
+                  {activeBrandContext}
+                </Badge>
+              )}
             </SheetTitle>
           </SheetHeader>
           <div className="flex-1 flex flex-col min-h-0 p-3">
@@ -1100,9 +1105,21 @@ const SuperContactProfile = () => {
               {aiMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-8">
                   <Bot className="h-10 w-10 opacity-30" />
-                  <p className="text-xs text-center">Pregúntame sobre esta modelo, sube screenshots, o pide estrategias.</p>
+                  <p className="text-xs text-center">
+                    {activeBrandContext
+                      ? `Pregúntame sobre el progreso con ${activeBrandContext}`
+                      : "Pregúntame sobre esta modelo, sube screenshots, o pide estrategias."}
+                  </p>
                   <div className="flex flex-wrap gap-1.5 justify-center">
-                    {["¿Qué sabemos?", "Sugiere estrategia", "Resumen contactos"].map(q => (
+                    {(activeBrandContext
+                      ? [
+                          `¿Qué pasó con ${activeBrandContext}?`,
+                          `¿Respondió a ${activeBrandContext}?`,
+                          `Siguiente paso con ${activeBrandContext}`,
+                          "Estrategia general",
+                        ]
+                      : ["¿Qué sabemos?", "Sugiere estrategia", "Resumen contactos", "Analiza su perfil"]
+                    ).map(q => (
                       <Button key={q} size="sm" variant="outline" className="text-xs h-7" onClick={() => setAiInput(q)}>
                         {q}
                       </Button>
