@@ -23,6 +23,7 @@ import {
   LineChart, Line, Cell, PieChart, Pie, Legend,
 } from "recharts";
 import type { PromologEntry } from "./PromologEntryCard";
+import ViewPromologEntryModal from "./ViewPromologEntryModal";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram" },
