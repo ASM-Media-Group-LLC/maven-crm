@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
