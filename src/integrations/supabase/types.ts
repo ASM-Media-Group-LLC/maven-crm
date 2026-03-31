@@ -3965,6 +3965,7 @@ export type Database = {
           company_address: string | null
           company_email: string | null
           company_name: string | null
+          company_zip: string | null
           created_at: string | null
           created_by: string | null
           id: string
@@ -3977,6 +3978,7 @@ export type Database = {
           company_address?: string | null
           company_email?: string | null
           company_name?: string | null
+          company_zip?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string
@@ -3989,6 +3991,7 @@ export type Database = {
           company_address?: string | null
           company_email?: string | null
           company_name?: string | null
+          company_zip?: string | null
           created_at?: string | null
           created_by?: string | null
           id?: string

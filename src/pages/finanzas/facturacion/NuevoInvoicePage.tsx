@@ -99,7 +99,7 @@ export default function NuevoInvoicePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoice_templates")
-        .select("id, name, type, company_name, company_address, company_email, logo_url")
+        .select("id, name, type, company_name, company_address, company_zip, company_email, logo_url")
         .eq("type", "invoice")
         .order("name");
       if (error) throw error;

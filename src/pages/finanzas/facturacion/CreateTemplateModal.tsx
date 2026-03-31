@@ -35,12 +35,13 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
   const [companyName, setCompanyName] = useState(template?.company_name || "");
   const [companyAddress, setCompanyAddress] = useState(template?.company_address || "");
   const [companyEmail, setCompanyEmail] = useState(template?.company_email || "");
+  const [companyZip, setCompanyZip] = useState((template as any)?.company_zip || "");
   const [logoUrl, setLogoUrl] = useState(template?.logo_url || "");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const resetForm = () => {
-    setName(""); setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyEmail(""); setLogoUrl("");
+    setName(""); setType("invoice"); setCompanyName(""); setCompanyAddress(""); setCompanyZip(""); setCompanyEmail(""); setLogoUrl("");
   };
 
   const handleFile = async (file: File) => {
@@ -76,6 +77,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
         name, type,
         company_name: type === "invoice" ? companyName || null : null,
         company_address: type === "invoice" ? companyAddress || null : null,
+        company_zip: type === "invoice" ? companyZip || null : null,
         company_email: type === "invoice" ? companyEmail || null : null,
         logo_url: type === "invoice" ? logoUrl || null : null,
       };
@@ -129,6 +131,10 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
               <div>
                 <Label>Dirección</Label>
                 <Input value={companyAddress} onChange={e => setCompanyAddress(e.target.value)} placeholder="Ej: 333 SE 2nd Ave, Miami, FL" />
+              </div>
+              <div>
+                <Label>Código postal</Label>
+                <Input value={companyZip} onChange={e => setCompanyZip(e.target.value)} placeholder="Ej: 33131" />
               </div>
               <div>
                 <Label>Correo electrónico</Label>
