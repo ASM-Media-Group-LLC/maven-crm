@@ -25,7 +25,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
-// CrearInvoiceModal removed — now uses /finanzas/facturacion/nuevo
+import CrearInvoiceModal from "./CrearInvoiceModal";
 import ReversarInvoiceModal from "./ReversarInvoiceModal";
 import InvoiceA4Preview from "./InvoiceA4Preview";
 import PaymentNoteA4Preview from "./PaymentNoteA4Preview";
