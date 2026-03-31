@@ -55,6 +55,8 @@ import PromologEntryCard, { type PromologEntry } from "./PromologEntryCard";
 import PromologTable from "./PromologTable";
 import PromologGrid from "./PromologGrid";
 import DataTableShell from "@/components/ui/data-table-shell";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const networkOptions = [
   { value: "instagram", label: "Instagram", icon: InstagramIcon },
@@ -113,6 +115,10 @@ const getAgentWeekDays = (offset: number): Date[] => {
 };
 
 const PromologContent = () => {
+  const { user } = useAuth();
+  const { role } = useUserRole();
+  const isManagement = ["admin", "manager", "supervisor"].includes(role ?? "");
+
   const { data: creators = [] } = useQuery({
     queryKey: ["creators-promolog"],
     queryFn: async () => {
@@ -167,6 +173,11 @@ const PromologContent = () => {
         .select("*, creators(name, artistic_name, instagram_handle)")
         .order("date", { ascending: false })
         .limit(200);
+
+      // Closers/agents/employees only see their own entries
+      if (!isManagement && user?.id) {
+        query = query.eq("reviewed_by", user.id);
+      }
 
       if (dateFrom) {
         const fromStr = dateFrom.toISOString().split("T")[0];
@@ -517,7 +528,7 @@ const PromologContent = () => {
       {/* Tabs */}
       <div className="shrink-0 px-6 pb-2">
         <div className="inline-flex items-center gap-1 rounded-lg bg-muted/50 p-1">
-          {tabItems.map((tab) => (
+          {tabItems.filter(tab => isManagement || tab.id !== "agentes").map((tab) => (
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? "secondary" : "ghost"}
