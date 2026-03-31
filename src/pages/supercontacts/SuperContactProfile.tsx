@@ -973,7 +973,86 @@ const SuperContactProfile = () => {
       {activeTab === "contactos" && renderContactos()}
       {activeTab === "analytics" && renderAnalytics()}
       {activeTab === "ia" && renderIA()}
-    </>
+
+      {/* Floating AI Button — hidden when on IA tab */}
+      {activeTab !== "ia" && (
+        <button
+          onClick={() => setAiDrawerOpen(true)}
+          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl"
+          aria-label="Abrir IA Asistente"
+        >
+          <Bot className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* AI Drawer */}
+      <Sheet open={aiDrawerOpen} onOpenChange={setAiDrawerOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[480px] p-0 flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
+            <SheetTitle className="flex items-center gap-2 text-sm">
+              <Bot className="h-4 w-4 text-primary" /> IA Asistente
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 flex flex-col min-h-0 p-3">
+            <div className="flex-1 overflow-auto space-y-2 mb-3">
+              {aiMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 py-8">
+                  <Bot className="h-10 w-10 opacity-30" />
+                  <p className="text-xs text-center">Pregúntame sobre esta modelo, sube screenshots, o pide estrategias.</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {["¿Qué sabemos?", "Sugiere estrategia", "Resumen contactos"].map(q => (
+                      <Button key={q} size="sm" variant="outline" className="text-xs h-7" onClick={() => setAiInput(q)}>
+                        {q}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {aiMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted border"
+                  }`}>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : <p>{msg.content}</p>}
+                  </div>
+                </div>
+              ))}
+              {aiLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-muted border rounded-2xl px-3 py-2">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            {imageAnalyzing && (
+              <div className="flex items-center gap-2 p-2 mb-2 rounded-lg bg-primary/10 text-primary text-xs shrink-0">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analizando imagen...
+              </div>
+            )}
+            <div className="flex gap-1.5 items-end shrink-0">
+              <input ref={drawerFileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => drawerFileInputRef.current?.click()} disabled={imageAnalyzing}>
+                {imageAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </Button>
+              <Input placeholder="Pregunta..." value={aiInput} onChange={e => setAiInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendAiMessage()} className="flex-1 h-8 text-sm" disabled={aiLoading} />
+              <Button size="icon" className="h-8 w-8 shrink-0" onClick={sendAiMessage} disabled={aiLoading || !aiInput.trim()}>
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>;
   );
 };
 
