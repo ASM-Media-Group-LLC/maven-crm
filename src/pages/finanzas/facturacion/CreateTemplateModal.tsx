@@ -77,6 +77,7 @@ export default function CreateTemplateModal({ open, onOpenChange, template }: Pr
         name, type,
         company_name: type === "invoice" ? companyName || null : null,
         company_address: type === "invoice" ? companyAddress || null : null,
+        company_zip: type === "invoice" ? companyZip || null : null,
         company_email: type === "invoice" ? companyEmail || null : null,
         logo_url: type === "invoice" ? logoUrl || null : null,
       };
