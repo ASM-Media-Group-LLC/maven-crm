@@ -5175,6 +5175,7 @@ export type Database = {
           buy_link_type: string | null
           contact_type: string | null
           created_at: string | null
+          created_by: string | null
           creator_id: string
           date: string
           evidence_url: string | null
@@ -5193,6 +5194,7 @@ export type Database = {
           buy_link_type?: string | null
           contact_type?: string | null
           created_at?: string | null
+          created_by?: string | null
           creator_id: string
           date: string
           evidence_url?: string | null
@@ -5211,6 +5213,7 @@ export type Database = {
           buy_link_type?: string | null
           contact_type?: string | null
           created_at?: string | null
+          created_by?: string | null
           creator_id?: string
           date?: string
           evidence_url?: string | null

@@ -176,7 +176,7 @@ const PromologContent = () => {
 
       // Closers/agents/employees only see their own entries
       if (!isManagement && user?.id) {
-        query = query.eq("reviewed_by", user.id);
+        query = query.or(`reviewed_by.eq.${user.id},created_by.eq.${user.id}`);
       }
 
       if (dateFrom) {
@@ -1179,6 +1179,7 @@ const PromologContent = () => {
                         action_taken: entryResult === "si" ? entryStrategy || null : null,
                         evidence_url: entryEvidencePreview || null,
                         reviewed_by: user?.id,
+                        created_by: user?.id,
                       });
                       if (error) {
                         toast({ title: "Error", description: error.message, variant: "destructive" });
